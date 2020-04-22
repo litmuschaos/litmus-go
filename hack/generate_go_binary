@@ -1,0 +1,2 @@
+# Building go binaries for pod_delete experiment
+go build -o build/_output/pod_delete ./experiments/generic/pod_delete

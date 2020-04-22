@@ -1,4 +1,4 @@
-# litmus-python: 
+# litmus-go: 
 
 This repo consists of Litmus Chaos Experiments written in golang. The examples in this repo are good indicators 
 of how to construct the experiments in golang: complete with steady state checks, chaosresult generation, chaos injectionm, 
