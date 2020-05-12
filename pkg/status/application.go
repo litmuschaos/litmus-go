@@ -1,4 +1,4 @@
-package utils
+package status
 
 import (
 	"k8s.io/klog"
@@ -6,12 +6,14 @@ import (
 	"time"
 
 	"github.com/openebs/maya/pkg/util/retry"
+	types "github.com/litmuschaos/litmus-go/pkg/types"
+	environment "github.com/litmuschaos/litmus-go/pkg/environment"
 	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // CheckApplicationStatus checks the status of the AUT
-func CheckApplicationStatus(appNs string, appLabel string, clients ClientSets) error {
+func CheckApplicationStatus(appNs string, appLabel string, clients environment.ClientSets) error {
 
 	// Checking whether application pods are in running state
 	klog.V(0).Infof("[Status]: Checking whether application pods are in running state")
@@ -29,7 +31,7 @@ func CheckApplicationStatus(appNs string, appLabel string, clients ClientSets) e
 }
 
 // CheckAuxiliaryApplicationStatus checks the status of the Auxiliary applications
-func CheckAuxiliaryApplicationStatus(experimentsDetails *ExperimentDetails, clients ClientSets) error {
+func CheckAuxiliaryApplicationStatus(experimentsDetails *types.ExperimentDetails, clients environment.ClientSets) error {
 
 	AuxiliaryAppInfo := strings.Split(experimentsDetails.AuxiliaryAppInfo, ",")
 
@@ -45,7 +47,7 @@ func CheckAuxiliaryApplicationStatus(experimentsDetails *ExperimentDetails, clie
 }
 
 // CheckPodStatus checks the status of the application pod
-func CheckPodStatus(appNs string, appLabel string, clients ClientSets) error {
+func CheckPodStatus(appNs string, appLabel string, clients environment.ClientSets) error {
 	err := retry.
 		Times(90).
 		Wait(2 * time.Second).
@@ -70,7 +72,7 @@ func CheckPodStatus(appNs string, appLabel string, clients ClientSets) error {
 }
 
 // CheckContainerStatus checks the status of the application container
-func CheckContainerStatus(appNs string, appLabel string, clients ClientSets) error {
+func CheckContainerStatus(appNs string, appLabel string, clients environment.ClientSets) error {
 	err := retry.
 		Times(90).
 		Wait(2 * time.Second).

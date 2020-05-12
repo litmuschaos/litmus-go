@@ -38,7 +38,7 @@ experiment-go-binary:
 	@echo "------------------"
 	@echo "--> Build experiment go binary" 
 	@echo "------------------"
-	@sh hack/generate_go_binary
+	@sh build/generate_go_binary
 
 .PHONY: build
 build: litmus-go-build
@@ -47,7 +47,7 @@ litmus-go-build:
 	@echo "------------------"
 	@echo "--> Build litmus-go image" 
 	@echo "------------------"
-	sudo docker build . -f build/litmus-go/Dockerfile -t shubh214/litmus-go:ci2
+	sudo docker build . -f build/litmus-go/Dockerfile -t litmuschaos/litmus-go:ci
 
 .PHONY: push
 push: litmus-go-push

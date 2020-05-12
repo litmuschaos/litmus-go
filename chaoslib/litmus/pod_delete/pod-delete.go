@@ -1,15 +1,17 @@
-package litmus
+package pod_delete
 
 import (
 	"k8s.io/klog"
 	"time"
 
-	utils "github.com/litmuschaos/litmus-go/pkg/utils"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+    "github.com/litmuschaos/litmus-go/pkg/types"
+    "github.com/litmuschaos/litmus-go/pkg/status"
+    "github.com/litmuschaos/litmus-go/pkg/environment"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 //PodDeleteChaos deletes the random single/multiple pods
-func PodDeleteChaos(experimentsDetails *utils.ExperimentDetails, clients utils.ClientSets, Iterations int, failStep *string) error {
+func PodDeleteChaos(experimentsDetails *types.ExperimentDetails, clients environment.ClientSets, Iterations int, resultDetails *types.ResultDetails) error {
 
 	//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
 	ChaosStartTimeStamp := time.Now().Unix()
@@ -17,7 +19,7 @@ func PodDeleteChaos(experimentsDetails *utils.ExperimentDetails, clients utils.C
 	for x := 0; x < Iterations; x++ {
 
 		//Getting the list of all the target pod for deletion
-		targetPodList, err := PreparePodList(experimentsDetails, clients,failStep)
+		targetPodList, err := PreparePodList(experimentsDetails, clients,resultDetails)
 		if err != nil {
 			return err
 		}
@@ -25,9 +27,9 @@ func PodDeleteChaos(experimentsDetails *utils.ExperimentDetails, clients utils.C
 
 		//Deleting the application pod
 		for _, pods := range targetPodList {
-			err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Delete(pods, &metav1.DeleteOptions{})
+			err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Delete(pods, &v1.DeleteOptions{})
 			if err != nil {
-				*failStep = "Deleting the application pod"
+				resultDetails.FailStep = "Deleting the application pod"
 				return err
 			}
 		}
@@ -50,9 +52,9 @@ func PodDeleteChaos(experimentsDetails *utils.ExperimentDetails, clients utils.C
 		}
 		//Verify the status of pod after the chaos injection
 		klog.V(0).Infof("[Status]: Verification for the recreation of application pod")
-		err = utils.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, clients)
+		err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, clients)
 		if err != nil {
-			*failStep = "Verification for the recreation of application pod"
+			resultDetails.FailStep = "Verification for the recreation of application pod"
 			return err
 		}
 	}
@@ -61,7 +63,7 @@ func PodDeleteChaos(experimentsDetails *utils.ExperimentDetails, clients utils.C
 }
 
 //PreparePodDelete contains the steps for prepration before chaos
-func PreparePodDelete(experimentsDetails *utils.ExperimentDetails, clients utils.ClientSets, failStep *string) error {
+func PreparePodDelete(experimentsDetails *types.ExperimentDetails, clients environment.ClientSets, resultDetails *types.ResultDetails) error {
 
 	//It will get the total iteration for the pod-delete
 	Iterations := GetIterations(experimentsDetails)
@@ -71,7 +73,7 @@ func PreparePodDelete(experimentsDetails *utils.ExperimentDetails, clients utils
 		waitForRampTime(experimentsDetails)
 	}
 	//Deleting for the application pod
-	err := PodDeleteChaos(experimentsDetails, clients, Iterations, failStep)
+	err := PodDeleteChaos(experimentsDetails, clients, Iterations, resultDetails)
 	if err != nil{
 		return err
 	}
@@ -84,7 +86,7 @@ func PreparePodDelete(experimentsDetails *utils.ExperimentDetails, clients utils
 }
 
 //GetIterations derive the iterations value from given parameters
-func GetIterations(experimentsDetails *utils.ExperimentDetails) int {
+func GetIterations(experimentsDetails *types.ExperimentDetails) int {
 
 	Iterations := experimentsDetails.ChaosDuration / experimentsDetails.ChaosInterval
 	return Maximum(Iterations, 1)
@@ -92,12 +94,12 @@ func GetIterations(experimentsDetails *utils.ExperimentDetails) int {
 }
 
 //waitForRampTime waits for the given ramp time duration (in seconds)
-func waitForRampTime(experimentsDetails *utils.ExperimentDetails) {
+func waitForRampTime(experimentsDetails *types.ExperimentDetails) {
 	time.Sleep(time.Duration(experimentsDetails.RampTime) * time.Second)
 }
 
 //waitForChaosInterval waits for the given ramp time duration (in seconds)
-func waitForChaosInterval(experimentsDetails *utils.ExperimentDetails) {
+func waitForChaosInterval(experimentsDetails *types.ExperimentDetails) {
 	time.Sleep(time.Duration(experimentsDetails.ChaosInterval) * time.Second)
 }
 
@@ -119,13 +121,13 @@ func Minimum(a int, b int) int {
 
 //PreparePodList derive the list of target pod for deletion
 //It is based on the KillCount value
-func PreparePodList(experimentsDetails *utils.ExperimentDetails, clients utils.ClientSets, failStep *string) ([]string, error) {
+func PreparePodList(experimentsDetails *types.ExperimentDetails, clients environment.ClientSets, resultDetails *types.ResultDetails) ([]string, error) {
 
 	var targetPodList []string
 	//Getting the list of pods with the given labels and namespaces
-	pods, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).List(metav1.ListOptions{LabelSelector: experimentsDetails.AppLabel})
+	pods, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).List(v1.ListOptions{LabelSelector: experimentsDetails.AppLabel})
 	if err != nil {
-		*failStep = "Getting the list of pods with the given labels and namespaces"
+		resultDetails.FailStep = "Getting the list of pods with the given labels and namespaces"
 		return targetPodList, err
 	}
 

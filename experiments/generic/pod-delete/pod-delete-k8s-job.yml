@@ -15,7 +15,7 @@
           restartPolicy: Never
           containers:
           - name: gotest
-            image: shubh214/litmus-go:ci2
+            image: litmuschaos/litmus-go:ci
             imagePullPolicy: Always
             env:
               - name: ANSIBLE_STDOUT_CALLBACK
@@ -23,33 +23,36 @@
     
               # provide application namespace
               - name: APP_NAMESPACE
-                value: 'shubham'
+                value: ''
     
               # provide application labels
               - name: APP_LABEL
-                value: 'run=nginx'
+                value: ''
     
                # provide application kind
               - name: APP_KIND
-                value: 'deployment'
+                value: ''
     
               - name: TOTAL_CHAOS_DURATION
                 value: '30'
     
               - name: CHAOS_INTERVAL
-                value: '5'
-    
-                ## Period to wait before injection of chaos  
-              - name: RAMP_TIME
                 value: '10'
+
+              - name: CHAOS_NAMESPACE
+                value: ''
+    
+                ## Period to wait before/after injection of chaos  
+              - name: RAMP_TIME
+                value: ''
     
               ## env var that describes the library used to execute the chaos
-              ## default: litmus. Supported values: litmus, powerfulseal
+              ## Only supported litmus
               - name: LIB
                 value: 'litmus'
     
               - name: CHAOSENGINE
-                value: 'engine'
+                value: ''
     
               - name: CHAOS_SERVICE_ACCOUNT
                 valueFrom:
@@ -57,4 +60,4 @@
                     fieldPath: spec.serviceAccountName
     
             command: ["/bin/bash"]
-            args: ["-c", "./build/_output/pod_delete"]
+            args: ["-c", "./experiments/pod-delete"]
