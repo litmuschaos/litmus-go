@@ -1,0 +1,15 @@
+package {{ category }}
+
+import (
+	"k8s.io/klog"
+	"time"
+
+    "github.com/litmuschaos/litmus-go/pkg/types"
+    "github.com/litmuschaos/litmus-go/pkg/status"
+    "github.com/litmuschaos/litmus-go/pkg/environment"
+)
+
+func {{ name }}() {
+    // add the chaos lib logic here
+
+}
