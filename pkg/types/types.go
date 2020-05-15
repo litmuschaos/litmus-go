@@ -1,5 +1,12 @@
 package types
 
+const (
+	PreChaosCheck                   string = "PreChaosCheck"
+	PostChaosCheck                  string = "PostChaosCheck"
+	Summary                         string = "Summary"
+	ChaosInject                     string = "ChaosInject"
+)
+
 // ExperimentDetails is for collecting all the experiment-related details
 type ExperimentDetails struct {
 	ExperimentName      string
@@ -18,6 +25,7 @@ type ExperimentDetails struct {
 	AuxiliaryAppInfo    string
 	InstanceID          string
 	ChaosNamespace      string
+	ChaosPodName        string
 }
 
 // ResultDetails is for collecting all the chaos-result-related details
