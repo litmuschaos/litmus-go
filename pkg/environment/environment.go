@@ -23,6 +23,7 @@ func GetENV(experimentDetails *types.ExperimentDetails, expName string) {
 	experimentDetails.ChaosUID = os.Getenv("CHAOS_UID")
 	experimentDetails.AuxiliaryAppInfo = os.Getenv("AUXILIARY_APPINFO")
 	experimentDetails.InstanceID = os.Getenv("INSTANCE_ID")
+	experimentDetails.ChaosPodName = os.Getenv("POD_NAME")
 }
 
 //SetResultAttributes initialise all the chaos result ENV

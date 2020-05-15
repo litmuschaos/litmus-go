@@ -8,10 +8,11 @@ import (
     "github.com/litmuschaos/litmus-go/pkg/status"
     "github.com/litmuschaos/litmus-go/pkg/environment"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	"github.com/litmuschaos/litmus-go/pkg/events"
 )
 
 //PodDeleteChaos deletes the random single/multiple pods
-func PodDeleteChaos(experimentsDetails *types.ExperimentDetails, clients environment.ClientSets, Iterations int, resultDetails *types.ResultDetails) error {
+func PodDeleteChaos(experimentsDetails *types.ExperimentDetails, clients environment.ClientSets, Iterations int, resultDetails *types.ResultDetails, recorder *events.Recorder) error {
 
 	//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
 	ChaosStartTimeStamp := time.Now().Unix()
@@ -33,6 +34,7 @@ func PodDeleteChaos(experimentsDetails *types.ExperimentDetails, clients environ
 				return err
 			}
 		}
+		recorder.ChaosInject(experimentsDetails)
 
 		//ChaosCurrentTimeStamp contains the current timestamp
 		ChaosCurrentTimeStamp := time.Now().Unix()
@@ -63,7 +65,7 @@ func PodDeleteChaos(experimentsDetails *types.ExperimentDetails, clients environ
 }
 
 //PreparePodDelete contains the steps for prepration before chaos
-func PreparePodDelete(experimentsDetails *types.ExperimentDetails, clients environment.ClientSets, resultDetails *types.ResultDetails) error {
+func PreparePodDelete(experimentsDetails *types.ExperimentDetails, clients environment.ClientSets, resultDetails *types.ResultDetails, recorder *events.Recorder) error {
 
 	//It will get the total iteration for the pod-delete
 	Iterations := GetIterations(experimentsDetails)
@@ -73,7 +75,7 @@ func PreparePodDelete(experimentsDetails *types.ExperimentDetails, clients envir
 		waitForRampTime(experimentsDetails)
 	}
 	//Deleting for the application pod
-	err := PodDeleteChaos(experimentsDetails, clients, Iterations, resultDetails)
+	err := PodDeleteChaos(experimentsDetails, clients, Iterations, resultDetails,recorder)
 	if err != nil{
 		return err
 	}

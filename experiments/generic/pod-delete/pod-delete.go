@@ -8,6 +8,7 @@ import (
 	 "github.com/litmuschaos/litmus-go/pkg/result"
 	 "github.com/litmuschaos/litmus-go/pkg/environment"
 	 "github.com/litmuschaos/litmus-go/pkg/types"
+	 "github.com/litmuschaos/litmus-go/pkg/events"
 )
 
 func main() {
@@ -25,6 +26,11 @@ func main() {
 	//Fetching all the ENV passed for the runner pod
 	klog.V(0).Infof("[PreReq]: Getting the ENV for the %v experiment",experimentsDetails.ExperimentName)
 	environment.GetENV(&experimentsDetails, "pod-delete")
+
+	recorder, err := events.NewEventRecorder(clients, experimentsDetails)
+	if err != nil {
+		klog.Errorf("Unable to initiate EventRecorder for chaos-experiment, would not be able to add events")
+	}
 
 	// Intialise Chaos Result Parameters
 	environment.SetResultAttributes(&resultDetails,&experimentsDetails)
@@ -51,9 +57,11 @@ func main() {
 		result.ChaosResult(&experimentsDetails, clients,&resultDetails,"EOT"); return
 	}
 
+	recorder.PreChaosCheck(experimentsDetails)
+
 	// Including the litmus lib for pod-delete
 	if experimentsDetails.ChaosLib == "litmus" {
-		err = pod_delete.PreparePodDelete(&experimentsDetails, clients,&resultDetails)
+		err = pod_delete.PreparePodDelete(&experimentsDetails, clients,&resultDetails,recorder)
 		if err != nil {
 			klog.V(0).Infof("Chaos injection failed due to %v\n", err)
 			result.ChaosResult(&experimentsDetails, clients,&resultDetails,"EOT"); return
@@ -74,13 +82,14 @@ func main() {
 		resultDetails.FailStep = "Verify that the AUT (Application Under Test) is running (post-chaos)"
 		result.ChaosResult(&experimentsDetails, clients,&resultDetails,"EOT"); return
 	}
+	recorder.PostChaosCheck(experimentsDetails)
 
 	//Updating the chaosResult in the end of experiment
 	klog.V(0).Infof("[The End]: Updating the chaos result of %v experiment (EOT)",experimentsDetails.ExperimentName)
-	err = result.ChaosResult(&experimentsDetails, clients,&resultDetails,"EOT"); return
+	err = result.ChaosResult(&experimentsDetails, clients,&resultDetails,"EOT")
 	if err != nil {
 		klog.V(0).Infof("Unable to Update the Chaos Result due to %v\n", err)
 		return
 	}
-
+	recorder.Summary(&experimentsDetails,&resultDetails)
 }
