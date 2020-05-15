@@ -1,0 +1,33 @@
+apiVersion: litmuschaos.io/v1alpha1
+description:
+  message: |
+    {{ description }}
+kind: ChaosExperiment
+metadata:
+  name: {{ name }}
+  version: {{ version }} 
+spec:
+  definition:
+    scope: {{ scope }}
+    permissions: {{ permissions }}
+    image: "litmuschaos/litmus-go:latest"
+    args:
+    - -c
+    - ./experiments/{{ name }}
+    command:
+    - /bin/bash
+    env:
+    - name: ANSIBLE_STDOUT_CALLBACK
+      value: 'default'
+
+    - name: TOTAL_CHAOS_DURATION
+      value: '' 
+
+    - name: LIB
+      value: ''
+
+    - name: RAMP_TIME
+      value: ''
+      
+    labels:
+      experiment: {{ name }} 
