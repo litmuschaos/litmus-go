@@ -1,8 +1,9 @@
 package pod_delete
 
 import (
-	"k8s.io/klog"
+	
 	"time"
+	log "github.com/sirupsen/logrus"
 
     "github.com/litmuschaos/litmus-go/pkg/types"
     "github.com/litmuschaos/litmus-go/pkg/status"
@@ -24,7 +25,7 @@ func PodDeleteChaos(experimentsDetails *types.ExperimentDetails, clients environ
 		if err != nil {
 			return err
 		}
-		klog.V(0).Infof("Killing %v pods", targetPodList)
+		log.WithFields(log.Fields{}).Infof("Killing %v pods", targetPodList)
 
 		//Deleting the application pod
 		for _, pods := range targetPodList {
@@ -34,7 +35,9 @@ func PodDeleteChaos(experimentsDetails *types.ExperimentDetails, clients environ
 				return err
 			}
 		}
+		if experimentsDetails.EngineName != ""{
 		recorder.ChaosInject(experimentsDetails)
+		}
 
 		//ChaosCurrentTimeStamp contains the current timestamp
 		ChaosCurrentTimeStamp := time.Now().Unix()
@@ -49,11 +52,11 @@ func PodDeleteChaos(experimentsDetails *types.ExperimentDetails, clients environ
 
 		//Waiting for the chaos interval after chaos injection
 		if experimentsDetails.ChaosInterval != 0 {
-			klog.V(0).Infof("[Wait]: Wait for the chaos interval %vs", experimentsDetails.ChaosInterval)
+			log.WithFields(log.Fields{}).Infof("[Wait]: Wait for the chaos interval %vs", experimentsDetails.ChaosInterval)
 			waitForChaosInterval(experimentsDetails)
 		}
 		//Verify the status of pod after the chaos injection
-		klog.V(0).Infof("[Status]: Verification for the recreation of application pod")
+		log.WithFields(log.Fields{}).Info("[Status]: Verification for the recreation of application pod")
 		err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, clients)
 		if err != nil {
 			resultDetails.FailStep = "Verification for the recreation of application pod"
@@ -71,7 +74,7 @@ func PreparePodDelete(experimentsDetails *types.ExperimentDetails, clients envir
 	Iterations := GetIterations(experimentsDetails)
 	//Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
-		klog.V(0).Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", experimentsDetails.RampTime)
+		log.WithFields(log.Fields{}).Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", experimentsDetails.RampTime)
 		waitForRampTime(experimentsDetails)
 	}
 	//Deleting for the application pod
@@ -81,7 +84,7 @@ func PreparePodDelete(experimentsDetails *types.ExperimentDetails, clients envir
 	}
 	//Waiting for the ramp time after chaos injection
 	if experimentsDetails.RampTime != 0 {
-		klog.V(0).Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", experimentsDetails.RampTime)
+		log.WithFields(log.Fields{}).Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", experimentsDetails.RampTime)
 		waitForRampTime(experimentsDetails)
 	}
 	return nil
