@@ -31,5 +31,9 @@ func SetResultAttributes(resultDetails *types.ResultDetails, experimentDetails *
 	resultDetails.Verdict = "Awaited"
 	resultDetails.Phase = "Running"
 	resultDetails.FailStep = "N/A"
+	if experimentDetails.EngineName != ""{
 	resultDetails.Name = experimentDetails.EngineName+"-"+experimentDetails.ExperimentName
+	} else {
+		resultDetails.Name = experimentDetails.ExperimentName
+	}
 }

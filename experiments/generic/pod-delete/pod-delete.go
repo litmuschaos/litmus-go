@@ -56,8 +56,9 @@ func main() {
 		resultDetails.FailStep = "Verify that the AUT (Application Under Test) is running (pre-chaos)"
 		result.ChaosResult(&experimentsDetails, clients,&resultDetails,"EOT"); return
 	}
-
+	if experimentsDetails.EngineName != "" {
 	recorder.PreChaosCheck(experimentsDetails)
+	}
 
 	// Including the litmus lib for pod-delete
 	if experimentsDetails.ChaosLib == "litmus" {
@@ -82,7 +83,9 @@ func main() {
 		resultDetails.FailStep = "Verify that the AUT (Application Under Test) is running (post-chaos)"
 		result.ChaosResult(&experimentsDetails, clients,&resultDetails,"EOT"); return
 	}
+	if experimentsDetails.EngineName != "" {
 	recorder.PostChaosCheck(experimentsDetails)
+	}
 
 	//Updating the chaosResult in the end of experiment
 	klog.V(0).Infof("[The End]: Updating the chaos result of %v experiment (EOT)",experimentsDetails.ExperimentName)
@@ -91,5 +94,7 @@ func main() {
 		klog.V(0).Infof("Unable to Update the Chaos Result due to %v\n", err)
 		return
 	}
+	if experimentsDetails.EngineName != "" {
 	recorder.Summary(&experimentsDetails,&resultDetails)
+	}
 }

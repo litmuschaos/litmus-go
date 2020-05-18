@@ -34,7 +34,9 @@ func PodDeleteChaos(experimentsDetails *types.ExperimentDetails, clients environ
 				return err
 			}
 		}
+		if experimentsDetails.EngineName != "" {
 		recorder.ChaosInject(experimentsDetails)
+		}
 
 		//ChaosCurrentTimeStamp contains the current timestamp
 		ChaosCurrentTimeStamp := time.Now().Unix()
