@@ -56,4 +56,4 @@ litmus-go-push:
 	@echo "------------------"
 	@echo "--> litmus-go image" 
 	@echo "------------------"
-	REPONAME="litmuschaos" IMGNAME="litmus-go" IMGTAG="ci" ./hack/push
+	REPONAME="litmuschaos" IMGNAME="litmus-go" IMGTAG="ci" ./build/push
