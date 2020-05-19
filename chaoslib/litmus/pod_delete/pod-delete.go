@@ -35,7 +35,9 @@ func PodDeleteChaos(experimentsDetails *types.ExperimentDetails, clients environ
 				return err
 			}
 		}
+		if experimentsDetails.EngineName != "" {
 		recorder.ChaosInject(experimentsDetails)
+		}
 
 		//ChaosCurrentTimeStamp contains the current timestamp
 		ChaosCurrentTimeStamp := time.Now().Unix()
@@ -61,6 +63,7 @@ func PodDeleteChaos(experimentsDetails *types.ExperimentDetails, clients environ
 			return err
 		}
 	}
+	klog.V(0).Infof("[Completion]: %v chaos is done",experimentsDetails.ExperimentName)
 
 	return nil
 }
