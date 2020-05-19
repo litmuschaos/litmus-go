@@ -1,15 +1,18 @@
 package pod_delete
 
 import (
-	"k8s.io/klog"
+	"strconv"
 	"time"
 
-    "github.com/litmuschaos/litmus-go/pkg/types"
-    "github.com/litmuschaos/litmus-go/pkg/status"
+	"github.com/litmuschaos/litmus-go/pkg/log"
+	"github.com/sirupsen/logrus"
+
 	"github.com/litmuschaos/litmus-go/pkg/environment"
-	"github.com/litmuschaos/litmus-go/pkg/math"
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"github.com/litmuschaos/litmus-go/pkg/events"
+	"github.com/litmuschaos/litmus-go/pkg/math"
+	"github.com/litmuschaos/litmus-go/pkg/status"
+	"github.com/litmuschaos/litmus-go/pkg/types"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 //PodDeleteChaos deletes the random single/multiple pods
@@ -21,11 +24,12 @@ func PodDeleteChaos(experimentsDetails *types.ExperimentDetails, clients environ
 	for x := 0; x < Iterations; x++ {
 
 		//Getting the list of all the target pod for deletion
-		targetPodList, err := PreparePodList(experimentsDetails, clients,resultDetails)
+		targetPodList, err := PreparePodList(experimentsDetails, clients, resultDetails)
 		if err != nil {
 			return err
 		}
-		klog.V(0).Infof("Killing %v pods", targetPodList)
+		log.InfoWithValues("[Info]: Killing the following pods", logrus.Fields{
+			"PodList": targetPodList})
 
 		//Deleting the application pod
 		for _, pods := range targetPodList {
@@ -36,34 +40,34 @@ func PodDeleteChaos(experimentsDetails *types.ExperimentDetails, clients environ
 			}
 		}
 		if experimentsDetails.EngineName != "" {
-		recorder.ChaosInject(experimentsDetails)
+			recorder.ChaosInject(experimentsDetails)
 		}
 
 		//ChaosCurrentTimeStamp contains the current timestamp
 		ChaosCurrentTimeStamp := time.Now().Unix()
-	
+
 		//ChaosDiffTimeStamp contains the difference of current timestamp and start timestamp
 		//It will helpful to track the total chaos duration
 		chaosDiffTimeStamp := ChaosCurrentTimeStamp - ChaosStartTimeStamp
-	
+
 		if int(chaosDiffTimeStamp) >= experimentsDetails.ChaosDuration {
 			break
 		}
 
 		//Waiting for the chaos interval after chaos injection
 		if experimentsDetails.ChaosInterval != 0 {
-			klog.V(0).Infof("[Wait]: Wait for the chaos interval %vs", experimentsDetails.ChaosInterval)
+			log.Infof("[Wait]: Wait for the chaos interval %vs", strconv.Itoa(experimentsDetails.ChaosInterval))
 			waitForChaosInterval(experimentsDetails)
 		}
 		//Verify the status of pod after the chaos injection
-		klog.V(0).Infof("[Status]: Verification for the recreation of application pod")
+		log.Info("[Status]: Verification for the recreation of application pod")
 		err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, clients)
 		if err != nil {
 			resultDetails.FailStep = "Verification for the recreation of application pod"
 			return err
 		}
 	}
-	klog.V(0).Infof("[Completion]: %v chaos is done",experimentsDetails.ExperimentName)
+	log.Infof("[Completion]: %v chaos is done", experimentsDetails.ExperimentName)
 
 	return nil
 }
@@ -75,17 +79,17 @@ func PreparePodDelete(experimentsDetails *types.ExperimentDetails, clients envir
 	Iterations := GetIterations(experimentsDetails)
 	//Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
-		klog.V(0).Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", experimentsDetails.RampTime)
+		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", strconv.Itoa(experimentsDetails.RampTime))
 		waitForRampTime(experimentsDetails)
 	}
 	//Deleting for the application pod
-	err := PodDeleteChaos(experimentsDetails, clients, Iterations, resultDetails,recorder)
-	if err != nil{
+	err := PodDeleteChaos(experimentsDetails, clients, Iterations, resultDetails, recorder)
+	if err != nil {
 		return err
 	}
 	//Waiting for the ramp time after chaos injection
 	if experimentsDetails.RampTime != 0 {
-		klog.V(0).Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", experimentsDetails.RampTime)
+		log.Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", strconv.Itoa(experimentsDetails.RampTime))
 		waitForRampTime(experimentsDetails)
 	}
 	return nil
