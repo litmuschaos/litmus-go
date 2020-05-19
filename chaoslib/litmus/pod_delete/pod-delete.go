@@ -6,7 +6,8 @@ import (
 
     "github.com/litmuschaos/litmus-go/pkg/types"
     "github.com/litmuschaos/litmus-go/pkg/status"
-    "github.com/litmuschaos/litmus-go/pkg/environment"
+	"github.com/litmuschaos/litmus-go/pkg/environment"
+	"github.com/litmuschaos/litmus-go/pkg/math"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 )
@@ -62,6 +63,7 @@ func PodDeleteChaos(experimentsDetails *types.ExperimentDetails, clients environ
 			return err
 		}
 	}
+	klog.V(0).Infof("[Completion]: %v chaos is done",experimentsDetails.ExperimentName)
 
 	return nil
 }
@@ -93,7 +95,7 @@ func PreparePodDelete(experimentsDetails *types.ExperimentDetails, clients envir
 func GetIterations(experimentsDetails *types.ExperimentDetails) int {
 
 	Iterations := experimentsDetails.ChaosDuration / experimentsDetails.ChaosInterval
-	return Maximum(Iterations, 1)
+	return math.Maximum(Iterations, 1)
 
 }
 
@@ -105,22 +107,6 @@ func waitForRampTime(experimentsDetails *types.ExperimentDetails) {
 //waitForChaosInterval waits for the given ramp time duration (in seconds)
 func waitForChaosInterval(experimentsDetails *types.ExperimentDetails) {
 	time.Sleep(time.Duration(experimentsDetails.ChaosInterval) * time.Second)
-}
-
-// Maximum calculates the maximum value among two integers
-func Maximum(a int, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}
-
-//Minimum calculates the minimum value among two integers
-func Minimum(a int, b int) int {
-	if a > b {
-		return b
-	}
-	return a
 }
 
 //PreparePodList derive the list of target pod for deletion
@@ -140,7 +126,7 @@ func PreparePodList(experimentsDetails *types.ExperimentDetails, clients environ
 	if experimentsDetails.KillCount == 0 {
 		targetPodList = append(targetPodList, pods.Items[0].Name)
 	} else {
-		for i := 0; i < Minimum(experimentsDetails.KillCount, len(pods.Items)); i++ {
+		for i := 0; i < math.Minimum(experimentsDetails.KillCount, len(pods.Items)); i++ {
 			targetPodList = append(targetPodList, pods.Items[i].Name)
 		}
 	}
