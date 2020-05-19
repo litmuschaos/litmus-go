@@ -4,25 +4,26 @@ import (
 	"strings"
 	"time"
 
-	"github.com/openebs/maya/pkg/util/retry"
-	types "github.com/litmuschaos/litmus-go/pkg/types"
 	environment "github.com/litmuschaos/litmus-go/pkg/environment"
+	"github.com/litmuschaos/litmus-go/pkg/log"
+	types "github.com/litmuschaos/litmus-go/pkg/types"
+	"github.com/openebs/maya/pkg/util/retry"
 	"github.com/pkg/errors"
+	logrus "github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	log "github.com/sirupsen/logrus"
 )
 
 // CheckApplicationStatus checks the status of the AUT
 func CheckApplicationStatus(appNs string, appLabel string, clients environment.ClientSets) error {
 
 	// Checking whether application pods are in running state
-	log.WithFields(log.Fields{}).Info("[Status]: Checking whether application pods are in running state")
+	log.Info("[Status]: Checking whether application pods are in running state")
 	err := CheckPodStatus(appNs, appLabel, clients)
 	if err != nil {
 		return err
 	}
 	// Checking whether application containers are in running state
-	log.WithFields(log.Fields{}).Info("[Status]: Checking whether application containers are in running state")
+	log.Info("[Status]: Checking whether application containers are in running state")
 	err = CheckContainerStatus(appNs, appLabel, clients)
 	if err != nil {
 		return err
@@ -61,7 +62,8 @@ func CheckPodStatus(appNs string, appLabel string, clients environment.ClientSet
 				if string(pod.Status.Phase) != "Running" {
 					return errors.Errorf("Pod is not yet in running state")
 				}
-				log.WithFields(log.Fields{}).Infof("%v Pod is in %v State", pod.Name, pod.Status.Phase)
+				log.InfoWithValues("The running status of Pods are as follows", logrus.Fields{
+					"Pod": pod.Name, "Status": pod.Status.Phase})
 			}
 			return nil
 		})
@@ -88,7 +90,8 @@ func CheckContainerStatus(appNs string, appLabel string, clients environment.Cli
 					if container.Ready != true {
 						return errors.Errorf("containers are not yet in running state")
 					}
-					log.WithFields(log.Fields{}).Infof(" %v container of pod %v is in %v State", container.Name, pod.Name, pod.Status.Phase)
+					log.InfoWithValues("The running status of container are as follows", logrus.Fields{
+						"container": container.Name, "Pod": pod.Name, "Status": pod.Status.Phase})
 				}
 			}
 			return nil

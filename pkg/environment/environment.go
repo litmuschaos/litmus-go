@@ -9,21 +9,21 @@ import (
 //GetENV fetches all the env variables from the runner pod
 func GetENV(experimentDetails *types.ExperimentDetails, expName string) {
 	experimentDetails.ExperimentName = expName
-	experimentDetails.ChaosNamespace = "test"
-	experimentDetails.EngineName = ""
-	experimentDetails.ChaosDuration = 10
-	experimentDetails.ChaosInterval= 10
+	experimentDetails.ChaosNamespace = os.Getenv("CHAOS_NAMESPACE")
+	experimentDetails.EngineName = os.Getenv("CHAOSENGINE")
+	experimentDetails.ChaosDuration,_ = strconv.Atoi(os.Getenv("TOTAL_CHAOS_DURATION"))
+	experimentDetails.ChaosInterval,_ = strconv.Atoi(os.Getenv("CHAOS_INTERVAL"))
 	experimentDetails.RampTime,_ = strconv.Atoi(os.Getenv("RAMP_TIME"))
-	experimentDetails.ChaosLib = "litmus"
-	experimentDetails.ChaosServiceAccount = "litmus"
-	experimentDetails.AppNS = "test"
-	experimentDetails.AppLabel = "run=nginx"
+	experimentDetails.ChaosLib = os.Getenv("LIB")
+	experimentDetails.ChaosServiceAccount = os.Getenv("CHAOS_SERVICE_ACCOUNT")
+	experimentDetails.AppNS = os.Getenv("APP_NAMESPACE")
+	experimentDetails.AppLabel = os.Getenv("APP_LABEL")
 	experimentDetails.AppKind = os.Getenv("APP_KIND")
 	experimentDetails.KillCount,_ =  strconv.Atoi(os.Getenv("KILL_COUNT"))
 	experimentDetails.ChaosUID = os.Getenv("CHAOS_UID")
-	experimentDetails.AuxiliaryAppInfo = ""
+	experimentDetails.AuxiliaryAppInfo = os.Getenv("AUXILIARY_APPINFO")
 	experimentDetails.InstanceID = os.Getenv("INSTANCE_ID")
-	experimentDetails.ChaosPodName = "pod-delete"
+	experimentDetails.ChaosPodName = os.Getenv("POD_NAME")
 }
 
 //SetResultAttributes initialise all the chaos result ENV
