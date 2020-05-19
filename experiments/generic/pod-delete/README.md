@@ -48,8 +48,6 @@ spec:
     command:
     - /bin/bash
     env:
-    - name: ANSIBLE_STDOUT_CALLBACK
-      value: 'default'
     - name: TOTAL_CHAOS_DURATION
       value: '30'
     - name: CHAOS_INTERVAL
