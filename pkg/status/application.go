@@ -54,8 +54,8 @@ func CheckPodStatus(appNs string, appLabel string, clients environment.ClientSet
 		Wait(2 * time.Second).
 		Try(func(attempt uint) error {
 			podSpec, err := clients.KubeClient.CoreV1().Pods(appNs).List(metav1.ListOptions{LabelSelector: appLabel})
-			if err != nil {
-				return err
+			if err != nil || len(podSpec.Items) == 0 {
+				return errors.Errorf("Unable to get the pod, err: %v", err)
 			}
 			err = nil
 			for _, pod := range podSpec.Items {
@@ -80,12 +80,11 @@ func CheckContainerStatus(appNs string, appLabel string, clients environment.Cli
 		Wait(2 * time.Second).
 		Try(func(attempt uint) error {
 			podSpec, err := clients.KubeClient.CoreV1().Pods(appNs).List(metav1.ListOptions{LabelSelector: appLabel})
-			if err != nil {
-				return err
+			if err != nil || len(podSpec.Items) == 0 {
+				return errors.Errorf("Unable to get the pod, err: %v", err)
 			}
 			err = nil
 			for _, pod := range podSpec.Items {
-
 				for _, container := range pod.Status.ContainerStatuses {
 					if container.Ready != true {
 						return errors.Errorf("containers are not yet in running state")

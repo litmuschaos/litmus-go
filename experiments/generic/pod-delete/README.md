@@ -56,6 +56,8 @@ spec:
       value: ''
     - name: LIB
       value: 'litmus'
+    - name: FORCE
+      value: ''
     - name: KILL_COUNT
       value: ''
     labels:
