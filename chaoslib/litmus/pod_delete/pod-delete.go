@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"github.com/litmuschaos/litmus-go/pkg/log"
+	"github.com/openebs/maya/pkg/util/retry"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
 	"github.com/litmuschaos/litmus-go/pkg/environment"
@@ -15,6 +17,10 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+//GracePeriod set to zero
+var GracePeriod int64 = 0
+var err error
+
 //PodDeleteChaos deletes the random single/multiple pods
 func PodDeleteChaos(experimentsDetails *types.ExperimentDetails, clients environment.ClientSets, Iterations int, resultDetails *types.ResultDetails, recorder *events.Recorder) error {
 
@@ -22,7 +28,6 @@ func PodDeleteChaos(experimentsDetails *types.ExperimentDetails, clients environ
 	ChaosStartTimeStamp := time.Now().Unix()
 
 	for x := 0; x < Iterations; x++ {
-
 		//Getting the list of all the target pod for deletion
 		targetPodList, err := PreparePodList(experimentsDetails, clients, resultDetails)
 		if err != nil {
@@ -33,7 +38,11 @@ func PodDeleteChaos(experimentsDetails *types.ExperimentDetails, clients environ
 
 		//Deleting the application pod
 		for _, pods := range targetPodList {
-			err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Delete(pods, &v1.DeleteOptions{})
+			if experimentsDetails.Force == true {
+				err = clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Delete(pods, &v1.DeleteOptions{GracePeriodSeconds: &GracePeriod})
+			} else {
+				err = clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Delete(pods, &v1.DeleteOptions{})
+			}
 			if err != nil {
 				resultDetails.FailStep = "Deleting the application pod"
 				return err
@@ -118,21 +127,27 @@ func waitForChaosInterval(experimentsDetails *types.ExperimentDetails) {
 func PreparePodList(experimentsDetails *types.ExperimentDetails, clients environment.ClientSets, resultDetails *types.ResultDetails) ([]string, error) {
 
 	var targetPodList []string
-	//Getting the list of pods with the given labels and namespaces
-	pods, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).List(v1.ListOptions{LabelSelector: experimentsDetails.AppLabel})
-	if err != nil {
-		resultDetails.FailStep = "Getting the list of pods with the given labels and namespaces"
-		return targetPodList, err
-	}
 
-	//Adding the first pod only, if KillCount is not set or 0
-	//Otherwise derive the min(KIllCount,len(pod_list)) pod
-	if experimentsDetails.KillCount == 0 {
-		targetPodList = append(targetPodList, pods.Items[0].Name)
-	} else {
-		for i := 0; i < math.Minimum(experimentsDetails.KillCount, len(pods.Items)); i++ {
-			targetPodList = append(targetPodList, pods.Items[i].Name)
-		}
-	}
+	err := retry.
+		Times(90).
+		Wait(2 * time.Second).
+		Try(func(attempt uint) error {
+			pods, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).List(v1.ListOptions{LabelSelector: experimentsDetails.AppLabel})
+			if err != nil || len(pods.Items) == 0 {
+				return errors.Errorf("Unable to get the pod, err: %v", err)
+			}
+			//Adding the first pod only, if KillCount is not set or 0
+			//Otherwise derive the min(KIllCount,len(pod_list)) pod
+			if experimentsDetails.KillCount == 0 {
+				targetPodList = append(targetPodList, pods.Items[0].Name)
+			} else {
+				for i := 0; i < math.Minimum(experimentsDetails.KillCount, len(pods.Items)); i++ {
+					targetPodList = append(targetPodList, pods.Items[i].Name)
+				}
+			}
+
+			return nil
+		})
+
 	return targetPodList, err
 }
