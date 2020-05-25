@@ -1,14 +1,14 @@
 package main
 
 import (
+	"github.com/litmuschaos/litmus-go/pkg/environment"
+	"github.com/litmuschaos/litmus-go/pkg/events"
+	"github.com/litmuschaos/litmus-go/pkg/log"
+	"github.com/litmuschaos/litmus-go/pkg/result"
+	"github.com/litmuschaos/litmus-go/pkg/status"
+	"github.com/litmuschaos/litmus-go/pkg/types"
+	"github.com/sirupsen/logrus"
 	"k8s.io/klog"
-
-	 "github.com/litmuschaos/litmus-go/pkg/status"
-	 "github.com/litmuschaos/litmus-go/pkg/result"
-	 "github.com/litmuschaos/litmus-go/pkg/environment"
-	 "github.com/litmuschaos/litmus-go/pkg/types"
-	 "github.com/litmuschaos/litmus-go/pkg/log"
-	 "github.com/sirupsen/logrus"
 )
 
 func init() {
@@ -76,6 +76,7 @@ func main() {
 		return
 	}
 
+{% if auxiliaryAppCheck is defined and auxiliaryAppCheck == true %}
 	//PRE-CHAOS AUXILIARY APPLICATION STATUS CHECK
 	if experimentsDetails.AuxiliaryAppInfo != "" {
 	log.Info("[Status]: Verify that the Auxiliary Applications are running (pre-chaos)")
@@ -85,6 +86,7 @@ func main() {
 		resultDetails.FailStep = "Verify that the Auxiliary Applications are running (pre-chaos)"
 		result.ChaosResult(&experimentsDetails, clients,&resultDetails,"EOT"); return
 	}
+{% endif %}
 
 	if experimentsDetails.EngineName != "" {
 		recorder.PreChaosCheck(experimentsDetails)
@@ -96,7 +98,7 @@ func main() {
    
 	// Including the litmus lib for pod-delete
 	if experimentsDetails.ChaosLib == "litmus" {
-		err = {{ category}}.{{ category }}()
+		err = {{ name }}.{{ name }}()
 		if err != nil {
 			log.Errorf("Chaos injection failed due to %v\n", err)
 			result.ChaosResult(&experimentsDetails, clients,&resultDetails,"EOT"); return
@@ -116,6 +118,7 @@ func main() {
 		result.ChaosResult(&experimentsDetails, clients,&resultDetails,"EOT"); return
 	}
 
+{% if auxiliaryAppCheck is defined and auxiliaryAppCheck == true %}
 	//POST-CHAOS AUXILIARY APPLICATION STATUS CHECK
 	if experimentsDetails.AuxiliaryAppInfo != "" {
 	log.Info("[Status]: Verify that the Auxiliary Applications are running (post-chaos)")
@@ -125,6 +128,7 @@ func main() {
 		resultDetails.FailStep = "Verify that the Auxiliary Applications are running (post-chaos)"
 		result.ChaosResult(&experimentsDetails, clients,&resultDetails,"EOT"); return
 	}
+{% endif %}
 
 	if experimentsDetails.EngineName != "" {
 		recorder.PostChaosCheck(experimentsDetails)

@@ -11,6 +11,7 @@ keywords:
   - sample-category
   - nginx
 scope: "Namespaced"
+auxiliaryAppCheck: false
 permissions:
   - apiGroups:
       - ""
