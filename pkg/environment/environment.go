@@ -4,6 +4,8 @@ import (
 	"os"
 	"strconv"
 
+	clientTypes "k8s.io/apimachinery/pkg/types"
+
 	types "github.com/litmuschaos/litmus-go/pkg/types"
 )
 
@@ -21,7 +23,7 @@ func GetENV(experimentDetails *types.ExperimentDetails, expName string) {
 	experimentDetails.AppLabel = os.Getenv("APP_LABEL")
 	experimentDetails.AppKind = os.Getenv("APP_KIND")
 	experimentDetails.KillCount, _ = strconv.Atoi(os.Getenv("KILL_COUNT"))
-	experimentDetails.ChaosUID = os.Getenv("CHAOS_UID")
+	experimentDetails.ChaosUID = clientTypes.UID(os.Getenv("CHAOS_UID"))
 	experimentDetails.AuxiliaryAppInfo = os.Getenv("AUXILIARY_APPINFO")
 	experimentDetails.InstanceID = os.Getenv("INSTANCE_ID")
 	experimentDetails.ChaosPodName = os.Getenv("POD_NAME")
@@ -38,4 +40,11 @@ func SetResultAttributes(resultDetails *types.ResultDetails, experimentDetails *
 	} else {
 		resultDetails.Name = experimentDetails.ExperimentName
 	}
+}
+
+//SetEventAttributes initialise all the chaos result ENV
+func SetEventAttributes(eventsDetails *types.EventDetails, Reason string, Message string) {
+
+	eventsDetails.Reason = Reason
+	eventsDetails.Message = Message
 }

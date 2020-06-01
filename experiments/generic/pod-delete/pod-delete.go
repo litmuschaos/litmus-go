@@ -26,6 +26,7 @@ func main() {
 	var err error
 	experimentsDetails := types.ExperimentDetails{}
 	resultDetails := types.ResultDetails{}
+	eventsDetails := types.EventDetails{}
 	clients := environment.ClientSets{}
 
 	//Getting kubeConfig and Generate ClientSets
@@ -36,11 +37,6 @@ func main() {
 	//Fetching all the ENV passed for the runner pod
 	log.Infof("[PreReq]: Getting the ENV for the %v experiment", experimentsDetails.ExperimentName)
 	environment.GetENV(&experimentsDetails, "pod-delete")
-
-	recorder, err := events.NewEventRecorder(clients, experimentsDetails)
-	if err != nil {
-		log.Warn("Unable to initiate EventRecorder for chaos-experiment, would not be able to add events")
-	}
 
 	// Intialise Chaos Result Parameters
 	environment.SetResultAttributes(&resultDetails, &experimentsDetails)
@@ -72,12 +68,13 @@ func main() {
 		return
 	}
 	if experimentsDetails.EngineName != "" {
-		recorder.PreChaosCheck(experimentsDetails)
+		environment.SetEventAttributes(&eventsDetails, types.PreChaosCheck, "AUT is Running successfully")
+		events.GenerateEvents(&experimentsDetails, clients, &eventsDetails)
 	}
 
 	// Including the litmus lib for pod-delete
 	if experimentsDetails.ChaosLib == "litmus" {
-		err = pod_delete.PreparePodDelete(&experimentsDetails, clients, &resultDetails, recorder)
+		err = pod_delete.PreparePodDelete(&experimentsDetails, clients, &resultDetails, &eventsDetails)
 		if err != nil {
 			log.Errorf("Chaos injection failed due to %v\n", err)
 			result.ChaosResult(&experimentsDetails, clients, &resultDetails, "EOT")
@@ -102,7 +99,8 @@ func main() {
 		return
 	}
 	if experimentsDetails.EngineName != "" {
-		recorder.PostChaosCheck(experimentsDetails)
+		environment.SetEventAttributes(&eventsDetails, types.PostChaosCheck, "AUT is Running successfully")
+		events.GenerateEvents(&experimentsDetails, clients, &eventsDetails)
 	}
 
 	//Updating the chaosResult in the end of experiment
@@ -112,6 +110,8 @@ func main() {
 		log.Fatalf("Unable to Update the Chaos Result due to %v\n", err)
 	}
 	if experimentsDetails.EngineName != "" {
-		recorder.Summary(&experimentsDetails, &resultDetails)
+		msg := experimentsDetails.ExperimentName + "experiment has been" + resultDetails.Verdict + "ed"
+		environment.SetEventAttributes(&eventsDetails, types.Summary, msg)
+		events.GenerateEvents(&experimentsDetails, clients, &eventsDetails)
 	}
 }

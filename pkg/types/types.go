@@ -1,10 +1,14 @@
 package types
 
+import (
+	clientTypes "k8s.io/apimachinery/pkg/types"
+)
+
 const (
-	PreChaosCheck                   string = "PreChaosCheck"
-	PostChaosCheck                  string = "PostChaosCheck"
-	Summary                         string = "Summary"
-	ChaosInject                     string = "ChaosInject"
+	PreChaosCheck  string = "PreChaosCheck"
+	PostChaosCheck string = "PostChaosCheck"
+	Summary        string = "Summary"
+	ChaosInject    string = "ChaosInject"
 )
 
 // ExperimentDetails is for collecting all the experiment-related details
@@ -21,7 +25,7 @@ type ExperimentDetails struct {
 	AppLabel            string
 	AppKind             string
 	KillCount           int
-	ChaosUID            string
+	ChaosUID            clientTypes.UID
 	AuxiliaryAppInfo    string
 	InstanceID          string
 	ChaosNamespace      string
@@ -30,8 +34,14 @@ type ExperimentDetails struct {
 
 // ResultDetails is for collecting all the chaos-result-related details
 type ResultDetails struct {
-	Name                string
-	Verdict             string
-	FailStep            string
-	Phase               string
+	Name     string
+	Verdict  string
+	FailStep string
+	Phase    string
+}
+
+// EventDetails is for collecting all the events-related details
+type EventDetails struct {
+	Message string
+	Reason  string
 }
