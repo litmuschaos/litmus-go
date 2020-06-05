@@ -30,6 +30,8 @@ type ExperimentDetails struct {
 	InstanceID          string
 	ChaosNamespace      string
 	ChaosPodName        string
+	Iterations          int
+	LIBImage            string
 }
 
 // ResultDetails is for collecting all the chaos-result-related details
