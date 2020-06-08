@@ -15,3 +15,11 @@ func Minimum(a int, b int) int {
 	}
 	return a
 }
+
+//Rule of three for calculating an integer given another integer representing a percentage
+func Adjustment(a int, b int) int {
+
+	b = a * b / 100
+
+	return b
+}

@@ -1,0 +1,23 @@
+apiVersion: litmuchaos.io/v1alpha1
+kind: ChartServiceVersion
+metadata:
+  name: cpu-hog 
+  version: 0.1.0
+  annotations:
+    categories: generic
+    repository: https://github.com/litmuschaos/litmus-go/tree/master/generic/cpu-hog
+    support: https://kubernetes.slack.com/messages/CNXNB0ZTN
+spec:
+  displayName: cpu-hog 
+  categoryDescription: >
+    Increases CPU consumption 
+  keywords: ['pods', 'kubernetes', 'generic', 'cpu'] 
+  maturity: alpha 
+  minKubeVersion: 1.12.0 
+  provider: {'name': 'ContainerSolutions'}
+  maintainers: ['andreas.krivas@container-solutions.com'] 
+  contributors: ['andreas.krivas@container-solutions.com'] 
+  links: ['https://docs.litmuschaos.io/docs/getstarted/'] 
+  icon:
+    - url: 
+      mediatype: ""

@@ -1,10 +1,10 @@
 package types
 
 const (
-	PreChaosCheck                   string = "PreChaosCheck"
-	PostChaosCheck                  string = "PostChaosCheck"
-	Summary                         string = "Summary"
-	ChaosInject                     string = "ChaosInject"
+	PreChaosCheck  string = "PreChaosCheck"
+	PostChaosCheck string = "PostChaosCheck"
+	Summary        string = "Summary"
+	ChaosInject    string = "ChaosInject"
 )
 
 // ExperimentDetails is for collecting all the experiment-related details
@@ -26,12 +26,14 @@ type ExperimentDetails struct {
 	InstanceID          string
 	ChaosNamespace      string
 	ChaosPodName        string
+	CPUcores            int
+	PodsAffectedPerc    int
 }
 
 // ResultDetails is for collecting all the chaos-result-related details
 type ResultDetails struct {
-	Name                string
-	Verdict             string
-	FailStep            string
-	Phase               string
+	Name     string
+	Verdict  string
+	FailStep string
+	Phase    string
 }

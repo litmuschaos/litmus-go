@@ -10,13 +10,14 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-// ClientSets is a collection of clientSets needed
+// ClientSets is a collection of clientSets and kubeConfig needed
 type ClientSets struct {
 	KubeClient   *kubernetes.Clientset
 	LitmusClient *chaosClient.LitmuschaosV1alpha1Client
+	KubeConfig   *rest.Config
 }
 
-// GenerateClientSetFromKubeConfig will generation both ClientSets (k8s, and Litmus)
+// GenerateClientSetFromKubeConfig will generation both ClientSets (k8s, and Litmus) as well as the KubeConfig
 func (clientSets *ClientSets) GenerateClientSetFromKubeConfig() error {
 
 	config, err := getKubeConfig()
@@ -33,6 +34,7 @@ func (clientSets *ClientSets) GenerateClientSetFromKubeConfig() error {
 	}
 	clientSets.KubeClient = k8sClientSet
 	clientSets.LitmusClient = litmusClientSet
+	clientSets.KubeConfig = config
 	return nil
 }
 
