@@ -60,6 +60,8 @@ spec:
       value: ''
     - name: KILL_COUNT
       value: ''
+    - name: LIB_IMAGE
+      value: 'litmuschaos/pod-delete-helper:latest'
     labels:
       name: pod-delete
 

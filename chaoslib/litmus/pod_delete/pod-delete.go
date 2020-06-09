@@ -1,103 +1,84 @@
 package pod_delete
 
 import (
+	"math/rand"
 	"strconv"
 	"time"
 
 	"github.com/litmuschaos/litmus-go/pkg/log"
+	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/openebs/maya/pkg/util/retry"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
+	apiv1 "k8s.io/api/core/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/litmuschaos/litmus-go/pkg/environment"
-	"github.com/litmuschaos/litmus-go/pkg/events"
 	"github.com/litmuschaos/litmus-go/pkg/math"
-	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-//GracePeriod set to zero
-var GracePeriod int64 = 0
 var err error
 
-//PodDeleteChaos deletes the random single/multiple pods
-func PodDeleteChaos(experimentsDetails *types.ExperimentDetails, clients environment.ClientSets, Iterations int, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
-
-	//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
-	ChaosStartTimeStamp := time.Now().Unix()
-
-	for x := 0; x < Iterations; x++ {
-		//Getting the list of all the target pod for deletion
-		targetPodList, err := PreparePodList(experimentsDetails, clients, resultDetails)
-		if err != nil {
-			return err
-		}
-		log.InfoWithValues("[Info]: Killing the following pods", logrus.Fields{
-			"PodList": targetPodList})
-
-		//Deleting the application pod
-		for _, pods := range targetPodList {
-			if experimentsDetails.Force == true {
-				err = clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Delete(pods, &v1.DeleteOptions{GracePeriodSeconds: &GracePeriod})
-			} else {
-				err = clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Delete(pods, &v1.DeleteOptions{})
-			}
-			if err != nil {
-				resultDetails.FailStep = "Deleting the application pod"
-				return err
-			}
-		}
-		if experimentsDetails.EngineName != "" {
-			msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on application pod"
-			environment.SetEventAttributes(eventsDetails, types.ChaosInject, msg)
-			events.GenerateEvents(experimentsDetails, clients, eventsDetails)
-		}
-
-		//ChaosCurrentTimeStamp contains the current timestamp
-		ChaosCurrentTimeStamp := time.Now().Unix()
-
-		//ChaosDiffTimeStamp contains the difference of current timestamp and start timestamp
-		//It will helpful to track the total chaos duration
-		chaosDiffTimeStamp := ChaosCurrentTimeStamp - ChaosStartTimeStamp
-
-		if int(chaosDiffTimeStamp) >= experimentsDetails.ChaosDuration {
-			break
-		}
-
-		//Waiting for the chaos interval after chaos injection
-		if experimentsDetails.ChaosInterval != 0 {
-			log.Infof("[Wait]: Wait for the chaos interval %vs", strconv.Itoa(experimentsDetails.ChaosInterval))
-			waitForChaosInterval(experimentsDetails)
-		}
-		//Verify the status of pod after the chaos injection
-		log.Info("[Status]: Verification for the recreation of application pod")
-		err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, clients)
-		if err != nil {
-			resultDetails.FailStep = "Verification for the recreation of application pod"
-			return err
-		}
-	}
-	log.Infof("[Completion]: %v chaos is done", experimentsDetails.ExperimentName)
-
-	return nil
-}
-
-//PreparePodDelete contains the steps for prepration before chaos
+//PreparePodDelete contains the prepration steps before chaos injection
 func PreparePodDelete(experimentsDetails *types.ExperimentDetails, clients environment.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
 
-	//It will get the total iteration for the pod-delete
-	Iterations := GetIterations(experimentsDetails)
+	//getting the iteration count for the pod deletion
+	GetIterations(experimentsDetails)
 	//Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
 		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", strconv.Itoa(experimentsDetails.RampTime))
 		waitForRampTime(experimentsDetails)
 	}
-	//Deleting for the application pod
-	err := PodDeleteChaos(experimentsDetails, clients, Iterations, resultDetails, eventsDetails)
+
+	// Getting the serviceAccountName
+	err = GetServiceAccount(experimentsDetails, clients)
+	if err != nil {
+		return errors.Errorf("Unable to get the serviceAccountName, err: %v", err)
+	}
+
+	// Generate the run_id
+	runID := GetRunID()
+
+	// Creating the helper pod
+	err = CreateHelperPod(experimentsDetails, clients, runID)
+	if err != nil {
+		errors.Errorf("Unable to create the helper pod, err: %v", err)
+	}
+
+	// Recording the chaos start timestamp
+	ChaosStartTimeStamp := time.Now().Unix()
+
+	//Checking the status of helper pod
+	log.Info("[Status]: Checking the status of the helper pod")
+	err = status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, "name=pod-delete"+runID, clients)
+	if err != nil {
+		errors.Errorf("helper pod is not in running state, err: %v", err)
+	}
+
+	// Wait till the completion of helper pod
+	log.Info("[Wait]: waiting till the completion of the helper pod")
+	err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, "name=pod-delete"+runID, clients, experimentsDetails.ChaosDuration+experimentsDetails.ChaosInterval+60)
 	if err != nil {
 		return err
 	}
+
+	//ChaosCurrentTimeStamp contains the current timestamp
+	ChaosCurrentTimeStamp := time.Now().Unix()
+	//ChaosDiffTimeStamp contains the difference of current timestamp and start timestamp
+    //It will helpful to track the total chaos duration
+	chaosDiffTimeStamp := ChaosCurrentTimeStamp - ChaosStartTimeStamp
+
+	if int(chaosDiffTimeStamp) < experimentsDetails.ChaosDuration {
+		errors.Errorf("The helper pod failed, check the logs of helper pod for more details")
+	}
+
+	//Deleting the helper pod
+	log.Info("[Cleanup]: Deleting the helper pod")
+	err = DeleteHelperPod(experimentsDetails, clients, runID)
+	if err != nil {
+		errors.Errorf("Unable to delete the helper pod, err: %v", err)
+	}
+
 	//Waiting for the ramp time after chaos injection
 	if experimentsDetails.RampTime != 0 {
 		log.Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", strconv.Itoa(experimentsDetails.RampTime))
@@ -107,10 +88,14 @@ func PreparePodDelete(experimentsDetails *types.ExperimentDetails, clients envir
 }
 
 //GetIterations derive the iterations value from given parameters
-func GetIterations(experimentsDetails *types.ExperimentDetails) int {
-
-	Iterations := experimentsDetails.ChaosDuration / experimentsDetails.ChaosInterval
-	return math.Maximum(Iterations, 1)
+func GetIterations(experimentsDetails *types.ExperimentDetails) {
+	var Iterations int
+	if experimentsDetails.ChaosInterval != 0 {
+		Iterations = experimentsDetails.ChaosDuration / experimentsDetails.ChaosInterval
+	} else {
+		Iterations = 0
+	}
+	experimentsDetails.Iterations = math.Maximum(Iterations, 1)
 
 }
 
@@ -119,37 +104,119 @@ func waitForRampTime(experimentsDetails *types.ExperimentDetails) {
 	time.Sleep(time.Duration(experimentsDetails.RampTime) * time.Second)
 }
 
-//waitForChaosInterval waits for the given ramp time duration (in seconds)
-func waitForChaosInterval(experimentsDetails *types.ExperimentDetails) {
-	time.Sleep(time.Duration(experimentsDetails.ChaosInterval) * time.Second)
+// GetRunID generate a random string
+func GetRunID() string {
+	var letterRunes = []rune("abcdefghijklmnopqrstuvwxyz")
+	runID := make([]rune, 6)
+	for i := range runID {
+		runID[i] = letterRunes[rand.Intn(len(letterRunes))]
+	}
+	return string(runID)
 }
 
-//PreparePodList derive the list of target pod for deletion
-//It is based on the KillCount value
-func PreparePodList(experimentsDetails *types.ExperimentDetails, clients environment.ClientSets, resultDetails *types.ResultDetails) ([]string, error) {
+// GetServiceAccount find the serviceAccountName for the helper pod
+func GetServiceAccount(experimentsDetails *types.ExperimentDetails, clients environment.ClientSets) error {
+	pod, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Get(experimentsDetails.ChaosPodName, v1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	experimentsDetails.ChaosServiceAccount = pod.Spec.ServiceAccountName
+	return nil
+}
 
-	var targetPodList []string
+// CreateHelperPod derive the attributes for helper pod and create the helper pod
+func CreateHelperPod(experimentsDetails *types.ExperimentDetails, clients environment.ClientSets, runID string) error {
 
-	err := retry.
+	helperPod := &apiv1.Pod{
+		ObjectMeta: v1.ObjectMeta{
+			Name:      "pod-delete-" + runID,
+			Namespace: experimentsDetails.ChaosNamespace,
+			Labels: map[string]string{
+				"app":      "pod-delete",
+				"name":     "pod-delete" + runID,
+				"chaosUID": string(experimentsDetails.ChaosUID),
+			},
+		},
+		Spec: apiv1.PodSpec{
+			ServiceAccountName: experimentsDetails.ChaosServiceAccount,
+			RestartPolicy:      apiv1.RestartPolicyNever,
+			Containers: []apiv1.Container{
+				{
+					Name:            "pod-delete",
+					Image:           experimentsDetails.LIBImage,
+					ImagePullPolicy: apiv1.PullAlways,
+					Command: []string{
+						"bin/bash",
+					},
+					Args: []string{
+						"-c",
+						"./experiments/pod-delete",
+					},
+					Env: GetPodEnv(experimentsDetails),
+				},
+			},
+		},
+	}
+
+	_, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Create(helperPod)
+	return err
+
+}
+
+//DeleteHelperPod delete the helper pod
+func DeleteHelperPod(experimentsDetails *types.ExperimentDetails, clients environment.ClientSets, runID string) error {
+
+	err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Delete("pod-delete-"+runID, &v1.DeleteOptions{})
+
+	if err != nil {
+		return err
+	}
+
+	err = retry.
 		Times(90).
-		Wait(2 * time.Second).
+		Wait(1 * time.Second).
 		Try(func(attempt uint) error {
-			pods, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).List(v1.ListOptions{LabelSelector: experimentsDetails.AppLabel})
-			if err != nil || len(pods.Items) == 0 {
-				return errors.Errorf("Unable to get the pod, err: %v", err)
+			podSpec, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).List(v1.ListOptions{LabelSelector: "name=pod-delete" + runID})
+			if err != nil || len(podSpec.Items) != 0 {
+				return errors.Errorf("Pod is not deleted yet, err: %v", err)
 			}
-			//Adding the first pod only, if KillCount is not set or 0
-			//Otherwise derive the min(KIllCount,len(pod_list)) pod
-			if experimentsDetails.KillCount == 0 {
-				targetPodList = append(targetPodList, pods.Items[0].Name)
-			} else {
-				for i := 0; i < math.Minimum(experimentsDetails.KillCount, len(pods.Items)); i++ {
-					targetPodList = append(targetPodList, pods.Items[i].Name)
-				}
-			}
-
 			return nil
 		})
 
-	return targetPodList, err
+	return err
+}
+
+// GetPodEnv derive all the env required for the helper pod
+func GetPodEnv(experimentsDetails *types.ExperimentDetails) []apiv1.EnvVar{
+
+	var envVar []apiv1.EnvVar
+	ENVList := map[string]string{"FORCE": strconv.FormatBool(experimentsDetails.Force),"APP_NS": experimentsDetails.AppNS,"KILL_COUNT": strconv.Itoa(experimentsDetails.KillCount),
+	"TOTAL_CHAOS_DURATION": strconv.Itoa(experimentsDetails.ChaosDuration),"CHAOS_NAMESPACE": experimentsDetails.ChaosNamespace,"APP_LABEL": experimentsDetails.AppLabel,
+	"CHAOS_ENGINE": experimentsDetails.EngineName,"CHAOS_UID": string(experimentsDetails.ChaosUID),"CHAOS_INTERVAL": strconv.Itoa(experimentsDetails.ChaosInterval),"ITERATIONS": strconv.Itoa(experimentsDetails.Iterations)}
+	for key, value := range ENVList {
+		var perEnv apiv1.EnvVar
+		perEnv.Name = key
+		perEnv.Value = value
+		envVar = append(envVar, perEnv)
+	}
+	// Getting experiment pod name from downward API
+	experimentPodName := GetValueFromDownwardAPI("v1", "metadata.name")
+
+	var downwardEnv apiv1.EnvVar
+	downwardEnv.Name = "POD_NAME"
+	downwardEnv.ValueFrom = &experimentPodName	
+	envVar = append(envVar, downwardEnv)
+
+	return envVar
+}
+
+// GetValueFromDownwardAPI returns the value from downwardApi
+func GetValueFromDownwardAPI(apiVersion string, fieldPath string) apiv1.EnvVarSource {
+	downwardENV := apiv1.EnvVarSource{
+		FieldRef: &apiv1.ObjectFieldSelector{
+			APIVersion: apiVersion,
+			FieldPath:  fieldPath,
+		},
+	}
+	return downwardENV
 }

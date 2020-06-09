@@ -100,3 +100,30 @@ func CheckContainerStatus(appNs string, appLabel string, clients environment.Cli
 	}
 	return nil
 }
+
+// WaitForCompletion wait until the completion of pod
+func WaitForCompletion(appNs string, appLabel string, clients environment.ClientSets, duration int) error {
+	err := retry.
+		Times(uint(duration)).
+		Wait(1 * time.Second).
+		Try(func(attempt uint) error {
+			podSpec, err := clients.KubeClient.CoreV1().Pods(appNs).List(metav1.ListOptions{LabelSelector: appLabel})
+			if err != nil || len(podSpec.Items) == 0 {
+				return errors.Errorf("Unable to get the pod, err: %v", err)
+			}
+			err = nil
+			for _, pod := range podSpec.Items {
+				log.Infof("helper pod status: %v",string(pod.Status.Phase))
+				if string(pod.Status.Phase) != "Succeeded" && string(pod.Status.Phase) != "Failed" {
+					return errors.Errorf("Helper pod is not yet completed yet")
+				}
+				log.InfoWithValues("The running status of Pods are as follows", logrus.Fields{
+					"Pod": pod.Name, "Status": pod.Status.Phase})
+			}
+			return nil
+		})
+	if err != nil {
+		return err
+	}
+	return nil
+}
