@@ -8,7 +8,6 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/sirupsen/logrus"
-	"k8s.io/klog"
 )
 
 func init() {
@@ -26,6 +25,7 @@ func main() {
 	var err error
 	experimentsDetails := types.ExperimentDetails{}
 	resultDetails := types.ResultDetails{}
+	eventsDetails := types.EventDetails{}
 	clients := environment.ClientSets{}
 	
 	//Getting kubeConfig and Generate ClientSets
@@ -36,11 +36,6 @@ func main() {
 	//Fetching all the ENV passed for the runner pod
 	log.Infof("[PreReq]: Getting the ENV for the %v experiment", experimentsDetails.ExperimentName)
 	environment.GetENV(&experimentsDetails, "{{ name }}")
-
-	recorder, err := events.NewEventRecorder(clients, experimentsDetails)
-	if err != nil {
-		log.Warn("Unable to initiate EventRecorder for chaos-experiment, would not be able to add events")
-	}
 
 	// Intialise Chaos Result Parameters
 	environment.SetResultAttributes(&resultDetails, &experimentsDetails)
@@ -89,7 +84,8 @@ func main() {
 {% endif %}
 
 	if experimentsDetails.EngineName != "" {
-		recorder.PreChaosCheck(experimentsDetails)
+		environment.SetEventAttributes(&eventsDetails, types.PreChaosCheck, "AUT is Running successfully")
+		events.GenerateEvents(&experimentsDetails, clients, &eventsDetails)
 	}
 
     // INVOKE THE CHAOSLIB OF YOUR CHOICE HERE, WHICH WILL CONTAIN 
@@ -110,10 +106,10 @@ func main() {
     // POD STATUS CHECKS FOR THE APPLICATION UNDER TEST AND AUXILIARY APPLICATIONS ARE ADDED BY DEFAULT 
 
 	//POST-CHAOS APPLICATION STATUS CHECK
-	klog.V(0).Infof("[Status]: Verify that the AUT (Application Under Test) is running (post-chaos)")
+    log.Info("[Status]: Verify that the AUT (Application Under Test) is running (post-chaos)")
 	err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, clients)
 	if err != nil {
-		klog.V(0).Infof("Application status check failed due to %v\n", err)
+		log.Errorf("Application status check failed due to %v\n", err)
 		resultDetails.FailStep = "Verify that the AUT (Application Under Test) is running (post-chaos)"
 		result.ChaosResult(&experimentsDetails, clients,&resultDetails,"EOT"); return
 	}
@@ -131,7 +127,8 @@ func main() {
 {% endif %}
 
 	if experimentsDetails.EngineName != "" {
-		recorder.PostChaosCheck(experimentsDetails)
+		environment.SetEventAttributes(&eventsDetails, types.PostChaosCheck, "AUT is Running successfully")
+		events.GenerateEvents(&experimentsDetails, clients, &eventsDetails)
 	}
 
 	//Updating the chaosResult in the end of experiment
@@ -141,6 +138,8 @@ func main() {
 		log.Fatalf("Unable to Update the Chaos Result due to %v\n", err)
 	}
 	if experimentsDetails.EngineName != "" {
-		recorder.Summary(&experimentsDetails, &resultDetails)
+		msg := experimentsDetails.ExperimentName + "experiment has been" + resultDetails.Verdict + "ed"
+		environment.SetEventAttributes(&eventsDetails, types.Summary, msg)
+		events.GenerateEvents(&experimentsDetails, clients, &eventsDetails)
 	}
 }
