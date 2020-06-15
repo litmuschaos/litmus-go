@@ -1,2 +1,4 @@
 # Building go binaries for pod_delete experiment
 go build -o build/_output/pod-delete ./experiments/generic/pod-delete
+# Building go binaries for cpu_hog experiment
+go build -o build/_output/cpu-hog ./experiments/generic/cpu-hog
