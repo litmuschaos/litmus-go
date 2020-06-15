@@ -32,7 +32,7 @@ type ExperimentDetails struct {
 	ChaosPodName        string
 	Iterations          int
 	LIBImage            string
-  CPUcores            int
+  	CPUcores            int
 	PodsAffectedPerc    int
 }
 
@@ -42,6 +42,7 @@ type ResultDetails struct {
 	Verdict  string
 	FailStep string
 	Phase    string
+}
 
 // EventDetails is for collecting all the events-related details
 type EventDetails struct {
