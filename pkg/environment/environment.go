@@ -29,6 +29,8 @@ func GetENV(experimentDetails *types.ExperimentDetails, expName string) {
 	experimentDetails.ChaosPodName = Getenv("POD_NAME","")
 	experimentDetails.Force, _ = strconv.ParseBool(Getenv("FORCE","false"))
 	experimentDetails.LIBImage = Getenv("LIB_IMAGE","")
+  	experimentDetails.CPUcores, _ = strconv.Atoi(Getenv("CPU_CORES","1"))
+	experimentDetails.PodsAffectedPerc, _ = strconv.Atoi(Getenv("PODS_AFFECTED_PERC","100"))
 }
 
 //SetResultAttributes initialise all the chaos result ENV
