@@ -1,0 +1,74 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  generateName: pod-network-duplication-
+spec:
+  template:
+    metadata:
+      labels:
+        experiment: pod-network-duplication
+    spec:
+      # Placeholder that is updated by the executor for automated runs
+      # Provide appropriate SA (with desired permissions) if executed manually
+      serviceAccountName: litmus
+      restartPolicy: Never
+      containers:
+      - name: gotest
+        image: litmuschaos/litmus-go:ci
+        imagePullPolicy: Always
+        env:
+          # provide application namespace
+          - name: APP_NAMESPACE
+            value: ''
+
+          # provide application labels
+          - name: APP_LABEL
+            value: ''
+
+          # provide application kind
+          - name: APP_KIND
+            value: ''
+
+          # provide target conatiner
+          - name: TARGET_CONTAINER
+            value: ''
+
+          - name: NETWORK_INTERFACE
+            value: 'eth0'
+
+          - name: NETWORK_PACKET_DUPLICATION_PERCENTAGE
+            value: '70' # in percentage
+
+          - name: TOTAL_CHAOS_DURATION
+            value: '60'  # in seconds
+
+          # Period to wait before&/fter injection of chaos in sec
+          - name: RAMP_TIME
+            value: ''
+            
+          - name: LIB
+            value: 'pumba'
+          
+          # provide lib image
+          - name: LIB_IMAGE
+            value: 'gaiaadm/pumba:0.6.5' 
+
+          - name: CHAOS_NAMESPACE
+            value: ''
+  
+          - name: CHAOSENGINE
+            value: ''
+
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+            
+          - name: CHAOS_SERVICE_ACCOUNT
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.serviceAccountName
+
+        command: ["/bin/bash"]
+        args: ["-c", "./experiments/pod-network-duplication"]
