@@ -1,18 +1,27 @@
 package network_chaos
 
 import (
+	"fmt"
 	"math/rand"
+	"os"
+	"os/signal"
 	"strconv"
+	"strings"
+	"syscall"
 	"time"
 
 	"github.com/litmuschaos/litmus-go/pkg/environment"
 	"github.com/litmuschaos/litmus-go/pkg/log"
+	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/openebs/maya/pkg/util/retry"
 	"github.com/pkg/errors"
 	apiv1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/remotecommand"
+	"k8s.io/klog"
 )
 
 var err error
@@ -68,6 +77,35 @@ func PreparePodNetworkDuplication(experimentsDetails *types.ExperimentDetails, c
 
 	// Wait till the completion of helper pod
 	log.Info("[Wait]: waiting till the completion of the helper pod")
+	var endTime <-chan time.Time
+	timeDelay := time.Duration(experimentsDetails.ChaosDuration+30) * time.Second
+
+	// signChan channel is used to transmit signal notifications.
+	signChan := make(chan os.Signal, 1)
+	// Catch and relay certain signal(s) to signChan channel.
+	signal.Notify(signChan, os.Interrupt, syscall.SIGTERM, syscall.SIGKILL)
+loop:
+	for {
+		endTime = time.After(timeDelay)
+		select {
+		case <-signChan:
+			log.Info("[Chaos]: Killing process started because of terminated signal received")
+			err = KillNetworkDuplication(targetContainer, appName, experimentsDetails.AppNS, clients)
+			if err != nil {
+				klog.V(0).Infof("Error in Kill stress after")
+				return err
+			}
+			resultDetails.FailStep = "Chaos injection stopped!"
+			resultDetails.Verdict = "Stopped"
+			result.ChaosResult(experimentsDetails, clients, resultDetails, "EOT")
+			os.Exit(1)
+		case <-endTime:
+			log.Infof("[Chaos]: Time is up for experiment: %v", experimentsDetails.ExperimentName)
+			endTime = nil
+			break loop
+		}
+	}
+
 	err = status.WaitForCompletion(experimentsDetails.ChaosNamespace, "name=pumba-netem-"+runID, clients, experimentsDetails.ChaosDuration+30)
 	if err != nil {
 		return err
@@ -230,4 +268,56 @@ func DeleteHelperPod(experimentsDetails *types.ExperimentDetails, clients enviro
 		})
 
 	return err
+}
+
+// KillNetworkDuplication is a Function to kill the experiment. Triggered by either timeout of chaos duration or termination of the experiment
+func KillNetworkDuplication(containerName, podName, namespace string, clients environment.ClientSets) error {
+
+	command := []string{"/bin/sh", "-c", "kill $(find /proc -name exe -lname '*/netem' 2>&1 | grep -v 'Permission denied' | awk -F/ '{print $(NF-1)}' |  head -n 1)"}
+
+	req := clients.KubeClient.CoreV1().RESTClient().Post().
+		Resource("pods").
+		Name(podName).
+		Namespace(namespace).
+		SubResource("exec")
+	scheme := runtime.NewScheme()
+	if err := apiv1.AddToScheme(scheme); err != nil {
+		return fmt.Errorf("error adding to scheme: %v", err)
+	}
+
+	parameterCodec := runtime.NewParameterCodec(scheme)
+	req.VersionedParams(&apiv1.PodExecOptions{
+		Command:   command,
+		Container: containerName,
+		Stdin:     false,
+		Stdout:    true,
+		Stderr:    true,
+		TTY:       false,
+	}, parameterCodec)
+
+	exec, err := remotecommand.NewSPDYExecutor(clients.KubeConfig, "POST", req.URL())
+	if err != nil {
+		return fmt.Errorf("error while creating Executor: %v", err)
+	}
+
+	stdout := os.Stdout
+	stderr := os.Stderr
+
+	err = exec.Stream(remotecommand.StreamOptions{
+		Stdin:  nil,
+		Stdout: stdout,
+		Stderr: stderr,
+		Tty:    false,
+	})
+
+	//The kill command returns a 143 when it kills a process. This is expected
+	if err != nil {
+		error_code := strings.Contains(err.Error(), "143")
+		if error_code != true {
+			log.Infof("[Chaos]:Pod Network Duplication error: %v", err.Error())
+			return err
+		}
+	}
+
+	return nil
 }
