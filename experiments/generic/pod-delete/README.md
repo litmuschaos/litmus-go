@@ -41,7 +41,7 @@ spec:
         verbs:
           - "get"
           - "list"
-    image: "litmuschaos/litmus-go:ci"
+    image: "litmuschaos/go-runner:ci"
     args:
     - -c
     - ./experiments/pod-delete
