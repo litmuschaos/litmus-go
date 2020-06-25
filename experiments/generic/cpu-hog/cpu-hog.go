@@ -51,7 +51,7 @@ func main() {
 	err = result.ChaosResult(&experimentsDetails, clients, &resultDetails, "SOT")
 	if err != nil {
 		log.Errorf("Unable to Create the Chaos Result due to %v", err)
-		resultDetails.FailStep = "Updating the chaos result of pod-delete experiment (SOT)"
+		resultDetails.FailStep = "Updating the chaos result of cpu-hog experiment (SOT)"
 		err = result.ChaosResult(&experimentsDetails, clients, &resultDetails, "EOT")
 		return
 	}
@@ -81,9 +81,7 @@ func main() {
 		recorder.PreChaosCheck(experimentsDetails)
 	}
 
-	// INVOKING THE CHAOS CPU HOG EXPERIMENT
-
-	// Including the litmus lib for pod-delete
+	// Including the litmus lib for cpu-hog
 	if experimentsDetails.ChaosLib == "litmus" {
 		err = cpu_hog.PrepareCPUstress(&experimentsDetails, clients, &resultDetails, recorder)
 		if err != nil {
@@ -98,7 +96,7 @@ func main() {
 		}
 	} else {
 		log.Error("[Invalid]: Please Provide the correct LIB")
-		resultDetails.FailStep = "Including the litmus lib for pod-delete"
+		resultDetails.FailStep = "Including the litmus lib for cpu-hog"
 		result.ChaosResult(&experimentsDetails, clients, &resultDetails, "EOT")
 		return
 	}

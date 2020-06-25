@@ -25,7 +25,7 @@ import (
 	"k8s.io/client-go/tools/remotecommand"
 )
 
-// Using the REST API to exec into the target container of the target pod
+// StressCPU Uses the REST API to exec into the target container of the target pod
 // The function will be constantly increasing the CPU utilisation until it reaches the maximum available or allowed number.
 // Using the TOTAL_CHAOS_DURATION we will need to specify for how long this experiment will last
 func StressCPU(containerName, podName, namespace string, clients environment.ClientSets) error {
@@ -146,7 +146,7 @@ func ExperimentCPU(experimentsDetails *types.ExperimentDetails, clients environm
 	return nil
 }
 
-//PreparePodDelete contains the steps for prepration before chaos
+//PrepareCPUstress contains the steps for prepration before chaos
 func PrepareCPUstress(experimentsDetails *types.ExperimentDetails, clients environment.ClientSets, resultDetails *types.ResultDetails, recorder *events.Recorder) error {
 
 	//Waiting for the ramp time before chaos injection
@@ -172,8 +172,7 @@ func waitForRampTime(experimentsDetails *types.ExperimentDetails) {
 	time.Sleep(time.Duration(experimentsDetails.RampTime) * time.Second)
 }
 
-//PreparePodList derive the list of target pod for deletion
-//It will also adjust the number of the target pods depending on the specified percentage in PODS_AFFECTED_PERC variable
+//PreparePodList will also adjust the number of the target pods depending on the specified percentage in PODS_AFFECTED_PERC variable
 func PreparePodList(experimentsDetails *types.ExperimentDetails, clients environment.ClientSets, resultDetails *types.ResultDetails) (*core_v1.PodList, error) {
 
 	log.Infof("[Chaos]:Pods percentage to affect is %v", strconv.Itoa(experimentsDetails.PodsAffectedPerc))
