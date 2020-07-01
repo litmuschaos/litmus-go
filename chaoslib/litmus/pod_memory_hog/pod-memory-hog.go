@@ -1,4 +1,4 @@
-package cpu_hog
+package pod_memory_hog
 
 import (
 	"fmt"
@@ -19,17 +19,20 @@ import (
 	"github.com/sirupsen/logrus"
 	core_v1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/remotecommand"
-	"k8s.io/klog"
 )
 
-// StressCPU Uses the REST API to exec into the target container of the target pod
-// The function will be constantly increasing the CPU utilisation until it reaches the maximum available or allowed number.
+// StressMemory Uses the REST API to exec into the target container of the target pod
+// The function will be constantly increasing the Memory utilisation until it reaches the maximum available or allowed number.
 // Using the TOTAL_CHAOS_DURATION we will need to specify for how long this experiment will last
-func StressCPU(containerName, podName, namespace string, clients environment.ClientSets) error {
+func StressMemory(MemoryConsumption, containerName, podName, namespace string, clients environment.ClientSets) error {
 
-	command := fmt.Sprintf("md5sum /dev/zero")
+	log.Infof("The memory consumption is: %v", MemoryConsumption)
+
+	command := fmt.Sprintf("dd if=/dev/zero of=/dev/null bs=" + MemoryConsumption + "M")
 
 	req := clients.KubeClient.CoreV1().RESTClient().Post().
 		Resource("pods").
@@ -69,7 +72,7 @@ func StressCPU(containerName, podName, namespace string, clients environment.Cli
 	if err != nil {
 		error_code := strings.Contains(err.Error(), "143")
 		if error_code != true {
-			log.Infof("[Chaos]:CPU stress error: %v", err.Error())
+			log.Infof("[Chaos]:Memory stress error: %v", err.Error())
 			return err
 		}
 	}
@@ -77,8 +80,8 @@ func StressCPU(containerName, podName, namespace string, clients environment.Cli
 	return nil
 }
 
-//ExperimentCPU function orchestrates the experiment by calling the StressCPU function for every core, of every container, of every pod that is targetted
-func ExperimentCPU(experimentsDetails *types.ExperimentDetails, clients environment.ClientSets, resultDetails *types.ResultDetails) error {
+//ExperimentMemory function orchestrates the experiment by calling the StressMemory function, of every container, of every pod that is targetted
+func ExperimentMemory(experimentsDetails *types.ExperimentDetails, clients environment.ClientSets, resultDetails *types.ResultDetails) error {
 
 	var endTime <-chan time.Time
 	timeDelay := time.Duration(experimentsDetails.ChaosDuration) * time.Second
@@ -98,45 +101,43 @@ func ExperimentCPU(experimentsDetails *types.ExperimentDetails, clients environm
 			log.InfoWithValues("The running status of container to stress is as follows", logrus.Fields{
 				"container": container.Name, "Pod": pod.Name, "Status": pod.Status.Phase})
 
-			log.Infof("[Chaos]:Stressing: %v cores", strconv.Itoa(experimentsDetails.CPUcores))
+			log.Infof("[Chaos]:Stressing: %v Megabytes", strconv.Itoa(experimentsDetails.MemoryConsumption))
 
-			for i := 0; i < experimentsDetails.CPUcores; i++ {
-				go StressCPU(container.Name, pod.Name, experimentsDetails.AppNS, clients)
+			go StressMemory(strconv.Itoa(experimentsDetails.MemoryConsumption), container.Name, pod.Name, experimentsDetails.AppNS, clients)
 
-				log.Infof("[Chaos]:Waiting for: %vs", strconv.Itoa(experimentsDetails.ChaosDuration))
+			log.Infof("[Chaos]:Waiting for: %vs", strconv.Itoa(experimentsDetails.ChaosDuration))
 
-				// signChan channel is used to transmit signal notifications.
-				signChan := make(chan os.Signal, 1)
-				// Catch and relay certain signal(s) to signChan channel.
-				signal.Notify(signChan, os.Interrupt, syscall.SIGTERM, syscall.SIGKILL)
-			loop:
-				for {
-					endTime = time.After(timeDelay)
-					select {
-					case <-signChan:
-						log.Info("[Chaos]: Killing process started because of terminated signal received")
-						err = KillStressCPU(container.Name, pod.Name, experimentsDetails.AppNS, clients)
-						if err != nil {
-							klog.V(0).Infof("Error in Kill stress after")
-							return err
-						}
-						resultDetails.FailStep = "CPU hog Chaos injection stopped!"
-						resultDetails.Verdict = "Stopped"
-						result.ChaosResult(experimentsDetails, clients, resultDetails, "EOT")
-						os.Exit(1)
-					case <-endTime:
-						log.Infof("[Chaos]: Time is up for experiment: %v", experimentsDetails.ExperimentName)
-						endTime = nil
-						break loop
-					}
-				}
-				err = KillStressCPU(container.Name, pod.Name, experimentsDetails.AppNS, clients)
-				if err != nil {
-					error_code := strings.Contains(err.Error(), "143")
-					if error_code != true {
-						log.Infof("[Chaos]:CPU stress error: %v", err.Error())
+			// signChan channel is used to transmit signal notifications.
+			signChan := make(chan os.Signal, 1)
+			// Catch and relay certain signal(s) to signChan channel.
+			signal.Notify(signChan, os.Interrupt, syscall.SIGTERM, syscall.SIGKILL)
+		loop:
+			for {
+				endTime = time.After(timeDelay)
+				select {
+				case <-signChan:
+					log.Info("[Chaos]: Killing process started because of terminated signal received")
+					err = KillStressMemory(container.Name, pod.Name, experimentsDetails.AppNS, clients)
+					if err != nil {
+						klog.V(0).Infof("Error in Kill stress after")
 						return err
 					}
+					resultDetails.FailStep = "Memory hog Chaos injection stopped!"
+					resultDetails.Verdict = "Stopped"
+					result.ChaosResult(experimentsDetails, clients, resultDetails, "EOT")
+					os.Exit(1)
+				case <-endTime:
+					log.Infof("[Chaos]: Time is up for experiment: %v", experimentsDetails.ExperimentName)
+					endTime = nil
+					break loop
+				}
+			}
+			err = KillStressMemory(container.Name, pod.Name, experimentsDetails.AppNS, clients)
+			if err != nil {
+				error_code := strings.Contains(err.Error(), "143")
+				if error_code != true {
+					log.Infof("[Chaos]:Memory stress error: %v", err.Error())
+					return err
 				}
 			}
 		}
@@ -145,16 +146,16 @@ func ExperimentCPU(experimentsDetails *types.ExperimentDetails, clients environm
 	return nil
 }
 
-//PrepareCPUstress contains the steps for prepration before chaos
-func PrepareCPUstress(experimentsDetails *types.ExperimentDetails, clients environment.ClientSets, resultDetails *types.ResultDetails, recorder *events.Recorder) error {
+//PrepareMemoryStress contains the steps for prepration before chaos
+func PrepareMemoryStress(experimentsDetails *types.ExperimentDetails, clients environment.ClientSets, resultDetails *types.ResultDetails, recorder *events.Recorder) error {
 
 	//Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
 		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", strconv.Itoa(experimentsDetails.RampTime))
 		waitForRampTime(experimentsDetails)
 	}
-	//Starting the CPU stress experiment
-	err := ExperimentCPU(experimentsDetails, clients, resultDetails)
+	//Starting the Memory stress experiment
+	err := ExperimentMemory(experimentsDetails, clients, resultDetails)
 	if err != nil {
 		return err
 	}
@@ -197,9 +198,9 @@ func PreparePodList(experimentsDetails *types.ExperimentDetails, clients environ
 }
 
 // Function to kill the experiment. Triggered by either timeout of chaos duration or termination of the experiment
-func KillStressCPU(containerName, podName, namespace string, clients environment.ClientSets) error {
+func KillStressMemory(containerName, podName, namespace string, clients environment.ClientSets) error {
 
-	command := []string{"/bin/sh", "-c", "kill $(find /proc -name exe -lname '*/md5sum' 2>&1 | grep -v 'Permission denied' | awk -F/ '{print $(NF-1)}' |  head -n 1)"}
+	command := []string{"/bin/sh", "-c", "kill $(find /proc -name exe -lname '*/dd' 2>&1 | grep -v 'Permission denied' | awk -F/ '{print $(NF-1)}' |  head -n 1)"}
 
 	req := clients.KubeClient.CoreV1().RESTClient().Post().
 		Resource("pods").
@@ -240,7 +241,7 @@ func KillStressCPU(containerName, podName, namespace string, clients environment
 	if err != nil {
 		error_code := strings.Contains(err.Error(), "143")
 		if error_code != true {
-			log.Infof("[Chaos]:CPU stress error: %v", err.Error())
+			log.Infof("[Chaos]:Memory stress error: %v", err.Error())
 			return err
 		}
 	}

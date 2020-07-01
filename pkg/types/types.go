@@ -32,7 +32,8 @@ type ExperimentDetails struct {
 	ChaosPodName        string
 	Iterations          int
 	LIBImage            string
-  	CPUcores            int
+	CPUcores            int
+	MemoryConsumption   int
 	PodsAffectedPerc    int
 }
 
