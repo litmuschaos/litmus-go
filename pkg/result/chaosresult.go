@@ -2,38 +2,37 @@ package result
 
 import (
 	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/environment"
+	"github.com/litmuschaos/litmus-go/pkg/types"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	//"k8s.io/klog"
 )
 
 //ChaosResult Create/Update the chaos result
-func ChaosResult(experimentsDetails *types.ExperimentDetails, clients environment.ClientSets, resultDetails *types.ResultDetails,state string) error {
+func ChaosResult(experimentsDetails *types.ExperimentDetails, clients environment.ClientSets, resultDetails *types.ResultDetails, state string) error {
 
 	result, _ := clients.LitmusClient.ChaosResults(experimentsDetails.ChaosNamespace).Get(resultDetails.Name, metav1.GetOptions{})
 
-	if state == "SOT"{
+	if state == "SOT" {
 
 		if result.Name == resultDetails.Name {
-			err := PatchChaosResult(result, clients, experimentsDetails,resultDetails)
+			err := PatchChaosResult(result, clients, experimentsDetails, resultDetails)
 			if err != nil {
 				return err
 			}
 		} else {
-			err := InitializeChaosResult(experimentsDetails, clients,resultDetails)
+			err := InitializeChaosResult(experimentsDetails, clients, resultDetails)
 			if err != nil {
 				return err
 			}
 		}
-	}else {
-		resultDetails.Phase= "Completed"
-		err := PatchChaosResult(result, clients, experimentsDetails,resultDetails)
-			if err != nil {
-				return err
-			}
+	} else {
+		resultDetails.Phase = "Completed"
+		err := PatchChaosResult(result, clients, experimentsDetails, resultDetails)
+		if err != nil {
+			return err
+		}
 	}
-
 
 	return nil
 }

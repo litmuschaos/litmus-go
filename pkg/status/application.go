@@ -113,7 +113,7 @@ func WaitForCompletion(appNs string, appLabel string, clients environment.Client
 			}
 			err = nil
 			for _, pod := range podSpec.Items {
-				log.Infof("helper pod status: %v",string(pod.Status.Phase))
+				log.Infof("helper pod status: %v", string(pod.Status.Phase))
 				if string(pod.Status.Phase) != "Succeeded" && string(pod.Status.Phase) != "Failed" {
 					return errors.Errorf("Helper pod is not yet completed yet")
 				}

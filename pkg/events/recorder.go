@@ -1,17 +1,17 @@
 package events
 
 import (
+	"github.com/litmuschaos/litmus-go/pkg/environment"
+	"github.com/litmuschaos/litmus-go/pkg/types"
+	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/record"
-	"github.com/litmuschaos/litmus-go/pkg/types"
-	"github.com/litmuschaos/litmus-go/pkg/environment"
 	"time"
-	"github.com/pkg/errors"
-	runtime "k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
 	litmuschaosScheme "github.com/litmuschaos/chaos-operator/pkg/client/clientset/versioned/scheme"
@@ -36,7 +36,7 @@ func generateEventRecorder(kubeClient *kubernetes.Clientset, componentName strin
 
 // NewEventRecorder initalizes EventRecorder with Resource as ChaosEngine
 func NewEventRecorder(clients environment.ClientSets, experimentsDetails types.ExperimentDetails) (*Recorder, error) {
-	engineForEvent, err := GetChaosEngine(clients,experimentsDetails)
+	engineForEvent, err := GetChaosEngine(clients, experimentsDetails)
 	if err != nil {
 		return &Recorder{}, err
 	}
@@ -64,13 +64,13 @@ func (r Recorder) PostChaosCheck(experimentsDetails types.ExperimentDetails) {
 
 // ChaosInject is an standard event spawned just after chaos injection
 func (r Recorder) ChaosInject(experimentsDetails *types.ExperimentDetails) {
-	r.EventRecorder.Eventf(r.EventResource, corev1.EventTypeNormal, types.ChaosInject, "Injecting %v chaos on application pod",experimentsDetails.ExperimentName)
+	r.EventRecorder.Eventf(r.EventResource, corev1.EventTypeNormal, types.ChaosInject, "Injecting %v chaos on application pod", experimentsDetails.ExperimentName)
 	time.Sleep(5 * time.Second)
 }
 
 // Summary is an standard event spawned in the end of test
 func (r Recorder) Summary(experimentsDetails *types.ExperimentDetails, resultDetails *types.ResultDetails) {
-	r.EventRecorder.Eventf(r.EventResource, corev1.EventTypeNormal, types.Summary, "%v experiment has been %ved",experimentsDetails.ExperimentName, resultDetails.Verdict)
+	r.EventRecorder.Eventf(r.EventResource, corev1.EventTypeNormal, types.Summary, "%v experiment has been %ved", experimentsDetails.ExperimentName, resultDetails.Verdict)
 	time.Sleep(5 * time.Second)
 }
 
