@@ -1,5 +1,8 @@
 sudo: required
 dist: xenial
+env:
+  global:
+    - TRIVYARCH="64bit"
 
 services:
   - docker
@@ -11,13 +14,23 @@ addons:
   apt:
     update: true
 
+before_script:
+  # Installing Trivy Deps
+  - sudo apt-get install curl
+  - export VERSION=$(curl --silent "https://api.github.com/repos/aquasecurity/trivy/releases/latest" | grep '"tag_name":' | sed -E 's/.*"v([^"]+)".*/\1/')
+  - echo ${VERSION} 
+  - wget https://github.com/aquasecurity/trivy/releases/download/v${VERSION}/trivy_${VERSION}_Linux-${TRIVYARCH}.tar.gz
+  - tar zxvf trivy_${VERSION}_Linux-${TRIVYARCH}.tar.gz
+
 script:
   # Installing and configuring dependencies
   - make deps
-  # Building go binaries
-  - make go-build
+  # gotaks includes formatting, linting and check unused packages
+  - make gotasks
   # Build
   - make build
+  # Running Security check
+  - make security-checks
 
 after_success:
   - make push
