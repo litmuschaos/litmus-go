@@ -19,7 +19,6 @@ type ExperimentDetails struct {
 	AppKind             string
 	KillCount           int
 	ChaosUID            clientTypes.UID
-	AuxiliaryAppInfo    string
 	InstanceID          string
 	ChaosNamespace      string
 	ChaosPodName        string

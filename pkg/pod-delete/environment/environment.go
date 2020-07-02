@@ -6,12 +6,12 @@ import (
 
 	clientTypes "k8s.io/apimachinery/pkg/types"
 
-	experimenttypes "github.com/litmuschaos/litmus-go/pkg/pod-delete/types"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/pod-delete/types"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 )
 
 //GetENV fetches all the env variables from the runner pod
-func GetENV(experimentDetails *experimenttypes.ExperimentDetails, expName string) {
+func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string) {
 	experimentDetails.ExperimentName = expName
 	experimentDetails.ChaosNamespace = Getenv("CHAOS_NAMESPACE", "litmus")
 	experimentDetails.EngineName = Getenv("CHAOSENGINE", "")
@@ -25,7 +25,6 @@ func GetENV(experimentDetails *experimenttypes.ExperimentDetails, expName string
 	experimentDetails.AppKind = Getenv("APP_KIND", "")
 	experimentDetails.KillCount, _ = strconv.Atoi(Getenv("KILL_COUNT", "1"))
 	experimentDetails.ChaosUID = clientTypes.UID(Getenv("CHAOS_UID", ""))
-	experimentDetails.AuxiliaryAppInfo = Getenv("AUXILIARY_APPINFO", "")
 	experimentDetails.InstanceID = Getenv("INSTANCE_ID", "")
 	experimentDetails.ChaosPodName = Getenv("POD_NAME", "")
 	experimentDetails.Force, _ = strconv.ParseBool(Getenv("FORCE", "false"))
@@ -41,14 +40,14 @@ func Getenv(key string, defaultValue string) string {
 	return value
 }
 
-//InitialiseEventAttributes initialise all the event attributes
-func InitialiseEventAttributes(eventsDetails *types.EventDetails, experimentDetails *experimenttypes.ExperimentDetails) {
+//InitialiseChaosVariables initialise all the global variables
+func InitialiseChaosVariables(chaosDetails *types.ChaosDetails, experimentDetails *experimentTypes.ExperimentDetails) {
 
-	eventsDetails.ChaosNamespace = experimentDetails.ChaosNamespace
-	eventsDetails.ChaosPodName = experimentDetails.ChaosPodName
-	eventsDetails.ChaosUID = experimentDetails.ChaosUID
-	eventsDetails.EngineName = experimentDetails.EngineName
-	eventsDetails.ExperimentName = experimentDetails.ExperimentName
-	eventsDetails.InstanceID = experimentDetails.InstanceID
+	chaosDetails.ChaosNamespace = experimentDetails.ChaosNamespace
+	chaosDetails.ChaosPodName = experimentDetails.ChaosPodName
+	chaosDetails.ChaosUID = experimentDetails.ChaosUID
+	chaosDetails.EngineName = experimentDetails.EngineName
+	chaosDetails.ExperimentName = experimentDetails.ExperimentName
+	chaosDetails.InstanceID = experimentDetails.InstanceID
 
 }

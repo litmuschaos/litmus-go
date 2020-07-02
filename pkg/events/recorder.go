@@ -36,12 +36,12 @@ func generateEventRecorder(kubeClient *kubernetes.Clientset, componentName strin
 }
 
 // NewEventRecorder initalizes EventRecorder with Resource as ChaosEngine
-func NewEventRecorder(clients environment.ClientSets, eventsDetails types.EventDetails) (*Recorder, error) {
-	engineForEvent, err := GetChaosEngine(clients, eventsDetails.ChaosNamespace, eventsDetails.EngineName)
+func NewEventRecorder(clients environment.ClientSets, chaosDetails types.ChaosDetails) (*Recorder, error) {
+	engineForEvent, err := GetChaosEngine(clients, chaosDetails.ChaosNamespace, chaosDetails.EngineName)
 	if err != nil {
 		return &Recorder{}, err
 	}
-	eventBroadCaster, err := generateEventRecorder(clients.KubeClient, eventsDetails.ChaosPodName)
+	eventBroadCaster, err := generateEventRecorder(clients.KubeClient, chaosDetails.ChaosPodName)
 	if err != nil {
 		return &Recorder{}, err
 	}

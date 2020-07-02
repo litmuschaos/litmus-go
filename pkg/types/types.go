@@ -15,16 +15,23 @@ const (
 
 // ResultDetails is for collecting all the chaos-result-related details
 type ResultDetails struct {
-	Name     string
-	Verdict  string
-	FailStep string
-	Phase    string
+	Name      string
+	Verdict   string
+	FailStep  string
+	Phase     string
+	ResultUID clientTypes.UID
 }
 
 // EventDetails is for collecting all the events-related details
 type EventDetails struct {
-	Message        string
-	Reason         string
+	Message      string
+	Reason       string
+	ResourceName string
+	ResourceUID  clientTypes.UID
+}
+
+// ChaosDetails is for collecting all the global variables
+type ChaosDetails struct {
 	ChaosUID       clientTypes.UID
 	ChaosNamespace string
 	ChaosPodName   string

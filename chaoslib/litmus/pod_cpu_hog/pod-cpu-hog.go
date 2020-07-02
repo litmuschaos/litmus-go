@@ -1,4 +1,4 @@
-package cpu_hog
+package pod_cpu_hog
 
 import (
 	"fmt"
@@ -13,17 +13,16 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/math"
-	experimenttypes "github.com/litmuschaos/litmus-go/pkg/pod-cpu-hog/types"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/pod-cpu-hog/types"
 	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	core_v1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/klog"
-
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/remotecommand"
+	"k8s.io/klog"
 )
 
 // StressCPU Uses the REST API to exec into the target container of the target pod
@@ -80,7 +79,7 @@ func StressCPU(containerName, podName, namespace string, clients environment.Cli
 }
 
 //ExperimentCPU function orchestrates the experiment by calling the StressCPU function for every core, of every container, of every pod that is targetted
-func ExperimentCPU(experimentsDetails *experimenttypes.ExperimentDetails, clients environment.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
+func ExperimentCPU(experimentsDetails *experimentTypes.ExperimentDetails, clients environment.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	var endTime <-chan time.Time
 	timeDelay := time.Duration(experimentsDetails.ChaosDuration) * time.Second
@@ -105,8 +104,9 @@ func ExperimentCPU(experimentsDetails *experimenttypes.ExperimentDetails, client
 			for i := 0; i < experimentsDetails.CPUcores; i++ {
 
 				if experimentsDetails.EngineName != "" {
-					environment.SetEventAttributes(eventsDetails, types.ChaosInject, "Injecting"+experimentsDetails.ExperimentName+"chaos on"+pod.Name+"pod")
-					events.GenerateEvents(eventsDetails, clients)
+					msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on " + pod.Name + " pod"
+					environment.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, chaosDetails)
+					events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 				}
 
 				go StressCPU(container.Name, pod.Name, experimentsDetails.AppNS, clients)
@@ -130,7 +130,7 @@ func ExperimentCPU(experimentsDetails *experimenttypes.ExperimentDetails, client
 						}
 						resultDetails.FailStep = "CPU hog Chaos injection stopped!"
 						resultDetails.Verdict = "Stopped"
-						result.ChaosResult(eventsDetails, clients, resultDetails, "EOT")
+						result.ChaosResult(chaosDetails, clients, resultDetails, "EOT")
 						os.Exit(1)
 					case <-endTime:
 						log.Infof("[Chaos]: Time is up for experiment: %v", experimentsDetails.ExperimentName)
@@ -154,7 +154,7 @@ func ExperimentCPU(experimentsDetails *experimenttypes.ExperimentDetails, client
 }
 
 //PrepareCPUstress contains the steps for prepration before chaos
-func PrepareCPUstress(experimentsDetails *experimenttypes.ExperimentDetails, clients environment.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
+func PrepareCPUstress(experimentsDetails *experimentTypes.ExperimentDetails, clients environment.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	//Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
@@ -162,7 +162,7 @@ func PrepareCPUstress(experimentsDetails *experimenttypes.ExperimentDetails, cli
 		waitForRampTime(experimentsDetails)
 	}
 	//Starting the CPU stress experiment
-	err := ExperimentCPU(experimentsDetails, clients, resultDetails, eventsDetails)
+	err := ExperimentCPU(experimentsDetails, clients, resultDetails, eventsDetails, chaosDetails)
 	if err != nil {
 		return err
 	}
@@ -175,12 +175,12 @@ func PrepareCPUstress(experimentsDetails *experimenttypes.ExperimentDetails, cli
 }
 
 //waitForRampTime waits for the given ramp time duration (in seconds)
-func waitForRampTime(experimentsDetails *experimenttypes.ExperimentDetails) {
+func waitForRampTime(experimentsDetails *experimentTypes.ExperimentDetails) {
 	time.Sleep(time.Duration(experimentsDetails.RampTime) * time.Second)
 }
 
 //PreparePodList will also adjust the number of the target pods depending on the specified percentage in PODS_AFFECTED_PERC variable
-func PreparePodList(experimentsDetails *experimenttypes.ExperimentDetails, clients environment.ClientSets, resultDetails *types.ResultDetails) (*core_v1.PodList, error) {
+func PreparePodList(experimentsDetails *experimentTypes.ExperimentDetails, clients environment.ClientSets, resultDetails *types.ResultDetails) (*core_v1.PodList, error) {
 
 	log.Infof("[Chaos]:Pods percentage to affect is %v", strconv.Itoa(experimentsDetails.PodsAffectedPerc))
 
@@ -194,7 +194,7 @@ func PreparePodList(experimentsDetails *experimenttypes.ExperimentDetails, clien
 	//If the default value has changed, means that we are aiming for a subset of the pods.
 	if experimentsDetails.PodsAffectedPerc != 100 {
 
-		newPodListLength := math.Adjustment(experimentsDetails.PodsAffectedPerc, len(pods.Items))
+		newPodListLength := math.Maximum(1, math.Adjustment(experimentsDetails.PodsAffectedPerc, len(pods.Items)))
 
 		pods.Items = pods.Items[:newPodListLength]
 

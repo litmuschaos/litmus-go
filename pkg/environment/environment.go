@@ -16,9 +16,22 @@ func SetResultAttributes(resultDetails *types.ResultDetails, EngineName string, 
 	}
 }
 
-//SetEventAttributes initialise all the chaos result ENV
-func SetEventAttributes(eventsDetails *types.EventDetails, Reason string, Message string) {
+//SetEngineEventAttributes initialise attributes for event generation in chaos engine
+func SetEngineEventAttributes(eventsDetails *types.EventDetails, Reason string, Message string, chaosDetails *types.ChaosDetails) {
 
 	eventsDetails.Reason = Reason
 	eventsDetails.Message = Message
+	eventsDetails.ResourceName = chaosDetails.EngineName
+	eventsDetails.ResourceUID = chaosDetails.ChaosUID
+
+}
+
+//SetResultEventAttributes initialise attributes for event generation in chaos result
+func SetResultEventAttributes(eventsDetails *types.EventDetails, Reason string, Message string, resultDetails *types.ResultDetails) {
+
+	eventsDetails.Reason = Reason
+	eventsDetails.Message = Message
+	eventsDetails.ResourceName = resultDetails.Name
+	eventsDetails.ResourceUID = resultDetails.ResultUID
+
 }
