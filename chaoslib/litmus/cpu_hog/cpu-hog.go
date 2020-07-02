@@ -13,6 +13,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/math"
+	experimenttypes "github.com/litmuschaos/litmus-go/pkg/pod-cpu-hog/types"
 	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/pkg/errors"
@@ -68,8 +69,8 @@ func StressCPU(containerName, podName, namespace string, clients environment.Cli
 	})
 
 	if err != nil {
-		error_code := strings.Contains(err.Error(), "143")
-		if error_code != true {
+		errorCode := strings.Contains(err.Error(), "143")
+		if errorCode != true {
 			log.Infof("[Chaos]:CPU stress error: %v", err.Error())
 			return err
 		}
@@ -78,8 +79,8 @@ func StressCPU(containerName, podName, namespace string, clients environment.Cli
 	return nil
 }
 
-//This function orchestrates the experiment by calling the StressCPU function for every core, of every container, of every pod that is targetted
-func ExperimentCPU(experimentsDetails *types.ExperimentDetails, clients environment.ClientSets, resultDetails *types.ResultDetails) error {
+//ExperimentCPU function orchestrates the experiment by calling the StressCPU function for every core, of every container, of every pod that is targetted
+func ExperimentCPU(experimentsDetails *experimenttypes.ExperimentDetails, clients environment.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
 
 	var endTime <-chan time.Time
 	timeDelay := time.Duration(experimentsDetails.ChaosDuration) * time.Second
@@ -102,6 +103,12 @@ func ExperimentCPU(experimentsDetails *types.ExperimentDetails, clients environm
 			log.Infof("[Chaos]:Stressing: %v cores", strconv.Itoa(experimentsDetails.CPUcores))
 
 			for i := 0; i < experimentsDetails.CPUcores; i++ {
+
+				if experimentsDetails.EngineName != "" {
+					environment.SetEventAttributes(eventsDetails, types.ChaosInject, "Injecting"+experimentsDetails.ExperimentName+"chaos on"+pod.Name+"pod")
+					events.GenerateEvents(eventsDetails, clients)
+				}
+
 				go StressCPU(container.Name, pod.Name, experimentsDetails.AppNS, clients)
 
 				log.Infof("[Chaos]:Waiting for: %vs", strconv.Itoa(experimentsDetails.ChaosDuration))
@@ -123,7 +130,7 @@ func ExperimentCPU(experimentsDetails *types.ExperimentDetails, clients environm
 						}
 						resultDetails.FailStep = "CPU hog Chaos injection stopped!"
 						resultDetails.Verdict = "Stopped"
-						result.ChaosResult(experimentsDetails, clients, resultDetails, "EOT")
+						result.ChaosResult(eventsDetails, clients, resultDetails, "EOT")
 						os.Exit(1)
 					case <-endTime:
 						log.Infof("[Chaos]: Time is up for experiment: %v", experimentsDetails.ExperimentName)
@@ -133,8 +140,8 @@ func ExperimentCPU(experimentsDetails *types.ExperimentDetails, clients environm
 				}
 				err = KillStressCPU(container.Name, pod.Name, experimentsDetails.AppNS, clients)
 				if err != nil {
-					error_code := strings.Contains(err.Error(), "143")
-					if error_code != true {
+					errorCode := strings.Contains(err.Error(), "143")
+					if errorCode != true {
 						log.Infof("[Chaos]:CPU stress error: %v", err.Error())
 						return err
 					}
@@ -147,7 +154,7 @@ func ExperimentCPU(experimentsDetails *types.ExperimentDetails, clients environm
 }
 
 //PrepareCPUstress contains the steps for prepration before chaos
-func PrepareCPUstress(experimentsDetails *types.ExperimentDetails, clients environment.ClientSets, resultDetails *types.ResultDetails, recorder *events.Recorder) error {
+func PrepareCPUstress(experimentsDetails *experimenttypes.ExperimentDetails, clients environment.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
 
 	//Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
@@ -155,7 +162,7 @@ func PrepareCPUstress(experimentsDetails *types.ExperimentDetails, clients envir
 		waitForRampTime(experimentsDetails)
 	}
 	//Starting the CPU stress experiment
-	err := ExperimentCPU(experimentsDetails, clients, resultDetails)
+	err := ExperimentCPU(experimentsDetails, clients, resultDetails, eventsDetails)
 	if err != nil {
 		return err
 	}
@@ -168,12 +175,12 @@ func PrepareCPUstress(experimentsDetails *types.ExperimentDetails, clients envir
 }
 
 //waitForRampTime waits for the given ramp time duration (in seconds)
-func waitForRampTime(experimentsDetails *types.ExperimentDetails) {
+func waitForRampTime(experimentsDetails *experimenttypes.ExperimentDetails) {
 	time.Sleep(time.Duration(experimentsDetails.RampTime) * time.Second)
 }
 
 //PreparePodList will also adjust the number of the target pods depending on the specified percentage in PODS_AFFECTED_PERC variable
-func PreparePodList(experimentsDetails *types.ExperimentDetails, clients environment.ClientSets, resultDetails *types.ResultDetails) (*core_v1.PodList, error) {
+func PreparePodList(experimentsDetails *experimenttypes.ExperimentDetails, clients environment.ClientSets, resultDetails *types.ResultDetails) (*core_v1.PodList, error) {
 
 	log.Infof("[Chaos]:Pods percentage to affect is %v", strconv.Itoa(experimentsDetails.PodsAffectedPerc))
 
@@ -187,17 +194,17 @@ func PreparePodList(experimentsDetails *types.ExperimentDetails, clients environ
 	//If the default value has changed, means that we are aiming for a subset of the pods.
 	if experimentsDetails.PodsAffectedPerc != 100 {
 
-		new_podlist_length := math.Adjustment(experimentsDetails.PodsAffectedPerc, len(pods.Items))
+		newPodListLength := math.Adjustment(experimentsDetails.PodsAffectedPerc, len(pods.Items))
 
-		pods.Items = pods.Items[:new_podlist_length]
+		pods.Items = pods.Items[:newPodListLength]
 
-		log.Infof("[Chaos]:Number of pods targetted: %v", strconv.Itoa(new_podlist_length))
+		log.Infof("[Chaos]:Number of pods targetted: %v", strconv.Itoa(newPodListLength))
 
 	}
 	return pods, nil
 }
 
-// Function to kill the experiment. Triggered by either timeout of chaos duration or termination of the experiment
+// KillStressCPU function to kill the experiment. Triggered by either timeout of chaos duration or termination of the experiment
 func KillStressCPU(containerName, podName, namespace string, clients environment.ClientSets) error {
 
 	command := []string{"/bin/sh", "-c", "kill $(find /proc -name exe -lname '*/md5sum' 2>&1 | grep -v 'Permission denied' | awk -F/ '{print $(NF-1)}' |  head -n 1)"}
@@ -239,8 +246,8 @@ func KillStressCPU(containerName, podName, namespace string, clients environment
 
 	//The kill command returns a 143 when it kills a process. This is expected
 	if err != nil {
-		error_code := strings.Contains(err.Error(), "143")
-		if error_code != true {
+		errorCode := strings.Contains(err.Error(), "143")
+		if errorCode != true {
 			log.Infof("[Chaos]:CPU stress error: %v", err.Error())
 			return err
 		}

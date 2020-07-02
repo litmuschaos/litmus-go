@@ -10,15 +10,15 @@ import (
 )
 
 //CreateEvents create the events
-func CreateEvents(experimentsDetails *types.ExperimentDetails, clients environment.ClientSets, eventsDetails *types.EventDetails) error {
+func CreateEvents(eventsDetails *types.EventDetails, clients environment.ClientSets) error {
 
 	events := &apiv1.Event{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      eventsDetails.Reason + string(experimentsDetails.ChaosUID),
-			Namespace: experimentsDetails.ChaosNamespace,
+			Name:      eventsDetails.Reason + string(eventsDetails.ChaosUID),
+			Namespace: eventsDetails.ChaosNamespace,
 		},
 		Source: apiv1.EventSource{
-			Component: experimentsDetails.ChaosPodName,
+			Component: eventsDetails.ChaosPodName,
 		},
 		Message:        eventsDetails.Message,
 		Reason:         eventsDetails.Reason,
@@ -29,33 +29,33 @@ func CreateEvents(experimentsDetails *types.ExperimentDetails, clients environme
 		InvolvedObject: apiv1.ObjectReference{
 			APIVersion: "litmuschaos.io/v1alpha1",
 			Kind:       "ChaosEngine",
-			Name:       experimentsDetails.EngineName,
-			Namespace:  experimentsDetails.ChaosNamespace,
-			UID:        experimentsDetails.ChaosUID,
+			Name:       eventsDetails.EngineName,
+			Namespace:  eventsDetails.ChaosNamespace,
+			UID:        eventsDetails.ChaosUID,
 		},
 	}
 
-	_, err := clients.KubeClient.CoreV1().Events(experimentsDetails.ChaosNamespace).Create(events)
+	_, err := clients.KubeClient.CoreV1().Events(eventsDetails.ChaosNamespace).Create(events)
 	return err
 
 }
 
 //GenerateEvents update the events
-func GenerateEvents(experimentsDetails *types.ExperimentDetails, clients environment.ClientSets, eventsDetails *types.EventDetails) error {
+func GenerateEvents(eventsDetails *types.EventDetails, clients environment.ClientSets) error {
 
 	var err error
-	event, err := clients.KubeClient.CoreV1().Events(experimentsDetails.ChaosNamespace).Get(eventsDetails.Reason+string(experimentsDetails.ChaosUID), metav1.GetOptions{})
+	event, err := clients.KubeClient.CoreV1().Events(eventsDetails.ChaosNamespace).Get(eventsDetails.Reason+string(eventsDetails.ChaosUID), metav1.GetOptions{})
 
-	if event.Name != eventsDetails.Reason+string(experimentsDetails.ChaosUID) {
+	if event.Name != eventsDetails.Reason+string(eventsDetails.ChaosUID) {
 
-		err = CreateEvents(experimentsDetails, clients, eventsDetails)
+		err = CreateEvents(eventsDetails, clients)
 
 	} else {
 
 		event.Count = event.Count + 1
 		event.LastTimestamp = metav1.Time{Time: time.Now()}
 
-		_, err = clients.KubeClient.CoreV1().Events(experimentsDetails.ChaosNamespace).Update(event)
+		_, err = clients.KubeClient.CoreV1().Events(eventsDetails.ChaosNamespace).Update(event)
 	}
 	return err
 }

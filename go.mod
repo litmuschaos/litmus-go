@@ -13,7 +13,6 @@ require (
 	github.com/imdario/mergo v0.3.9 // indirect
 	github.com/json-iterator/go v1.1.9 // indirect
 	github.com/kr/pretty v0.2.0 // indirect
-	github.com/kubernetes/client-go v1.5.1 // indirect
 	github.com/litmuschaos/chaos-operator v0.0.0-20200415134554-796f3ffb366e
 	github.com/mailru/easyjson v0.7.1 // indirect
 	github.com/openebs/maya v0.0.0-20200411140727-1c81f9e017b0
