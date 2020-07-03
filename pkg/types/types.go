@@ -1,52 +1,41 @@
 package types
 
-import (
-	clientTypes "k8s.io/apimachinery/pkg/types"
-)
+import clientTypes "k8s.io/apimachinery/pkg/types"
 
 const (
-	PreChaosCheck  string = "PreChaosCheck"
+	// PreChaosCheck initial stage of experiment check for health before chaos injection
+	PreChaosCheck string = "PreChaosCheck"
+	// PostChaosCheck  pre-final stage of experiment check for health after chaos injection
 	PostChaosCheck string = "PostChaosCheck"
-	Summary        string = "Summary"
-	ChaosInject    string = "ChaosInject"
+	// Summary final stage of experiment update the verdict
+	Summary string = "Summary"
+	// ChaosInject this stage refer to the main chaos injection
+	ChaosInject string = "ChaosInject"
 )
-
-// ExperimentDetails is for collecting all the experiment-related details
-type ExperimentDetails struct {
-	ExperimentName      string
-	EngineName          string
-	ChaosDuration       int
-	ChaosInterval       int
-	RampTime            int
-	Force               bool
-	ChaosLib            string
-	ChaosServiceAccount string
-	AppNS               string
-	AppLabel            string
-	AppKind             string
-	KillCount           int
-	ChaosUID            clientTypes.UID
-	AuxiliaryAppInfo    string
-	InstanceID          string
-	ChaosNamespace      string
-	ChaosPodName        string
-	Iterations          int
-	LIBImage            string
-	CPUcores            int
-	MemoryConsumption   int
-	PodsAffectedPerc    int
-}
 
 // ResultDetails is for collecting all the chaos-result-related details
 type ResultDetails struct {
-	Name     string
-	Verdict  string
-	FailStep string
-	Phase    string
+	Name      string
+	Verdict   string
+	FailStep  string
+	Phase     string
+	ResultUID clientTypes.UID
 }
 
 // EventDetails is for collecting all the events-related details
 type EventDetails struct {
-	Message string
-	Reason  string
+	Message      string
+	Reason       string
+	ResourceName string
+	ResourceUID  clientTypes.UID
+}
+
+// ChaosDetails is for collecting all the global variables
+type ChaosDetails struct {
+	ChaosUID       clientTypes.UID
+	ChaosNamespace string
+	ChaosPodName   string
+	EngineName     string
+	InstanceID     string
+	ExperimentName string
 }
