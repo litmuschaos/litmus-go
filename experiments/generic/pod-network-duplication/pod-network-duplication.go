@@ -17,8 +17,7 @@ import (
 func init() {
 	// Log as JSON instead of the default ASCII formatter.
 	logrus.SetFormatter(&logrus.TextFormatter{
-		FullTimestamp: true,
-		// ForceColors:            true,
+		FullTimestamp:          true,
 		DisableSorting:         true,
 		DisableLevelTruncation: true,
 	})
@@ -38,7 +37,7 @@ func main() {
 		log.Fatalf("Unable to Get the kubeconfig due to %v", err)
 	}
 
-	//Fetching all the ENV passed for the runner pod
+	//Fetching all the ENV passed from the runner pod
 	log.Infof("[PreReq]: Getting the ENV for the %v experiment", experimentsDetails.ExperimentName)
 	experimentEnv.GetENV(&experimentsDetails, "pod-network-duplication")
 

@@ -29,18 +29,12 @@ func PreparePodNetworkDuplication(experimentsDetails *experimentTypes.Experiment
 	log.Infof("[Prepare]: Application pod name under chaos: %v", appName)
 	log.Infof("[Prepare]: Application node name: %v", appNodeName)
 
-	//Get the target contaien name of the application pod
-	var targetContainer string
-	if experimentsDetails.TargetContainer == "" {
-		targetContainer, err = GetTargetContainer(experimentsDetails, appName, clients)
-		if err != nil {
-			return errors.Errorf("Unable to get the target container name due to, err: %v", err)
-		}
-		log.Infof("[Prepare]: Target container name: %v", targetContainer)
-	} else {
-		targetContainer = experimentsDetails.TargetContainer
-		log.Infof("[Prepare]: Target container name: %v", targetContainer)
+	//Get the target container name of the application pod
+	experimentsDetails.TargetContainer, err = GetTargetContainer(experimentsDetails, appName, clients)
+	if err != nil {
+		return errors.Errorf("Unable to get the target container name due to, err: %v", err)
 	}
+	log.Infof("[Prepare]: Target container name: %v", experimentsDetails.TargetContainer)
 
 	//Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
@@ -56,9 +50,10 @@ func PreparePodNetworkDuplication(experimentsDetails *experimentTypes.Experiment
 
 	// Generate the run_id
 	runID := GetRunID()
+	experimentsDetails.RunID = runID
 
 	// Creating the helper pod to perform pod network duplication
-	err = CreateHelperPod(experimentsDetails, clients, targetContainer, runID, appName, appNodeName)
+	err = CreateHelperPod(experimentsDetails, clients, appName, appNodeName)
 	if err != nil {
 		errors.Errorf("Unable to create the helper pod, err: %v", err)
 	}
@@ -96,9 +91,6 @@ func PreparePodNetworkDuplication(experimentsDetails *experimentTypes.Experiment
 //GetApplicationPod will select a random replica of application pod for chaos
 //It will also get the node name of the application pod
 func GetApplicationPod(experimentsDetails *experimentTypes.ExperimentDetails, clients environment.ClientSets) (string, string, error) {
-	log.Infof("Printing experimentsDetails.AppNS: %v", experimentsDetails.AppNS)
-	log.Infof("Printing experimentsDetails.AppLabel: %v", experimentsDetails.AppLabel)
-
 	podList, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).List(v1.ListOptions{LabelSelector: experimentsDetails.AppLabel})
 	if err != nil {
 		return "", "", err
@@ -158,15 +150,15 @@ func GetServiceAccount(experimentsDetails *experimentTypes.ExperimentDetails, cl
 }
 
 // CreateHelperPod derive the attributes for helper pod and create the helper pod
-func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients environment.ClientSets, targetContainer string, runID string, appName string, appNodeName string) error {
+func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients environment.ClientSets, appName, appNodeName string) error {
 
 	helperPod := &apiv1.Pod{
 		ObjectMeta: v1.ObjectMeta{
-			Name:      "pumba-netem-" + runID,
+			Name:      "pumba-netem-" + experimentsDetails.RunID,
 			Namespace: experimentsDetails.ChaosNamespace,
 			Labels: map[string]string{
 				"app":      "pumba",
-				"name":     "pumba-netem-" + runID,
+				"name":     "pumba-netem-" + experimentsDetails.RunID,
 				"chaosUID": string(experimentsDetails.ChaosUID),
 			},
 		},
@@ -200,7 +192,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 						"duplicate",
 						"--percent",
 						strconv.Itoa(experimentsDetails.NetworkPacketDuplicationPercentage),
-						"re2:k8s_" + targetContainer + "_" + appName,
+						"re2:k8s_" + experimentsDetails.TargetContainer + "_" + appName,
 					},
 					VolumeMounts: []apiv1.VolumeMount{
 						apiv1.VolumeMount{

@@ -8,7 +8,7 @@
 </tr>
 <tr>
  <td> Pod Network Duplication </td>
- <td> This experiment causes network duplication using pumba. It injects network duplicati on the specified container by starting a traffic control (tc) process with netem rules to add egress delays. It Can test the application's resilience to duplicate network </td>
+ <td> This experiment causes network duplication using pumba. It injects network duplication on the specified container by starting a traffic control (tc) process with netem rules. It Can test the application's resilience to duplicate network </td>
  <td>  <a href="https://docs.litmuschaos.io/docs/pod-network-duplication/"> Here </a> </td>
  </tr>
  </table>
@@ -46,7 +46,7 @@ spec:
           - "patch"
           - "update"
           - "get"
-    image: "litmuschaos/litmus-go:ci"
+    image: "litmuschaos/go-runner:latest"
     args:
     - -c
     - ./experiments/pod-network-duplication
@@ -62,7 +62,7 @@ spec:
     - name: NETWORK_INTERFACE
       value: 'eth0'
     - name: NETWORK_PACKET_DUPLICATION_PERCENTAGE
-      value: '70' # in percentage
+      value: '100' # in percentage
     - name: LIB
       value: 'pumba'      
     - name: LIB_IMAGE

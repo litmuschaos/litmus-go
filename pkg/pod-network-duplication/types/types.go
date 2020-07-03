@@ -9,9 +9,7 @@ type ExperimentDetails struct {
 	ExperimentName                     string
 	EngineName                         string
 	ChaosDuration                      int
-	ChaosInterval                      int
 	ChaosServiceAccount                string
-	AuxiliaryAppInfo                   string
 	LIBImage                           string
 	RampTime                           int
 	ChaosLib                           string
@@ -22,6 +20,7 @@ type ExperimentDetails struct {
 	InstanceID                         string
 	ChaosNamespace                     string
 	ChaosPodName                       string
+	RunID                              string
 	NetworkPacketDuplicationPercentage int
 	NetworkInterface                   string
 	TargetContainer                    string
