@@ -86,6 +86,32 @@ def generate_chaoslib(chaoslib_parent_path, chaoslib_name, chaoslib_config, litm
     with open(chaoslib_filename, "w+") as f:
         f.write(output_from_parsed_template)
 
+# generate_environment creates the environment for the experiment
+def generate_environment(environment_parent_path, environment_config, litmus_env):
+    environment_filename = environment_parent_path + '/environment.go'
+
+    if os.path.isdir(environment_parent_path) != True:
+        os.makedirs(environment_parent_path)
+            
+    # Load Jinja2 template
+    template = litmus_env.get_template('./templates/environment.tmpl')
+    output_from_parsed_template = template.render(environment_config)
+    with open(environment_filename, "w+") as f:
+        f.write(output_from_parsed_template)
+
+# generate_types creates the types.go for the experiment
+def generate_types(types_parent_path, types_config, litmus_env):
+    types_filename = types_parent_path + '/types.go'
+
+    if os.path.isdir(types_parent_path) != True:
+        os.makedirs(types_parent_path)
+            
+    # Load Jinja2 template
+    template = litmus_env.get_template('./templates/types.tmpl')
+    output_from_parsed_template = template.render(types_config)
+    with open(types_filename, "w+") as f:
+        f.write(output_from_parsed_template)
+
 # generate_experiment creates the expriment.go file
 def generate_experiment(experiment_parent_path, experiment_name, experiment_config, litmus_env):
     ansible_logic_filename = experiment_parent_path + '/' + experiment_name + '.go'
@@ -147,6 +173,8 @@ def main():
             chart_dir = litmus_root + '/experiments/' + entity_parent
 
         chaoslib_dir = litmus_root + '/chaoslib/litmus/' + config['name']
+        environment_dir = litmus_root + '/pkg/' + config['name'] + '/environment'
+        types_dir = litmus_root + '/pkg/' + config['name'] + '/types'
         # if a folder with specified/derived chart name is not present, create it
         if os.path.isdir(chart_dir) != True:
             os.makedirs(chart_dir)
@@ -181,6 +209,12 @@ def main():
 
         # generate chaoslib
         generate_chaoslib(chaoslib_dir, entity_name, config, env)
+
+        # generate environment.go 
+        generate_environment(environment_dir, config, env)
+
+        # generate environment.go 
+        generate_types(types_dir, config, env)
 
 
 if __name__=="__main__":
