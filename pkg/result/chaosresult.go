@@ -2,54 +2,52 @@ package result
 
 import (
 	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/environment"
-	//"k8s.io/klog"
+	"github.com/litmuschaos/litmus-go/pkg/types"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-//ChaosResult Create/Update the chaos result
-func ChaosResult(experimentsDetails *types.ExperimentDetails, clients environment.ClientSets, resultDetails *types.ResultDetails,state string) error {
+//ChaosResult Create and Update the chaos result
+func ChaosResult(chaosDetails *types.ChaosDetails, clients environment.ClientSets, resultDetails *types.ResultDetails, state string) error {
 
-	result, _ := clients.LitmusClient.ChaosResults(experimentsDetails.ChaosNamespace).Get(resultDetails.Name, metav1.GetOptions{})
+	result, _ := clients.LitmusClient.ChaosResults(chaosDetails.ChaosNamespace).Get(resultDetails.Name, metav1.GetOptions{})
 
-	if state == "SOT"{
+	if state == "SOT" {
 
 		if result.Name == resultDetails.Name {
-			err := PatchChaosResult(result, clients, experimentsDetails,resultDetails)
+			err := PatchChaosResult(result, clients, chaosDetails, resultDetails)
 			if err != nil {
 				return err
 			}
 		} else {
-			err := InitializeChaosResult(experimentsDetails, clients,resultDetails)
+			err := InitializeChaosResult(chaosDetails, clients, resultDetails)
 			if err != nil {
 				return err
 			}
 		}
-	}else {
-		resultDetails.Phase= "Completed"
-		err := PatchChaosResult(result, clients, experimentsDetails,resultDetails)
-			if err != nil {
-				return err
-			}
+	} else {
+		resultDetails.Phase = "Completed"
+		err := PatchChaosResult(result, clients, chaosDetails, resultDetails)
+		if err != nil {
+			return err
+		}
 	}
-
 
 	return nil
 }
 
 //InitializeChaosResult create the chaos result
-func InitializeChaosResult(experimentsDetails *types.ExperimentDetails, clients environment.ClientSets, resultDetails *types.ResultDetails) error {
+func InitializeChaosResult(chaosDetails *types.ChaosDetails, clients environment.ClientSets, resultDetails *types.ResultDetails) error {
 
 	chaosResult := &v1alpha1.ChaosResult{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      resultDetails.Name,
-			Namespace: experimentsDetails.ChaosNamespace,
+			Namespace: chaosDetails.ChaosNamespace,
 		},
 		Spec: v1alpha1.ChaosResultSpec{
-			EngineName:     experimentsDetails.EngineName,
-			ExperimentName: experimentsDetails.ExperimentName,
-			InstanceID:     experimentsDetails.InstanceID,
+			EngineName:     chaosDetails.EngineName,
+			ExperimentName: chaosDetails.ExperimentName,
+			InstanceID:     chaosDetails.InstanceID,
 		},
 		Status: v1alpha1.ChaosResultStatus{
 			ExperimentStatus: v1alpha1.TestStatus{
@@ -58,19 +56,33 @@ func InitializeChaosResult(experimentsDetails *types.ExperimentDetails, clients 
 			},
 		},
 	}
-	_, err := clients.LitmusClient.ChaosResults(experimentsDetails.ChaosNamespace).Create(chaosResult)
+	_, err := clients.LitmusClient.ChaosResults(chaosDetails.ChaosNamespace).Create(chaosResult)
 	return err
 }
 
 //PatchChaosResult Update the chaos result
-func PatchChaosResult(result *v1alpha1.ChaosResult, clients environment.ClientSets, experimentsDetails *types.ExperimentDetails, resultDetails *types.ResultDetails) error {
+func PatchChaosResult(result *v1alpha1.ChaosResult, clients environment.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails) error {
 
 	result.Status.ExperimentStatus.Phase = resultDetails.Phase
 	result.Status.ExperimentStatus.Verdict = resultDetails.Verdict
-	result.Spec.InstanceID = experimentsDetails.InstanceID
+	result.Spec.InstanceID = chaosDetails.InstanceID
 	result.Status.ExperimentStatus.FailStep = resultDetails.FailStep
 
 	_, err := clients.LitmusClient.ChaosResults(result.Namespace).Update(result)
 
 	return err
+}
+
+// SetResultUID sets the ResultUID into the ResultDetails structure
+func SetResultUID(resultDetails *types.ResultDetails, clients environment.ClientSets, chaosDetails *types.ChaosDetails) error {
+
+	result, err := clients.LitmusClient.ChaosResults(chaosDetails.ChaosNamespace).Get(resultDetails.Name, metav1.GetOptions{})
+
+	if err != nil {
+		return err
+	}
+
+	resultDetails.ResultUID = result.UID
+	return nil
+
 }
