@@ -1,33 +1,25 @@
 package network_chaos
 
 import (
-	"fmt"
 	"math/rand"
-	"os"
-	"os/signal"
 	"strconv"
-	"strings"
-	"syscall"
 	"time"
 
 	"github.com/litmuschaos/litmus-go/pkg/environment"
 	"github.com/litmuschaos/litmus-go/pkg/log"
-	"github.com/litmuschaos/litmus-go/pkg/result"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/pod-network-duplication/types"
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/openebs/maya/pkg/util/retry"
 	"github.com/pkg/errors"
 	apiv1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/tools/remotecommand"
-	"k8s.io/klog"
 )
 
 var err error
 
 //PreparePodNetworkDuplication contains the prepration steps before chaos injection
-func PreparePodNetworkDuplication(experimentsDetails *types.ExperimentDetails, clients environment.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
+func PreparePodNetworkDuplication(experimentsDetails *experimentTypes.ExperimentDetails, clients environment.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
 
 	//Select application pod for pod network duplication
 	appName, appNodeName, err := GetApplicationPod(experimentsDetails, clients)
@@ -44,6 +36,9 @@ func PreparePodNetworkDuplication(experimentsDetails *types.ExperimentDetails, c
 		if err != nil {
 			return errors.Errorf("Unable to get the target container name due to, err: %v", err)
 		}
+		log.Infof("[Prepare]: Target container name: %v", targetContainer)
+	} else {
+		targetContainer = experimentsDetails.TargetContainer
 		log.Infof("[Prepare]: Target container name: %v", targetContainer)
 	}
 
@@ -77,34 +72,6 @@ func PreparePodNetworkDuplication(experimentsDetails *types.ExperimentDetails, c
 
 	// Wait till the completion of helper pod
 	log.Info("[Wait]: waiting till the completion of the helper pod")
-	var endTime <-chan time.Time
-	timeDelay := time.Duration(experimentsDetails.ChaosDuration+30) * time.Second
-
-	// signChan channel is used to transmit signal notifications.
-	signChan := make(chan os.Signal, 1)
-	// Catch and relay certain signal(s) to signChan channel.
-	signal.Notify(signChan, os.Interrupt, syscall.SIGTERM, syscall.SIGKILL)
-loop:
-	for {
-		endTime = time.After(timeDelay)
-		select {
-		case <-signChan:
-			log.Info("[Chaos]: Killing process started because of terminated signal received")
-			err = KillNetworkDuplication(targetContainer, appName, experimentsDetails.AppNS, clients)
-			if err != nil {
-				klog.V(0).Infof("Error in Kill stress after")
-				return err
-			}
-			resultDetails.FailStep = "Chaos injection stopped!"
-			resultDetails.Verdict = "Stopped"
-			result.ChaosResult(experimentsDetails, clients, resultDetails, "EOT")
-			os.Exit(1)
-		case <-endTime:
-			log.Infof("[Chaos]: Time is up for experiment: %v", experimentsDetails.ExperimentName)
-			endTime = nil
-			break loop
-		}
-	}
 
 	err = status.WaitForCompletion(experimentsDetails.ChaosNamespace, "name=pumba-netem-"+runID, clients, experimentsDetails.ChaosDuration+30)
 	if err != nil {
@@ -128,7 +95,10 @@ loop:
 
 //GetApplicationPod will select a random replica of application pod for chaos
 //It will also get the node name of the application pod
-func GetApplicationPod(experimentsDetails *types.ExperimentDetails, clients environment.ClientSets) (string, string, error) {
+func GetApplicationPod(experimentsDetails *experimentTypes.ExperimentDetails, clients environment.ClientSets) (string, string, error) {
+	log.Infof("Printing experimentsDetails.AppNS: %v", experimentsDetails.AppNS)
+	log.Infof("Printing experimentsDetails.AppLabel: %v", experimentsDetails.AppLabel)
+
 	podList, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).List(v1.ListOptions{LabelSelector: experimentsDetails.AppLabel})
 	if err != nil {
 		return "", "", err
@@ -153,7 +123,7 @@ func GetApplicationPod(experimentsDetails *types.ExperimentDetails, clients envi
 
 //GetTargetContainer will fetch the conatiner name from application pod
 //This container will be used as target container
-func GetTargetContainer(experimentsDetails *types.ExperimentDetails, appName string, clients environment.ClientSets) (string, error) {
+func GetTargetContainer(experimentsDetails *experimentTypes.ExperimentDetails, appName string, clients environment.ClientSets) (string, error) {
 	pod, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Get(appName, v1.GetOptions{})
 	if err != nil {
 		return "", errors.Wrapf(err, "Fail to get the application pod status, due to:%v", err)
@@ -163,7 +133,7 @@ func GetTargetContainer(experimentsDetails *types.ExperimentDetails, appName str
 }
 
 //waitForRampTime waits for the given ramp time duration (in seconds)
-func waitForRampTime(experimentsDetails *types.ExperimentDetails) {
+func waitForRampTime(experimentsDetails *experimentTypes.ExperimentDetails) {
 	time.Sleep(time.Duration(experimentsDetails.RampTime) * time.Second)
 }
 
@@ -178,7 +148,7 @@ func GetRunID() string {
 }
 
 // GetServiceAccount find the serviceAccountName for the helper pod
-func GetServiceAccount(experimentsDetails *types.ExperimentDetails, clients environment.ClientSets) error {
+func GetServiceAccount(experimentsDetails *experimentTypes.ExperimentDetails, clients environment.ClientSets) error {
 	pod, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Get(experimentsDetails.ChaosPodName, v1.GetOptions{})
 	if err != nil {
 		return err
@@ -188,14 +158,14 @@ func GetServiceAccount(experimentsDetails *types.ExperimentDetails, clients envi
 }
 
 // CreateHelperPod derive the attributes for helper pod and create the helper pod
-func CreateHelperPod(experimentsDetails *types.ExperimentDetails, clients environment.ClientSets, targetContainer string, runID string, appName string, appNodeName string) error {
+func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients environment.ClientSets, targetContainer string, runID string, appName string, appNodeName string) error {
 
 	helperPod := &apiv1.Pod{
 		ObjectMeta: v1.ObjectMeta{
 			Name:      "pumba-netem-" + runID,
 			Namespace: experimentsDetails.ChaosNamespace,
 			Labels: map[string]string{
-				"app":      "pumba-netem",
+				"app":      "pumba",
 				"name":     "pumba-netem-" + runID,
 				"chaosUID": string(experimentsDetails.ChaosUID),
 			},
@@ -248,7 +218,7 @@ func CreateHelperPod(experimentsDetails *types.ExperimentDetails, clients enviro
 }
 
 //DeleteHelperPod delete the helper pod
-func DeleteHelperPod(experimentsDetails *types.ExperimentDetails, clients environment.ClientSets, runID string) error {
+func DeleteHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients environment.ClientSets, runID string) error {
 
 	err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Delete("pumba-netem-"+runID, &v1.DeleteOptions{})
 
@@ -268,56 +238,4 @@ func DeleteHelperPod(experimentsDetails *types.ExperimentDetails, clients enviro
 		})
 
 	return err
-}
-
-// KillNetworkDuplication is a Function to kill the experiment. Triggered by either timeout of chaos duration or termination of the experiment
-func KillNetworkDuplication(containerName, podName, namespace string, clients environment.ClientSets) error {
-
-	command := []string{"/bin/sh", "-c", "kill $(find /proc -name exe -lname '*/netem' 2>&1 | grep -v 'Permission denied' | awk -F/ '{print $(NF-1)}' |  head -n 1)"}
-
-	req := clients.KubeClient.CoreV1().RESTClient().Post().
-		Resource("pods").
-		Name(podName).
-		Namespace(namespace).
-		SubResource("exec")
-	scheme := runtime.NewScheme()
-	if err := apiv1.AddToScheme(scheme); err != nil {
-		return fmt.Errorf("error adding to scheme: %v", err)
-	}
-
-	parameterCodec := runtime.NewParameterCodec(scheme)
-	req.VersionedParams(&apiv1.PodExecOptions{
-		Command:   command,
-		Container: containerName,
-		Stdin:     false,
-		Stdout:    true,
-		Stderr:    true,
-		TTY:       false,
-	}, parameterCodec)
-
-	exec, err := remotecommand.NewSPDYExecutor(clients.KubeConfig, "POST", req.URL())
-	if err != nil {
-		return fmt.Errorf("error while creating Executor: %v", err)
-	}
-
-	stdout := os.Stdout
-	stderr := os.Stderr
-
-	err = exec.Stream(remotecommand.StreamOptions{
-		Stdin:  nil,
-		Stdout: stdout,
-		Stderr: stderr,
-		Tty:    false,
-	})
-
-	//The kill command returns a 143 when it kills a process. This is expected
-	if err != nil {
-		error_code := strings.Contains(err.Error(), "143")
-		if error_code != true {
-			log.Infof("[Chaos]:Pod Network Duplication error: %v", err.Error())
-			return err
-		}
-	}
-
-	return nil
 }

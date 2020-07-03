@@ -5,6 +5,8 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/environment"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	"github.com/litmuschaos/litmus-go/pkg/log"
+	experimentEnv "github.com/litmuschaos/litmus-go/pkg/pod-network-duplication/environment"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/pod-network-duplication/types"
 	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
@@ -24,7 +26,7 @@ func init() {
 func main() {
 
 	var err error
-	experimentsDetails := types.ExperimentDetails{}
+	experimentsDetails := experimentTypes.ExperimentDetails{}
 	resultDetails := types.ResultDetails{}
 	eventsDetails := types.EventDetails{}
 	clients := environment.ClientSets{}
@@ -36,14 +38,17 @@ func main() {
 
 	//Fetching all the ENV passed for the runner pod
 	log.Infof("[PreReq]: Getting the ENV for the %v experiment", experimentsDetails.ExperimentName)
-	environment.GetENV(&experimentsDetails, "pod-network-duplication")
+	experimentEnv.GetENV(&experimentsDetails, "pod-network-duplication")
 
 	// Intialise Chaos Result Parameters
-	environment.SetResultAttributes(&resultDetails, &experimentsDetails)
+	environment.SetResultAttributes(&resultDetails, experimentsDetails.EngineName, experimentsDetails.ExperimentName)
+
+	// Intialise events Parameters
+	experimentEnv.InitialiseEventAttributes(&eventsDetails, &experimentsDetails)
 
 	//Updating the chaos result in the beggining of experiment
 	log.Infof("[PreReq]: Updating the chaos result of %v experiment (SOT)", experimentsDetails.ExperimentName)
-	err = result.ChaosResult(&experimentsDetails, clients, &resultDetails, "SOT")
+	err = result.ChaosResult(&eventsDetails, clients, &resultDetails, "SOT")
 	if err != nil {
 		log.Errorf("Unable to Create the Chaos Result due to %v", err)
 		resultDetails.FailStep = "Updating the chaos result of pod-network-duplication experiment (SOT)"
@@ -64,12 +69,12 @@ func main() {
 	if err != nil {
 		log.Errorf("Application status check failed due to %v\n", err)
 		resultDetails.FailStep = "Verify that the AUT (Application Under Test) is running (pre-chaos)"
-		result.ChaosResult(&experimentsDetails, clients, &resultDetails, "EOT")
+		result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 		return
 	}
 	if experimentsDetails.EngineName != "" {
 		environment.SetEventAttributes(&eventsDetails, types.PreChaosCheck, "AUT is Running successfully")
-		events.GenerateEvents(&experimentsDetails, clients, &eventsDetails)
+		events.GenerateEvents(&eventsDetails, clients)
 	}
 
 	// Including the pumba lib for pod-network-duplication
@@ -78,7 +83,7 @@ func main() {
 		if err != nil {
 			log.Errorf("Chaos injection failed due to %v\n", err)
 			resultDetails.FailStep = "Including the pumba lib for pod-network-duplication"
-			result.ChaosResult(&experimentsDetails, clients, &resultDetails, "EOT")
+			result.ChaosResult(&eventsDetails, clients, &resultDetails, "EOT")
 			return
 		}
 		log.Info("[Confirmation]: The app pod network duplication")
@@ -86,7 +91,7 @@ func main() {
 	} else {
 		log.Error("[Invalid]: Please Provide the correct LIB")
 		resultDetails.FailStep = "Including the pumba lib for pod-network-duplication"
-		result.ChaosResult(&experimentsDetails, clients, &resultDetails, "EOT")
+		result.ChaosResult(&eventsDetails, clients, &resultDetails, "EOT")
 		return
 	}
 
@@ -96,23 +101,23 @@ func main() {
 	if err != nil {
 		log.Errorf("Application status check failed due to %v\n", err)
 		resultDetails.FailStep = "Verify that the AUT (Application Under Test) is running (post-chaos)"
-		result.ChaosResult(&experimentsDetails, clients, &resultDetails, "EOT")
+		result.ChaosResult(&eventsDetails, clients, &resultDetails, "EOT")
 		return
 	}
 	if experimentsDetails.EngineName != "" {
 		environment.SetEventAttributes(&eventsDetails, types.PostChaosCheck, "AUT is Running successfully")
-		events.GenerateEvents(&experimentsDetails, clients, &eventsDetails)
+		events.GenerateEvents(&eventsDetails, clients)
 	}
 
 	//Updating the chaosResult in the end of experiment
 	log.Infof("[The End]: Updating the chaos result of %v experiment (EOT)", experimentsDetails.ExperimentName)
-	err = result.ChaosResult(&experimentsDetails, clients, &resultDetails, "EOT")
+	err = result.ChaosResult(&eventsDetails, clients, &resultDetails, "EOT")
 	if err != nil {
 		log.Fatalf("Unable to Update the Chaos Result due to %v\n", err)
 	}
 	if experimentsDetails.EngineName != "" {
 		msg := experimentsDetails.ExperimentName + "experiment has been" + resultDetails.Verdict + "ed"
 		environment.SetEventAttributes(&eventsDetails, types.Summary, msg)
-		events.GenerateEvents(&experimentsDetails, clients, &eventsDetails)
+		events.GenerateEvents(&eventsDetails, clients)
 	}
 }
