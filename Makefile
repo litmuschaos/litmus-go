@@ -45,15 +45,15 @@ build: litmus-go-build
 
 litmus-go-build:
 	@echo "------------------"
-	@echo "--> Build litmus-go image" 
+	@echo "--> Build go-runner image" 
 	@echo "------------------"
-	sudo docker build . -f build/litmus-go/Dockerfile -t litmuschaos/litmus-go:ci
+	sudo docker build . -f build/litmus-go/Dockerfile -t litmuschaos/go-runner:ci
 
 .PHONY: push
 push: litmus-go-push
 
 litmus-go-push:
 	@echo "------------------"
-	@echo "--> litmus-go image" 
+	@echo "--> go-runner image" 
 	@echo "------------------"
-	REPONAME="litmuschaos" IMGNAME="litmus-go" IMGTAG="ci" ./build/push
+	REPONAME="litmuschaos" IMGNAME="go-runner" IMGTAG="ci" ./build/push

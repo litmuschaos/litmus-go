@@ -1,67 +1,64 @@
 ---
-    apiVersion: batch/v1
-    kind: Job
+apiVersion: batch/v1
+kind: Job
+metadata:
+  generateName: pod-delete-
+spec:
+  template:
     metadata:
-      generateName: pod-delete-
+      labels:
+        experiment: pod-delete
     spec:
-      template:
-        metadata:
-          labels:
-            experiment: pod-delete
-        spec:
-          # Placeholder that is updated by the executor for automated runs
-          # Provide appropriate SA (with desired permissions) if executed manually
-          serviceAccountName: litmus
-          restartPolicy: Never
-          containers:
-          - name: gotest
-            image: litmuschaos/litmus-go:ci
-            imagePullPolicy: Always
-            env:
-              - name: ANSIBLE_STDOUT_CALLBACK
-                value: 'default'
-    
-              # provide application namespace
-              - name: APP_NAMESPACE
-                value: ''
-    
-              # provide application labels
-              - name: APP_LABEL
-                value: ''
-    
-               # provide application kind
-              - name: APP_KIND
-                value: ''
-    
-              - name: TOTAL_CHAOS_DURATION
-                value: '30'
-    
-              - name: CHAOS_INTERVAL
-                value: '10'
+      # Placeholder that is updated by the executor for automated runs
+      # Provide appropriate SA (with desired permissions) if executed manually
+      serviceAccountName: %CHAOS_SERVICE_ACCOUNT%
+      restartPolicy: Never
+      containers:
+      - name: gotest
+        image: litmuschaos/go-runner:ci
+        imagePullPolicy: Always
+        env:
+          # provide application namespace
+          - name: APP_NAMESPACE
+            value: ''
 
-              # provide application namespace
-              - name: FORCE
-                value: ''
+          # provide application labels
+          - name: APP_LABEL
+            value: ''
 
-              - name: CHAOS_NAMESPACE
-                value: ''
-    
-                ## Period to wait before/after injection of chaos  
-              - name: RAMP_TIME
-                value: ''
-    
-              ## env var that describes the library used to execute the chaos
-              ## Only supported litmus
-              - name: LIB
-                value: 'litmus'
-    
-              - name: CHAOSENGINE
-                value: ''
-    
-              - name: CHAOS_SERVICE_ACCOUNT
-                valueFrom:
-                  fieldRef:
-                    fieldPath: spec.serviceAccountName
-    
-            command: ["/bin/bash"]
-            args: ["-c", "./experiments/pod-delete"]
+            # provide application kind
+          - name: APP_KIND
+            value: ''
+
+          - name: TOTAL_CHAOS_DURATION
+            value: '30'
+
+          - name: CHAOS_INTERVAL
+            value: '10'
+
+          # provide application namespace
+          - name: FORCE
+            value: ''
+
+          - name: CHAOS_NAMESPACE
+            value: ''
+
+            ## Period to wait before/after injection of chaos  
+          - name: RAMP_TIME
+            value: ''
+
+          ## env var that describes the library used to execute the chaos
+          ## Only supported litmus
+          - name: LIB
+            value: 'litmus'
+
+          - name: CHAOSENGINE
+            value: ''
+
+          - name: CHAOS_SERVICE_ACCOUNT
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.serviceAccountName
+
+        command: ["/bin/bash"]
+        args: ["-c", "./experiments/pod-delete"]
