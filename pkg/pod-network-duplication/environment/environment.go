@@ -40,14 +40,14 @@ func Getenv(key string, defaultValue string) string {
 	return value
 }
 
-//InitialiseEventAttributes initialise all the event attributes
-func InitialiseEventAttributes(eventsDetails *types.ChaosDetails, experimentDetails *experimentTypes.ExperimentDetails) {
+//InitialiseChaosVariables initialise all the global variables
+func InitialiseChaosVariables(chaosDetails *types.ChaosDetails, experimentDetails *experimentTypes.ExperimentDetails) {
 
-	eventsDetails.ChaosNamespace = experimentDetails.ChaosNamespace
-	eventsDetails.ChaosPodName = experimentDetails.ChaosPodName
-	eventsDetails.ChaosUID = experimentDetails.ChaosUID
-	eventsDetails.EngineName = experimentDetails.EngineName
-	eventsDetails.ExperimentName = experimentDetails.ExperimentName
-	eventsDetails.InstanceID = experimentDetails.InstanceID
+	chaosDetails.ChaosNamespace = experimentDetails.ChaosNamespace
+	chaosDetails.ChaosPodName = experimentDetails.ChaosPodName
+	chaosDetails.ChaosUID = experimentDetails.ChaosUID
+	chaosDetails.EngineName = experimentDetails.EngineName
+	chaosDetails.ExperimentName = experimentDetails.ExperimentName
+	chaosDetails.InstanceID = experimentDetails.InstanceID
 
 }

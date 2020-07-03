@@ -1,16 +1,17 @@
 package main
 
 import (
-	"github.com/litmuschaos/litmus-go/chaoslib/litmus/pod_delete"
+	"github.com/litmuschaos/litmus-go/chaoslib/litmus/pod_memory_hog"
 	"github.com/litmuschaos/litmus-go/pkg/environment"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	"github.com/litmuschaos/litmus-go/pkg/log"
-	experimentEnv "github.com/litmuschaos/litmus-go/pkg/pod-delete/environment"
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/pod-delete/types"
+	experimentEnv "github.com/litmuschaos/litmus-go/pkg/pod-memory-hog/environment"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/pod-memory-hog/types"
 	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/sirupsen/logrus"
+	"k8s.io/klog"
 )
 
 func init() {
@@ -38,7 +39,7 @@ func main() {
 
 	//Fetching all the ENV passed from the runner pod
 	log.Infof("[PreReq]: Getting the ENV for the %v experiment", experimentsDetails.ExperimentName)
-	experimentEnv.GetENV(&experimentsDetails, "pod-delete")
+	experimentEnv.GetENV(&experimentsDetails, "pod-memory-hog")
 
 	// Intialise Chaos Result Parameters
 	environment.SetResultAttributes(&resultDetails, experimentsDetails.EngineName, experimentsDetails.ExperimentName)
@@ -51,7 +52,7 @@ func main() {
 	err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT")
 	if err != nil {
 		log.Errorf("Unable to Create the Chaos Result due to %v", err)
-		resultDetails.FailStep = "Updating the chaos result of pod-delete experiment (SOT)"
+		resultDetails.FailStep = "Updating the chaos result of pod-memory-hog experiment (SOT)"
 		err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 		return
 	}
@@ -61,9 +62,11 @@ func main() {
 
 	//DISPLAY THE APP INFORMATION
 	log.InfoWithValues("The application informations are as follows", logrus.Fields{
-		"Namespace": experimentsDetails.AppNS,
-		"Label":     experimentsDetails.AppLabel,
-		"Ramp Time": experimentsDetails.RampTime,
+		"Namespace":          experimentsDetails.AppNS,
+		"Label":              experimentsDetails.AppLabel,
+		"Chaos Duration":     experimentsDetails.ChaosDuration,
+		"Ramp Time":          experimentsDetails.RampTime,
+		"Memory Consumption": experimentsDetails.MemoryConsumption,
 	})
 
 	//PRE-CHAOS APPLICATION STATUS CHECK
@@ -75,25 +78,27 @@ func main() {
 		result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 		return
 	}
+
 	if experimentsDetails.EngineName != "" {
 		environment.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, "AUT is Running successfully", &chaosDetails)
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
-	// Including the litmus lib for pod-delete
+	// Including the litmus lib for pod-memory-hog
 	if experimentsDetails.ChaosLib == "litmus" {
-		err = pod_delete.PreparePodDelete(&experimentsDetails, clients, &resultDetails, &eventsDetails)
+		err = pod_memory_hog.PrepareMemoryStress(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
 		if err != nil {
-			log.Errorf("Chaos injection failed due to %v\n", err)
-			resultDetails.FailStep = "Including the litmus lib for pod-delete"
+			log.Errorf("[Error]: pod memory hog failed due to %v\n", err)
+			resultDetails.FailStep = "pod memory hog chaos injection failed"
+			resultDetails.Verdict = "Fail"
 			result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 			return
 		}
-		log.Info("[Confirmation]: The application pod has been deleted successfully")
+		log.Info("[Confirmation]: Memory of the application pod has been stressed successfully")
 		resultDetails.Verdict = "Pass"
 	} else {
 		log.Error("[Invalid]: Please Provide the correct LIB")
-		resultDetails.FailStep = "Including the litmus lib for pod-delete"
+		resultDetails.FailStep = "Including the litmus lib for pod-memory-hog"
 		result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 		return
 	}
@@ -102,11 +107,12 @@ func main() {
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (post-chaos)")
 	err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, clients)
 	if err != nil {
-		log.Errorf("Application status check failed due to %v\n", err)
+		klog.V(0).Infof("Application status check failed due to %v\n", err)
 		resultDetails.FailStep = "Verify that the AUT (Application Under Test) is running (post-chaos)"
 		result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 		return
 	}
+
 	if experimentsDetails.EngineName != "" {
 		environment.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, "AUT is Running successfully", &chaosDetails)
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
