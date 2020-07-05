@@ -57,6 +57,9 @@ func main() {
 		return
 	}
 
+	// Set the chaos result uid
+	result.SetResultUID(&resultDetails, clients, &chaosDetails)
+
 	//DISPLAY THE APP INFORMATION
 	log.InfoWithValues("The application informations are as follows\n", logrus.Fields{
 		"Namespace": experimentsDetails.AppNS,
