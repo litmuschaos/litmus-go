@@ -4,10 +4,9 @@ import (
 	"os"
 	"strconv"
 
-	clientTypes "k8s.io/apimachinery/pkg/types"
-
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/pod-delete/types"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/network-chaos/types"
 	"github.com/litmuschaos/litmus-go/pkg/types"
+	clientTypes "k8s.io/apimachinery/pkg/types"
 )
 
 //GetENV fetches all the env variables from the runner pod
@@ -15,20 +14,23 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string
 	experimentDetails.ExperimentName = expName
 	experimentDetails.ChaosNamespace = Getenv("CHAOS_NAMESPACE", "litmus")
 	experimentDetails.EngineName = Getenv("CHAOSENGINE", "")
-	experimentDetails.ChaosDuration, _ = strconv.Atoi(Getenv("TOTAL_CHAOS_DURATION", "30"))
-	experimentDetails.ChaosInterval, _ = strconv.Atoi(Getenv("CHAOS_INTERVAL", "10"))
+	experimentDetails.ChaosDuration, _ = strconv.Atoi(Getenv("TOTAL_CHAOS_DURATION", "60"))
 	experimentDetails.RampTime, _ = strconv.Atoi(Getenv("RAMP_TIME", "0"))
-	experimentDetails.ChaosLib = Getenv("LIB", "litmus")
-	experimentDetails.ChaosServiceAccount = Getenv("CHAOS_SERVICE_ACCOUNT", "")
+	experimentDetails.ChaosLib = Getenv("LIB", "pumba")
 	experimentDetails.AppNS = Getenv("APP_NAMESPACE", "")
 	experimentDetails.AppLabel = Getenv("APP_LABEL", "")
 	experimentDetails.AppKind = Getenv("APP_KIND", "")
-	experimentDetails.KillCount, _ = strconv.Atoi(Getenv("KILL_COUNT", "1"))
 	experimentDetails.ChaosUID = clientTypes.UID(Getenv("CHAOS_UID", ""))
 	experimentDetails.InstanceID = Getenv("INSTANCE_ID", "")
-	experimentDetails.ChaosPodName = Getenv("POD_NAME", "")
-	experimentDetails.Force, _ = strconv.ParseBool(Getenv("FORCE", "false"))
 	experimentDetails.LIBImage = Getenv("LIB_IMAGE", "")
+	experimentDetails.ChaosPodName = Getenv("POD_NAME", "")
+	experimentDetails.RunID = Getenv("RunID", "")
+	experimentDetails.NetworkPacketDuplicationPercentage, _ = strconv.Atoi(Getenv("NETWORK_PACKET_DUPLICATION_PERCENTAGE", "100"))
+	experimentDetails.NetworkLatency, _ = strconv.Atoi(Getenv("NETWORK_LATENCY", "60000"))
+	experimentDetails.NetworkPacketLossPercentage, _ = strconv.Atoi(Getenv("NETWORK_PACKET_LOSS_PERCENTAGE", "100"))
+	experimentDetails.NetworkPacketCorruptionPercentage, _ = strconv.Atoi(Getenv("NETWORK_PACKET_CORRUPTION_PERCENTAGE", "100"))
+	experimentDetails.NetworkInterface = Getenv("NETWORK_INTERFACE", "eth0")
+	experimentDetails.TargetContainer = Getenv("TARGET_CONTAINER", "")
 }
 
 // Getenv fetch the env and set the default value, if any

@@ -3,7 +3,7 @@ package events
 import (
 	"time"
 
-	"github.com/litmuschaos/litmus-go/pkg/environment"
+	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
@@ -36,7 +36,7 @@ func generateEventRecorder(kubeClient *kubernetes.Clientset, componentName strin
 }
 
 // NewEventRecorder initalizes EventRecorder with Resource as ChaosEngine
-func NewEventRecorder(clients environment.ClientSets, chaosDetails types.ChaosDetails) (*Recorder, error) {
+func NewEventRecorder(clients clients.ClientSets, chaosDetails types.ChaosDetails) (*Recorder, error) {
 	engineForEvent, err := GetChaosEngine(clients, chaosDetails.ChaosNamespace, chaosDetails.EngineName)
 	if err != nil {
 		return &Recorder{}, err
@@ -76,7 +76,7 @@ func (r Recorder) Summary(ExperimentName string, resultDetails *types.ResultDeta
 }
 
 // GetChaosEngine returns chaosEngine Object
-func GetChaosEngine(clients environment.ClientSets, ChaosNamespace string, EngineName string) (*v1alpha1.ChaosEngine, error) {
+func GetChaosEngine(clients clients.ClientSets, ChaosNamespace string, EngineName string) (*v1alpha1.ChaosEngine, error) {
 	expEngine, err := clients.LitmusClient.ChaosEngines(ChaosNamespace).Get(EngineName, metav1.GetOptions{})
 	if err != nil {
 

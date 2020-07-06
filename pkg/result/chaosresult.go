@@ -2,13 +2,13 @@ package result
 
 import (
 	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
-	"github.com/litmuschaos/litmus-go/pkg/environment"
+	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 //ChaosResult Create and Update the chaos result
-func ChaosResult(chaosDetails *types.ChaosDetails, clients environment.ClientSets, resultDetails *types.ResultDetails, state string) error {
+func ChaosResult(chaosDetails *types.ChaosDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, state string) error {
 
 	result, _ := clients.LitmusClient.ChaosResults(chaosDetails.ChaosNamespace).Get(resultDetails.Name, metav1.GetOptions{})
 
@@ -37,7 +37,7 @@ func ChaosResult(chaosDetails *types.ChaosDetails, clients environment.ClientSet
 }
 
 //InitializeChaosResult create the chaos result
-func InitializeChaosResult(chaosDetails *types.ChaosDetails, clients environment.ClientSets, resultDetails *types.ResultDetails) error {
+func InitializeChaosResult(chaosDetails *types.ChaosDetails, clients clients.ClientSets, resultDetails *types.ResultDetails) error {
 
 	chaosResult := &v1alpha1.ChaosResult{
 		ObjectMeta: metav1.ObjectMeta{
@@ -61,7 +61,7 @@ func InitializeChaosResult(chaosDetails *types.ChaosDetails, clients environment
 }
 
 //PatchChaosResult Update the chaos result
-func PatchChaosResult(result *v1alpha1.ChaosResult, clients environment.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails) error {
+func PatchChaosResult(result *v1alpha1.ChaosResult, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails) error {
 
 	result.Status.ExperimentStatus.Phase = resultDetails.Phase
 	result.Status.ExperimentStatus.Verdict = resultDetails.Verdict
@@ -74,7 +74,7 @@ func PatchChaosResult(result *v1alpha1.ChaosResult, clients environment.ClientSe
 }
 
 // SetResultUID sets the ResultUID into the ResultDetails structure
-func SetResultUID(resultDetails *types.ResultDetails, clients environment.ClientSets, chaosDetails *types.ChaosDetails) error {
+func SetResultUID(resultDetails *types.ResultDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
 
 	result, err := clients.LitmusClient.ChaosResults(chaosDetails.ChaosNamespace).Get(resultDetails.Name, metav1.GetOptions{})
 

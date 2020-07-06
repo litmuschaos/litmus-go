@@ -5,10 +5,10 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/litmuschaos/litmus-go/pkg/environment"
+	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/network-chaos/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/network-chaos/types"
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/openebs/maya/pkg/util/retry"
@@ -21,7 +21,7 @@ import (
 var err error
 
 //PreparePodNetworkChaos contains the prepration steps before chaos injection
-func PreparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients environment.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+func PreparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	//Select application pod for pod network duplication
 	appName, appNodeName, err := GetApplicationPod(experimentsDetails, clients)
@@ -53,7 +53,7 @@ func PreparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetail
 
 	if experimentsDetails.EngineName != "" {
 		msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on " + appName + " pod"
-		environment.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, chaosDetails)
+		types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, chaosDetails)
 		events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 	}
 
@@ -95,7 +95,7 @@ func PreparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetail
 
 //GetApplicationPod will select a random replica of application pod for chaos
 //It will also get the node name of the application pod
-func GetApplicationPod(experimentsDetails *experimentTypes.ExperimentDetails, clients environment.ClientSets) (string, string, error) {
+func GetApplicationPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) (string, string, error) {
 	podList, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).List(v1.ListOptions{LabelSelector: experimentsDetails.AppLabel})
 	if err != nil || len(podList.Items) == 0 {
 		return "", "", errors.Wrapf(err, "Fail to get the application pod in %v namespace", experimentsDetails.AppNS)
@@ -111,7 +111,7 @@ func GetApplicationPod(experimentsDetails *experimentTypes.ExperimentDetails, cl
 
 //GetTargetContainer will fetch the conatiner name from application pod
 //This container will be used as target container
-func GetTargetContainer(experimentsDetails *experimentTypes.ExperimentDetails, appName string, clients environment.ClientSets) (string, error) {
+func GetTargetContainer(experimentsDetails *experimentTypes.ExperimentDetails, appName string, clients clients.ClientSets) (string, error) {
 	pod, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Get(appName, v1.GetOptions{})
 	if err != nil {
 		return "", errors.Wrapf(err, "Fail to get the application pod status, due to:%v", err)
@@ -135,32 +135,8 @@ func GetRunID() string {
 	return string(runID)
 }
 
-// GetNetworkChaosCommands derive the commands for the pumba pod
-func GetNetworkChaosCommands(experimentsDetails *experimentTypes.ExperimentDetails) (string, string, string) {
-
-	var command, keyAttibute, valueAttribute string
-	if experimentsDetails.ExperimentName == "pod-network-duplication" {
-		command = "duplicate"
-		keyAttibute = "--percent"
-		valueAttribute = strconv.Itoa(experimentsDetails.NetworkPacketDuplicationPercentage)
-	} else if experimentsDetails.ExperimentName == "pod-network-latency" {
-		command = "delay"
-		keyAttibute = "--time"
-		valueAttribute = strconv.Itoa(experimentsDetails.NetworkLatency)
-	} else if experimentsDetails.ExperimentName == "pod-network-loss" {
-		command = "loss"
-		keyAttibute = "--percent"
-		valueAttribute = strconv.Itoa(experimentsDetails.NetworkPacketLossPercentage)
-	} else if experimentsDetails.ExperimentName == "pod-network-corruption" {
-		command = "corrupt"
-		keyAttibute = "--percent"
-		valueAttribute = strconv.Itoa(experimentsDetails.NetworkPacketCorruptionPercentage)
-	}
-	return command, keyAttibute, valueAttribute
-}
-
 // CreateHelperPod derive the attributes for helper pod and create the helper pod
-func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients environment.ClientSets, appName, appNodeName string) error {
+func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, appName, appNodeName string) error {
 
 	command, keyAttibute, valueAttribute := GetNetworkChaosCommands(experimentsDetails)
 
@@ -221,7 +197,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 }
 
 //DeleteHelperPod delete the helper pod
-func DeleteHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients environment.ClientSets, runID string) error {
+func DeleteHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, runID string) error {
 
 	err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Delete("pumba-netem-"+runID, &v1.DeleteOptions{})
 
@@ -241,4 +217,28 @@ func DeleteHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 		})
 
 	return err
+}
+
+// GetNetworkChaosCommands derive the commands for the pumba pod
+func GetNetworkChaosCommands(experimentsDetails *experimentTypes.ExperimentDetails) (string, string, string) {
+
+	var command, keyAttibute, valueAttribute string
+	if experimentsDetails.ExperimentName == "pod-network-duplication" {
+		command = "duplicate"
+		keyAttibute = "--percent"
+		valueAttribute = strconv.Itoa(experimentsDetails.NetworkPacketDuplicationPercentage)
+	} else if experimentsDetails.ExperimentName == "pod-network-latency" {
+		command = "delay"
+		keyAttibute = "--time"
+		valueAttribute = strconv.Itoa(experimentsDetails.NetworkLatency)
+	} else if experimentsDetails.ExperimentName == "pod-network-loss" {
+		command = "loss"
+		keyAttibute = "--percent"
+		valueAttribute = strconv.Itoa(experimentsDetails.NetworkPacketLossPercentage)
+	} else if experimentsDetails.ExperimentName == "pod-network-corruption" {
+		command = "corrupt"
+		keyAttibute = "--percent"
+		valueAttribute = strconv.Itoa(experimentsDetails.NetworkPacketCorruptionPercentage)
+	}
+	return command, keyAttibute, valueAttribute
 }

@@ -4,7 +4,7 @@ import (
 	"os"
 	"strconv"
 
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/pod-memory-hog/types"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-cpu-hog/types"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	clientTypes "k8s.io/apimachinery/pkg/types"
 )
@@ -24,8 +24,8 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string
 	experimentDetails.ChaosUID = clientTypes.UID(Getenv("CHAOS_UID", ""))
 	experimentDetails.InstanceID = Getenv("INSTANCE_ID", "")
 	experimentDetails.ChaosPodName = Getenv("POD_NAME", "")
+	experimentDetails.CPUcores, _ = strconv.Atoi(Getenv("CPU_CORES", "1"))
 	experimentDetails.PodsAffectedPerc, _ = strconv.Atoi(Getenv("PODS_AFFECTED_PERC", "0"))
-	experimentDetails.MemoryConsumption, _ = strconv.Atoi(Getenv("MEMORY_CONSUMPTION", "500"))
 }
 
 // Getenv fetch the env and set the default value, if any
