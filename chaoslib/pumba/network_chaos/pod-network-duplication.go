@@ -96,7 +96,7 @@ func GetApplicationPod(experimentsDetails *experimentTypes.ExperimentDetails, cl
 		return "", "", errors.Wrapf(err, "Fail to get the application pod in %v namespace", experimentsDetails.AppNS)
 	}
 
-	podNameListSize := len(podList.Items) + 1
+	podNameListSize := len(podList.Items)
 	podNameList := make([]string, podNameListSize)
 	podNodeName := make([]string, podNameListSize)
 
