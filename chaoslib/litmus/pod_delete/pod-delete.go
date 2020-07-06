@@ -5,24 +5,24 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/litmuschaos/litmus-go/pkg/environment"
 	"github.com/litmuschaos/litmus-go/pkg/log"
+	"github.com/litmuschaos/litmus-go/pkg/math"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/pod-delete/types"
 	"github.com/litmuschaos/litmus-go/pkg/status"
+	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/openebs/maya/pkg/util/retry"
 	"github.com/pkg/errors"
 	apiv1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"github.com/litmuschaos/litmus-go/pkg/environment"
-	"github.com/litmuschaos/litmus-go/pkg/math"
-	"github.com/litmuschaos/litmus-go/pkg/types"
 )
 
 var err error
 
 //PreparePodDelete contains the prepration steps before chaos injection
-func PreparePodDelete(experimentsDetails *types.ExperimentDetails, clients environment.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
+func PreparePodDelete(experimentsDetails *experimentTypes.ExperimentDetails, clients environment.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
 
-	//getting the iteration count for the pod deletion
+	//Getting the iteration count for the pod deletion
 	GetIterations(experimentsDetails)
 	//Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
@@ -39,7 +39,7 @@ func PreparePodDelete(experimentsDetails *types.ExperimentDetails, clients envir
 	// Generate the run_id
 	runID := GetRunID()
 
-	// Creating the helper pod
+	// Creating a helper pod
 	err = CreateHelperPod(experimentsDetails, clients, runID)
 	if err != nil {
 		errors.Errorf("Unable to create the helper pod, err: %v", err)
@@ -65,7 +65,7 @@ func PreparePodDelete(experimentsDetails *types.ExperimentDetails, clients envir
 	//ChaosCurrentTimeStamp contains the current timestamp
 	ChaosCurrentTimeStamp := time.Now().Unix()
 	//ChaosDiffTimeStamp contains the difference of current timestamp and start timestamp
-    //It will helpful to track the total chaos duration
+	//It will helpful to track the total chaos duration
 	chaosDiffTimeStamp := ChaosCurrentTimeStamp - ChaosStartTimeStamp
 
 	if int(chaosDiffTimeStamp) < experimentsDetails.ChaosDuration {
@@ -88,7 +88,7 @@ func PreparePodDelete(experimentsDetails *types.ExperimentDetails, clients envir
 }
 
 //GetIterations derive the iterations value from given parameters
-func GetIterations(experimentsDetails *types.ExperimentDetails) {
+func GetIterations(experimentsDetails *experimentTypes.ExperimentDetails) {
 	var Iterations int
 	if experimentsDetails.ChaosInterval != 0 {
 		Iterations = experimentsDetails.ChaosDuration / experimentsDetails.ChaosInterval
@@ -100,7 +100,7 @@ func GetIterations(experimentsDetails *types.ExperimentDetails) {
 }
 
 //waitForRampTime waits for the given ramp time duration (in seconds)
-func waitForRampTime(experimentsDetails *types.ExperimentDetails) {
+func waitForRampTime(experimentsDetails *experimentTypes.ExperimentDetails) {
 	time.Sleep(time.Duration(experimentsDetails.RampTime) * time.Second)
 }
 
@@ -115,7 +115,7 @@ func GetRunID() string {
 }
 
 // GetServiceAccount find the serviceAccountName for the helper pod
-func GetServiceAccount(experimentsDetails *types.ExperimentDetails, clients environment.ClientSets) error {
+func GetServiceAccount(experimentsDetails *experimentTypes.ExperimentDetails, clients environment.ClientSets) error {
 	pod, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Get(experimentsDetails.ChaosPodName, v1.GetOptions{})
 	if err != nil {
 		return err
@@ -125,7 +125,7 @@ func GetServiceAccount(experimentsDetails *types.ExperimentDetails, clients envi
 }
 
 // CreateHelperPod derive the attributes for helper pod and create the helper pod
-func CreateHelperPod(experimentsDetails *types.ExperimentDetails, clients environment.ClientSets, runID string) error {
+func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients environment.ClientSets, runID string) error {
 
 	helperPod := &apiv1.Pod{
 		ObjectMeta: v1.ObjectMeta{
@@ -164,7 +164,7 @@ func CreateHelperPod(experimentsDetails *types.ExperimentDetails, clients enviro
 }
 
 //DeleteHelperPod delete the helper pod
-func DeleteHelperPod(experimentsDetails *types.ExperimentDetails, clients environment.ClientSets, runID string) error {
+func DeleteHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients environment.ClientSets, runID string) error {
 
 	err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Delete("pod-delete-"+runID, &v1.DeleteOptions{})
 
@@ -187,12 +187,12 @@ func DeleteHelperPod(experimentsDetails *types.ExperimentDetails, clients enviro
 }
 
 // GetPodEnv derive all the env required for the helper pod
-func GetPodEnv(experimentsDetails *types.ExperimentDetails) []apiv1.EnvVar{
+func GetPodEnv(experimentsDetails *experimentTypes.ExperimentDetails) []apiv1.EnvVar {
 
 	var envVar []apiv1.EnvVar
-	ENVList := map[string]string{"FORCE": strconv.FormatBool(experimentsDetails.Force),"APP_NS": experimentsDetails.AppNS,"KILL_COUNT": strconv.Itoa(experimentsDetails.KillCount),
-	"TOTAL_CHAOS_DURATION": strconv.Itoa(experimentsDetails.ChaosDuration),"CHAOS_NAMESPACE": experimentsDetails.ChaosNamespace,"APP_LABEL": experimentsDetails.AppLabel,
-	"CHAOS_ENGINE": experimentsDetails.EngineName,"CHAOS_UID": string(experimentsDetails.ChaosUID),"CHAOS_INTERVAL": strconv.Itoa(experimentsDetails.ChaosInterval),"ITERATIONS": strconv.Itoa(experimentsDetails.Iterations)}
+	ENVList := map[string]string{"FORCE": strconv.FormatBool(experimentsDetails.Force), "APP_NS": experimentsDetails.AppNS, "KILL_COUNT": strconv.Itoa(experimentsDetails.KillCount),
+		"TOTAL_CHAOS_DURATION": strconv.Itoa(experimentsDetails.ChaosDuration), "CHAOS_NAMESPACE": experimentsDetails.ChaosNamespace, "APP_LABEL": experimentsDetails.AppLabel,
+		"CHAOS_ENGINE": experimentsDetails.EngineName, "CHAOS_UID": string(experimentsDetails.ChaosUID), "CHAOS_INTERVAL": strconv.Itoa(experimentsDetails.ChaosInterval), "ITERATIONS": strconv.Itoa(experimentsDetails.Iterations)}
 	for key, value := range ENVList {
 		var perEnv apiv1.EnvVar
 		perEnv.Name = key
@@ -204,7 +204,7 @@ func GetPodEnv(experimentsDetails *types.ExperimentDetails) []apiv1.EnvVar{
 
 	var downwardEnv apiv1.EnvVar
 	downwardEnv.Name = "POD_NAME"
-	downwardEnv.ValueFrom = &experimentPodName	
+	downwardEnv.ValueFrom = &experimentPodName
 	envVar = append(envVar, downwardEnv)
 
 	return envVar

@@ -1,21 +1,23 @@
 package main
 
 import (
+	"github.com/litmuschaos/litmus-go/chaoslib/litmus/pod_memory_hog"
 	"github.com/litmuschaos/litmus-go/pkg/environment"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	"github.com/litmuschaos/litmus-go/pkg/log"
-	experimentEnv "github.com/litmuschaos/litmus-go/pkg/{{ name }}/environment"
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/{{ name }}/types"
+	experimentEnv "github.com/litmuschaos/litmus-go/pkg/pod-memory-hog/environment"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/pod-memory-hog/types"
 	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/sirupsen/logrus"
+	"k8s.io/klog"
 )
 
 func init() {
 	// Log as JSON instead of the default ASCII formatter.
 	logrus.SetFormatter(&logrus.TextFormatter{
-		FullTimestamp: true,
+		FullTimestamp:          true,
 		DisableSorting:         true,
 		DisableLevelTruncation: true,
 	})
@@ -29,7 +31,7 @@ func main() {
 	eventsDetails := types.EventDetails{}
 	clients := environment.ClientSets{}
 	chaosDetails := types.ChaosDetails{}
-	
+
 	//Getting kubeConfig and Generate ClientSets
 	if err := clients.GenerateClientSetFromKubeConfig(); err != nil {
 		log.Fatalf("Unable to Get the kubeconfig due to %v", err)
@@ -37,7 +39,7 @@ func main() {
 
 	//Fetching all the ENV passed from the runner pod
 	log.Infof("[PreReq]: Getting the ENV for the %v experiment", experimentsDetails.ExperimentName)
-	experimentEnv.GetENV(&experimentsDetails, "{{ name }}")
+	experimentEnv.GetENV(&experimentsDetails, "pod-memory-hog")
 
 	// Intialise Chaos Result Parameters
 	environment.SetResultAttributes(&resultDetails, experimentsDetails.EngineName, experimentsDetails.ExperimentName)
@@ -50,7 +52,7 @@ func main() {
 	err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT")
 	if err != nil {
 		log.Errorf("Unable to Create the Chaos Result due to %v", err)
-		resultDetails.FailStep = "Updating the chaos result of pod-delete experiment (SOT)"
+		resultDetails.FailStep = "Updating the chaos result of pod-memory-hog experiment (SOT)"
 		err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 		return
 	}
@@ -60,14 +62,13 @@ func main() {
 
 	//DISPLAY THE APP INFORMATION
 	log.InfoWithValues("The application informations are as follows", logrus.Fields{
-		"Namespace": experimentsDetails.AppNS,
-		"Label":     experimentsDetails.AppLabel,
-		"Ramp Time": experimentsDetails.RampTime,
+		"Namespace":          experimentsDetails.AppNS,
+		"Label":              experimentsDetails.AppLabel,
+		"Chaos Duration":     experimentsDetails.ChaosDuration,
+		"Ramp Time":          experimentsDetails.RampTime,
+		"Memory Consumption": experimentsDetails.MemoryConsumption,
 	})
 
-    // ADD A PRE-CHAOS CHECK OF YOUR CHOICE HERE
-    // POD STATUS CHECKS FOR THE APPLICATION UNDER TEST AND AUXILIARY APPLICATIONS ARE ADDED BY DEFAULT 
-    
 	//PRE-CHAOS APPLICATION STATUS CHECK
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (pre-chaos)")
 	err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, clients)
@@ -77,60 +78,40 @@ func main() {
 		result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 		return
 	}
-{% if auxiliaryAppCheck is defined and auxiliaryAppCheck == true %}
-	//PRE-CHAOS AUXILIARY APPLICATION STATUS CHECK
-	if experimentsDetails.AuxiliaryAppInfo != "" {
-	log.Info("[Status]: Verify that the Auxiliary Applications are running (pre-chaos)")
-	err = status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, clients)
-	if err != nil {
-		log.Errorf("Auxiliary Application status check failed due to %v", err)
-		resultDetails.FailStep = "Verify that the Auxiliary Applications are running (pre-chaos)"
-		result.ChaosResult(&chaosDetails, clients,&resultDetails,"EOT"); return
-	}
-{% endif %}
 
 	if experimentsDetails.EngineName != "" {
 		environment.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, "AUT is Running successfully", &chaosDetails)
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
-    // INVOKE THE CHAOSLIB OF YOUR CHOICE HERE, WHICH WILL CONTAIN 
-	// THE BUSINESS LOGIC OF THE ACTUAL CHAOS
-    // IT CAN BE A NEW CHAOSLIB YOU HAVE CREATED SPECIALLY FOR THIS EXPERIMENT OR ANY EXISTING ONE 
-   
-	// Including the litmus lib for pod-delete
+	// Including the litmus lib for pod-memory-hog
 	if experimentsDetails.ChaosLib == "litmus" {
-		err = {{ name }}.{{ name }}()
+		err = pod_memory_hog.PrepareMemoryStress(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
 		if err != nil {
-			log.Errorf("Chaos injection failed due to %v\n", err)
-			result.ChaosResult(&chaosDetails, clients,&resultDetails,"EOT"); return
+			log.Errorf("[Error]: pod memory hog failed due to %v\n", err)
+			resultDetails.FailStep = "pod memory hog chaos injection failed"
+			resultDetails.Verdict = "Fail"
+			result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
+			return
 		}
-		resultDetails.Verdict="Pass"
+		log.Info("[Confirmation]: Memory of the application pod has been stressed successfully")
+		resultDetails.Verdict = "Pass"
+	} else {
+		log.Error("[Invalid]: Please Provide the correct LIB")
+		resultDetails.FailStep = "Including the litmus lib for pod-memory-hog"
+		result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
+		return
 	}
-
-	// ADD A POST-CHAOS CHECK OF YOUR CHOICE HERE
-    // POD STATUS CHECKS FOR THE APPLICATION UNDER TEST AND AUXILIARY APPLICATIONS ARE ADDED BY DEFAULT 
 
 	//POST-CHAOS APPLICATION STATUS CHECK
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (post-chaos)")
 	err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, clients)
 	if err != nil {
-		log.Errorf("Application status check failed due to %v\n", err)
+		klog.V(0).Infof("Application status check failed due to %v\n", err)
 		resultDetails.FailStep = "Verify that the AUT (Application Under Test) is running (post-chaos)"
 		result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 		return
 	}
-{% if auxiliaryAppCheck is defined and auxiliaryAppCheck == true %}
-	//POST-CHAOS AUXILIARY APPLICATION STATUS CHECK
-	if experimentsDetails.AuxiliaryAppInfo != "" {
-	log.Info("[Status]: Verify that the Auxiliary Applications are running (post-chaos)")
-	err = status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, clients)
-	if err != nil {
-		log.Errorf("Auxiliary Application status check failed due to %v", err)
-		resultDetails.FailStep = "Verify that the Auxiliary Applications are running (post-chaos)"
-		result.ChaosResult(&chaosDetails, clients,&resultDetails,"EOT"); return
-	}
-{% endif %}
 
 	if experimentsDetails.EngineName != "" {
 		environment.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, "AUT is Running successfully", &chaosDetails)

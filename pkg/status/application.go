@@ -6,7 +6,6 @@ import (
 
 	environment "github.com/litmuschaos/litmus-go/pkg/environment"
 	"github.com/litmuschaos/litmus-go/pkg/log"
-	types "github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/openebs/maya/pkg/util/retry"
 	"github.com/pkg/errors"
 	logrus "github.com/sirupsen/logrus"
@@ -32,9 +31,9 @@ func CheckApplicationStatus(appNs string, appLabel string, clients environment.C
 }
 
 // CheckAuxiliaryApplicationStatus checks the status of the Auxiliary applications
-func CheckAuxiliaryApplicationStatus(experimentsDetails *types.ExperimentDetails, clients environment.ClientSets) error {
+func CheckAuxiliaryApplicationStatus(AuxiliaryAppDetails string, clients environment.ClientSets) error {
 
-	AuxiliaryAppInfo := strings.Split(experimentsDetails.AuxiliaryAppInfo, ",")
+	AuxiliaryAppInfo := strings.Split(AuxiliaryAppDetails, ",")
 
 	for _, val := range AuxiliaryAppInfo {
 		AppInfo := strings.Split(val, ":")
@@ -113,7 +112,7 @@ func WaitForCompletion(appNs string, appLabel string, clients environment.Client
 			}
 			err = nil
 			for _, pod := range podSpec.Items {
-				log.Infof("helper pod status: %v",string(pod.Status.Phase))
+				log.Infof("helper pod status: %v", string(pod.Status.Phase))
 				if string(pod.Status.Phase) != "Succeeded" && string(pod.Status.Phase) != "Failed" {
 					return errors.Errorf("Helper pod is not yet completed yet")
 				}

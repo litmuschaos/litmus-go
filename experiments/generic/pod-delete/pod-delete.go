@@ -5,6 +5,8 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/environment"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	"github.com/litmuschaos/litmus-go/pkg/log"
+	experimentEnv "github.com/litmuschaos/litmus-go/pkg/pod-delete/environment"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/pod-delete/types"
 	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
@@ -14,8 +16,7 @@ import (
 func init() {
 	// Log as JSON instead of the default ASCII formatter.
 	logrus.SetFormatter(&logrus.TextFormatter{
-		FullTimestamp: true,
-		// ForceColors:            true,
+		FullTimestamp:          true,
 		DisableSorting:         true,
 		DisableLevelTruncation: true,
 	})
@@ -24,32 +25,39 @@ func init() {
 func main() {
 
 	var err error
-	experimentsDetails := types.ExperimentDetails{}
+	experimentsDetails := experimentTypes.ExperimentDetails{}
 	resultDetails := types.ResultDetails{}
 	eventsDetails := types.EventDetails{}
 	clients := environment.ClientSets{}
+	chaosDetails := types.ChaosDetails{}
 
 	//Getting kubeConfig and Generate ClientSets
 	if err := clients.GenerateClientSetFromKubeConfig(); err != nil {
 		log.Fatalf("Unable to Get the kubeconfig due to %v", err)
 	}
 
-	//Fetching all the ENV passed for the runner pod
+	//Fetching all the ENV passed from the runner pod
 	log.Infof("[PreReq]: Getting the ENV for the %v experiment", experimentsDetails.ExperimentName)
-	environment.GetENV(&experimentsDetails, "pod-delete")
+	experimentEnv.GetENV(&experimentsDetails, "pod-delete")
 
 	// Intialise Chaos Result Parameters
-	environment.SetResultAttributes(&resultDetails, &experimentsDetails)
+	environment.SetResultAttributes(&resultDetails, experimentsDetails.EngineName, experimentsDetails.ExperimentName)
+
+	// Intialise the chaos attributes
+	experimentEnv.InitialiseChaosVariables(&chaosDetails, &experimentsDetails)
 
 	//Updating the chaos result in the beggining of experiment
 	log.Infof("[PreReq]: Updating the chaos result of %v experiment (SOT)", experimentsDetails.ExperimentName)
-	err = result.ChaosResult(&experimentsDetails, clients, &resultDetails, "SOT")
+	err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT")
 	if err != nil {
 		log.Errorf("Unable to Create the Chaos Result due to %v", err)
 		resultDetails.FailStep = "Updating the chaos result of pod-delete experiment (SOT)"
-		err = result.ChaosResult(&experimentsDetails, clients, &resultDetails, "EOT")
+		err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 		return
 	}
+
+	// Set the chaos result uid
+	result.SetResultUID(&resultDetails, clients, &chaosDetails)
 
 	//DISPLAY THE APP INFORMATION
 	log.InfoWithValues("The application informations are as follows", logrus.Fields{
@@ -64,12 +72,12 @@ func main() {
 	if err != nil {
 		log.Errorf("Application status check failed due to %v\n", err)
 		resultDetails.FailStep = "Verify that the AUT (Application Under Test) is running (pre-chaos)"
-		result.ChaosResult(&experimentsDetails, clients, &resultDetails, "EOT")
+		result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 		return
 	}
 	if experimentsDetails.EngineName != "" {
-		environment.SetEventAttributes(&eventsDetails, types.PreChaosCheck, "AUT is Running successfully")
-		events.GenerateEvents(&experimentsDetails, clients, &eventsDetails)
+		environment.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, "AUT is Running successfully", &chaosDetails)
+		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
 	// Including the litmus lib for pod-delete
@@ -78,7 +86,7 @@ func main() {
 		if err != nil {
 			log.Errorf("Chaos injection failed due to %v\n", err)
 			resultDetails.FailStep = "Including the litmus lib for pod-delete"
-			result.ChaosResult(&experimentsDetails, clients, &resultDetails, "EOT")
+			result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 			return
 		}
 		log.Info("[Confirmation]: The application pod has been deleted successfully")
@@ -86,7 +94,7 @@ func main() {
 	} else {
 		log.Error("[Invalid]: Please Provide the correct LIB")
 		resultDetails.FailStep = "Including the litmus lib for pod-delete"
-		result.ChaosResult(&experimentsDetails, clients, &resultDetails, "EOT")
+		result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 		return
 	}
 
@@ -96,23 +104,27 @@ func main() {
 	if err != nil {
 		log.Errorf("Application status check failed due to %v\n", err)
 		resultDetails.FailStep = "Verify that the AUT (Application Under Test) is running (post-chaos)"
-		result.ChaosResult(&experimentsDetails, clients, &resultDetails, "EOT")
+		result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 		return
 	}
 	if experimentsDetails.EngineName != "" {
-		environment.SetEventAttributes(&eventsDetails, types.PostChaosCheck, "AUT is Running successfully")
-		events.GenerateEvents(&experimentsDetails, clients, &eventsDetails)
+		environment.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, "AUT is Running successfully", &chaosDetails)
+		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
 	//Updating the chaosResult in the end of experiment
 	log.Infof("[The End]: Updating the chaos result of %v experiment (EOT)", experimentsDetails.ExperimentName)
-	err = result.ChaosResult(&experimentsDetails, clients, &resultDetails, "EOT")
+	err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 	if err != nil {
 		log.Fatalf("Unable to Update the Chaos Result due to %v\n", err)
 	}
 	if experimentsDetails.EngineName != "" {
-		msg := experimentsDetails.ExperimentName + "experiment has been" + resultDetails.Verdict + "ed"
-		environment.SetEventAttributes(&eventsDetails, types.Summary, msg)
-		events.GenerateEvents(&experimentsDetails, clients, &eventsDetails)
+		msg := experimentsDetails.ExperimentName + " experiment has been " + resultDetails.Verdict + "ed"
+		environment.SetEngineEventAttributes(&eventsDetails, types.Summary, msg, &chaosDetails)
+		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
+
+	msg := experimentsDetails.ExperimentName + " experiment has been " + resultDetails.Verdict + "ed"
+	environment.SetResultEventAttributes(&eventsDetails, types.Summary, msg, &resultDetails)
+	events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosResult")
 }

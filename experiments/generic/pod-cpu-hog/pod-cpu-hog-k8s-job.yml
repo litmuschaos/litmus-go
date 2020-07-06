@@ -2,12 +2,12 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  generateName: cpu-hog-
+  generateName: pod-cpu-hog-
 spec:
   template:
     metadata:
       labels:
-        experiment: cpu-hog
+        experiment: pod-cpu-hog
     spec:
       # Placeholder that is updated by the executor for automated runs
       # Provide appropriate SA (with desired permissions) if executed manually
@@ -18,9 +18,6 @@ spec:
         image: litmuschaos/go-runner:ci
         imagePullPolicy: Always
         env:
-          - name: ANSIBLE_STDOUT_CALLBACK
-            value: 'default'
-
           - name: APP_NAMESPACE
             value: ''
 
@@ -65,4 +62,4 @@ spec:
                 fieldPath: spec.serviceAccountName
 
         command: ["/bin/bash"]
-        args: ["-c", "./experiments/cpu-hog"]
+        args: ["-c", "./experiments/pod-cpu-hog"]
