@@ -91,12 +91,12 @@ func PreparePodNetworkDuplication(experimentsDetails *experimentTypes.Experiment
 //GetApplicationPod will select a random replica of application pod for chaos
 //It will also get the node name of the application pod
 func GetApplicationPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) (string, string, error) {
-	podList, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).List(v1.ListOptions{LabelSelector: experimentsDetails.AppLabel})
-	if err != nil {
-		return "", "", err
+	podList, _ := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).List(v1.ListOptions{LabelSelector: experimentsDetails.AppLabel})
+	if len(podList.Items) == 0 {
+		return "", "", errors.Wrapf(err, "Fail to get the application pod in %v namespace", experimentsDetails.AppNS)
 	}
 
-	podNameListSize := len(podList.Items) + 1
+	podNameListSize := len(podList.Items)
 	podNameList := make([]string, podNameListSize)
 	podNodeName := make([]string, podNameListSize)
 
