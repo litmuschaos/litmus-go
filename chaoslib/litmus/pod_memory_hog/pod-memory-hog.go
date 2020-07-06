@@ -9,11 +9,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/litmuschaos/litmus-go/pkg/environment"
+	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-memory-hog/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/math"
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/pod-memory-hog/types"
 	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/pkg/errors"
@@ -29,7 +29,7 @@ import (
 // StressMemory Uses the REST API to exec into the target container of the target pod
 // The function will be constantly increasing the Memory utilisation until it reaches the maximum available or allowed number.
 // Using the TOTAL_CHAOS_DURATION we will need to specify for how long this experiment will last
-func StressMemory(MemoryConsumption, containerName, podName, namespace string, clients environment.ClientSets) error {
+func StressMemory(MemoryConsumption, containerName, podName, namespace string, clients clients.ClientSets) error {
 
 	log.Infof("The memory consumption is: %v", MemoryConsumption)
 
@@ -82,7 +82,7 @@ func StressMemory(MemoryConsumption, containerName, podName, namespace string, c
 }
 
 //ExperimentMemory function orchestrates the experiment by calling the StressMemory function, of every container, of every pod that is targetted
-func ExperimentMemory(experimentsDetails *experimentTypes.ExperimentDetails, clients environment.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+func ExperimentMemory(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	var endTime <-chan time.Time
 	timeDelay := time.Duration(experimentsDetails.ChaosDuration) * time.Second
@@ -106,7 +106,7 @@ func ExperimentMemory(experimentsDetails *experimentTypes.ExperimentDetails, cli
 
 			if experimentsDetails.EngineName != "" {
 				msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on " + pod.Name + " pod"
-				environment.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, chaosDetails)
+				types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, chaosDetails)
 				events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 			}
 
@@ -154,7 +154,7 @@ func ExperimentMemory(experimentsDetails *experimentTypes.ExperimentDetails, cli
 }
 
 //PrepareMemoryStress contains the steps for prepration before chaos
-func PrepareMemoryStress(experimentsDetails *experimentTypes.ExperimentDetails, clients environment.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+func PrepareMemoryStress(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	//Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
@@ -180,7 +180,7 @@ func waitForRampTime(experimentsDetails *experimentTypes.ExperimentDetails) {
 }
 
 //PreparePodList will also adjust the number of the target pods depending on the specified percentage in PODS_AFFECTED_PERC variable
-func PreparePodList(experimentsDetails *experimentTypes.ExperimentDetails, clients environment.ClientSets, resultDetails *types.ResultDetails) (*core_v1.PodList, error) {
+func PreparePodList(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails) (*core_v1.PodList, error) {
 
 	log.Infof("[Chaos]:Pods percentage to affect is %v", strconv.Itoa(experimentsDetails.PodsAffectedPerc))
 
@@ -205,7 +205,7 @@ func PreparePodList(experimentsDetails *experimentTypes.ExperimentDetails, clien
 }
 
 //KillStressMemory function to kill the experiment. Triggered by either timeout of chaos duration or termination of the experiment
-func KillStressMemory(containerName, podName, namespace string, clients environment.ClientSets) error {
+func KillStressMemory(containerName, podName, namespace string, clients clients.ClientSets) error {
 
 	command := []string{"/bin/sh", "-c", "kill $(find /proc -name exe -lname '*/dd' 2>&1 | grep -v 'Permission denied' | awk -F/ '{print $(NF-1)}' |  head -n 1)"}
 

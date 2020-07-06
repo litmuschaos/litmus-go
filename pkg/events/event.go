@@ -3,14 +3,14 @@ package events
 import (
 	"time"
 
-	"github.com/litmuschaos/litmus-go/pkg/environment"
+	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 //CreateEvents create the events in the desired resource
-func CreateEvents(eventsDetails *types.EventDetails, clients environment.ClientSets, chaosDetails *types.ChaosDetails, kind string) error {
+func CreateEvents(eventsDetails *types.EventDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, kind string) error {
 
 	events := &apiv1.Event{
 		ObjectMeta: metav1.ObjectMeta{
@@ -42,7 +42,7 @@ func CreateEvents(eventsDetails *types.EventDetails, clients environment.ClientS
 
 //GenerateEvents update the events and increase the count by 1, if already present
 // else it will create a new event
-func GenerateEvents(eventsDetails *types.EventDetails, clients environment.ClientSets, chaosDetails *types.ChaosDetails, kind string) error {
+func GenerateEvents(eventsDetails *types.EventDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, kind string) error {
 
 	var err error
 	event, err := clients.KubeClient.CoreV1().Events(chaosDetails.ChaosNamespace).Get(eventsDetails.Reason+string(eventsDetails.ResourceUID), metav1.GetOptions{})

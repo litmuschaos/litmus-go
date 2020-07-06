@@ -6,7 +6,7 @@ import (
 
     "github.com/litmuschaos/litmus-go/pkg/types"
     "github.com/litmuschaos/litmus-go/pkg/status"
-    "github.com/litmuschaos/litmus-go/pkg/environment"
+    clients "github.com/litmuschaos/litmus-go/pkg/clients"
 )
 
 func {{ name }}() {

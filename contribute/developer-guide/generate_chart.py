@@ -173,8 +173,8 @@ def main():
             chart_dir = litmus_root + '/experiments/' + entity_parent
 
         chaoslib_dir = litmus_root + '/chaoslib/litmus/' + config['name']
-        environment_dir = litmus_root + '/pkg/' + config['name'] + '/environment'
-        types_dir = litmus_root + '/pkg/' + config['name'] + '/types'
+        environment_dir = litmus_root + '/pkg/' + config['category'] + '/' + config['name'] + '/environment'
+        types_dir = litmus_root + '/pkg/' + config['category'] + '/' + config['name'] + '/types'
         # if a folder with specified/derived chart name is not present, create it
         if os.path.isdir(chart_dir) != True:
             os.makedirs(chart_dir)
