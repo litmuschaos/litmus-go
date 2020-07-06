@@ -7,22 +7,22 @@
 <th> Documentation Link </th>
 </tr>
 <tr>
- <td> Pod Network Duplication </td>
- <td> This experiment causes network duplication using pumba. It injects network duplication on the specified container by starting a traffic control (tc) process with netem rules. It Can test the application's resilience to duplicate network </td>
- <td>  <a href="https://docs.litmuschaos.io/docs/pod-network-duplication/"> Here </a> </td>
+ <td> Pod Network Loss </td>
+ <td> This experiment injects chaos to disrupt network connectivity to kubernetes pods.The application pod should be healthy once chaos is stopped. It causes loss of access to application replica by injecting packet loss using pumba </td>
+ <td>  <a href="https://docs.litmuschaos.io/docs/pod-network-loss/"> Here </a> </td>
  </tr>
  </table>
 
-## Experiment CR for the pod-network-duplication experiment
+## Experiment CR for the pod-network-loss experiment
 
 ```
 apiVersion: litmuschaos.io/v1alpha1
 description:
   message: |
-    Injects network packet duplication on pods belonging to an app deployment
+   Injects network loss on pods belonging to an app deployment
 kind: ChaosExperiment
 metadata:
-  name: pod-network-duplication
+  name: pod-network-loss
   version: 0.1.0
 spec:
   definition:
@@ -49,7 +49,7 @@ spec:
     image: "litmuschaos/go-runner:latest"
     args:
     - -c
-    - ./experiments/pod-network-duplication
+    - ./experiments/pod-network-loss
     command:
     - /bin/bash
     env:
@@ -61,13 +61,13 @@ spec:
       value: ''
     - name: NETWORK_INTERFACE
       value: 'eth0'
-    - name: NETWORK_PACKET_DUPLICATION_PERCENTAGE
+    - name: NETWORK_PACKET_LOSS_PERCENTAGE
       value: '100' # in percentage
     - name: LIB
       value: 'pumba'      
     - name: LIB_IMAGE
       value: 'gaiaadm/pumba:0.6.5'
     labels:
-      name: pod-network-duplication
+      name: pod-network-loss
 
 ```

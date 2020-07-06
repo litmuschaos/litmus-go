@@ -45,15 +45,15 @@ func PreparePodDelete(experimentsDetails *experimentTypes.ExperimentDetails, cli
 		errors.Errorf("Unable to create the helper pod, err: %v", err)
 	}
 
-	// Recording the chaos start timestamp
-	ChaosStartTimeStamp := time.Now().Unix()
-
 	//Checking the status of helper pod
 	log.Info("[Status]: Checking the status of the helper pod")
 	err = status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, "name=pod-delete"+runID, clients)
 	if err != nil {
 		errors.Errorf("helper pod is not in running state, err: %v", err)
 	}
+
+	// Recording the chaos start timestamp
+	ChaosStartTimeStamp := time.Now().Unix()
 
 	// Wait till the completion of helper pod
 	log.Info("[Wait]: waiting till the completion of the helper pod")

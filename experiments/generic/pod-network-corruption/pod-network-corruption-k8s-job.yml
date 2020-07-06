@@ -2,12 +2,12 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  generateName: pod-network-duplication-
+  generateName: pod-network-corruption-
 spec:
   template:
     metadata:
       labels:
-        experiment: pod-network-duplication
+        experiment: pod-network-corruption
     spec:
       # Placeholder that is updated by the executor for automated runs
       # Provide appropriate SA (with desired permissions) if executed manually
@@ -37,7 +37,7 @@ spec:
           - name: NETWORK_INTERFACE
             value: 'eth0'
 
-          - name: NETWORK_PACKET_DUPLICATION_PERCENTAGE
+          - name: NETWORK_PACKET_CORRUPTION_PERCENTAGE
             value: '100' # in percentage
 
           - name: TOTAL_CHAOS_DURATION
@@ -71,4 +71,4 @@ spec:
                 fieldPath: spec.serviceAccountName
 
         command: ["/bin/bash"]
-        args: ["-c", "./experiments/pod-network-duplication"]
+        args: ["-c", "./experiments/pod-network-corruption"]

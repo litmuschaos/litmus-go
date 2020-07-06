@@ -4,7 +4,7 @@ import (
 	"os"
 	"strconv"
 
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/pod-network-duplication/types"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/network-chaos/types"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	clientTypes "k8s.io/apimachinery/pkg/types"
 )
@@ -16,8 +16,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string
 	experimentDetails.EngineName = Getenv("CHAOSENGINE", "")
 	experimentDetails.ChaosDuration, _ = strconv.Atoi(Getenv("TOTAL_CHAOS_DURATION", "60"))
 	experimentDetails.RampTime, _ = strconv.Atoi(Getenv("RAMP_TIME", "0"))
-	experimentDetails.ChaosLib = Getenv("LIB", "litmus")
-	experimentDetails.ChaosServiceAccount = Getenv("CHAOS_SERVICE_ACCOUNT", "")
+	experimentDetails.ChaosLib = Getenv("LIB", "pumba")
 	experimentDetails.AppNS = Getenv("APP_NAMESPACE", "")
 	experimentDetails.AppLabel = Getenv("APP_LABEL", "")
 	experimentDetails.AppKind = Getenv("APP_KIND", "")
@@ -27,6 +26,9 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string
 	experimentDetails.ChaosPodName = Getenv("POD_NAME", "")
 	experimentDetails.RunID = Getenv("RunID", "")
 	experimentDetails.NetworkPacketDuplicationPercentage, _ = strconv.Atoi(Getenv("NETWORK_PACKET_DUPLICATION_PERCENTAGE", "100"))
+	experimentDetails.NetworkLatency, _ = strconv.Atoi(Getenv("NETWORK_LATENCY", "60000"))
+	experimentDetails.NetworkPacketLossPercentage, _ = strconv.Atoi(Getenv("NETWORK_PACKET_LOSS_PERCENTAGE", "100"))
+	experimentDetails.NetworkPacketCorruptionPercentage, _ = strconv.Atoi(Getenv("NETWORK_PACKET_CORRUPTION_PERCENTAGE", "100"))
 	experimentDetails.NetworkInterface = Getenv("NETWORK_INTERFACE", "eth0")
 	experimentDetails.TargetContainer = Getenv("TARGET_CONTAINER", "")
 }
