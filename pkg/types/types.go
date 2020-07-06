@@ -39,3 +39,35 @@ type ChaosDetails struct {
 	InstanceID     string
 	ExperimentName string
 }
+
+//SetResultAttributes initialise all the chaos result ENV
+func SetResultAttributes(resultDetails *ResultDetails, EngineName string, ExperimentName string) {
+	resultDetails.Verdict = "Awaited"
+	resultDetails.Phase = "Running"
+	resultDetails.FailStep = "N/A"
+	if EngineName != "" {
+		resultDetails.Name = EngineName + "-" + ExperimentName
+	} else {
+		resultDetails.Name = ExperimentName
+	}
+}
+
+//SetEngineEventAttributes initialise attributes for event generation in chaos engine
+func SetEngineEventAttributes(eventsDetails *EventDetails, Reason string, Message string, chaosDetails *ChaosDetails) {
+
+	eventsDetails.Reason = Reason
+	eventsDetails.Message = Message
+	eventsDetails.ResourceName = chaosDetails.EngineName
+	eventsDetails.ResourceUID = chaosDetails.ChaosUID
+
+}
+
+//SetResultEventAttributes initialise attributes for event generation in chaos result
+func SetResultEventAttributes(eventsDetails *EventDetails, Reason string, Message string, resultDetails *ResultDetails) {
+
+	eventsDetails.Reason = Reason
+	eventsDetails.Message = Message
+	eventsDetails.ResourceName = resultDetails.Name
+	eventsDetails.ResourceUID = resultDetails.ResultUID
+
+}

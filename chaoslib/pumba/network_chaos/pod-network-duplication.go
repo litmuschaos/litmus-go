@@ -5,9 +5,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/litmuschaos/litmus-go/pkg/environment"
+	clients "github.com/litmuschaos/litmus-go/pkg/clients"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-network-duplication/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/pod-network-duplication/types"
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/openebs/maya/pkg/util/retry"
@@ -19,7 +19,7 @@ import (
 var err error
 
 //PreparePodNetworkDuplication contains the prepration steps before chaos injection
-func PreparePodNetworkDuplication(experimentsDetails *experimentTypes.ExperimentDetails, clients environment.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
+func PreparePodNetworkDuplication(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
 
 	//Select application pod for pod network duplication
 	appName, appNodeName, err := GetApplicationPod(experimentsDetails, clients)
@@ -90,7 +90,7 @@ func PreparePodNetworkDuplication(experimentsDetails *experimentTypes.Experiment
 
 //GetApplicationPod will select a random replica of application pod for chaos
 //It will also get the node name of the application pod
-func GetApplicationPod(experimentsDetails *experimentTypes.ExperimentDetails, clients environment.ClientSets) (string, string, error) {
+func GetApplicationPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) (string, string, error) {
 	podList, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).List(v1.ListOptions{LabelSelector: experimentsDetails.AppLabel})
 	if err != nil {
 		return "", "", err
@@ -115,7 +115,7 @@ func GetApplicationPod(experimentsDetails *experimentTypes.ExperimentDetails, cl
 
 //GetTargetContainer will fetch the conatiner name from application pod
 //This container will be used as target container
-func GetTargetContainer(experimentsDetails *experimentTypes.ExperimentDetails, appName string, clients environment.ClientSets) (string, error) {
+func GetTargetContainer(experimentsDetails *experimentTypes.ExperimentDetails, appName string, clients clients.ClientSets) (string, error) {
 	pod, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Get(appName, v1.GetOptions{})
 	if err != nil {
 		return "", errors.Wrapf(err, "Fail to get the application pod status, due to:%v", err)
@@ -140,7 +140,7 @@ func GetRunID() string {
 }
 
 // GetServiceAccount find the serviceAccountName for the helper pod
-func GetServiceAccount(experimentsDetails *experimentTypes.ExperimentDetails, clients environment.ClientSets) error {
+func GetServiceAccount(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) error {
 	pod, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Get(experimentsDetails.ChaosPodName, v1.GetOptions{})
 	if err != nil {
 		return err
@@ -150,7 +150,7 @@ func GetServiceAccount(experimentsDetails *experimentTypes.ExperimentDetails, cl
 }
 
 // CreateHelperPod derive the attributes for helper pod and create the helper pod
-func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients environment.ClientSets, appName, appNodeName string) error {
+func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, appName, appNodeName string) error {
 
 	helperPod := &apiv1.Pod{
 		ObjectMeta: v1.ObjectMeta{
@@ -210,7 +210,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 }
 
 //DeleteHelperPod delete the helper pod
-func DeleteHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients environment.ClientSets, runID string) error {
+func DeleteHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, runID string) error {
 
 	err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Delete("pumba-netem-"+runID, &v1.DeleteOptions{})
 

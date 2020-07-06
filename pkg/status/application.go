@@ -4,7 +4,7 @@ import (
 	"strings"
 	"time"
 
-	environment "github.com/litmuschaos/litmus-go/pkg/environment"
+	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/openebs/maya/pkg/util/retry"
 	"github.com/pkg/errors"
@@ -13,7 +13,7 @@ import (
 )
 
 // CheckApplicationStatus checks the status of the AUT
-func CheckApplicationStatus(appNs string, appLabel string, clients environment.ClientSets) error {
+func CheckApplicationStatus(appNs string, appLabel string, clients clients.ClientSets) error {
 
 	// Checking whether application pods are in running state
 	log.Info("[Status]: Checking whether application pods are in running state")
@@ -31,7 +31,7 @@ func CheckApplicationStatus(appNs string, appLabel string, clients environment.C
 }
 
 // CheckAuxiliaryApplicationStatus checks the status of the Auxiliary applications
-func CheckAuxiliaryApplicationStatus(AuxiliaryAppDetails string, clients environment.ClientSets) error {
+func CheckAuxiliaryApplicationStatus(AuxiliaryAppDetails string, clients clients.ClientSets) error {
 
 	AuxiliaryAppInfo := strings.Split(AuxiliaryAppDetails, ",")
 
@@ -47,7 +47,7 @@ func CheckAuxiliaryApplicationStatus(AuxiliaryAppDetails string, clients environ
 }
 
 // CheckPodStatus checks the status of the application pod
-func CheckPodStatus(appNs string, appLabel string, clients environment.ClientSets) error {
+func CheckPodStatus(appNs string, appLabel string, clients clients.ClientSets) error {
 	err := retry.
 		Times(90).
 		Wait(2 * time.Second).
@@ -73,7 +73,7 @@ func CheckPodStatus(appNs string, appLabel string, clients environment.ClientSet
 }
 
 // CheckContainerStatus checks the status of the application container
-func CheckContainerStatus(appNs string, appLabel string, clients environment.ClientSets) error {
+func CheckContainerStatus(appNs string, appLabel string, clients clients.ClientSets) error {
 	err := retry.
 		Times(90).
 		Wait(2 * time.Second).
@@ -101,7 +101,7 @@ func CheckContainerStatus(appNs string, appLabel string, clients environment.Cli
 }
 
 // WaitForCompletion wait until the completion of pod
-func WaitForCompletion(appNs string, appLabel string, clients environment.ClientSets, duration int) error {
+func WaitForCompletion(appNs string, appLabel string, clients clients.ClientSets, duration int) error {
 	err := retry.
 		Times(uint(duration)).
 		Wait(1 * time.Second).

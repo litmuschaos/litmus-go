@@ -2,11 +2,11 @@ package main
 
 import (
 	"github.com/litmuschaos/litmus-go/chaoslib/litmus/pod_cpu_hog"
-	"github.com/litmuschaos/litmus-go/pkg/environment"
+	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
+	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/pod-cpu-hog/environment"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-cpu-hog/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
-	experimentEnv "github.com/litmuschaos/litmus-go/pkg/pod-cpu-hog/environment"
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/pod-cpu-hog/types"
 	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
@@ -30,7 +30,7 @@ func main() {
 	resultDetails := types.ResultDetails{}
 	eventsDetails := types.EventDetails{}
 	chaosDetails := types.ChaosDetails{}
-	clients := environment.ClientSets{}
+	clients := clients.ClientSets{}
 
 	//Getting kubeConfig and Generate ClientSets
 	if err := clients.GenerateClientSetFromKubeConfig(); err != nil {
@@ -42,7 +42,7 @@ func main() {
 	experimentEnv.GetENV(&experimentsDetails, "pod-cpu-hog")
 
 	// Intialise Chaos Result Parameters
-	environment.SetResultAttributes(&resultDetails, experimentsDetails.EngineName, experimentsDetails.ExperimentName)
+	types.SetResultAttributes(&resultDetails, experimentsDetails.EngineName, experimentsDetails.ExperimentName)
 
 	// Intialise the chaos attributes
 	experimentEnv.InitialiseChaosVariables(&chaosDetails, &experimentsDetails)
@@ -79,7 +79,7 @@ func main() {
 	}
 
 	if experimentsDetails.EngineName != "" {
-		environment.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, "AUT is Running successfully", &chaosDetails)
+		types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, "AUT is Running successfully", &chaosDetails)
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
@@ -113,7 +113,7 @@ func main() {
 	}
 
 	if experimentsDetails.EngineName != "" {
-		environment.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, "AUT is Running successfully", &chaosDetails)
+		types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, "AUT is Running successfully", &chaosDetails)
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
@@ -125,11 +125,11 @@ func main() {
 	}
 	if experimentsDetails.EngineName != "" {
 		msg := experimentsDetails.ExperimentName + " experiment has been " + resultDetails.Verdict + "ed"
-		environment.SetEngineEventAttributes(&eventsDetails, types.Summary, msg, &chaosDetails)
+		types.SetEngineEventAttributes(&eventsDetails, types.Summary, msg, &chaosDetails)
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
 	msg := experimentsDetails.ExperimentName + " experiment has been " + resultDetails.Verdict + "ed"
-	environment.SetResultEventAttributes(&eventsDetails, types.Summary, msg, &resultDetails)
+	types.SetResultEventAttributes(&eventsDetails, types.Summary, msg, &resultDetails)
 	events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosResult")
 }

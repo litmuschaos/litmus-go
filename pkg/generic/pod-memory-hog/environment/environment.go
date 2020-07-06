@@ -4,10 +4,9 @@ import (
 	"os"
 	"strconv"
 
-	clientTypes "k8s.io/apimachinery/pkg/types"
-
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/pod-delete/types"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-memory-hog/types"
 	"github.com/litmuschaos/litmus-go/pkg/types"
+	clientTypes "k8s.io/apimachinery/pkg/types"
 )
 
 //GetENV fetches all the env variables from the runner pod
@@ -19,16 +18,14 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string
 	experimentDetails.ChaosInterval, _ = strconv.Atoi(Getenv("CHAOS_INTERVAL", "10"))
 	experimentDetails.RampTime, _ = strconv.Atoi(Getenv("RAMP_TIME", "0"))
 	experimentDetails.ChaosLib = Getenv("LIB", "litmus")
-	experimentDetails.ChaosServiceAccount = Getenv("CHAOS_SERVICE_ACCOUNT", "")
 	experimentDetails.AppNS = Getenv("APP_NAMESPACE", "")
 	experimentDetails.AppLabel = Getenv("APP_LABEL", "")
 	experimentDetails.AppKind = Getenv("APP_KIND", "")
-	experimentDetails.KillCount, _ = strconv.Atoi(Getenv("KILL_COUNT", "1"))
 	experimentDetails.ChaosUID = clientTypes.UID(Getenv("CHAOS_UID", ""))
 	experimentDetails.InstanceID = Getenv("INSTANCE_ID", "")
 	experimentDetails.ChaosPodName = Getenv("POD_NAME", "")
-	experimentDetails.Force, _ = strconv.ParseBool(Getenv("FORCE", "false"))
-	experimentDetails.LIBImage = Getenv("LIB_IMAGE", "")
+	experimentDetails.PodsAffectedPerc, _ = strconv.Atoi(Getenv("PODS_AFFECTED_PERC", "0"))
+	experimentDetails.MemoryConsumption, _ = strconv.Atoi(Getenv("MEMORY_CONSUMPTION", "500"))
 }
 
 // Getenv fetch the env and set the default value, if any
