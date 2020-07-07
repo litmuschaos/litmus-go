@@ -39,7 +39,7 @@ func main() {
 
 	//Fetching all the ENV passed from the runner pod
 	log.Infof("[PreReq]: Getting the ENV for the %v experiment", experimentsDetails.ExperimentName)
-	experimentEnv.GetENV(&experimentsDetails, "pod-network-duplication")
+	experimentEnv.GetENV(&experimentsDetails, "pod-network-corruption")
 
 	// Intialise Chaos Result Parameters
 	types.SetResultAttributes(&resultDetails, experimentsDetails.EngineName, experimentsDetails.ExperimentName)
@@ -52,7 +52,7 @@ func main() {
 	err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT")
 	if err != nil {
 		log.Errorf("Unable to Create the Chaos Result due to %v", err)
-		resultDetails.FailStep = "Updating the chaos result of pod-network-duplication experiment (SOT)"
+		resultDetails.FailStep = "Updating the chaos result of pod-network-corruption experiment (SOT)"
 		err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 		return
 	}
@@ -81,20 +81,20 @@ func main() {
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
-	// Including the pumba lib for pod-network-duplication
+	// Including the pumba lib for pod-network-corruption
 	if experimentsDetails.ChaosLib == "pumba" {
 		err = network_chaos.PreparePodNetworkChaos(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
 		if err != nil {
 			log.Errorf("Chaos injection failed due to %v\n", err)
-			resultDetails.FailStep = "Including the pumba lib for pod-network-duplication"
+			resultDetails.FailStep = "Including the pumba lib for pod-network-corruption"
 			result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 			return
 		}
-		log.Info("[Confirmation]: The pod network duplication chaos has been applied")
+		log.Info("[Confirmation]: The pod network corruption chaos has been applied")
 		resultDetails.Verdict = "Pass"
 	} else {
 		log.Error("[Invalid]: Please Provide the correct LIB")
-		resultDetails.FailStep = "Including the pumba lib for pod-network-duplication"
+		resultDetails.FailStep = "Including the pumba lib for pod-network-corruption"
 		result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 		return
 	}

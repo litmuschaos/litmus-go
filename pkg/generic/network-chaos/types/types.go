@@ -9,7 +9,6 @@ type ExperimentDetails struct {
 	ExperimentName                     string
 	EngineName                         string
 	ChaosDuration                      int
-	ChaosServiceAccount                string
 	LIBImage                           string
 	RampTime                           int
 	ChaosLib                           string
@@ -24,4 +23,7 @@ type ExperimentDetails struct {
 	NetworkPacketDuplicationPercentage int
 	NetworkInterface                   string
 	TargetContainer                    string
+	NetworkLatency                     int
+	NetworkPacketLossPercentage        int
+	NetworkPacketCorruptionPercentage  int
 }

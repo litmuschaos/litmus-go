@@ -6,4 +6,10 @@ go build -o build/_output/pod-cpu-hog ./experiments/generic/pod-cpu-hog
 go build -o build/_output/pod-memory-hog ./experiments/generic/pod-memory-hog
 # Buiding go binaries for pod_network_duplication experiment
 go build -o build/_output/pod-network-duplication ./experiments/generic/pod-network-duplication
+# Buiding go binaries for pod_network_latency experiment
+go build -o build/_output/pod-network-latency ./experiments/generic/pod-network-latency
+# Buiding go binaries for pod_network_loss experiment
+go build -o build/_output/pod-network-loss ./experiments/generic/pod-network-loss
+# Buiding go binaries for pod_network_corruption experiment
+go build -o build/_output/pod-network-corruption ./experiments/generic/pod-network-corruption
 

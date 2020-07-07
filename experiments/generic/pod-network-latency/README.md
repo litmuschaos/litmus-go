@@ -7,22 +7,22 @@
 <th> Documentation Link </th>
 </tr>
 <tr>
- <td> Pod Network Duplication </td>
- <td> This experiment causes network duplication using pumba. It injects network duplication on the specified container by starting a traffic control (tc) process with netem rules. It Can test the application's resilience to duplicate network </td>
- <td>  <a href="https://docs.litmuschaos.io/docs/pod-network-duplication/"> Here </a> </td>
+ <td> Pod Network Latency </td>
+ <td> This experiment causes flaky access to application replica by injecting network delay using pumba. It injects latency on the specified container by starting a traffic control (tc) process with netem rules to add egress delays. It Can test the application's resilience to lossy/flaky network </td>
+ <td>  <a href="https://docs.litmuschaos.io/docs/pod-network-latency/"> Here </a> </td>
  </tr>
  </table>
 
-## Experiment CR for the pod-network-duplication experiment
+## Experiment CR for the pod-network-latency experiment
 
 ```
 apiVersion: litmuschaos.io/v1alpha1
 description:
   message: |
-    Injects network packet duplication on pods belonging to an app deployment
+   Injects network latency on pods belonging to an app deployment
 kind: ChaosExperiment
 metadata:
-  name: pod-network-duplication
+  name: pod-network-latency
   version: 0.1.0
 spec:
   definition:
@@ -49,7 +49,7 @@ spec:
     image: "litmuschaos/go-runner:latest"
     args:
     - -c
-    - ./experiments/pod-network-duplication
+    - ./experiments/pod-network-latency
     command:
     - /bin/bash
     env:
@@ -61,13 +61,13 @@ spec:
       value: ''
     - name: NETWORK_INTERFACE
       value: 'eth0'
-    - name: NETWORK_PACKET_DUPLICATION_PERCENTAGE
-      value: '100' # in percentage
+    - name: NETWORK_LATENCY
+      value: '60000' # in ms
     - name: LIB
       value: 'pumba'      
     - name: LIB_IMAGE
       value: 'gaiaadm/pumba:0.6.5'
     labels:
-      name: pod-network-duplication
+      name: pod-network-latency
 
 ```

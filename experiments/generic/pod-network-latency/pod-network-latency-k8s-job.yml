@@ -2,12 +2,12 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  generateName: pod-network-duplication-
+  generateName: pod-network-latency-
 spec:
   template:
     metadata:
       labels:
-        experiment: pod-network-duplication
+        experiment: pod-network-latency
     spec:
       # Placeholder that is updated by the executor for automated runs
       # Provide appropriate SA (with desired permissions) if executed manually
@@ -37,8 +37,8 @@ spec:
           - name: NETWORK_INTERFACE
             value: 'eth0'
 
-          - name: NETWORK_PACKET_DUPLICATION_PERCENTAGE
-            value: '100' # in percentage
+          - name: NETWORK_LATENCY
+            value: '60000' # in ms
 
           - name: TOTAL_CHAOS_DURATION
             value: '60'  # in seconds
@@ -71,4 +71,4 @@ spec:
                 fieldPath: spec.serviceAccountName
 
         command: ["/bin/bash"]
-        args: ["-c", "./experiments/pod-network-duplication"]
+        args: ["-c", "./experiments/pod-network-latency"]
