@@ -2,12 +2,12 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  generateName: pod-delete-
+  generateName: node-drain-
 spec:
   template:
     metadata:
       labels:
-        experiment: pod-delete
+        experiment: node-drain
     spec:
       # Placeholder that is updated by the executor for automated runs
       # Provide appropriate SA (with desired permissions) if executed manually
@@ -30,15 +30,17 @@ spec:
           - name: APP_KIND
             value: ''
 
-          - name: TOTAL_CHAOS_DURATION
-            value: '30'
-
-          - name: CHAOS_INTERVAL
-            value: '10'
-
-          # provide application namespace
-          - name: FORCE
+          # provide node name
+          - name: APP_NODE
             value: ''
+
+          # provide auxiliary application details - namespace and labels of the applications
+          # sample input is - "ns1:app=percona,ns2:name=nginx"
+          - name: AUXILIARY_APPINFO
+            value: ''
+
+          - name: TOTAL_CHAOS_DURATION
+            value: '60'
 
           - name: CHAOS_NAMESPACE
             value: ''
@@ -52,10 +54,5 @@ spec:
           - name: LIB
             value: 'litmus'
 
-          - name: CHAOS_SERVICE_ACCOUNT
-            valueFrom:
-              fieldRef:
-                fieldPath: spec.serviceAccountName
-
         command: ["/bin/bash"]
-        args: ["-c", "./experiments/pod-delete"]
+        args: ["-c", "./experiments/node-drain"]
