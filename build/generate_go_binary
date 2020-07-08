@@ -14,4 +14,7 @@ go build -o build/_output/pod-network-loss ./experiments/generic/pod-network-los
 go build -o build/_output/pod-network-corruption ./experiments/generic/pod-network-corruption
 # Buiding go binaries for node_memory_hog experiment
 go build -o build/_output/node-memory-hog ./experiments/generic/node-memory-hog
-
+# Buiding go binaries for node_cpu_hog experiment
+go build -o build/_output/node-cpu-hog ./experiments/generic/node-cpu-hog
+# Buiding go binaries for node_drain experiment
+go build -o build/_output/node-drain ./experiments/generic/node-drain

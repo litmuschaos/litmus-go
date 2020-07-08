@@ -4,7 +4,7 @@ import (
 	"os"
 	"strconv"
 
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/node-memory-hog/types"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/node-cpu-hog/types"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	clientTypes "k8s.io/apimachinery/pkg/types"
 )
@@ -14,7 +14,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string
 	experimentDetails.ExperimentName = expName
 	experimentDetails.ChaosNamespace = Getenv("CHAOS_NAMESPACE", "litmus")
 	experimentDetails.EngineName = Getenv("CHAOSENGINE", "")
-	experimentDetails.ChaosDuration, _ = strconv.Atoi(Getenv("TOTAL_CHAOS_DURATION", "60"))
+	experimentDetails.ChaosDuration, _ = strconv.Atoi(Getenv("TOTAL_CHAOS_DURATION", "30"))
 	experimentDetails.RampTime, _ = strconv.Atoi(Getenv("RAMP_TIME", "0"))
 	experimentDetails.ChaosLib = Getenv("LIB", "litmus")
 	experimentDetails.AppNS = Getenv("APP_NAMESPACE", "")
@@ -23,7 +23,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string
 	experimentDetails.ChaosUID = clientTypes.UID(Getenv("CHAOS_UID", ""))
 	experimentDetails.InstanceID = Getenv("INSTANCE_ID", "")
 	experimentDetails.ChaosPodName = Getenv("POD_NAME", "")
-	experimentDetails.MemoryPercentage, _ = strconv.Atoi(Getenv("MEMORY_PERCENTAGE", "90"))
+	experimentDetails.NodeCPUcores, _ = strconv.Atoi(Getenv("NODE_CPU_CORE", "0"))
 	experimentDetails.LIBImage = Getenv("LIB_IMAGE", "")
 	experimentDetails.AuxiliaryAppInfo = Getenv("AUXILIARY_APPINFO", "")
 }

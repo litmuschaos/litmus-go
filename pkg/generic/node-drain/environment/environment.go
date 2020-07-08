@@ -4,9 +4,10 @@ import (
 	"os"
 	"strconv"
 
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/node-memory-hog/types"
-	"github.com/litmuschaos/litmus-go/pkg/types"
 	clientTypes "k8s.io/apimachinery/pkg/types"
+
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/node-drain/types"
+	"github.com/litmuschaos/litmus-go/pkg/types"
 )
 
 //GetENV fetches all the env variables from the runner pod
@@ -23,9 +24,8 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string
 	experimentDetails.ChaosUID = clientTypes.UID(Getenv("CHAOS_UID", ""))
 	experimentDetails.InstanceID = Getenv("INSTANCE_ID", "")
 	experimentDetails.ChaosPodName = Getenv("POD_NAME", "")
-	experimentDetails.MemoryPercentage, _ = strconv.Atoi(Getenv("MEMORY_PERCENTAGE", "90"))
-	experimentDetails.LIBImage = Getenv("LIB_IMAGE", "")
 	experimentDetails.AuxiliaryAppInfo = Getenv("AUXILIARY_APPINFO", "")
+	experimentDetails.AppNode = Getenv("APP_NODE", "")
 }
 
 // Getenv fetch the env and set the default value, if any

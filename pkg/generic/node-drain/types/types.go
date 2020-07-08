@@ -18,8 +18,6 @@ type ExperimentDetails struct {
 	InstanceID       string
 	ChaosNamespace   string
 	ChaosPodName     string
-	MemoryPercentage int
-	RunID            string
-	LIBImage         string
+	AppNode          string
 	AuxiliaryAppInfo string
 }

@@ -47,7 +47,7 @@ func main() {
 	// Intialise the chaos attributes
 	experimentEnv.InitialiseChaosVariables(&chaosDetails, &experimentsDetails)
 
-	//Updating the chaos result in the beggining of experiment
+	//Updating the chaos result in the beginning of experiment
 	log.Infof("[PreReq]: Updating the chaos result of %v experiment (SOT)", experimentsDetails.ExperimentName)
 	err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT")
 	if err != nil {
@@ -66,7 +66,7 @@ func main() {
 		"Label":             experimentsDetails.AppLabel,
 		"Chaos Duration":    experimentsDetails.ChaosDuration,
 		"Ramp Time":         experimentsDetails.RampTime,
-		"Memory Percentage": experimentsDetails.MemoryPercantage,
+		"Memory Percentage": experimentsDetails.MemoryPercentage,
 	})
 
 	//PRE-CHAOS APPLICATION STATUS CHECK

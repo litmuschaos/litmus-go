@@ -1,4 +1,4 @@
-package node_memory_hog
+package node_cpu_hog
 
 import (
 	"math/rand"
@@ -7,7 +7,7 @@ import (
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/node-memory-hog/types"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/node-cpu-hog/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
@@ -18,8 +18,10 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// PrepareNodeMemoryHog contains prepration steps before chaos injection
-func PrepareNodeMemoryHog(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+var err error
+
+// PrepareNodeCPUHog contains prepration steps before chaos injection
+func PrepareNodeCPUHog(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	//Select the node name
 	appNodeName, err := GetNodeName(experimentsDetails, clients)
@@ -27,9 +29,14 @@ func PrepareNodeMemoryHog(experimentsDetails *experimentTypes.ExperimentDetails,
 		return errors.Errorf("Unable to get the node name due to, err: %v", err)
 	}
 
+	// When number of cpu cores for hogging is not defined , it will take it from node capacity
+	if experimentsDetails.NodeCPUcores == 0 {
+		err = SetCPUCapacity(experimentsDetails, appNodeName, clients)
+	}
+
 	log.InfoWithValues("[Info]: Details of application under chaos injection", logrus.Fields{
-		"NodeName":             appNodeName,
-		"MemoryHog Percentage": experimentsDetails.MemoryPercentage,
+		"NodeName":     appNodeName,
+		"NodeCPUcores": experimentsDetails.NodeCPUcores,
 	})
 
 	experimentsDetails.RunID = GetRunID()
@@ -46,7 +53,7 @@ func PrepareNodeMemoryHog(experimentsDetails *experimentTypes.ExperimentDetails,
 		events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 	}
 
-	// Creating the helper pod to perform node memory hog
+	// Creating the helper pod to perform node cpu hog
 	err = CreateHelperPod(experimentsDetails, clients, appNodeName)
 	if err != nil {
 		errors.Errorf("Unable to create the helper pod, err: %v", err)
@@ -54,7 +61,7 @@ func PrepareNodeMemoryHog(experimentsDetails *experimentTypes.ExperimentDetails,
 
 	//Checking the status of helper pod
 	log.Info("[Status]: Checking the status of the helper pod")
-	err = status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, "name=node-memory-hog-"+experimentsDetails.RunID, clients)
+	err = status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, "name=node-cpu-hog-"+experimentsDetails.RunID, clients)
 	if err != nil {
 		return errors.Errorf("helper pod is not in running state, err: %v", err)
 	}
@@ -62,7 +69,7 @@ func PrepareNodeMemoryHog(experimentsDetails *experimentTypes.ExperimentDetails,
 	// Wait till the completion of helper pod
 	log.Infof("[Wait]: Waiting for %vs till the completion of the helper pod", strconv.Itoa(experimentsDetails.ChaosDuration+30))
 
-	err = status.WaitForCompletion(experimentsDetails.ChaosNamespace, "name=node-memory-hog-"+experimentsDetails.RunID, clients, experimentsDetails.ChaosDuration+30)
+	err = status.WaitForCompletion(experimentsDetails.ChaosNamespace, "name=node-cpu-hog-"+experimentsDetails.RunID, clients, experimentsDetails.ChaosDuration+30)
 	if err != nil {
 		return err
 	}
@@ -103,6 +110,20 @@ func GetNodeName(experimentsDetails *experimentTypes.ExperimentDetails, clients 
 	return nodeName, nil
 }
 
+//SetCPUCapacity will fetch the node cpu capacity
+func SetCPUCapacity(experimentsDetails *experimentTypes.ExperimentDetails, nodeName string, clients clients.ClientSets) error {
+	node, err := clients.KubeClient.CoreV1().Nodes().Get(nodeName, v1.GetOptions{})
+	if err != nil {
+		return errors.Wrapf(err, "Fail to get the application node, due to ", err)
+	}
+
+	cpuCapacity, _ := node.Status.Capacity.Cpu().AsInt64()
+
+	experimentsDetails.NodeCPUcores = int(cpuCapacity)
+
+	return nil
+}
+
 //waitForRampTime waits for the given ramp time duration (in seconds)
 func waitForRampTime(experimentsDetails *experimentTypes.ExperimentDetails) {
 	time.Sleep(time.Duration(experimentsDetails.RampTime) * time.Second)
@@ -123,11 +144,11 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 
 	helperPod := &apiv1.Pod{
 		ObjectMeta: v1.ObjectMeta{
-			Name:      "node-memory-hog-" + experimentsDetails.RunID,
+			Name:      "node-cpu-hog-" + experimentsDetails.RunID,
 			Namespace: experimentsDetails.ChaosNamespace,
 			Labels: map[string]string{
-				"app":      "node-memory-hog",
-				"name":     "node-memory-hog-" + experimentsDetails.RunID,
+				"app":      "node-cpu-hog",
+				"name":     "node-cpu-hog-" + experimentsDetails.RunID,
 				"chaosUID": string(experimentsDetails.ChaosUID),
 			},
 		},
@@ -136,14 +157,12 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 			NodeName:      appNodeName,
 			Containers: []apiv1.Container{
 				{
-					Name:            "node-memory-hog",
+					Name:            "node-cpu-hog",
 					Image:           experimentsDetails.LIBImage,
 					ImagePullPolicy: apiv1.PullAlways,
 					Args: []string{
-						"--vm",
-						"1",
-						"--vm-bytes",
-						strconv.Itoa(experimentsDetails.MemoryPercentage) + "%",
+						"--cpu",
+						strconv.Itoa(experimentsDetails.NodeCPUcores),
 						"--timeout",
 						strconv.Itoa(experimentsDetails.ChaosDuration),
 					},
@@ -159,7 +178,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 //DeleteHelperPod delete the helper pod
 func DeleteHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) error {
 
-	err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Delete("node-memory-hog-"+experimentsDetails.RunID, &v1.DeleteOptions{})
+	err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Delete("node-cpu-hog-"+experimentsDetails.RunID, &v1.DeleteOptions{})
 
 	if err != nil {
 		return err
@@ -169,7 +188,7 @@ func DeleteHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 		Times(90).
 		Wait(1 * time.Second).
 		Try(func(attempt uint) error {
-			podSpec, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).List(v1.ListOptions{LabelSelector: "name=node-memory-hog-" + experimentsDetails.RunID})
+			podSpec, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).List(v1.ListOptions{LabelSelector: "name=node-cpu-hog-" + experimentsDetails.RunID})
 			if err != nil || len(podSpec.Items) != 0 {
 				return errors.Errorf("Helper Pod is not deleted yet, err: %v", err)
 			}
