@@ -56,9 +56,6 @@ spec:
           - name: LIB
             value: 'litmus'
 
-          - name: CHAOSENGINE
-            value: ''
-
           - name: CHAOS_SERVICE_ACCOUNT
             valueFrom:
               fieldRef:
