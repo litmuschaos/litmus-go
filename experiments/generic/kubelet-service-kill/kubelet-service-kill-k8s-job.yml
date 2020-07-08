@@ -2,12 +2,12 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  generateName: pod-delete-
+  generateName: kubelet-service-kill-
 spec:
   template:
     metadata:
       labels:
-        experiment: pod-delete
+        experiment: kubelet-service-kill
     spec:
       # Placeholder that is updated by the executor for automated runs
       # Provide appropriate SA (with desired permissions) if executed manually
@@ -31,35 +31,24 @@ spec:
             value: ''
 
           - name: TOTAL_CHAOS_DURATION
-            value: '30'
-
-          - name: CHAOS_INTERVAL
-            value: '10'
-
-          # provide application namespace
-          - name: FORCE
-            value: ''
-
-          # provide lib image
-          - name: LIB_IMAGE
-            value: 'litmuschaos/pod-delete-helper"latest' 
+            value: '90'
 
           - name: CHAOS_NAMESPACE
+            value: ''
+
+          ## PROVIDE AUXILIARY APPLICATION DETAILS - NAMESPACE AND LABELS OF THE APPLICATIONS
+          ## Sample input is  "ns1:app=percona,ns2:name=nginx"
+          - name: AUXILIARY_APPINFO
             value: ''
 
             ## Period to wait before/after injection of chaos  
           - name: RAMP_TIME
             value: ''
 
-          ## env var that describes the library used to execute the chaos
-          ## Only supported litmus
+          ## PROVIDE THE LIB
+          ## ONLY LITMUS SUPPORTED
           - name: LIB
-            value: 'litmus'
-
-          - name: CHAOS_SERVICE_ACCOUNT
-            valueFrom:
-              fieldRef:
-                fieldPath: spec.serviceAccountName
+            value: 'litmus' 
 
         command: ["/bin/bash"]
-        args: ["-c", "./experiments/pod-delete"]
+        args: ["-c", "./experiments/kubelet-service-kill"]

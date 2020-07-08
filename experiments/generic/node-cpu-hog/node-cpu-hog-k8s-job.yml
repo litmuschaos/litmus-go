@@ -2,12 +2,12 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  generateName: pod-delete-
+  generateName: node-cpu-hog-
 spec:
   template:
     metadata:
       labels:
-        experiment: pod-delete
+        experiment: node-cpu-hog
     spec:
       # Placeholder that is updated by the executor for automated runs
       # Provide appropriate SA (with desired permissions) if executed manually
@@ -18,48 +18,48 @@ spec:
         image: litmuschaos/go-runner:ci
         imagePullPolicy: Always
         env:
-          # provide application namespace
           - name: APP_NAMESPACE
             value: ''
 
-          # provide application labels
           - name: APP_LABEL
             value: ''
 
-            # provide application kind
           - name: APP_KIND
-            value: ''
+            value: '' 
 
+          ## Total duration to infuse chaos
           - name: TOTAL_CHAOS_DURATION
             value: '30'
-
+          
           - name: CHAOS_INTERVAL
             value: '10'
 
-          # provide application namespace
-          - name: FORCE
+          ## Number of CPU cores to stress
+          - name: NODE_CPU_CORE
             value: ''
 
-          # provide lib image
-          - name: LIB_IMAGE
-            value: 'litmuschaos/pod-delete-helper"latest' 
-
-          - name: CHAOS_NAMESPACE
-            value: ''
-
-            ## Period to wait before/after injection of chaos  
+          ## Period to wait before injection of chaos in sec
           - name: RAMP_TIME
             value: ''
 
-          ## env var that describes the library used to execute the chaos
-          ## Only supported litmus
+           # provide lib image
+          - name: LIB_IMAGE
+            value: 'litmuschaos/stress-ng:latest' 
+
+          ## PROVIDE AUXILIARY APPLICATION DETAILS - NAMESPACE AND LABELS OF THE APPLICATIONS
+          ## Sample input is  "ns1:app=percona,ns2:name=nginx"
+          - name: AUXILIARY_APPINFO
+            value: ''
+
+          ## PROVIDE THE LIB
+          ## ONLY LITMUS SUPPORTED
           - name: LIB
             value: 'litmus'
-
-          - name: CHAOS_SERVICE_ACCOUNT
+        
+          - name: POD_NAME
             valueFrom:
               fieldRef:
-                fieldPath: spec.serviceAccountName
+                fieldPath: metadata.name
 
         command: ["/bin/bash"]
-        args: ["-c", "./experiments/pod-delete"]
+        args: ["-c", "./experiments/node-cpu-hog"]

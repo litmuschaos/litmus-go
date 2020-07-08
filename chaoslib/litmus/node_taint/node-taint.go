@@ -172,9 +172,13 @@ func GetTaintDetails(experimentsDetails *experimentTypes.ExperimentDetails) (str
 	TaintLabel := strings.Split(Taints[0], "=")
 	TaintKey := TaintLabel[0]
 
+	// It will set the value for taint label from `TAINT` env, if provided
+	// otherwise it will use the `node-taint` value as default value.
 	if len(TaintLabel) >= 2 {
 		TaintValue = TaintLabel[1]
 	}
+	// It will set the value for taint effect from `TAINT` env, if provided
+	// otherwise it will use `NoExecute` value as default value.
 	if len(Taints) >= 2 {
 		TaintEffect = Taints[1]
 	}
