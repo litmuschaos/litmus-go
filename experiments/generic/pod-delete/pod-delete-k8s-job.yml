@@ -40,6 +40,10 @@ spec:
           - name: FORCE
             value: ''
 
+          # provide lib image
+          - name: LIB_IMAGE
+            value: 'litmuschaos/pod-delete-helper"latest' 
+
           - name: CHAOS_NAMESPACE
             value: ''
 

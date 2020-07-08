@@ -65,10 +65,5 @@ spec:
               fieldRef:
                 fieldPath: metadata.name
             
-          - name: CHAOS_SERVICE_ACCOUNT
-            valueFrom:
-              fieldRef:
-                fieldPath: spec.serviceAccountName
-
         command: ["/bin/bash"]
         args: ["-c", "./experiments/pod-network-latency"]
