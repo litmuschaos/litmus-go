@@ -2,12 +2,12 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  generateName: pod-cpu-hog-
+  generateName: node-memory-hog-
 spec:
   template:
     metadata:
       labels:
-        experiment: pod-cpu-hog
+        experiment: node-memory-hog
     spec:
       # Placeholder that is updated by the executor for automated runs
       # Provide appropriate SA (with desired permissions) if executed manually
@@ -29,30 +29,36 @@ spec:
 
           ## Total duration to infuse chaos
           - name: TOTAL_CHAOS_DURATION
-            value: '30'
+            value: '60'
           
           - name: CHAOS_INTERVAL
             value: '10'
 
-          ## Number of CPU cores to stress
-          - name: CPU_CORES
-            value: '1'
-
-          ## Percentage of total pods to target
-          - name: PODS_AFFECTED_PERC
-            value: '100'
+          ## SPECIFY THE SIZE AS PERCENT OF TOTAL AVAILABLE MEMORY (In Percentage %)
+          ## DEFAULT VALUE 90%
+          - name: MEMORY_PERCENTAGE
+            value: '500'
 
           ## Period to wait before injection of chaos in sec
           - name: RAMP_TIME
             value: ''
 
-          - name: CHAOS_NAMESPACE
-            value: ''  
-
-          ## env var that describes the library used to execute the chaos
-          ## default: litmus. Supported values: litmus, powerfulseal, chaoskube
-          - name: LIB
+          ## PROVIDE AUXILIARY APPLICATION DETAILS - NAMESPACE AND LABELS OF THE APPLICATIONS
+          ## Sample input is  "ns1:app=percona,ns2:name=nginx"
+          - name: AUXILIARY_APPINFO
             value: ''
+
+          # provide lib image
+          - name: LIB_IMAGE
+            value: 'litmuschaos/stress-ng:latest' 
+
+          - name: CHAOS_NAMESPACE
+            value: ''          
+
+          ## PROVIDE THE LIB
+          ## ONLY LITMUS SUPPORTED
+          - name: LIB
+            value: 'litmus'
         
           - name: POD_NAME
             valueFrom:
@@ -60,4 +66,4 @@ spec:
                 fieldPath: metadata.name
 
         command: ["/bin/bash"]
-        args: ["-c", "./experiments/pod-cpu-hog"]
+        args: ["-c", "./experiments/node-memory-hog"]

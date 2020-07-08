@@ -1,4 +1,4 @@
-package kubelet_service_kill
+package node_memory_hog
 
 import (
 	"math/rand"
@@ -7,7 +7,7 @@ import (
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/kubelet-service-kill/types"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/node-memory-hog/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
@@ -18,18 +18,18 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// PrepareKubeletKill contains prepration steps before chaos injection
-func PrepareKubeletKill(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+// PrepareNodeMemoryHog contains prepration steps before chaos injection
+func PrepareNodeMemoryHog(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
-	//Select application pod and node for kubelet-service-kill
-	appName, appNodeName, err := GetApplicationPod(experimentsDetails, clients)
+	//Select the node name
+	appNodeName, err := GetNodeName(experimentsDetails, clients)
 	if err != nil {
-		return errors.Errorf("Unable to get the application name and application nodename due to, err: %v", err)
+		return errors.Errorf("Unable to get the node name due to, err: %v", err)
 	}
 
 	log.InfoWithValues("[Info]: Details of application under chaos injection", logrus.Fields{
-		"NodeName": appNodeName,
-		"PodName":  appName,
+		"NodeName":             appNodeName,
+		"MemoryHog Percentage": experimentsDetails.MemoryPercentage,
 	})
 
 	experimentsDetails.RunID = GetRunID()
@@ -54,22 +54,15 @@ func PrepareKubeletKill(experimentsDetails *experimentTypes.ExperimentDetails, c
 
 	//Checking the status of helper pod
 	log.Info("[Status]: Checking the status of the helper pod")
-	err = status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, "name=kubelet-service-kill-"+experimentsDetails.RunID, clients)
+	err = status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, "name=node-memory-hog-"+experimentsDetails.RunID, clients)
 	if err != nil {
 		return errors.Errorf("helper pod is not in running state, err: %v", err)
-	}
-
-	// Checking for the node to be in not-ready state
-	log.Info("[Status]: Check for the node to be in NotReady state")
-	err = status.CheckNodeNotReadyState(appNodeName, clients)
-	if err != nil {
-		return errors.Errorf("application node is not in NotReady state, err: %v", err)
 	}
 
 	// Wait till the completion of helper pod
 	log.Infof("[Wait]: Waiting for %vs till the completion of the helper pod", strconv.Itoa(experimentsDetails.ChaosDuration+30))
 
-	err = status.WaitForCompletion(experimentsDetails.ChaosNamespace, "name=kubelet-service-kill-"+experimentsDetails.RunID, clients, experimentsDetails.ChaosDuration+30)
+	err = status.WaitForCompletion(experimentsDetails.ChaosNamespace, "name=node-memory-hog-"+experimentsDetails.RunID, clients, experimentsDetails.ChaosDuration+30)
 	if err != nil {
 		return err
 	}
@@ -78,7 +71,7 @@ func PrepareKubeletKill(experimentsDetails *experimentTypes.ExperimentDetails, c
 	log.Info("[Status]: Getting the status of application node")
 	err = status.CheckNodeStatus(appNodeName, clients)
 	if err != nil {
-		return errors.Errorf("application node is not in ready state, err: %v", err)
+		log.Warn("Application node is not in the ready state, you may need to manually recover the node")
 	}
 
 	//Deleting the helper pod
@@ -96,20 +89,18 @@ func PrepareKubeletKill(experimentsDetails *experimentTypes.ExperimentDetails, c
 	return nil
 }
 
-//GetApplicationPod will select a random replica of application pod for chaos
-//It will also get the node name of the application pod
-func GetApplicationPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) (string, string, error) {
+//GetNodeName will select a random replica of application pod and return the node name of that application pod
+func GetNodeName(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) (string, error) {
 	podList, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).List(v1.ListOptions{LabelSelector: experimentsDetails.AppLabel})
 	if err != nil || len(podList.Items) == 0 {
-		return "", "", errors.Wrapf(err, "Fail to get the application pod in %v namespace", experimentsDetails.AppNS)
+		return "", errors.Wrapf(err, "Fail to get the application pod in %v namespace, due to err: %v", experimentsDetails.AppNS, err)
 	}
 
 	rand.Seed(time.Now().Unix())
 	randomIndex := rand.Intn(len(podList.Items))
-	applicationName := podList.Items[randomIndex].Name
 	nodeName := podList.Items[randomIndex].Spec.NodeName
 
-	return applicationName, nodeName, nil
+	return nodeName, nil
 }
 
 //waitForRampTime waits for the given ramp time duration (in seconds)
@@ -130,64 +121,32 @@ func GetRunID() string {
 // CreateHelperPod derive the attributes for helper pod and create the helper pod
 func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, appNodeName string) error {
 
-	privileged := true
 	helperPod := &apiv1.Pod{
 		ObjectMeta: v1.ObjectMeta{
-			Name:      "kubelet-service-kill-" + experimentsDetails.RunID,
+			Name:      "node-memory-hog-" + experimentsDetails.RunID,
 			Namespace: experimentsDetails.ChaosNamespace,
 			Labels: map[string]string{
-				"app":      "kubelet-service-kill",
-				"name":     "kubelet-service-kill-" + experimentsDetails.RunID,
+				"app":      "node-memory-hog",
+				"name":     "node-memory-hog-" + experimentsDetails.RunID,
 				"chaosUID": string(experimentsDetails.ChaosUID),
 			},
 		},
 		Spec: apiv1.PodSpec{
 			RestartPolicy: apiv1.RestartPolicyNever,
 			NodeName:      appNodeName,
-			Volumes: []apiv1.Volume{
-				{
-					Name: "bus",
-					VolumeSource: apiv1.VolumeSource{
-						HostPath: &apiv1.HostPathVolumeSource{
-							Path: "/var/run",
-						},
-					},
-				},
-				{
-					Name: "root",
-					VolumeSource: apiv1.VolumeSource{
-						HostPath: &apiv1.HostPathVolumeSource{
-							Path: "/",
-						},
-					},
-				},
-			},
 			Containers: []apiv1.Container{
 				{
-					Name:            "kubelet-service-kill",
-					Image:           "ubuntu:16.04",
+					Name:            "node-memory-hog",
+					Image:           experimentsDetails.LIBImage,
 					ImagePullPolicy: apiv1.PullAlways,
-					Command: []string{
-						"/bin/bash",
-					},
 					Args: []string{
-						"-c",
-						"sleep 10 && systemctl stop kubelet && sleep " + strconv.Itoa(experimentsDetails.ChaosDuration) + " && systemctl start kubelet",
+						"--vm",
+						"1",
+						"--vm-bytes",
+						strconv.Itoa(experimentsDetails.MemoryPercentage) + "%",
+						"--timeout",
+						strconv.Itoa(experimentsDetails.ChaosDuration),
 					},
-					VolumeMounts: []apiv1.VolumeMount{
-						{
-							Name:      "bus",
-							MountPath: "/var/run",
-						},
-						{
-							Name:      "root",
-							MountPath: "/node",
-						},
-					},
-					SecurityContext: &apiv1.SecurityContext{
-						Privileged: &privileged,
-					},
-					TTY: true,
 				},
 			},
 		},
@@ -200,7 +159,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 //DeleteHelperPod delete the helper pod
 func DeleteHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) error {
 
-	err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Delete("kubelet-service-kill-"+experimentsDetails.RunID, &v1.DeleteOptions{})
+	err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Delete("node-memory-hog-"+experimentsDetails.RunID, &v1.DeleteOptions{})
 
 	if err != nil {
 		return err
@@ -210,7 +169,7 @@ func DeleteHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 		Times(90).
 		Wait(1 * time.Second).
 		Try(func(attempt uint) error {
-			podSpec, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).List(v1.ListOptions{LabelSelector: "name=kubelet-service-kill-" + experimentsDetails.RunID})
+			podSpec, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).List(v1.ListOptions{LabelSelector: "name=node-memory-hog-" + experimentsDetails.RunID})
 			if err != nil || len(podSpec.Items) != 0 {
 				return errors.Errorf("Helper Pod is not deleted yet, err: %v", err)
 			}

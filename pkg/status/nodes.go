@@ -23,19 +23,19 @@ func CheckNodeStatus(nodeName string, clients clients.ClientSets) error {
 				return errors.Errorf("Unable to get the node, err: %v", err)
 			}
 			conditions := node.Status.Conditions
-			nodeReady := false
+			isReady := false
 			for _, condition := range conditions {
 
 				if condition.Type == apiv1.NodeReady && condition.Status == apiv1.ConditionTrue {
-					nodeReady = true
+					isReady = true
 					break
 				}
 			}
-			if !nodeReady {
+			if !isReady {
 				return errors.Errorf("Node is not in ready state")
 			}
 			log.InfoWithValues("The running status of Nodes are as follows", logrus.Fields{
-				"Node": node.Name, "Ready": nodeReady})
+				"Node": node.Name, "Ready": isReady})
 
 			return nil
 		})
@@ -56,19 +56,20 @@ func CheckNodeNotReadyState(nodeName string, clients clients.ClientSets) error {
 				return errors.Errorf("Unable to get the node, err: %v", err)
 			}
 			conditions := node.Status.Conditions
-			nodeReady := false
+			isReady := false
 			for _, condition := range conditions {
 
 				if condition.Type == apiv1.NodeReady && condition.Status == apiv1.ConditionTrue {
-					nodeReady = true
+					isReady = true
 					break
 				}
 			}
-			if nodeReady {
-				return errors.Errorf("Node is in ready state")
+			// It will retries until the node becomes NotReady
+			if isReady {
+				return errors.Errorf("Node is not in NotReady state")
 			}
 			log.InfoWithValues("The running status of Nodes are as follows", logrus.Fields{
-				"Node": node.Name, "Ready": nodeReady})
+				"Node": node.Name, "Ready": isReady})
 
 			return nil
 		})
