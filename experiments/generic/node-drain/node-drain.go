@@ -1,11 +1,12 @@
 package main
 
 import (
+	node_drain "github.com/litmuschaos/litmus-go/chaoslib/litmus/node_drain"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
+	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/node-drain/environment"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/node-drain/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
-	experimentEnv "github.com/litmuschaos/litmus-go/pkg/{{ category }}/{{ name }}/environment"
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/{{ category }}/{{ name }}/types"
 	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
@@ -15,7 +16,7 @@ import (
 func init() {
 	// Log as JSON instead of the default ASCII formatter.
 	logrus.SetFormatter(&logrus.TextFormatter{
-		FullTimestamp: true,
+		FullTimestamp:          true,
 		DisableSorting:         true,
 		DisableLevelTruncation: true,
 	})
@@ -29,7 +30,7 @@ func main() {
 	eventsDetails := types.EventDetails{}
 	clients := clients.ClientSets{}
 	chaosDetails := types.ChaosDetails{}
-	
+
 	//Getting kubeConfig and Generate ClientSets
 	if err := clients.GenerateClientSetFromKubeConfig(); err != nil {
 		log.Fatalf("Unable to Get the kubeconfig due to %v", err)
@@ -37,7 +38,7 @@ func main() {
 
 	//Fetching all the ENV passed from the runner pod
 	log.Infof("[PreReq]: Getting the ENV for the %v experiment", experimentsDetails.ExperimentName)
-	experimentEnv.GetENV(&experimentsDetails, "{{ name }}")
+	experimentEnv.GetENV(&experimentsDetails, "node-drain")
 
 	// Intialise Chaos Result Parameters
 	types.SetResultAttributes(&resultDetails, experimentsDetails.EngineName, experimentsDetails.ExperimentName)
@@ -50,7 +51,7 @@ func main() {
 	err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT")
 	if err != nil {
 		log.Errorf("Unable to Create the Chaos Result due to %v", err)
-		resultDetails.FailStep = "Updating the chaos result of pod-delete experiment (SOT)"
+		resultDetails.FailStep = "Updating the chaos result of node-drain experiment (SOT)"
 		err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 		return
 	}
@@ -59,15 +60,13 @@ func main() {
 	result.SetResultUID(&resultDetails, clients, &chaosDetails)
 
 	//DISPLAY THE APP INFORMATION
-	log.InfoWithValues("The application informations are as follows", logrus.Fields{
+	log.InfoWithValues("[Info]: The application informations are as follows", logrus.Fields{
 		"Namespace": experimentsDetails.AppNS,
 		"Label":     experimentsDetails.AppLabel,
 		"Ramp Time": experimentsDetails.RampTime,
+		"Node Name": experimentsDetails.AppNode,
 	})
 
-    // ADD A PRE-CHAOS CHECK OF YOUR CHOICE HERE
-    // POD STATUS CHECKS FOR THE APPLICATION UNDER TEST AND AUXILIARY APPLICATIONS ARE ADDED BY DEFAULT 
-    
 	//PRE-CHAOS APPLICATION STATUS CHECK
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (pre-chaos)")
 	err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, clients)
@@ -77,40 +76,41 @@ func main() {
 		result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 		return
 	}
-{% if auxiliaryAppCheck is defined and auxiliaryAppCheck == true %}
+
 	//PRE-CHAOS AUXILIARY APPLICATION STATUS CHECK
 	if experimentsDetails.AuxiliaryAppInfo != "" {
-	log.Info("[Status]: Verify that the Auxiliary Applications are running (pre-chaos)")
-	err = status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, clients)
-	if err != nil {
-		log.Errorf("Auxiliary Application status check failed due to %v", err)
-		resultDetails.FailStep = "Verify that the Auxiliary Applications are running (pre-chaos)"
-		result.ChaosResult(&chaosDetails, clients,&resultDetails,"EOT"); return
+		log.Info("[Status]: Verify that the Auxiliary Applications are running (pre-chaos)")
+		err = status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, clients)
+		if err != nil {
+			log.Errorf("Auxiliary Application status check failed due to %v", err)
+			resultDetails.FailStep = "Verify that the Auxiliary Applications are running (pre-chaos)"
+			result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
+			return
+		}
 	}
-	}
-{% endif %}
 
 	if experimentsDetails.EngineName != "" {
 		types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, "AUT is Running successfully", &chaosDetails)
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
-    // INVOKE THE CHAOSLIB OF YOUR CHOICE HERE, WHICH WILL CONTAIN 
-	// THE BUSINESS LOGIC OF THE ACTUAL CHAOS
-    // IT CAN BE A NEW CHAOSLIB YOU HAVE CREATED SPECIALLY FOR THIS EXPERIMENT OR ANY EXISTING ONE 
-   
-	// Including the litmus lib for pod-delete
+	// Including the litmus lib for node-drain
 	if experimentsDetails.ChaosLib == "litmus" {
-		err = {{ name }}.{{ name }}()
+		err = node_drain.PrepareNodeDrain(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
 		if err != nil {
 			log.Errorf("Chaos injection failed due to %v\n", err)
-			result.ChaosResult(&chaosDetails, clients,&resultDetails,"EOT"); return
+			resultDetails.FailStep = "Including the litmus lib for node-drain"
+			result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
+			return
 		}
-		resultDetails.Verdict="Pass"
+		log.Info("[Confirmation]: The application node has been drained successfully")
+		resultDetails.Verdict = "Pass"
+	} else {
+		log.Error("[Invalid]: Please Provide the correct LIB")
+		resultDetails.FailStep = "Including the litmus lib for node-drain"
+		result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
+		return
 	}
-
-	// ADD A POST-CHAOS CHECK OF YOUR CHOICE HERE
-    // POD STATUS CHECKS FOR THE APPLICATION UNDER TEST AND AUXILIARY APPLICATIONS ARE ADDED BY DEFAULT 
 
 	//POST-CHAOS APPLICATION STATUS CHECK
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (post-chaos)")
@@ -121,18 +121,18 @@ func main() {
 		result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 		return
 	}
-{% if auxiliaryAppCheck is defined and auxiliaryAppCheck == true %}
+
 	//POST-CHAOS AUXILIARY APPLICATION STATUS CHECK
 	if experimentsDetails.AuxiliaryAppInfo != "" {
-	log.Info("[Status]: Verify that the Auxiliary Applications are running (post-chaos)")
-	err = status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, clients)
-	if err != nil {
-		log.Errorf("Auxiliary Application status check failed due to %v", err)
-		resultDetails.FailStep = "Verify that the Auxiliary Applications are running (post-chaos)"
-		result.ChaosResult(&chaosDetails, clients,&resultDetails,"EOT"); return
+		log.Info("[Status]: Verify that the Auxiliary Applications are running (post-chaos)")
+		err = status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, clients)
+		if err != nil {
+			log.Errorf("Auxiliary Application status check failed due to %v", err)
+			resultDetails.FailStep = "Verify that the Auxiliary Applications are running (post-chaos)"
+			result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
+			return
+		}
 	}
-	}
-{% endif %}
 
 	if experimentsDetails.EngineName != "" {
 		types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, "AUT is Running successfully", &chaosDetails)

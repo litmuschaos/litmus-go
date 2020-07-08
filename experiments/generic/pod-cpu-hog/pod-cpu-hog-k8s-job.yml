@@ -46,6 +46,9 @@ spec:
           - name: RAMP_TIME
             value: ''
 
+          - name: CHAOS_NAMESPACE
+            value: ''  
+
           ## env var that describes the library used to execute the chaos
           ## default: litmus. Supported values: litmus, powerfulseal, chaoskube
           - name: LIB
@@ -55,11 +58,6 @@ spec:
             valueFrom:
               fieldRef:
                 fieldPath: metadata.name
-
-          - name: CHAOS_SERVICE_ACCOUNT
-            valueFrom:
-              fieldRef:
-                fieldPath: spec.serviceAccountName
 
         command: ["/bin/bash"]
         args: ["-c", "./experiments/pod-cpu-hog"]
