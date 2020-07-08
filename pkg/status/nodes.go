@@ -23,19 +23,53 @@ func CheckNodeStatus(nodeName string, clients clients.ClientSets) error {
 				return errors.Errorf("Unable to get the node, err: %v", err)
 			}
 			conditions := node.Status.Conditions
-			nodeReady := false
+			isReady := false
 			for _, condition := range conditions {
 
 				if condition.Type == apiv1.NodeReady && condition.Status == apiv1.ConditionTrue {
-					nodeReady = true
+					isReady = true
 					break
 				}
 			}
-			if !nodeReady {
+			if !isReady {
 				return errors.Errorf("Node is not in ready state")
 			}
 			log.InfoWithValues("The running status of Nodes are as follows", logrus.Fields{
-				"Node": node.Name, "Ready": nodeReady})
+				"Node": node.Name, "Ready": isReady})
+
+			return nil
+		})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// CheckNodeNotReadyState check for node to be in not ready state
+func CheckNodeNotReadyState(nodeName string, clients clients.ClientSets) error {
+	err := retry.
+		Times(90).
+		Wait(2 * time.Second).
+		Try(func(attempt uint) error {
+			node, err := clients.KubeClient.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+			if err != nil {
+				return errors.Errorf("Unable to get the node, err: %v", err)
+			}
+			conditions := node.Status.Conditions
+			isReady := false
+			for _, condition := range conditions {
+
+				if condition.Type == apiv1.NodeReady && condition.Status == apiv1.ConditionTrue {
+					isReady = true
+					break
+				}
+			}
+			// It will retries until the node becomes NotReady
+			if isReady {
+				return errors.Errorf("Node is not in NotReady state")
+			}
+			log.InfoWithValues("The running status of Nodes are as follows", logrus.Fields{
+				"Node": node.Name, "Ready": isReady})
 
 			return nil
 		})
