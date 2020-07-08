@@ -12,4 +12,6 @@ go build -o build/_output/pod-network-latency ./experiments/generic/pod-network-
 go build -o build/_output/pod-network-loss ./experiments/generic/pod-network-loss
 # Buiding go binaries for pod_network_corruption experiment
 go build -o build/_output/pod-network-corruption ./experiments/generic/pod-network-corruption
+# Buiding go binaries for kubelet_service_kill experiment
+go build -o build/_output/kubelet-service-kill ./experiments/generic/kubelet-service-kill
 
