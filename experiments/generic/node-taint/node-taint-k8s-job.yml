@@ -2,12 +2,12 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  generateName: disk-fill-
+  generateName: node-taint-
 spec:
   template:
     metadata:
       labels:
-        experiment: disk-fill
+        experiment: node-taint
     spec:
       # Placeholder that is updated by the executor for automated runs
       # Provide appropriate SA (with desired permissions) if executed manually
@@ -26,11 +26,17 @@ spec:
           - name: APP_LABEL
             value: ''
 
-          # provide application kind
+            # provide application kind
           - name: APP_KIND
             value: ''
 
-          - name: TARGET_CONTAINER
+          # provide node name
+          - name: APP_NODE
+            value: ''
+
+          # provide taint label & effect
+          # sample input is - key=value:effect
+          - name: TAINTS
             value: ''
 
           # provide auxiliary application details - namespace and labels of the applications
@@ -48,15 +54,10 @@ spec:
           - name: RAMP_TIME
             value: ''
 
-          # provide the container runtime path
-          # default set to docker
-          - name: CONTAINER_PATH
-            value: '/var/lib/docker/containers'
-
           ## env var that describes the library used to execute the chaos
           ## Only supported litmus
           - name: LIB
             value: 'litmus'
 
         command: ["/bin/bash"]
-        args: ["-c", "./experiments/disk-fill"]
+        args: ["-c", "./experiments/node-taint"]

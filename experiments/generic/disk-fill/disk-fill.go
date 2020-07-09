@@ -102,7 +102,7 @@ func main() {
 			result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 			return
 		}
-		log.Info("[Confirmation]: The application pod has been deleted successfully")
+		log.Info("[Confirmation]: disk fill chaos has been injected successfully")
 		resultDetails.Verdict = "Pass"
 	} else {
 		log.Error("[Invalid]: Please Provide the correct LIB")

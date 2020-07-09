@@ -1,10 +1,8 @@
 package disk_fill
 
 import (
-	"bytes"
 	"fmt"
 	"math/rand"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -15,80 +13,19 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
+	"github.com/litmuschaos/litmus-go/pkg/utils/exec"
 	"github.com/openebs/maya/pkg/util/retry"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/tools/remotecommand"
 )
-
-var err error
-
-// GetEphemeralStorageSize return the ephemeral storage size for the target pod
-func GetEphemeralStorageSize(experimentsDetails *experimentTypes.ExperimentDetails, containerID string, clients clients.ClientSets) (int, error) {
-
-	// it will return the ephemeral storage size for the target container
-	command := fmt.Sprintf("du /diskfill/" + containerID)
-
-	req := clients.KubeClient.CoreV1().RESTClient().Post().
-		Resource("pods").
-		Name("disk-fill-" + experimentsDetails.RunID).
-		Namespace(experimentsDetails.ChaosNamespace).
-		SubResource("exec")
-	scheme := runtime.NewScheme()
-	if err := apiv1.AddToScheme(scheme); err != nil {
-		return 0, fmt.Errorf("error adding to scheme: %v", err)
-	}
-
-	parameterCodec := runtime.NewParameterCodec(scheme)
-	req.VersionedParams(&apiv1.PodExecOptions{
-		Command:   strings.Fields(command),
-		Container: "disk-fill",
-		Stdin:     false,
-		Stdout:    true,
-		Stderr:    true,
-		TTY:       false,
-	}, parameterCodec)
-
-	exec, err := remotecommand.NewSPDYExecutor(clients.KubeConfig, "POST", req.URL())
-	if err != nil {
-		return 0, fmt.Errorf("error while creating Executor: %v", err)
-	}
-
-	var out bytes.Buffer
-	stdout := &out
-	stderr := os.Stderr
-
-	err = exec.Stream(remotecommand.StreamOptions{
-		Stdin:  nil,
-		Stdout: stdout,
-		Stderr: stderr,
-		Tty:    false,
-	})
-
-	if err != nil {
-		errorCode := strings.Contains(err.Error(), "143")
-		if errorCode != true {
-			log.Infof("[Prepare}: Unable to get the ephemeral storage size due to, err : %v", err.Error())
-			return 0, err
-		}
-	}
-
-	// Filtering out the ephemeral storage size from the output of du command
-	// It contains details of all subdirectories of target container
-	ephemeralStorageAll := strings.Split(out.String(), "\n")
-	// It will return the details of main directory
-	ephemeralStorageAllDiskFill := strings.Split(ephemeralStorageAll[len(ephemeralStorageAll)-2], "\t")[0]
-	// type casting string to interger
-	ephemeralStorageSize, err := strconv.Atoi(ephemeralStorageAllDiskFill)
-	return ephemeralStorageSize, nil
-}
 
 //PrepareDiskFill contains the prepration steps before chaos injection
 func PrepareDiskFill(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+
+	execCommandDetails := exec.CommandDetails{}
 
 	//Select application pod & node for the disk fill
 	appName, appNodeName, err := GetApplicationPod(experimentsDetails, clients)
@@ -104,8 +41,8 @@ func PrepareDiskFill(experimentsDetails *experimentTypes.ExperimentDetails, clie
 		}
 	}
 
-	// GetEmhemeralStorageAttributes derive the emhemeral storage attributes
-	ephemeralStorageLimit, ephemeralStorageRequest, err := GetEmhemeralStorageAttributes(experimentsDetails, clients, appName)
+	// GetEphemeralStorageAttributes derive the ephemeral storage attributes
+	ephemeralStorageLimit, ephemeralStorageRequest, err := GetEphemeralStorageAttributes(experimentsDetails, clients, appName)
 	if err != nil {
 		return err
 	}
@@ -140,7 +77,7 @@ func PrepareDiskFill(experimentsDetails *experimentTypes.ExperimentDetails, clie
 		events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 	}
 
-	// Creating the helper pod to perform network chaos
+	// Creating the helper pod to perform disk fill
 	err = CreateHelperPod(experimentsDetails, clients, appName, appNodeName)
 	if err != nil {
 		errors.Errorf("Unable to create the helper pod, err: %v", err)
@@ -154,7 +91,10 @@ func PrepareDiskFill(experimentsDetails *experimentTypes.ExperimentDetails, clie
 	}
 
 	// Derive the used ephemeral storage size from the target container
-	usedEphemeralStorageSize, err := GetEphemeralStorageSize(experimentsDetails, containerID, clients)
+	command := "du /diskfill/" + containerID
+	exec.SetExecCommandAttributes(&execCommandDetails, appName, experimentsDetails.TargetContainer, experimentsDetails.AppNS, command)
+	ephemeralStorageDetails, err := exec.Exec(&execCommandDetails, clients)
+	usedEphemeralStorageSize, err := FilterEphemeralStorage(ephemeralStorageDetails)
 	log.Infof("used ephemeral storage space: %v", strconv.Itoa(usedEphemeralStorageSize))
 
 	// deriving the ephemeral storage size to be filled
@@ -164,7 +104,12 @@ func PrepareDiskFill(experimentsDetails *experimentTypes.ExperimentDetails, clie
 
 	if sizeTobeFilled > 0 {
 		// Creating files to fill those size
-		FileCreation(experimentsDetails, clients, containerID, sizeTobeFilled)
+		command := "dd if=/dev/urandom of=/diskfill/" + containerID + "/diskfill bs=4K count=" + strconv.Itoa(sizeTobeFilled/4)
+		exec.SetExecCommandAttributes(&execCommandDetails, appName, experimentsDetails.TargetContainer, experimentsDetails.AppNS, command)
+		_, err = exec.Exec(&execCommandDetails, clients)
+		if err != nil {
+			return err
+		}
 	} else {
 		log.Warn("jagha nahi hai, housefull")
 	}
@@ -174,7 +119,7 @@ func PrepareDiskFill(experimentsDetails *experimentTypes.ExperimentDetails, clie
 	waitForDuration(experimentsDetails.ChaosDuration)
 
 	// It will delete the target pod if it is evicted or delete the files, which was created during chaos execution
-	err = Remedy(experimentsDetails, clients, containerID, appName)
+	err = Remedy(experimentsDetails, clients, containerID, appName, &execCommandDetails)
 
 	//Deleting the helper pod
 	log.Info("[Cleanup]: Deleting the helper pod")
@@ -265,7 +210,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 			Containers: []apiv1.Container{
 				{
 					Name:            "disk-fill",
-					Image:           "ubuntu",
+					Image:           "alpine",
 					ImagePullPolicy: apiv1.PullAlways,
 					Args: []string{
 						"sleep",
@@ -313,8 +258,8 @@ func DeleteHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 	return err
 }
 
-// GetEmhemeralStorageAttributes derive the emhemeral storage attributes from target pod
-func GetEmhemeralStorageAttributes(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, podName string) (int64, int64, error) {
+// GetEphemeralStorageAttributes derive the ephemeral storage attributes from target pod
+func GetEphemeralStorageAttributes(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, podName string) (int64, int64, error) {
 
 	pod, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Get(podName, v1.GetOptions{})
 
@@ -364,111 +309,21 @@ func GetContainerID(experimentsDetails *experimentTypes.ExperimentDetails, clien
 
 }
 
-// FileCreation creates the file to filled the desired space in the ephemeral storage
-func FileCreation(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, containerID string, sizeTobeFilled int) error {
+// FilterEphemeralStorage ...
+func FilterEphemeralStorage(ephemeralStorageDetails string) (int, error) {
 
-	command := fmt.Sprintf("dd if=/dev/urandom of=/diskfill/" + containerID + "/diskfill bs=4K count=" + strconv.Itoa(sizeTobeFilled/4))
+	// Filtering out the ephemeral storage size from the output of du command
+	// It contains details of all subdirectories of target container
+	ephemeralStorageAll := strings.Split(ephemeralStorageDetails, "\n")
+	// It will return the details of main directory
+	ephemeralStorageAllDiskFill := strings.Split(ephemeralStorageAll[len(ephemeralStorageAll)-2], "\t")[0]
+	// type casting string to interger
+	ephemeralStorageSize, err := strconv.Atoi(ephemeralStorageAllDiskFill)
+	return ephemeralStorageSize, err
 
-	req := clients.KubeClient.CoreV1().RESTClient().Post().
-		Resource("pods").
-		Name("disk-fill-" + experimentsDetails.RunID).
-		Namespace(experimentsDetails.ChaosNamespace).
-		SubResource("exec")
-	scheme := runtime.NewScheme()
-	if err := apiv1.AddToScheme(scheme); err != nil {
-		return fmt.Errorf("error adding to scheme: %v", err)
-	}
-
-	parameterCodec := runtime.NewParameterCodec(scheme)
-	req.VersionedParams(&apiv1.PodExecOptions{
-		Command:   strings.Fields(command),
-		Container: "disk-fill",
-		Stdin:     false,
-		Stdout:    true,
-		Stderr:    true,
-		TTY:       false,
-	}, parameterCodec)
-
-	exec, err := remotecommand.NewSPDYExecutor(clients.KubeConfig, "POST", req.URL())
-	if err != nil {
-		return fmt.Errorf("error while creating Executor: %v", err)
-	}
-
-	var out bytes.Buffer
-	stdout := &out
-	stderr := os.Stderr
-
-	err = exec.Stream(remotecommand.StreamOptions{
-		Stdin:  nil,
-		Stdout: stdout,
-		Stderr: stderr,
-		Tty:    false,
-	})
-
-	if err != nil {
-		errorCode := strings.Contains(err.Error(), "143")
-		if errorCode != true {
-			log.Infof("[Chaos]:Unable to create the files due to err: %v", err.Error())
-			return err
-		}
-	}
-
-	return nil
 }
 
-// FileDeletion deletes the files, which was created during chaos execution
-func FileDeletion(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, containerID string) error {
-
-	command := fmt.Sprintf("rm -rf /diskfill/" + containerID + "/diskfill")
-
-	req := clients.KubeClient.CoreV1().RESTClient().Post().
-		Resource("pods").
-		Name("disk-fill-" + experimentsDetails.RunID).
-		Namespace(experimentsDetails.ChaosNamespace).
-		SubResource("exec")
-	scheme := runtime.NewScheme()
-	if err := apiv1.AddToScheme(scheme); err != nil {
-		return fmt.Errorf("error adding to scheme: %v", err)
-	}
-
-	parameterCodec := runtime.NewParameterCodec(scheme)
-	req.VersionedParams(&apiv1.PodExecOptions{
-		Command:   strings.Fields(command),
-		Container: "disk-fill",
-		Stdin:     false,
-		Stdout:    true,
-		Stderr:    true,
-		TTY:       false,
-	}, parameterCodec)
-
-	exec, err := remotecommand.NewSPDYExecutor(clients.KubeConfig, "POST", req.URL())
-	if err != nil {
-		return fmt.Errorf("error while creating Executor: %v", err)
-	}
-
-	var out bytes.Buffer
-	stdout := &out
-	stderr := os.Stderr
-
-	err = exec.Stream(remotecommand.StreamOptions{
-		Stdin:  nil,
-		Stdout: stdout,
-		Stderr: stderr,
-		Tty:    false,
-	})
-
-	if err != nil {
-		errorCode := strings.Contains(err.Error(), "143")
-		if errorCode != true {
-			log.Infof("[Chaos]:Unable to delete the files due to, err: %v", err.Error())
-			return err
-		}
-	}
-
-	return nil
-}
-
-// GetSizeToBeFilled generate the emhemeral storage size need to be filled
+// GetSizeToBeFilled generate the ephemeral storage size need to be filled
 func GetSizeToBeFilled(experimentsDetails *experimentTypes.ExperimentDetails, usedEphemeralStorageSize int, ephemeralStorageLimit int) int {
 
 	requirementToFill := (ephemeralStorageLimit * experimentsDetails.FillPercentage) / 100
@@ -477,7 +332,7 @@ func GetSizeToBeFilled(experimentsDetails *experimentTypes.ExperimentDetails, us
 }
 
 // Remedy will delete the target pod if it is evicted or delete the files, which was created during chaos execution
-func Remedy(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, containerID string, podName string) error {
+func Remedy(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, containerID string, podName string, execCommandDetails *exec.CommandDetails) error {
 	pod, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Get(podName, v1.GetOptions{})
 	if err != nil {
 		return err
@@ -491,7 +346,12 @@ func Remedy(experimentsDetails *experimentTypes.ExperimentDetails, clients clien
 	} else {
 
 		// deleting the files after chaos execution
-		FileDeletion(experimentsDetails, clients, containerID)
+		command := "rm -rf /diskfill/" + containerID + "/diskfill"
+		exec.SetExecCommandAttributes(execCommandDetails, podName, experimentsDetails.TargetContainer, experimentsDetails.AppNS, command)
+		_, err = exec.Exec(execCommandDetails, clients)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
