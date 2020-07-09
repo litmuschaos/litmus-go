@@ -20,3 +20,5 @@ go build -o build/_output/node-memory-hog ./experiments/generic/node-memory-hog
 go build -o build/_output/node-cpu-hog ./experiments/generic/node-cpu-hog
 # Buiding go binaries for node_drain experiment
 go build -o build/_output/node-drain ./experiments/generic/node-drain
+# Buiding go binaries for disk_fill experiment
+go build -o build/_output/disk-fill ./experiments/generic/disk-fill
