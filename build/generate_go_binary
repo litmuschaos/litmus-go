@@ -12,11 +12,13 @@ go build -o build/_output/pod-network-latency ./experiments/generic/pod-network-
 go build -o build/_output/pod-network-loss ./experiments/generic/pod-network-loss
 # Buiding go binaries for pod_network_corruption experiment
 go build -o build/_output/pod-network-corruption ./experiments/generic/pod-network-corruption
+# Buiding go binaries for node_taint experiment
+go build -o build/_output/node-taint ./experiments/generic/node-taint
+# Buiding go binaries for node_drain experiment
+go build -o build/_output/node-drain ./experiments/generic/node-drain
 # Buiding go binaries for kubelet_service_kill experiment
 go build -o build/_output/kubelet-service-kill ./experiments/generic/kubelet-service-kill
 # Buiding go binaries for node_memory_hog experiment
 go build -o build/_output/node-memory-hog ./experiments/generic/node-memory-hog
 # Buiding go binaries for node_cpu_hog experiment
 go build -o build/_output/node-cpu-hog ./experiments/generic/node-cpu-hog
-# Buiding go binaries for node_drain experiment
-go build -o build/_output/node-drain ./experiments/generic/node-drain

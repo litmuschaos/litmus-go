@@ -1,11 +1,11 @@
 package main
 
 import (
-	"github.com/litmuschaos/litmus-go/chaoslib/litmus/kubelet_service_kill"
+	node_taint "github.com/litmuschaos/litmus-go/chaoslib/litmus/node_taint"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
-	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/kubelet-service-kill/environment"
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/kubelet-service-kill/types"
+	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/node-taint/environment"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/node-taint/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/status"
@@ -38,7 +38,7 @@ func main() {
 
 	//Fetching all the ENV passed from the runner pod
 	log.Infof("[PreReq]: Getting the ENV for the %v experiment", experimentsDetails.ExperimentName)
-	experimentEnv.GetENV(&experimentsDetails, "kubelet-service-kill")
+	experimentEnv.GetENV(&experimentsDetails, "node-taint")
 
 	// Intialise Chaos Result Parameters
 	types.SetResultAttributes(&resultDetails, experimentsDetails.EngineName, experimentsDetails.ExperimentName)
@@ -51,7 +51,7 @@ func main() {
 	err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT")
 	if err != nil {
 		log.Errorf("Unable to Create the Chaos Result due to %v", err)
-		resultDetails.FailStep = "Updating the chaos result of kubelet-service-kill experiment (SOT)"
+		resultDetails.FailStep = "Updating the chaos result of node-taint experiment (SOT)"
 		err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 		return
 	}
@@ -93,20 +93,20 @@ func main() {
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
-	// Including the litmus lib for kubelet-service-kill
+	// Including the litmus lib for node-taint
 	if experimentsDetails.ChaosLib == "litmus" {
-		err = kubelet_service_kill.PrepareKubeletKill(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
+		err = node_taint.PrepareNodeTaint(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
 		if err != nil {
 			log.Errorf("Chaos injection failed due to %v\n", err)
-			resultDetails.FailStep = "Including the litmus lib for kubelet-service-kill"
+			resultDetails.FailStep = "Including the litmus lib for node-taint"
 			result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 			return
 		}
-		log.Info("[Confirmation]: kubelet-service-kill chaos has been injected successfully")
+		log.Info("[Confirmation]: The application node has been tainted successfully")
 		resultDetails.Verdict = "Pass"
 	} else {
 		log.Error("[Invalid]: Please Provide the correct LIB")
-		resultDetails.FailStep = "Including the litmus lib for kubelet-service-kill"
+		resultDetails.FailStep = "Including the litmus lib for node-taint"
 		result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 		return
 	}
