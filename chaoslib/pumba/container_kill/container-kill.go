@@ -1,4 +1,4 @@
-package network_chaos
+package container_kill
 
 import (
 	"math/rand"
@@ -7,7 +7,7 @@ import (
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/network-chaos/types"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/container-kill/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
@@ -20,10 +20,10 @@ import (
 
 var err error
 
-//PreparePodNetworkChaos contains the prepration steps before chaos injection
-func PreparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+//PrepareContainerKill contains the prepration steps before chaos injection
+func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
-	//Select application pod for network chaos
+	//Select application pod for container-kill
 	appName, appNodeName, err := GetApplicationPod(experimentsDetails, clients)
 	if err != nil {
 		return errors.Errorf("Unable to get the application name and application nodename due to, err: %v", err)
@@ -43,19 +43,26 @@ func PreparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetail
 		"ContainerName": experimentsDetails.TargetContainer,
 	})
 
+	experimentsDetails.RunID = GetRunID()
+
 	//Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
 		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", strconv.Itoa(experimentsDetails.RampTime))
 		waitForRampTime(experimentsDetails)
 	}
 
-	experimentsDetails.RunID = GetRunID()
-
 	if experimentsDetails.EngineName != "" {
 		msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on " + appName + " pod"
 		types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, chaosDetails)
 		events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 	}
+
+	//GetRestartCount return the restart count of target container
+	restartCountBefore, err := GetRestartCount(experimentsDetails, appName, clients)
+	if err != nil {
+		return err
+	}
+	log.Infof("restartCount of target container before chaos injection: %v", strconv.Itoa(restartCountBefore))
 
 	// Creating the helper pod to perform network chaos
 	err = CreateHelperPod(experimentsDetails, clients, appName, appNodeName)
@@ -65,24 +72,25 @@ func PreparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetail
 
 	//Checking the status of helper pod
 	log.Info("[Status]: Checking the status of the helper pod")
-	err = status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, "name=pumba-netem-"+experimentsDetails.RunID, clients)
+	err = status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, "name=pumba-sig-kill-"+experimentsDetails.RunID, clients)
 	if err != nil {
 		return errors.Errorf("helper pod is not in running state, err: %v", err)
 	}
 
-	// Wait till the completion of helper pod
-	log.Infof("[Wait]: Waiting for %vs till the completion of the helper pod", strconv.Itoa(experimentsDetails.ChaosDuration))
-
-	err = status.WaitForCompletion(experimentsDetails.ChaosNamespace, "name=pumba-netem-"+experimentsDetails.RunID, clients, experimentsDetails.ChaosDuration+30)
-	if err != nil {
-		return err
-	}
+	// Wait for Chaos Duration
+	log.Infof("[Wait]: Waiting for the %vs chaos duration", strconv.Itoa(experimentsDetails.ChaosDuration))
+	waitForChaosDuration(experimentsDetails)
 
 	//Deleting the helper pod
 	log.Info("[Cleanup]: Deleting the helper pod")
 	err = DeleteHelperPod(experimentsDetails, clients, experimentsDetails.RunID)
 	if err != nil {
 		return errors.Errorf("Unable to delete the helper pod, err: %v", err)
+	}
+
+	err = VerifyRestartCount(experimentsDetails, appName, clients, restartCountBefore)
+	if err != nil {
+		return errors.Errorf("Target container is not restarted , err: %v", err)
 	}
 
 	//Waiting for the ramp time after chaos injection
@@ -125,6 +133,11 @@ func waitForRampTime(experimentsDetails *experimentTypes.ExperimentDetails) {
 	time.Sleep(time.Duration(experimentsDetails.RampTime) * time.Second)
 }
 
+//waitForChaosDuration waits for the given chaos duration (in seconds)
+func waitForChaosDuration(experimentsDetails *experimentTypes.ExperimentDetails) {
+	time.Sleep(time.Duration(experimentsDetails.ChaosDuration) * time.Second)
+}
+
 // GetRunID generate a random string
 func GetRunID() string {
 	var letterRunes = []rune("abcdefghijklmnopqrstuvwxyz")
@@ -135,18 +148,62 @@ func GetRunID() string {
 	return string(runID)
 }
 
+//GetRestartCount return the restart count of target container
+func GetRestartCount(experimentsDetails *experimentTypes.ExperimentDetails, podName string, clients clients.ClientSets) (int, error) {
+	pod, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Get(podName, v1.GetOptions{})
+	if err != nil {
+		return 0, err
+	}
+	restartCount := 0
+	for _, container := range pod.Status.ContainerStatuses {
+		if container.Name == experimentsDetails.TargetContainer {
+			restartCount = int(container.RestartCount)
+			break
+		}
+	}
+	return restartCount, nil
+}
+
+//VerifyRestartCount verify the restart count of target container that it is restarted or not after chaos injection
+func VerifyRestartCount(experimentsDetails *experimentTypes.ExperimentDetails, podName string, clients clients.ClientSets, restartCountBefore int) error {
+
+	restartCountAfter := 0
+	err = retry.
+		Times(90).
+		Wait(1 * time.Second).
+		Try(func(attempt uint) error {
+			pod, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Get(podName, v1.GetOptions{})
+			if err != nil {
+				return errors.Errorf("Unable to get the application pod, err: %v", err)
+			}
+			for _, container := range pod.Status.ContainerStatuses {
+				if container.Name == experimentsDetails.TargetContainer {
+					restartCountAfter = int(container.RestartCount)
+					break
+				}
+			}
+			if restartCountAfter <= restartCountBefore {
+				return errors.Errorf("Target container is not restarted")
+			}
+			return nil
+		})
+
+	log.Infof("restartCount of target container after chaos injection: %v", strconv.Itoa(restartCountAfter))
+
+	return err
+
+}
+
 // CreateHelperPod derive the attributes for helper pod and create the helper pod
 func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, appName, appNodeName string) error {
 
-	command, keyAttibute, valueAttribute := GetNetworkChaosCommands(experimentsDetails)
-
 	helperPod := &apiv1.Pod{
 		ObjectMeta: v1.ObjectMeta{
-			Name:      "pumba-netem-" + experimentsDetails.RunID,
+			Name:      "pumba-sig-kill-" + experimentsDetails.RunID,
 			Namespace: experimentsDetails.ChaosNamespace,
 			Labels: map[string]string{
 				"app":      "pumba",
-				"name":     "pumba-netem-" + experimentsDetails.RunID,
+				"name":     "pumba-sig-kill-" + experimentsDetails.RunID,
 				"chaosUID": string(experimentsDetails.ChaosUID),
 			},
 		},
@@ -154,7 +211,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 			RestartPolicy: apiv1.RestartPolicyNever,
 			NodeName:      appNodeName,
 			Volumes: []apiv1.Volume{
-				apiv1.Volume{
+				{
 					Name: "dockersocket",
 					VolumeSource: apiv1.VolumeSource{
 						HostPath: &apiv1.HostPathVolumeSource{
@@ -169,20 +226,16 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 					Image:           experimentsDetails.LIBImage,
 					ImagePullPolicy: apiv1.PullAlways,
 					Args: []string{
-						"netem",
-						"--tc-image",
-						"gaiadocker/iproute2",
-						"--interface",
-						experimentsDetails.NetworkInterface,
-						"--duration",
-						strconv.Itoa(experimentsDetails.ChaosDuration) + "s",
-						command,
-						keyAttibute,
-						valueAttribute,
+						"--random",
+						"--interval",
+						strconv.Itoa(experimentsDetails.ChaosInterval) + "s",
+						"kill",
+						"--signal",
+						"SIGKILL",
 						"re2:k8s_" + experimentsDetails.TargetContainer + "_" + appName,
 					},
 					VolumeMounts: []apiv1.VolumeMount{
-						apiv1.VolumeMount{
+						{
 							Name:      "dockersocket",
 							MountPath: "/var/run/docker.sock",
 						},
@@ -199,7 +252,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 //DeleteHelperPod delete the helper pod
 func DeleteHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, runID string) error {
 
-	err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Delete("pumba-netem-"+runID, &v1.DeleteOptions{})
+	err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Delete("pumba-sig-kill-"+runID, &v1.DeleteOptions{})
 
 	if err != nil {
 		return err
@@ -209,7 +262,7 @@ func DeleteHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 		Times(90).
 		Wait(1 * time.Second).
 		Try(func(attempt uint) error {
-			podSpec, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).List(v1.ListOptions{LabelSelector: "name=pumba-netem-" + runID})
+			podSpec, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).List(v1.ListOptions{LabelSelector: "name=pumba-sig-kill-" + runID})
 			if err != nil || len(podSpec.Items) != 0 {
 				return errors.Errorf("Helper Pod is not deleted yet, err: %v", err)
 			}
@@ -217,28 +270,4 @@ func DeleteHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 		})
 
 	return err
-}
-
-// GetNetworkChaosCommands derive the commands for the pumba pod
-func GetNetworkChaosCommands(experimentsDetails *experimentTypes.ExperimentDetails) (string, string, string) {
-
-	var command, keyAttibute, valueAttribute string
-	if experimentsDetails.ExperimentName == "pod-network-duplication" {
-		command = "duplicate"
-		keyAttibute = "--percent"
-		valueAttribute = strconv.Itoa(experimentsDetails.NetworkPacketDuplicationPercentage)
-	} else if experimentsDetails.ExperimentName == "pod-network-latency" {
-		command = "delay"
-		keyAttibute = "--time"
-		valueAttribute = strconv.Itoa(experimentsDetails.NetworkLatency)
-	} else if experimentsDetails.ExperimentName == "pod-network-loss" {
-		command = "loss"
-		keyAttibute = "--percent"
-		valueAttribute = strconv.Itoa(experimentsDetails.NetworkPacketLossPercentage)
-	} else if experimentsDetails.ExperimentName == "pod-network-corruption" {
-		command = "corrupt"
-		keyAttibute = "--percent"
-		valueAttribute = strconv.Itoa(experimentsDetails.NetworkPacketCorruptionPercentage)
-	}
-	return command, keyAttibute, valueAttribute
 }

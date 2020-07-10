@@ -49,7 +49,7 @@ func PrepareKubeletKill(experimentsDetails *experimentTypes.ExperimentDetails, c
 	// Creating the helper pod to perform node memory hog
 	err = CreateHelperPod(experimentsDetails, clients, appNodeName)
 	if err != nil {
-		errors.Errorf("Unable to create the helper pod, err: %v", err)
+		return errors.Errorf("Unable to create the helper pod, err: %v", err)
 	}
 
 	//Checking the status of helper pod
@@ -85,7 +85,7 @@ func PrepareKubeletKill(experimentsDetails *experimentTypes.ExperimentDetails, c
 	log.Info("[Cleanup]: Deleting the helper pod")
 	err = DeleteHelperPod(experimentsDetails, clients)
 	if err != nil {
-		errors.Errorf("Unable to delete the helper pod, err: %v", err)
+		return errors.Errorf("Unable to delete the helper pod, err: %v", err)
 	}
 
 	//Waiting for the ramp time after chaos injection

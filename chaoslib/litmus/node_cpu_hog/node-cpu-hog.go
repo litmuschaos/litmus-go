@@ -32,6 +32,9 @@ func PrepareNodeCPUHog(experimentsDetails *experimentTypes.ExperimentDetails, cl
 	// When number of cpu cores for hogging is not defined , it will take it from node capacity
 	if experimentsDetails.NodeCPUcores == 0 {
 		err = SetCPUCapacity(experimentsDetails, appNodeName, clients)
+		if err != nil {
+			return err
+		}
 	}
 
 	log.InfoWithValues("[Info]: Details of application under chaos injection", logrus.Fields{
@@ -56,7 +59,7 @@ func PrepareNodeCPUHog(experimentsDetails *experimentTypes.ExperimentDetails, cl
 	// Creating the helper pod to perform node cpu hog
 	err = CreateHelperPod(experimentsDetails, clients, appNodeName)
 	if err != nil {
-		errors.Errorf("Unable to create the helper pod, err: %v", err)
+		return errors.Errorf("Unable to create the helper pod, err: %v", err)
 	}
 
 	//Checking the status of helper pod
@@ -85,7 +88,7 @@ func PrepareNodeCPUHog(experimentsDetails *experimentTypes.ExperimentDetails, cl
 	log.Info("[Cleanup]: Deleting the helper pod")
 	err = DeleteHelperPod(experimentsDetails, clients)
 	if err != nil {
-		errors.Errorf("Unable to delete the helper pod, err: %v", err)
+		return errors.Errorf("Unable to delete the helper pod, err: %v", err)
 	}
 
 	//Waiting for the ramp time after chaos injection
