@@ -25,9 +25,10 @@ import (
 //PrepareDiskFill contains the prepration steps before chaos injection
 func PrepareDiskFill(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
-	execCommandDetails := exec.CommandDetails{}
+	// It will contains all the pod & container details required for exec command
+	execCommandDetails := exec.PodDetails{}
 
-	//Select application pod & node for the disk fill
+	//Select application pod & node for the disk fill chaos
 	appName, appNodeName, err := GetApplicationPod(experimentsDetails, clients)
 	if err != nil {
 		return errors.Errorf("Unable to get the application name and application nodename due to, err: %v", err)
@@ -41,13 +42,13 @@ func PrepareDiskFill(experimentsDetails *experimentTypes.ExperimentDetails, clie
 		}
 	}
 
-	// GetEphemeralStorageAttributes derive the ephemeral storage attributes
+	// GetEphemeralStorageAttributes derive the ephemeral storage attributes from the target container
 	ephemeralStorageLimit, ephemeralStorageRequest, err := GetEphemeralStorageAttributes(experimentsDetails, clients, appName)
 	if err != nil {
 		return err
 	}
 
-	// Getting the container id of target container
+	// Derive the container id of the target container
 	containerID, err := GetContainerID(experimentsDetails, clients, appName)
 	if err != nil {
 		return err
@@ -62,7 +63,7 @@ func PrepareDiskFill(experimentsDetails *experimentTypes.ExperimentDetails, clie
 		"ContainerID":             containerID,
 	})
 
-	// generate the runid, a unique string
+	// generating a unique string which can be appended with the helper pod name & labels for the uniquely identification
 	experimentsDetails.RunID = GetRunID()
 
 	//Waiting for the ramp time before chaos injection
@@ -71,19 +72,20 @@ func PrepareDiskFill(experimentsDetails *experimentTypes.ExperimentDetails, clie
 		waitForDuration(experimentsDetails.RampTime)
 	}
 
+	// generating the chaos inject event in the chaosengine
 	if experimentsDetails.EngineName != "" {
 		msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on " + appName + " pod"
 		types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, chaosDetails)
 		events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 	}
 
-	// Creating the helper pod to perform disk fill
+	// creating the helper pod to perform disk fill chaos
 	err = CreateHelperPod(experimentsDetails, clients, appName, appNodeName)
 	if err != nil {
 		errors.Errorf("Unable to create the helper pod, err: %v", err)
 	}
 
-	//Checking the status of helper pod
+	//checking the status of the helper pod, wait till the helper pod comes to running state else fail the experiment
 	log.Info("[Status]: Checking the status of the helper pod")
 	err = status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, "name=disk-fill-"+experimentsDetails.RunID, clients)
 	if err != nil {
@@ -91,10 +93,18 @@ func PrepareDiskFill(experimentsDetails *experimentTypes.ExperimentDetails, clie
 	}
 
 	// Derive the used ephemeral storage size from the target container
+	// It will exec inside disk-fill helper pod & derive the used ephemeral storage space
 	command := "du /diskfill/" + containerID
-	exec.SetExecCommandAttributes(&execCommandDetails, appName, experimentsDetails.TargetContainer, experimentsDetails.AppNS, command)
-	ephemeralStorageDetails, err := exec.Exec(&execCommandDetails, clients)
-	usedEphemeralStorageSize, err := FilterEphemeralStorage(ephemeralStorageDetails)
+	exec.SetExecCommandAttributes(&execCommandDetails, "disk-fill-"+experimentsDetails.RunID, "disk-fill", experimentsDetails.ChaosNamespace)
+	ephemeralStorageDetails, err := exec.Exec(&execCommandDetails, clients, command)
+	if err != nil {
+		return errors.Errorf("Unable to get ephemeral storage details due to err: %v", err)
+	}
+	// filtering out the used ephemeral storage from the output of du command
+	usedEphemeralStorageSize, err := FilterUsedEphemeralStorage(ephemeralStorageDetails)
+	if err != nil {
+		return errors.Errorf("Unable to filter used ephemeral storage size due to err: %v", err)
+	}
 	log.Infof("used ephemeral storage space: %v", strconv.Itoa(usedEphemeralStorageSize))
 
 	// deriving the ephemeral storage size to be filled
@@ -103,23 +113,26 @@ func PrepareDiskFill(experimentsDetails *experimentTypes.ExperimentDetails, clie
 	log.Infof("ephemeral storage size to be filled: %v", strconv.Itoa(sizeTobeFilled))
 
 	if sizeTobeFilled > 0 {
-		// Creating files to fill those size
+		// Creating files to fill the required ephemeral storage size of block size of 4K
 		command := "dd if=/dev/urandom of=/diskfill/" + containerID + "/diskfill bs=4K count=" + strconv.Itoa(sizeTobeFilled/4)
-		exec.SetExecCommandAttributes(&execCommandDetails, appName, experimentsDetails.TargetContainer, experimentsDetails.AppNS, command)
-		_, err = exec.Exec(&execCommandDetails, clients)
+		_, err = exec.Exec(&execCommandDetails, clients, command)
 		if err != nil {
-			return err
+			return errors.Errorf("Unable to to create the files to fill the ephemeral storage due to err: %v", err)
 		}
 	} else {
-		log.Warn("jagha nahi hai, housefull")
+		log.Warn("No required free space found!, It's Housefull")
 	}
 
 	// waiting for the chaos duration
 	log.Infof("[Wait]: Waiting for the %vs after injecting chaos", strconv.Itoa(experimentsDetails.ChaosDuration))
 	waitForDuration(experimentsDetails.ChaosDuration)
 
-	// It will delete the target pod if it is evicted or delete the files, which was created during chaos execution
+	// It will delete the target pod if target pod is evicted
+	// if target pod is still running then it will delete all the files, which was created earlier during chaos execution
 	err = Remedy(experimentsDetails, clients, containerID, appName, &execCommandDetails)
+	if err != nil {
+		return errors.Errorf("Unable to perform remedy operation due to err: %v", err)
+	}
 
 	//Deleting the helper pod
 	log.Info("[Cleanup]: Deleting the helper pod")
@@ -152,8 +165,8 @@ func GetApplicationPod(experimentsDetails *experimentTypes.ExperimentDetails, cl
 	return applicationName, nodeName, nil
 }
 
-//GetTargetContainer will fetch the conatiner name from application pod
-//This container will be used as target container
+//GetTargetContainer will fetch the container name from application pod
+// It will return the first container name from the application pod
 func GetTargetContainer(experimentsDetails *experimentTypes.ExperimentDetails, appName string, clients clients.ClientSets) (string, error) {
 	pod, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Get(appName, v1.GetOptions{})
 	if err != nil {
@@ -235,7 +248,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 	return err
 }
 
-//DeleteHelperPod delete the helper pod
+//DeleteHelperPod deletes the helper pod and wait until it got terminated
 func DeleteHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, runID string) error {
 
 	err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Delete("disk-fill-"+runID, &v1.DeleteOptions{})
@@ -244,6 +257,7 @@ func DeleteHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 		return err
 	}
 
+	// waiting for the termination of the pod
 	err = retry.
 		Times(90).
 		Wait(1 * time.Second).
@@ -258,7 +272,7 @@ func DeleteHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 	return err
 }
 
-// GetEphemeralStorageAttributes derive the ephemeral storage attributes from target pod
+// GetEphemeralStorageAttributes derive the ephemeral storage attributes from the target pod
 func GetEphemeralStorageAttributes(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, podName string) (int64, int64, error) {
 
 	pod, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Get(podName, v1.GetOptions{})
@@ -270,6 +284,8 @@ func GetEphemeralStorageAttributes(experimentsDetails *experimentTypes.Experimen
 	var ephemeralStorageLimit, ephemeralStorageRequest int64
 	containers := pod.Spec.Containers
 
+	// Extracting ephemeral storage limit & requested value from the target container
+	// It will be in the form of Kb
 	for _, container := range containers {
 		if container.Name == experimentsDetails.TargetContainer {
 			ephemeralStorageLimit = container.Resources.Limits.StorageEphemeral().ToDec().ScaledValue(resource.Kilo)
@@ -281,8 +297,6 @@ func GetEphemeralStorageAttributes(experimentsDetails *experimentTypes.Experimen
 	if ephemeralStorageRequest == 0 || ephemeralStorageLimit == 0 {
 		return 0, 0, fmt.Errorf("No Ephemeral storage details found inside %v container", experimentsDetails.TargetContainer)
 	}
-
-	fmt.Printf("values %v   %v ", ephemeralStorageLimit, ephemeralStorageRequest)
 
 	return ephemeralStorageLimit, ephemeralStorageRequest, nil
 }
@@ -298,6 +312,8 @@ func GetContainerID(experimentsDetails *experimentTypes.ExperimentDetails, clien
 	var containerID string
 	containers := pod.Status.ContainerStatuses
 
+	// filtering out the container id from the details of containers inside containerStatuses of the given pod
+	// container id is present in the form of <runtime>://<container-id>
 	for _, container := range containers {
 		if container.Name == experimentsDetails.TargetContainer {
 			containerID = strings.Split(container.ContainerID, "//")[1]
@@ -309,8 +325,8 @@ func GetContainerID(experimentsDetails *experimentTypes.ExperimentDetails, clien
 
 }
 
-// FilterEphemeralStorage ...
-func FilterEphemeralStorage(ephemeralStorageDetails string) (int, error) {
+// FilterUsedEphemeralStorage filter out the used ephemeral storage from the given string
+func FilterUsedEphemeralStorage(ephemeralStorageDetails string) (int, error) {
 
 	// Filtering out the ephemeral storage size from the output of du command
 	// It contains details of all subdirectories of target container
@@ -326,18 +342,20 @@ func FilterEphemeralStorage(ephemeralStorageDetails string) (int, error) {
 // GetSizeToBeFilled generate the ephemeral storage size need to be filled
 func GetSizeToBeFilled(experimentsDetails *experimentTypes.ExperimentDetails, usedEphemeralStorageSize int, ephemeralStorageLimit int) int {
 
-	requirementToFill := (ephemeralStorageLimit * experimentsDetails.FillPercentage) / 100
-	needToFilled := requirementToFill - usedEphemeralStorageSize
-	return needToFilled
+	// deriving size need to be filled from the used size & requirement size to fill
+	requirementToBeFill := (ephemeralStorageLimit * experimentsDetails.FillPercentage) / 100
+	needToBeFilled := requirementToBeFill - usedEphemeralStorageSize
+	return needToBeFilled
 }
 
-// Remedy will delete the target pod if it is evicted or delete the files, which was created during chaos execution
-func Remedy(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, containerID string, podName string, execCommandDetails *exec.CommandDetails) error {
+// Remedy will delete the target pod if target pod is evicted
+// if target pod is still running then it will delete the files, which was created during chaos execution
+func Remedy(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, containerID string, podName string, execCommandDetails *exec.PodDetails) error {
 	pod, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Get(podName, v1.GetOptions{})
 	if err != nil {
 		return err
 	}
-
+	// Deleting the pod as pod is already evicted
 	podReason := pod.Status.Reason
 	if podReason == "Evicted" {
 		if err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Delete(podName, &v1.DeleteOptions{}); err != nil {
@@ -347,10 +365,9 @@ func Remedy(experimentsDetails *experimentTypes.ExperimentDetails, clients clien
 
 		// deleting the files after chaos execution
 		command := "rm -rf /diskfill/" + containerID + "/diskfill"
-		exec.SetExecCommandAttributes(execCommandDetails, podName, experimentsDetails.TargetContainer, experimentsDetails.AppNS, command)
-		_, err = exec.Exec(execCommandDetails, clients)
+		_, err = exec.Exec(execCommandDetails, clients, command)
 		if err != nil {
-			return err
+			errors.Errorf("Unable to delete files to clean ephemeral storage due to err: %v", err)
 		}
 	}
 	return nil
