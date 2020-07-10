@@ -130,7 +130,10 @@ func ExperimentCPU(experimentsDetails *experimentTypes.ExperimentDetails, client
 						}
 						resultDetails.FailStep = "CPU hog Chaos injection stopped!"
 						resultDetails.Verdict = "Stopped"
+						msg := experimentsDetails.ExperimentName + " experiment has been aborted"
 						result.ChaosResult(chaosDetails, clients, resultDetails, "EOT")
+						types.SetResultEventAttributes(eventsDetails, types.Summary, msg, resultDetails)
+						events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosResult")
 						os.Exit(1)
 					case <-endTime:
 						log.Infof("[Chaos]: Time is up for experiment: %v", experimentsDetails.ExperimentName)
