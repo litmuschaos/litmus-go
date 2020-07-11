@@ -22,3 +22,5 @@ go build -o build/_output/kubelet-service-kill ./experiments/generic/kubelet-ser
 go build -o build/_output/node-memory-hog ./experiments/generic/node-memory-hog
 # Buiding go binaries for node_cpu_hog experiment
 go build -o build/_output/node-cpu-hog ./experiments/generic/node-cpu-hog
+# Buiding go binaries for disk_fill experiment
+go build -o build/_output/disk-fill ./experiments/generic/disk-fill
