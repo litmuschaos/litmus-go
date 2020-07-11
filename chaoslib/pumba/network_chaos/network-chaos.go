@@ -154,7 +154,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 			RestartPolicy: apiv1.RestartPolicyNever,
 			NodeName:      appNodeName,
 			Volumes: []apiv1.Volume{
-				apiv1.Volume{
+				{
 					Name: "dockersocket",
 					VolumeSource: apiv1.VolumeSource{
 						HostPath: &apiv1.HostPathVolumeSource{
@@ -182,7 +182,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 						"re2:k8s_" + experimentsDetails.TargetContainer + "_" + appName,
 					},
 					VolumeMounts: []apiv1.VolumeMount{
-						apiv1.VolumeMount{
+						{
 							Name:      "dockersocket",
 							MountPath: "/var/run/docker.sock",
 						},

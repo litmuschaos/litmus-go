@@ -18,12 +18,10 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-var err error
-
 //PrepareContainerKill contains the prepration steps before chaos injection
 func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
 
-	//Select application pod for container-kill
+	//Select application pod and node name for the container-kill
 	appName, appNodeName, err := GetApplicationPod(experimentsDetails, clients)
 	if err != nil {
 		return errors.Errorf("Unable to get the application name and application nodename due to, err: %v", err)
@@ -43,13 +41,13 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 		"ContainerName": experimentsDetails.TargetContainer,
 	})
 
-	//Getting the iteration count for the container-killl
+	//Getting the iteration count for the container-kill
 	GetIterations(experimentsDetails)
 
-	// Generate the run_id
+	// generating a unique string which can be appended with the helper pod name & labels for the uniquely identification
 	experimentsDetails.RunID = GetRunID()
 
-	// Getting the serviceAccountName
+	// Getting the serviceAccountName, need permission inside helper pod to create the events
 	if experimentsDetails.ChaosServiceAccount == "" {
 		err = GetServiceAccount(experimentsDetails, clients)
 		if err != nil {
@@ -60,16 +58,24 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 	//Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
 		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", strconv.Itoa(experimentsDetails.RampTime))
-		waitForRampTime(experimentsDetails)
+		waitForDuration(experimentsDetails.RampTime)
 	}
 
-	// Creating a helper pod
-	err = CreateHelperPod(experimentsDetails, clients, appName)
+	//GetRestartCount return the restart count of target container
+	restartCountBefore, err := GetRestartCount(experimentsDetails, appName, clients)
+	if err != nil {
+		return err
+	}
+
+	log.Infof("restartCount of target container before chaos injection: %v", strconv.Itoa(restartCountBefore))
+
+	// creating the helper pod to perform container kill chaos
+	err = CreateHelperPod(experimentsDetails, clients, appName, appNodeName)
 	if err != nil {
 		return errors.Errorf("Unable to create the helper pod, err: %v", err)
 	}
 
-	//Checking the status of helper pod
+	//checking the status of the helper pod, wait till the helper pod comes to running state else fail the experiment
 	log.Info("[Status]: Checking the status of the helper pod")
 	err = status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, "name=container-kill-"+experimentsDetails.RunID, clients)
 	if err != nil {
@@ -79,7 +85,8 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 	// Recording the chaos start timestamp
 	ChaosStartTimeStamp := time.Now().Unix()
 
-	// Wait till the completion of helper pod
+	// Wait till the completion of the helper pod
+	// set an upper limit for the waiting time
 	log.Info("[Wait]: waiting till the completion of the helper pod")
 	err = status.WaitForCompletion(experimentsDetails.ChaosNamespace, "name=container-kill-"+experimentsDetails.RunID, clients, experimentsDetails.ChaosDuration+experimentsDetails.ChaosInterval+60)
 	if err != nil {
@@ -96,17 +103,23 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 		return errors.Errorf("The helper pod failed, check the logs of helper pod for more details")
 	}
 
-	//Deleting the helper pod
+	//Deleting the helper pod for container-kill chaos
 	log.Info("[Cleanup]: Deleting the helper pod")
 	err = DeleteHelperPod(experimentsDetails, clients)
 	if err != nil {
 		return errors.Errorf("Unable to delete the helper pod, err: %v", err)
 	}
 
+	// It will verify that the restart count of container should increase after chaos injection
+	err = VerifyRestartCount(experimentsDetails, appName, clients, restartCountBefore)
+	if err != nil {
+		return errors.Errorf("Target container is not restarted , err: %v", err)
+	}
+
 	//Waiting for the ramp time after chaos injection
 	if experimentsDetails.RampTime != 0 {
 		log.Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", strconv.Itoa(experimentsDetails.RampTime))
-		waitForRampTime(experimentsDetails)
+		waitForDuration(experimentsDetails.RampTime)
 	}
 	return nil
 }
@@ -121,9 +134,9 @@ func GetIterations(experimentsDetails *experimentTypes.ExperimentDetails) {
 
 }
 
-//waitForRampTime waits for the given ramp time duration (in seconds)
-func waitForRampTime(experimentsDetails *experimentTypes.ExperimentDetails) {
-	time.Sleep(time.Duration(experimentsDetails.RampTime) * time.Second)
+//waitForDuration waits for the given time duration (in seconds)
+func waitForDuration(duration int) {
+	time.Sleep(time.Duration(duration) * time.Second)
 }
 
 // GetRunID generate a random string
@@ -162,6 +175,52 @@ func GetApplicationPod(experimentsDetails *experimentTypes.ExperimentDetails, cl
 	return applicationName, nodeName, nil
 }
 
+//GetRestartCount return the restart count of target container
+func GetRestartCount(experimentsDetails *experimentTypes.ExperimentDetails, podName string, clients clients.ClientSets) (int, error) {
+	pod, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Get(podName, v1.GetOptions{})
+	if err != nil {
+		return 0, err
+	}
+	restartCount := 0
+	for _, container := range pod.Status.ContainerStatuses {
+		if container.Name == experimentsDetails.TargetContainer {
+			restartCount = int(container.RestartCount)
+			break
+		}
+	}
+	return restartCount, nil
+}
+
+//VerifyRestartCount verify the restart count of target container that it is restarted or not after chaos injection
+func VerifyRestartCount(experimentsDetails *experimentTypes.ExperimentDetails, podName string, clients clients.ClientSets, restartCountBefore int) error {
+
+	restartCountAfter := 0
+	err := retry.
+		Times(90).
+		Wait(1 * time.Second).
+		Try(func(attempt uint) error {
+			pod, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Get(podName, v1.GetOptions{})
+			if err != nil {
+				return errors.Errorf("Unable to get the application pod, err: %v", err)
+			}
+			for _, container := range pod.Status.ContainerStatuses {
+				if container.Name == experimentsDetails.TargetContainer {
+					restartCountAfter = int(container.RestartCount)
+					break
+				}
+			}
+			if restartCountAfter <= restartCountBefore {
+				return errors.Errorf("Target container is not restarted")
+			}
+			return nil
+		})
+
+	log.Infof("restartCount of target container after chaos injection: %v", strconv.Itoa(restartCountAfter))
+
+	return err
+
+}
+
 //GetTargetContainer will fetch the conatiner name from application pod
 //This container will be used as target container
 func GetTargetContainer(experimentsDetails *experimentTypes.ExperimentDetails, appName string, clients clients.ClientSets) (string, error) {
@@ -174,7 +233,7 @@ func GetTargetContainer(experimentsDetails *experimentTypes.ExperimentDetails, a
 }
 
 // CreateHelperPod derive the attributes for helper pod and create the helper pod
-func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, podName string) error {
+func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, podName, nodeName string) error {
 
 	privilegedEnable := true
 
@@ -191,6 +250,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 		Spec: apiv1.PodSpec{
 			ServiceAccountName: experimentsDetails.ChaosServiceAccount,
 			RestartPolicy:      apiv1.RestartPolicyNever,
+			NodeName:           nodeName,
 			Volumes: []apiv1.Volume{
 				{
 					Name: "cri-socket",
@@ -245,7 +305,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 
 }
 
-//DeleteHelperPod delete the helper pod
+//DeleteHelperPod deletes the helper pod and wait until it got terminated
 func DeleteHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) error {
 
 	err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Delete("container-kill-"+experimentsDetails.RunID, &v1.DeleteOptions{})
@@ -254,6 +314,7 @@ func DeleteHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 		return err
 	}
 
+	// waiting for the termination of the pod
 	err = retry.
 		Times(90).
 		Wait(1 * time.Second).
@@ -272,8 +333,17 @@ func DeleteHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 func GetPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, podName string) []apiv1.EnvVar {
 
 	var envVar []apiv1.EnvVar
-	ENVList := map[string]string{"APP_NS": experimentsDetails.AppNS, "APP_POD": podName, "APP_CONTAINER": experimentsDetails.TargetContainer, "TOTAL_CHAOS_DURATION": strconv.Itoa(experimentsDetails.ChaosDuration), "CHAOS_NAMESPACE": experimentsDetails.ChaosNamespace,
-		"CHAOS_ENGINE": experimentsDetails.EngineName, "CHAOS_UID": string(experimentsDetails.ChaosUID), "CHAOS_INTERVAL": strconv.Itoa(experimentsDetails.ChaosInterval), "ITERATIONS": strconv.Itoa(experimentsDetails.Iterations), "RETRY": "90", "DELAY": "2"}
+	ENVList := map[string]string{
+		"APP_NS":               experimentsDetails.AppNS,
+		"APP_POD":              podName,
+		"APP_CONTAINER":        experimentsDetails.TargetContainer,
+		"TOTAL_CHAOS_DURATION": strconv.Itoa(experimentsDetails.ChaosDuration),
+		"CHAOS_NAMESPACE":      experimentsDetails.ChaosNamespace,
+		"CHAOS_ENGINE":         experimentsDetails.EngineName,
+		"CHAOS_UID":            string(experimentsDetails.ChaosUID),
+		"CHAOS_INTERVAL":       strconv.Itoa(experimentsDetails.ChaosInterval),
+		"ITERATIONS":           strconv.Itoa(experimentsDetails.Iterations),
+	}
 	for key, value := range ENVList {
 		var perEnv apiv1.EnvVar
 		perEnv.Name = key

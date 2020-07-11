@@ -24,3 +24,5 @@ go build -o build/_output/node-memory-hog ./experiments/generic/node-memory-hog
 go build -o build/_output/node-cpu-hog ./experiments/generic/node-cpu-hog
 # Buiding go binaries for container_kill experiment
 go build -o build/_output/container-kill ./experiments/generic/container-kill
+# Buiding go binaries for disk_fill experiment
+go build -o build/_output/disk-fill ./experiments/generic/disk-fill

@@ -190,9 +190,18 @@ func DeleteHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 func GetPodEnv(experimentsDetails *experimentTypes.ExperimentDetails) []apiv1.EnvVar {
 
 	var envVar []apiv1.EnvVar
-	ENVList := map[string]string{"FORCE": strconv.FormatBool(experimentsDetails.Force), "APP_NS": experimentsDetails.AppNS, "KILL_COUNT": strconv.Itoa(experimentsDetails.KillCount),
-		"TOTAL_CHAOS_DURATION": strconv.Itoa(experimentsDetails.ChaosDuration), "CHAOS_NAMESPACE": experimentsDetails.ChaosNamespace, "APP_LABEL": experimentsDetails.AppLabel,
-		"CHAOS_ENGINE": experimentsDetails.EngineName, "CHAOS_UID": string(experimentsDetails.ChaosUID), "CHAOS_INTERVAL": strconv.Itoa(experimentsDetails.ChaosInterval), "ITERATIONS": strconv.Itoa(experimentsDetails.Iterations)}
+	ENVList := map[string]string{
+		"FORCE":                strconv.FormatBool(experimentsDetails.Force),
+		"APP_NS":               experimentsDetails.AppNS,
+		"KILL_COUNT":           strconv.Itoa(experimentsDetails.KillCount),
+		"TOTAL_CHAOS_DURATION": strconv.Itoa(experimentsDetails.ChaosDuration),
+		"CHAOS_NAMESPACE":      experimentsDetails.ChaosNamespace,
+		"APP_LABEL":            experimentsDetails.AppLabel,
+		"CHAOS_ENGINE":         experimentsDetails.EngineName,
+		"CHAOS_UID":            string(experimentsDetails.ChaosUID),
+		"CHAOS_INTERVAL":       strconv.Itoa(experimentsDetails.ChaosInterval),
+		"ITERATIONS":           strconv.Itoa(experimentsDetails.Iterations),
+	}
 	for key, value := range ENVList {
 		var perEnv apiv1.EnvVar
 		perEnv.Name = key
