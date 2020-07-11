@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/litmuschaos/litmus-go/chaoslib/litmus/pod_delete"
+	powerfulseal "github.com/litmuschaos/litmus-go/chaoslib/powerfulseal/pod_delete"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/pod-delete/environment"
@@ -80,23 +81,20 @@ func main() {
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
-	// Including the litmus lib for pod-delete
-	if experimentsDetails.ChaosLib == "litmus" {
-		err = pod_delete.PreparePodDelete(&experimentsDetails, clients, &resultDetails, &eventsDetails)
-		if err != nil {
-			log.Errorf("Chaos injection failed due to %v\n", err)
-			resultDetails.FailStep = "Including the litmus lib for pod-delete"
-			result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
-			return
-		}
-		log.Info("[Confirmation]: The application pod has been deleted successfully")
-		resultDetails.Verdict = "Pass"
+	// Including the chaos lib for pod-delete
+	if experimentsDetails.ChaosLib == "powerfulseal" {
+		err = powerfulseal.PreparePodDelete(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
 	} else {
-		log.Error("[Invalid]: Please Provide the correct LIB")
-		resultDetails.FailStep = "Including the litmus lib for pod-delete"
+		err = pod_delete.PreparePodDelete(&experimentsDetails, clients, &resultDetails, &eventsDetails)
+	}
+	if err != nil {
+		log.Errorf("Chaos injection failed due to %v\n", err)
+		resultDetails.FailStep = "while executing pod-delete chaos"
 		result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 		return
 	}
+	log.Info("[Confirmation]: The application pod has been deleted successfully")
+	resultDetails.Verdict = "Pass"
 
 	//POST-CHAOS APPLICATION STATUS CHECK
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (post-chaos)")
