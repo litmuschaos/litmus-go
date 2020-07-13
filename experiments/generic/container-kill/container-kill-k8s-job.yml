@@ -44,7 +44,7 @@ spec:
           # For pumba image use : gaiaadm/pumba:0.6.5
           # For containerd image use : litmuschaos/container-killer:latest
           - name: LIB_IMAGE  
-            value: 'gaiaadm/pumba:0.6.5'
+            value: 'litmuschaos/container-killer:latest'
 
           - name: CHAOS_NAMESPACE
             value: ''
@@ -55,7 +55,7 @@ spec:
 
           # provide lib - It supports pumba and containerd
           - name: LIB 
-            value: 'pumba'
+            value: 'containerd'
 
           # provide the container runtime path for containerd
           # applicable only for containerd runtime
