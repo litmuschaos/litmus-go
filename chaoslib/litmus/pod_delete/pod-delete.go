@@ -42,14 +42,14 @@ func PreparePodDelete(experimentsDetails *experimentTypes.ExperimentDetails, cli
 	// Creating a helper pod
 	err = CreateHelperPod(experimentsDetails, clients, runID)
 	if err != nil {
-		errors.Errorf("Unable to create the helper pod, err: %v", err)
+		return errors.Errorf("Unable to create the helper pod, err: %v", err)
 	}
 
 	//Checking the status of helper pod
 	log.Info("[Status]: Checking the status of the helper pod")
 	err = status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, "name=pod-delete"+runID, clients)
 	if err != nil {
-		errors.Errorf("helper pod is not in running state, err: %v", err)
+		return errors.Errorf("helper pod is not in running state, err: %v", err)
 	}
 
 	// Recording the chaos start timestamp
@@ -69,14 +69,14 @@ func PreparePodDelete(experimentsDetails *experimentTypes.ExperimentDetails, cli
 	chaosDiffTimeStamp := ChaosCurrentTimeStamp - ChaosStartTimeStamp
 
 	if int(chaosDiffTimeStamp) < experimentsDetails.ChaosDuration {
-		errors.Errorf("The helper pod failed, check the logs of helper pod for more details")
+		return errors.Errorf("The helper pod failed, check the logs of helper pod for more details")
 	}
 
 	//Deleting the helper pod
 	log.Info("[Cleanup]: Deleting the helper pod")
 	err = DeleteHelperPod(experimentsDetails, clients, runID)
 	if err != nil {
-		errors.Errorf("Unable to delete the helper pod, err: %v", err)
+		return errors.Errorf("Unable to delete the helper pod, err: %v", err)
 	}
 
 	//Waiting for the ramp time after chaos injection
@@ -190,9 +190,18 @@ func DeleteHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 func GetPodEnv(experimentsDetails *experimentTypes.ExperimentDetails) []apiv1.EnvVar {
 
 	var envVar []apiv1.EnvVar
-	ENVList := map[string]string{"FORCE": strconv.FormatBool(experimentsDetails.Force), "APP_NS": experimentsDetails.AppNS, "KILL_COUNT": strconv.Itoa(experimentsDetails.KillCount),
-		"TOTAL_CHAOS_DURATION": strconv.Itoa(experimentsDetails.ChaosDuration), "CHAOS_NAMESPACE": experimentsDetails.ChaosNamespace, "APP_LABEL": experimentsDetails.AppLabel,
-		"CHAOS_ENGINE": experimentsDetails.EngineName, "CHAOS_UID": string(experimentsDetails.ChaosUID), "CHAOS_INTERVAL": strconv.Itoa(experimentsDetails.ChaosInterval), "ITERATIONS": strconv.Itoa(experimentsDetails.Iterations)}
+	ENVList := map[string]string{
+		"FORCE":                strconv.FormatBool(experimentsDetails.Force),
+		"APP_NS":               experimentsDetails.AppNS,
+		"KILL_COUNT":           strconv.Itoa(experimentsDetails.KillCount),
+		"TOTAL_CHAOS_DURATION": strconv.Itoa(experimentsDetails.ChaosDuration),
+		"CHAOS_NAMESPACE":      experimentsDetails.ChaosNamespace,
+		"APP_LABEL":            experimentsDetails.AppLabel,
+		"CHAOS_ENGINE":         experimentsDetails.EngineName,
+		"CHAOS_UID":            string(experimentsDetails.ChaosUID),
+		"CHAOS_INTERVAL":       strconv.Itoa(experimentsDetails.ChaosInterval),
+		"ITERATIONS":           strconv.Itoa(experimentsDetails.Iterations),
+	}
 	for key, value := range ENVList {
 		var perEnv apiv1.EnvVar
 		perEnv.Name = key

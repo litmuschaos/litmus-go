@@ -1,0 +1,66 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  generateName: container-kill-
+spec:
+  template:
+    metadata:
+      labels:
+        experiment: container-kill
+    spec:
+      # Placeholder that is updated by the executor for automated runs
+      # Provide appropriate SA (with desired permissions) if executed manually
+      serviceAccountName: %CHAOS_SERVICE_ACCOUNT%
+      restartPolicy: Never
+      containers:
+      - name: gotest
+        image: litmuschaos/go-runner:ci
+        imagePullPolicy: Always
+        env:
+          # provide application namespace
+          - name: APP_NAMESPACE
+            value: ''
+
+          # provide application labels
+          - name: APP_LABEL
+            value: ''
+
+           # provide target container name
+          - name: TARGET_CONTAINER
+            value: ''
+
+            # provide application kind
+          - name: APP_KIND
+            value: ''
+
+          - name: TOTAL_CHAOS_DURATION
+            value: '20'
+
+          - name: CHAOS_INTERVAL
+            value: '10'
+
+          # LIB_IMAGE can be - gaiaadm/pumba:0.6.5, litmuschaos/container-killer:latest
+          # For pumba image use : gaiaadm/pumba:0.6.5
+          # For containerd image use : litmuschaos/container-killer:latest
+          - name: LIB_IMAGE  
+            value: 'litmuschaos/container-killer:latest'
+
+          - name: CHAOS_NAMESPACE
+            value: ''
+
+            ## Period to wait before/after injection of chaos  
+          - name: RAMP_TIME
+            value: ''
+
+          # provide lib - It supports pumba and containerd
+          - name: LIB 
+            value: 'containerd'
+
+          # provide the container runtime path for containerd
+          # applicable only for containerd runtime
+          - name: CONTAINER_PATH
+            value: '/run/containerd/containerd.sock'
+
+        command: ["/bin/bash"]
+        args: ["-c", "./experiments/container-kill"]
