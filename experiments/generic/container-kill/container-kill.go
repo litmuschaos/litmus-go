@@ -52,7 +52,8 @@ func main() {
 	err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT")
 	if err != nil {
 		log.Errorf("Unable to Create the Chaos Result due to %v", err)
-		resultDetails.FailStep = "Updating the chaos result of container-kill experiment (SOT)"
+		failStep := "Updating the chaos result of container-kill experiment (SOT)"
+		types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
 		err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 		return
 	}
@@ -72,7 +73,8 @@ func main() {
 	err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, clients)
 	if err != nil {
 		log.Errorf("Application status check failed due to %v\n", err)
-		resultDetails.FailStep = "Verify that the AUT (Application Under Test) is running (pre-chaos)"
+		failStep := "Verify that the AUT (Application Under Test) is running (pre-chaos)"
+		types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
 		result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 		return
 	}
@@ -86,7 +88,8 @@ func main() {
 		err = litmusLIB.PrepareContainerKill(&experimentsDetails, clients, &resultDetails, &eventsDetails)
 		if err != nil {
 			log.Errorf("Chaos injection failed due to %v\n", err)
-			resultDetails.FailStep = "Executing litmus lib for the container-kill"
+			failStep := "Executing litmus lib for the container-kill"
+			types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
 			result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 			return
 		}
@@ -94,7 +97,8 @@ func main() {
 		err = pumbaLIB.PrepareContainerKill(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
 		if err != nil {
 			log.Errorf("Chaos injection failed due to %v\n", err)
-			resultDetails.FailStep = "Executing pumba lib for the container-kill"
+			failStep := "Executing pumba lib for the container-kill"
+			types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
 			result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 			return
 		}
@@ -108,7 +112,8 @@ func main() {
 	err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, clients)
 	if err != nil {
 		log.Errorf("Application status check failed due to %v\n", err)
-		resultDetails.FailStep = "Verify that the AUT (Application Under Test) is running (post-chaos)"
+		failStep := "Verify that the AUT (Application Under Test) is running (post-chaos)"
+		types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
 		result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 		return
 	}

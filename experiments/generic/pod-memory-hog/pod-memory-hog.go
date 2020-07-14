@@ -52,7 +52,8 @@ func main() {
 	err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT")
 	if err != nil {
 		log.Errorf("Unable to Create the Chaos Result due to %v", err)
-		resultDetails.FailStep = "Updating the chaos result of pod-memory-hog experiment (SOT)"
+		failStep := "Updating the chaos result of pod-memory-hog experiment (SOT)"
+		types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
 		err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 		return
 	}
@@ -74,7 +75,8 @@ func main() {
 	err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, clients)
 	if err != nil {
 		log.Errorf("Application status check failed due to %v\n", err)
-		resultDetails.FailStep = "Verify that the AUT (Application Under Test) is running (pre-chaos)"
+		failStep := "Verify that the AUT (Application Under Test) is running (pre-chaos)"
+		types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
 		result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 		return
 	}
@@ -89,8 +91,8 @@ func main() {
 		err = pod_memory_hog.PrepareMemoryStress(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
 		if err != nil {
 			log.Errorf("[Error]: pod memory hog failed due to %v\n", err)
-			resultDetails.FailStep = "pod memory hog chaos injection failed"
-			resultDetails.Verdict = "Fail"
+			failStep := "pod memory hog chaos injection failed"
+			types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
 			result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 			return
 		}
@@ -98,7 +100,8 @@ func main() {
 		resultDetails.Verdict = "Pass"
 	} else {
 		log.Error("[Invalid]: Please Provide the correct LIB")
-		resultDetails.FailStep = "Including the litmus lib for pod-memory-hog"
+		failStep := "Including the litmus lib for pod-memory-hog"
+		types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
 		result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 		return
 	}
@@ -108,7 +111,8 @@ func main() {
 	err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, clients)
 	if err != nil {
 		klog.V(0).Infof("Application status check failed due to %v\n", err)
-		resultDetails.FailStep = "Verify that the AUT (Application Under Test) is running (post-chaos)"
+		failStep := "Verify that the AUT (Application Under Test) is running (post-chaos)"
+		types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
 		result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 		return
 	}
