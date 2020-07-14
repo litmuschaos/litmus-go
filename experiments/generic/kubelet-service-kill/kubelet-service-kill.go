@@ -51,7 +51,8 @@ func main() {
 	err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT")
 	if err != nil {
 		log.Errorf("Unable to Create the Chaos Result due to %v", err)
-		resultDetails.FailStep = "Updating the chaos result of kubelet-service-kill experiment (SOT)"
+		failStep := "Updating the chaos result of kubelet-service-kill experiment (SOT)"
+		types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
 		err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 		return
 	}
@@ -71,7 +72,8 @@ func main() {
 	err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, clients)
 	if err != nil {
 		log.Errorf("Application status check failed due to %v\n", err)
-		resultDetails.FailStep = "Verify that the AUT (Application Under Test) is running (pre-chaos)"
+		failStep := "Verify that the AUT (Application Under Test) is running (pre-chaos)"
+		types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
 		result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 		return
 	}
@@ -82,7 +84,8 @@ func main() {
 		err = status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, clients)
 		if err != nil {
 			log.Errorf("Auxiliary Application status check failed due to %v", err)
-			resultDetails.FailStep = "Verify that the Auxiliary Applications are running (pre-chaos)"
+			failStep := "Verify that the Auxiliary Applications are running (pre-chaos)"
+			types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
 			result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 			return
 		}
@@ -98,7 +101,8 @@ func main() {
 		err = kubelet_service_kill.PrepareKubeletKill(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
 		if err != nil {
 			log.Errorf("Chaos injection failed due to %v\n", err)
-			resultDetails.FailStep = "Including the litmus lib for kubelet-service-kill"
+			failStep := "Including the litmus lib for kubelet-service-kill"
+			types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
 			result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 			return
 		}
@@ -106,7 +110,8 @@ func main() {
 		resultDetails.Verdict = "Pass"
 	} else {
 		log.Error("[Invalid]: Please Provide the correct LIB")
-		resultDetails.FailStep = "Including the litmus lib for kubelet-service-kill"
+		failStep := "Including the litmus lib for kubelet-service-kill"
+		types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
 		result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 		return
 	}
@@ -116,7 +121,8 @@ func main() {
 	err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, clients)
 	if err != nil {
 		log.Errorf("Application status check failed due to %v\n", err)
-		resultDetails.FailStep = "Verify that the AUT (Application Under Test) is running (post-chaos)"
+		failStep := "Verify that the AUT (Application Under Test) is running (post-chaos)"
+		types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
 		result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 		return
 	}
@@ -127,7 +133,8 @@ func main() {
 		err = status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, clients)
 		if err != nil {
 			log.Errorf("Auxiliary Application status check failed due to %v", err)
-			resultDetails.FailStep = "Verify that the Auxiliary Applications are running (post-chaos)"
+			failStep := "Verify that the Auxiliary Applications are running (post-chaos)"
+			types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
 			result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 			return
 		}
