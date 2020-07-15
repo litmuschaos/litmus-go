@@ -25,6 +25,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string
 	experimentDetails.InstanceID = Getenv("INSTANCE_ID", "")
 	experimentDetails.ChaosPodName = Getenv("POD_NAME", "")
 	experimentDetails.AuxiliaryAppInfo = Getenv("AUXILIARY_APPINFO", "")
+	experimentDetails.AppNode = Getenv("APP_NODE", "")
 }
 
 // Getenv fetch the env and set the default value, if any
