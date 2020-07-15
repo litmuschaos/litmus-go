@@ -52,7 +52,8 @@ func main() {
 	err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT")
 	if err != nil {
 		log.Errorf("Unable to Create the Chaos Result due to %v", err)
-		resultDetails.FailStep = "Updating the chaos result of pod-cpu-hog experiment (SOT)"
+		failStep := "Updating the chaos result of pod-cpu-hog experiment (SOT)"
+		types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
 		err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 		return
 	}
@@ -73,7 +74,8 @@ func main() {
 	err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, clients)
 	if err != nil {
 		log.Errorf("Application status check failed due to %v\n", err)
-		resultDetails.FailStep = "Verify that the AUT (Application Under Test) is running (pre-chaos)"
+		failStep := "Verify that the AUT (Application Under Test) is running (pre-chaos)"
+		types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
 		result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 		return
 	}
@@ -84,7 +86,8 @@ func main() {
 		err = status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, clients)
 		if err != nil {
 			log.Errorf("Auxiliary Application status check failed due to %v", err)
-			resultDetails.FailStep = "Verify that the Auxiliary Applications are running (pre-chaos)"
+			failStep := "Verify that the Auxiliary Applications are running (pre-chaos)"
+			types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
 			result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 			return
 		}
@@ -100,8 +103,8 @@ func main() {
 		err = node_cpu_hog.PrepareNodeCPUHog(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
 		if err != nil {
 			log.Errorf("[Error]: CPU hog failed due to %v\n", err)
-			resultDetails.FailStep = "CPU hog Chaos injection failed"
-			resultDetails.Verdict = "Fail"
+			failStep := "CPU hog Chaos injection failed"
+			types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
 			result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 			return
 		}
@@ -109,7 +112,8 @@ func main() {
 		resultDetails.Verdict = "Pass"
 	} else {
 		log.Error("[Invalid]: Please Provide the correct LIB")
-		resultDetails.FailStep = "Including the litmus lib for node-cpu-hog"
+		failStep := "Including the litmus lib for node-cpu-hog"
+		types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
 		result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 		return
 	}
@@ -119,7 +123,8 @@ func main() {
 	err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, clients)
 	if err != nil {
 		klog.V(0).Infof("Application status check failed due to %v\n", err)
-		resultDetails.FailStep = "Verify that the AUT (Application Under Test) is running (post-chaos)"
+		failStep := "Verify that the AUT (Application Under Test) is running (post-chaos)"
+		types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
 		result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 		return
 	}
@@ -130,7 +135,8 @@ func main() {
 		err = status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, clients)
 		if err != nil {
 			log.Errorf("Auxiliary Application status check failed due to %v", err)
-			resultDetails.FailStep = "Verify that the Auxiliary Applications are running (post-chaos)"
+			failStep := "Verify that the Auxiliary Applications are running (post-chaos)"
+			types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
 			result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 			return
 		}

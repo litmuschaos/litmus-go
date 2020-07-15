@@ -52,6 +52,13 @@ func SetResultAttributes(resultDetails *ResultDetails, EngineName string, Experi
 	}
 }
 
+//SetResultAfterCompletion set all the chaos result ENV in the EOT
+func SetResultAfterCompletion(resultDetails *ResultDetails, verdict, phase, failStep string) {
+	resultDetails.Verdict = verdict
+	resultDetails.Phase = phase
+	resultDetails.FailStep = failStep
+}
+
 //SetEngineEventAttributes initialise attributes for event generation in chaos engine
 func SetEngineEventAttributes(eventsDetails *EventDetails, Reason string, Message string, chaosDetails *ChaosDetails) {
 
