@@ -20,4 +20,5 @@ type ExperimentDetails struct {
 	ChaosPodName     string
 	AuxiliaryAppInfo string
 	RunID            string
+	AppNode          string
 }
