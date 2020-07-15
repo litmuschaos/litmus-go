@@ -30,6 +30,10 @@ spec:
           - name: APP_KIND
             value: ''
 
+          # provide node name
+          - name: APP_NODE
+            value: ''
+
           - name: TOTAL_CHAOS_DURATION
             value: '90'
 

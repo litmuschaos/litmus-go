@@ -21,15 +21,18 @@ import (
 // PrepareKubeletKill contains prepration steps before chaos injection
 func PrepareKubeletKill(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
-	//Select application pod and node for kubelet-service-kill
-	appName, appNodeName, err := GetApplicationPod(experimentsDetails, clients)
-	if err != nil {
-		return errors.Errorf("Unable to get the application name and application nodename due to, err: %v", err)
+	if experimentsDetails.AppNode == "" {
+		//Select node for kubelet-service-kill
+		_, appNodeName, err := GetApplicationPod(experimentsDetails, clients)
+		if err != nil {
+			return errors.Errorf("Unable to get the application nodename due to, err: %v", err)
+		}
+
+		experimentsDetails.AppNode = appNodeName
 	}
 
-	log.InfoWithValues("[Info]: Details of application under chaos injection", logrus.Fields{
-		"NodeName": appNodeName,
-		"PodName":  appName,
+	log.InfoWithValues("[Info]: Details of node under chaos injection", logrus.Fields{
+		"NodeName": experimentsDetails.AppNode,
 	})
 
 	experimentsDetails.RunID = GetRunID()
@@ -41,13 +44,13 @@ func PrepareKubeletKill(experimentsDetails *experimentTypes.ExperimentDetails, c
 	}
 
 	if experimentsDetails.EngineName != "" {
-		msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on " + appNodeName + " node"
+		msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on " + experimentsDetails.AppNode + " node"
 		types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, chaosDetails)
 		events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 	}
 
 	// Creating the helper pod to perform node memory hog
-	err = CreateHelperPod(experimentsDetails, clients, appNodeName)
+	err := CreateHelperPod(experimentsDetails, clients, experimentsDetails.AppNode)
 	if err != nil {
 		return errors.Errorf("Unable to create the helper pod, err: %v", err)
 	}
@@ -61,7 +64,7 @@ func PrepareKubeletKill(experimentsDetails *experimentTypes.ExperimentDetails, c
 
 	// Checking for the node to be in not-ready state
 	log.Info("[Status]: Check for the node to be in NotReady state")
-	err = status.CheckNodeNotReadyState(appNodeName, clients)
+	err = status.CheckNodeNotReadyState(experimentsDetails.AppNode, clients)
 	if err != nil {
 		return errors.Errorf("application node is not in NotReady state, err: %v", err)
 	}
@@ -76,7 +79,7 @@ func PrepareKubeletKill(experimentsDetails *experimentTypes.ExperimentDetails, c
 
 	// Checking the status of application node
 	log.Info("[Status]: Getting the status of application node")
-	err = status.CheckNodeStatus(appNodeName, clients)
+	err = status.CheckNodeStatus(experimentsDetails.AppNode, clients)
 	if err != nil {
 		return errors.Errorf("application node is not in ready state, err: %v", err)
 	}
