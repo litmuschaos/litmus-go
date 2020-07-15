@@ -101,7 +101,9 @@ func CheckContainerStatus(appNs string, appLabel string, clients clients.ClientS
 }
 
 // WaitForCompletion wait until the completion of pod
-func WaitForCompletion(appNs string, appLabel string, clients clients.ClientSets, duration int) error {
+func WaitForCompletion(appNs string, appLabel string, clients clients.ClientSets, duration int) (string, error) {
+	var podStatus string
+
 	err := retry.
 		Times(uint(duration)).
 		Wait(1 * time.Second).
@@ -112,17 +114,18 @@ func WaitForCompletion(appNs string, appLabel string, clients clients.ClientSets
 			}
 			err = nil
 			for _, pod := range podSpec.Items {
-				log.Infof("helper pod status: %v", string(pod.Status.Phase))
-				if string(pod.Status.Phase) != "Succeeded" && string(pod.Status.Phase) != "Failed" {
+				podStatus = string(pod.Status.Phase)
+				log.Infof("helper pod status: %v", podStatus)
+				if podStatus != "Succeeded" && podStatus != "Failed" {
 					return errors.Errorf("Helper pod is not yet completed yet")
 				}
 				log.InfoWithValues("The running status of Pods are as follows", logrus.Fields{
-					"Pod": pod.Name, "Status": pod.Status.Phase})
+					"Pod": pod.Name, "Status": podStatus})
 			}
 			return nil
 		})
 	if err != nil {
-		return err
+		return "", err
 	}
-	return nil
+	return podStatus, nil
 }

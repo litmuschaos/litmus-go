@@ -73,9 +73,9 @@ func PreparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetail
 	// Wait till the completion of helper pod
 	log.Infof("[Wait]: Waiting for %vs till the completion of the helper pod", strconv.Itoa(experimentsDetails.ChaosDuration))
 
-	err = status.WaitForCompletion(experimentsDetails.ChaosNamespace, "name=pumba-netem-"+experimentsDetails.RunID, clients, experimentsDetails.ChaosDuration+30)
-	if err != nil {
-		return err
+	podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, "name=pumba-netem-"+experimentsDetails.RunID, clients, experimentsDetails.ChaosDuration+30)
+	if err != nil || podStatus == "Failed" {
+		return errors.Errorf("helper pod failed due to, err: %v", err)
 	}
 
 	//Deleting the helper pod
