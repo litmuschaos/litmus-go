@@ -72,7 +72,7 @@ func PrepareKubeletKill(experimentsDetails *experimentTypes.ExperimentDetails, c
 	// Wait till the completion of helper pod
 	log.Infof("[Wait]: Waiting for %vs till the completion of the helper pod", strconv.Itoa(experimentsDetails.ChaosDuration+30))
 
-	podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, "name=kubelet-service-kill-"+experimentsDetails.RunID, clients, experimentsDetails.ChaosDuration+30)
+	podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, "name=kubelet-service-kill-"+experimentsDetails.RunID, clients, experimentsDetails.ChaosDuration+30, "kubelet-service-kill")
 	if err != nil || podStatus == "Failed" {
 		return errors.Errorf("helper pod failed due to, err: %v", err)
 	}

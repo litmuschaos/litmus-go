@@ -85,7 +85,7 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 	// Wait till the completion of the helper pod
 	// set an upper limit for the waiting time
 	log.Info("[Wait]: waiting till the completion of the helper pod")
-	podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, "name=container-kill-"+experimentsDetails.RunID, clients, experimentsDetails.ChaosDuration+experimentsDetails.ChaosInterval+60)
+	podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, "name=container-kill-"+experimentsDetails.RunID, clients, experimentsDetails.ChaosDuration+experimentsDetails.ChaosInterval+60, "container-kill")
 	if err != nil || podStatus == "Failed" {
 		return errors.Errorf("helper pod failed due to, err: %v", err)
 	}
