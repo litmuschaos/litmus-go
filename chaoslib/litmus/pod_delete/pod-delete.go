@@ -54,7 +54,7 @@ func PreparePodDelete(experimentsDetails *experimentTypes.ExperimentDetails, cli
 
 	// Wait till the completion of helper pod
 	log.Info("[Wait]: waiting till the completion of the helper pod")
-	podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, "name=pod-delete"+runID, clients, experimentsDetails.ChaosDuration+experimentsDetails.ChaosInterval+60)
+	podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, "name=pod-delete"+runID, clients, experimentsDetails.ChaosDuration+experimentsDetails.ChaosInterval+60, "pod-delete")
 	if err != nil || podStatus == "Failed" {
 		return errors.Errorf("helper pod failed due to, err: %v", err)
 	}

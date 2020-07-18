@@ -101,9 +101,10 @@ func CheckContainerStatus(appNs string, appLabel string, clients clients.ClientS
 }
 
 // WaitForCompletion wait until the completion of pod
-func WaitForCompletion(appNs string, appLabel string, clients clients.ClientSets, duration int) (string, error) {
+func WaitForCompletion(appNs string, appLabel string, clients clients.ClientSets, duration int, containerName string) (string, error) {
 	var podStatus string
-
+	// It will wait till the completion of target container
+	// it will retries until the target container completed or met the timeout(chaos duration)
 	err := retry.
 		Times(uint(duration)).
 		Wait(1 * time.Second).
@@ -113,11 +114,20 @@ func WaitForCompletion(appNs string, appLabel string, clients clients.ClientSets
 				return errors.Errorf("Unable to get the pod, err: %v", err)
 			}
 			err = nil
+			// it will check for the status of helper pod, if it is Succeeded and target container is completed then it will marked it as completed and return
+			// if it is still running then it will check for the target container, as we can have multiple container inside helper pod (istio)
+			// if the target container is in completed state(ready flag is false), then we will marked the helper pod as completed
+			// we will retry till it met the timeout(chaos duration)
 			for _, pod := range podSpec.Items {
 				podStatus = string(pod.Status.Phase)
 				log.Infof("helper pod status: %v", podStatus)
 				if podStatus != "Succeeded" && podStatus != "Failed" {
-					return errors.Errorf("Helper pod is not yet completed yet")
+					for _, container := range pod.Status.ContainerStatuses {
+
+						if container.Name == containerName && container.Ready {
+							return errors.Errorf("Container is not completed yet")
+						}
+					}
 				}
 				log.InfoWithValues("The running status of Pods are as follows", logrus.Fields{
 					"Pod": pod.Name, "Status": podStatus})
