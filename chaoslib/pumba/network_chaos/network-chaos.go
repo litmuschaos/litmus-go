@@ -171,7 +171,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 					Args: []string{
 						"netem",
 						"--tc-image",
-						"gaiadocker/iproute2",
+						experimentsDetails.TCImage,
 						"--interface",
 						experimentsDetails.NetworkInterface,
 						"--duration",
