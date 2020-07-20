@@ -10,7 +10,7 @@ spec:
   definition:
     scope: {{ .Scope }}
     permissions: 
-      {{ range .Permissions }}
+      {{- range .Permissions }}
       - apiGroups:
         {{- range .APIGroups }} 
           - "{{ . }}"

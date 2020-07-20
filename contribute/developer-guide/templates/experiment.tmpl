@@ -91,7 +91,7 @@ func main() {
 		result.ChaosResult(&chaosDetails, clients,&resultDetails,"EOT"); return
 	}
 	}
-{{ end }}
+{{- end }}
 
 	if experimentsDetails.EngineName != "" {
 		types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, "AUT is Running successfully", &chaosDetails)
@@ -137,7 +137,7 @@ func main() {
 		result.ChaosResult(&chaosDetails, clients,&resultDetails,"EOT"); return
 	}
 	}
-{{ end }}
+{{- end }}
 
 	if experimentsDetails.EngineName != "" {
 		types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, "AUT is Running successfully", &chaosDetails)

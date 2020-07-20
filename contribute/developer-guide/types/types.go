@@ -26,7 +26,7 @@ type Experiment struct {
 	Scope string `json:"scope"`
 	// This check define whether you want auxiliary status check or not
 	// while generating new chaos experiment
-	AuxiliaryAppCheck bool `json:"auxiliaryAppCheck"`
+	AuxiliaryAppCheck bool `json:"auxiliaryappcheck,omitempty"`
 	// Permissions contains the list of all permission needed inside cluster-role to execute the experiment
 	// it contains list of all apigroups, resources and verbs
 	Permissions []Permission `json:"permissions"`

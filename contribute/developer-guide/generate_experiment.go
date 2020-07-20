@@ -16,7 +16,8 @@ import (
 
 func main() {
 
-	attributeFile := flag.String("attribute", "", "metadata to generate chartserviceversion yaml")
+	attributeFile := flag.String("attributes", "", "metadata to generate chartserviceversion yaml")
+	generationType := flag.String("generateType", "experiment", "scaffold a new chart or experiment into existing chart")
 	flag.Parse()
 
 	// Fetch all the required attributes from the given file
@@ -38,65 +39,70 @@ func main() {
 	chartDIR := litmusRootDir + "/experiments/" + experimentDetails.Category
 	CreateDirectoryIfNotPresent(chartDIR)
 
-	// creating the directory for the experiment, if not present
-	experimentDIR := chartDIR + "/" + experimentDetails.Name
-	CreateDirectoryIfNotPresent(experimentDIR)
+	if *generationType == "chart" {
+		csvFilePath := chartDIR + "/" + experimentDetails.Category + ".chartserviceversion.yaml"
+		GenerateFile(experimentDetails, csvFilePath, "./templates/chartserviceversion.tmpl")
+		packageFilePath := chartDIR + "/" + experimentDetails.Category + ".package.yaml"
+		GenerateFile(experimentDetails, packageFilePath, "./templates/package.tmpl")
+	} else if *generationType == "experiment" {
 
-	// creating the directory for the chaoslib, if not present
-	chaoslibDIR := litmusRootDir + "/chaoslib/litmus/" + experimentDetails.Name
-	CreateDirectoryIfNotPresent(chaoslibDIR)
+		// creating the directory for the experiment, if not present
+		experimentDIR := chartDIR + "/" + experimentDetails.Name
+		CreateDirectoryIfNotPresent(experimentDIR)
 
-	// creating the directory for the environment variables file, if not present
-	experimentPKGDirectory := litmusRootDir + "/pkg/" + experimentDetails.Category
-	CreateDirectoryIfNotPresent(experimentPKGDirectory)
-	experimentPKGSubDirectory := experimentPKGDirectory + "/" + experimentDetails.Name
-	CreateDirectoryIfNotPresent(experimentPKGSubDirectory)
-	environmentDIR := experimentPKGSubDirectory + "/environment"
-	CreateDirectoryIfNotPresent(environmentDIR)
+		// creating the directory for the chaoslib, if not present
+		chaoslibDIR := litmusRootDir + "/chaoslib/litmus/" + experimentDetails.Name
+		CreateDirectoryIfNotPresent(chaoslibDIR)
 
-	// creating the directory for the types.go file, if not present
-	typesDIR := experimentPKGSubDirectory + "/environment"
-	CreateDirectoryIfNotPresent(typesDIR)
+		// creating the directory for the environment variables file, if not present
+		experimentPKGDirectory := litmusRootDir + "/pkg/" + experimentDetails.Category
+		CreateDirectoryIfNotPresent(experimentPKGDirectory)
+		experimentPKGSubDirectory := experimentPKGDirectory + "/" + experimentDetails.Name
+		CreateDirectoryIfNotPresent(experimentPKGSubDirectory)
+		environmentDIR := experimentPKGSubDirectory + "/environment"
+		CreateDirectoryIfNotPresent(environmentDIR)
 
-	// generating the experiement.go file
-	experimentFilePath := experimentDIR + "/" + experimentDetails.Name + ".go"
-	GenerateFile(experimentDetails, experimentFilePath, "./templates/experiment.tmpl")
+		// creating the directory for the types.go file, if not present
+		typesDIR := experimentPKGSubDirectory + "/environment"
+		CreateDirectoryIfNotPresent(typesDIR)
 
-	// generating the csv file
-	csvFilePath := experimentDIR + "/" + experimentDetails.Name + ".chartserviceversion.yaml"
-	GenerateFile(experimentDetails, csvFilePath, "./templates/chartserviceversion.tmpl")
+		// generating the experiement.go file
+		experimentFilePath := experimentDIR + "/" + experimentDetails.Name + ".go"
+		GenerateFile(experimentDetails, experimentFilePath, "./templates/experiment.tmpl")
 
-	// generating the chart file
-	chartFilePath := experimentDIR + "/" + "experiment.yaml"
-	GenerateFile(experimentDetails, chartFilePath, "./templates/experiment_custom_resource.tmpl")
+		// generating the csv file
+		csvFilePath := experimentDIR + "/" + experimentDetails.Name + ".chartserviceversion.yaml"
+		GenerateFile(experimentDetails, csvFilePath, "./templates/chartserviceversion.tmpl")
 
-	// generating the rbac file
-	rbacFilePath := experimentDIR + "/" + "rbac.yaml"
-	GenerateFile(experimentDetails, rbacFilePath, "./templates/experiment_rbac.tmpl")
+		// generating the chart file
+		chartFilePath := experimentDIR + "/" + "experiment.yaml"
+		GenerateFile(experimentDetails, chartFilePath, "./templates/experiment_custom_resource.tmpl")
 
-	// generating the engine file
-	engineFilePath := experimentDIR + "/" + "engine.yaml"
-	GenerateFile(experimentDetails, engineFilePath, "./templates/experiment_engine.tmpl")
+		// generating the rbac file
+		rbacFilePath := experimentDIR + "/" + "rbac.yaml"
+		GenerateFile(experimentDetails, rbacFilePath, "./templates/experiment_rbac.tmpl")
 
-	// generating the job file
-	jobFilePath := experimentDIR + "/" + experimentDetails.Name + "-k8s-job.yml"
-	GenerateFile(experimentDetails, jobFilePath, "./templates/experiment_k8s_job.tmpl")
+		// generating the engine file
+		engineFilePath := experimentDIR + "/" + "engine.yaml"
+		GenerateFile(experimentDetails, engineFilePath, "./templates/experiment_engine.tmpl")
 
-	// generating the chaoslib file
-	chaoslibFilePath := chaoslibDIR + "/" + experimentDetails.Name + ".go"
-	GenerateFile(experimentDetails, chaoslibFilePath, "./templates/chaoslib.tmpl")
+		// generating the job file
+		jobFilePath := experimentDIR + "/" + experimentDetails.Name + "-k8s-job.yml"
+		GenerateFile(experimentDetails, jobFilePath, "./templates/experiment_k8s_job.tmpl")
 
-	// generating the environment var file
-	environmentFilePath := environmentDIR + "/" + "environment.go"
-	GenerateFile(experimentDetails, environmentFilePath, "./templates/environment.tmpl")
+		// generating the chaoslib file
+		chaoslibFilePath := chaoslibDIR + "/" + experimentDetails.Name + ".go"
+		GenerateFile(experimentDetails, chaoslibFilePath, "./templates/chaoslib.tmpl")
 
-	// generating the types.go file
-	typesFilePath := typesDIR + "/" + "types.go"
-	GenerateFile(experimentDetails, typesFilePath, "./templates/types.tmpl")
+		// generating the environment var file
+		environmentFilePath := environmentDIR + "/" + "environment.go"
+		GenerateFile(experimentDetails, environmentFilePath, "./templates/environment.tmpl")
 
-	// generating the pacakge file
-	packageFilePath := chartDIR + "/" + experimentDetails.Category + ".package.yaml"
-	GenerateFile(experimentDetails, packageFilePath, "./templates/package.tmpl")
+		// generating the types.go file
+		typesFilePath := typesDIR + "/" + "types.go"
+		GenerateFile(experimentDetails, typesFilePath, "./templates/types.tmpl")
+
+	}
 
 }
 

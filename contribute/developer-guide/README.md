@@ -18,14 +18,13 @@ The artefacts associated with a chaos-experiment are summarized below:
 
   Example: [pod delete experiment in chaos-charts](https://github.com/litmuschaos/chaos-charts/tree/master/charts/generic/pod-delete)
 
-The *generate_charts.py* script is a simple way to bootstrap your experiment, and helps create the aforementioned artefacts in the 
+The *generate_experiment.go* script is a simple way to bootstrap your experiment, and helps create the aforementioned artefacts in the 
 appropriate directory (i.e., as per the chaos-category) based on an attributes file provided as input by the chart-developer. The 
 scaffolded files consist of placeholders which can then be filled as desired.  
 
 ### Pre-Requisites
 
-- *python3* is available (`sudo apt-get install python3.6`) 
-- *jinja2* & *pyYaml* python packages are available (`sudo apt-get install python3-pip`, `pip install jinja2`, `pip install pyYaml`) 
+- *go* should be is available.
 
 ### Steps to Generate Experiment Manifests
 
@@ -44,46 +43,47 @@ scaffolded files consist of placeholders which can then be filled as desired.
   $ cat attributes.yaml 
   
   ---
-  name: pod-delete
-  version: 0.1.0
-  category: sample-category
-  repository: https://github.com/litmuschaos/litmus-go/tree/master/experiments/sample-category/pod-delete
-  community: https://kubernetes.slack.com/messages/CNXNB0ZTN
-  description: "kills nginx pods in a random manner"
-  keywords:
-    - pods
-    - kubernetes
-    - sample-category
-    - nginx
-  scope: "Namespaced"
-  permissions:
-    - apiGroups:
-        - ""
-        - "batch"
-        - "litmuschaos.io"
-      resources:
-        - "jobs"
-        - "pods"
-        - "chaosengines"
-        - "chaosexperiments"
-        - "chaosresults"
-      verbs:
-        - "create"
-        - "list"
-        - "get"
-        - "update"
-        - "patch"
-        - "delete"
-  maturity: alpha
-  maintainers:
-    - ksatchit@mayadata.io
-  contributors:
-    - ksatchit@mayadata.io
-  provider:
-    name: Mayadata
-  min_kubernetes_version: 1.12.0
-  references:
-    - https://docs.litmuschaos.io/docs/getstarted/
+  name: "pod-delete"
+version: "0.1.0"
+category: "sample-category"
+repository: "https://github.com/litmuschaos/litmus-go/tree/master/sample-category/pod-delete"
+community: "https://kubernetes.slack.com/messages/CNXNB0ZTN"
+description: "kills nginx pods in a random manner"
+keywords:
+  - "pods"
+  - "kubernetes"
+  - "sample-category"
+  - "nginx"
+scope: "Namespaced"
+auxiliaryappcheck: false
+permissions:
+  - apigroups:
+      - ""
+      - "batch"
+      - "litmuschaos.io"
+    resources:
+      - "jobs"
+      - "pods"
+      - "chaosengines"
+      - "chaosexperiments"
+      - "chaosresults"
+    verbs:
+      - "create"
+      - "list"
+      - "get"
+      - "update"
+      - "patch"
+      - "delete"
+maturity: "alpha"
+maintainers:
+  - name: "ksatchit"
+    email: "ksatchit@mayadata.io"
+provider:
+  name: "Mayadata"
+minkubernetesversion: "1.12.0"
+references:
+  - name: Documentation
+    url: "https://docs.litmuschaos.io/docs/getstarted/"
 
   ```
 
@@ -91,10 +91,10 @@ scaffolded files consist of placeholders which can then be filled as desired.
   `pod-delete` experiment.
 
   ```
-  $ python3 generate_chart.py --attributes_file=attributes.yaml --generate_type=experiment
+  $ go run generate_experiment.go -attributes=attributes.yaml -generateType=experiment
   ```
 
-  **Note**: In the `--generate_type` attribute, select the appropriate type of manifests to be generated, where, 
+  **Note**: In the `-generateType` attribute, select the appropriate type of manifests to be generated, where, 
   - `chart`: Just the chaos-chart metadata, i.e., chartserviceversion yaml 
   - `experiment`: Chaos experiment artefacts belonging to a an existing OR new chart. 
 
