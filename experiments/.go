@@ -4,8 +4,8 @@ import (
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	"github.com/litmuschaos/litmus-go/pkg/log"
-	experimentEnv "github.com/litmuschaos/litmus-go/pkg/{{ .Category }}/{{ .Name }}/environment"
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/{{ .Category }}/{{ .Name }}/types"
+	experimentEnv "github.com/litmuschaos/litmus-go/pkg///environment"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg///types"
 	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
@@ -37,7 +37,7 @@ func main() {
 
 	//Fetching all the ENV passed from the runner pod
 	log.Infof("[PreReq]: Getting the ENV for the %v experiment", experimentsDetails.ExperimentName)
-	experimentEnv.GetENV(&experimentsDetails, "{{ .Name }}")
+	experimentEnv.GetENV(&experimentsDetails, "")
 
 	// Intialise Chaos Result Parameters
 	types.SetResultAttributes(&resultDetails, experimentsDetails.EngineName, experimentsDetails.ExperimentName)
@@ -79,19 +79,7 @@ func main() {
 		result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 		return
 	}
-{{ if eq .AuxiliaryAppCheck true }}
-	//PRE-CHAOS AUXILIARY APPLICATION STATUS CHECK
-	if experimentsDetails.AuxiliaryAppInfo != "" {
-	log.Info("[Status]: Verify that the Auxiliary Applications are running (pre-chaos)")
-	err = status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, clients)
-	if err != nil {
-		log.Errorf("Auxiliary Application status check failed due to %v", err)
-		failStep := "Verify that the Auxiliary Applications are running (pre-chaos)"
-		types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
-		result.ChaosResult(&chaosDetails, clients,&resultDetails,"EOT"); return
-	}
-	}
-{{ end }}
+
 
 	if experimentsDetails.EngineName != "" {
 		types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, "AUT is Running successfully", &chaosDetails)
@@ -104,7 +92,7 @@ func main() {
    
 	// Including the litmus lib for pod-delete
 	if experimentsDetails.ChaosLib == "litmus" {
-		err = {{ .Name }}.{{ .Name }}()
+		err = .()
 		if err != nil {
 			log.Errorf("Chaos injection failed due to %v\n", err)
 			result.ChaosResult(&chaosDetails, clients,&resultDetails,"EOT"); return
@@ -125,19 +113,7 @@ func main() {
 		result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 		return
 	}
-{{ if eq .AuxiliaryAppCheck true }}
-	//POST-CHAOS AUXILIARY APPLICATION STATUS CHECK
-	if experimentsDetails.AuxiliaryAppInfo != "" {
-	log.Info("[Status]: Verify that the Auxiliary Applications are running (post-chaos)")
-	err = status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, clients)
-	if err != nil {
-		log.Errorf("Auxiliary Application status check failed due to %v", err)
-		failStep := "Verify that the Auxiliary Applications are running (post-chaos)"
-		types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
-		result.ChaosResult(&chaosDetails, clients,&resultDetails,"EOT"); return
-	}
-	}
-{{ end }}
+
 
 	if experimentsDetails.EngineName != "" {
 		types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, "AUT is Running successfully", &chaosDetails)

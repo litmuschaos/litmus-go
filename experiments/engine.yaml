@@ -14,12 +14,12 @@ spec:
   engineState: 'active'
   #ex. values: ns1:name=percona,ns2:run=nginx
   auxiliaryAppInfo: ''
-  chaosServiceAccount: {{ .Name }}-sa
+  chaosServiceAccount: -sa
   monitoring: false
   # It can be delete/retain
   jobCleanUpPolicy: 'delete'
   experiments:
-    - name: {{ .Name }}
+    - name: 
       spec:
         components:
           env:

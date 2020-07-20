@@ -6,7 +6,7 @@ import (
 
 	clientTypes "k8s.io/apimachinery/pkg/types"
 
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/{{ .Category }}/{{ .Name }}/types"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg///types"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 )
 
