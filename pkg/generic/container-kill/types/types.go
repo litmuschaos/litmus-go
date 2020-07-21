@@ -25,4 +25,5 @@ type ExperimentDetails struct {
 	Iterations          int
 	ChaosServiceAccount string
 	RunID               string
+	ApplicationPod      string
 }

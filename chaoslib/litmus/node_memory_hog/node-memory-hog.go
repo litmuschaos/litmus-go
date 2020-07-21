@@ -139,6 +139,9 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 					Name:            "node-memory-hog",
 					Image:           experimentsDetails.LIBImage,
 					ImagePullPolicy: apiv1.PullAlways,
+					Command: []string{
+						"/stress-ng",
+					},
 					Args: []string{
 						"--vm",
 						"1",
