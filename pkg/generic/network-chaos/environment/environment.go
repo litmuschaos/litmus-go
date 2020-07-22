@@ -31,6 +31,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string
 	experimentDetails.NetworkPacketCorruptionPercentage, _ = strconv.Atoi(Getenv("NETWORK_PACKET_CORRUPTION_PERCENTAGE", "100"))
 	experimentDetails.NetworkInterface = Getenv("NETWORK_INTERFACE", "eth0")
 	experimentDetails.TargetContainer = Getenv("TARGET_CONTAINER", "")
+	experimentDetails.TCImage = Getenv("TC_IMAGE", "gaiadocker/iproute2")
 }
 
 // Getenv fetch the env and set the default value, if any

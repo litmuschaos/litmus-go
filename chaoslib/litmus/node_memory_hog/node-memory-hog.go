@@ -62,7 +62,7 @@ func PrepareNodeMemoryHog(experimentsDetails *experimentTypes.ExperimentDetails,
 	// Wait till the completion of helper pod
 	log.Infof("[Wait]: Waiting for %vs till the completion of the helper pod", strconv.Itoa(experimentsDetails.ChaosDuration+30))
 
-	podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, "name=node-memory-hog-"+experimentsDetails.RunID, clients, experimentsDetails.ChaosDuration+30)
+	podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, "name=node-memory-hog-"+experimentsDetails.RunID, clients, experimentsDetails.ChaosDuration+30, "node-memory-hog")
 	if err != nil || podStatus == "Failed" {
 		return errors.Errorf("helper pod failed due to, err: %v", err)
 	}

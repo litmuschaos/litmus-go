@@ -73,7 +73,7 @@ func PreparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetail
 	// Wait till the completion of helper pod
 	log.Infof("[Wait]: Waiting for %vs till the completion of the helper pod", strconv.Itoa(experimentsDetails.ChaosDuration))
 
-	podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, "name=pumba-netem-"+experimentsDetails.RunID, clients, experimentsDetails.ChaosDuration+30)
+	podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, "name=pumba-netem-"+experimentsDetails.RunID, clients, experimentsDetails.ChaosDuration+30, "pumba")
 	if err != nil || podStatus == "Failed" {
 		return errors.Errorf("helper pod failed due to, err: %v", err)
 	}
@@ -171,7 +171,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 					Args: []string{
 						"netem",
 						"--tc-image",
-						"gaiadocker/iproute2",
+						experimentsDetails.TCImage,
 						"--interface",
 						experimentsDetails.NetworkInterface,
 						"--duration",
