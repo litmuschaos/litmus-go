@@ -24,7 +24,7 @@ scaffolded files consist of placeholders which can then be filled as desired.
 
 ### Pre-Requisites
 
-- *go* should be is available.
+- *go* should be is available & the GOPATH env is configured appropriately
 
 ### Steps to Generate Experiment Manifests
 
