@@ -53,9 +53,9 @@ spec:
           - name: LIB
             value: 'pumba'
           
-          # provide lib image
+           # provide lib image
           - name: LIB_IMAGE
-            value: 'gaiaadm/pumba:0.6.5' 
+            value: 'litmuschaos/go-runner:ci' 
 
           - name: CHAOS_NAMESPACE
             value: ''
