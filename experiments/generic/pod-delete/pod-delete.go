@@ -7,6 +7,7 @@ import (
 	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/pod-delete/environment"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-delete/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
+	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
@@ -80,6 +81,10 @@ func main() {
 	if experimentsDetails.EngineName != "" {
 		types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, "AUT is Running successfully", &chaosDetails)
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
+		err = probe.AddProbes(&chaosDetails, clients)
+		if err != nil {
+			log.Fatalf("Unable to Add the probes, due to err: %v", err)
+		}
 	}
 
 	// Including the litmus lib for pod-delete
