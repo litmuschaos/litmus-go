@@ -24,7 +24,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string
 	experimentDetails.InstanceID = Getenv("INSTANCE_ID", "")
 	experimentDetails.ChaosPodName = Getenv("POD_NAME", "")
 	experimentDetails.MemoryPercentage, _ = strconv.Atoi(Getenv("MEMORY_PERCENTAGE", "90"))
-	experimentDetails.LIBImage = Getenv("LIB_IMAGE", "")
+	experimentDetails.LIBImage = Getenv("LIB_IMAGE", "litmuschaos/go-runner:latest")
 	experimentDetails.AuxiliaryAppInfo = Getenv("AUXILIARY_APPINFO", "")
 }
 
