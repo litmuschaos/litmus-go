@@ -25,4 +25,6 @@ type ExperimentDetails struct {
 	Iterations          int
 	ChaosServiceAccount string
 	RunID               string
+	Timeout             int
+	Delay               int
 }

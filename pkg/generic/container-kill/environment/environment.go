@@ -29,6 +29,8 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string
 	experimentDetails.LIBImage = Getenv("LIB_IMAGE", "")
 	experimentDetails.TargetContainer = Getenv("TARGET_CONTAINER", "")
 	experimentDetails.ContainerPath = Getenv("CONTAINER_PATH", "/run/containerd/containerd.sock")
+	experimentDetails.Delay, _ = strconv.Atoi(Getenv("DELAY", "2"))
+	experimentDetails.Timeout, _ = strconv.Atoi(Getenv("TIMEOUT", "180"))
 }
 
 // Getenv fetch the env and set the default value, if any

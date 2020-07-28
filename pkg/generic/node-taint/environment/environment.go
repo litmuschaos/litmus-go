@@ -27,6 +27,8 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string
 	experimentDetails.AuxiliaryAppInfo = Getenv("AUXILIARY_APPINFO", "")
 	experimentDetails.AppNode = Getenv("APP_NODE", "")
 	experimentDetails.Taints = Getenv("TAINTS", "")
+	experimentDetails.Delay, _ = strconv.Atoi(Getenv("DELAY", "2"))
+	experimentDetails.Timeout, _ = strconv.Atoi(Getenv("TIMEOUT", "180"))
 }
 
 // Getenv fetch the env and set the default value, if any

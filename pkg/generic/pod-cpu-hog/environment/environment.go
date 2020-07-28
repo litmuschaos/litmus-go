@@ -26,6 +26,8 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string
 	experimentDetails.ChaosPodName = Getenv("POD_NAME", "")
 	experimentDetails.CPUcores, _ = strconv.Atoi(Getenv("CPU_CORES", "1"))
 	experimentDetails.PodsAffectedPerc, _ = strconv.Atoi(Getenv("PODS_AFFECTED_PERC", "0"))
+	experimentDetails.Delay, _ = strconv.Atoi(Getenv("DELAY", "2"))
+	experimentDetails.Timeout, _ = strconv.Atoi(Getenv("TIMEOUT", "180"))
 }
 
 // Getenv fetch the env and set the default value, if any

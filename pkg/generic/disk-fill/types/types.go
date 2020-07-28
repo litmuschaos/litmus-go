@@ -23,4 +23,6 @@ type ExperimentDetails struct {
 	FillPercentage   int
 	ContainerPath    string
 	RunID            string
+	Timeout          int
+	Delay            int
 }

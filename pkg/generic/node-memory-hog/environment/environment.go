@@ -26,6 +26,8 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string
 	experimentDetails.MemoryPercentage, _ = strconv.Atoi(Getenv("MEMORY_PERCENTAGE", "90"))
 	experimentDetails.LIBImage = Getenv("LIB_IMAGE", "")
 	experimentDetails.AuxiliaryAppInfo = Getenv("AUXILIARY_APPINFO", "")
+	experimentDetails.Delay, _ = strconv.Atoi(Getenv("DELAY", "2"))
+	experimentDetails.Timeout, _ = strconv.Atoi(Getenv("TIMEOUT", "180"))
 }
 
 // Getenv fetch the env and set the default value, if any

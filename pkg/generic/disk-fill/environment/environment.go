@@ -28,6 +28,8 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string
 	experimentDetails.TargetContainer = Getenv("TARGET_CONTAINER", "")
 	experimentDetails.ContainerPath = Getenv("CONTAINER_PATH", "/var/lib/docker/containers")
 	experimentDetails.FillPercentage, _ = strconv.Atoi(Getenv("FILL_PERCENTAGE", "80"))
+	experimentDetails.Delay, _ = strconv.Atoi(Getenv("DELAY", "2"))
+	experimentDetails.Timeout, _ = strconv.Atoi(Getenv("TIMEOUT", "180"))
 }
 
 // Getenv fetch the env and set the default value, if any

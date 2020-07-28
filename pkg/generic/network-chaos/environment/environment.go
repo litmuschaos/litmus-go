@@ -32,6 +32,8 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string
 	experimentDetails.NetworkInterface = Getenv("NETWORK_INTERFACE", "eth0")
 	experimentDetails.TargetContainer = Getenv("TARGET_CONTAINER", "")
 	experimentDetails.TCImage = Getenv("TC_IMAGE", "gaiadocker/iproute2")
+	experimentDetails.Delay, _ = strconv.Atoi(Getenv("DELAY", "2"))
+	experimentDetails.Timeout, _ = strconv.Atoi(Getenv("TIMEOUT", "180"))
 }
 
 // Getenv fetch the env and set the default value, if any
