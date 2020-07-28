@@ -40,11 +40,8 @@ spec:
           - name: CHAOS_INTERVAL
             value: '10'
 
-          # LIB_IMAGE can be - gaiaadm/pumba:0.6.5, litmuschaos/container-killer:latest
-          # For pumba image use : gaiaadm/pumba:0.6.5
-          # For containerd image use : litmuschaos/container-killer:latest
           - name: LIB_IMAGE  
-            value: 'litmuschaos/container-killer:latest'
+            value: 'litmuschaos/go-runner:ci'
 
           - name: CHAOS_NAMESPACE
             value: ''
