@@ -84,7 +84,7 @@ func main() {
 
 	// Including the litmus lib for pod-delete
 	if experimentsDetails.ChaosLib == "litmus" {
-		err = pod_delete.PreparePodDelete(&experimentsDetails, clients, &resultDetails, &eventsDetails)
+		err = pod_delete.PreparePodDelete(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
 		if err != nil {
 			log.Errorf("Chaos injection failed due to %v\n", err)
 			failStep := "Including the litmus lib for pod-delete"

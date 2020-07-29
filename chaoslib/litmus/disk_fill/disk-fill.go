@@ -223,7 +223,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 			Containers: []apiv1.Container{
 				{
 					Name:            "disk-fill",
-					Image:           "alpine",
+					Image:           experimentsDetails.LIBImage,
 					ImagePullPolicy: apiv1.PullAlways,
 					Args: []string{
 						"sleep",

@@ -25,4 +25,5 @@ type ExperimentDetails struct {
 	RunID            string
 	Timeout          int
 	Delay            int
+	LIBImage         string
 }

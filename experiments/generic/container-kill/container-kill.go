@@ -85,7 +85,7 @@ func main() {
 
 	// Including the litmus lib for container-kill
 	if experimentsDetails.ChaosLib == "litmus" {
-		err = litmusLIB.PrepareContainerKill(&experimentsDetails, clients, &resultDetails, &eventsDetails)
+		err = litmusLIB.PrepareContainerKill(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
 		if err != nil {
 			log.Errorf("Chaos injection failed due to %v\n", err)
 			failStep := "Executing litmus lib for the container-kill"

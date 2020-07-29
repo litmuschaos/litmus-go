@@ -27,4 +27,5 @@ type ExperimentDetails struct {
 	RunID               string
 	Timeout             int
 	Delay               int
+	ApplicationPod      string
 }
