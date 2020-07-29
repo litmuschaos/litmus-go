@@ -29,7 +29,6 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string
 	experimentDetails.InstanceID = Getenv("INSTANCE_ID", "")
 	experimentDetails.ChaosPodName = Getenv("POD_NAME", "hello")
 	experimentDetails.Force, _ = strconv.ParseBool(Getenv("FORCE", "false"))
-	experimentDetails.LIBImage = Getenv("LIB_IMAGE", "litmuschaos/pod-delete-helper:latest")
 }
 
 // Getenv fetch the env and set the default value, if any

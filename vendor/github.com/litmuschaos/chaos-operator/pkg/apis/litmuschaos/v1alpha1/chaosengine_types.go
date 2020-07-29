@@ -157,19 +157,42 @@ type ExperimentAttributes struct {
 	// It contains env, configmaps, secrets, experimentImage, node selector, custom experiment annotation
 	// which can be provided or overridden from the chaos engine
 	Components ExperimentComponents `json:"components,omitempty"`
-	// Probe contains details of probe, which can be applied on the experiments
-	Probe []ProbeAttributes `json:"probe,omitempty"`
+	// K8sProbe contains details of k8s probe, which can be applied on the experiments
+	K8sProbe []K8sProbeAttributes `json:"k8sProbe,omitempty"`
+	// CmdProbe contains details of cmd probe, which can be applied on the experiments
+	CmdProbe []CmdProbeAttributes `json:"cmdProbe,omitempty"`
+	// HTTPProbe contains details of http probe, which can be applied on the experiments
+	HTTPProbe []HTTPProbeAttributes `json:"httpProbe,omitempty"`
 }
 
-// ProbeAttributes contains details of probe, which can be applied on the experiments
-type ProbeAttributes struct {
-	Name   string `json:"name,omitempty"`
-	Type   string `json:"type,omitempty"`
-	Inputs Inputs `json:"inputs,omitempty"`
+// K8sProbeAttributes contains details of k8s probe, which can be applied on the experiments
+type K8sProbeAttributes struct {
+	Name   string         `json:"name,omitempty"`
+	Inputs K8sProbeInputs `json:"inputs,omitempty"`
 }
 
-// Inputs contains all the inputs required for that probe
-type Inputs struct {
+// CmdProbeAttributes contains details of cmd probe, which can be applied on the experiments
+type CmdProbeAttributes struct {
+	Name   string         `json:"name,omitempty"`
+	Inputs CmdProbeInputs `json:"inputs,omitempty"`
+}
+
+// HTTPProbeAttributes contains details of k8s probe, which can be applied on the experiments
+type HTTPProbeAttributes struct {
+	Name   string          `json:"name,omitempty"`
+	Inputs HTTPProbeInputs `json:"inputs,omitempty"`
+}
+
+// K8sProbeInputs contains all the inputs required for k8s probe
+type K8sProbeInputs struct {
+	// Command need to be executed for the probe
+	Command string `json:"command,omitempty"`
+	// Expected output or result of the command
+	ExpectedResult string `json:"expectedResult,omitempty"`
+}
+
+//CmdProbeInputs contains all the inputs required for cmd probe
+type CmdProbeInputs struct {
 	// Command need to be executed for the probe
 	Command string `json:"command,omitempty"`
 	// Expected output or result of the command
@@ -177,6 +200,14 @@ type Inputs struct {
 	// The source where we have to run the command
 	// It can be a image or inline(inside experiment itself)
 	Source string `json:"source,omitempty"`
+}
+
+//HTTPProbeInputs contains all the inputs required for http probe
+type HTTPProbeInputs struct {
+	// URL which needs to curl, to check the status
+	URL string `json:"url,omitempty"`
+	// Expected output or result of the command
+	ExpectedResult string `json:"expectedResult,omitempty"`
 }
 
 // ExperimentComponents contains ENV, Configmaps and Secrets

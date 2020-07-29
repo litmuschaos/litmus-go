@@ -22,7 +22,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string
 	experimentDetails.AppKind = Getenv("APP_KIND", "")
 	experimentDetails.ChaosUID = clientTypes.UID(Getenv("CHAOS_UID", ""))
 	experimentDetails.InstanceID = Getenv("INSTANCE_ID", "")
-	experimentDetails.LIBImage = Getenv("LIB_IMAGE", "")
+	experimentDetails.LIBImage = Getenv("LIB_IMAGE", "litmuschaos/go-runner:latest")
 	experimentDetails.ChaosPodName = Getenv("POD_NAME", "")
 	experimentDetails.RunID = Getenv("RunID", "")
 	experimentDetails.NetworkPacketDuplicationPercentage, _ = strconv.Atoi(Getenv("NETWORK_PACKET_DUPLICATION_PERCENTAGE", "100"))

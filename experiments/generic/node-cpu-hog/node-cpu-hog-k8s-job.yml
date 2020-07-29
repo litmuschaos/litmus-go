@@ -44,7 +44,7 @@ spec:
 
            # provide lib image
           - name: LIB_IMAGE
-            value: 'litmuschaos/stress-ng:latest' 
+            value: 'litmuschaos/go-runner:ci' 
 
           ## PROVIDE AUXILIARY APPLICATION DETAILS - NAMESPACE AND LABELS OF THE APPLICATIONS
           ## Sample input is  "ns1:app=percona,ns2:name=nginx"

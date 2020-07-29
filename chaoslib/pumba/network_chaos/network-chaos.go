@@ -168,6 +168,9 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 					Name:            "pumba",
 					Image:           experimentsDetails.LIBImage,
 					ImagePullPolicy: apiv1.PullAlways,
+					Command: []string{
+						"pumba",
+					},
 					Args: []string{
 						"netem",
 						"--tc-image",
