@@ -31,6 +31,14 @@ type ChaosResultSpec struct {
 	ExperimentName string `json:"experiment"`
 	// InstanceID defines the instance id
 	InstanceID string `json:"instance,omitempty"`
+	// Probes contains details of the probes
+	Probes []ProbeDetails `json:"probes,omitempty"`
+}
+
+// ProbeDetails informations of the probes
+type ProbeDetails struct {
+	Name string `json:"name,omitempty"`
+	Type string `json:"type,omitempty"`
 }
 
 // ChaosResultStatus defines the observed state of ChaosResult
@@ -40,8 +48,24 @@ type ChaosResultStatus struct {
 	// Important: Run "operator-sdk generate k8s" to regenerate code after modifying this file
 	// Add custom validation using kubebuilder tags: https://book.kubebuilder.io/beyond_basics/generating_crd.html
 
-	// Definition carries low-level chaos options
+	// ExperimentStatus contains the status,verdict of the experiment
 	ExperimentStatus TestStatus `json:"experimentstatus"`
+	// ProbeStatus contains the status of the probe
+	ProbeStatus []ProbeStatus `json:"probeStatus,omitempty"`
+}
+
+// ProbeStatus defines information about the status and result of the probes
+type ProbeStatus struct {
+	// Name defines the name of probe
+	Name string `json:"name,omitempty"`
+	// Verdict defines whether a probe is pass or fail
+	Status ProbeStatuses `json:"status,omitempty"`
+}
+
+// ProbeStatuses contains the verdict of probes
+type ProbeStatuses struct {
+	// Verdict defines whether a probe is pass or fail
+	Verdict string `json:"verdict"`
 }
 
 // TestStatus defines information about the status and results of a chaos experiment
@@ -52,6 +76,8 @@ type TestStatus struct {
 	Verdict string `json:"verdict"`
 	// FailStep defines step where the experiments fails
 	FailStep string `json:"failStep,omitempty"`
+	// Score defines the score of the experiment on the basis of probes
+	Score string `json:"score,omitempty"`
 }
 
 // +genclient

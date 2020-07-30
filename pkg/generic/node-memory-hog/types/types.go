@@ -22,4 +22,6 @@ type ExperimentDetails struct {
 	RunID            string
 	LIBImage         string
 	AuxiliaryAppInfo string
+	Timeout          int
+	Delay            int
 }

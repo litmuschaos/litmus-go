@@ -102,7 +102,7 @@ func PodDeleteChaos(experimentsDetails *experimentTypes.ExperimentDetails, clien
 		}
 		//Verify the status of pod after the chaos injection
 		log.Info("[Status]: Verification for the recreation of application pod")
-		err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, clients)
+		err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 
 		//ChaosCurrentTimeStamp contains the current timestamp
 		ChaosCurrentTimeStamp := time.Now().Unix()
@@ -132,9 +132,9 @@ func PreparePodList(experimentsDetails *experimentTypes.ExperimentDetails, clien
 
 	var targetPodList []string
 
-	err := retry.
-		Times(90).
-		Wait(2 * time.Second).
+	err = retry.
+		Times(uint(experimentsDetails.Timeout / experimentsDetails.Delay)).
+		Wait(time.Duration(experimentsDetails.Delay) * time.Second).
 		Try(func(attempt uint) error {
 			pods, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).List(v1.ListOptions{LabelSelector: experimentsDetails.AppLabel})
 			if err != nil || len(pods.Items) == 0 {

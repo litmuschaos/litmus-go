@@ -1,6 +1,8 @@
 package types
 
-import clientTypes "k8s.io/apimachinery/pkg/types"
+import (
+	clientTypes "k8s.io/apimachinery/pkg/types"
+)
 
 const (
 	// PreChaosCheck initial stage of experiment check for health before chaos injection
@@ -15,11 +17,20 @@ const (
 
 // ResultDetails is for collecting all the chaos-result-related details
 type ResultDetails struct {
-	Name      string
-	Verdict   string
-	FailStep  string
-	Phase     string
-	ResultUID clientTypes.UID
+	Name         string
+	Verdict      string
+	FailStep     string
+	Phase        string
+	ResultUID    clientTypes.UID
+	ProbeDetails []ProbeDetails
+	ProbeCount   int
+}
+
+// ProbeDetails is for collecting all the probe details
+type ProbeDetails struct {
+	Name    string
+	Type    string
+	Verdict string
 }
 
 // EventDetails is for collecting all the events-related details
@@ -38,18 +49,22 @@ type ChaosDetails struct {
 	EngineName     string
 	InstanceID     string
 	ExperimentName string
+	Timeout        int
+	Delay          int
 }
 
 //SetResultAttributes initialise all the chaos result ENV
-func SetResultAttributes(resultDetails *ResultDetails, EngineName string, ExperimentName string) {
+func SetResultAttributes(resultDetails *ResultDetails, chaosDetails ChaosDetails) {
 	resultDetails.Verdict = "Awaited"
 	resultDetails.Phase = "Running"
 	resultDetails.FailStep = "N/A"
-	if EngineName != "" {
-		resultDetails.Name = EngineName + "-" + ExperimentName
+	resultDetails.ProbeCount = 0
+	if chaosDetails.EngineName != "" {
+		resultDetails.Name = chaosDetails.EngineName + "-" + chaosDetails.ExperimentName
 	} else {
-		resultDetails.Name = ExperimentName
+		resultDetails.Name = chaosDetails.ExperimentName
 	}
+
 }
 
 //SetResultAfterCompletion set all the chaos result ENV in the EOT
