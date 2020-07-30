@@ -29,6 +29,8 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string
 	experimentDetails.ChaosPodName = Getenv("POD_NAME", "")
 	experimentDetails.Force, _ = strconv.ParseBool(Getenv("FORCE", "false"))
 	experimentDetails.LIBImage = Getenv("LIB_IMAGE", "")
+	experimentDetails.Delay, _ = strconv.Atoi(Getenv("STATUS_CHECK_DELAY", "2"))
+	experimentDetails.Timeout, _ = strconv.Atoi(Getenv("STATUS_CHECK_TIMEOUT", "180"))
 }
 
 // Getenv fetch the env and set the default value, if any

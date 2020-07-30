@@ -20,4 +20,6 @@ type ExperimentDetails struct {
 	ChaosPodName     string
 	AppNode          string
 	AuxiliaryAppInfo string
+	Timeout          int
+	Delay            int
 }
