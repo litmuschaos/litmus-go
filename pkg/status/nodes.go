@@ -13,10 +13,10 @@ import (
 )
 
 // CheckNodeStatus checks the status of the node
-func CheckNodeStatus(nodeName string, clients clients.ClientSets) error {
+func CheckNodeStatus(nodeName string, timeout, delay int, clients clients.ClientSets) error {
 	err := retry.
-		Times(90).
-		Wait(2 * time.Second).
+		Times(uint(timeout / delay)).
+		Wait(time.Duration(delay) * time.Second).
 		Try(func(attempt uint) error {
 			node, err := clients.KubeClient.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
 			if err != nil {
@@ -46,10 +46,10 @@ func CheckNodeStatus(nodeName string, clients clients.ClientSets) error {
 }
 
 // CheckNodeNotReadyState check for node to be in not ready state
-func CheckNodeNotReadyState(nodeName string, clients clients.ClientSets) error {
+func CheckNodeNotReadyState(nodeName string, timeout, delay int, clients clients.ClientSets) error {
 	err := retry.
-		Times(90).
-		Wait(2 * time.Second).
+		Times(uint(timeout / delay)).
+		Wait(time.Duration(delay) * time.Second).
 		Try(func(attempt uint) error {
 			node, err := clients.KubeClient.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
 			if err != nil {

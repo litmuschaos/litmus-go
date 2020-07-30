@@ -64,7 +64,7 @@ func PrepareNodeCPUHog(experimentsDetails *experimentTypes.ExperimentDetails, cl
 
 	//Checking the status of helper pod
 	log.Info("[Status]: Checking the status of the helper pod")
-	err = status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, "name=node-cpu-hog-"+experimentsDetails.RunID, clients)
+	err = status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, "name=node-cpu-hog-"+experimentsDetails.RunID, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 	if err != nil {
 		return errors.Errorf("helper pod is not in running state, err: %v", err)
 	}
@@ -79,7 +79,7 @@ func PrepareNodeCPUHog(experimentsDetails *experimentTypes.ExperimentDetails, cl
 
 	// Checking the status of application node
 	log.Info("[Status]: Getting the status of application node")
-	err = status.CheckNodeStatus(appNodeName, clients)
+	err = status.CheckNodeStatus(appNodeName, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 	if err != nil {
 		log.Warn("Application node is not in the ready state, you may need to manually recover the node")
 	}
@@ -188,8 +188,8 @@ func DeleteHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 	}
 
 	err = retry.
-		Times(90).
-		Wait(1 * time.Second).
+		Times(uint(experimentsDetails.Timeout / experimentsDetails.Delay)).
+		Wait(time.Duration(experimentsDetails.Delay) * time.Second).
 		Try(func(attempt uint) error {
 			podSpec, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).List(v1.ListOptions{LabelSelector: "name=node-cpu-hog-" + experimentsDetails.RunID})
 			if err != nil || len(podSpec.Items) != 0 {
