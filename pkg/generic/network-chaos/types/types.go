@@ -27,4 +27,6 @@ type ExperimentDetails struct {
 	NetworkPacketLossPercentage        int
 	NetworkPacketCorruptionPercentage  int
 	TCImage                            string
+	Timeout                            int
+	Delay                              int
 }

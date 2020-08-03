@@ -69,7 +69,7 @@ func main() {
 
 	//PRE-CHAOS APPLICATION STATUS CHECK
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (pre-chaos)")
-	err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, clients)
+	err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 	if err != nil {
 		log.Errorf("Application status check failed due to %v\n", err)
 		failStep := "Verify that the AUT (Application Under Test) is running (pre-chaos)"
@@ -84,7 +84,7 @@ func main() {
 
 	// Including the litmus lib for pod-delete
 	if experimentsDetails.ChaosLib == "litmus" {
-		err = pod_delete.PreparePodDelete(&experimentsDetails, clients, &resultDetails, &eventsDetails)
+		err = pod_delete.PreparePodDelete(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
 		if err != nil {
 			log.Errorf("Chaos injection failed due to %v\n", err)
 			failStep := "Including the litmus lib for pod-delete"
@@ -104,7 +104,7 @@ func main() {
 
 	//POST-CHAOS APPLICATION STATUS CHECK
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (post-chaos)")
-	err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, clients)
+	err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 	if err != nil {
 		log.Errorf("Application status check failed due to %v\n", err)
 		failStep := "Verify that the AUT (Application Under Test) is running (post-chaos)"
