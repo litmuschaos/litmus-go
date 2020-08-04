@@ -26,12 +26,5 @@ type ExperimentDetails struct {
 	LIBImage               string
 	Timeout                int
 	Delay                  int
-	AppName                string
-	CassandraServiceName   string
-	KeySpaceReplicaFactor  string
-	CassandraPort          int
-	LivenessServicePort    int
-	CassandraLivenessImage string
-	CassandraLivenessCheck string
-	PodResourceVersion     string
+
 }

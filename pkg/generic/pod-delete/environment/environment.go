@@ -31,6 +31,15 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string
 	experimentDetails.LIBImage = Getenv("LIB_IMAGE", "")
 	experimentDetails.Delay, _ = strconv.Atoi(Getenv("STATUS_CHECK_DELAY", "2"))
 	experimentDetails.Timeout, _ = strconv.Atoi(Getenv("STATUS_CHECK_TIMEOUT", "180"))
+	experimentDetails.CassandraServiceName = Getenv("CASSANDRA_SVC_NAME", "")
+	experimentDetails.KeySpaceReplicaFactor = Getenv("KEYSPACE_REPLICATION_FACTOR", "")
+	experimentDetails.CassandraPort, _ = strconv.Atoi(Getenv("CASSANDRA_PORT", "9242"))
+	experimentDetails.LivenessServicePort, _ = strconv.Atoi(Getenv("LIVENESS_SVC_PORT", "9242"))
+	experimentDetails.CassandraLivenessImage = Getenv("CASSANDRA_LIVENESS_IMAGE", "litmuschaos/cassandra-client:latest")
+	experimentDetails.CassandraLivenessCheck = Getenv("CASSANDRA_LIVENESS_CHECK", "enabled")
+	experimentDetails.AppName = Getenv("APP_NAME", "")
+	experimentDetails.PodResourceVersion = Getenv("POD_RESOURCE_VERSION", "")
+
 }
 
 // Getenv fetch the env and set the default value, if any
