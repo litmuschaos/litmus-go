@@ -70,7 +70,7 @@ func main() {
 
 	//PRE-CHAOS APPLICATION STATUS CHECK
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (pre-chaos)")
-	err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, clients)
+	err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 	if err != nil {
 		log.Errorf("Application status check failed due to %v\n", err)
 		failStep := "Verify that the AUT (Application Under Test) is running (pre-chaos)"
@@ -85,7 +85,7 @@ func main() {
 
 	// Including the litmus lib for container-kill
 	if experimentsDetails.ChaosLib == "litmus" {
-		err = litmusLIB.PrepareContainerKill(&experimentsDetails, clients, &resultDetails, &eventsDetails)
+		err = litmusLIB.PrepareContainerKill(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
 		if err != nil {
 			log.Errorf("Chaos injection failed due to %v\n", err)
 			failStep := "Executing litmus lib for the container-kill"
@@ -109,7 +109,7 @@ func main() {
 
 	//POST-CHAOS APPLICATION STATUS CHECK
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (post-chaos)")
-	err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, clients)
+	err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 	if err != nil {
 		log.Errorf("Application status check failed due to %v\n", err)
 		failStep := "Verify that the AUT (Application Under Test) is running (post-chaos)"

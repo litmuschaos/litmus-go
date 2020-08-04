@@ -26,3 +26,5 @@ go build -o build/_output/node-cpu-hog ./experiments/generic/node-cpu-hog
 go build -o build/_output/container-kill ./experiments/generic/container-kill
 # Buiding go binaries for disk_fill experiment
 go build -o build/_output/disk-fill ./experiments/generic/disk-fill
+# Buiding go binaries for container_kill helper
+go build -o build/_output/container-killer ./chaoslib/litmus/container_kill/helper

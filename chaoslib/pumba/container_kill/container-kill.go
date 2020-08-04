@@ -71,7 +71,7 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 
 	//checking the status of the helper pod, wait till the helper pod comes to running state else fail the experiment
 	log.Info("[Status]: Checking the status of the helper pod")
-	err = status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, "name=pumba-sig-kill-"+experimentsDetails.RunID, clients)
+	err = status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, "name=pumba-sig-kill-"+experimentsDetails.RunID, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 	if err != nil {
 		return errors.Errorf("helper pod is not in running state, err: %v", err)
 	}
@@ -222,6 +222,9 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 					Name:            "pumba",
 					Image:           experimentsDetails.LIBImage,
 					ImagePullPolicy: apiv1.PullAlways,
+					Command: []string{
+						"pumba",
+					},
 					Args: []string{
 						"--random",
 						"--interval",
@@ -256,8 +259,8 @@ func DeleteHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 	}
 
 	err = retry.
-		Times(90).
-		Wait(1 * time.Second).
+		Times(uint(experimentsDetails.Timeout / experimentsDetails.Delay)).
+		Wait(time.Duration(experimentsDetails.Delay) * time.Second).
 		Try(func(attempt uint) error {
 			podSpec, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).List(v1.ListOptions{LabelSelector: "name=pumba-sig-kill-" + runID})
 			if err != nil || len(podSpec.Items) != 0 {

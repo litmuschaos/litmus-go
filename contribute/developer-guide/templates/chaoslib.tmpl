@@ -1,4 +1,4 @@
-package {{ category }}
+package {{ .Category }}
 
 import (
 	"k8s.io/klog"
@@ -9,7 +9,7 @@ import (
     clients "github.com/litmuschaos/litmus-go/pkg/clients"
 )
 
-func {{ name }}() {
+func {{ .Name }}() {
 
     // IF YOU WANT TO USE AN EXISTING CHAOSLIB THEN DELETE THIS FILE AND USE THE SAME
     // ELSE

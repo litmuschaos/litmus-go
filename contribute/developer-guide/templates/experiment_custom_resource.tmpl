@@ -1,19 +1,33 @@
 apiVersion: litmuschaos.io/v1alpha1
 description:
   message: |
-    {{ description }}
+    {{ .Description }}
 kind: ChaosExperiment
 metadata:
-  name: {{ name }}
-  version: {{ version }} 
+  name: {{ .Name }}
+  version: {{ .Version }} 
 spec:
   definition:
-    scope: {{ scope }}
-    permissions: {{ permissions }}
+    scope: {{ .Scope }}
+    permissions: 
+      {{- range .Permissions }}
+      - apiGroups:
+        {{- range .APIGroups }} 
+          - "{{ . }}"
+        {{- end}}
+        resources:
+        {{- range .Resources }} 
+          - "{{ . }}"
+        {{- end}}
+        verbs:
+        {{- range .Verbs }} 
+          - "{{ . }}"
+        {{- end}}
+      {{- end}}
     image: "litmuschaos/litmus-go:latest"
     args:
     - -c
-    - ./experiments/{{ name }}
+    - ./experiments/{{ .Name }}
     command:
     - /bin/bash
     env:
@@ -33,4 +47,4 @@ spec:
       value: ''
       
     labels:
-      experiment: {{ name }} 
+      experiment: {{ .Name }} 
