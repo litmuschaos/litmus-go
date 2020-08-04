@@ -52,7 +52,7 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 
 	if experimentsDetails.EngineName != "" {
 		msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on " + appName + " pod"
-		types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, chaosDetails)
+		types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
 		events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 	}
 
