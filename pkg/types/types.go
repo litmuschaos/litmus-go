@@ -28,6 +28,7 @@ type EventDetails struct {
 	Reason       string
 	ResourceName string
 	ResourceUID  clientTypes.UID
+	Type         string
 }
 
 // ChaosDetails is for collecting all the global variables
@@ -60,12 +61,13 @@ func SetResultAfterCompletion(resultDetails *ResultDetails, verdict, phase, fail
 }
 
 //SetEngineEventAttributes initialise attributes for event generation in chaos engine
-func SetEngineEventAttributes(eventsDetails *EventDetails, Reason string, Message string, chaosDetails *ChaosDetails) {
+func SetEngineEventAttributes(eventsDetails *EventDetails, Reason, Message, Type string, chaosDetails *ChaosDetails) {
 
 	eventsDetails.Reason = Reason
 	eventsDetails.Message = Message
 	eventsDetails.ResourceName = chaosDetails.EngineName
 	eventsDetails.ResourceUID = chaosDetails.ChaosUID
+	eventsDetails.Type = Type
 
 }
 
