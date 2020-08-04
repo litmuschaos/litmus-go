@@ -163,6 +163,9 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 					Name:            "node-cpu-hog",
 					Image:           experimentsDetails.LIBImage,
 					ImagePullPolicy: apiv1.PullAlways,
+					Command: []string{
+						"/stress-ng",
+					},
 					Args: []string{
 						"--cpu",
 						strconv.Itoa(experimentsDetails.NodeCPUcores),
