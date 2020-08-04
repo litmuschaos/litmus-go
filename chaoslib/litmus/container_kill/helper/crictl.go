@@ -85,7 +85,7 @@ func KillContainer(experimentsDetails *experimentTypes.ExperimentDetails, client
 		// record the event inside chaosengine
 		if experimentsDetails.EngineName != "" {
 			msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on application pod"
-			types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, chaosDetails)
+			types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
 			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngne")
 		}
 
