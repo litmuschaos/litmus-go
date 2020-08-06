@@ -153,9 +153,13 @@ func RecordAfterFailure(chaosDetails *types.ChaosDetails, resultDetails *types.R
 	types.SetResultAfterCompletion(resultDetails, "Fail", "Completed", failStep)
 	ChaosResult(chaosDetails, clients, resultDetails, "EOT")
 
-	// add the summary event
+	// add the summary event in chaos result
+	msg := chaosDetails.ExperimentName + " experiment has been " + resultDetails.Verdict + "ed"
+	types.SetResultEventAttributes(eventsDetails, types.Summary, msg, "Warning", resultDetails)
+	events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosResult")
+
+	// add the summary event in chaos engine
 	if chaosDetails.EngineName != "" {
-		msg := chaosDetails.ExperimentName + " experiment has been " + resultDetails.Verdict + "ed"
 		types.SetEngineEventAttributes(eventsDetails, types.Summary, msg, "Warning", chaosDetails)
 		events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 	}
