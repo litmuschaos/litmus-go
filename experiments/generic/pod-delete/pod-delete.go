@@ -56,8 +56,7 @@ func main() {
 	if err != nil {
 		log.Errorf("Unable to Create the Chaos Result due to %v", err)
 		failStep := "Updating the chaos result of pod-delete experiment (SOT)"
-		types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
-		err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
 
@@ -77,19 +76,21 @@ func main() {
 	if err != nil {
 		log.Errorf("Application status check failed due to %v\n", err)
 		failStep := "Verify that the AUT (Application Under Test) is running (pre-chaos)"
-		types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
-		result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
+
 	if experimentsDetails.EngineName != "" {
-		types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, "AUT is Running successfully", &chaosDetails)
+		// generating pre chaos event
+		types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, "AUT is Running successfully", "Normal", &chaosDetails)
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
+
+		// Add the probes in the pre-chaos check
 		err = probe.AddProbes(&chaosDetails, clients, &resultDetails)
 		if err != nil {
-			failStep := "Failed while adding probe"
-			types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
-			result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 			log.Errorf("Unable to Add the probes, due to err: %v", err)
+			failStep := "Failed while adding probe"
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}
 	}
@@ -100,8 +101,7 @@ func main() {
 		if err != nil {
 			log.Errorf("Chaos injection failed due to %v\n", err)
 			failStep := "Including the litmus lib for pod-delete"
-			types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
-			result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}
 		log.Info("[Confirmation]: The application pod has been deleted successfully")
@@ -109,8 +109,7 @@ func main() {
 	} else {
 		log.Error("[Invalid]: Please Provide the correct LIB")
 		failStep := "Including the litmus lib for pod-delete"
-		types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
-		result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
 
@@ -120,13 +119,22 @@ func main() {
 	if err != nil {
 		log.Errorf("Application status check failed due to %v\n", err)
 		failStep := "Verify that the AUT (Application Under Test) is running (post-chaos)"
-		types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
-		result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
 	if experimentsDetails.EngineName != "" {
-		types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, "AUT is Running successfully", &chaosDetails)
+		// generating post chaos event
+		types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, "AUT is Running successfully", "Normal", &chaosDetails)
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
+
+		// Add the probes in the post-chaos check
+		err = probe.AddProbes(&chaosDetails, clients, &resultDetails)
+		if err != nil {
+			log.Errorf("Unable to Add the probes, due to err: %v", err)
+			failStep := "Failed while adding probe"
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+			return
+		}
 	}
 
 	//Updating the chaosResult in the end of experiment
@@ -135,9 +143,10 @@ func main() {
 	if err != nil {
 		log.Fatalf("Unable to Update the Chaos Result due to %v\n", err)
 	}
+
 	if experimentsDetails.EngineName != "" {
 		msg := experimentsDetails.ExperimentName + " experiment has been " + resultDetails.Verdict + "ed"
-		types.SetEngineEventAttributes(&eventsDetails, types.Summary, msg, &chaosDetails)
+		types.SetEngineEventAttributes(&eventsDetails, types.Summary, msg, "Normal", &chaosDetails)
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 

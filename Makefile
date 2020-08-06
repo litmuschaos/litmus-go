@@ -47,7 +47,7 @@ litmus-go-build:
 	@echo "------------------"
 	@echo "--> Build go-runner image" 
 	@echo "------------------"
-	sudo docker build . -f build/litmus-go/Dockerfile -t shubh214/go-runner:ci
+	sudo docker build . -f build/litmus-go/Dockerfile -t shubh214/go-runner:stage1
 
 .PHONY: push
 push: litmus-go-push

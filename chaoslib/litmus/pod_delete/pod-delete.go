@@ -79,7 +79,8 @@ func PodDeleteChaos(experimentsDetails *experimentTypes.ExperimentDetails, clien
 			"PodList": targetPodList})
 
 		if experimentsDetails.EngineName != "" {
-			types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, "Injecting "+experimentsDetails.ExperimentName+" chaos on application pod", chaosDetails)
+			msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on application pod"
+			types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
 			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 		}
 
