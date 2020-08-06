@@ -163,6 +163,6 @@ func main() {
 	}
 
 	msg := experimentsDetails.ExperimentName + " experiment has been " + resultDetails.Verdict + "ed"
-	types.SetResultEventAttributes(&eventsDetails, types.Summary, msg, &resultDetails)
+	types.SetResultEventAttributes(&eventsDetails, types.Summary, msg, "Normal", &resultDetails)
 	events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosResult")
 }
