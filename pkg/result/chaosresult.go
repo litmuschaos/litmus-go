@@ -151,9 +151,9 @@ func PatchChaosResult(result *v1alpha1.ChaosResult, clients clients.ClientSets, 
 	result.Status.ProbeStatus = GetProbeStatus(resultDetails)
 	if resultDetails.Phase == "Completed" {
 		if resultDetails.Verdict == "Pass" {
-			result.Status.ExperimentStatus.Score = strconv.Itoa((resultDetails.ProbeCount*60)/len(resultDetails.ProbeDetails)+40) + "%"
+			result.Status.ExperimentStatus.Score = strconv.Itoa((resultDetails.ProbeCount*30)/len(resultDetails.ProbeDetails)+40) + "%"
 		} else {
-			result.Status.ExperimentStatus.Score = strconv.Itoa((resultDetails.ProbeCount*60)/len(resultDetails.ProbeDetails)) + "%"
+			result.Status.ExperimentStatus.Score = strconv.Itoa((resultDetails.ProbeCount*30)/len(resultDetails.ProbeDetails)) + "%"
 		}
 
 	} else {
@@ -197,10 +197,15 @@ func RecordAfterFailure(chaosDetails *types.ChaosDetails, resultDetails *types.R
 	types.SetResultAfterCompletion(resultDetails, "Fail", "Completed", failStep)
 	ChaosResult(chaosDetails, clients, resultDetails, "EOT")
 
-	// add the summary event
+	// add the summary event in chaos result
+	msg := chaosDetails.ExperimentName + " experiment has been " + resultDetails.Verdict + "ed"
+	types.SetResultEventAttributes(eventsDetails, types.Summary, msg, "Warning", resultDetails)
+	events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosResult")
+
+	// add the summary event in chaos engine
 	if chaosDetails.EngineName != "" {
-		msg := chaosDetails.ExperimentName + " experiment has been " + resultDetails.Verdict + "ed"
 		types.SetEngineEventAttributes(eventsDetails, types.Summary, msg, "Warning", chaosDetails)
 		events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 	}
+
 }

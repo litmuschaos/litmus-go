@@ -71,13 +71,10 @@ func PrepareK8sProbe(k8sProbes []v1alpha1.K8sProbeAttributes, resultDetails *typ
 			})
 
 			// triggering the k8s probe and storing the output into the out buffer
-			if err = TriggerK8sProbe(probe, probe.Inputs.Command); err != nil {
-				return err
-			}
-
+			err = TriggerK8sProbe(probe, probe.Inputs.Command)
 			// failing the probe, if the success condition doesn't met after the retry & timeout combinations
 			if err != nil {
-				SetProbeVerdict(resultDetails, "Better Luck Next Time", probe.Name, "K8sProbe")
+				SetProbeVerdictAfterFailure(resultDetails)
 				log.Infof("The %v k8s probe has been Failed", probe.Name)
 				return err
 			}
@@ -97,6 +94,17 @@ func SetProbeVerdict(resultDetails *types.ResultDetails, verdict, probeName, pro
 		if probe.Name == probeName && probe.Type == probeType {
 			resultDetails.ProbeDetails[index].Verdict = verdict
 			break
+		}
+	}
+}
+
+//SetProbeVerdictAfterFailure mark the verdict of all the failed/unrun probes as failed
+func SetProbeVerdictAfterFailure(resultDetails *types.ResultDetails) {
+
+	for index := range resultDetails.ProbeDetails {
+
+		if resultDetails.ProbeDetails[index].Verdict == "Awaited" {
+			resultDetails.ProbeDetails[index].Verdict = "Better Luck Next Time"
 		}
 	}
 }
@@ -134,7 +142,7 @@ func PrepareHTTPProbe(httpProbes []v1alpha1.HTTPProbeAttributes, clients clients
 		for _, probe := range httpProbes {
 
 			//DISPLAY THE K8S PROBE INFO
-			log.InfoWithValues("[Probe]: The k8s probe informations are as follows", logrus.Fields{
+			log.InfoWithValues("[Probe]: The http probe informations are as follows", logrus.Fields{
 				"Name":              probe.Name,
 				"URL":               probe.Inputs.URL,
 				"Expecected Result": probe.Inputs.ExpectedResult,
@@ -142,13 +150,10 @@ func PrepareHTTPProbe(httpProbes []v1alpha1.HTTPProbeAttributes, clients clients
 			})
 
 			// trigger the http probe and storing the output into the out buffer
-			if err = TriggerHTTPProbe(probe); err != nil {
-				return err
-			}
-
+			err = TriggerHTTPProbe(probe)
 			// failing the probe, if the success condition doesn't met after the retry & timeout combinations
 			if err != nil {
-				SetProbeVerdict(resultDetails, "Better Luck Next Time", probe.Name, "HTTPProbe")
+				SetProbeVerdictAfterFailure(resultDetails)
 				log.Infof("The %v http probe has been Failed", probe.Name)
 				return err
 			}
@@ -209,9 +214,7 @@ func PrepareCmdProbe(cmdProbes []v1alpha1.CmdProbeAttributes, clients clients.Cl
 			if probe.Inputs.Source == "inline" {
 
 				// triggering the cmd probe and storing the output into the out buffer
-				if err = TriggerInlineCmdProbe(probe, command); err != nil {
-					return err
-				}
+				err = TriggerInlineCmdProbe(probe, command)
 
 			} else {
 
@@ -233,9 +236,7 @@ func PrepareCmdProbe(cmdProbes []v1alpha1.CmdProbeAttributes, clients clients.Cl
 				litmusexec.SetExecCommandAttributes(&execCommandDetails, chaosDetails.ExperimentName+"-probe-"+runID, chaosDetails.ExperimentName+"-probe", chaosDetails.ChaosNamespace)
 
 				// triggering the cmd probe and storing the output into the out buffer
-				if err = TriggerCmdProbe(probe, command, execCommandDetails, clients); err != nil {
-					return err
-				}
+				err = TriggerCmdProbe(probe, command, execCommandDetails, clients)
 
 				// deleting the external pod which was created for cmd probe
 				if err = DeleteProbePod(chaosDetails, clients, runID); err != nil {
@@ -245,7 +246,7 @@ func PrepareCmdProbe(cmdProbes []v1alpha1.CmdProbeAttributes, clients clients.Cl
 
 			// failing the probe, if the success condition doesn't met after the retry & timeout combinations
 			if err != nil {
-				SetProbeVerdict(resultDetails, "Better Luck Next Time", probe.Name, "CmdProbe")
+				SetProbeVerdictAfterFailure(resultDetails)
 				log.Infof("The %v cmd probe has been Failed", probe.Name)
 				return err
 			}

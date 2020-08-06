@@ -132,7 +132,7 @@ func ExperimentCPU(experimentsDetails *experimentTypes.ExperimentDetails, client
 						resultDetails.Verdict = "Stopped"
 						msg := experimentsDetails.ExperimentName + " experiment has been aborted"
 						result.ChaosResult(chaosDetails, clients, resultDetails, "EOT")
-						types.SetResultEventAttributes(eventsDetails, types.Summary, msg, resultDetails)
+						types.SetResultEventAttributes(eventsDetails, types.Summary, msg, "Normal", resultDetails)
 						events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosResult")
 						os.Exit(1)
 					case <-endTime:
