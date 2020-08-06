@@ -44,20 +44,20 @@ scaffolded files consist of placeholders which can then be filled as desired.
   
   ---
   name: "pod-delete"
-version: "0.1.0"
-category: "sample-category"
-repository: "https://github.com/litmuschaos/litmus-go/tree/master/sample-category/pod-delete"
-community: "https://kubernetes.slack.com/messages/CNXNB0ZTN"
-description: "kills nginx pods in a random manner"
-keywords:
-  - "pods"
-  - "kubernetes"
-  - "sample-category"
-  - "nginx"
-scope: "Namespaced"
-auxiliaryappcheck: false
-permissions:
-  - apigroups:
+  version: "0.1.0"
+  category: "sample-category"
+  repository: "https://github.com/litmuschaos/litmus-go/tree/master/sample-category/pod-delete"
+  community: "https://kubernetes.slack.com/messages/CNXNB0ZTN"
+  description: "kills nginx pods in a random manner"
+  keywords:
+    - "pods"
+    - "kubernetes"
+    - "sample-category"
+    - "nginx"
+  scope: "Namespaced"
+  auxiliaryappcheck: false
+  permissions:
+    - apigroups:
       - ""
       - "batch"
       - "litmuschaos.io"
@@ -74,16 +74,16 @@ permissions:
       - "update"
       - "patch"
       - "delete"
-maturity: "alpha"
-maintainers:
-  - name: "ksatchit"
-    email: "ksatchit@mayadata.io"
-provider:
-  name: "Mayadata"
-minkubernetesversion: "1.12.0"
-references:
-  - name: Documentation
-    url: "https://docs.litmuschaos.io/docs/getstarted/"
+  maturity: "alpha"
+  maintainers:
+    - name: "ksatchit"
+      email: "ksatchit@mayadata.io"
+  provider:
+    name: "Mayadata"
+  minkubernetesversion: "1.12.0"
+  references:
+    - name: Documentation
+      url: "https://docs.litmuschaos.io/docs/getstarted/"
 
   ```
 
