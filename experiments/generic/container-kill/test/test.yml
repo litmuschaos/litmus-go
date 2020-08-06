@@ -1,38 +1,41 @@
 ---
-apiVersion: batch/v1
-kind: Job
+apiVersion: apps/v1
+kind: Deployment
 metadata:
-  generateName: container-kill-
+  name: litmus-experiment
 spec:
+  replicas: 1
+  selector: 
+    matchLabels:
+      app: litmus-experiment
   template:
     metadata:
       labels:
-        experiment: container-kill
+        app: litmus-experiment
     spec:
-      # Placeholder that is updated by the executor for automated runs
-      # Provide appropriate SA (with desired permissions) if executed manually
-      serviceAccountName: %CHAOS_SERVICE_ACCOUNT%
-      restartPolicy: Never
+      serviceAccountName: container-kill-sa 
       containers:
       - name: gotest
-        image: litmuschaos/go-runner:ci
-        imagePullPolicy: Always
+        image: busybox
+        command:
+          - sleep 
+          - "3600"
         env:
           # provide application namespace
           - name: APP_NAMESPACE
-            value: ''
+            value: 'default'
 
           # provide application labels
           - name: APP_LABEL
-            value: ''
+            value: 'run=nginx'
 
            # provide target container name
           - name: TARGET_CONTAINER
-            value: ''
+            value: 'nginx'
 
             # provide application kind
           - name: APP_KIND
-            value: ''
+            value: 'deployment'
 
           - name: TOTAL_CHAOS_DURATION
             value: '20'
@@ -44,7 +47,7 @@ spec:
             value: 'litmuschaos/go-runner:ci'
 
           - name: CHAOS_NAMESPACE
-            value: ''
+            value: 'default'
 
             ## Period to wait before/after injection of chaos  
           - name: RAMP_TIME
@@ -52,12 +55,6 @@ spec:
 
           # provide lib - It supports pumba and containerd
           - name: LIB 
-            value: 'containerd'
+            value: 'pumba'
+        
 
-          # provide the container runtime path for containerd
-          # applicable only for containerd runtime
-          - name: CONTAINER_PATH
-            value: '/run/containerd/containerd.sock'
-
-        command: ["/bin/bash"]
-        args: ["-c", "./experiments/container-kill"]
