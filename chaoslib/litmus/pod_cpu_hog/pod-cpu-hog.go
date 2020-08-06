@@ -128,11 +128,18 @@ func ExperimentCPU(experimentsDetails *experimentTypes.ExperimentDetails, client
 							klog.V(0).Infof("Error in Kill stress after")
 							return err
 						}
-						resultDetails.FailStep = "CPU hog Chaos injection stopped!"
-						resultDetails.Verdict = "Stopped"
-						msg := experimentsDetails.ExperimentName + " experiment has been aborted"
+						// updating the chaosresult after stopped
+						failStep := "CPU hog Chaos injection stopped!"
+						types.SetResultAfterCompletion(resultDetails, "Fail", "Stopped", failStep)
 						result.ChaosResult(chaosDetails, clients, resultDetails, "EOT")
-						types.SetResultEventAttributes(eventsDetails, types.Summary, msg, "Normal", resultDetails)
+
+						// generating summary event in chaosengine
+						msg := experimentsDetails.ExperimentName + " experiment has been aborted"
+						types.SetEngineEventAttributes(eventsDetails, types.Summary, msg, "Warning", chaosDetails)
+						events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
+
+						// generating summary event in chaosresult
+						types.SetResultEventAttributes(eventsDetails, types.Summary, msg, "Warning", resultDetails)
 						events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosResult")
 						os.Exit(1)
 					case <-endTime:

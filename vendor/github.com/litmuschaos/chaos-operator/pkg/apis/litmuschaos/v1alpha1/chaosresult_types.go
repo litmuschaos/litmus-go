@@ -59,13 +59,7 @@ type ProbeStatus struct {
 	// Name defines the name of probe
 	Name string `json:"name,omitempty"`
 	// Verdict defines whether a probe is pass or fail
-	Status ProbeStatuses `json:"status,omitempty"`
-}
-
-// ProbeStatuses contains the verdict of probes
-type ProbeStatuses struct {
-	// Verdict defines whether a probe is pass or fail
-	Verdict string `json:"verdict"`
+	Status string `json:"status,omitempty"`
 }
 
 // TestStatus defines information about the status and results of a chaos experiment

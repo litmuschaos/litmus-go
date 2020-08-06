@@ -12,6 +12,7 @@ require (
 	github.com/imdario/mergo v0.3.9 // indirect
 	github.com/json-iterator/go v1.1.9 // indirect
 	github.com/kr/pretty v0.2.0 // indirect
+	github.com/kyokomi/emoji v2.2.4+incompatible
 	github.com/litmuschaos/chaos-operator v0.0.0-20200415134554-796f3ffb366e
 	github.com/mailru/easyjson v0.7.1 // indirect
 	github.com/onsi/ginkgo v1.10.1 // indirect

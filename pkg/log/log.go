@@ -11,8 +11,8 @@ func Fatalf(msg string, err error) {
 }
 
 //Infof log the General operational entries about what's going on inside the application
-func Infof(msg string, val string) {
-	logrus.WithFields(logrus.Fields{}).Infof(msg, val)
+func Infof(msg string, val ...interface{}) {
+	logrus.WithFields(logrus.Fields{}).Infof(msg, val...)
 }
 
 //Info log the General operational entries about what's going on inside the application

@@ -99,7 +99,7 @@ func InitializeChaosResult(chaosDetails *types.ChaosDetails, clients clients.Cli
 		if err != nil {
 			return errors.Errorf("Unable to get the chaosresult, err: %v", err)
 		}
-		// adding the labels to the chaosresullt
+		// adding the labels to the chaosresult
 		chaosResult.ObjectMeta.Labels = map[string]string{
 			"name": resultDetails.Name,
 		}
@@ -134,7 +134,7 @@ func GetProbeStatus(resultDetails *types.ResultDetails) []v1alpha1.ProbeStatus {
 	for _, probe := range resultDetails.ProbeDetails {
 		probes := v1alpha1.ProbeStatus{}
 		probes.Name = probe.Name
-		probes.Status.Verdict = probe.Verdict
+		probes.Status = probe.Status
 		probeStatus = append(probeStatus, probes)
 	}
 	return probeStatus
