@@ -53,8 +53,7 @@ func main() {
 	if err != nil {
 		log.Errorf("Unable to Create the Chaos Result due to %v", err)
 		failStep := "Updating the chaos result of pod-cpu-hog experiment (SOT)"
-		types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
-		err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
 
@@ -75,8 +74,7 @@ func main() {
 	if err != nil {
 		log.Errorf("Application status check failed due to %v\n", err)
 		failStep := "Verify that the AUT (Application Under Test) is running (pre-chaos)"
-		types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
-		result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
 
@@ -87,14 +85,13 @@ func main() {
 		if err != nil {
 			log.Errorf("Auxiliary Application status check failed due to %v", err)
 			failStep := "Verify that the Auxiliary Applications are running (pre-chaos)"
-			types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
-			result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}
 	}
 
 	if experimentsDetails.EngineName != "" {
-		types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, "AUT is Running successfully", &chaosDetails)
+		types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, "AUT is Running successfully", "Normal", &chaosDetails)
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
@@ -104,8 +101,7 @@ func main() {
 		if err != nil {
 			log.Errorf("[Error]: CPU hog failed due to %v\n", err)
 			failStep := "CPU hog Chaos injection failed"
-			types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
-			result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}
 		log.Info("[Confirmation]: CPU of the application node has been stressed successfully")
@@ -113,8 +109,7 @@ func main() {
 	} else {
 		log.Error("[Invalid]: Please Provide the correct LIB")
 		failStep := "Including the litmus lib for node-cpu-hog"
-		types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
-		result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
 
@@ -124,8 +119,7 @@ func main() {
 	if err != nil {
 		klog.V(0).Infof("Application status check failed due to %v\n", err)
 		failStep := "Verify that the AUT (Application Under Test) is running (post-chaos)"
-		types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
-		result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
 
@@ -136,14 +130,13 @@ func main() {
 		if err != nil {
 			log.Errorf("Auxiliary Application status check failed due to %v", err)
 			failStep := "Verify that the Auxiliary Applications are running (post-chaos)"
-			types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
-			result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}
 	}
 
 	if experimentsDetails.EngineName != "" {
-		types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, "AUT is Running successfully", &chaosDetails)
+		types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, "AUT is Running successfully", "Normal", &chaosDetails)
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
@@ -155,11 +148,11 @@ func main() {
 	}
 	if experimentsDetails.EngineName != "" {
 		msg := experimentsDetails.ExperimentName + " experiment has been " + resultDetails.Verdict + "ed"
-		types.SetEngineEventAttributes(&eventsDetails, types.Summary, msg, &chaosDetails)
+		types.SetEngineEventAttributes(&eventsDetails, types.Summary, msg, "Normal", &chaosDetails)
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
 	msg := experimentsDetails.ExperimentName + " experiment has been " + resultDetails.Verdict + "ed"
-	types.SetResultEventAttributes(&eventsDetails, types.Summary, msg, &resultDetails)
+	types.SetResultEventAttributes(&eventsDetails, types.Summary, msg, "Normal", &resultDetails)
 	events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosResult")
 }

@@ -5,6 +5,7 @@ import (
 
 	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
+	"github.com/litmuschaos/litmus-go/pkg/events"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/openebs/maya/pkg/util/retry"
 	"github.com/pkg/errors"
@@ -143,4 +144,23 @@ func SetResultUID(resultDetails *types.ResultDetails, clients clients.ClientSets
 	resultDetails.ResultUID = result.UID
 	return nil
 
+}
+
+//RecordAfterFailure update the chaosresult and create the summary events
+func RecordAfterFailure(chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, failStep string, clients clients.ClientSets, eventsDetails *types.EventDetails) {
+
+	// update the chaos result
+	types.SetResultAfterCompletion(resultDetails, "Fail", "Completed", failStep)
+	ChaosResult(chaosDetails, clients, resultDetails, "EOT")
+
+	// add the summary event in chaos result
+	msg := chaosDetails.ExperimentName + " experiment has been " + resultDetails.Verdict + "ed"
+	types.SetResultEventAttributes(eventsDetails, types.Summary, msg, "Warning", resultDetails)
+	events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosResult")
+
+	// add the summary event in chaos engine
+	if chaosDetails.EngineName != "" {
+		types.SetEngineEventAttributes(eventsDetails, types.Summary, msg, "Warning", chaosDetails)
+		events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
+	}
 }
