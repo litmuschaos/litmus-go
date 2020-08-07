@@ -13,7 +13,7 @@ spec:
       labels:
         app: litmus-experiment
     spec:
-      serviceAccountName: container-kill-sa 
+      serviceAccountName: node-cpu-hog-sa
       containers:
       - name: gotest
         image: busybox
@@ -27,19 +27,25 @@ spec:
           - name: APP_LABEL
             value: 'run=nginx'
 
-          - name: TARGET_CONTAINER
-            value: 'nginx'
-
           - name: APP_KIND
             value: 'deployment'
 
+          - name: AUXILIARY_APPINFO
+            value: ''
+
           - name: TOTAL_CHAOS_DURATION
-            value: '20'
+            value: '60'
 
           - name: CHAOS_INTERVAL
             value: '10'
 
-          - name: LIB_IMAGE  
+          - name: NODE_CPU_CORE
+            value: '1'
+
+          - name: LIB
+            value: 'litmus'
+
+          - name: LIB_IMAGE
             value: 'litmuschaos/go-runner:ci'
 
           - name: CHAOS_NAMESPACE
@@ -48,14 +54,6 @@ spec:
           - name: RAMP_TIME
             value: ''
 
-          - name: LIB 
-            value: 'pumba'
-
-          - name: CHAOS_SERVICE_ACCOUNT
-            valueFrom:
-              fieldRef:
-                fieldPath: spec.serviceAccountName
-        
           - name: POD_NAME
             valueFrom:
               fieldRef:

@@ -1,63 +1,14 @@
-## Experiment CR for the node-taint experiment
+## Experiment Metadata
 
-```
-apiVersion: litmuschaos.io/v1alpha1
-description:
-  message: |
-    Taint the node where application pod is scheduled
-kind: ChaosExperiment
-metadata:
-  name: node-taint
-  version: 0.1.0
-spec:
-  definition:
-    permissions:
-      - apiGroups:
-          - ""
-          - "apps"
-          - "batch"
-          - "litmuschaos.io"
-        resources:
-          - "deployments"
-          - "jobs"
-          - "pods"
-          - "pods/log"
-          - "events"
-          - "configmaps"
-          - "chaosengines"
-          - "chaosexperiments"
-          - "chaosresults"
-        verbs:
-          - "create"
-          - "list"
-          - "get"
-          - "patch"
-          - "update"
-          - "delete"
-      - apiGroups:
-          - ""
-        resources: 
-          - "nodes"
-        verbs:
-          - "get"
-          - "list"
-    image: "litmuschaos/go-runner:ci"
-    args:
-    - -c
-    - ./experiments/node-taint
-    command:
-    - /bin/bash
-    env:
-     # provide taint label & effect
-     # sample input is - key=value:effect
-    - name: TAINTS
-      value: ''
-    - name: RAMP_TIME
-      value: ''
-    - name: LIB
-      value: 'litmus'
-    - name: APP_NODE
-      value: ''
-    labels:
-      name: node-taint
-```
+<table>
+<tr>
+<th> Name </th>
+<th> Description </th>
+<th> Documentation Link </th>
+</tr>
+<tr>
+ <td> Node Taint </td>
+ <td> This experiment adds specific taints to the node which causes a forceful eviction of the pods from that node & checks if they are scheduled on another available node. </td>
+ <td>  <a href="https://docs.litmuschaos.io/docs/node-taint/"> Here </a> </td>
+ </tr>
+ </table>

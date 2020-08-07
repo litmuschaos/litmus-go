@@ -13,7 +13,7 @@ spec:
       labels:
         app: litmus-experiment
     spec:
-      serviceAccountName: container-kill-sa 
+      serviceAccountName: pod-network-latency-sa
       containers:
       - name: gotest
         image: busybox
@@ -30,32 +30,42 @@ spec:
           - name: TARGET_CONTAINER
             value: 'nginx'
 
+          # provide application kind
           - name: APP_KIND
             value: 'deployment'
 
+          - name: NETWORK_INTERFACE
+            value: 'eth0'
+
+          - name: TC_IMAGE
+            value: 'gaiadocker/iproute2'
+
+          # in ms
+          - name: NETWORK_LATENCY
+            value: '60000'
+
+          # in sec
           - name: TOTAL_CHAOS_DURATION
-            value: '20'
+            value: '60'
 
-          - name: CHAOS_INTERVAL
-            value: '10'
+          - name: LIB
+            value: 'pumba'
 
-          - name: LIB_IMAGE  
+          - name: LIB_IMAGE
             value: 'litmuschaos/go-runner:ci'
 
           - name: CHAOS_NAMESPACE
             value: 'default'
 
+            ## Period to wait before/after injection of chaos  
           - name: RAMP_TIME
             value: ''
-
-          - name: LIB 
-            value: 'pumba'
 
           - name: CHAOS_SERVICE_ACCOUNT
             valueFrom:
               fieldRef:
                 fieldPath: spec.serviceAccountName
-        
+
           - name: POD_NAME
             valueFrom:
               fieldRef:

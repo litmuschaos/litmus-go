@@ -13,7 +13,7 @@ spec:
       labels:
         app: litmus-experiment
     spec:
-      serviceAccountName: container-kill-sa 
+      serviceAccountName: pod-network-corruption-sa
       containers:
       - name: gotest
         image: busybox
@@ -33,13 +33,22 @@ spec:
           - name: APP_KIND
             value: 'deployment'
 
+          - name: NETWORK_INTERFACE
+            value: 'eth0'
+
+          - name: TC_IMAGE
+            value: 'gaiadocker/iproute2'
+
+          - name: NETWORK_PACKET_CORRUPTION_PERCENTAGE
+            value: '100'
+
           - name: TOTAL_CHAOS_DURATION
-            value: '20'
+            value: '60'
 
-          - name: CHAOS_INTERVAL
-            value: '10'
+          - name: LIB
+            value: 'pumba'
 
-          - name: LIB_IMAGE  
+          - name: LIB_IMAGE
             value: 'litmuschaos/go-runner:ci'
 
           - name: CHAOS_NAMESPACE
@@ -48,14 +57,11 @@ spec:
           - name: RAMP_TIME
             value: ''
 
-          - name: LIB 
-            value: 'pumba'
-
           - name: CHAOS_SERVICE_ACCOUNT
             valueFrom:
               fieldRef:
                 fieldPath: spec.serviceAccountName
-        
+
           - name: POD_NAME
             valueFrom:
               fieldRef:
