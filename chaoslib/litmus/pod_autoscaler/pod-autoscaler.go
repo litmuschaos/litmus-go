@@ -1,12 +1,17 @@
 package pod_autoscaler
 
 import (
+	"os"
+	"os/signal"
 	"strconv"
+	"syscall"
 	"time"
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
+	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-autoscaler/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
+	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	retries "k8s.io/client-go/util/retry"
@@ -33,14 +38,13 @@ func PreparePodAutoscaler(experimentsDetails *experimentTypes.ExperimentDetails,
 		return errors.Errorf("Unable to get the serviceAccountName, err: %v", err)
 	}
 
-	err = PodAutoscalerChaos(experimentsDetails, clients, replicaCount, appName)
+	err = PodAutoscalerChaos(experimentsDetails, clients, replicaCount, appName, resultDetails, eventsDetails, chaosDetails)
 
 	if err != nil {
 		return errors.Errorf("Unable to perform autoscaling, due to %v", err)
 	}
 
 	err = AutoscalerReovery(experimentsDetails, clients, replicaCount, appName)
-
 	if err != nil {
 		return errors.Errorf("Unable to perform autoscaling, due to %v", err)
 	}
@@ -79,7 +83,7 @@ func GetApplicationDetails(experimentsDetails *experimentTypes.ExperimentDetails
 }
 
 //PodAutoscalerChaos scales up the application pod replicas
-func PodAutoscalerChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, replicaCount int, appName string) error {
+func PodAutoscalerChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, replicaCount int, appName string, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	applicationClient := clients.KubeClient.AppsV1().Deployments(experimentsDetails.ChaosNamespace)
 
@@ -102,7 +106,7 @@ func PodAutoscalerChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 	}
 	log.Info("Application Started Scaling")
 
-	err = ApplicationPodStatusCheck(experimentsDetails, appName, clients, replicaCount)
+	err = ApplicationPodStatusCheck(experimentsDetails, appName, clients, replicaCount, resultDetails, eventsDetails, chaosDetails)
 	if err != nil {
 		return errors.Errorf("Status Check failed, err: %v", err)
 	}
@@ -111,11 +115,12 @@ func PodAutoscalerChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 }
 
 // ApplicationPodStatusCheck checks the status of the application pod
-func ApplicationPodStatusCheck(experimentsDetails *experimentTypes.ExperimentDetails, appName string, clients clients.ClientSets, replicaCount int) error {
+func ApplicationPodStatusCheck(experimentsDetails *experimentTypes.ExperimentDetails, appName string, clients clients.ClientSets, replicaCount int, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
 	ChaosStartTimeStamp := time.Now().Unix()
-
+	var endTime <-chan time.Time
+	timeDelay := time.Duration(experimentsDetails.ChaosDuration) * time.Second
 	failFlag := false
 	applicationClient := clients.KubeClient.AppsV1().Deployments(experimentsDetails.AppNS)
 	applicationDeploy, err := applicationClient.Get(appName, metav1.GetOptions{})
@@ -142,6 +147,49 @@ func ApplicationPodStatusCheck(experimentsDetails *experimentTypes.ExperimentDet
 			if int(chaosDiffTimeStamp) >= experimentsDetails.ChaosDuration {
 				failFlag = true
 				break
+			}
+
+			// signChan channel is used to transmit signal notifications.
+			signChan := make(chan os.Signal, 1)
+			// Catch and relay certain signal(s) to signChan channel.
+			signal.Notify(signChan, os.Interrupt, syscall.SIGTERM, syscall.SIGKILL)
+		loop:
+			for {
+				endTime = time.After(timeDelay)
+
+				select {
+				case <-signChan:
+					err = AutoscalerReovery(experimentsDetails, clients, replicaCount, appName)
+					if err != nil {
+						return errors.Errorf("Unable to perform autoscaling, due to %v", err)
+					}
+					// updating the chaosresult after stopped
+					failStep := "Pod autoscaler chaos injection stopped!"
+					types.SetResultAfterCompletion(resultDetails, "Fail", "Stopped", failStep)
+					result.ChaosResult(chaosDetails, clients, resultDetails, "EOT")
+
+					// generating summary event in chaosengine
+					msg := experimentsDetails.ExperimentName + " experiment has been aborted"
+					types.SetEngineEventAttributes(eventsDetails, types.Summary, msg, "Warning", chaosDetails)
+					events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
+
+					// generating summary event in chaosresult
+					types.SetResultEventAttributes(eventsDetails, types.Summary, msg, "Warning", resultDetails)
+					events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosResult")
+
+					os.Exit(1)
+				case <-endTime:
+					log.Infof("[Chaos]: Time is up for experiment: %v", experimentsDetails.ExperimentName)
+					endTime = nil
+					break loop
+
+				}
+
+			}
+
+			err = AutoscalerReovery(experimentsDetails, clients, replicaCount, appName)
+			if err != nil {
+				return errors.Errorf("Unable to perform autoscaling, due to %v", err)
 			}
 		} else {
 			break

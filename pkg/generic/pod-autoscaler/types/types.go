@@ -21,4 +21,6 @@ type ExperimentDetails struct {
 	ChaosPodName     string
 	RunID            string
 	AuxiliaryAppInfo string
+	Timeout             int
+	Delay               int
 }
