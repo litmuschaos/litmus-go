@@ -72,11 +72,12 @@ func SetEngineEventAttributes(eventsDetails *EventDetails, Reason, Message, Type
 }
 
 //SetResultEventAttributes initialise attributes for event generation in chaos result
-func SetResultEventAttributes(eventsDetails *EventDetails, Reason string, Message string, resultDetails *ResultDetails) {
+func SetResultEventAttributes(eventsDetails *EventDetails, Reason, Message, Type string, resultDetails *ResultDetails) {
 
 	eventsDetails.Reason = Reason
 	eventsDetails.Message = Message
 	eventsDetails.ResourceName = resultDetails.Name
 	eventsDetails.ResourceUID = resultDetails.ResultUID
+	eventsDetails.Type = Type
 
 }
