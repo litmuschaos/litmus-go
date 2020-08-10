@@ -1,8 +1,6 @@
 package main
 
 import (
-	"strconv"
-
 	"github.com/litmuschaos/litmus-go/chaoslib/litmus/pod_delete"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
@@ -83,21 +81,24 @@ func main() {
 	}
 
 	if experimentsDetails.EngineName != "" {
-		// generating pre chaos event
-		types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, "AUT is Running successfully", "Normal", &chaosDetails)
-		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 
 		// Add the probes in the pre-chaos check
 		err = probe.AddProbes(&chaosDetails, clients, &resultDetails, "PreChaos", &eventsDetails)
-		msg := strconv.Itoa(len(resultDetails.PassedProbe)) + " probes passed in prechaos check out of " + strconv.Itoa(len(resultDetails.ProbeDetails))
-		types.SetEngineEventAttributes(&eventsDetails, types.PreChaosProbe, msg, "Normal", &chaosDetails)
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 		if err != nil {
 			log.Errorf("Unable to Add the probes, due to err: %v", err)
 			failStep := "Failed while adding probe"
+			msg := "AUT: Running, Probes: Unsuccessful"
+			types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, msg, "Warning", &chaosDetails)
+			events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}
+
+		// generating pre chaos event
+		msg := "AUT: Running, Probes: Successful"
+		types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, msg, "Normal", &chaosDetails)
+		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
 	// Including the litmus lib for pod-delete
@@ -128,23 +129,24 @@ func main() {
 		return
 	}
 	if experimentsDetails.EngineName != "" {
-		// generating post chaos event
-		types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, "AUT is Running successfully", "Normal", &chaosDetails)
-		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 
 		// Add the probes in the post-chaos check
-		resultDetails.PassedProbe = []string{}
 		err = probe.AddProbes(&chaosDetails, clients, &resultDetails, "PostChaos", &eventsDetails)
-		msg := strconv.Itoa(len(resultDetails.PassedProbe)) + " probes passed in postchaos check out of " + strconv.Itoa(len(resultDetails.ProbeDetails))
-		types.SetEngineEventAttributes(&eventsDetails, types.PostChaosProbe, msg, "Normal", &chaosDetails)
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 		if err != nil {
 			log.Errorf("Unable to Add the probes, due to err: %v", err)
 			failStep := "Failed while adding probe"
+			msg := "AUT: Running, Probes: Unsuccessful"
+			types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, msg, "Warning", &chaosDetails)
+			events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}
 
+		// generating post chaos event
+		msg := "AUT: Running, Probes: Successful"
+		types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, msg, "Normal", &chaosDetails)
+		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
 	//Updating the chaosResult in the end of experiment

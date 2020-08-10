@@ -173,6 +173,9 @@ type K8sProbeAttributes struct {
 	Inputs K8sProbeInputs `json:"inputs,omitempty"`
 	// RunProperty contains timeout, retry and interval for the probe
 	RunProperties RunProperty `json:"runProperties,omitempty"`
+	// mode for k8s probe
+	// it can be SOT, EOT, Edge
+	Mode string `json:"mode,omitempty"`
 }
 
 // CmdProbeAttributes contains details of cmd probe, which can be applied on the experiments
@@ -196,6 +199,9 @@ type HTTPProbeAttributes struct {
 	Inputs HTTPProbeInputs `json:"inputs,omitempty"`
 	// RunProperty contains timeout, retry and interval for the probe
 	RunProperties RunProperty `json:"runProperties,omitempty"`
+	// mode for http probe
+	// it can be SOT, EOT, Edge, Continuous
+	Mode string `json:"mode,omitempty"`
 }
 
 // K8sProbeInputs contains all the inputs required for k8s probe

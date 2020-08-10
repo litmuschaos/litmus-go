@@ -23,33 +23,52 @@ func PrepareK8sProbe(k8sProbes []v1alpha1.K8sProbeAttributes, resultDetails *typ
 
 		for _, probe := range k8sProbes {
 
-			//DISPLAY THE K8S PROBE INFO
-			log.InfoWithValues("[Probe]: The k8s probe informations are as follows", logrus.Fields{
-				"Name":            probe.Name,
-				"Command":         probe.Inputs.Command,
-				"Expected Result": probe.Inputs.ExpectedResult,
-				"Run Properties":  probe.RunProperties,
-			})
+			//division on the basis of mode
+			// trigger probes for the edge modes
+			if (probe.Mode == "SOT" && phase == "PreChaos") || (probe.Mode == "EOT" && phase == "PostChaos") || probe.Mode == "Edge" {
 
-			// triggering the k8s probe and storing the output into the out buffer
-			err = TriggerK8sProbe(probe, probe.Inputs.Command, clients)
-			// failing the probe, if the success condition doesn't met after the retry & timeout combinations
-			if err != nil {
-				SetProbeVerdictAfterFailure(resultDetails)
-				log.Infof("[Probe]: %v probe has been Failed %v", probe.Name, emoji.Sprint(":cry:"))
-				return err
+				//DISPLAY THE K8S PROBE INFO
+				log.InfoWithValues("[Probe]: The k8s probe informations are as follows", logrus.Fields{
+					"Name":            probe.Name,
+					"Command":         probe.Inputs.Command,
+					"Expected Result": probe.Inputs.ExpectedResult,
+					"Run Properties":  probe.RunProperties,
+					"Mode":            probe.Mode,
+				})
+
+				// triggering the k8s probe
+				err = TriggerK8sProbe(probe, probe.Inputs.Command, clients)
+
+				// failing the probe, if the success condition doesn't met after the retry & timeout combinations
+				if err != nil {
+					SetProbeVerdictAfterFailure(resultDetails)
+					log.InfoWithValues("[Probe]: k8s probe has been Failed "+emoji.Sprint(":cry:"), logrus.Fields{
+						"ProbeName":     probe.Name,
+						"ProbeType":     "K8sProbe",
+						"ProbeInstance": phase,
+						"ProbeStatus":   "Fail",
+					})
+					return err
+				}
+				// counting the passed probes count to generate the score and mark the verdict as passed
+				// for edge, probe is marked as Passed if passed in both pre/post chaos checks
+				if !(probe.Mode == "Edge" && phase == "PreChaos") {
+					resultDetails.ProbeCount++
+				}
+				SetProbeVerdict(resultDetails, "Passed", probe.Name, "K8sProbe", probe.Mode, phase)
+				log.InfoWithValues("[Probe]: k8s probe has been Passed "+emoji.Sprint(":smile:"), logrus.Fields{
+					"ProbeName":     probe.Name,
+					"ProbeType":     "K8sProbe",
+					"ProbeInstance": phase,
+					"ProbeStatus":   "Pass",
+				})
 			}
-			// counting the passed probes count to generate the score and mark the verdict as passed
-			resultDetails.ProbeCount++
-			SetProbeVerdict(resultDetails, "Passed", probe.Name, "K8sProbe", "edge", phase)
-			log.Infof("[Probe]: The %v probe has been Passed %v", probe.Name, emoji.Sprint(":smile:"))
-			resultDetails.PassedProbe = append(resultDetails.PassedProbe, probe.Name+"-"+phase)
 		}
 	}
 	return nil
 }
 
-// TriggerK8sProbe run the k8s probe command and storing the output into the out buffer
+// TriggerK8sProbe run the k8s probe command
 func TriggerK8sProbe(probe v1alpha1.K8sProbeAttributes, cmd v1alpha1.K8sCommand, clients clients.ClientSets) error {
 
 	// it will retry for some retry count, in each iterations of try it contains following things

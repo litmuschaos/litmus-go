@@ -13,10 +13,6 @@ const (
 	Summary string = "Summary"
 	// ChaosInject this stage refer to the main chaos injection
 	ChaosInject string = "ChaosInject"
-	// PreChaosProbe ...
-	PreChaosProbe string = "PreChaosProbe"
-	// PostChaosProbe ...
-	PostChaosProbe string = "PostChaosProbe"
 )
 
 // ResultDetails is for collecting all the chaos-result-related details
@@ -28,7 +24,6 @@ type ResultDetails struct {
 	ResultUID    clientTypes.UID
 	ProbeDetails []ProbeDetails
 	ProbeCount   int
-	PassedProbe  []string
 }
 
 // ProbeDetails is for collecting all the probe details
@@ -36,7 +31,6 @@ type ProbeDetails struct {
 	Name   string
 	Type   string
 	Status map[string]string
-	C1     error
 }
 
 // EventDetails is for collecting all the events-related details

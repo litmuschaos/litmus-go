@@ -32,105 +32,72 @@ func PrepareCmdProbe(cmdProbes []v1alpha1.CmdProbeAttributes, clients clients.Cl
 	if cmdProbes != nil {
 		for _, probe := range cmdProbes {
 
-			//DISPLAY THE K8S PROBE INFO
-			log.InfoWithValues("[Probe]: The cmd probe informations are as follows", logrus.Fields{
-				"Name":            probe.Name,
-				"Command":         probe.Inputs.Command,
-				"Expected Result": probe.Inputs.ExpectedResult,
-				"Source":          probe.Inputs.Source,
-				"Run Properties":  probe.RunProperties,
-				"Mode":            probe.Mode,
-			})
+			//division on the basis of mode
+			// trigger probes for the edge modes
+			if (probe.Mode == "SOT" && phase == "PreChaos") || (probe.Mode == "EOT" && phase == "PostChaos") || probe.Mode == "Edge" {
 
-			if probe.Inputs.Source == "inline" {
+				//DISPLAY THE K8S PROBE INFO
+				log.InfoWithValues("[Probe]: The cmd probe informations are as follows", logrus.Fields{
+					"Name":            probe.Name,
+					"Command":         probe.Inputs.Command,
+					"Expected Result": probe.Inputs.ExpectedResult,
+					"Source":          probe.Inputs.Source,
+					"Run Properties":  probe.RunProperties,
+					"Mode":            probe.Mode,
+				})
 
-				//division on the basis of mode
-				// trigger probes for the edge modes
-				if (probe.Mode == "SOT" && phase == "PreChaos") || (probe.Mode == "EOT" && phase == "PostChaos") || probe.Mode == "Edge" {
+				// trigger for the inline cmd
+				if probe.Inputs.Source == "inline" {
 
 					// triggering the cmd probe for the inline mode
 					err = TriggerInlineCmdProbe(probe)
-					// failing the probe, if the success condition doesn't met after the retry & timeout combinations
-					MarkedVerdictInEnd(err, probe, resultDetails, phase)
-					if err != nil {
-						return err
-					}
-				}
-				// trigger probes for the continuous mode
-				if probe.Mode == "Continuous" && phase == "PreChaos" {
-					go TriggerInlineContinuousCmdProbe(probe, resultDetails)
-				}
-				// verify the continuous mode
-				if probe.Mode == "Continuous" && phase == "PostChaos" {
-					err = ContinuousTrial(resultDetails, cmdProbes)
-					// failing the probe, if the success condition doesn't met after the retry & timeout combinations
-					MarkedVerdictInEnd(err, probe, resultDetails, phase)
-					if err != nil {
-						return err
-					}
-				}
-
-			} else {
-
-				// create the external pod with source image for cmd probe
-				err := CreateProbePod(clients, chaosDetails, runID, probe.Inputs.Source)
-				if err != nil {
-					return err
-				}
-
-				// verify the running status of external probe pod
-				log.Info("[Status]: Checking the status of the probe pod")
-				err = status.CheckApplicationStatus(chaosDetails.ChaosNamespace, "name="+chaosDetails.ExperimentName+"-probe-"+runID, chaosDetails.Timeout, chaosDetails.Delay, clients)
-				if err != nil {
-					return errors.Errorf("probe pod is not in running state, err: %v", err)
-				}
-
-				// setting the attributes for the exec command
-				execCommandDetails := litmusexec.PodDetails{}
-				litmusexec.SetExecCommandAttributes(&execCommandDetails, chaosDetails.ExperimentName+"-probe-"+runID, chaosDetails.ExperimentName+"-probe", chaosDetails.ChaosNamespace)
-
-				//division on the basis of mode
-				// trigger probes for the edge modes
-				if (probe.Mode == "SOT" && phase == "PreChaos") || (probe.Mode == "EOT" && phase == "PostChaos") || probe.Mode == "Edge" {
-
-					// triggering the cmd probe and storing the output into the out buffer
-					err = TriggerCmdProbe(probe, execCommandDetails, clients)
-					// failing the probe, if the success condition doesn't met after the retry & timeout combinations
 
 					// failing the probe, if the success condition doesn't met after the retry & timeout combinations
 					MarkedVerdictInEnd(err, probe, resultDetails, phase)
 					if err != nil {
 						return err
 					}
+				} else {
 
-					// deleting the external pod which was created for cmd probe
-					if err = DeleteProbePod(chaosDetails, clients, runID); err != nil {
-						return err
-					}
-				}
-				// trigger probes for the continuous mode
-				if probe.Mode == "Continuous" && phase == "PreChaos" {
-					go TriggerContinuousCmdProbe(probe, execCommandDetails, clients, resultDetails)
-				}
-				// verify the continuous mode
-				if probe.Mode == "Continuous" && phase == "PostChaos" {
-					err = ContinuousTrial(resultDetails, cmdProbes)
-
-					// failing the probe, if the success condition doesn't met after the retry & timeout combinations
-					MarkedVerdictInEnd(err, probe, resultDetails, phase)
+					// create the external pod with source image for cmd probe
+					err := CreateProbePod(clients, chaosDetails, runID, probe.Inputs.Source)
 					if err != nil {
 						return err
 					}
 
-					// deleting the external pod which was created for cmd probe
-					if err = DeleteProbePod(chaosDetails, clients, runID); err != nil {
-						return err
+					// verify the running status of external probe pod
+					log.Info("[Status]: Checking the status of the probe pod")
+					err = status.CheckApplicationStatus(chaosDetails.ChaosNamespace, "name="+chaosDetails.ExperimentName+"-probe-"+runID, chaosDetails.Timeout, chaosDetails.Delay, clients)
+					if err != nil {
+						return errors.Errorf("probe pod is not in running state, err: %v", err)
 					}
-				}
 
+					// setting the attributes for the exec command
+					execCommandDetails := litmusexec.PodDetails{}
+					litmusexec.SetExecCommandAttributes(&execCommandDetails, chaosDetails.ExperimentName+"-probe-"+runID, chaosDetails.ExperimentName+"-probe", chaosDetails.ChaosNamespace)
+
+					//division on the basis of mode
+					// trigger probes for the edge modes
+					if (probe.Mode == "SOT" && phase == "PreChaos") || (probe.Mode == "EOT" && phase == "PostChaos") || probe.Mode == "Edge" {
+
+						// triggering the cmd probe and storing the output into the out buffer
+						err = TriggerCmdProbe(probe, execCommandDetails, clients)
+
+						// failing the probe, if the success condition doesn't met after the retry & timeout combinations
+						if err = MarkedVerdictInEnd(err, probe, resultDetails, phase); err != nil {
+							return err
+						}
+
+						// deleting the external pod which was created for cmd probe
+						if err = DeleteProbePod(chaosDetails, clients, runID); err != nil {
+							return err
+						}
+					}
+
+				}
 			}
-		}
 
+		}
 	}
 	return nil
 }
@@ -146,40 +113,20 @@ func TriggerInlineCmdProbe(probe v1alpha1.CmdProbeAttributes) error {
 		Timeout(int64(probe.RunProperties.ProbeTimeout)).
 		Wait(time.Duration(probe.RunProperties.Interval) * time.Second).
 		TryWithTimeout(func(attempt uint) error {
-			// parse the command for the pipe, if command contains awk, grep commands
-			out, err := ParseCommandAndRun(probe.Inputs.Command)
-			if err != nil {
-				return err
+			var out bytes.Buffer
+			// run the inline command probe
+			cmd := exec.Command("/bin/sh", "-c", probe.Inputs.Command)
+			cmd.Stdout = &out
+			if err := cmd.Run(); err != nil {
+				return fmt.Errorf("Unable to run command, err: %v", err)
 			}
 			// Trim the extra whitespaces from the output and match the actual output with the expected output
-			if strings.TrimSpace(string(out)) != probe.Inputs.ExpectedResult {
-				log.Infof("[Retry]The %v cmd probe has been Failed", probe.Name)
-				return fmt.Errorf("The probe output didn't match with expected output, %v", string(out))
+			if strings.TrimSpace(out.String()) != probe.Inputs.ExpectedResult {
+				return fmt.Errorf("The probe output didn't match with expected output, %v", out.String())
 			}
 			return nil
 		})
 	return err
-}
-
-// TriggerInlineContinuousCmdProbe trigger the inline continuous cmd probes
-func TriggerInlineContinuousCmdProbe(probe v1alpha1.CmdProbeAttributes, chaosresult *types.ResultDetails) {
-	// it trigger the inline cmd probe for the entire duration of chaos and it fails when get an not nil error
-	// it mark the not nill error for the probes, if any
-	for {
-		err = TriggerInlineCmdProbe(probe)
-		if err != nil {
-			for index := range chaosresult.ProbeDetails {
-				if chaosresult.ProbeDetails[index].Name == probe.Name {
-					chaosresult.ProbeDetails[index].C1 = err
-					break
-				}
-
-			}
-			break
-		}
-
-	}
-
 }
 
 // TriggerCmdProbe trigger the cmd probe inside the external pod and storing the output into the out buffer
@@ -207,27 +154,6 @@ func TriggerCmdProbe(probe v1alpha1.CmdProbeAttributes, execCommandDetails litmu
 			return nil
 		})
 	return err
-}
-
-// TriggerContinuousCmdProbe trigger the continuous cmd probes
-func TriggerContinuousCmdProbe(probe v1alpha1.CmdProbeAttributes, execCommandDetails litmusexec.PodDetails, clients clients.ClientSets, chaosresult *types.ResultDetails) {
-	// it trigger the cmd probe for the entire duration of chaos and it fails when get an not nil error
-	// it mark the not nill error for the probes, if any
-	for {
-		err = TriggerCmdProbe(probe, execCommandDetails, clients)
-		if err != nil {
-			for index := range chaosresult.ProbeDetails {
-				if chaosresult.ProbeDetails[index].Name == probe.Name {
-					chaosresult.ProbeDetails[index].C1 = err
-					break
-				}
-
-			}
-			break
-		}
-
-	}
-
 }
 
 // CreateProbePod creates an extrenal pod with source image for the cmd probe
@@ -301,86 +227,30 @@ func GetRunID() string {
 	return string(runID)
 }
 
-// ParseCommandAndRun parse the command for pipe(|) operator
-// it used when command contains awk, grep commands
-func ParseCommandAndRun(command string) ([]byte, error) {
-	commands := []*exec.Cmd{}
-	// split the command by pipe operator
-	cmd := strings.Split(command, "|")
-	// trim extra space from the commands and convert them to exec.Cmd form
-	for index := range cmd {
-
-		cmd[index] = strings.TrimSpace(cmd[index])
-		values := strings.Fields(cmd[index])
-		command := exec.Command(values[0], values[1:]...)
-		commands = append(commands, command)
-	}
-
-	// running the commands and joined them by pipe for multiple commands
-	// otherwise run the command normally
-	out, err := PipeCommand(commands...)
-	if err != nil {
-		return nil, err
-	}
-
-	return out, nil
-}
-
-// PipeCommand joined the command by pipe and run them
-// and return the final output
-func PipeCommand(commands ...*exec.Cmd) ([]byte, error) {
-	len := len(commands)
-	// running the commads [1,n-1]
-	for i, command := range commands[:len-1] {
-		var out, stderr bytes.Buffer
-		command.Stdout = &out
-		command.Stderr = &stderr
-		if err := command.Run(); err != nil {
-			return nil, fmt.Errorf("Unable to run the command, err: %v", err)
-		}
-		// use the ouput of (i-1)th output as input of ith command
-		commands[i+1].Stdin = &out
-		// adding the pipe to the input of command
-		commands[i+1].StdinPipe()
-
-	}
-
-	// running the nth command and provide o/p of (n-1)th command's ouput as input
-	var out, stderr bytes.Buffer
-	commands[len-1].Stdout = &out
-	commands[len-1].Stderr = &stderr
-	if err := commands[len-1].Run(); err != nil {
-		return nil, fmt.Errorf("Unable to run the command, err: %v", err)
-	}
-	return out.Bytes(), nil
-}
-
-//ContinuousTrial verify the probe result for the continuous cmd probe
-func ContinuousTrial(resultDetails *types.ResultDetails, cmdProbes []v1alpha1.CmdProbeAttributes) error {
-
-	for _, probe := range cmdProbes {
-		if probe.Mode == "" {
-			for index, probe1 := range resultDetails.ProbeDetails {
-				if probe1.Name == probe.Name {
-					err = resultDetails.ProbeDetails[index].C1
-					return err
-				}
-			}
-		}
-	}
-
-	return nil
-}
-
-// MarkedVerdictInEnd ...
-func MarkedVerdictInEnd(err error, probe v1alpha1.CmdProbeAttributes, resultDetails *types.ResultDetails, phase string) {
+// MarkedVerdictInEnd add the probe status in the chaosresult
+func MarkedVerdictInEnd(err error, probe v1alpha1.CmdProbeAttributes, resultDetails *types.ResultDetails, phase string) error {
 	// failing the probe, if the success condition doesn't met after the retry & timeout combinations
 	if err != nil {
-		log.Infof("[Probe]: %v probe has been Failed %v", probe.Name, emoji.Sprint(":cry:"))
+		log.InfoWithValues("[Probe]: cmd probe has been Failed "+emoji.Sprint(":cry:"), logrus.Fields{
+			"ProbeName":     probe.Name,
+			"ProbeType":     "CmdProbe",
+			"ProbeInstance": phase,
+			"ProbeStatus":   "Fail",
+		})
 		SetProbeVerdictAfterFailure(resultDetails)
+		return err
 	}
-	resultDetails.ProbeCount++
+	// counting the passed probes count to generate the score and mark the verdict as passed
+	// for edge, probe is marked as Passed if passed in both pre/post chaos checks
+	if !(probe.Mode == "Edge" && phase == "PreChaos") {
+		resultDetails.ProbeCount++
+	}
+	log.InfoWithValues("[Probe]: cmd probe has been Passed "+emoji.Sprint(":smile:"), logrus.Fields{
+		"ProbeName":     probe.Name,
+		"ProbeType":     "CmdProbe",
+		"ProbeInstance": phase,
+		"ProbeStatus":   "Pass",
+	})
 	SetProbeVerdict(resultDetails, "Passed", probe.Name, "CmdProbe", probe.Mode, phase)
-	log.Infof("[Probe]: %v probe has been Passed %v", probe.Name, emoji.Sprint(":smile:"))
-	resultDetails.PassedProbe = append(resultDetails.PassedProbe, probe.Name+"-"+phase)
+	return nil
 }

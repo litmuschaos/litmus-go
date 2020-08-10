@@ -17,7 +17,7 @@ var err error
 func AddProbes(chaosDetails *types.ChaosDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, phase string, eventsDetails *types.EventDetails) error {
 
 	// get the probes details from the chaosengine
-	k8sProbes, cmdProbes, _, err := GetProbesFromEngine(chaosDetails, clients)
+	k8sProbes, cmdProbes, httpProbes, err := GetProbesFromEngine(chaosDetails, clients)
 	if err != nil {
 		return err
 	}
@@ -34,29 +34,27 @@ func AddProbes(chaosDetails *types.ChaosDetails, clients clients.ClientSets, res
 		return err
 	}
 
-	// // it contains steps to prepare http probe
-	// err = PrepareHTTPProbe(httpProbes, clients, chaosDetails, resultDetails, phase, eventsDetails)
-	// if err != nil {
-	// 	return err
-	// }
+	// it contains steps to prepare http probe
+	err = PrepareHTTPProbe(httpProbes, clients, chaosDetails, resultDetails, phase, eventsDetails)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
 
 //SetProbeVerdict mark the verdict of the probe in the chaosresult as passed
+// on the basis of phase(pre/post chaos)
 func SetProbeVerdict(resultDetails *types.ResultDetails, verdict, probeName, probeType, mode, phase string) {
 
 	for index, probe := range resultDetails.ProbeDetails {
 		if probe.Name == probeName && probe.Type == probeType {
 
-			if phase == "PreChaos" && (mode == "SOT" || mode == "Edge" || probeType == "K8sProbe") {
+			if phase == "PreChaos" && (mode == "SOT" || mode == "Edge") {
 				resultDetails.ProbeDetails[index].Status["PreChaos"] = verdict + emoji.Sprint(" :thumbsup:")
-			} else if phase == "PostChaos" && (mode == "EOT" || mode == "Edge" || probeType == "K8sProbe") {
+			} else if phase == "PostChaos" && (mode == "EOT" || mode == "Edge") {
 				resultDetails.ProbeDetails[index].Status["PostChaos"] = verdict + emoji.Sprint(" :thumbsup:")
-			} else {
-				resultDetails.ProbeDetails[index].Status["Continuous"] = verdict + emoji.Sprint(" :thumbsup:")
 			}
-			break
 		}
 	}
 }
@@ -69,9 +67,6 @@ func SetProbeVerdictAfterFailure(resultDetails *types.ResultDetails) {
 		}
 		if resultDetails.ProbeDetails[index].Status["PostChaos"] == "Awaited" {
 			resultDetails.ProbeDetails[index].Status["PostChaos"] = "Better Luck Next Time" + emoji.Sprint(" :thumbsdown:")
-		}
-		if resultDetails.ProbeDetails[index].Status["Continuous"] == "Awaited" {
-			resultDetails.ProbeDetails[index].Status["Continuous"] = "Better Luck Next Time" + emoji.Sprint(" :thumbsdown:")
 		}
 	}
 }
@@ -120,10 +115,7 @@ func SetProbesInChaosResult(chaosDetails *types.ChaosDetails, clients clients.Cl
 	for _, probe := range k8sProbes {
 		probeDetail.Name = probe.Name
 		probeDetail.Type = "K8sProbe"
-		probeDetail.Status = map[string]string{
-			"PreChaos":  "Awaited",
-			"PostChaos": "Awaited",
-		}
+		SetProbeIntialStatus(&probeDetail, probe.Mode)
 		probeDetails = append(probeDetails, probeDetail)
 	}
 
@@ -131,10 +123,7 @@ func SetProbesInChaosResult(chaosDetails *types.ChaosDetails, clients clients.Cl
 	for _, probe := range httpProbes {
 		probeDetail.Name = probe.Name
 		probeDetail.Type = "HTTPProbe"
-		probeDetail.Status = map[string]string{
-			"PreChaos":  "Awaited",
-			"PostChaos": "Awaited",
-		}
+		SetProbeIntialStatus(&probeDetail, probe.Mode)
 		probeDetails = append(probeDetails, probeDetail)
 	}
 
@@ -142,21 +131,29 @@ func SetProbesInChaosResult(chaosDetails *types.ChaosDetails, clients clients.Cl
 	for _, probe := range cmdProbes {
 		probeDetail.Name = probe.Name
 		probeDetail.Type = "CmdProbe"
-		if probe.Mode != "Continuous" {
-			probeDetail.Status = map[string]string{
-				"PreChaos":  "Awaited",
-				"PostChaos": "Awaited",
-			}
-		} else {
-			probeDetail.Status = map[string]string{
-				"Continuous": "Awaited",
-			}
-		}
-		probeDetail.C1 = nil
+		SetProbeIntialStatus(&probeDetail, probe.Mode)
 		probeDetails = append(probeDetails, probeDetail)
 	}
 
 	chaosresult.ProbeDetails = probeDetails
 
 	return nil
+}
+
+//SetProbeIntialStatus sets the initial status inside chaosresult
+func SetProbeIntialStatus(probeDetails *types.ProbeDetails, mode string) {
+	if mode == "Edge" {
+		probeDetails.Status = map[string]string{
+			"PreChaos":  "Awaited",
+			"PostChaos": "Awaited",
+		}
+	} else if mode == "SOT" {
+		probeDetails.Status = map[string]string{
+			"PreChaos": "Awaited",
+		}
+	} else {
+		probeDetails.Status = map[string]string{
+			"PostChaos": "Awaited",
+		}
+	}
 }

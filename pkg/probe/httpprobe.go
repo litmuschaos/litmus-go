@@ -17,39 +17,58 @@ import (
 )
 
 // PrepareHTTPProbe contains the steps to prepare the http probe
-// http probe can be used to add the probe which will curl an url and match the output
+// http probe can be used to add the probe which will send a request to given url and match the status code
 func PrepareHTTPProbe(httpProbes []v1alpha1.HTTPProbeAttributes, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, phase string, eventsDetails *types.EventDetails) error {
 
 	if httpProbes != nil {
 
 		for _, probe := range httpProbes {
 
-			//DISPLAY THE K8S PROBE INFO
-			log.InfoWithValues("[Probe]: The http probe informations are as follows", logrus.Fields{
-				"Name":                     probe.Name,
-				"URL":                      probe.Inputs.URL,
-				"Expecected Response Code": probe.Inputs.ExpectedResponseCode,
-				"Run Properties":           probe.RunProperties,
-			})
+			//division on the basis of mode
+			// trigger probes for the edge modes
+			if (probe.Mode == "SOT" && phase == "PreChaos") || (probe.Mode == "EOT" && phase == "PostChaos") || probe.Mode == "Edge" {
 
-			// trigger the http probe and storing the output into the out buffer
-			err = TriggerHTTPProbe(probe)
-			// failing the probe, if the success condition doesn't met after the retry & timeout combinations
-			if err != nil {
-				SetProbeVerdictAfterFailure(resultDetails)
-				log.Infof("[Probe]: %v probe has been Failed %v", probe.Name, emoji.Sprint(":cry:"))
-				return err
+				//DISPLAY THE K8S PROBE INFO
+				log.InfoWithValues("[Probe]: The http probe informations are as follows", logrus.Fields{
+					"Name":                     probe.Name,
+					"URL":                      probe.Inputs.URL,
+					"Expecected Response Code": probe.Inputs.ExpectedResponseCode,
+					"Run Properties":           probe.RunProperties,
+				})
+
+				// trigger the http probe
+				err = TriggerHTTPProbe(probe)
+
+				// failing the probe, if the success condition doesn't met after the retry & timeout combinations
+				if err != nil {
+					SetProbeVerdictAfterFailure(resultDetails)
+					log.InfoWithValues("[Probe]: http probe has been Failed "+emoji.Sprint(":cry:"), logrus.Fields{
+						"ProbeName":     probe.Name,
+						"ProbeType":     "HttpProbe",
+						"ProbeInstance": phase,
+						"ProbeStatus":   "Fail",
+					})
+					return err
+				}
+				// counting the passed probes count to generate the score and mark the verdict as passed
+				// for edge, probe is marked as Passed if passed in both pre/post chaos checks
+				if !(probe.Mode == "Edge" && phase == "PreChaos") {
+					resultDetails.ProbeCount++
+				}
+				SetProbeVerdict(resultDetails, "Passed", probe.Name, "HTTPProbe", probe.Mode, phase)
+				log.InfoWithValues("[Probe]: http probe has been Passed "+emoji.Sprint(":smile:"), logrus.Fields{
+					"ProbeName":     probe.Name,
+					"ProbeType":     "HttpProbe",
+					"ProbeInstance": phase,
+					"ProbeStatus":   "Pass",
+				})
 			}
-			resultDetails.ProbeCount++
-			SetProbeVerdict(resultDetails, "Passed", probe.Name, "HTTPProbe", "edge", phase)
-			log.Infof("[Probe]: The %v probe has been Passed %v", probe.Name, emoji.Sprint(":smile:"))
-			resultDetails.PassedProbe = append(resultDetails.PassedProbe, probe.Name+"-"+phase)
 		}
 	}
 	return nil
 }
 
-// TriggerHTTPProbe run the http probe command and storing the output into the out buffer
+// TriggerHTTPProbe run the http probe command
 func TriggerHTTPProbe(probe v1alpha1.HTTPProbeAttributes) error {
 
 	// it will retry for some retry count, in each iterations of try it contains following things

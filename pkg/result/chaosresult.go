@@ -78,9 +78,9 @@ func InitializeChaosResult(chaosDetails *types.ChaosDetails, clients clients.Cli
 		},
 		Status: v1alpha1.ChaosResultStatus{
 			ExperimentStatus: v1alpha1.TestStatus{
-				Phase:   resultDetails.Phase,
-				Verdict: resultDetails.Verdict,
-				Score:   "Awaited",
+				Phase:           resultDetails.Phase,
+				Verdict:         resultDetails.Verdict,
+				ResilienceScore: "Awaited",
 			},
 			ProbeStatus: probeStatus,
 		},
@@ -114,7 +114,7 @@ func InitializeChaosResult(chaosDetails *types.ChaosDetails, clients clients.Cli
 	return nil
 }
 
-//GetProbeDetails ...
+//GetProbeDetails fetch details of all probes
 func GetProbeDetails(resultDetails *types.ResultDetails) []v1alpha1.ProbeDetails {
 
 	probeDetails := []v1alpha1.ProbeDetails{}
@@ -127,7 +127,7 @@ func GetProbeDetails(resultDetails *types.ResultDetails) []v1alpha1.ProbeDetails
 	return probeDetails
 }
 
-//GetProbeStatus ...
+//GetProbeStatus fetch status of all probes
 func GetProbeStatus(resultDetails *types.ResultDetails) []v1alpha1.ProbeStatus {
 
 	probeStatus := []v1alpha1.ProbeStatus{}
@@ -151,13 +151,13 @@ func PatchChaosResult(result *v1alpha1.ChaosResult, clients clients.ClientSets, 
 	result.Status.ProbeStatus = GetProbeStatus(resultDetails)
 	if resultDetails.Phase == "Completed" {
 		if resultDetails.Verdict == "Pass" {
-			result.Status.ExperimentStatus.Score = strconv.Itoa((resultDetails.ProbeCount*30)/len(resultDetails.ProbeDetails)+40) + "%"
+			result.Status.ExperimentStatus.ResilienceScore = strconv.Itoa((resultDetails.ProbeCount*30)/len(resultDetails.ProbeDetails)+40) + "%"
 		} else {
-			result.Status.ExperimentStatus.Score = strconv.Itoa((resultDetails.ProbeCount*30)/len(resultDetails.ProbeDetails)) + "%"
+			result.Status.ExperimentStatus.ResilienceScore = strconv.Itoa((resultDetails.ProbeCount*30)/len(resultDetails.ProbeDetails)) + "%"
 		}
 
 	} else {
-		result.Status.ExperimentStatus.Score = "Awaited"
+		result.Status.ExperimentStatus.ResilienceScore = "Awaited"
 	}
 
 	// It will update the existing chaos-result CR with new values

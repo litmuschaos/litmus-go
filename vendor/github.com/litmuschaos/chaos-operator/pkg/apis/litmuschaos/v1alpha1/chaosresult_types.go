@@ -58,8 +58,8 @@ type ChaosResultStatus struct {
 type ProbeStatus struct {
 	// Name defines the name of probe
 	Name string `json:"name,omitempty"`
-	// Verdict defines whether a probe is pass or fail
-	Status string `json:"status,omitempty"`
+	// Status defines whether a probe is pass or fail in pre/post chaos checks
+	Status map[string]string `json:"status,omitempty"`
 }
 
 // TestStatus defines information about the status and results of a chaos experiment
@@ -70,8 +70,8 @@ type TestStatus struct {
 	Verdict string `json:"verdict"`
 	// FailStep defines step where the experiments fails
 	FailStep string `json:"failStep,omitempty"`
-	// Score defines the score of the experiment on the basis of probes
-	Score string `json:"score,omitempty"`
+	// ResilienceScore defines the score of the experiment on the basis of probes result
+	ResilienceScore string `json:"resilienceScore,omitempty"`
 }
 
 // +genclient
