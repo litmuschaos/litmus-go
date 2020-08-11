@@ -23,8 +23,9 @@ import (
 )
 
 // PrepareCmdProbe contains the steps to prepare the cmd probe
-// cmd probe can be used to add the probe which will run the command which need a source(an external image) or
-// any inline command which can be run without source image as well
+// cmd probe can be used to add the command probes
+// it can be of two types one: which need a source(an external image)
+// another: any inline command which can be run without source image, directly via go-runner image
 func PrepareCmdProbe(cmdProbes []v1alpha1.CmdProbeAttributes, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, phase string, eventsDetails *types.EventDetails) error {
 	// Generate the run_id
 	runID := GetRunID()
@@ -32,11 +33,10 @@ func PrepareCmdProbe(cmdProbes []v1alpha1.CmdProbeAttributes, clients clients.Cl
 	if cmdProbes != nil {
 		for _, probe := range cmdProbes {
 
-			//division on the basis of mode
 			// trigger probes for the edge modes
 			if (probe.Mode == "SOT" && phase == "PreChaos") || (probe.Mode == "EOT" && phase == "PostChaos") || probe.Mode == "Edge" {
 
-				//DISPLAY THE K8S PROBE INFO
+				//DISPLAY THE cmd PROBE INFO
 				log.InfoWithValues("[Probe]: The cmd probe informations are as follows", logrus.Fields{
 					"Name":            probe.Name,
 					"Command":         probe.Inputs.Command,
@@ -46,13 +46,13 @@ func PrepareCmdProbe(cmdProbes []v1alpha1.CmdProbeAttributes, clients clients.Cl
 					"Mode":            probe.Mode,
 				})
 
-				// trigger for the inline cmd
+				// triggering the cmd probe for the inline mode
 				if probe.Inputs.Source == "inline" {
 
-					// triggering the cmd probe for the inline mode
 					err = TriggerInlineCmdProbe(probe)
 
 					// failing the probe, if the success condition doesn't met after the retry & timeout combinations
+					// it will update the status of all the unrun probes as well
 					MarkedVerdictInEnd(err, probe, resultDetails, phase)
 					if err != nil {
 						return err
@@ -76,25 +76,21 @@ func PrepareCmdProbe(cmdProbes []v1alpha1.CmdProbeAttributes, clients clients.Cl
 					execCommandDetails := litmusexec.PodDetails{}
 					litmusexec.SetExecCommandAttributes(&execCommandDetails, chaosDetails.ExperimentName+"-probe-"+runID, chaosDetails.ExperimentName+"-probe", chaosDetails.ChaosNamespace)
 
-					//division on the basis of mode
-					// trigger probes for the edge modes
-					if (probe.Mode == "SOT" && phase == "PreChaos") || (probe.Mode == "EOT" && phase == "PostChaos") || probe.Mode == "Edge" {
+					// triggering the cmd probe and storing the output into the out buffer
+					err = TriggerCmdProbe(probe, execCommandDetails, clients)
 
-						// triggering the cmd probe and storing the output into the out buffer
-						err = TriggerCmdProbe(probe, execCommandDetails, clients)
-
-						// failing the probe, if the success condition doesn't met after the retry & timeout combinations
-						if err = MarkedVerdictInEnd(err, probe, resultDetails, phase); err != nil {
-							return err
-						}
-
-						// deleting the external pod which was created for cmd probe
-						if err = DeleteProbePod(chaosDetails, clients, runID); err != nil {
-							return err
-						}
+					// failing the probe, if the success condition doesn't met after the retry & timeout combinations
+					// it will update the status of all the unrun probes as well
+					if err = MarkedVerdictInEnd(err, probe, resultDetails, phase); err != nil {
+						return err
 					}
 
+					// deleting the external pod which was created for cmd probe
+					if err = DeleteProbePod(chaosDetails, clients, runID); err != nil {
+						return err
+					}
 				}
+
 			}
 
 		}
@@ -129,7 +125,7 @@ func TriggerInlineCmdProbe(probe v1alpha1.CmdProbeAttributes) error {
 	return err
 }
 
-// TriggerCmdProbe trigger the cmd probe inside the external pod and storing the output into the out buffer
+// TriggerCmdProbe trigger the cmd probe inside the external pod
 func TriggerCmdProbe(probe v1alpha1.CmdProbeAttributes, execCommandDetails litmusexec.PodDetails, clients clients.ClientSets) error {
 
 	// running the cmd probe command and matching the ouput
@@ -156,7 +152,7 @@ func TriggerCmdProbe(probe v1alpha1.CmdProbeAttributes, execCommandDetails litmu
 	return err
 }
 
-// CreateProbePod creates an extrenal pod with source image for the cmd probe
+// CreateProbePod creates an external pod with source image for the cmd probe
 func CreateProbePod(clients clients.ClientSets, chaosDetails *types.ChaosDetails, runID, source string) error {
 
 	cmdProbe := &apiv1.Pod{
@@ -201,7 +197,7 @@ func DeleteProbePod(chaosDetails *types.ChaosDetails, clients clients.ClientSets
 		return err
 	}
 
-	// waiting for the termination of the pod
+	// waiting till the termination of the pod
 	err = retry.
 		Times(uint(chaosDetails.Timeout / chaosDetails.Delay)).
 		Wait(time.Duration(chaosDetails.Delay) * time.Second).

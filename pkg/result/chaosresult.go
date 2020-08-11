@@ -60,7 +60,6 @@ func ChaosResult(chaosDetails *types.ChaosDetails, clients clients.ClientSets, r
 //InitializeChaosResult create the chaos result
 func InitializeChaosResult(chaosDetails *types.ChaosDetails, clients clients.ClientSets, resultDetails *types.ResultDetails) error {
 
-	probeDetails := GetProbeDetails(resultDetails)
 	probeStatus := GetProbeStatus(resultDetails)
 	chaosResult := &v1alpha1.ChaosResult{
 		ObjectMeta: metav1.ObjectMeta{
@@ -74,7 +73,6 @@ func InitializeChaosResult(chaosDetails *types.ChaosDetails, clients clients.Cli
 			EngineName:     chaosDetails.EngineName,
 			ExperimentName: chaosDetails.ExperimentName,
 			InstanceID:     chaosDetails.InstanceID,
-			Probes:         probeDetails,
 		},
 		Status: v1alpha1.ChaosResultStatus{
 			ExperimentStatus: v1alpha1.TestStatus{
@@ -114,19 +112,6 @@ func InitializeChaosResult(chaosDetails *types.ChaosDetails, clients clients.Cli
 	return nil
 }
 
-//GetProbeDetails fetch details of all probes
-func GetProbeDetails(resultDetails *types.ResultDetails) []v1alpha1.ProbeDetails {
-
-	probeDetails := []v1alpha1.ProbeDetails{}
-	for _, probe := range resultDetails.ProbeDetails {
-		probes := v1alpha1.ProbeDetails{}
-		probes.Name = probe.Name
-		probes.Type = probe.Type
-		probeDetails = append(probeDetails, probes)
-	}
-	return probeDetails
-}
-
 //GetProbeStatus fetch status of all probes
 func GetProbeStatus(resultDetails *types.ResultDetails) []v1alpha1.ProbeStatus {
 
@@ -134,6 +119,7 @@ func GetProbeStatus(resultDetails *types.ResultDetails) []v1alpha1.ProbeStatus {
 	for _, probe := range resultDetails.ProbeDetails {
 		probes := v1alpha1.ProbeStatus{}
 		probes.Name = probe.Name
+		probes.Type = probe.Type
 		probes.Status = probe.Status
 		probeStatus = append(probeStatus, probes)
 	}
@@ -147,13 +133,12 @@ func PatchChaosResult(result *v1alpha1.ChaosResult, clients clients.ClientSets, 
 	result.Status.ExperimentStatus.Verdict = resultDetails.Verdict
 	result.Spec.InstanceID = chaosDetails.InstanceID
 	result.Status.ExperimentStatus.FailStep = resultDetails.FailStep
-	result.Spec.Probes = GetProbeDetails(resultDetails)
 	result.Status.ProbeStatus = GetProbeStatus(resultDetails)
 	if resultDetails.Phase == "Completed" {
 		if resultDetails.Verdict == "Pass" {
-			result.Status.ExperimentStatus.ResilienceScore = strconv.Itoa((resultDetails.ProbeCount*30)/len(resultDetails.ProbeDetails)+40) + "%"
+			result.Status.ExperimentStatus.ResilienceScore = strconv.Itoa((resultDetails.ProbeCount*60)/len(resultDetails.ProbeDetails)+40) + "%"
 		} else {
-			result.Status.ExperimentStatus.ResilienceScore = strconv.Itoa((resultDetails.ProbeCount*30)/len(resultDetails.ProbeDetails)) + "%"
+			result.Status.ExperimentStatus.ResilienceScore = strconv.Itoa((resultDetails.ProbeCount*60)/len(resultDetails.ProbeDetails)) + "%"
 		}
 
 	} else {

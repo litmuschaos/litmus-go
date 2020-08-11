@@ -24,7 +24,6 @@ func PrepareHTTPProbe(httpProbes []v1alpha1.HTTPProbeAttributes, clients clients
 
 		for _, probe := range httpProbes {
 
-			//division on the basis of mode
 			// trigger probes for the edge modes
 			if (probe.Mode == "SOT" && phase == "PreChaos") || (probe.Mode == "EOT" && phase == "PostChaos") || probe.Mode == "Edge" {
 
@@ -34,6 +33,7 @@ func PrepareHTTPProbe(httpProbes []v1alpha1.HTTPProbeAttributes, clients clients
 					"URL":                      probe.Inputs.URL,
 					"Expecected Response Code": probe.Inputs.ExpectedResponseCode,
 					"Run Properties":           probe.RunProperties,
+					"Mode":                     probe.Mode,
 				})
 
 				// trigger the http probe
@@ -41,13 +41,13 @@ func PrepareHTTPProbe(httpProbes []v1alpha1.HTTPProbeAttributes, clients clients
 
 				// failing the probe, if the success condition doesn't met after the retry & timeout combinations
 				if err != nil {
-					SetProbeVerdictAfterFailure(resultDetails)
 					log.InfoWithValues("[Probe]: http probe has been Failed "+emoji.Sprint(":cry:"), logrus.Fields{
 						"ProbeName":     probe.Name,
-						"ProbeType":     "HttpProbe",
+						"ProbeType":     "HTTPProbe",
 						"ProbeInstance": phase,
 						"ProbeStatus":   "Fail",
 					})
+					SetProbeVerdictAfterFailure(resultDetails)
 					return err
 				}
 				// counting the passed probes count to generate the score and mark the verdict as passed
@@ -58,7 +58,7 @@ func PrepareHTTPProbe(httpProbes []v1alpha1.HTTPProbeAttributes, clients clients
 				SetProbeVerdict(resultDetails, "Passed", probe.Name, "HTTPProbe", probe.Mode, phase)
 				log.InfoWithValues("[Probe]: http probe has been Passed "+emoji.Sprint(":smile:"), logrus.Fields{
 					"ProbeName":     probe.Name,
-					"ProbeType":     "HttpProbe",
+					"ProbeType":     "HTTPProbe",
 					"ProbeInstance": phase,
 					"ProbeStatus":   "Pass",
 				})

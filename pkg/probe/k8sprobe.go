@@ -23,7 +23,6 @@ func PrepareK8sProbe(k8sProbes []v1alpha1.K8sProbeAttributes, resultDetails *typ
 
 		for _, probe := range k8sProbes {
 
-			//division on the basis of mode
 			// trigger probes for the edge modes
 			if (probe.Mode == "SOT" && phase == "PreChaos") || (probe.Mode == "EOT" && phase == "PostChaos") || probe.Mode == "Edge" {
 
@@ -41,13 +40,13 @@ func PrepareK8sProbe(k8sProbes []v1alpha1.K8sProbeAttributes, resultDetails *typ
 
 				// failing the probe, if the success condition doesn't met after the retry & timeout combinations
 				if err != nil {
-					SetProbeVerdictAfterFailure(resultDetails)
 					log.InfoWithValues("[Probe]: k8s probe has been Failed "+emoji.Sprint(":cry:"), logrus.Fields{
 						"ProbeName":     probe.Name,
 						"ProbeType":     "K8sProbe",
 						"ProbeInstance": phase,
 						"ProbeStatus":   "Fail",
 					})
+					SetProbeVerdictAfterFailure(resultDetails)
 					return err
 				}
 				// counting the passed probes count to generate the score and mark the verdict as passed

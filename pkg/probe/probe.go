@@ -84,7 +84,7 @@ func GetProbesFromEngine(chaosDetails *types.ChaosDetails, clients clients.Clien
 	var httpProbes []v1alpha1.HTTPProbeAttributes
 	var cmdProbes []v1alpha1.CmdProbeAttributes
 
-	// get all the probes define inside chaosengine for the corresponding experiment
+	// get all the probes defined inside chaosengine for the corresponding experiment
 	experimentSpec := engine.Spec.Experiments
 	for _, experiment := range experimentSpec {
 

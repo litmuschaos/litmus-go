@@ -31,14 +31,6 @@ type ChaosResultSpec struct {
 	ExperimentName string `json:"experiment"`
 	// InstanceID defines the instance id
 	InstanceID string `json:"instance,omitempty"`
-	// Probes contains details of the probes
-	Probes []ProbeDetails `json:"probes,omitempty"`
-}
-
-// ProbeDetails informations of the probes
-type ProbeDetails struct {
-	Name string `json:"name,omitempty"`
-	Type string `json:"type,omitempty"`
 }
 
 // ChaosResultStatus defines the observed state of ChaosResult
@@ -58,7 +50,9 @@ type ChaosResultStatus struct {
 type ProbeStatus struct {
 	// Name defines the name of probe
 	Name string `json:"name,omitempty"`
-	// Status defines whether a probe is pass or fail in pre/post chaos checks
+	// Type defined the type of probe, supported values: K8sProbe, HTTPProbe, CmdProbe
+	Type string `json:"type,omitempty"`
+	// Status defines whether a probe is pass or fail
 	Status map[string]string `json:"status,omitempty"`
 }
 

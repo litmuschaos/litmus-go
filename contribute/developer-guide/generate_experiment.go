@@ -66,6 +66,10 @@ func main() {
 		typesDIR := experimentPKGSubDirectory + "/environment"
 		CreateDirectoryIfNotPresent(typesDIR)
 
+		//creating the directory for test deployment
+		testDIR := experimentDIR + "/" + "test"
+		CreateDirectoryIfNotPresent(testDIR)
+
 		// generating the experiement.go file
 		experimentFilePath := experimentDIR + "/" + experimentDetails.Name + ".go"
 		GenerateFile(experimentDetails, experimentFilePath, "./templates/experiment.tmpl")
@@ -86,9 +90,9 @@ func main() {
 		engineFilePath := experimentDIR + "/" + "engine.yaml"
 		GenerateFile(experimentDetails, engineFilePath, "./templates/experiment_engine.tmpl")
 
-		// generating the job file
-		jobFilePath := experimentDIR + "/" + experimentDetails.Name + "-k8s-job.yml"
-		GenerateFile(experimentDetails, jobFilePath, "./templates/experiment_k8s_job.tmpl")
+		// generating the test deployment file
+		testDeploymentFilePath := testDIR + "/" + "test.yml"
+		GenerateFile(experimentDetails, testDeploymentFilePath, "./templates/experiment_k8s_deployment.tmpl")
 
 		// generating the chaoslib file
 		chaoslibFilePath := chaoslibDIR + "/" + experimentDetails.Name + ".go"
