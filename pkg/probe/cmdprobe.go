@@ -27,8 +27,6 @@ import (
 // it can be of two types one: which need a source(an external image)
 // another: any inline command which can be run without source image, directly via go-runner image
 func PrepareCmdProbe(cmdProbes []v1alpha1.CmdProbeAttributes, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, phase string, eventsDetails *types.EventDetails) error {
-	// Generate the run_id
-	runID := GetRunID()
 
 	if cmdProbes != nil {
 		for _, probe := range cmdProbes {
@@ -58,6 +56,9 @@ func PrepareCmdProbe(cmdProbes []v1alpha1.CmdProbeAttributes, clients clients.Cl
 						return err
 					}
 				} else {
+
+					// Generate the run_id
+					runID := GetRunID()
 
 					// create the external pod with source image for cmd probe
 					err := CreateProbePod(clients, chaosDetails, runID, probe.Inputs.Source)
@@ -165,7 +166,8 @@ func CreateProbePod(clients clients.ClientSets, chaosDetails *types.ChaosDetails
 			},
 		},
 		Spec: apiv1.PodSpec{
-			RestartPolicy: apiv1.RestartPolicyNever,
+			RestartPolicy:      apiv1.RestartPolicyNever,
+			ServiceAccountName: "litmus",
 			Containers: []apiv1.Container{
 				{
 					Name:            chaosDetails.ExperimentName + "-probe",

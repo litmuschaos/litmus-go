@@ -132,7 +132,6 @@ func main() {
 
 		// Add the probes in the post-chaos check
 		err = probe.AddProbes(&chaosDetails, clients, &resultDetails, "PostChaos", &eventsDetails)
-		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 		if err != nil {
 			log.Errorf("Unable to Add the probes, due to err: %v", err)
 			failStep := "Failed while adding probe"
