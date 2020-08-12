@@ -1,0 +1,57 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: litmus-experiment
+spec:
+  replicas: 1
+  selector: 
+    matchLabels:
+      app: litmus-experiment
+  template:
+    metadata:
+      labels:
+        app: litmus-experiment
+    spec:
+      serviceAccountName: node-taint-sa
+      containers:
+      - name: gotest
+        image: busybox
+        command:
+          - sleep 
+          - "3600"
+        env:
+          - name: APP_NAMESPACE
+            value: 'default'
+
+          - name: APP_LABEL
+            value: 'run=nginx'
+
+          - name: APP_KIND
+            value: 'deployment'
+
+          - name: APP_NODE
+            value: 'node-01'
+
+          - name: TAINTS
+            value: 'node.kubernetes.io/unreachable:NoExecute'
+
+          - name: AUXILIARY_APPINFO
+            value: ''
+
+          - name: TOTAL_CHAOS_DURATION
+            value: '60'
+
+          - name: LIB
+            value: 'litmus'
+
+          - name: CHAOS_NAMESPACE
+            value: 'default'
+
+          - name: RAMP_TIME
+            value: ''
+
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name

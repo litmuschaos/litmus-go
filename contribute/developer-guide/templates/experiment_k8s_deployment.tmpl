@@ -1,43 +1,46 @@
 ---
-apiVersion: batch/v1
-kind: Job
+apiVersion: apps/v1
+kind: Deployment
 metadata:
-  generateName: {{ .Name }}-
+  name: litmus-experiment
 spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: litmus-experiment
   template:
     metadata:
-      labels:
-        experiment: {{ .Name }}
+      labels: 
+        app: litmus-experiment
     spec:
-      # Placeholder that is updated by the executor for automated runs
-      # Provide appropriate SA (with desired permissions) if executed manually
-      serviceAccountName: %CHAOS_SERVICE_ACCOUNT%
-      restartPolicy: Never
+      serviceAccountName: "{{ .Name }}-sa" 
       containers:
       - name: gotest
-        image: litmuschaos/litmus-go:ci
-        imagePullPolicy: Always
+        image: busybox 
+        command: 
+          - sleep
+          - "3600"
         env:
-          - name: ANSIBLE_STDOUT_CALLBACK
-            value: 'default'
-
+          # provide application namespace
           - name: APP_NAMESPACE
             value: ''
 
+          # provide application labels
           - name: APP_LABEL
             value: ''
-
+ 
+          # provide application kind
           - name: APP_KIND
             value: '' 
 
           - name: TOTAL_CHAOS_DURATION
             value: ''
-          
+
           # provide auxiliary application details - namespace and labels of the applications
           # sample input is - "ns1:app=percona,ns2:name=nginx"
           - name: AUXILIARY_APPINFO
             value: ''
-
+          
           ## Period to wait before injection of chaos in sec
           - name: RAMP_TIME
             value: ''
@@ -61,5 +64,3 @@ spec:
               fieldRef:
                 fieldPath: spec.serviceAccountName
 
-        command: ["/bin/bash"]
-        args: ["-c", "./experiments/{{ .Name }}"]
