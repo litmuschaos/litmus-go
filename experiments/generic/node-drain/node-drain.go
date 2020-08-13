@@ -60,7 +60,7 @@ func main() {
 	result.SetResultUID(&resultDetails, clients, &chaosDetails)
 
 	//DISPLAY THE APP INFORMATION
-	log.InfoWithValues("[Info]: The application informations are as follows", logrus.Fields{
+	log.InfoWithValues("[Info]: The application information is as follows", logrus.Fields{
 		"Namespace": experimentsDetails.AppNS,
 		"Label":     experimentsDetails.AppLabel,
 		"Ramp Time": experimentsDetails.RampTime,

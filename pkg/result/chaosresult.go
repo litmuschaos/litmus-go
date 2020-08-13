@@ -76,9 +76,9 @@ func InitializeChaosResult(chaosDetails *types.ChaosDetails, clients clients.Cli
 		},
 		Status: v1alpha1.ChaosResultStatus{
 			ExperimentStatus: v1alpha1.TestStatus{
-				Phase:           resultDetails.Phase,
-				Verdict:         resultDetails.Verdict,
-				ResilienceScore: "Awaited",
+				Phase:                  resultDetails.Phase,
+				Verdict:                resultDetails.Verdict,
+				ProbeSuccessPercentage: "Awaited",
 			},
 			ProbeStatus: probeStatus,
 		},
@@ -135,14 +135,17 @@ func PatchChaosResult(result *v1alpha1.ChaosResult, clients clients.ClientSets, 
 	result.Status.ExperimentStatus.FailStep = resultDetails.FailStep
 	result.Status.ProbeStatus = GetProbeStatus(resultDetails)
 	if resultDetails.Phase == "Completed" {
-		if resultDetails.Verdict == "Pass" {
-			result.Status.ExperimentStatus.ResilienceScore = strconv.Itoa((resultDetails.ProbeCount*60)/len(resultDetails.ProbeDetails)+40) + "%"
-		} else {
-			result.Status.ExperimentStatus.ResilienceScore = strconv.Itoa((resultDetails.ProbeCount*60)/len(resultDetails.ProbeDetails)) + "%"
+		if resultDetails.Verdict == "Pass" && len(resultDetails.ProbeDetails) != 0 {
+
+			result.Status.ExperimentStatus.ProbeSuccessPercentage = "100"
+
+		} else if resultDetails.Verdict == "Fail" && len(resultDetails.ProbeDetails) != 0 {
+
+			result.Status.ExperimentStatus.ProbeSuccessPercentage = strconv.Itoa((resultDetails.PassedProbeCount * 100) / len(resultDetails.ProbeDetails))
 		}
 
 	} else {
-		result.Status.ExperimentStatus.ResilienceScore = "Awaited"
+		result.Status.ExperimentStatus.ProbeSuccessPercentage = "Awaited"
 	}
 
 	// It will update the existing chaos-result CR with new values

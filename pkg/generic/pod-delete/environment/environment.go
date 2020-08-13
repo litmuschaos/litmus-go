@@ -5,7 +5,6 @@ import (
 	"strconv"
 
 	clientTypes "k8s.io/apimachinery/pkg/types"
-	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-delete/types"
 	"github.com/litmuschaos/litmus-go/pkg/types"

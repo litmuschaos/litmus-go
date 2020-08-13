@@ -17,13 +17,13 @@ const (
 
 // ResultDetails is for collecting all the chaos-result-related details
 type ResultDetails struct {
-	Name         string
-	Verdict      string
-	FailStep     string
-	Phase        string
-	ResultUID    clientTypes.UID
-	ProbeDetails []ProbeDetails
-	ProbeCount   int
+	Name             string
+	Verdict          string
+	FailStep         string
+	Phase            string
+	ResultUID        clientTypes.UID
+	ProbeDetails     []ProbeDetails
+	PassedProbeCount int
 }
 
 // ProbeDetails is for collecting all the probe details
@@ -59,7 +59,7 @@ func SetResultAttributes(resultDetails *ResultDetails, chaosDetails ChaosDetails
 	resultDetails.Verdict = "Awaited"
 	resultDetails.Phase = "Running"
 	resultDetails.FailStep = "N/A"
-	resultDetails.ProbeCount = 0
+	resultDetails.PassedProbeCount = 0
 	if chaosDetails.EngineName != "" {
 		resultDetails.Name = chaosDetails.EngineName + "-" + chaosDetails.ExperimentName
 	} else {

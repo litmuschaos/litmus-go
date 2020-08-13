@@ -50,7 +50,7 @@ type ChaosResultStatus struct {
 type ProbeStatus struct {
 	// Name defines the name of probe
 	Name string `json:"name,omitempty"`
-	// Type defined the type of probe, supported values: K8sProbe, HTTPProbe, CmdProbe
+	// Type defined the type of probe, supported values: K8sProbe, HttpProbe, CmdProbe
 	Type string `json:"type,omitempty"`
 	// Status defines whether a probe is pass or fail
 	Status map[string]string `json:"status,omitempty"`
@@ -64,8 +64,8 @@ type TestStatus struct {
 	Verdict string `json:"verdict"`
 	// FailStep defines step where the experiments fails
 	FailStep string `json:"failStep,omitempty"`
-	// ResilienceScore defines the score of the experiment on the basis of probes result
-	ResilienceScore string `json:"resilienceScore,omitempty"`
+	// ProbeSuccessPercentage defines the score of the experiment on the basis of probes result
+	ProbeSuccessPercentage string `json:"probeSuccessPercentage,omitempty"`
 }
 
 // +genclient

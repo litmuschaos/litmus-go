@@ -26,6 +26,12 @@ func InfoWithValues(msg string, val map[string]interface{}) {
 	logrus.WithFields(val).Info(msg)
 }
 
+// ErrorWithValues log the Error entries happening inside the code
+// It also print the extra key values pairs
+func ErrorWithValues(msg string, val map[string]interface{}) {
+	logrus.WithFields(val).Error(msg)
+}
+
 //Warn log the Non-critical entries that deserve eyes.
 func Warn(msg string) {
 	logrus.WithFields(logrus.Fields{}).Warn(msg)

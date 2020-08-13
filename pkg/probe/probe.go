@@ -12,9 +12,9 @@ import (
 
 var err error
 
-// AddProbes contains the steps to trigger the probes
+// RunProbes contains the steps to trigger the probes
 // It contains steps to trigger all three probes: k8sprobe, httpprobe, cmdprobe
-func AddProbes(chaosDetails *types.ChaosDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, phase string, eventsDetails *types.EventDetails) error {
+func RunProbes(chaosDetails *types.ChaosDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, phase string, eventsDetails *types.EventDetails) error {
 
 	// get the probes details from the chaosengine
 	k8sProbes, cmdProbes, httpProbes, err := GetProbesFromEngine(chaosDetails, clients)
@@ -99,9 +99,9 @@ func GetProbesFromEngine(chaosDetails *types.ChaosDetails, clients clients.Clien
 	return k8sProbes, cmdProbes, httpProbes, nil
 }
 
-// SetProbesInChaosResult set the probe inside chaos result
+// InitializeProbesInChaosResultDetails set the probe inside chaos result
 // it fetch the probe details from the chaosengine and set into the chaosresult
-func SetProbesInChaosResult(chaosDetails *types.ChaosDetails, clients clients.ClientSets, chaosresult *types.ResultDetails) error {
+func InitializeProbesInChaosResultDetails(chaosDetails *types.ChaosDetails, clients clients.ClientSets, chaosresult *types.ResultDetails) error {
 
 	probeDetails := []types.ProbeDetails{}
 	probeDetail := types.ProbeDetails{}

@@ -31,11 +31,14 @@ func PrepareCmdProbe(cmdProbes []v1alpha1.CmdProbeAttributes, clients clients.Cl
 	if cmdProbes != nil {
 		for _, probe := range cmdProbes {
 
-			// trigger probes for the edge modes
+			// triggering probes on the basis of mode & phase so that probe will only run when they are requested to run
+			// if mode is SOT & phase is PreChaos, it will trigger Probes in PreChaos section
+			// if mode is EOT & phase is PostChaos, it will trigger Probes in PostChaos section
+			// if mode is Edge then independent of phase, it will trigger Probes in both Pre/Post Chaos section
 			if (probe.Mode == "SOT" && phase == "PreChaos") || (probe.Mode == "EOT" && phase == "PostChaos") || probe.Mode == "Edge" {
 
 				//DISPLAY THE cmd PROBE INFO
-				log.InfoWithValues("[Probe]: The cmd probe informations are as follows", logrus.Fields{
+				log.InfoWithValues("[Probe]: The cmd probe information is as follows", logrus.Fields{
 					"Name":            probe.Name,
 					"Command":         probe.Inputs.Command,
 					"Expected Result": probe.Inputs.ExpectedResult,
@@ -229,11 +232,11 @@ func GetRunID() string {
 func MarkedVerdictInEnd(err error, probe v1alpha1.CmdProbeAttributes, resultDetails *types.ResultDetails, phase string) error {
 	// failing the probe, if the success condition doesn't met after the retry & timeout combinations
 	if err != nil {
-		log.InfoWithValues("[Probe]: cmd probe has been Failed "+emoji.Sprint(":cry:"), logrus.Fields{
+		log.ErrorWithValues("[Probe]: cmd probe has been Failed "+emoji.Sprint(":cry:"), logrus.Fields{
 			"ProbeName":     probe.Name,
 			"ProbeType":     "CmdProbe",
 			"ProbeInstance": phase,
-			"ProbeStatus":   "Fail",
+			"ProbeStatus":   "Failed",
 		})
 		SetProbeVerdictAfterFailure(resultDetails)
 		return err
@@ -241,13 +244,13 @@ func MarkedVerdictInEnd(err error, probe v1alpha1.CmdProbeAttributes, resultDeta
 	// counting the passed probes count to generate the score and mark the verdict as passed
 	// for edge, probe is marked as Passed if passed in both pre/post chaos checks
 	if !(probe.Mode == "Edge" && phase == "PreChaos") {
-		resultDetails.ProbeCount++
+		resultDetails.PassedProbeCount++
 	}
 	log.InfoWithValues("[Probe]: cmd probe has been Passed "+emoji.Sprint(":smile:"), logrus.Fields{
 		"ProbeName":     probe.Name,
 		"ProbeType":     "CmdProbe",
 		"ProbeInstance": phase,
-		"ProbeStatus":   "Pass",
+		"ProbeStatus":   "Passed",
 	})
 	SetProbeVerdict(resultDetails, "Passed", probe.Name, "CmdProbe", probe.Mode, phase)
 	return nil

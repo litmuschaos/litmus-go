@@ -48,7 +48,7 @@ func main() {
 	types.SetResultAttributes(&resultDetails, chaosDetails)
 
 	// Intialise the probe details
-	probe.SetProbesInChaosResult(&chaosDetails, clients, &resultDetails)
+	probe.InitializeProbesInChaosResultDetails(&chaosDetails, clients, &resultDetails)
 
 	//Updating the chaos result in the beginning of experiment
 	log.Infof("[PreReq]: Updating the chaos result of %v experiment (SOT)", experimentsDetails.ExperimentName)
@@ -64,7 +64,7 @@ func main() {
 	result.SetResultUID(&resultDetails, clients, &chaosDetails)
 
 	//DISPLAY THE APP INFORMATION
-	log.InfoWithValues("The application informations are as follows", logrus.Fields{
+	log.InfoWithValues("The application information is as follows", logrus.Fields{
 		"Namespace": experimentsDetails.AppNS,
 		"Label":     experimentsDetails.AppLabel,
 		"Ramp Time": experimentsDetails.RampTime,
@@ -82,11 +82,11 @@ func main() {
 
 	if experimentsDetails.EngineName != "" {
 
-		// Add the probes in the pre-chaos check
-		err = probe.AddProbes(&chaosDetails, clients, &resultDetails, "PreChaos", &eventsDetails)
+		// run the probes in the pre-chaos check
+		err = probe.RunProbes(&chaosDetails, clients, &resultDetails, "PreChaos", &eventsDetails)
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 		if err != nil {
-			log.Errorf("Unable to Add the probes, due to err: %v", err)
+			log.Errorf("Probe failed, due to err: %v", err)
 			failStep := "Failed while adding probe"
 			msg := "AUT: Running, Probes: Unsuccessful"
 			types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, msg, "Warning", &chaosDetails)
@@ -130,8 +130,8 @@ func main() {
 	}
 	if experimentsDetails.EngineName != "" {
 
-		// Add the probes in the post-chaos check
-		err = probe.AddProbes(&chaosDetails, clients, &resultDetails, "PostChaos", &eventsDetails)
+		// run the probes in the post-chaos check
+		err = probe.RunProbes(&chaosDetails, clients, &resultDetails, "PostChaos", &eventsDetails)
 		if err != nil {
 			log.Errorf("Unable to Add the probes, due to err: %v", err)
 			failStep := "Failed while adding probe"
