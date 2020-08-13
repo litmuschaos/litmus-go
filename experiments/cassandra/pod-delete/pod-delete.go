@@ -26,6 +26,7 @@ func init() {
 func main() {
 
 	var err error
+	var ResourceVersionBefore []string
 	experimentsDetails := experimentTypes.ExperimentDetails{}
 	resultDetails := types.ResultDetails{}
 	eventsDetails := types.EventDetails{}
@@ -79,7 +80,7 @@ func main() {
 		return
 	}
 	if experimentsDetails.EngineName != "" {
-		types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, "AUT is Running successfully", &chaosDetails)
+		types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, "AUT is Running successfully", "Normal", &chaosDetails)
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
@@ -92,7 +93,7 @@ func main() {
 
 	// Cassandra liveness check
 	if experimentsDetails.CassandraLivenessCheck == "enabled" {
-		err = cassandra.LivenessCheck(&experimentsDetails, clients)
+		ResourceVersionBefore, err = cassandra.LivenessCheck(&experimentsDetails, clients)
 		if err != nil {
 			log.Errorf("[Liveness]: Cassandra liveness check failed, due to %v\n", err)
 		}
@@ -132,7 +133,7 @@ func main() {
 		return
 	}
 	if experimentsDetails.EngineName != "" {
-		types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, "AUT is Running successfully", &chaosDetails)
+		types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, "AUT is Running successfully", "Normal", &chaosDetails)
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
@@ -140,7 +141,7 @@ func main() {
 	log.Info("[Status]: Checking the load distribution on the ring (post-chaos)")
 	err = cassandra.NodeToolStatusCheck(&experimentsDetails, clients)
 	if err != nil {
-		log.Errorf("[Status]: Chaos node tool status check is failed due to %v\n", err)
+		log.Fatalf("[Status]: Chaos node tool status check is failed due to %v\n", err)
 	}
 
 	// Cassandra statefulset liveness check (post-chaos)
@@ -149,26 +150,26 @@ func main() {
 	if experimentsDetails.CassandraLivenessCheck == "enabled" {
 		err = status.CheckApplicationStatus(experimentsDetails.AppNS, "name=cassandra-liveness-deploy", experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 		if err != nil {
-			log.Errorf("Liveness status check failed due to %v\n", err)
+			log.Fatalf("Liveness status check failed due to %v\n", err)
 		}
-		err = cassandra.LivenessCleanup(&experimentsDetails, clients)
+		err = cassandra.LivenessCleanup(&experimentsDetails, clients, ResourceVersionBefore)
 		if err != nil {
-			log.Errorf("Liveness cleanup failed due to %v\n", err)
+			log.Fatalf("Liveness cleanup failed due to %v\n", err)
 		}
 	}
 	//Updating the chaosResult in the end of experiment
-	log.Infof("[The End]: Updating the chaos result of %v experiment (EOT)", experimentsDetails.ExperimentName)
+	log.Info("[The End]: Updating the chaos result of cassandra pod delete experiment experiment (EOT)")
 	err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 	if err != nil {
 		log.Fatalf("Unable to Update the Chaos Result due to %v\n", err)
 	}
 	if experimentsDetails.EngineName != "" {
 		msg := experimentsDetails.ExperimentName + " experiment has been " + resultDetails.Verdict + "ed"
-		types.SetEngineEventAttributes(&eventsDetails, types.Summary, msg, &chaosDetails)
+		types.SetEngineEventAttributes(&eventsDetails, types.Summary, msg, "Normal", &chaosDetails)
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
 	msg := experimentsDetails.ExperimentName + " experiment has been " + resultDetails.Verdict + "ed"
-	types.SetResultEventAttributes(&eventsDetails, types.Summary, msg, &resultDetails)
+	types.SetResultEventAttributes(&eventsDetails, types.Summary, msg, "Normal", &resultDetails)
 	events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosResult")
 }

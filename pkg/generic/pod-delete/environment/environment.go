@@ -37,8 +37,6 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string
 	experimentDetails.LivenessServicePort, _ = strconv.Atoi(Getenv("LIVENESS_SVC_PORT", "9242"))
 	experimentDetails.CassandraLivenessImage = Getenv("CASSANDRA_LIVENESS_IMAGE", "litmuschaos/cassandra-client:latest")
 	experimentDetails.CassandraLivenessCheck = Getenv("CASSANDRA_LIVENESS_CHECK", "enabled")
-	experimentDetails.AppName = Getenv("APP_NAME", "")
-	experimentDetails.PodResourceVersion = Getenv("POD_RESOURCE_VERSION", "")
 
 }
 
