@@ -96,7 +96,7 @@ func PrepareDiskFill(experimentsDetails *experimentTypes.ExperimentDetails, clie
 	// It will exec inside disk-fill helper pod & derive the used ephemeral storage space
 	command := "du /diskfill/" + containerID
 	exec.SetExecCommandAttributes(&execCommandDetails, "disk-fill-"+experimentsDetails.RunID, "disk-fill", experimentsDetails.ChaosNamespace)
-	ephemeralStorageDetails, err := exec.Exec(&execCommandDetails, clients, command)
+	ephemeralStorageDetails, err := exec.Exec(&execCommandDetails, clients, strings.Fields(command))
 	if err != nil {
 		return errors.Errorf("Unable to get ephemeral storage details due to err: %v", err)
 	}
@@ -115,7 +115,7 @@ func PrepareDiskFill(experimentsDetails *experimentTypes.ExperimentDetails, clie
 	if sizeTobeFilled > 0 {
 		// Creating files to fill the required ephemeral storage size of block size of 4K
 		command := "dd if=/dev/urandom of=/diskfill/" + containerID + "/diskfill bs=4K count=" + strconv.Itoa(sizeTobeFilled/4)
-		_, err = exec.Exec(&execCommandDetails, clients, command)
+		_, err = exec.Exec(&execCommandDetails, clients, strings.Fields(command))
 		if err != nil {
 			return errors.Errorf("Unable to to create the files to fill the ephemeral storage due to err: %v", err)
 		}
@@ -365,7 +365,7 @@ func Remedy(experimentsDetails *experimentTypes.ExperimentDetails, clients clien
 
 		// deleting the files after chaos execution
 		command := "rm -rf /diskfill/" + containerID + "/diskfill"
-		_, err = exec.Exec(execCommandDetails, clients, command)
+		_, err = exec.Exec(execCommandDetails, clients, strings.Fields(command))
 		if err != nil {
 			errors.Errorf("Unable to delete files to clean ephemeral storage due to err: %v", err)
 		}

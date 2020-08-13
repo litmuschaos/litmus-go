@@ -121,7 +121,7 @@ type ApplicationParams struct {
 
 // ComponentParams defines information about the runner
 type ComponentParams struct {
-	//Contains informations of the the runner pod
+	//Contains information of the the runner pod
 	Runner RunnerInfo `json:"runner"`
 }
 
@@ -167,28 +167,63 @@ type ExperimentAttributes struct {
 
 // K8sProbeAttributes contains details of k8s probe, which can be applied on the experiments
 type K8sProbeAttributes struct {
-	Name   string         `json:"name,omitempty"`
+	// Name of probe
+	Name string `json:"name,omitempty"`
+	// inputs needed for the k8s probe
 	Inputs K8sProbeInputs `json:"inputs,omitempty"`
+	// RunProperty contains timeout, retry and interval for the probe
+	RunProperties RunProperty `json:"runProperties,omitempty"`
+	// mode for k8s probe
+	// it can be SOT, EOT, Edge
+	Mode string `json:"mode,omitempty"`
 }
 
 // CmdProbeAttributes contains details of cmd probe, which can be applied on the experiments
 type CmdProbeAttributes struct {
-	Name   string         `json:"name,omitempty"`
+	// Name of probe
+	Name string `json:"name,omitempty"`
+	// inputs needed for the cmd probe
 	Inputs CmdProbeInputs `json:"inputs,omitempty"`
+	// RunProperty contains timeout, retry and interval for the probe
+	RunProperties RunProperty `json:"runProperties,omitempty"`
+	// mode for cmd probe
+	// it can be SOT, EOT, Edge, Continuous
+	Mode string `json:"mode,omitempty"`
 }
 
 // HTTPProbeAttributes contains details of k8s probe, which can be applied on the experiments
 type HTTPProbeAttributes struct {
-	Name   string          `json:"name,omitempty"`
+	// Name of probe
+	Name string `json:"name,omitempty"`
+	// inputs needed for the http probe
 	Inputs HTTPProbeInputs `json:"inputs,omitempty"`
+	// RunProperty contains timeout, retry and interval for the probe
+	RunProperties RunProperty `json:"runProperties,omitempty"`
+	// mode for http probe
+	// it can be SOT, EOT, Edge, Continuous
+	Mode string `json:"mode,omitempty"`
 }
 
 // K8sProbeInputs contains all the inputs required for k8s probe
 type K8sProbeInputs struct {
 	// Command need to be executed for the probe
-	Command string `json:"command,omitempty"`
+	Command K8sCommand `json:"command,omitempty"`
 	// Expected output or result of the command
 	ExpectedResult string `json:"expectedResult,omitempty"`
+}
+
+// K8sCommand contains all the commands need for the k8sprobe
+type K8sCommand struct {
+	// group of the resource
+	Group string `json:"group,omitempty"`
+	// apiversion of the resource
+	Version string `json:"version,omitempty"`
+	// kind of resource
+	Resource string `json:"resource,omitempty"`
+	// namespace of the resource
+	Namespace string `json:"namespace,omitempty"`
+	// fieldselector to get the details
+	FieldSelector string `json:"fieldSelector,omitempty"`
 }
 
 //CmdProbeInputs contains all the inputs required for cmd probe
@@ -206,18 +241,35 @@ type CmdProbeInputs struct {
 type HTTPProbeInputs struct {
 	// URL which needs to curl, to check the status
 	URL string `json:"url,omitempty"`
-	// Expected output or result of the command
-	ExpectedResult string `json:"expectedResult,omitempty"`
+	// Expected response code from the given url
+	ExpectedResponseCode string `json:"expectedResponseCode,omitempty"`
+}
+
+//RunProperty contains timeout, retry and interval for the probe
+type RunProperty struct {
+	//ProbeTimeout contains timeout for the probe
+	ProbeTimeout int `json:"probeTimeout,omitempty"`
+	// Interval contains the inverval for the probe
+	Interval int `json:"interval,omitempty"`
+	// Retry contains the retry count for the probe
+	Retry int `json:"retry,omitempty"`
 }
 
 // ExperimentComponents contains ENV, Configmaps and Secrets
 type ExperimentComponents struct {
-	ENV                   []ExperimentENV   `json:"env,omitempty"`
-	ConfigMaps            []ConfigMap       `json:"configMaps,omitempty"`
-	Secrets               []Secret          `json:"secrets,omitempty"`
-	ExperimentAnnotations map[string]string `json:"experimentannotation,omitempty"`
-	ExperimentImage       string            `json:"experimentImage,omitempty"`
-	NodeSelector          map[string]string `json:"nodeSelector,omitempty"`
+	ENV                   []ExperimentENV    `json:"env,omitempty"`
+	ConfigMaps            []ConfigMap        `json:"configMaps,omitempty"`
+	Secrets               []Secret           `json:"secrets,omitempty"`
+	ExperimentAnnotations map[string]string  `json:"experimentannotation,omitempty"`
+	ExperimentImage       string             `json:"experimentImage,omitempty"`
+	NodeSelector          map[string]string  `json:"nodeSelector,omitempty"`
+	StatusCheckTimeouts   StatusCheckTimeout `json:"statusCheckTimeouts,omitempty"`
+}
+
+// StatusCheckTimeout contains Delay and timeouts for the status checks
+type StatusCheckTimeout struct {
+	Delay   int `json:"delay,omitempty"`
+	Timeout int `json:"timeout,omitempty"`
 }
 
 // ExperimentENV varibles to override the default values in chaosexperiment
@@ -229,8 +281,12 @@ type ExperimentENV struct {
 // ExperimentStatuses defines information about status of individual experiments
 // These fields are immutable, and are derived by kubernetes(operator)
 type ExperimentStatuses struct {
-	//Name of experiment whose status is detailed
+	//Name of the chaos experiment
 	Name string `json:"name"`
+	//Name of chaos-runner pod managing this experiment
+	Runner string `json:"runner"`
+	//Name of experiment pod executing the chaos
+	ExpPod string `json:"experimentPod"`
 	//Current state of chaos experiment
 	Status ExperimentStatus `json:"status"`
 	//Result of a completed chaos experiment
