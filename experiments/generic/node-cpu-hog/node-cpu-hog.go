@@ -41,11 +41,11 @@ func main() {
 	log.Infof("[PreReq]: Getting the ENV for the %v experiment", experimentsDetails.ExperimentName)
 	experimentEnv.GetENV(&experimentsDetails, "node-cpu-hog")
 
-	// Intialise Chaos Result Parameters
-	types.SetResultAttributes(&resultDetails, experimentsDetails.EngineName, experimentsDetails.ExperimentName)
-
 	// Intialise the chaos attributes
 	experimentEnv.InitialiseChaosVariables(&chaosDetails, &experimentsDetails)
+
+	// Intialise Chaos Result Parameters
+	types.SetResultAttributes(&resultDetails, chaosDetails)
 
 	//Updating the chaos result in the beginning of experiment
 	log.Infof("[PreReq]: Updating the chaos result of %v experiment (SOT)", experimentsDetails.ExperimentName)
@@ -61,7 +61,7 @@ func main() {
 	result.SetResultUID(&resultDetails, clients, &chaosDetails)
 
 	//DISPLAY THE APP INFORMATION
-	log.InfoWithValues("The application informations are as follows", logrus.Fields{
+	log.InfoWithValues("The application information is as follows", logrus.Fields{
 		"Namespace":      experimentsDetails.AppNS,
 		"Label":          experimentsDetails.AppLabel,
 		"Chaos Duration": experimentsDetails.ChaosDuration,

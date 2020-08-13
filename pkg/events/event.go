@@ -60,6 +60,7 @@ func GenerateEvents(eventsDetails *types.EventDetails, clients clients.ClientSet
 			event.CreationTimestamp = metav1.Time{Time: time.Now()}
 			event.FirstTimestamp = metav1.Time{Time: time.Now()}
 			event.Source.Component = chaosDetails.ChaosPodName
+			event.Type = eventsDetails.Type
 		} else {
 			event.Count = event.Count + 1
 		}

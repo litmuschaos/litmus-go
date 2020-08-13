@@ -97,12 +97,6 @@ func IoctlSetRTCTime(fd int, value *RTCTime) error {
 	return err
 }
 
-func IoctlSetRTCWkAlrm(fd int, value *RTCWkAlrm) error {
-	err := ioctl(fd, RTC_WKALM_SET, uintptr(unsafe.Pointer(value)))
-	runtime.KeepAlive(value)
-	return err
-}
-
 func IoctlGetUint32(fd int, req uint) (uint32, error) {
 	var value uint32
 	err := ioctl(fd, req, uintptr(unsafe.Pointer(&value)))
@@ -112,12 +106,6 @@ func IoctlGetUint32(fd int, req uint) (uint32, error) {
 func IoctlGetRTCTime(fd int) (*RTCTime, error) {
 	var value RTCTime
 	err := ioctl(fd, RTC_RD_TIME, uintptr(unsafe.Pointer(&value)))
-	return &value, err
-}
-
-func IoctlGetRTCWkAlrm(fd int) (*RTCWkAlrm, error) {
-	var value RTCWkAlrm
-	err := ioctl(fd, RTC_WKALM_RD, uintptr(unsafe.Pointer(&value)))
 	return &value, err
 }
 
@@ -1950,30 +1938,11 @@ func Vmsplice(fd int, iovs []Iovec, flags int) (int, error) {
 	return int(n), nil
 }
 
-func isGroupMember(gid int) bool {
-	groups, err := Getgroups()
-	if err != nil {
-		return false
-	}
-
-	for _, g := range groups {
-		if g == gid {
-			return true
-		}
-	}
-	return false
-}
-
 //sys	faccessat(dirfd int, path string, mode uint32) (err error)
-//sys	Faccessat2(dirfd int, path string, mode uint32, flags int) (err error)
 
 func Faccessat(dirfd int, path string, mode uint32, flags int) (err error) {
-	if flags == 0 {
-		return faccessat(dirfd, path, mode)
-	}
-
-	if err := Faccessat2(dirfd, path, mode, flags); err != ENOSYS && err != EPERM {
-		return err
+	if flags & ^(AT_SYMLINK_NOFOLLOW|AT_EACCESS) != 0 {
+		return EINVAL
 	}
 
 	// The Linux kernel faccessat system call does not take any flags.
@@ -1982,8 +1951,8 @@ func Faccessat(dirfd int, path string, mode uint32, flags int) (err error) {
 	// Because people naturally expect syscall.Faccessat to act
 	// like C faccessat, we do the same.
 
-	if flags & ^(AT_SYMLINK_NOFOLLOW|AT_EACCESS) != 0 {
-		return EINVAL
+	if flags == 0 {
+		return faccessat(dirfd, path, mode)
 	}
 
 	var st Stat_t
@@ -2026,7 +1995,7 @@ func Faccessat(dirfd int, path string, mode uint32, flags int) (err error) {
 			gid = Getgid()
 		}
 
-		if uint32(gid) == st.Gid || isGroupMember(gid) {
+		if uint32(gid) == st.Gid {
 			fmode = (st.Mode >> 3) & 7
 		} else {
 			fmode = st.Mode & 7
@@ -2126,18 +2095,6 @@ func Klogset(typ int, arg int) (err error) {
 	}
 	return nil
 }
-
-// RemoteIovec is Iovec with the pointer replaced with an integer.
-// It is used for ProcessVMReadv and ProcessVMWritev, where the pointer
-// refers to a location in a different process' address space, which
-// would confuse the Go garbage collector.
-type RemoteIovec struct {
-	Base uintptr
-	Len  int
-}
-
-//sys	ProcessVMReadv(pid int, localIov []Iovec, remoteIov []RemoteIovec, flags uint) (n int, err error) = SYS_PROCESS_VM_READV
-//sys	ProcessVMWritev(pid int, localIov []Iovec, remoteIov []RemoteIovec, flags uint) (n int, err error) = SYS_PROCESS_VM_WRITEV
 
 /*
  * Unimplemented

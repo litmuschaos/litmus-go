@@ -31,12 +31,8 @@ func PreparePodDelete(experimentsDetails *experimentTypes.ExperimentDetails, cli
 		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", strconv.Itoa(experimentsDetails.RampTime))
 		waitForRampTime(experimentsDetails)
 	}
-	if err != nil {
-		return errors.Errorf("Unable to get the serviceAccountName, err: %v", err)
-	}
 
 	err = PodDeleteChaos(experimentsDetails, clients, eventsDetails, chaosDetails)
-
 	if err != nil {
 		return errors.Errorf("Unable to delete the application pods, due to %v", err)
 	}

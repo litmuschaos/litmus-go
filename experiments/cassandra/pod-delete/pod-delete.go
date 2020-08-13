@@ -26,7 +26,7 @@ func init() {
 func main() {
 
 	var err error
-	var ResourceVersionBefore []string
+	var ResourceVersionBefore string
 	experimentsDetails := experimentTypes.ExperimentDetails{}
 	resultDetails := types.ResultDetails{}
 	eventsDetails := types.EventDetails{}
@@ -43,7 +43,7 @@ func main() {
 	experimentEnv.GetENV(&experimentsDetails, "pod-delete")
 
 	// Intialise Chaos Result Parameters
-	types.SetResultAttributes(&resultDetails, experimentsDetails.EngineName, experimentsDetails.ExperimentName)
+	types.SetResultAttributes(&resultDetails, chaosDetails)
 
 	// Intialise the chaos attributes
 	experimentEnv.InitialiseChaosVariables(&chaosDetails, &experimentsDetails)
@@ -88,14 +88,14 @@ func main() {
 	log.Info("[Status]: Checking the load distribution on the ring (pre-chaos)")
 	err = cassandra.NodeToolStatusCheck(&experimentsDetails, clients)
 	if err != nil {
-		log.Errorf("[Status]: Chaos node tool status check is failed due to %v\n", err)
+		log.Fatalf("[Status]: Chaos node tool status check is failed due to %v\n", err)
 	}
 
 	// Cassandra liveness check
 	if experimentsDetails.CassandraLivenessCheck == "enabled" {
 		ResourceVersionBefore, err = cassandra.LivenessCheck(&experimentsDetails, clients)
 		if err != nil {
-			log.Errorf("[Liveness]: Cassandra liveness check failed, due to %v\n", err)
+			log.Fatalf("[Liveness]: Cassandra liveness check failed, due to %v\n", err)
 		}
 		log.Info("[Confirmation]: The cassandra application liveness pod deployed successfully")
 	} else {
@@ -148,7 +148,7 @@ func main() {
 	log.Info("[Status]: Confirm that the cassandra liveness pod is running(post-chaos)")
 	// Checking the running status of cassandra liveness
 	if experimentsDetails.CassandraLivenessCheck == "enabled" {
-		err = status.CheckApplicationStatus(experimentsDetails.AppNS, "name=cassandra-liveness-deploy", experimentsDetails.Timeout, experimentsDetails.Delay, clients)
+		err = status.CheckApplicationStatus(experimentsDetails.AppNS, "name=cassandra-liveness-deploy-"+experimentsDetails.RunID, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 		if err != nil {
 			log.Fatalf("Liveness status check failed due to %v\n", err)
 		}

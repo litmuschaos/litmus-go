@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	rbacV1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -51,13 +52,22 @@ type Secret struct {
 	MountPath string `json:"mountPath"`
 }
 
+// HostFile is an simpler implementation of corev1.HostPath, needed for experiments
+type HostFile struct {
+	Name      string `json:"name"`
+	MountPath string `json:"mountPath"`
+	NodePath  string `json:"nodePath"`
+}
+
 // ExperimentDef defines information about nature of chaos & components subjected to it
 type ExperimentDef struct {
 	// Default labels of the runner pod
 	// +optional
 	Labels map[string]string `json:"labels"`
-	// Image of the chaos executor
+	// Image of the chaos experiment
 	Image string `json:"image"`
+	// ImagePullPolicy of the chaos experiment container
+	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
 	//Scope specifies the service account scope (& thereby blast radius) of the experiment
 	Scope string `json:"scope"`
 	// List of Permission needed for a service account to execute experiment
@@ -72,6 +82,22 @@ type ExperimentDef struct {
 	ConfigMaps []ConfigMap `json:"configmaps,omitempty"`
 	// Secrets contains a list of Secrets
 	Secrets []Secret `json:"secrets,omitempty"`
+	// HostFileVolume defines the host directory/file to be mounted
+	HostFileVolumes []HostFile `json:"hostFileVolumes,omitempty"`
+	// Annotations that needs to be provided in the pod for pod that is getting created
+	ExperimentAnnotations map[string]string `json:"experimentannotations,omitempty"`
+	// SecurityContext holds security configuration that will be applied to a container
+	SecurityContext SecurityContext `json:"securityContext,omitempty"`
+	// HostPID is need to be provided in the chaospod
+	HostPID bool `json:"hostPID,omitempty"`
+}
+
+// SecurityContext defines the security contexts of the pod and container.
+type SecurityContext struct {
+	// PodSecurityContext holds security configuration that will be applied to a pod
+	PodSecurityContext corev1.PodSecurityContext `json:"podSecurityContext,omitempty"`
+	// ContainerSecurityContext holds security configuration that will be applied to a container
+	ContainerSecurityContext corev1.SecurityContext `json:"containerSecurityContext,omitempty"`
 }
 
 // ENVPair defines env var list to hold chaos params

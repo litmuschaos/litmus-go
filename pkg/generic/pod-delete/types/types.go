@@ -32,4 +32,5 @@ type ExperimentDetails struct {
 	LivenessServicePort    int
 	CassandraLivenessImage string
 	CassandraLivenessCheck string
+	RunID                  string
 }
