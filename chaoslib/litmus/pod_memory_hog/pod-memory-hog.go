@@ -33,7 +33,8 @@ func StressMemory(MemoryConsumption, containerName, podName, namespace string, c
 
 	log.Infof("The memory consumption is: %v", MemoryConsumption)
 
-	command := fmt.Sprintf("dd if=/dev/zero of=/dev/null bs=" + MemoryConsumption + "M")
+	ddCmd := fmt.Sprintf("dd if=/dev/zero of=/dev/null bs=" + MemoryConsumption + "M")
+	command := []string{"/bin/sh", "-c", ddCmd}
 
 	req := clients.KubeClient.CoreV1().RESTClient().Post().
 		Resource("pods").
@@ -47,7 +48,7 @@ func StressMemory(MemoryConsumption, containerName, podName, namespace string, c
 
 	parameterCodec := runtime.NewParameterCodec(scheme)
 	req.VersionedParams(&core_v1.PodExecOptions{
-		Command:   strings.Fields(command),
+		Command:   command,
 		Container: containerName,
 		Stdin:     false,
 		Stdout:    true,

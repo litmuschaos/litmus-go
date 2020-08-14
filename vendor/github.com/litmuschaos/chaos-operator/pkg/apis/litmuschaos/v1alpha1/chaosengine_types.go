@@ -121,7 +121,7 @@ type ApplicationParams struct {
 
 // ComponentParams defines information about the runner
 type ComponentParams struct {
-	//Contains information of the the runner pod
+	//Contains informations of the the runner pod
 	Runner RunnerInfo `json:"runner"`
 }
 
@@ -281,7 +281,7 @@ type ExperimentENV struct {
 // ExperimentStatuses defines information about status of individual experiments
 // These fields are immutable, and are derived by kubernetes(operator)
 type ExperimentStatuses struct {
-	//Name of the chaos experiment
+	//Name of the chaos experiment 
 	Name string `json:"name"`
 	//Name of chaos-runner pod managing this experiment
 	Runner string `json:"runner"`
