@@ -48,5 +48,6 @@ func InitialiseChaosVariables(chaosDetails *types.ChaosDetails, experimentDetail
 	chaosDetails.EngineName = experimentDetails.EngineName
 	chaosDetails.ExperimentName = experimentDetails.ExperimentName
 	chaosDetails.InstanceID = experimentDetails.InstanceID
-
+	chaosDetails.Timeout = experimentDetails.Timeout
+	chaosDetails.Delay = experimentDetails.Delay
 }
