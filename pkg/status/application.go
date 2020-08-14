@@ -6,7 +6,7 @@ import (
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/log"
-	"github.com/openebs/maya/pkg/util/retry"
+	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
 	"github.com/pkg/errors"
 	logrus "github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -15,18 +15,19 @@ import (
 // CheckApplicationStatus checks the status of the AUT
 func CheckApplicationStatus(appNs string, appLabel string, timeout, delay int, clients clients.ClientSets) error {
 
-	// Checking whether application pods are in running state
-	log.Info("[Status]: Checking whether application pods are in running state")
-	err := CheckPodStatus(appNs, appLabel, timeout, delay, clients)
-	if err != nil {
-		return err
-	}
 	// Checking whether application containers are in running state
 	log.Info("[Status]: Checking whether application containers are in running state")
-	err = CheckContainerStatus(appNs, appLabel, timeout, delay, clients)
+	err := CheckContainerStatus(appNs, appLabel, timeout, delay, clients)
 	if err != nil {
 		return err
 	}
+	// Checking whether application pods are in running state
+	log.Info("[Status]: Checking whether application pods are in running state")
+	err = CheckPodStatus(appNs, appLabel, timeout, delay, clients)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -74,6 +75,7 @@ func CheckPodStatus(appNs string, appLabel string, timeout, delay int, clients c
 
 // CheckContainerStatus checks the status of the application container
 func CheckContainerStatus(appNs string, appLabel string, timeout, delay int, clients clients.ClientSets) error {
+
 	err := retry.
 		Times(uint(timeout / delay)).
 		Wait(time.Duration(delay) * time.Second).
@@ -85,6 +87,9 @@ func CheckContainerStatus(appNs string, appLabel string, timeout, delay int, cli
 			err = nil
 			for _, pod := range podSpec.Items {
 				for _, container := range pod.Status.ContainerStatuses {
+					if container.State.Terminated != nil {
+						return errors.Errorf("container is in terminated state")
+					}
 					if container.Ready != true {
 						return errors.Errorf("containers are not yet in running state")
 					}

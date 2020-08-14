@@ -1,7 +1,6 @@
 package pod_cpu_hog
 
 import (
-	"fmt"
 	"os"
 	"os/signal"
 	"strconv"
@@ -16,12 +15,12 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/math"
 	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/types"
+	"github.com/litmuschaos/litmus-go/pkg/utils/common"
+	litmusexec "github.com/litmuschaos/litmus-go/pkg/utils/exec"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	core_v1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/klog"
 )
 
@@ -29,53 +28,14 @@ import (
 // The function will be constantly increasing the CPU utilisation until it reaches the maximum available or allowed number.
 // Using the TOTAL_CHAOS_DURATION we will need to specify for how long this experiment will last
 func StressCPU(containerName, podName, namespace string, clients clients.ClientSets) error {
-
-	//command := fmt.Sprintf("md5sum /dev/zero")
+	// It will contains all the pod & container details required for exec command
+	execCommandDetails := litmusexec.PodDetails{}
 	command := []string{"/bin/sh", "-c", "md5sum /dev/zero"}
-
-	req := clients.KubeClient.CoreV1().RESTClient().Post().
-		Resource("pods").
-		Name(podName).
-		Namespace(namespace).
-		SubResource("exec")
-	scheme := runtime.NewScheme()
-	if err := core_v1.AddToScheme(scheme); err != nil {
-		return fmt.Errorf("error adding to scheme: %v", err)
-	}
-
-	parameterCodec := runtime.NewParameterCodec(scheme)
-	req.VersionedParams(&core_v1.PodExecOptions{
-		Command:   command,
-		Container: containerName,
-		Stdin:     false,
-		Stdout:    true,
-		Stderr:    true,
-		TTY:       false,
-	}, parameterCodec)
-
-	exec, err := remotecommand.NewSPDYExecutor(clients.KubeConfig, "POST", req.URL())
+	litmusexec.SetExecCommandAttributes(&execCommandDetails, podName, containerName, namespace)
+	_, err := litmusexec.Exec(&execCommandDetails, clients, command)
 	if err != nil {
-		return fmt.Errorf("error while creating Executor: %v", err)
+		return errors.Errorf("Unable to run stress command inside target container, due to err: %v", err)
 	}
-
-	stdout := os.Stdout
-	stderr := os.Stderr
-
-	err = exec.Stream(remotecommand.StreamOptions{
-		Stdin:  nil,
-		Stdout: stdout,
-		Stderr: stderr,
-		Tty:    false,
-	})
-
-	if err != nil {
-		errorCode := strings.Contains(err.Error(), "143")
-		if errorCode != true {
-			log.Infof("[Chaos]:CPU stress error: %v", err.Error())
-			return err
-		}
-	}
-
 	return nil
 }
 
@@ -170,7 +130,7 @@ func PrepareCPUstress(experimentsDetails *experimentTypes.ExperimentDetails, cli
 	//Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
 		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", strconv.Itoa(experimentsDetails.RampTime))
-		waitForRampTime(experimentsDetails)
+		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 	//Starting the CPU stress experiment
 	err := ExperimentCPU(experimentsDetails, clients, resultDetails, eventsDetails, chaosDetails)
@@ -180,14 +140,9 @@ func PrepareCPUstress(experimentsDetails *experimentTypes.ExperimentDetails, cli
 	//Waiting for the ramp time after chaos injection
 	if experimentsDetails.RampTime != 0 {
 		log.Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", strconv.Itoa(experimentsDetails.RampTime))
-		waitForRampTime(experimentsDetails)
+		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 	return nil
-}
-
-//waitForRampTime waits for the given ramp time duration (in seconds)
-func waitForRampTime(experimentsDetails *experimentTypes.ExperimentDetails) {
-	time.Sleep(time.Duration(experimentsDetails.RampTime) * time.Second)
 }
 
 //PreparePodList will also adjust the number of the target pods depending on the specified percentage in PODS_AFFECTED_PERC variable
@@ -217,52 +172,15 @@ func PreparePodList(experimentsDetails *experimentTypes.ExperimentDetails, clien
 
 // KillStressCPU function to kill the experiment. Triggered by either timeout of chaos duration or termination of the experiment
 func KillStressCPU(containerName, podName, namespace string, clients clients.ClientSets) error {
+	// It will contains all the pod & container details required for exec command
+	execCommandDetails := litmusexec.PodDetails{}
 
 	command := []string{"/bin/sh", "-c", "kill $(find /proc -name exe -lname '*/md5sum' 2>&1 | grep -v 'Permission denied' | awk -F/ '{print $(NF-1)}' |  head -n 1)"}
 
-	req := clients.KubeClient.CoreV1().RESTClient().Post().
-		Resource("pods").
-		Name(podName).
-		Namespace(namespace).
-		SubResource("exec")
-	scheme := runtime.NewScheme()
-	if err := core_v1.AddToScheme(scheme); err != nil {
-		return fmt.Errorf("error adding to scheme: %v", err)
-	}
-
-	parameterCodec := runtime.NewParameterCodec(scheme)
-	req.VersionedParams(&core_v1.PodExecOptions{
-		Command:   command,
-		Container: containerName,
-		Stdin:     false,
-		Stdout:    true,
-		Stderr:    true,
-		TTY:       false,
-	}, parameterCodec)
-
-	exec, err := remotecommand.NewSPDYExecutor(clients.KubeConfig, "POST", req.URL())
+	litmusexec.SetExecCommandAttributes(&execCommandDetails, podName, containerName, namespace)
+	_, err := litmusexec.Exec(&execCommandDetails, clients, command)
 	if err != nil {
-		return fmt.Errorf("error while creating Executor: %v", err)
+		return errors.Errorf("Unable to kill the stress process, due to err: %v", err)
 	}
-
-	stdout := os.Stdout
-	stderr := os.Stderr
-
-	err = exec.Stream(remotecommand.StreamOptions{
-		Stdin:  nil,
-		Stdout: stdout,
-		Stderr: stderr,
-		Tty:    false,
-	})
-
-	//The kill command returns a 143 when it kills a process. This is expected
-	if err != nil {
-		errorCode := strings.Contains(err.Error(), "143")
-		if errorCode != true {
-			log.Infof("[Chaos]:CPU stress error: %v", err.Error())
-			return err
-		}
-	}
-
 	return nil
 }
