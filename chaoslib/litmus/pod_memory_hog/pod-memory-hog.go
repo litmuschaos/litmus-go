@@ -16,14 +16,13 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/math"
 	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/types"
+	litmusexec "github.com/litmuschaos/litmus-go/pkg/utils/exec"
+	"github.com/litmuschaos/litmus-go/pkg/utils/regular"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	core_v1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog"
-
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/tools/remotecommand"
 )
 
 // StressMemory Uses the REST API to exec into the target container of the target pod
@@ -33,51 +32,17 @@ func StressMemory(MemoryConsumption, containerName, podName, namespace string, c
 
 	log.Infof("The memory consumption is: %v", MemoryConsumption)
 
-	command := fmt.Sprintf("dd if=/dev/zero of=/dev/null bs=" + MemoryConsumption + "M")
+	// It will contains all the pod & container details required for exec command
+	execCommandDetails := litmusexec.PodDetails{}
 
-	req := clients.KubeClient.CoreV1().RESTClient().Post().
-		Resource("pods").
-		Name(podName).
-		Namespace(namespace).
-		SubResource("exec")
-	scheme := runtime.NewScheme()
-	if err := core_v1.AddToScheme(scheme); err != nil {
-		return fmt.Errorf("error adding to scheme: %v", err)
-	}
+	ddCmd := fmt.Sprintf("dd if=/dev/zero of=/dev/null bs=" + MemoryConsumption + "M")
+	command := []string{"/bin/sh", "-c", ddCmd}
 
-	parameterCodec := runtime.NewParameterCodec(scheme)
-	req.VersionedParams(&core_v1.PodExecOptions{
-		Command:   strings.Fields(command),
-		Container: containerName,
-		Stdin:     false,
-		Stdout:    true,
-		Stderr:    true,
-		TTY:       false,
-	}, parameterCodec)
-
-	exec, err := remotecommand.NewSPDYExecutor(clients.KubeConfig, "POST", req.URL())
+	litmusexec.SetExecCommandAttributes(&execCommandDetails, podName, containerName, namespace)
+	_, err := litmusexec.Exec(&execCommandDetails, clients, command)
 	if err != nil {
-		return fmt.Errorf("error while creating Executor: %v", err)
+		return errors.Errorf("Unable to run stress command inside target container, due to err: %v", err)
 	}
-
-	stdout := os.Stdout
-	stderr := os.Stderr
-
-	err = exec.Stream(remotecommand.StreamOptions{
-		Stdin:  nil,
-		Stdout: stdout,
-		Stderr: stderr,
-		Tty:    false,
-	})
-
-	if err != nil {
-		errorCode := strings.Contains(err.Error(), "143")
-		if errorCode != true {
-			log.Infof("[Chaos]:Memory stress error: %v", err.Error())
-			return err
-		}
-	}
-
 	return nil
 }
 
@@ -169,7 +134,7 @@ func PrepareMemoryStress(experimentsDetails *experimentTypes.ExperimentDetails, 
 	//Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
 		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", strconv.Itoa(experimentsDetails.RampTime))
-		waitForRampTime(experimentsDetails)
+		regular.WaitForDuration(experimentsDetails.RampTime)
 	}
 	//Starting the Memory stress experiment
 	err := ExperimentMemory(experimentsDetails, clients, resultDetails, eventsDetails, chaosDetails)
@@ -179,14 +144,9 @@ func PrepareMemoryStress(experimentsDetails *experimentTypes.ExperimentDetails, 
 	//Waiting for the ramp time after chaos injection
 	if experimentsDetails.RampTime != 0 {
 		log.Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", strconv.Itoa(experimentsDetails.RampTime))
-		waitForRampTime(experimentsDetails)
+		regular.WaitForDuration(experimentsDetails.RampTime)
 	}
 	return nil
-}
-
-//waitForRampTime waits for the given ramp time duration (in seconds)
-func waitForRampTime(experimentsDetails *experimentTypes.ExperimentDetails) {
-	time.Sleep(time.Duration(experimentsDetails.RampTime) * time.Second)
 }
 
 //PreparePodList will also adjust the number of the target pods depending on the specified percentage in PODS_AFFECTED_PERC variable
@@ -216,52 +176,15 @@ func PreparePodList(experimentsDetails *experimentTypes.ExperimentDetails, clien
 
 //KillStressMemory function to kill the experiment. Triggered by either timeout of chaos duration or termination of the experiment
 func KillStressMemory(containerName, podName, namespace string, clients clients.ClientSets) error {
+	// It will contains all the pod & container details required for exec command
+	execCommandDetails := litmusexec.PodDetails{}
 
 	command := []string{"/bin/sh", "-c", "kill $(find /proc -name exe -lname '*/dd' 2>&1 | grep -v 'Permission denied' | awk -F/ '{print $(NF-1)}' |  head -n 1)"}
 
-	req := clients.KubeClient.CoreV1().RESTClient().Post().
-		Resource("pods").
-		Name(podName).
-		Namespace(namespace).
-		SubResource("exec")
-	scheme := runtime.NewScheme()
-	if err := core_v1.AddToScheme(scheme); err != nil {
-		return fmt.Errorf("error adding to scheme: %v", err)
-	}
-
-	parameterCodec := runtime.NewParameterCodec(scheme)
-	req.VersionedParams(&core_v1.PodExecOptions{
-		Command:   command,
-		Container: containerName,
-		Stdin:     false,
-		Stdout:    true,
-		Stderr:    true,
-		TTY:       false,
-	}, parameterCodec)
-
-	exec, err := remotecommand.NewSPDYExecutor(clients.KubeConfig, "POST", req.URL())
+	litmusexec.SetExecCommandAttributes(&execCommandDetails, podName, containerName, namespace)
+	_, err := litmusexec.Exec(&execCommandDetails, clients, command)
 	if err != nil {
-		return fmt.Errorf("error while creating Executor: %v", err)
+		return errors.Errorf("Unable to kill stress process inside target container, due to err: %v", err)
 	}
-
-	stdout := os.Stdout
-	stderr := os.Stderr
-
-	err = exec.Stream(remotecommand.StreamOptions{
-		Stdin:  nil,
-		Stdout: stdout,
-		Stderr: stderr,
-		Tty:    false,
-	})
-
-	//The kill command returns a 143 when it kills a process. This is expected
-	if err != nil {
-		errorCode := strings.Contains(err.Error(), "143")
-		if errorCode != true {
-			log.Infof("[Chaos]:Memory stress error: %v", err.Error())
-			return err
-		}
-	}
-
 	return nil
 }
