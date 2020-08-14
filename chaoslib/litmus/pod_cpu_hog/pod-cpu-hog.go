@@ -30,7 +30,8 @@ import (
 // Using the TOTAL_CHAOS_DURATION we will need to specify for how long this experiment will last
 func StressCPU(containerName, podName, namespace string, clients clients.ClientSets) error {
 
-	command := fmt.Sprintf("md5sum /dev/zero")
+	//command := fmt.Sprintf("md5sum /dev/zero")
+	command := []string{"/bin/sh", "-c", "md5sum /dev/zero"}
 
 	req := clients.KubeClient.CoreV1().RESTClient().Post().
 		Resource("pods").
@@ -44,7 +45,7 @@ func StressCPU(containerName, podName, namespace string, clients clients.ClientS
 
 	parameterCodec := runtime.NewParameterCodec(scheme)
 	req.VersionedParams(&core_v1.PodExecOptions{
-		Command:   strings.Fields(command),
+		Command:   command,
 		Container: containerName,
 		Stdin:     false,
 		Stdout:    true,
