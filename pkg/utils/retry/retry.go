@@ -3,6 +3,8 @@ package retry
 import (
 	"fmt"
 	"time"
+
+	"github.com/pkg/errors"
 )
 
 // Action defines the prototype of action function, function as a value
@@ -68,6 +70,9 @@ func (model Model) Try(action Action) error {
 		err = action(attempt)
 		if model.waitTime > 0 {
 			time.Sleep(model.waitTime)
+		}
+		if err == errors.Errorf("container is in terminated state") {
+			break
 		}
 	}
 
