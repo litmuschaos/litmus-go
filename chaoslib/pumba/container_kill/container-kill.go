@@ -11,7 +11,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
-	"github.com/litmuschaos/litmus-go/pkg/utils/regular"
+	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -43,12 +43,12 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 	})
 
 	// generating a unique string which can be appended with the helper pod name & labels for the uniquely identification
-	experimentsDetails.RunID = regular.GetRunID()
+	experimentsDetails.RunID = common.GetRunID()
 
 	//Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
 		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", strconv.Itoa(experimentsDetails.RampTime))
-		regular.WaitForDuration(experimentsDetails.RampTime)
+		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 
 	if experimentsDetails.EngineName != "" {
@@ -79,11 +79,11 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 
 	// Waiting for the Chaos Duration
 	log.Infof("[Wait]: Waiting for the %vs chaos duration", strconv.Itoa(experimentsDetails.ChaosDuration))
-	regular.WaitForDuration(experimentsDetails.ChaosDuration)
+	common.WaitForDuration(experimentsDetails.ChaosDuration)
 
 	//Deleting the the helper pod for container-kill
 	log.Info("[Cleanup]: Deleting the helper pod")
-	err = regular.DeletePod("pumba-sig-kill-"+experimentsDetails.RunID, "name="+experimentsDetails.ExperimentName+"-"+experimentsDetails.RunID, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients)
+	err = common.DeletePod(experimentsDetails.ExperimentName+"-"+experimentsDetails.RunID, "name="+experimentsDetails.ExperimentName+"-"+experimentsDetails.RunID, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients)
 	if err != nil {
 		return errors.Errorf("Unable to delete the helper pod, err: %v", err)
 	}
@@ -97,7 +97,7 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 	//Waiting for the ramp time after chaos injection
 	if experimentsDetails.RampTime != 0 {
 		log.Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", strconv.Itoa(experimentsDetails.RampTime))
-		regular.WaitForDuration(experimentsDetails.RampTime)
+		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 	return nil
 }

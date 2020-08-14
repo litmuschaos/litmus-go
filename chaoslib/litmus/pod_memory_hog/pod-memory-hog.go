@@ -16,8 +16,8 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/math"
 	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/types"
+	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	litmusexec "github.com/litmuschaos/litmus-go/pkg/utils/exec"
-	"github.com/litmuschaos/litmus-go/pkg/utils/regular"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	core_v1 "k8s.io/api/core/v1"
@@ -32,7 +32,7 @@ func StressMemory(MemoryConsumption, containerName, podName, namespace string, c
 
 	log.Infof("The memory consumption is: %v", MemoryConsumption)
 
-	// It will contains all the pod & container details required for exec command
+	// It will contain all the pod & container details required for exec command
 	execCommandDetails := litmusexec.PodDetails{}
 
 	ddCmd := fmt.Sprintf("dd if=/dev/zero of=/dev/null bs=" + MemoryConsumption + "M")
@@ -134,7 +134,7 @@ func PrepareMemoryStress(experimentsDetails *experimentTypes.ExperimentDetails, 
 	//Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
 		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", strconv.Itoa(experimentsDetails.RampTime))
-		regular.WaitForDuration(experimentsDetails.RampTime)
+		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 	//Starting the Memory stress experiment
 	err := ExperimentMemory(experimentsDetails, clients, resultDetails, eventsDetails, chaosDetails)
@@ -144,7 +144,7 @@ func PrepareMemoryStress(experimentsDetails *experimentTypes.ExperimentDetails, 
 	//Waiting for the ramp time after chaos injection
 	if experimentsDetails.RampTime != 0 {
 		log.Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", strconv.Itoa(experimentsDetails.RampTime))
-		regular.WaitForDuration(experimentsDetails.RampTime)
+		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 	return nil
 }
