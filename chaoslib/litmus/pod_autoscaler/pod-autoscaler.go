@@ -8,6 +8,8 @@ import (
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-autoscaler/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/types"
+	"github.com/litmuschaos/litmus-go/pkg/utils/common"
+	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	retries "k8s.io/client-go/util/retry"
 
@@ -27,34 +29,28 @@ func PreparePodAutoscaler(experimentsDetails *experimentTypes.ExperimentDetails,
 	//Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
 		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", strconv.Itoa(experimentsDetails.RampTime))
-		waitForRampTime(experimentsDetails)
+		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 
 	err = PodAutoscalerChaos(experimentsDetails, clients, replicaCount, appName, resultDetails, eventsDetails, chaosDetails)
-
 	if err != nil {
 		return errors.Errorf("Unable to perform autoscaling, due to %v", err)
 	}
 
 	err = AutoscalerRecovery(experimentsDetails, clients, replicaCount, appName)
 	if err != nil {
-		return errors.Errorf("Unable to perform autoscaling, due to %v", err)
+		return errors.Errorf("Unable to recover the auto scaling, due to %v", err)
 	}
 
 	//Waiting for the ramp time after chaos injection
 	if experimentsDetails.RampTime != 0 {
 		log.Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", strconv.Itoa(experimentsDetails.RampTime))
-		waitForRampTime(experimentsDetails)
+		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 	return nil
 }
 
-//waitForRampTime waits for the given ramp time duration (in seconds)
-func waitForRampTime(experimentsDetails *experimentTypes.ExperimentDetails) {
-	time.Sleep(time.Duration(experimentsDetails.RampTime) * time.Second)
-}
-
-//GetApplicationDetails is used to get the application name, replicas of the application
+//GetApplicationDetails is used to get the name and total number of replicas of the application
 func GetApplicationDetails(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) (string, int, error) {
 
 	var appReplica int
@@ -87,8 +83,8 @@ func PodAutoscalerChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 		if err != nil {
 			return errors.Errorf("Failed to get latest version of Application Deployment: %v", err)
 		}
-
-		appUnderTest.Spec.Replicas = int32Ptr(replicas) // modify replica count
+		// modifying the replica count
+		appUnderTest.Spec.Replicas = int32Ptr(replicas)
 		_, updateErr := applicationClient.Update(appUnderTest)
 		return updateErr
 	})
@@ -107,48 +103,35 @@ func PodAutoscalerChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 
 // ApplicationPodStatusCheck checks the status of the application pod
 func ApplicationPodStatusCheck(experimentsDetails *experimentTypes.ExperimentDetails, appName string, clients clients.ClientSets, replicaCount int, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-
-	//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
-	ChaosStartTimeStamp := time.Now().Unix()
-	failFlag := false
 	applicationClient := clients.KubeClient.AppsV1().Deployments(experimentsDetails.AppNS)
-	applicationDeploy, err := applicationClient.Get(appName, metav1.GetOptions{})
-	if err != nil {
-		return errors.Errorf("Unable to get the application, err: %v", err)
-	}
-	for count := 0; count < int(experimentsDetails.ChaosDuration/2); count++ {
+	isFailed := false
 
-		if int(applicationDeploy.Status.AvailableReplicas) != experimentsDetails.Replicas {
-
-			log.Infof("Application Pod Avaliable Count is: %s", strconv.Itoa(int(applicationDeploy.Status.AvailableReplicas)))
-			applicationDeploy, err = applicationClient.Get(appName, metav1.GetOptions{})
+	err := retry.
+		Times(uint(experimentsDetails.Timeout / experimentsDetails.Delay)).
+		Wait(time.Duration(experimentsDetails.Delay) * time.Second).
+		Try(func(attempt uint) error {
+			applicationDeploy, err := applicationClient.Get(appName, metav1.GetOptions{})
 			if err != nil {
 				return errors.Errorf("Unable to get the application, err: %v", err)
 			}
-
-			time.Sleep(2 * time.Second)
-			//ChaosCurrentTimeStamp contains the current timestamp
-			ChaosCurrentTimeStamp := time.Now().Unix()
-
-			//ChaosDiffTimeStamp contains the difference of current timestamp and start timestamp
-			//It will helpful to track the total chaos duration
-			chaosDiffTimeStamp := ChaosCurrentTimeStamp - ChaosStartTimeStamp
-			if int(chaosDiffTimeStamp) >= experimentsDetails.ChaosDuration {
-				failFlag = true
-				break
+			if int(applicationDeploy.Status.AvailableReplicas) != experimentsDetails.Replicas {
+				log.Infof("Application Pod Avaliable Count is: %v", applicationDeploy.Status.AvailableReplicas)
+				isFailed = true
+				return errors.Errorf("Application is not scaled yet, err: %v", err)
 			}
-
-		} else {
-			break
-		}
-	}
-	if failFlag == true {
+			isFailed = false
+			return nil
+		})
+	if isFailed {
 		err = AutoscalerRecovery(experimentsDetails, clients, replicaCount, appName)
 		if err != nil {
 			return errors.Errorf("Unable to perform autoscaling, due to %v", err)
 		}
-		return errors.Errorf("Application pod fails to come in running state after Chaos Duration of %d sec", experimentsDetails.ChaosDuration)
+		return errors.Errorf("Failed to scale the appplication, err: %v", err)
+	} else if err != nil {
+		return err
 	}
+
 	// Keeping a wait time of 10s after all pod comes in running state
 	// This is optional and used just for viewing the pod status
 	time.Sleep(10 * time.Second)
@@ -179,33 +162,23 @@ func AutoscalerRecovery(experimentsDetails *experimentTypes.ExperimentDetails, c
 	}
 	log.Info("[Info]: Application pod started rolling back")
 
-	applicationDeploy, err := clients.KubeClient.AppsV1().Deployments(experimentsDetails.AppNS).Get(appName, metav1.GetOptions{})
-	if err != nil {
-		return errors.Errorf("Unable to get the application, err: %v", err)
-	}
-
-	failFlag := false
-	// Check for 30 retries with 2secs of delay
-	for count := 0; count < 30; count++ {
-
-		if int(applicationDeploy.Status.AvailableReplicas) != replicaCount {
-
-			applicationDeploy, err = applicationClient.Get(appName, metav1.GetOptions{})
+	err = retry.
+		Times(uint(experimentsDetails.Timeout / experimentsDetails.Delay)).
+		Wait(time.Duration(experimentsDetails.Delay) * time.Second).
+		Try(func(attempt uint) error {
+			applicationDeploy, err := applicationClient.Get(appName, metav1.GetOptions{})
 			if err != nil {
 				return errors.Errorf("Unable to get the application, err: %v", err)
 			}
-			time.Sleep(2 * time.Second)
-			if count == 30 {
-				failFlag = true
-				break
+			if int(applicationDeploy.Status.AvailableReplicas) != experimentsDetails.Replicas {
+				log.Infof("Application Pod Avaliable Count is: %v", applicationDeploy.Status.AvailableReplicas)
+				return errors.Errorf("Unable to roll back to older replica count due to, err: %v", err)
 			}
+			return nil
+		})
 
-		} else {
-			break
-		}
-	}
-	if failFlag == true {
-		return errors.Errorf("Application fails to roll back")
+	if err != nil {
+		return err
 	}
 	log.Info("[RollBack]: Application Pod roll back to initial number of replicas")
 
