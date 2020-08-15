@@ -11,7 +11,8 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
-	"github.com/openebs/maya/pkg/util/retry"
+	"github.com/litmuschaos/litmus-go/pkg/utils/common"
+	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	apiv1 "k8s.io/api/core/v1"
@@ -24,7 +25,7 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 	//Select application pod & node name for container-kill
 	appName, appNodeName, err := GetApplicationPod(experimentsDetails, clients)
 	if err != nil {
-		return errors.Errorf("Unable to get the application name and application nodename due to, err: %v", err)
+		return errors.Errorf("Unable to get the application pod and node name due to, err: %v", err)
 	}
 
 	//Get the target container name of the application pod
@@ -42,12 +43,12 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 	})
 
 	// generating a unique string which can be appended with the helper pod name & labels for the uniquely identification
-	experimentsDetails.RunID = GetRunID()
+	experimentsDetails.RunID = common.GetRunID()
 
 	//Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
 		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", strconv.Itoa(experimentsDetails.RampTime))
-		waitForDuration(experimentsDetails.RampTime)
+		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 
 	if experimentsDetails.EngineName != "" {
@@ -71,18 +72,18 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 
 	//checking the status of the helper pod, wait till the helper pod comes to running state else fail the experiment
 	log.Info("[Status]: Checking the status of the helper pod")
-	err = status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, "name=pumba-sig-kill-"+experimentsDetails.RunID, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
+	err = status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, "name="+experimentsDetails.ExperimentName+"-"+experimentsDetails.RunID, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 	if err != nil {
 		return errors.Errorf("helper pod is not in running state, err: %v", err)
 	}
 
 	// Waiting for the Chaos Duration
 	log.Infof("[Wait]: Waiting for the %vs chaos duration", strconv.Itoa(experimentsDetails.ChaosDuration))
-	waitForDuration(experimentsDetails.ChaosDuration)
+	common.WaitForDuration(experimentsDetails.ChaosDuration)
 
 	//Deleting the the helper pod for container-kill
 	log.Info("[Cleanup]: Deleting the helper pod")
-	err = DeleteHelperPod(experimentsDetails, clients, experimentsDetails.RunID)
+	err = common.DeletePod(experimentsDetails.ExperimentName+"-"+experimentsDetails.RunID, "name="+experimentsDetails.ExperimentName+"-"+experimentsDetails.RunID, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients)
 	if err != nil {
 		return errors.Errorf("Unable to delete the helper pod, err: %v", err)
 	}
@@ -96,7 +97,7 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 	//Waiting for the ramp time after chaos injection
 	if experimentsDetails.RampTime != 0 {
 		log.Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", strconv.Itoa(experimentsDetails.RampTime))
-		waitForDuration(experimentsDetails.RampTime)
+		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 	return nil
 }
@@ -126,21 +127,6 @@ func GetTargetContainer(experimentsDetails *experimentTypes.ExperimentDetails, a
 	}
 
 	return pod.Spec.Containers[0].Name, nil
-}
-
-//waitForDuration waits for the given time duration (in seconds)
-func waitForDuration(duration int) {
-	time.Sleep(time.Duration(duration) * time.Second)
-}
-
-// GetRunID generate a random string
-func GetRunID() string {
-	var letterRunes = []rune("abcdefghijklmnopqrstuvwxyz")
-	runID := make([]rune, 6)
-	for i := range runID {
-		runID[i] = letterRunes[rand.Intn(len(letterRunes))]
-	}
-	return string(runID)
 }
 
 //GetRestartCount return the restart count of target container
@@ -196,11 +182,11 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 
 	helperPod := &apiv1.Pod{
 		ObjectMeta: v1.ObjectMeta{
-			Name:      "pumba-sig-kill-" + experimentsDetails.RunID,
+			Name:      experimentsDetails.ExperimentName + "-" + experimentsDetails.RunID,
 			Namespace: experimentsDetails.ChaosNamespace,
 			Labels: map[string]string{
-				"app":      "pumba",
-				"name":     "pumba-sig-kill-" + experimentsDetails.RunID,
+				"app":      experimentsDetails.ExperimentName,
+				"name":     experimentsDetails.ExperimentName + "-" + experimentsDetails.RunID,
 				"chaosUID": string(experimentsDetails.ChaosUID),
 			},
 		},
@@ -219,7 +205,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 			},
 			Containers: []apiv1.Container{
 				{
-					Name:            "pumba",
+					Name:            experimentsDetails.ExperimentName,
 					Image:           experimentsDetails.LIBImage,
 					ImagePullPolicy: apiv1.PullAlways,
 					Command: []string{
@@ -246,28 +232,5 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 	}
 
 	_, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Create(helperPod)
-	return err
-}
-
-//DeleteHelperPod delete the helper pod for container-kill
-func DeleteHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, runID string) error {
-
-	err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Delete("pumba-sig-kill-"+runID, &v1.DeleteOptions{})
-
-	if err != nil {
-		return err
-	}
-
-	err = retry.
-		Times(uint(experimentsDetails.Timeout / experimentsDetails.Delay)).
-		Wait(time.Duration(experimentsDetails.Delay) * time.Second).
-		Try(func(attempt uint) error {
-			podSpec, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).List(v1.ListOptions{LabelSelector: "name=pumba-sig-kill-" + runID})
-			if err != nil || len(podSpec.Items) != 0 {
-				return errors.Errorf("Helper Pod is not deleted yet, err: %v", err)
-			}
-			return nil
-		})
-
 	return err
 }

@@ -1,62 +1,14 @@
-## Experiment CR for the node-drain experiment
+## Experiment Metadata
 
-```
-apiVersion: litmuschaos.io/v1alpha1
-description:
-  message: |
-    Drain the node where application pod is scheduled
-kind: ChaosExperiment
-metadata:
-  name: node-drain
-  version: 0.1.0
-spec:
-  definition:
-    permissions:
-      - apiGroups:
-          - ""
-          - "apps"
-          - "batch"
-          - "litmuschaos.io"
-        resources:
-          - "deployments"
-          - "jobs"
-          - "pods"
-          - "pods/log"
-          - "events"
-          - "configmaps"
-          - "chaosengines"
-          - "chaosexperiments"
-          - "chaosresults"
-        verbs:
-          - "create"
-          - "list"
-          - "get"
-          - "patch"
-          - "update"
-          - "delete"
-      - apiGroups:
-          - ""
-        resources: 
-          - "nodes"
-        verbs:
-          - "get"
-          - "list"
-    image: "litmuschaos/go-runner:ci"
-    args:
-    - -c
-    - ./experiments/node-drain
-    command:
-    - /bin/bash
-    env:
-    - name: TOTAL_CHAOS_DURATION
-      value: '60'
-    - name: RAMP_TIME
-      value: ''
-    - name: LIB
-      value: 'litmus'
-    - name: APP_NODE
-      value: ''
-    labels:
-      name: node-drain
-
-```
+<table>
+<tr>
+<th> Name </th>
+<th> Description </th>
+<th> Documentation Link </th>
+</tr>
+<tr>
+ <td> Node Drain </td>
+ <td> This experiment drains the node where application pod is running and verifies if it is scheduled on another available node. </td>
+ <td>  <a href="https://docs.litmuschaos.io/docs/node-drain/"> Here </a> </td>
+ </tr>
+ </table>

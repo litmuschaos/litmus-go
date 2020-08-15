@@ -5,6 +5,7 @@ import (
 
 	chaosClient "github.com/litmuschaos/chaos-operator/pkg/client/clientset/versioned/typed/litmuschaos/v1alpha1"
 	"github.com/pkg/errors"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -12,9 +13,10 @@ import (
 
 // ClientSets is a collection of clientSets and kubeConfig needed
 type ClientSets struct {
-	KubeClient   *kubernetes.Clientset
-	LitmusClient *chaosClient.LitmuschaosV1alpha1Client
-	KubeConfig   *rest.Config
+	KubeClient    *kubernetes.Clientset
+	LitmusClient  *chaosClient.LitmuschaosV1alpha1Client
+	KubeConfig    *rest.Config
+	DynamicClient dynamic.Interface
 }
 
 // GenerateClientSetFromKubeConfig will generation both ClientSets (k8s, and Litmus) as well as the KubeConfig
@@ -32,9 +34,14 @@ func (clientSets *ClientSets) GenerateClientSetFromKubeConfig() error {
 	if err != nil {
 		return err
 	}
+	dynamicClientSet, err := dynamic.NewForConfig(config)
+	if err != nil {
+		return err
+	}
 	clientSets.KubeClient = k8sClientSet
 	clientSets.LitmusClient = litmusClientSet
 	clientSets.KubeConfig = config
+	clientSets.DynamicClient = dynamicClientSet
 	return nil
 }
 

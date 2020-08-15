@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"time"
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
@@ -12,6 +11,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
+	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/pkg/errors"
 	apiv1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -25,7 +25,7 @@ func PrepareNodeTaint(experimentsDetails *experimentTypes.ExperimentDetails, cli
 	//Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
 		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", strconv.Itoa(experimentsDetails.RampTime))
-		waitForRampTime(experimentsDetails)
+		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 
 	if experimentsDetails.EngineName != "" {
@@ -58,7 +58,7 @@ func PrepareNodeTaint(experimentsDetails *experimentTypes.ExperimentDetails, cli
 
 	// Wait for Chaos Duration
 	log.Infof("[Wait]: Waiting for the %vs chaos duration", strconv.Itoa(experimentsDetails.ChaosDuration))
-	waitForChaosDuration(experimentsDetails)
+	common.WaitForDuration(experimentsDetails.ChaosDuration)
 
 	// remove taint from the application node
 	err = RemoveTaintFromNode(experimentsDetails, clients)
@@ -69,19 +69,9 @@ func PrepareNodeTaint(experimentsDetails *experimentTypes.ExperimentDetails, cli
 	//Waiting for the ramp time after chaos injection
 	if experimentsDetails.RampTime != 0 {
 		log.Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", strconv.Itoa(experimentsDetails.RampTime))
-		waitForRampTime(experimentsDetails)
+		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 	return nil
-}
-
-//waitForRampTime waits for the given ramp time duration (in seconds)
-func waitForRampTime(experimentsDetails *experimentTypes.ExperimentDetails) {
-	time.Sleep(time.Duration(experimentsDetails.RampTime) * time.Second)
-}
-
-//waitForChaosDuration waits for the given chaos duration (in seconds)
-func waitForChaosDuration(experimentsDetails *experimentTypes.ExperimentDetails) {
-	time.Sleep(time.Duration(experimentsDetails.ChaosDuration) * time.Second)
 }
 
 // TaintNode taint the application node

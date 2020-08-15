@@ -40,20 +40,19 @@ func main() {
 	log.Infof("[PreReq]: Getting the ENV for the %v experiment", experimentsDetails.ExperimentName)
 	experimentEnv.GetENV(&experimentsDetails, "pod-autoscaler")
 
-	// Intialise Chaos Result Parameters
-	types.SetResultAttributes(&resultDetails, experimentsDetails.EngineName, experimentsDetails.ExperimentName)
-
 	// Intialise the chaos attributes
 	experimentEnv.InitialiseChaosVariables(&chaosDetails, &experimentsDetails)
+
+	// Intialise Chaos Result Parameters
+	types.SetResultAttributes(&resultDetails, chaosDetails)
 
 	//Updating the chaos result in the beginning of experiment
 	log.Infof("[PreReq]: Updating the chaos result of %v experiment (SOT)", experimentsDetails.ExperimentName)
 	err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT")
 	if err != nil {
 		log.Errorf("Unable to Create the Chaos Result due to %v", err)
-		failStep := "Updating the chaos result of pod-autoscaler experiment (SOT)"
-		types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
-		err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
+		failStep := "Updating the chaos result of pod-delete experiment (SOT)"
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
 

@@ -1,17 +1,12 @@
 package pod_autoscaler
 
 import (
-	"os"
-	"os/signal"
 	"strconv"
-	"syscall"
 	"time"
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
-	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-autoscaler/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
-	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	retries "k8s.io/client-go/util/retry"
@@ -34,9 +29,6 @@ func PreparePodAutoscaler(experimentsDetails *experimentTypes.ExperimentDetails,
 		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", strconv.Itoa(experimentsDetails.RampTime))
 		waitForRampTime(experimentsDetails)
 	}
-	if err != nil {
-		return errors.Errorf("Unable to get the serviceAccountName, err: %v", err)
-	}
 
 	err = PodAutoscalerChaos(experimentsDetails, clients, replicaCount, appName, resultDetails, eventsDetails, chaosDetails)
 
@@ -44,7 +36,7 @@ func PreparePodAutoscaler(experimentsDetails *experimentTypes.ExperimentDetails,
 		return errors.Errorf("Unable to perform autoscaling, due to %v", err)
 	}
 
-	err = AutoscalerReovery(experimentsDetails, clients, replicaCount, appName)
+	err = AutoscalerRecovery(experimentsDetails, clients, replicaCount, appName)
 	if err != nil {
 		return errors.Errorf("Unable to perform autoscaling, due to %v", err)
 	}
@@ -67,10 +59,9 @@ func GetApplicationDetails(experimentsDetails *experimentTypes.ExperimentDetails
 
 	var appReplica int
 	var appName string
-	applicationClient := clients.KubeClient.AppsV1().Deployments(experimentsDetails.ChaosNamespace)
 	// Get Deployment replica count
-	applicationList, err := applicationClient.List(metav1.ListOptions{})
-	if err != nil {
+	applicationList, err := clients.KubeClient.AppsV1().Deployments(experimentsDetails.AppNS).List(metav1.ListOptions{LabelSelector: experimentsDetails.AppLabel})
+	if err != nil || len(applicationList.Items) == 0 {
 		return "", 0, errors.Errorf("Unable to get application, err: %v", err)
 	}
 	for _, app := range applicationList.Items {
@@ -85,20 +76,20 @@ func GetApplicationDetails(experimentsDetails *experimentTypes.ExperimentDetails
 //PodAutoscalerChaos scales up the application pod replicas
 func PodAutoscalerChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, replicaCount int, appName string, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
-	applicationClient := clients.KubeClient.AppsV1().Deployments(experimentsDetails.ChaosNamespace)
+	applicationClient := clients.KubeClient.AppsV1().Deployments(experimentsDetails.AppNS)
 
 	replicas := int32(experimentsDetails.Replicas)
 	// Scale Application
 	retryErr := retries.RetryOnConflict(retries.DefaultRetry, func() error {
 		// Retrieve the latest version of Deployment before attempting update
 		// RetryOnConflict uses exponential backoff to avoid exhausting the apiserver
-		result, err := applicationClient.Get(appName, metav1.GetOptions{})
+		appUnderTest, err := applicationClient.Get(appName, metav1.GetOptions{})
 		if err != nil {
 			return errors.Errorf("Failed to get latest version of Application Deployment: %v", err)
 		}
 
-		result.Spec.Replicas = int32Ptr(replicas) // modify replica count
-		_, updateErr := applicationClient.Update(result)
+		appUnderTest.Spec.Replicas = int32Ptr(replicas) // modify replica count
+		_, updateErr := applicationClient.Update(appUnderTest)
 		return updateErr
 	})
 	if retryErr != nil {
@@ -119,8 +110,6 @@ func ApplicationPodStatusCheck(experimentsDetails *experimentTypes.ExperimentDet
 
 	//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
 	ChaosStartTimeStamp := time.Now().Unix()
-	var endTime <-chan time.Time
-	timeDelay := time.Duration(experimentsDetails.ChaosDuration) * time.Second
 	failFlag := false
 	applicationClient := clients.KubeClient.AppsV1().Deployments(experimentsDetails.AppNS)
 	applicationDeploy, err := applicationClient.Get(appName, metav1.GetOptions{})
@@ -149,54 +138,12 @@ func ApplicationPodStatusCheck(experimentsDetails *experimentTypes.ExperimentDet
 				break
 			}
 
-			// signChan channel is used to transmit signal notifications.
-			signChan := make(chan os.Signal, 1)
-			// Catch and relay certain signal(s) to signChan channel.
-			signal.Notify(signChan, os.Interrupt, syscall.SIGTERM, syscall.SIGKILL)
-		loop:
-			for {
-				endTime = time.After(timeDelay)
-
-				select {
-				case <-signChan:
-					err = AutoscalerReovery(experimentsDetails, clients, replicaCount, appName)
-					if err != nil {
-						return errors.Errorf("Unable to perform autoscaling, due to %v", err)
-					}
-					// updating the chaosresult after stopped
-					failStep := "Pod autoscaler chaos injection stopped!"
-					types.SetResultAfterCompletion(resultDetails, "Fail", "Stopped", failStep)
-					result.ChaosResult(chaosDetails, clients, resultDetails, "EOT")
-
-					// generating summary event in chaosengine
-					msg := experimentsDetails.ExperimentName + " experiment has been aborted"
-					types.SetEngineEventAttributes(eventsDetails, types.Summary, msg, "Warning", chaosDetails)
-					events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
-
-					// generating summary event in chaosresult
-					types.SetResultEventAttributes(eventsDetails, types.Summary, msg, "Warning", resultDetails)
-					events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosResult")
-
-					os.Exit(1)
-				case <-endTime:
-					log.Infof("[Chaos]: Time is up for experiment: %v", experimentsDetails.ExperimentName)
-					endTime = nil
-					break loop
-
-				}
-
-			}
-
-			err = AutoscalerReovery(experimentsDetails, clients, replicaCount, appName)
-			if err != nil {
-				return errors.Errorf("Unable to perform autoscaling, due to %v", err)
-			}
 		} else {
 			break
 		}
 	}
 	if failFlag == true {
-		err = AutoscalerReovery(experimentsDetails, clients, replicaCount, appName)
+		err = AutoscalerRecovery(experimentsDetails, clients, replicaCount, appName)
 		if err != nil {
 			return errors.Errorf("Unable to perform autoscaling, due to %v", err)
 		}
@@ -209,8 +156,8 @@ func ApplicationPodStatusCheck(experimentsDetails *experimentTypes.ExperimentDet
 	return nil
 }
 
-//AutoscalerReovery scale back to initial number of replica
-func AutoscalerReovery(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, replicaCount int, appName string) error {
+//AutoscalerRecovery scale back to initial number of replica
+func AutoscalerRecovery(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, replicaCount int, appName string) error {
 
 	applicationClient := clients.KubeClient.AppsV1().Deployments(experimentsDetails.ChaosNamespace)
 
@@ -218,24 +165,25 @@ func AutoscalerReovery(experimentsDetails *experimentTypes.ExperimentDetails, cl
 	retryErr := retries.RetryOnConflict(retries.DefaultRetry, func() error {
 		// Retrieve the latest version of Deployment before attempting update
 		// RetryOnConflict uses exponential backoff to avoid exhausting the apiserver
-		result, err := applicationClient.Get(appName, metav1.GetOptions{})
+		appUnderTest, err := applicationClient.Get(appName, metav1.GetOptions{})
 		if err != nil {
 			return errors.Errorf("Failed to get latest version of Application Deployment: %v", err)
 		}
 
-		result.Spec.Replicas = int32Ptr(int32(replicaCount)) // modify replica count
-		_, updateErr := applicationClient.Update(result)
+		appUnderTest.Spec.Replicas = int32Ptr(int32(replicaCount)) // modify replica count
+		_, updateErr := applicationClient.Update(appUnderTest)
 		return updateErr
 	})
 	if retryErr != nil {
 		return errors.Errorf("Unable to scale the, due to: %v", retryErr)
 	}
-	log.Info("[Info]: Application Started Scaling back")
+	log.Info("[Info]: Application pod started rolling back")
 
 	applicationDeploy, err := clients.KubeClient.AppsV1().Deployments(experimentsDetails.AppNS).Get(appName, metav1.GetOptions{})
 	if err != nil {
 		return errors.Errorf("Unable to get the application, err: %v", err)
 	}
+
 	failFlag := false
 	// Check for 30 retries with 2secs of delay
 	for count := 0; count < 30; count++ {

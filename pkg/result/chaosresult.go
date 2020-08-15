@@ -1,6 +1,7 @@
 package result
 
 import (
+	"strconv"
 	"time"
 
 	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
@@ -59,6 +60,7 @@ func ChaosResult(chaosDetails *types.ChaosDetails, clients clients.ClientSets, r
 //InitializeChaosResult create the chaos result
 func InitializeChaosResult(chaosDetails *types.ChaosDetails, clients clients.ClientSets, resultDetails *types.ResultDetails) error {
 
+	probeStatus := GetProbeStatus(resultDetails)
 	chaosResult := &v1alpha1.ChaosResult{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      resultDetails.Name,
@@ -74,9 +76,11 @@ func InitializeChaosResult(chaosDetails *types.ChaosDetails, clients clients.Cli
 		},
 		Status: v1alpha1.ChaosResultStatus{
 			ExperimentStatus: v1alpha1.TestStatus{
-				Phase:   resultDetails.Phase,
-				Verdict: resultDetails.Verdict,
+				Phase:                  resultDetails.Phase,
+				Verdict:                resultDetails.Verdict,
+				ProbeSuccessPercentage: "Awaited",
 			},
+			ProbeStatus: probeStatus,
 		},
 	}
 
@@ -93,7 +97,7 @@ func InitializeChaosResult(chaosDetails *types.ChaosDetails, clients clients.Cli
 		if err != nil {
 			return errors.Errorf("Unable to get the chaosresult, err: %v", err)
 		}
-		// adding the labels to the chaosresullt
+		// adding the labels to the chaosresult
 		chaosResult.ObjectMeta.Labels = map[string]string{
 			"name": resultDetails.Name,
 		}
@@ -108,6 +112,20 @@ func InitializeChaosResult(chaosDetails *types.ChaosDetails, clients clients.Cli
 	return nil
 }
 
+//GetProbeStatus fetch status of all probes
+func GetProbeStatus(resultDetails *types.ResultDetails) []v1alpha1.ProbeStatus {
+
+	probeStatus := []v1alpha1.ProbeStatus{}
+	for _, probe := range resultDetails.ProbeDetails {
+		probes := v1alpha1.ProbeStatus{}
+		probes.Name = probe.Name
+		probes.Type = probe.Type
+		probes.Status = probe.Status
+		probeStatus = append(probeStatus, probes)
+	}
+	return probeStatus
+}
+
 //PatchChaosResult Update the chaos result
 func PatchChaosResult(result *v1alpha1.ChaosResult, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails) error {
 
@@ -115,6 +133,20 @@ func PatchChaosResult(result *v1alpha1.ChaosResult, clients clients.ClientSets, 
 	result.Status.ExperimentStatus.Verdict = resultDetails.Verdict
 	result.Spec.InstanceID = chaosDetails.InstanceID
 	result.Status.ExperimentStatus.FailStep = resultDetails.FailStep
+	result.Status.ProbeStatus = GetProbeStatus(resultDetails)
+	if resultDetails.Phase == "Completed" {
+		if resultDetails.Verdict == "Pass" && len(resultDetails.ProbeDetails) != 0 {
+
+			result.Status.ExperimentStatus.ProbeSuccessPercentage = "100"
+
+		} else if resultDetails.Verdict == "Fail" && len(resultDetails.ProbeDetails) != 0 {
+
+			result.Status.ExperimentStatus.ProbeSuccessPercentage = strconv.Itoa((resultDetails.PassedProbeCount * 100) / len(resultDetails.ProbeDetails))
+		}
+
+	} else {
+		result.Status.ExperimentStatus.ProbeSuccessPercentage = "Awaited"
+	}
 
 	// It will update the existing chaos-result CR with new values
 	// it will retries until it will able to update successfully or met the timeout(3 mins)
@@ -163,4 +195,5 @@ func RecordAfterFailure(chaosDetails *types.ChaosDetails, resultDetails *types.R
 		types.SetEngineEventAttributes(eventsDetails, types.Summary, msg, "Warning", chaosDetails)
 		events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 	}
+
 }

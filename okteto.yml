@@ -1,0 +1,17 @@
+name: litmus-experiment
+image: okteto/golang:1
+command:
+- bash
+workdir: /okteto
+forward:
+- 2345:2345
+- 8080:8080
+volumes:
+- /go/pkg/
+- /root/.cache/go-build/
+persistentVolume:
+  enabled: true
+securityContext:
+  capabilities:
+    add:
+    - SYS_PTRACE
