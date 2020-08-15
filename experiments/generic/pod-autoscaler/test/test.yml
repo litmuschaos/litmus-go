@@ -1,0 +1,57 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: litmus-experiment
+spec:
+  replicas: 1
+  selector: 
+    matchLabels:
+      app: litmus-experiment
+  template:
+    metadata:
+      labels:
+        app: litmus-experiment
+    spec:
+      serviceAccountName: pod-autoscaler-sa
+      containers:
+      - name: gotest
+        image: busybox
+        command:
+          - sleep 
+          - "3600"
+        env:
+          # provide application namespace
+          - name: APP_NAMESPACE
+            value: ''
+
+          # provide application labels
+          - name: APP_LABEL
+            value: ''
+
+          # provide application kind
+          - name: APP_KIND
+            value: ''
+
+          - name: TOTAL_CHAOS_DURATION
+            value: '30'
+
+          - name: REPLICA_COUNT
+            value: ''
+
+          - name: CHAOS_NAMESPACE
+            value: ''
+
+            ## Period to wait before/after injection of chaos  
+          - name: RAMP_TIME
+            value: ''
+
+          ## env var that describes the library used to execute the chaos
+          ## Only supported litmus
+          - name: LIB
+            value: 'litmus'
+
+          - name: CHAOS_SERVICE_ACCOUNT
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.serviceAccountName

@@ -91,7 +91,7 @@ func ExperimentCPU(experimentsDetails *experimentTypes.ExperimentDetails, client
 						}
 						// updating the chaosresult after stopped
 						failStep := "CPU hog Chaos injection stopped!"
-						types.SetResultAfterCompletion(resultDetails, "Fail", "Stopped", failStep)
+						types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep)
 						result.ChaosResult(chaosDetails, clients, resultDetails, "EOT")
 
 						// generating summary event in chaosengine
