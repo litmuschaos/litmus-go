@@ -47,7 +47,7 @@ func CheckAuxiliaryApplicationStatus(AuxiliaryAppDetails string, timeout, delay 
 	return nil
 }
 
-// CheckPodStatus checks the status of the application pod
+// CheckPodStatus checks the running status of the application pod
 func CheckPodStatus(appNs string, appLabel string, timeout, delay int, clients clients.ClientSets) error {
 	err := retry.
 		Times(uint(timeout / delay)).
