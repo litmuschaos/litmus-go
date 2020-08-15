@@ -11,7 +11,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/math"
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
-	"github.com/openebs/maya/pkg/util/retry"
+	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	apiv1 "k8s.io/api/core/v1"
@@ -24,7 +24,7 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 	//Select application pod and node name for the container-kill
 	appName, appNodeName, err := GetApplicationPod(experimentsDetails, clients)
 	if err != nil {
-		return errors.Errorf("Unable to get the application name and application nodename due to, err: %v", err)
+		return errors.Errorf("Unable to get the application pod and node name due to, err: %v", err)
 	}
 
 	//Get the target container name of the application pod
@@ -45,7 +45,7 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 	GetIterations(experimentsDetails)
 
 	// generating a unique string which can be appended with the helper pod name & labels for the uniquely identification
-	experimentsDetails.RunID = GetRunID()
+	experimentsDetails.RunID = common.GetRunID()
 
 	// Getting the serviceAccountName, need permission inside helper pod to create the events
 	if experimentsDetails.ChaosServiceAccount == "" {
@@ -58,7 +58,7 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 	//Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
 		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", strconv.Itoa(experimentsDetails.RampTime))
-		waitForDuration(experimentsDetails.RampTime)
+		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 
 	// creating the helper pod to perform container kill chaos
@@ -69,7 +69,7 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 
 	//checking the status of the helper pod, wait till the helper pod comes to running state else fail the experiment
 	log.Info("[Status]: Checking the status of the helper pod")
-	err = status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, "name=container-kill-"+experimentsDetails.RunID, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
+	err = status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, "name="+experimentsDetails.ExperimentName+"-"+experimentsDetails.RunID, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 	if err != nil {
 		return errors.Errorf("helper pod is not in running state, err: %v", err)
 	}
@@ -77,14 +77,14 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 	// Wait till the completion of the helper pod
 	// set an upper limit for the waiting time
 	log.Info("[Wait]: waiting till the completion of the helper pod")
-	podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, "name=container-kill-"+experimentsDetails.RunID, clients, experimentsDetails.ChaosDuration+experimentsDetails.ChaosInterval+60, "container-kill")
+	podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, "name="+experimentsDetails.ExperimentName+"-"+experimentsDetails.RunID, clients, experimentsDetails.ChaosDuration+experimentsDetails.ChaosInterval+60, experimentsDetails.ExperimentName)
 	if err != nil || podStatus == "Failed" {
 		return errors.Errorf("helper pod failed due to, err: %v", err)
 	}
 
 	//Deleting the helper pod for container-kill chaos
 	log.Info("[Cleanup]: Deleting the helper pod")
-	err = DeleteHelperPod(experimentsDetails, clients)
+	err = common.DeletePod(experimentsDetails.ExperimentName+"-"+experimentsDetails.RunID, "name="+experimentsDetails.ExperimentName+"-"+experimentsDetails.RunID, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients)
 	if err != nil {
 		return errors.Errorf("Unable to delete the helper pod, err: %v", err)
 	}
@@ -92,7 +92,7 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 	//Waiting for the ramp time after chaos injection
 	if experimentsDetails.RampTime != 0 {
 		log.Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", strconv.Itoa(experimentsDetails.RampTime))
-		waitForDuration(experimentsDetails.RampTime)
+		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 	return nil
 }
@@ -105,21 +105,6 @@ func GetIterations(experimentsDetails *experimentTypes.ExperimentDetails) {
 	}
 	experimentsDetails.Iterations = math.Maximum(Iterations, 1)
 
-}
-
-//waitForDuration waits for the given time duration (in seconds)
-func waitForDuration(duration int) {
-	time.Sleep(time.Duration(duration) * time.Second)
-}
-
-// GetRunID generate a random string
-func GetRunID() string {
-	var letterRunes = []rune("abcdefghijklmnopqrstuvwxyz")
-	runID := make([]rune, 6)
-	for i := range runID {
-		runID[i] = letterRunes[rand.Intn(len(letterRunes))]
-	}
-	return string(runID)
 }
 
 // GetServiceAccount find the serviceAccountName for the helper pod
@@ -166,11 +151,11 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 
 	helperPod := &apiv1.Pod{
 		ObjectMeta: v1.ObjectMeta{
-			Name:      "container-kill-" + experimentsDetails.RunID,
+			Name:      experimentsDetails.ExperimentName + "-" + experimentsDetails.RunID,
 			Namespace: experimentsDetails.ChaosNamespace,
 			Labels: map[string]string{
-				"app":      "container-kill",
-				"name":     "container-kill-" + experimentsDetails.RunID,
+				"app":      experimentsDetails.ExperimentName,
+				"name":     experimentsDetails.ExperimentName + "-" + experimentsDetails.RunID,
 				"chaosUID": string(experimentsDetails.ChaosUID),
 			},
 		},
@@ -198,7 +183,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 			},
 			Containers: []apiv1.Container{
 				{
-					Name:            "container-kill",
+					Name:            experimentsDetails.ExperimentName,
 					Image:           experimentsDetails.LIBImage,
 					ImagePullPolicy: apiv1.PullAlways,
 					Command: []string{
@@ -230,30 +215,6 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 	_, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Create(helperPod)
 	return err
 
-}
-
-//DeleteHelperPod deletes the helper pod and wait until it got terminated
-func DeleteHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) error {
-
-	err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Delete("container-kill-"+experimentsDetails.RunID, &v1.DeleteOptions{})
-
-	if err != nil {
-		return err
-	}
-
-	// waiting for the termination of the pod
-	err = retry.
-		Times(uint(experimentsDetails.Timeout / experimentsDetails.Delay)).
-		Wait(time.Duration(experimentsDetails.Delay) * time.Second).
-		Try(func(attempt uint) error {
-			podSpec, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).List(v1.ListOptions{LabelSelector: "name=container-kill-" + experimentsDetails.RunID})
-			if err != nil || len(podSpec.Items) != 0 {
-				return errors.Errorf("Pod is not deleted yet, err: %v", err)
-			}
-			return nil
-		})
-
-	return err
 }
 
 // GetPodEnv derive all the env required for the helper pod

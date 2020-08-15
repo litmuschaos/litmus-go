@@ -4,7 +4,7 @@ import (
 	"os"
 	"strconv"
 
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/node-cpu-hog/types"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-autoscaler/types"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	clientTypes "k8s.io/apimachinery/pkg/types"
 )
@@ -14,17 +14,16 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string
 	experimentDetails.ExperimentName = expName
 	experimentDetails.ChaosNamespace = Getenv("CHAOS_NAMESPACE", "litmus")
 	experimentDetails.EngineName = Getenv("CHAOSENGINE", "")
-	experimentDetails.ChaosDuration, _ = strconv.Atoi(Getenv("TOTAL_CHAOS_DURATION", "30"))
+	experimentDetails.ChaosDuration, _ = strconv.Atoi(Getenv("TOTAL_CHAOS_DURATION", "60"))
 	experimentDetails.RampTime, _ = strconv.Atoi(Getenv("RAMP_TIME", "0"))
 	experimentDetails.ChaosLib = Getenv("LIB", "litmus")
 	experimentDetails.AppNS = Getenv("APP_NAMESPACE", "")
 	experimentDetails.AppLabel = Getenv("APP_LABEL", "")
 	experimentDetails.AppKind = Getenv("APP_KIND", "")
+	experimentDetails.Replicas, _ = strconv.Atoi(Getenv("REPLICA_COUNT", ""))
 	experimentDetails.ChaosUID = clientTypes.UID(Getenv("CHAOS_UID", ""))
 	experimentDetails.InstanceID = Getenv("INSTANCE_ID", "")
 	experimentDetails.ChaosPodName = Getenv("POD_NAME", "")
-	experimentDetails.NodeCPUcores, _ = strconv.Atoi(Getenv("NODE_CPU_CORE", "0"))
-	experimentDetails.LIBImage = Getenv("LIB_IMAGE", "litmuschaos/go-runner:latest")
 	experimentDetails.AuxiliaryAppInfo = Getenv("AUXILIARY_APPINFO", "")
 	experimentDetails.Delay, _ = strconv.Atoi(Getenv("STATUS_CHECK_DELAY", "2"))
 	experimentDetails.Timeout, _ = strconv.Atoi(Getenv("STATUS_CHECK_TIMEOUT", "180"))
@@ -48,6 +47,5 @@ func InitialiseChaosVariables(chaosDetails *types.ChaosDetails, experimentDetail
 	chaosDetails.EngineName = experimentDetails.EngineName
 	chaosDetails.ExperimentName = experimentDetails.ExperimentName
 	chaosDetails.InstanceID = experimentDetails.InstanceID
-	chaosDetails.Timeout = experimentDetails.Timeout
-	chaosDetails.Delay = experimentDetails.Delay
+
 }

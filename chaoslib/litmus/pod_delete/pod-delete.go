@@ -12,8 +12,8 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/math"
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
-
-	"github.com/openebs/maya/pkg/util/retry"
+	"github.com/litmuschaos/litmus-go/pkg/utils/common"
+	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,7 +29,7 @@ func PreparePodDelete(experimentsDetails *experimentTypes.ExperimentDetails, cli
 	//Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
 		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", strconv.Itoa(experimentsDetails.RampTime))
-		waitForRampTime(experimentsDetails)
+		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 
 	err = PodDeleteChaos(experimentsDetails, clients, eventsDetails, chaosDetails)
@@ -40,7 +40,7 @@ func PreparePodDelete(experimentsDetails *experimentTypes.ExperimentDetails, cli
 	//Waiting for the ramp time after chaos injection
 	if experimentsDetails.RampTime != 0 {
 		log.Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", strconv.Itoa(experimentsDetails.RampTime))
-		waitForRampTime(experimentsDetails)
+		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 	return nil
 }
@@ -55,11 +55,6 @@ func GetIterations(experimentsDetails *experimentTypes.ExperimentDetails) {
 	}
 	experimentsDetails.Iterations = math.Maximum(Iterations, 1)
 
-}
-
-//waitForRampTime waits for the given ramp time duration (in seconds)
-func waitForRampTime(experimentsDetails *experimentTypes.ExperimentDetails) {
-	time.Sleep(time.Duration(experimentsDetails.RampTime) * time.Second)
 }
 
 //PodDeleteChaos deletes the random single/multiple pods
@@ -99,7 +94,7 @@ func PodDeleteChaos(experimentsDetails *experimentTypes.ExperimentDetails, clien
 		//Waiting for the chaos interval after chaos injection
 		if experimentsDetails.ChaosInterval != 0 {
 			log.Infof("[Wait]: Wait for the chaos interval %vs", strconv.Itoa(experimentsDetails.ChaosInterval))
-			waitForChaosInterval(experimentsDetails)
+			common.WaitForDuration(experimentsDetails.ChaosInterval)
 		}
 		//Verify the status of pod after the chaos injection
 		log.Info("[Status]: Verification for the recreation of application pod")
@@ -120,11 +115,6 @@ func PodDeleteChaos(experimentsDetails *experimentTypes.ExperimentDetails, clien
 	log.Infof("[Completion]: %v chaos is done", experimentsDetails.ExperimentName)
 
 	return nil
-}
-
-//waitForChaosInterval waits for the given ramp time duration (in seconds)
-func waitForChaosInterval(experimentsDetails *experimentTypes.ExperimentDetails) {
-	time.Sleep(time.Duration(experimentsDetails.ChaosInterval) * time.Second)
 }
 
 //PreparePodList derive the list of target pod for deletion
