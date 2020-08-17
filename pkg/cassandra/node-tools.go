@@ -6,8 +6,8 @@ import (
 	litmusexec "github.com/litmuschaos/litmus-go/pkg/utils/exec"
 	"github.com/pkg/errors"
 
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/cassandra/pod-delete/types"
 	"github.com/litmuschaos/litmus-go/pkg/clients"
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-delete/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -46,9 +46,9 @@ func NodeToolStatusCheck(experimentsDetails *experimentTypes.ExperimentDetails, 
 
 //GetApplicationPodName will return the name of first application pod
 func GetApplicationPodName(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) (string, error) {
-	podList, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).List(metav1.ListOptions{LabelSelector: experimentsDetails.AppLabel})
+	podList, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaoslibDetail.AppNS).List(metav1.ListOptions{LabelSelector: experimentsDetails.ChaoslibDetail.AppLabel})
 	if err != nil || len(podList.Items) == 0 {
-		return "", errors.Errorf("Fail to get the application pod in %v namespace", experimentsDetails.AppNS)
+		return "", errors.Errorf("Fail to get the application pod in %v namespace", experimentsDetails.ChaoslibDetail.AppNS)
 	}
 
 	return podList.Items[0].Name, nil
@@ -56,9 +56,9 @@ func GetApplicationPodName(experimentsDetails *experimentTypes.ExperimentDetails
 
 //GetApplicationReplicaCount will return the replica count of the sts application
 func GetApplicationReplicaCount(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) (int, error) {
-	podList, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).List(metav1.ListOptions{LabelSelector: experimentsDetails.AppLabel})
+	podList, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaoslibDetail.AppNS).List(metav1.ListOptions{LabelSelector: experimentsDetails.ChaoslibDetail.AppLabel})
 	if err != nil || len(podList.Items) == 0 {
-		return 0, errors.Errorf("Fail to get the application pod in %v namespace", experimentsDetails.AppNS)
+		return 0, errors.Errorf("Fail to get the application pod in %v namespace", experimentsDetails.ChaoslibDetail.AppNS)
 	}
 	return len(podList.Items), nil
 }
@@ -78,7 +78,7 @@ func CheckLoadPercentage(loadPercentage []string, replicaCount int) error {
 			return errors.Errorf("The Load distribution percentage failed, as its value is: '%v'", loadPercentage[count])
 		}
 	}
-	log.Info("[Check]: Check each replica should have some load")
+	log.Info("[Check]: Check each replica is haveing some load")
 
 	return nil
 }
@@ -90,10 +90,10 @@ func GetLoadDistribution(experimentsDetails *experimentTypes.ExperimentDetails, 
 	execCommandDetails := litmusexec.PodDetails{}
 
 	command := append([]string{"/bin/sh", "-c"}, "nodetool status | tail -n +6 | head -n -1")
-	litmusexec.SetExecCommandAttributes(&execCommandDetails, targetPod, "cassandra", experimentsDetails.AppNS)
+	litmusexec.SetExecCommandAttributes(&execCommandDetails, targetPod, "cassandra", experimentsDetails.ChaoslibDetail.AppNS)
 	response, err := litmusexec.Exec(&execCommandDetails, clients, command)
 	if err != nil {
-		return nil, errors.Errorf("Unable to get ephemeral storage details due to err: %v", err)
+		return nil, errors.Errorf("Unable to get nodetool status details due to err: %v", err)
 	}
 	split := strings.Split(response, "\n")
 	loadPercentage := split[:len(split)-1]

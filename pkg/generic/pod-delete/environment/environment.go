@@ -30,13 +30,6 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string
 	experimentDetails.Force, _ = strconv.ParseBool(Getenv("FORCE", "false"))
 	experimentDetails.Delay, _ = strconv.Atoi(Getenv("STATUS_CHECK_DELAY", "2"))
 	experimentDetails.Timeout, _ = strconv.Atoi(Getenv("STATUS_CHECK_TIMEOUT", "180"))
-	experimentDetails.CassandraServiceName = Getenv("CASSANDRA_SVC_NAME", "")
-	experimentDetails.KeySpaceReplicaFactor = Getenv("KEYSPACE_REPLICATION_FACTOR", "")
-	experimentDetails.CassandraPort, _ = strconv.Atoi(Getenv("CASSANDRA_PORT", "9042"))
-	experimentDetails.LivenessServicePort, _ = strconv.Atoi(Getenv("LIVENESS_SVC_PORT", "8088"))
-	experimentDetails.CassandraLivenessImage = Getenv("CASSANDRA_LIVENESS_IMAGE", "litmuschaos/cassandra-client:latest")
-	experimentDetails.CassandraLivenessCheck = Getenv("CASSANDRA_LIVENESS_CHECK", "")
-	experimentDetails.RunID = Getenv("RunID", "")
 
 }
 
