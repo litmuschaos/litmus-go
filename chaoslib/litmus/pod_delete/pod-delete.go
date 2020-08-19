@@ -1,8 +1,10 @@
 package pod_delete
 
 import (
+	"fmt"
 	"math/rand"
 	"strconv"
+	"strings"
 	"time"
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
@@ -32,7 +34,7 @@ func PreparePodDelete(experimentsDetails *experimentTypes.ExperimentDetails, cli
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 
-	err = PodDeleteChaos(experimentsDetails, clients, eventsDetails, chaosDetails)
+	err = PodDeleteChaos(experimentsDetails, clients, eventsDetails, chaosDetails, resultDetails)
 	if err != nil {
 		return errors.Errorf("Unable to delete the application pods, due to %v", err)
 	}
@@ -58,11 +60,16 @@ func GetIterations(experimentsDetails *experimentTypes.ExperimentDetails) {
 }
 
 //PodDeleteChaos deletes the random single/multiple pods
-func PodDeleteChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+func PodDeleteChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails) error {
 
 	//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
 	ChaosStartTimeStamp := time.Now().Unix()
 	var GracePeriod int64 = 0
+
+	// Record Replica Count Before in chaosresult
+	if err = SetReplicaCountBefore(resultDetails, clients, experimentsDetails); err != nil {
+		return err
+	}
 
 	for x := 0; x < experimentsDetails.Iterations; x++ {
 		//Getting the list of all the target pod for deletion
@@ -114,6 +121,11 @@ func PodDeleteChaos(experimentsDetails *experimentTypes.ExperimentDetails, clien
 	}
 	log.Infof("[Completion]: %v chaos is done", experimentsDetails.ExperimentName)
 
+	// Record Replica Count After in chaosresult
+	if err = SetReplicaCount(resultDetails, clients, experimentsDetails, "ReplicaCountAfter"); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -147,4 +159,44 @@ func PreparePodList(experimentsDetails *experimentTypes.ExperimentDetails, clien
 		})
 
 	return targetPodList, err
+}
+
+//SetReplicaCountBefore set the replica count before the chaos
+func SetReplicaCountBefore(chaosresult *types.ResultDetails, clients clients.ClientSets, experimentsDetails *experimentTypes.ExperimentDetails) error {
+	data := map[string]interface{}{}
+	chaosresult.Data = data
+	err = SetReplicaCount(chaosresult, clients, experimentsDetails, "ReplicaCountBefore")
+	return err
+}
+
+//SetReplicaCount sets the replica count in the chaosresult
+func SetReplicaCount(chaosresult *types.ResultDetails, clients clients.ClientSets, experimentsDetails *experimentTypes.ExperimentDetails, key string) error {
+
+	var replicaCount int32
+
+	// it list the resource on the basis of app kind
+	switch strings.ToLower(experimentsDetails.AppKind) {
+	case "deployment", "deployments":
+		deployList, err := clients.KubeClient.AppsV1().Deployments(experimentsDetails.AppNS).List(v1.ListOptions{LabelSelector: experimentsDetails.AppLabel})
+
+		if err != nil || len(deployList.Items) == 0 {
+			return fmt.Errorf("Unable to list the deployment due to, err: %v", err)
+		}
+		replicaCount = *(deployList.Items[0].Spec.Replicas)
+		chaosresult.Data[key] = deployList.Items[0]
+	case "statefulset", "statefulsets":
+		stsList, err := clients.KubeClient.AppsV1().StatefulSets(experimentsDetails.AppNS).List(v1.ListOptions{LabelSelector: experimentsDetails.AppLabel})
+
+		if err != nil || len(stsList.Items) == 0 {
+			return fmt.Errorf("Unable to list the statefulsets due to, err: %v", err)
+		}
+		replicaCount = *(stsList.Items[0].Spec.Replicas)
+	default:
+		log.Warnf("resource type '%s' not supported for recording of replica count", experimentsDetails.AppKind)
+		return nil
+	}
+
+	log.Infof("val: %v", replicaCount)
+
+	return nil
 }

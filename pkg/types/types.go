@@ -24,6 +24,7 @@ type ResultDetails struct {
 	ResultUID        clientTypes.UID
 	ProbeDetails     []ProbeDetails
 	PassedProbeCount int
+	Data             map[string]interface{}
 }
 
 // ProbeDetails is for collecting all the probe details

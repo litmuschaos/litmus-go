@@ -143,6 +143,10 @@ func PatchChaosResult(result *v1alpha1.ChaosResult, clients clients.ClientSets, 
 			result.Status.ExperimentStatus.ProbeSuccessPercentage = strconv.Itoa((resultDetails.PassedProbeCount * 100) / len(resultDetails.ProbeDetails))
 		}
 
+		if resultDetails.Data != nil {
+			result.Status.Data = resultDetails.Data
+		}
+
 	} else if len(resultDetails.ProbeDetails) != 0 {
 		result.Status.ExperimentStatus.ProbeSuccessPercentage = "Awaited"
 	}
