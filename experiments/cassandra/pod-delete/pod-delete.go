@@ -38,14 +38,14 @@ func main() {
 	}
 
 	//Fetching all the ENV passed from the runner pod
-	log.Infof("[PreReq]: Getting the ENV for the %v experiment", experimentsDetails.ChaoslibDetail.ExperimentName)
+	log.Info("[PreReq]: Getting the ENV for the cassandra-pod-delete experiment")
 	experimentEnv.GetENV(&experimentsDetails, "cassandra-pod-delete")
-
-	// Intialise Chaos Result Parameters
-	types.SetResultAttributes(&resultDetails, chaosDetails)
 
 	// Intialise the chaos attributes
 	experimentEnv.InitialiseChaosVariables(&chaosDetails, &experimentsDetails)
+
+	// Intialise Chaos Result Parameters
+	types.SetResultAttributes(&resultDetails, chaosDetails)
 
 	//Updating the chaos result in the beginning of experiment
 	log.Infof("[PreReq]: Updating the chaos result of %v experiment (SOT)", experimentsDetails.ChaoslibDetail.ExperimentName)
@@ -103,7 +103,7 @@ func main() {
 
 	// Including the litmus lib for cassandra-pod-delete
 	if experimentsDetails.ChaoslibDetail.ChaosLib == "litmus" {
-		err = pod_delete.PreparePodDelete(&experimentsDetails.ChaoslibDetail, clients, &resultDetails, &eventsDetails, &chaosDetails)
+		err = pod_delete.PreparePodDelete(experimentsDetails.ChaoslibDetail, clients, &resultDetails, &eventsDetails, &chaosDetails)
 		if err != nil {
 			log.Errorf("Chaos injection failed due to %v\n", err)
 			failStep := "Including the litmus lib for pod-delete"

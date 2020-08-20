@@ -108,11 +108,11 @@ func LivenessCleanup(experimentsDetails *experimentTypes.ExperimentDetails, clie
 // GetLivenessPodResourceVersion will return the resource version of the liveness pod
 func GetLivenessPodResourceVersion(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) (string, error) {
 
-	livenessPods, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaoslibDetail.AppNS).Get("cassandra-liveness-deploy-"+experimentsDetails.RunID, metav1.GetOptions{})
-	if err != nil {
+	livenessPods, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaoslibDetail.AppNS).List(metav1.ListOptions{LabelSelector: "name=cassandra-liveness-deploy-" + experimentsDetails.RunID})
+	if err != nil || len(livenessPods.Items) == 0 {
 		return "", errors.Errorf("Unable to get the liveness pod, due to %v", err)
 	}
-	ResourceVersion := livenessPods.ResourceVersion
+	ResourceVersion := livenessPods.Items[0].ResourceVersion
 
 	return ResourceVersion, nil
 }

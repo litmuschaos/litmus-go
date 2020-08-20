@@ -56,14 +56,12 @@ func Getenv(key string, defaultValue string) string {
 //InitialiseChaosVariables initialise all the global variables
 func InitialiseChaosVariables(chaosDetails *types.ChaosDetails, cassandraDetails *cassandraTypes.ExperimentDetails) {
 
-	var ChaoslibDetail exp.ExperimentDetails
-
-	chaosDetails.ChaosNamespace = ChaoslibDetail.ChaosNamespace
-	chaosDetails.ChaosPodName = ChaoslibDetail.ChaosPodName
-	chaosDetails.ChaosUID = ChaoslibDetail.ChaosUID
-	chaosDetails.EngineName = ChaoslibDetail.EngineName
-	chaosDetails.ExperimentName = ChaoslibDetail.ExperimentName
-	chaosDetails.InstanceID = ChaoslibDetail.InstanceID
-	chaosDetails.Timeout = ChaoslibDetail.Timeout
-	chaosDetails.Delay = ChaoslibDetail.Delay
+	chaosDetails.ChaosNamespace = cassandraDetails.ChaoslibDetail.ChaosNamespace
+	chaosDetails.ChaosPodName = cassandraDetails.ChaoslibDetail.ChaosPodName
+	chaosDetails.ChaosUID = cassandraDetails.ChaoslibDetail.ChaosUID
+	chaosDetails.EngineName = cassandraDetails.ChaoslibDetail.EngineName
+	chaosDetails.ExperimentName = cassandraDetails.ChaoslibDetail.ExperimentName
+	chaosDetails.InstanceID = cassandraDetails.ChaoslibDetail.InstanceID
+	chaosDetails.Timeout = cassandraDetails.ChaoslibDetail.Timeout
+	chaosDetails.Delay = cassandraDetails.ChaoslibDetail.Delay
 }
