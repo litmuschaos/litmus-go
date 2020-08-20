@@ -81,17 +81,17 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 	log.Infof("[Wait]: Waiting for the %vs chaos duration", strconv.Itoa(experimentsDetails.ChaosDuration))
 	common.WaitForDuration(experimentsDetails.ChaosDuration)
 
+	// It will verify that the restart count of container should increase after chaos injection
+	err = VerifyRestartCount(experimentsDetails, appName, clients, restartCountBefore)
+	if err != nil {
+		return errors.Errorf("Target container is not restarted , err: %v", err)
+	}
+
 	//Deleting the the helper pod for container-kill
 	log.Info("[Cleanup]: Deleting the helper pod")
 	err = common.DeletePod(experimentsDetails.ExperimentName+"-"+experimentsDetails.RunID, "name="+experimentsDetails.ExperimentName+"-"+experimentsDetails.RunID, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients)
 	if err != nil {
 		return errors.Errorf("Unable to delete the helper pod, err: %v", err)
-	}
-
-	// It will verify that the restart count of container should increase after chaos injection
-	err = VerifyRestartCount(experimentsDetails, appName, clients, restartCountBefore)
-	if err != nil {
-		return errors.Errorf("Target container is not restarted , err: %v", err)
 	}
 
 	//Waiting for the ramp time after chaos injection
