@@ -76,9 +76,8 @@ func InitializeChaosResult(chaosDetails *types.ChaosDetails, clients clients.Cli
 		},
 		Status: v1alpha1.ChaosResultStatus{
 			ExperimentStatus: v1alpha1.TestStatus{
-				Phase:                  resultDetails.Phase,
-				Verdict:                resultDetails.Verdict,
-				ProbeSuccessPercentage: "Awaited",
+				Phase:   resultDetails.Phase,
+				Verdict: resultDetails.Verdict,
 			},
 			ProbeStatus: probeStatus,
 		},
@@ -144,7 +143,7 @@ func PatchChaosResult(result *v1alpha1.ChaosResult, clients clients.ClientSets, 
 			result.Status.ExperimentStatus.ProbeSuccessPercentage = strconv.Itoa((resultDetails.PassedProbeCount * 100) / len(resultDetails.ProbeDetails))
 		}
 
-	} else {
+	} else if len(resultDetails.ProbeDetails) != 0 {
 		result.Status.ExperimentStatus.ProbeSuccessPercentage = "Awaited"
 	}
 

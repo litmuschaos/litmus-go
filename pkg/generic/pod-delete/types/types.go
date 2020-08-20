@@ -23,7 +23,6 @@ type ExperimentDetails struct {
 	ChaosNamespace      string
 	ChaosPodName        string
 	Iterations          int
-	LIBImage            string
 	Timeout             int
 	Delay               int
 }

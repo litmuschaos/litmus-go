@@ -2,7 +2,6 @@ package cassandra
 
 import (
 	"io/ioutil"
-	"math/rand"
 	"net/http"
 	"strconv"
 	"strings"
@@ -14,6 +13,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/status"
+	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
 	appsv1 "k8s.io/api/apps/v1"
 	apiv1 "k8s.io/api/core/v1"
@@ -21,12 +21,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// LivenessCheck will check the liveness of the cassandra application during chaos
+// LivenessCheck will create an external liveness pod which will continuously check for the liveness of cassandra statefulset
 func LivenessCheck(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) (string, error) {
 	var err error
 
 	// Generate the run_id
-	experimentsDetails.RunID = GetRunID()
+	experimentsDetails.RunID = common.GetRunID()
 
 	// Creating liveness deployment
 	err = CreateLivenessPod(experimentsDetails, clients)
@@ -71,8 +71,6 @@ func LivenessCleanup(experimentsDetails *experimentTypes.ExperimentDetails, clie
 	}
 
 	// Record cassandra liveness pod resource version after chaos
-	log.Info("[Liveness]: Record the resource version of liveness pod (after-chaos)")
-
 	ResourceVersionAfter, err := GetLivenessPodResourceVersion(experimentsDetails, clients)
 	if err != nil {
 		return errors.Errorf("Fail to get the pod resource version")
@@ -144,10 +142,11 @@ func WaitTillCycleComplete(experimentsDetails *experimentTypes.ExperimentDetails
 				return errors.Errorf("The HTTP request failed with error %s\n", err)
 			}
 			data, _ := ioutil.ReadAll(response.Body)
-			if strings.Contains(string(data), "CycleComplete") {
-				log.Info("Liveness pod to comes in CycleComplete state")
+			if !strings.Contains(string(data), "CycleComplete") {
+				log.Info("[Verification]: Wait for liveness pod to come in CycleComplete state")
+				return errors.Errorf("Livenss pod is not in completed state")
 			}
-			log.Info("[Verification]: Wait for liveness pod to come in CycleComplete state")
+			log.Info("Liveness pod to comes in CycleComplete state")
 			return nil
 		})
 
@@ -163,16 +162,6 @@ func ResourceVersionCheck(ResourceVersionBefore, ResourceVersionAfter string) er
 	log.Info("The cassandra cluster is active")
 
 	return nil
-}
-
-// GetRunID generate a random string
-func GetRunID() string {
-	var letterRunes = []rune("abcdefghijklmnopqrstuvwxyz")
-	runID := make([]rune, 6)
-	for i := range runID {
-		runID[i] = letterRunes[rand.Intn(len(letterRunes))]
-	}
-	return string(runID)
 }
 
 // DeleteLivenessDeployment deletes the livenes deployments and wait for its termination

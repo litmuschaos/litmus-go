@@ -78,7 +78,7 @@ func CheckLoadPercentage(loadPercentage []string, replicaCount int) error {
 			return errors.Errorf("The Load distribution percentage failed, as its value is: '%v'", loadPercentage[count])
 		}
 	}
-	log.Info("[Check]: Check each replica is haveing some load")
+	log.Info("[Check]: Load is distributed over all the replica of cassandra")
 
 	return nil
 }
@@ -89,7 +89,7 @@ func GetLoadDistribution(experimentsDetails *experimentTypes.ExperimentDetails, 
 	// It will contains all the pod & container details required for exec command
 	execCommandDetails := litmusexec.PodDetails{}
 
-	command := append([]string{"/bin/sh", "-c"}, "nodetool status | tail -n +6 | head -n -1")
+	command := append([]string{"/bin/sh", "-c"}, "nodetool status  | awk '{print $6}' | tail -n +6 | head -n -1")
 	litmusexec.SetExecCommandAttributes(&execCommandDetails, targetPod, "cassandra", experimentsDetails.ChaoslibDetail.AppNS)
 	response, err := litmusexec.Exec(&execCommandDetails, clients, command)
 	if err != nil {

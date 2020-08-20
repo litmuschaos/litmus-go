@@ -63,9 +63,12 @@ func main() {
 
 	//DISPLAY THE APP INFORMATION
 	log.InfoWithValues("The application informations are as follows", logrus.Fields{
-		"Namespace": experimentsDetails.ChaoslibDetail.AppNS,
-		"Label":     experimentsDetails.ChaoslibDetail.AppLabel,
-		"Ramp Time": experimentsDetails.ChaoslibDetail.RampTime,
+		"Namespace":              experimentsDetails.ChaoslibDetail.AppNS,
+		"Label":                  experimentsDetails.ChaoslibDetail.AppLabel,
+		"CassandraLivenessImage": experimentsDetails.CassandraLivenessImage,
+		"CassandraLivenessCheck": experimentsDetails.CassandraLivenessCheck,
+		"CassandraPort":          experimentsDetails.CassandraPort,
+		"Ramp Time":              experimentsDetails.ChaoslibDetail.RampTime,
 	})
 
 	//PRE-CHAOS APPLICATION STATUS CHECK
@@ -98,7 +101,7 @@ func main() {
 		}
 		log.Info("[Confirmation]: The cassandra application liveness pod deployed successfully")
 	} else {
-		log.Info("[Liveness]: Cassandra Liveness check skipped as it was not enabled")
+		log.Warn("[Liveness]: Cassandra Liveness check skipped as it was not enabled")
 	}
 
 	// Including the litmus lib for cassandra-pod-delete
@@ -106,7 +109,7 @@ func main() {
 		err = pod_delete.PreparePodDelete(experimentsDetails.ChaoslibDetail, clients, &resultDetails, &eventsDetails, &chaosDetails)
 		if err != nil {
 			log.Errorf("Chaos injection failed due to %v\n", err)
-			failStep := "Including the litmus lib for pod-delete"
+			failStep := "Including the litmus lib for cassandra-pod-delete"
 			types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
 			result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 			return
@@ -115,7 +118,7 @@ func main() {
 		resultDetails.Verdict = "Pass"
 	} else {
 		log.Error("[Invalid]: Please Provide the correct LIB")
-		failStep := "Including the litmus lib for pod-delete"
+		failStep := "Including the litmus lib for cassandra-pod-delete"
 		types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
 		result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 		return

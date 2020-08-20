@@ -128,6 +128,7 @@ func main() {
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
+
 	if experimentsDetails.EngineName != "" {
 
 		// run the probes in the post-chaos check
