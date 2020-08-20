@@ -64,7 +64,7 @@ func KillContainer(experimentsDetails *experimentTypes.ExperimentDetails, client
 		}
 
 		//GetRestartCount return the restart count of target container
-		restartCountBefore, err := GetRestartCount(experimentsDetails, experimentsDetails.ApplicationPod, clients)
+		restartCountBefore, err := GetRestartCount(experimentsDetails, experimentsDetails.TargetPod, clients)
 		if err != nil {
 			return err
 		}
@@ -77,7 +77,7 @@ func KillContainer(experimentsDetails *experimentTypes.ExperimentDetails, client
 		}
 
 		log.InfoWithValues("[Info]: Details of application under chaos injection", logrus.Fields{
-			"PodName":            experimentsDetails.ApplicationPod,
+			"PodName":            experimentsDetails.TargetPod,
 			"ContainerName":      experimentsDetails.TargetContainer,
 			"RestartCountBefore": restartCountBefore,
 		})
@@ -99,13 +99,13 @@ func KillContainer(experimentsDetails *experimentTypes.ExperimentDetails, client
 		}
 
 		//Check the status of restarted container
-		err = CheckContainerStatus(experimentsDetails, clients, experimentsDetails.ApplicationPod)
+		err = CheckContainerStatus(experimentsDetails, clients, experimentsDetails.TargetPod)
 		if err != nil {
 			return errors.Errorf("Application container is not running, %v", err)
 		}
 
 		// It will verify that the restart count of container should increase after chaos injection
-		err = VerifyRestartCount(experimentsDetails, experimentsDetails.ApplicationPod, clients, restartCountBefore)
+		err = VerifyRestartCount(experimentsDetails, experimentsDetails.TargetPod, clients, restartCountBefore)
 		if err != nil {
 			return errors.Errorf("Target container is not restarted , err: %v", err)
 		}
@@ -134,7 +134,7 @@ func GetPodID(experimentsDetails *experimentTypes.ExperimentDetails) (string, er
 	pods := RemoveExtraSpaces(stdout)
 	for i := 0; i < len(pods)-1; i++ {
 		attributes := strings.Split(pods[i], " ")
-		if attributes[3] == experimentsDetails.ApplicationPod {
+		if attributes[3] == experimentsDetails.TargetPod {
 			return attributes[0], nil
 		}
 
@@ -278,7 +278,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, name string) {
 	experimentDetails.ExperimentName = name
 	experimentDetails.AppNS = Getenv("APP_NS", "")
 	experimentDetails.TargetContainer = Getenv("APP_CONTAINER", "")
-	experimentDetails.ApplicationPod = Getenv("APP_POD", "")
+	experimentDetails.TargetPod = Getenv("APP_POD", "")
 	experimentDetails.ChaosDuration, _ = strconv.Atoi(Getenv("TOTAL_CHAOS_DURATION", "30"))
 	experimentDetails.ChaosInterval, _ = strconv.Atoi(Getenv("CHAOS_INTERVAL", "10"))
 	experimentDetails.Iterations, _ = strconv.Atoi(Getenv("ITERATIONS", "3"))

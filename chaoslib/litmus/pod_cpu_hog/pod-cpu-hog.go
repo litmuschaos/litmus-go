@@ -45,10 +45,26 @@ func ExperimentCPU(experimentsDetails *experimentTypes.ExperimentDetails, client
 	var endTime <-chan time.Time
 	timeDelay := time.Duration(experimentsDetails.ChaosDuration) * time.Second
 
-	//Getting the list of all the target pod for deletion
-	realpods, err := PreparePodList(experimentsDetails, clients, resultDetails)
+	realpods := core_v1.PodList{}
+
+	// checking for the availibilty of the target pod
+	isPodAvailable, err := common.CheckForAvailibiltyOfPod(experimentsDetails.AppNS, experimentsDetails.TargetPod, clients)
 	if err != nil {
 		return err
+	}
+	if isPodAvailable {
+		pod, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Get(experimentsDetails.TargetPod, v1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		realpods.Items = append(realpods.Items, *pod)
+		// selecting the random pod, if the target pod is not specified
+	} else {
+		log.Info("selecting a random pod with specified labels")
+		realpods, err = PreparePodList(experimentsDetails, clients, resultDetails)
+		if err != nil {
+			return err
+		}
 	}
 
 	for _, pod := range realpods.Items {
@@ -146,7 +162,7 @@ func PrepareCPUstress(experimentsDetails *experimentTypes.ExperimentDetails, cli
 }
 
 //PreparePodList will also adjust the number of the target pods depending on the specified percentage in PODS_AFFECTED_PERC variable
-func PreparePodList(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails) (*core_v1.PodList, error) {
+func PreparePodList(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails) (core_v1.PodList, error) {
 
 	log.Infof("[Chaos]:Pods percentage to affect is %v", strconv.Itoa(experimentsDetails.PodsAffectedPerc))
 
@@ -154,7 +170,7 @@ func PreparePodList(experimentsDetails *experimentTypes.ExperimentDetails, clien
 	pods, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).List(v1.ListOptions{LabelSelector: experimentsDetails.AppLabel})
 	if err != nil {
 		resultDetails.FailStep = "Getting the list of pods with the given labels and namespaces"
-		return nil, err
+		return core_v1.PodList{}, err
 	}
 
 	//If the default value has changed, means that we are aiming for a subset of the pods.
@@ -167,7 +183,7 @@ func PreparePodList(experimentsDetails *experimentTypes.ExperimentDetails, clien
 		log.Infof("[Chaos]:Number of pods targetted: %v", strconv.Itoa(newPodListLength))
 
 	}
-	return pods, nil
+	return *pods, nil
 }
 
 // KillStressCPU function to kill the experiment. Triggered by either timeout of chaos duration or termination of the experiment

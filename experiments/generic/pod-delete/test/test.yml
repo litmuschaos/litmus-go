@@ -42,6 +42,9 @@ spec:
           - name: LIB
             value: 'litmus'
 
+          - name: TARGET_POD
+            value: ''
+
           - name: CHAOS_NAMESPACE
             value: 'default'
 
