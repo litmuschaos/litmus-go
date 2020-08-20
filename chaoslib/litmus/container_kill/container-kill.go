@@ -1,9 +1,7 @@
 package container_kill
 
 import (
-	"math/rand"
 	"strconv"
-	"time"
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/container-kill/types"
@@ -21,8 +19,8 @@ import (
 //PrepareContainerKill contains the prepration steps before chaos injection
 func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
-	//Select application pod and node name for the container-kill
-	appName, appNodeName, err := GetApplicationPod(experimentsDetails, clients)
+	//Select application pod & node for the container kill chaos
+	appName, appNodeName, err := common.GetPodAndNodeName(experimentsDetails.AppNS, experimentsDetails.TargetPod, experimentsDetails.AppLabel, clients)
 	if err != nil {
 		return errors.Errorf("Unable to get the application pod and node name due to, err: %v", err)
 	}
@@ -115,22 +113,6 @@ func GetServiceAccount(experimentsDetails *experimentTypes.ExperimentDetails, cl
 	}
 	experimentsDetails.ChaosServiceAccount = pod.Spec.ServiceAccountName
 	return nil
-}
-
-//GetApplicationPod will select a random replica of application pod for chaos
-//It will also get the node name of the application pod
-func GetApplicationPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) (string, string, error) {
-	podList, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).List(v1.ListOptions{LabelSelector: experimentsDetails.AppLabel})
-	if err != nil || len(podList.Items) == 0 {
-		return "", "", errors.Wrapf(err, "Fail to get the application pod in %v namespace", experimentsDetails.AppNS)
-	}
-
-	rand.Seed(time.Now().Unix())
-	randomIndex := rand.Intn(len(podList.Items))
-	applicationName := podList.Items[randomIndex].Name
-	nodeName := podList.Items[randomIndex].Spec.NodeName
-
-	return applicationName, nodeName, nil
 }
 
 //GetTargetContainer will fetch the container name from application pod
