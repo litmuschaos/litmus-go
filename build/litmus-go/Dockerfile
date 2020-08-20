@@ -5,6 +5,9 @@ RUN apt-get update && apt-get install -yq make gcc
 
 WORKDIR /code
 
+ENV USER_UID=1001 \
+    USER_NAME=litmus-go
+
 # download stress-ng sources
 ARG STRESS_NG_VERSION
 ENV STRESS_NG_VERSION ${STRESS_NG_VERSION:-0.10.10}
@@ -43,3 +46,5 @@ COPY --from=builder /code/stress-ng/stress-ng /
 
 #Copying Necessary Files
 COPY ./build/_output ./experiments
+
+USER ${USER_UID}
