@@ -26,4 +26,5 @@ type ExperimentDetails struct {
 	Timeout          int
 	Delay            int
 	LIBImage         string
+	TargetPod        string
 }

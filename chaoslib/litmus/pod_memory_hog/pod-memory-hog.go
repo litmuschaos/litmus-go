@@ -25,6 +25,8 @@ import (
 	"k8s.io/klog"
 )
 
+var err error
+
 // StressMemory Uses the REST API to exec into the target container of the target pod
 // The function will be constantly increasing the Memory utilisation until it reaches the maximum available or allowed number.
 // Using the TOTAL_CHAOS_DURATION we will need to specify for how long this experiment will last
@@ -52,10 +54,26 @@ func ExperimentMemory(experimentsDetails *experimentTypes.ExperimentDetails, cli
 	var endTime <-chan time.Time
 	timeDelay := time.Duration(experimentsDetails.ChaosDuration) * time.Second
 
-	//Getting the list of all the target pod for deletion
-	realpods, err := PreparePodList(experimentsDetails, clients, resultDetails)
+	var realpods core_v1.PodList
+
+	isPodAvailable, err := common.CheckForAvailibiltyOfPod(experimentsDetails.AppNS, experimentsDetails.TargetPod, clients)
 	if err != nil {
 		return err
+	}
+
+	if isPodAvailable {
+		pod, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Get(experimentsDetails.TargetPod, v1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		realpods.Items = append(realpods.Items, *pod)
+
+	} else {
+		log.Info("selecting a random pod with specified labels")
+		realpods, err = PreparePodList(experimentsDetails, clients, resultDetails)
+		if err != nil {
+			return err
+		}
 	}
 
 	for _, pod := range realpods.Items {
@@ -150,7 +168,7 @@ func PrepareMemoryStress(experimentsDetails *experimentTypes.ExperimentDetails, 
 }
 
 //PreparePodList will also adjust the number of the target pods depending on the specified percentage in PODS_AFFECTED_PERC variable
-func PreparePodList(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails) (*core_v1.PodList, error) {
+func PreparePodList(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails) (core_v1.PodList, error) {
 
 	log.Infof("[Chaos]:Pods percentage to affect is %v", strconv.Itoa(experimentsDetails.PodsAffectedPerc))
 
@@ -158,7 +176,7 @@ func PreparePodList(experimentsDetails *experimentTypes.ExperimentDetails, clien
 	pods, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).List(v1.ListOptions{LabelSelector: experimentsDetails.AppLabel})
 	if err != nil {
 		resultDetails.FailStep = "Getting the list of pods with the given labels and namespaces"
-		return nil, err
+		return core_v1.PodList{}, err
 	}
 
 	//If the default value has changed, means that we are aiming for a subset of the pods.
@@ -171,7 +189,7 @@ func PreparePodList(experimentsDetails *experimentTypes.ExperimentDetails, clien
 		log.Infof("[Chaos]:Number of pods targetted: %v", strconv.Itoa(newPodlistLength))
 
 	}
-	return pods, nil
+	return *pods, nil
 }
 
 //KillStressMemory function to kill the experiment. Triggered by either timeout of chaos duration or termination of the experiment
