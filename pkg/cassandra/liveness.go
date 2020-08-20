@@ -146,7 +146,7 @@ func WaitTillCycleComplete(experimentsDetails *experimentTypes.ExperimentDetails
 				log.Info("[Verification]: Wait for liveness pod to come in CycleComplete state")
 				return errors.Errorf("Livenss pod is not in completed state")
 			}
-			log.Info("Liveness pod to comes in CycleComplete state")
+			log.Info("Liveness pod comes to CycleComplete state")
 			return nil
 		})
 
