@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/litmuschaos/litmus-go/chaoslib/litmus/node_memory_hog"
+	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/node-memory-hog/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/node-memory-hog/environment"
@@ -110,7 +110,7 @@ func main() {
 
 	// Including the litmus lib for node-memory-hog
 	if experimentsDetails.ChaosLib == "litmus" {
-		err = node_memory_hog.PrepareNodeMemoryHog(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
+		err = litmusLIB.PrepareNodeMemoryHog(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
 		if err != nil {
 			log.Errorf("[Error]: node memory hog failed due to %v\n", err)
 			failStep := "node memory hog chaos injection failed"

@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/litmuschaos/litmus-go/chaoslib/litmus/node_cpu_hog"
+	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/node-cpu-hog/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/node-cpu-hog/environment"
@@ -121,7 +121,7 @@ func main() {
 
 	// Including the litmus lib for node-cpu-hog
 	if experimentsDetails.ChaosLib == "litmus" {
-		err = node_cpu_hog.PrepareNodeCPUHog(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
+		err = litmusLIB.PrepareNodeCPUHog(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
 		if err != nil {
 			log.Errorf("[Error]: CPU hog failed due to %v\n", err)
 			failStep := "CPU hog Chaos injection failed"
