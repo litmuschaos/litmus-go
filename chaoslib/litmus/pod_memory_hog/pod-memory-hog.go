@@ -107,7 +107,7 @@ func ExperimentMemory(experimentsDetails *experimentTypes.ExperimentDetails, cli
 				select {
 				case <-signChan:
 					log.Info("[Chaos]: Killing process started because of terminated signal received")
-					err = KillStressMemory(container.Name, pod.Name, experimentsDetails.AppNS, clients)
+					err = KillStressMemory(container.Name, pod.Name, experimentsDetails.AppNS, experimentsDetails.ChaosKillCmd, clients)
 					if err != nil {
 						klog.V(0).Infof("Error in Kill stress after")
 						return err
@@ -132,7 +132,7 @@ func ExperimentMemory(experimentsDetails *experimentTypes.ExperimentDetails, cli
 					break loop
 				}
 			}
-			err = KillStressMemory(container.Name, pod.Name, experimentsDetails.AppNS, clients)
+			err = KillStressMemory(container.Name, pod.Name, experimentsDetails.AppNS, experimentsDetails.ChaosKillCmd, clients)
 			if err != nil {
 				errorCode := strings.Contains(err.Error(), "143")
 				if errorCode != true {
@@ -193,11 +193,11 @@ func PreparePodList(experimentsDetails *experimentTypes.ExperimentDetails, clien
 }
 
 //KillStressMemory function to kill the experiment. Triggered by either timeout of chaos duration or termination of the experiment
-func KillStressMemory(containerName, podName, namespace string, clients clients.ClientSets) error {
+func KillStressMemory(containerName, podName, namespace, memFreeCmd string, clients clients.ClientSets) error {
 	// It will contains all the pod & container details required for exec command
 	execCommandDetails := litmusexec.PodDetails{}
 
-	command := []string{"/bin/sh", "-c", "kill $(find /proc -name exe -lname '*/dd' 2>&1 | grep -v 'Permission denied' | awk -F/ '{print $(NF-1)}' |  head -n 1)"}
+	command := []string{"/bin/sh", "-c", memFreeCmd}
 
 	litmusexec.SetExecCommandAttributes(&execCommandDetails, podName, containerName, namespace)
 	_, err := litmusexec.Exec(&execCommandDetails, clients, command)
