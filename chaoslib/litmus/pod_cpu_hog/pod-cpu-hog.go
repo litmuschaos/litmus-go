@@ -27,10 +27,10 @@ import (
 // StressCPU Uses the REST API to exec into the target container of the target pod
 // The function will be constantly increasing the CPU utilisation until it reaches the maximum available or allowed number.
 // Using the TOTAL_CHAOS_DURATION we will need to specify for how long this experiment will last
-func StressCPU(containerName, podName, namespace string, clients clients.ClientSets) error {
+func StressCPU(containerName, podName, namespace, cpuHogCmd string, clients clients.ClientSets) error {
 	// It will contains all the pod & container details required for exec command
 	execCommandDetails := litmusexec.PodDetails{}
-	command := []string{"/bin/sh", "-c", "md5sum /dev/zero"}
+	command := []string{"/bin/sh", "-c", cpuHogCmd}
 	litmusexec.SetExecCommandAttributes(&execCommandDetails, podName, containerName, namespace)
 	_, err := litmusexec.Exec(&execCommandDetails, clients, command)
 	if err != nil {
@@ -86,7 +86,7 @@ func ExperimentCPU(experimentsDetails *experimentTypes.ExperimentDetails, client
 					events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 				}
 
-				go StressCPU(container.Name, pod.Name, experimentsDetails.AppNS, clients)
+				go StressCPU(container.Name, pod.Name, experimentsDetails.AppNS, experimentsDetails.ChaosInjectCmd, clients)
 
 				log.Infof("[Chaos]:Waiting for: %vs", strconv.Itoa(experimentsDetails.ChaosDuration))
 
@@ -100,7 +100,7 @@ func ExperimentCPU(experimentsDetails *experimentTypes.ExperimentDetails, client
 					select {
 					case <-signChan:
 						log.Info("[Chaos]: Killing process started because of terminated signal received")
-						err = KillStressCPU(container.Name, pod.Name, experimentsDetails.AppNS, clients)
+						err = KillStressCPU(container.Name, pod.Name, experimentsDetails.AppNS, experimentsDetails.ChaosKillCmd, clients)
 						if err != nil {
 							klog.V(0).Infof("Error in Kill stress after")
 							return err
@@ -125,7 +125,7 @@ func ExperimentCPU(experimentsDetails *experimentTypes.ExperimentDetails, client
 						break loop
 					}
 				}
-				err = KillStressCPU(container.Name, pod.Name, experimentsDetails.AppNS, clients)
+				err = KillStressCPU(container.Name, pod.Name, experimentsDetails.AppNS, experimentsDetails.ChaosKillCmd, clients)
 				if err != nil {
 					errorCode := strings.Contains(err.Error(), "143")
 					if errorCode != true {
@@ -187,11 +187,11 @@ func PreparePodList(experimentsDetails *experimentTypes.ExperimentDetails, clien
 }
 
 // KillStressCPU function to kill the experiment. Triggered by either timeout of chaos duration or termination of the experiment
-func KillStressCPU(containerName, podName, namespace string, clients clients.ClientSets) error {
+func KillStressCPU(containerName, podName, namespace, cpuFreeCmd string, clients clients.ClientSets) error {
 	// It will contains all the pod & container details required for exec command
 	execCommandDetails := litmusexec.PodDetails{}
 
-	command := []string{"/bin/sh", "-c", "kill $(find /proc -name exe -lname '*/md5sum' 2>&1 | grep -v 'Permission denied' | awk -F/ '{print $(NF-1)}' |  head -n 1)"}
+	command := []string{"/bin/sh", "-c", cpuFreeCmd}
 
 	litmusexec.SetExecCommandAttributes(&execCommandDetails, podName, containerName, namespace)
 	_, err := litmusexec.Exec(&execCommandDetails, clients, command)
