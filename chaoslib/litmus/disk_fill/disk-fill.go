@@ -163,7 +163,6 @@ func GetTargetContainer(experimentsDetails *experimentTypes.ExperimentDetails, a
 func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, appName, appNodeName string) error {
 
 	mountPropagationMode := apiv1.MountPropagationHostToContainer
-	privileged := true
 
 	helperPod := &apiv1.Pod{
 		ObjectMeta: v1.ObjectMeta{
@@ -203,9 +202,6 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 							MountPath:        "/diskfill",
 							MountPropagation: &mountPropagationMode,
 						},
-					},
-					SecurityContext: &apiv1.SecurityContext{
-						Privileged: &privileged,
 					},
 				},
 			},
