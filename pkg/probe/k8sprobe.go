@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/kyokomi/emoji"
 	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/log"
@@ -23,12 +22,7 @@ func PrepareK8sProbe(k8sProbes []v1alpha1.K8sProbeAttributes, resultDetails *typ
 
 		for _, probe := range k8sProbes {
 
-			// triggering probes on the basis of mode & phase so that probe will only run when they are requested to run
-			// if mode is SOT & phase is PreChaos, it will trigger Probes in PreChaos section
-			// if mode is EOT & phase is PostChaos, it will trigger Probes in PostChaos section
-			// if mode is Edge then independent of phase, it will trigger Probes in both Pre/Post Chaos section
-			if (probe.Mode == "SOT" && phase == "PreChaos") || (probe.Mode == "EOT" && phase == "PostChaos") || probe.Mode == "Edge" {
-
+			if !((probe.Mode == "SOT" || probe.Mode == "Continuous") && phase == "PreChaos") {
 				//DISPLAY THE K8S PROBE INFO
 				log.InfoWithValues("[Probe]: The k8s probe information is as follows", logrus.Fields{
 					"Name":            probe.Name,
@@ -37,33 +31,35 @@ func PrepareK8sProbe(k8sProbes []v1alpha1.K8sProbeAttributes, resultDetails *typ
 					"Run Properties":  probe.RunProperties,
 					"Mode":            probe.Mode,
 				})
+			}
+
+			// triggering probes on the basis of mode & phase so that probe will only run when they are requested to run
+			// if mode is SOT & phase is PreChaos, it will trigger Probes in PreChaos section
+			// if mode is EOT & phase is PostChaos, it will trigger Probes in PostChaos section
+			// if mode is Edge then independent of phase, it will trigger Probes in both Pre/Post Chaos section
+			if (probe.Mode == "SOT" && phase == "PreChaos") || (probe.Mode == "EOT" && phase == "PostChaos") || probe.Mode == "Edge" {
 
 				// triggering the k8s probe
 				err = TriggerK8sProbe(probe, probe.Inputs.Command, clients)
 
 				// failing the probe, if the success condition doesn't met after the retry & timeout combinations
-				if err != nil {
-					log.ErrorWithValues("[Probe]: k8s probe has been Failed "+emoji.Sprint(":cry:"), logrus.Fields{
-						"ProbeName":     probe.Name,
-						"ProbeType":     "K8sProbe",
-						"ProbeInstance": phase,
-						"ProbeStatus":   "Failed",
-					})
-					SetProbeVerdictAfterFailure(resultDetails)
+				// it will update the status of all the unrun probes as well
+				if err = MarkedVerdictInEnd(err, resultDetails, probe.Name, probe.Mode, "K8sProbe", phase); err != nil {
 					return err
 				}
-				// counting the passed probes count to generate the score and mark the verdict as passed
-				// for edge, probe is marked as Passed if passed in both pre/post chaos checks
-				if !(probe.Mode == "Edge" && phase == "PreChaos") {
-					resultDetails.PassedProbeCount++
+			}
+			// trigger probes for the continuous mode
+			if probe.Mode == "Continuous" && phase == "PreChaos" {
+				go TriggerContinuousK8sProbe(probe, probe.Inputs.Command, clients, resultDetails)
+			}
+			// verify the continuous mode and marked the result of the probes
+			if probe.Mode == "Continuous" && phase == "PostChaos" {
+				// it will check for the error, It will detect the error if any error encountered in probe during chaos
+				err = CheckForErrorInContinuousProbe(resultDetails, probe.Name)
+				// failing the probe, if the success condition doesn't met after the retry & timeout combinations
+				if err = MarkedVerdictInEnd(err, resultDetails, probe.Name, probe.Mode, "K8sProbe", phase); err != nil {
+					return err
 				}
-				SetProbeVerdict(resultDetails, "Passed", probe.Name, "K8sProbe", probe.Mode, phase)
-				log.InfoWithValues("[Probe]: k8s probe has been Passed "+emoji.Sprint(":smile:"), logrus.Fields{
-					"ProbeName":     probe.Name,
-					"ProbeType":     "K8sProbe",
-					"ProbeInstance": phase,
-					"ProbeStatus":   "Passed",
-				})
 			}
 		}
 	}
@@ -96,4 +92,26 @@ func TriggerK8sProbe(probe v1alpha1.K8sProbeAttributes, cmd v1alpha1.K8sCommand,
 			return nil
 		})
 	return err
+}
+
+// TriggerContinuousK8sProbe trigger the continuous k8s probes
+func TriggerContinuousK8sProbe(probe v1alpha1.K8sProbeAttributes, cmd v1alpha1.K8sCommand, clients clients.ClientSets, chaosresult *types.ResultDetails) {
+	// it trigger the k8s probe for the entire duration of chaos and it fails, if any error encounter
+	// marked the error for the probes, if any
+	for {
+		err = TriggerK8sProbe(probe, cmd, clients)
+		// record the error inside the probeDetails, we are maintaining a dedicated variable for the err, inside probeDetails
+		if err != nil {
+			for index := range chaosresult.ProbeDetails {
+				if chaosresult.ProbeDetails[index].Name == probe.Name {
+					chaosresult.ProbeDetails[index].IsProbeFailedWithError = err
+					break
+				}
+
+			}
+			break
+		}
+
+	}
+
 }
