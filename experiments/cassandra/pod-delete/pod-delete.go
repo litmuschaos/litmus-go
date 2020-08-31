@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/litmuschaos/litmus-go/chaoslib/litmus/pod_delete"
+	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/pod-delete/lib"
 	"github.com/litmuschaos/litmus-go/pkg/cassandra"
 	experimentEnv "github.com/litmuschaos/litmus-go/pkg/cassandra/pod-delete/environment"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/cassandra/pod-delete/types"
@@ -106,7 +106,7 @@ func main() {
 
 	// Including the litmus lib for cassandra-pod-delete
 	if experimentsDetails.ChaoslibDetail.ChaosLib == "litmus" {
-		err = pod_delete.PreparePodDelete(experimentsDetails.ChaoslibDetail, clients, &resultDetails, &eventsDetails, &chaosDetails)
+		err = litmusLIB.PreparePodDelete(experimentsDetails.ChaoslibDetail, clients, &resultDetails, &eventsDetails, &chaosDetails)
 		if err != nil {
 			log.Errorf("Chaos injection failed due to %v\n", err)
 			failStep := "Including the litmus lib for cassandra-pod-delete"

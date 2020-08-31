@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/litmuschaos/litmus-go/chaoslib/litmus/kubelet_service_kill"
+	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/kubelet-service-kill/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/kubelet-service-kill/environment"
@@ -119,7 +119,7 @@ func main() {
 
 	// Including the litmus lib for kubelet-service-kill
 	if experimentsDetails.ChaosLib == "litmus" {
-		err = kubelet_service_kill.PrepareKubeletKill(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
+		err = litmusLIB.PrepareKubeletKill(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
 		if err != nil {
 			log.Errorf("Chaos injection failed due to %v\n", err)
 			failStep := "Including the litmus lib for kubelet-service-kill"

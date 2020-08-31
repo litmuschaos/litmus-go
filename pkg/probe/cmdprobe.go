@@ -132,7 +132,7 @@ func TriggerInlineCmdProbe(probe v1alpha1.CmdProbeAttributes) error {
 // TriggerCmdProbe trigger the cmd probe inside the external pod
 func TriggerCmdProbe(probe v1alpha1.CmdProbeAttributes, execCommandDetails litmusexec.PodDetails, clients clients.ClientSets) error {
 
-	// running the cmd probe command and matching the ouput
+	// running the cmd probe command and matching the output
 	// it will retry for some retry count, in each iterations of try it contains following things
 	// it contains a timeout per iteration of retry. if the timeout expires without success then it will go to next try
 	// for a timeout, it will run the command, if it fails wait for the iterval and again execute the command until timeout expires

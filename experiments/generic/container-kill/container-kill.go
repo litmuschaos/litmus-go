@@ -1,8 +1,8 @@
 package main
 
 import (
-	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/container_kill"
-	pumbaLIB "github.com/litmuschaos/litmus-go/chaoslib/pumba/container_kill"
+	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/container-kill/lib"
+	pumbaLIB "github.com/litmuschaos/litmus-go/chaoslib/pumba/container-kill/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/container-kill/environment"

@@ -1,7 +1,7 @@
 package main
 
 import (
-	node_taint "github.com/litmuschaos/litmus-go/chaoslib/litmus/node_taint"
+	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/node-taint/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/node-taint/environment"
@@ -119,7 +119,7 @@ func main() {
 
 	// Including the litmus lib for node-taint
 	if experimentsDetails.ChaosLib == "litmus" {
-		err = node_taint.PrepareNodeTaint(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
+		err = litmusLIB.PrepareNodeTaint(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
 		if err != nil {
 			log.Errorf("Chaos injection failed due to %v\n", err)
 			failStep := "Including the litmus lib for node-taint"
