@@ -44,11 +44,23 @@ experiment-go-binary:
 build: litmus-go-build
 
 litmus-go-build:
-	@echo "------------------"
+	@echo "-------------------------"
 	@echo "--> Build go-runner image" 
-	@echo "------------------"
-	sudo docker build . -f build/litmus-go/Dockerfile -t litmuschaos/go-runner:ci
-
+	@echo "-------------------------"
+	sudo docker version
+	wget https://github.com/docker/buildx/releases/download/v0.4.1/buildx-v0.4.1.linux-amd64 -O docker-buildx
+	chmod a+x docker-buildx
+	mkdir -p ~/.docker/cli-plugins
+	mv docker-buildx ~/.docker/cli-plugins
+	sudo docker buildx --version
+	sudo apt-get install -y qemu-user-static
+	sudo apt-get install -y binfmt-support
+	update-binfmts --version
+	sudo docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+	sudo docker buildx create --name multibuilder
+	sudo docker buildx use multibuilder
+	sudo docker buildx ls
+	
 .PHONY: push
 push: litmus-go-push
 
@@ -57,3 +69,4 @@ litmus-go-push:
 	@echo "--> go-runner image" 
 	@echo "------------------"
 	REPONAME="litmuschaos" IMGNAME="go-runner" IMGTAG="ci" ./build/push
+	

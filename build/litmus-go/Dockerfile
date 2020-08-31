@@ -1,4 +1,4 @@
-FROM ubuntu:18.04 as builder
+FROM --platform=$BUILDPLATFORM ubuntu:18.04 as builder
 
 # intall gcc and supporting packages
 RUN apt-get update && apt-get install -yq make gcc
@@ -21,7 +21,7 @@ RUN apt-get install stress
 WORKDIR /code/stress-ng
 RUN STATIC=1 make
 
-FROM alpine:latest
+FROM --platform=$BUILDPLATFORM alpine:latest
 
 LABEL maintainer="LitmusChaos"
 
@@ -43,8 +43,10 @@ ENV PUMBA_VERSION="0.6.5"
 RUN curl -L https://github.com/alexei-led/pumba/releases/download/${PUMBA_VERSION}/pumba_linux_amd64 --output /usr/local/bin/pumba && chmod +x /usr/local/bin/pumba
 
 COPY --from=builder /code/stress-ng/stress-ng /
+RUN true
 
 #Copying Necessary Files
 COPY ./build/_output ./experiments
+RUN true
 
 USER ${USER_UID}
