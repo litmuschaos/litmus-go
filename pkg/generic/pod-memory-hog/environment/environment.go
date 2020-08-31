@@ -28,6 +28,8 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string
 	experimentDetails.MemoryConsumption, _ = strconv.Atoi(Getenv("MEMORY_CONSUMPTION", "500"))
 	experimentDetails.Delay, _ = strconv.Atoi(Getenv("STATUS_CHECK_DELAY", "2"))
 	experimentDetails.Timeout, _ = strconv.Atoi(Getenv("STATUS_CHECK_TIMEOUT", "180"))
+	experimentDetails.TargetPod = Getenv("TARGET_POD", "")
+	experimentDetails.ChaosKillCmd = Getenv("CHAOS_KILL_COMMAND", "kill $(find /proc -name exe -lname '*/dd' 2>&1 | grep -v 'Permission denied' | awk -F/ '{print $(NF-1)}' |  head -n 1)")
 }
 
 // Getenv fetch the env and set the default value, if any

@@ -1,7 +1,6 @@
 package container_kill
 
 import (
-	"math/rand"
 	"strconv"
 	"time"
 
@@ -22,8 +21,8 @@ import (
 //PrepareContainerKill contains the prepration steps before chaos injection
 func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
-	//Select application pod & node name for container-kill
-	appName, appNodeName, err := GetApplicationPod(experimentsDetails, clients)
+	//Select application pod & node for the container kill chaos
+	appName, appNodeName, err := common.GetPodAndNodeName(experimentsDetails.AppNS, experimentsDetails.TargetPod, experimentsDetails.AppLabel, clients)
 	if err != nil {
 		return errors.Errorf("Unable to get the application pod and node name due to, err: %v", err)
 	}
@@ -81,17 +80,17 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 	log.Infof("[Wait]: Waiting for the %vs chaos duration", strconv.Itoa(experimentsDetails.ChaosDuration))
 	common.WaitForDuration(experimentsDetails.ChaosDuration)
 
+	// It will verify that the restart count of container should increase after chaos injection
+	err = VerifyRestartCount(experimentsDetails, appName, clients, restartCountBefore)
+	if err != nil {
+		return errors.Errorf("Target container is not restarted , err: %v", err)
+	}
+
 	//Deleting the the helper pod for container-kill
 	log.Info("[Cleanup]: Deleting the helper pod")
 	err = common.DeletePod(experimentsDetails.ExperimentName+"-"+experimentsDetails.RunID, "name="+experimentsDetails.ExperimentName+"-"+experimentsDetails.RunID, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients)
 	if err != nil {
 		return errors.Errorf("Unable to delete the helper pod, err: %v", err)
-	}
-
-	// It will verify that the restart count of container should increase after chaos injection
-	err = VerifyRestartCount(experimentsDetails, appName, clients, restartCountBefore)
-	if err != nil {
-		return errors.Errorf("Target container is not restarted , err: %v", err)
 	}
 
 	//Waiting for the ramp time after chaos injection
@@ -100,22 +99,6 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 	return nil
-}
-
-//GetApplicationPod will select a random replica of application pod for chaos
-//It will also get the node name of the application pod
-func GetApplicationPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) (string, string, error) {
-	podList, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).List(v1.ListOptions{LabelSelector: experimentsDetails.AppLabel})
-	if err != nil || len(podList.Items) == 0 {
-		return "", "", errors.Wrapf(err, "Fail to get the application pod in %v namespace", experimentsDetails.AppNS)
-	}
-
-	rand.Seed(time.Now().Unix())
-	randomIndex := rand.Intn(len(podList.Items))
-	applicationName := podList.Items[randomIndex].Name
-	nodeName := podList.Items[randomIndex].Spec.NodeName
-
-	return applicationName, nodeName, nil
 }
 
 //GetTargetContainer will fetch the conatiner name from application pod

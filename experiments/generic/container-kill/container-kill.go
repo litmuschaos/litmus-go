@@ -82,42 +82,49 @@ func main() {
 	}
 
 	if experimentsDetails.EngineName != "" {
+		// marking AUT as running, as we already checked the status of application under test
+		msg := "AUT: Running"
 
 		// run the probes in the pre-chaos check
-		err = probe.RunProbes(&chaosDetails, clients, &resultDetails, "PreChaos", &eventsDetails)
-		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
-		if err != nil {
-			log.Errorf("Probe failed, due to err: %v", err)
-			failStep := "Failed while adding probe"
-			msg := "AUT: Running, Probes: Unsuccessful"
-			types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, msg, "Warning", &chaosDetails)
+		if len(resultDetails.ProbeDetails) != 0 {
+
+			err = probe.RunProbes(&chaosDetails, clients, &resultDetails, "PreChaos", &eventsDetails)
 			events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
-			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-			return
+			if err != nil {
+				log.Errorf("Probe failed, due to err: %v", err)
+				failStep := "Failed while adding probe"
+				msg := "AUT: Running, Probes: Unsuccessful"
+				types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, msg, "Warning", &chaosDetails)
+				events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
+				result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+				return
+			}
+			msg = "AUT: Running, Probes: Successful"
 		}
-		// generating pre chaos event
-		msg := "AUT: Running, Probes: Successful"
+		// generating the events for the pre-chaos check
 		types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, msg, "Normal", &chaosDetails)
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
 	// Including the litmus lib for container-kill
-	if experimentsDetails.ChaosLib == "litmus" {
+	if experimentsDetails.ChaosLib == "litmus" && (experimentsDetails.ContainerRuntime == "containerd" || experimentsDetails.ContainerRuntime == "crio") {
 		err = litmusLIB.PrepareContainerKill(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
 		if err != nil {
-			log.Errorf("Chaos injection failed due to %v\n", err)
 			failStep := "Executing litmus lib for the container-kill"
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-			return
+			log.Fatalf("Chaos injection failed due to %v\n", err)
 		}
-	} else {
+	} else if experimentsDetails.ChaosLib == "litmus" && experimentsDetails.ContainerRuntime == "docker" {
 		err = pumbaLIB.PrepareContainerKill(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
 		if err != nil {
-			log.Errorf("Chaos injection failed due to %v\n", err)
 			failStep := "Executing pumba lib for the container-kill"
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-			return
+			log.Fatalf("Chaos injection failed due to %v\n", err)
 		}
+	} else {
+		failStep := "lib and container-runtime combination not supported!"
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+		log.Fatal("lib and container-runtime combination not supported, provide the correct value of lib & container-runtime")
 	}
 
 	log.Infof("[Confirmation]: %v chaos has been injected successfully", experimentsDetails.ExperimentName)
@@ -134,21 +141,25 @@ func main() {
 	}
 
 	if experimentsDetails.EngineName != "" {
+		// marking AUT as running, as we already checked the status of application under test
+		msg := "AUT: Running"
 
 		// run the probes in the post-chaos check
-		err = probe.RunProbes(&chaosDetails, clients, &resultDetails, "PostChaos", &eventsDetails)
-		if err != nil {
-			log.Errorf("Unable to Add the probes, due to err: %v", err)
-			failStep := "Failed while adding probe"
-			msg := "AUT: Running, Probes: Unsuccessful"
-			types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, msg, "Warning", &chaosDetails)
-			events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
-			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-			return
+		if len(resultDetails.ProbeDetails) != 0 {
+			err = probe.RunProbes(&chaosDetails, clients, &resultDetails, "PostChaos", &eventsDetails)
+			if err != nil {
+				log.Errorf("Unable to Add the probes, due to err: %v", err)
+				failStep := "Failed while adding probe"
+				msg := "AUT: Running, Probes: Unsuccessful"
+				types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, msg, "Warning", &chaosDetails)
+				events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
+				result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+				return
+			}
+			msg = "AUT: Running, Probes: Successful"
 		}
 
 		// generating post chaos event
-		msg := "AUT: Running, Probes: Successful"
 		types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, msg, "Normal", &chaosDetails)
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}

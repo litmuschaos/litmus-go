@@ -2,10 +2,8 @@ package disk_fill
 
 import (
 	"fmt"
-	"math/rand"
 	"strconv"
 	"strings"
-	"time"
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
@@ -29,7 +27,7 @@ func PrepareDiskFill(experimentsDetails *experimentTypes.ExperimentDetails, clie
 	execCommandDetails := exec.PodDetails{}
 
 	//Select application pod & node for the disk fill chaos
-	appName, appNodeName, err := GetApplicationPod(experimentsDetails, clients)
+	appName, appNodeName, err := common.GetPodAndNodeName(experimentsDetails.AppNS, experimentsDetails.TargetPod, experimentsDetails.AppLabel, clients)
 	if err != nil {
 		return errors.Errorf("Unable to get the application pod and node name due to, err: %v", err)
 	}
@@ -150,22 +148,6 @@ func PrepareDiskFill(experimentsDetails *experimentTypes.ExperimentDetails, clie
 	return nil
 }
 
-//GetApplicationPod will select a random replica of application pod for chaos
-//It will also get the node name of the application pod
-func GetApplicationPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) (string, string, error) {
-	podList, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).List(v1.ListOptions{LabelSelector: experimentsDetails.AppLabel})
-	if err != nil || len(podList.Items) == 0 {
-		return "", "", errors.Wrapf(err, "Fail to get the application pod in %v namespace", experimentsDetails.AppNS)
-	}
-
-	rand.Seed(time.Now().Unix())
-	randomIndex := rand.Intn(len(podList.Items))
-	applicationName := podList.Items[randomIndex].Name
-	nodeName := podList.Items[randomIndex].Spec.NodeName
-
-	return applicationName, nodeName, nil
-}
-
 //GetTargetContainer will fetch the container name from application pod
 // It will return the first container name from the application pod
 func GetTargetContainer(experimentsDetails *experimentTypes.ExperimentDetails, appName string, clients clients.ClientSets) (string, error) {
@@ -181,7 +163,6 @@ func GetTargetContainer(experimentsDetails *experimentTypes.ExperimentDetails, a
 func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, appName, appNodeName string) error {
 
 	mountPropagationMode := apiv1.MountPropagationHostToContainer
-	privileged := true
 
 	helperPod := &apiv1.Pod{
 		ObjectMeta: v1.ObjectMeta{
@@ -221,9 +202,6 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 							MountPath:        "/diskfill",
 							MountPropagation: &mountPropagationMode,
 						},
-					},
-					SecurityContext: &apiv1.SecurityContext{
-						Privileged: &privileged,
 					},
 				},
 			},

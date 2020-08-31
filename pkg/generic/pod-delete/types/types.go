@@ -25,4 +25,5 @@ type ExperimentDetails struct {
 	Iterations          int
 	Timeout             int
 	Delay               int
+	TargetPod           string
 }

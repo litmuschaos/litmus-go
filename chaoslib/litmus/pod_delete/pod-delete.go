@@ -65,11 +65,25 @@ func PodDeleteChaos(experimentsDetails *experimentTypes.ExperimentDetails, clien
 	var GracePeriod int64 = 0
 
 	for x := 0; x < experimentsDetails.Iterations; x++ {
-		//Getting the list of all the target pod for deletion
-		targetPodList, err := PreparePodList(experimentsDetails, clients)
+
+		targetPodList := []string{}
+
+		isPodAvailable, err := common.CheckForAvailibiltyOfPod(experimentsDetails.AppNS, experimentsDetails.TargetPod, clients)
 		if err != nil {
 			return err
 		}
+
+		if isPodAvailable {
+			targetPodList = append(targetPodList, experimentsDetails.TargetPod)
+
+		} else {
+			log.Info("selecting a random pod with specified labels")
+			targetPodList, err = PreparePodList(experimentsDetails, clients)
+			if err != nil {
+				return err
+			}
+		}
+
 		log.InfoWithValues("[Info]: Killing the following pods", logrus.Fields{
 			"PodList": targetPodList})
 

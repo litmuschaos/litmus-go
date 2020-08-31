@@ -27,10 +27,10 @@ import (
 // StressCPU Uses the REST API to exec into the target container of the target pod
 // The function will be constantly increasing the CPU utilisation until it reaches the maximum available or allowed number.
 // Using the TOTAL_CHAOS_DURATION we will need to specify for how long this experiment will last
-func StressCPU(containerName, podName, namespace string, clients clients.ClientSets) error {
+func StressCPU(containerName, podName, namespace, cpuHogCmd string, clients clients.ClientSets) error {
 	// It will contains all the pod & container details required for exec command
 	execCommandDetails := litmusexec.PodDetails{}
-	command := []string{"/bin/sh", "-c", "md5sum /dev/zero"}
+	command := []string{"/bin/sh", "-c", cpuHogCmd}
 	litmusexec.SetExecCommandAttributes(&execCommandDetails, podName, containerName, namespace)
 	_, err := litmusexec.Exec(&execCommandDetails, clients, command)
 	if err != nil {
@@ -45,10 +45,26 @@ func ExperimentCPU(experimentsDetails *experimentTypes.ExperimentDetails, client
 	var endTime <-chan time.Time
 	timeDelay := time.Duration(experimentsDetails.ChaosDuration) * time.Second
 
-	//Getting the list of all the target pod for deletion
-	realpods, err := PreparePodList(experimentsDetails, clients, resultDetails)
+	realpods := core_v1.PodList{}
+
+	// checking for the availibilty of the target pod
+	isPodAvailable, err := common.CheckForAvailibiltyOfPod(experimentsDetails.AppNS, experimentsDetails.TargetPod, clients)
 	if err != nil {
 		return err
+	}
+	if isPodAvailable {
+		pod, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Get(experimentsDetails.TargetPod, v1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		realpods.Items = append(realpods.Items, *pod)
+		// selecting the random pod, if the target pod is not specified
+	} else {
+		log.Info("selecting a random pod with specified labels")
+		realpods, err = PreparePodList(experimentsDetails, clients, resultDetails)
+		if err != nil {
+			return err
+		}
 	}
 
 	for _, pod := range realpods.Items {
@@ -70,7 +86,7 @@ func ExperimentCPU(experimentsDetails *experimentTypes.ExperimentDetails, client
 					events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 				}
 
-				go StressCPU(container.Name, pod.Name, experimentsDetails.AppNS, clients)
+				go StressCPU(container.Name, pod.Name, experimentsDetails.AppNS, experimentsDetails.ChaosInjectCmd, clients)
 
 				log.Infof("[Chaos]:Waiting for: %vs", strconv.Itoa(experimentsDetails.ChaosDuration))
 
@@ -84,7 +100,7 @@ func ExperimentCPU(experimentsDetails *experimentTypes.ExperimentDetails, client
 					select {
 					case <-signChan:
 						log.Info("[Chaos]: Killing process started because of terminated signal received")
-						err = KillStressCPU(container.Name, pod.Name, experimentsDetails.AppNS, clients)
+						err = KillStressCPU(container.Name, pod.Name, experimentsDetails.AppNS, experimentsDetails.ChaosKillCmd, clients)
 						if err != nil {
 							klog.V(0).Infof("Error in Kill stress after")
 							return err
@@ -109,7 +125,7 @@ func ExperimentCPU(experimentsDetails *experimentTypes.ExperimentDetails, client
 						break loop
 					}
 				}
-				err = KillStressCPU(container.Name, pod.Name, experimentsDetails.AppNS, clients)
+				err = KillStressCPU(container.Name, pod.Name, experimentsDetails.AppNS, experimentsDetails.ChaosKillCmd, clients)
 				if err != nil {
 					errorCode := strings.Contains(err.Error(), "143")
 					if errorCode != true {
@@ -146,7 +162,7 @@ func PrepareCPUstress(experimentsDetails *experimentTypes.ExperimentDetails, cli
 }
 
 //PreparePodList will also adjust the number of the target pods depending on the specified percentage in PODS_AFFECTED_PERC variable
-func PreparePodList(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails) (*core_v1.PodList, error) {
+func PreparePodList(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails) (core_v1.PodList, error) {
 
 	log.Infof("[Chaos]:Pods percentage to affect is %v", strconv.Itoa(experimentsDetails.PodsAffectedPerc))
 
@@ -154,7 +170,7 @@ func PreparePodList(experimentsDetails *experimentTypes.ExperimentDetails, clien
 	pods, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).List(v1.ListOptions{LabelSelector: experimentsDetails.AppLabel})
 	if err != nil {
 		resultDetails.FailStep = "Getting the list of pods with the given labels and namespaces"
-		return nil, err
+		return core_v1.PodList{}, err
 	}
 
 	//If the default value has changed, means that we are aiming for a subset of the pods.
@@ -167,15 +183,15 @@ func PreparePodList(experimentsDetails *experimentTypes.ExperimentDetails, clien
 		log.Infof("[Chaos]:Number of pods targetted: %v", strconv.Itoa(newPodListLength))
 
 	}
-	return pods, nil
+	return *pods, nil
 }
 
 // KillStressCPU function to kill the experiment. Triggered by either timeout of chaos duration or termination of the experiment
-func KillStressCPU(containerName, podName, namespace string, clients clients.ClientSets) error {
+func KillStressCPU(containerName, podName, namespace, cpuFreeCmd string, clients clients.ClientSets) error {
 	// It will contains all the pod & container details required for exec command
 	execCommandDetails := litmusexec.PodDetails{}
 
-	command := []string{"/bin/sh", "-c", "kill $(find /proc -name exe -lname '*/md5sum' 2>&1 | grep -v 'Permission denied' | awk -F/ '{print $(NF-1)}' |  head -n 1)"}
+	command := []string{"/bin/sh", "-c", cpuFreeCmd}
 
 	litmusexec.SetExecCommandAttributes(&execCommandDetails, podName, containerName, namespace)
 	_, err := litmusexec.Exec(&execCommandDetails, clients, command)
