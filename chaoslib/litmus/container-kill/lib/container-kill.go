@@ -129,7 +129,10 @@ func GetTargetContainer(experimentsDetails *experimentTypes.ExperimentDetails, a
 // CreateHelperPod derive the attributes for helper pod and create the helper pod
 func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, podName, nodeName string) error {
 
-	privilegedEnable := true
+	privilegedEnable := false
+	if experimentsDetails.ContainerRuntime == "crio" {
+		privilegedEnable = true
+	}
 
 	helperPod := &apiv1.Pod{
 		ObjectMeta: v1.ObjectMeta{
