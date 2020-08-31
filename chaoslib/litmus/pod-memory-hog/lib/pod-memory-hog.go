@@ -13,15 +13,12 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-memory-hog/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
-	"github.com/litmuschaos/litmus-go/pkg/math"
 	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	litmusexec "github.com/litmuschaos/litmus-go/pkg/utils/exec"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	core_v1 "k8s.io/api/core/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog"
 )
 
@@ -54,29 +51,14 @@ func ExperimentMemory(experimentsDetails *experimentTypes.ExperimentDetails, cli
 	var endTime <-chan time.Time
 	timeDelay := time.Duration(experimentsDetails.ChaosDuration) * time.Second
 
-	var realpods core_v1.PodList
-
-	isPodAvailable, err := common.CheckForAvailibiltyOfPod(experimentsDetails.AppNS, experimentsDetails.TargetPod, clients)
+	// Get the target pod details for the chaos execution
+	// if the target pod is not defined it will derive the random target pod list using pod affected percentage
+	targetPodList, err := common.GetPodList(experimentsDetails.AppNS, experimentsDetails.TargetPod, experimentsDetails.AppLabel, experimentsDetails.PodsAffectedPerc, clients)
 	if err != nil {
-		return err
+		return errors.Errorf("Unable to get the target pod list due to, err: %v", err)
 	}
 
-	if isPodAvailable {
-		pod, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Get(experimentsDetails.TargetPod, v1.GetOptions{})
-		if err != nil {
-			return err
-		}
-		realpods.Items = append(realpods.Items, *pod)
-
-	} else {
-		log.Info("selecting a random pod with specified labels")
-		realpods, err = PreparePodList(experimentsDetails, clients, resultDetails)
-		if err != nil {
-			return err
-		}
-	}
-
-	for _, pod := range realpods.Items {
+	for _, pod := range targetPodList.Items {
 
 		for _, container := range pod.Status.ContainerStatuses {
 			if container.Ready != true {
@@ -164,31 +146,6 @@ func PrepareMemoryStress(experimentsDetails *experimentTypes.ExperimentDetails, 
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 	return nil
-}
-
-//PreparePodList will also adjust the number of the target pods depending on the specified percentage in PODS_AFFECTED_PERC variable
-func PreparePodList(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails) (core_v1.PodList, error) {
-
-	log.Infof("[Chaos]:Pods percentage to affect is %v", strconv.Itoa(experimentsDetails.PodsAffectedPerc))
-
-	//Getting the list of pods with the given labels and namespaces
-	pods, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).List(v1.ListOptions{LabelSelector: experimentsDetails.AppLabel})
-	if err != nil {
-		resultDetails.FailStep = "Getting the list of pods with the given labels and namespaces"
-		return core_v1.PodList{}, err
-	}
-
-	//If the default value has changed, means that we are aiming for a subset of the pods.
-	if experimentsDetails.PodsAffectedPerc != 100 {
-
-		newPodlistLength := math.Maximum(1, math.Adjustment(experimentsDetails.PodsAffectedPerc, len(pods.Items)))
-
-		pods.Items = pods.Items[:newPodlistLength]
-
-		log.Infof("[Chaos]:Number of pods targeted: %v", strconv.Itoa(newPodlistLength))
-
-	}
-	return *pods, nil
 }
 
 //KillStressMemory function to kill the experiment. Triggered by either timeout of chaos duration or termination of the experiment

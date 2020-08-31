@@ -28,7 +28,5 @@ go build -o build/_output/container-kill ./experiments/generic/container-kill
 go build -o build/_output/disk-fill ./experiments/generic/disk-fill
 # Buiding go binaries for pod-autoscaler experiment
 go build -o build/_output/pod-autoscaler ./experiments/generic/pod-autoscaler
-# Buiding go binaries for container_kill helper
-go build -o build/_output/container-killer ./chaoslib/litmus/container-kill/helper
 # Buiding go binaries for cassandra-pod-delete
 go build -o build/_output/cassandra-pod-delete ./experiments/cassandra/pod-delete

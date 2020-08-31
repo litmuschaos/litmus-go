@@ -21,28 +21,12 @@ import (
 //PrepareContainerKill contains the prepration steps before chaos injection
 func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
-	//Select application pod & node for the container kill chaos
-	appName, appNodeName, err := common.GetPodAndNodeName(experimentsDetails.AppNS, experimentsDetails.TargetPod, experimentsDetails.AppLabel, clients)
+	// Get the target pod details for the chaos execution
+	// if the target pod is not defined it will derive the random target pod list using pod affected percentage
+	targetPodList, err := common.GetPodList(experimentsDetails.AppNS, experimentsDetails.TargetPod, experimentsDetails.AppLabel, experimentsDetails.PodsAffectedPerc, clients)
 	if err != nil {
-		return errors.Errorf("Unable to get the application pod and node name due to, err: %v", err)
+		return errors.Errorf("Unable to get the target pod list due to, err: %v", err)
 	}
-
-	//Get the target container name of the application pod
-	if experimentsDetails.TargetContainer == "" {
-		experimentsDetails.TargetContainer, err = GetTargetContainer(experimentsDetails, appName, clients)
-		if err != nil {
-			return errors.Errorf("Unable to get the target container name due to, err: %v", err)
-		}
-	}
-
-	log.InfoWithValues("[Info]: Details of application under chaos injection", logrus.Fields{
-		"PodName":       appName,
-		"NodeName":      appNodeName,
-		"ContainerName": experimentsDetails.TargetContainer,
-	})
-
-	// generating a unique string which can be appended with the helper pod name & labels for the uniquely identification
-	experimentsDetails.RunID = common.GetRunID()
 
 	//Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
@@ -50,47 +34,67 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 
-	if experimentsDetails.EngineName != "" {
-		msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on " + appName + " pod"
-		types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
-		events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
-	}
+	for _, pod := range targetPodList.Items {
 
-	//GetRestartCount return the restart count of target container
-	restartCountBefore, err := GetRestartCount(experimentsDetails, appName, clients)
-	if err != nil {
-		return err
-	}
-	log.Infof("restartCount of target container before chaos injection: %v", strconv.Itoa(restartCountBefore))
+		//Get the target container name of the application pod
+		if experimentsDetails.TargetContainer == "" {
+			experimentsDetails.TargetContainer, err = GetTargetContainer(experimentsDetails, pod.Name, clients)
+			if err != nil {
+				return errors.Errorf("Unable to get the target container name due to, err: %v", err)
+			}
+		}
 
-	// Creating the helper pod to perform container-kill chaos
-	err = CreateHelperPod(experimentsDetails, clients, appName, appNodeName)
-	if err != nil {
-		return errors.Errorf("Unable to create the helper pod, err: %v", err)
-	}
+		log.InfoWithValues("[Info]: Details of application under chaos injection", logrus.Fields{
+			"PodName":       pod.Name,
+			"NodeName":      pod.Spec.NodeName,
+			"ContainerName": experimentsDetails.TargetContainer,
+		})
 
-	//checking the status of the helper pod, wait till the helper pod comes to running state else fail the experiment
-	log.Info("[Status]: Checking the status of the helper pod")
-	err = status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, "name="+experimentsDetails.ExperimentName+"-"+experimentsDetails.RunID, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
-	if err != nil {
-		return errors.Errorf("helper pod is not in running state, err: %v", err)
-	}
+		// generating a unique string which can be appended with the helper pod name & labels for the uniquely identification
+		experimentsDetails.RunID = common.GetRunID()
 
-	// Waiting for the Chaos Duration
-	log.Infof("[Wait]: Waiting for the %vs chaos duration", strconv.Itoa(experimentsDetails.ChaosDuration))
-	common.WaitForDuration(experimentsDetails.ChaosDuration)
+		if experimentsDetails.EngineName != "" {
+			msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on " + pod.Name + " pod"
+			types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
+			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
+		}
 
-	// It will verify that the restart count of container should increase after chaos injection
-	err = VerifyRestartCount(experimentsDetails, appName, clients, restartCountBefore)
-	if err != nil {
-		return errors.Errorf("Target container is not restarted , err: %v", err)
-	}
+		//GetRestartCount return the restart count of target container
+		restartCountBefore, err := GetRestartCount(experimentsDetails, pod.Name, clients)
+		if err != nil {
+			return err
+		}
+		log.Infof("restartCount of target container before chaos injection: %v", strconv.Itoa(restartCountBefore))
 
-	//Deleting the the helper pod for container-kill
-	log.Info("[Cleanup]: Deleting the helper pod")
-	err = common.DeletePod(experimentsDetails.ExperimentName+"-"+experimentsDetails.RunID, "name="+experimentsDetails.ExperimentName+"-"+experimentsDetails.RunID, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients)
-	if err != nil {
-		return errors.Errorf("Unable to delete the helper pod, err: %v", err)
+		// Creating the helper pod to perform container-kill chaos
+		err = CreateHelperPod(experimentsDetails, clients, pod.Name, pod.Spec.NodeName)
+		if err != nil {
+			return errors.Errorf("Unable to create the helper pod, err: %v", err)
+		}
+
+		//checking the status of the helper pod, wait till the helper pod comes to running state else fail the experiment
+		log.Info("[Status]: Checking the status of the helper pod")
+		err = status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, "name="+experimentsDetails.ExperimentName+"-"+experimentsDetails.RunID, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
+		if err != nil {
+			return errors.Errorf("helper pod is not in running state, err: %v", err)
+		}
+
+		// Waiting for the Chaos Duration
+		log.Infof("[Wait]: Waiting for the %vs chaos duration", strconv.Itoa(experimentsDetails.ChaosDuration))
+		common.WaitForDuration(experimentsDetails.ChaosDuration)
+
+		// It will verify that the restart count of container should increase after chaos injection
+		err = VerifyRestartCount(experimentsDetails, pod.Name, clients, restartCountBefore)
+		if err != nil {
+			return errors.Errorf("Target container is not restarted , err: %v", err)
+		}
+
+		//Deleting the the helper pod for container-kill
+		log.Info("[Cleanup]: Deleting the helper pod")
+		err = common.DeletePod(experimentsDetails.ExperimentName+"-"+experimentsDetails.RunID, "name="+experimentsDetails.ExperimentName+"-"+experimentsDetails.RunID, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients)
+		if err != nil {
+			return errors.Errorf("Unable to delete the helper pod, err: %v", err)
+		}
 	}
 
 	//Waiting for the ramp time after chaos injection

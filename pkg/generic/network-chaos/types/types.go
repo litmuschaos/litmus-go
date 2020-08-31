@@ -30,4 +30,5 @@ type ExperimentDetails struct {
 	Timeout                            int
 	Delay                              int
 	TargetPod                          string
+	PodsAffectedPerc                   int
 }

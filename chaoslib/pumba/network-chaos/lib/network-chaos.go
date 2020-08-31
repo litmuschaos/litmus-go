@@ -21,25 +21,12 @@ var err error
 //PreparePodNetworkChaos contains the prepration steps before chaos injection
 func PreparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
-	//Select application pod & node for the network chaos
-	appName, appNodeName, err := common.GetPodAndNodeName(experimentsDetails.AppNS, experimentsDetails.TargetPod, experimentsDetails.AppLabel, clients)
+	// Get the target pod details for the chaos execution
+	// if the target pod is not defined it will derive the random target pod list using pod affected percentage
+	targetPodList, err := common.GetPodList(experimentsDetails.AppNS, experimentsDetails.TargetPod, experimentsDetails.AppLabel, experimentsDetails.PodsAffectedPerc, clients)
 	if err != nil {
-		return errors.Errorf("Unable to get the application pod and node name due to, err: %v", err)
+		return errors.Errorf("Unable to get the target pod list due to, err: %v", err)
 	}
-
-	//Get the target container name of the application pod
-	if experimentsDetails.TargetContainer == "" {
-		experimentsDetails.TargetContainer, err = GetTargetContainer(experimentsDetails, appName, clients)
-		if err != nil {
-			return errors.Errorf("Unable to get the target container name due to, err: %v", err)
-		}
-	}
-
-	log.InfoWithValues("[Info]: Details of application under chaos injection", logrus.Fields{
-		"PodName":       appName,
-		"NodeName":      appNodeName,
-		"ContainerName": experimentsDetails.TargetContainer,
-	})
 
 	//Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
@@ -47,40 +34,57 @@ func PreparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetail
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 
-	experimentsDetails.RunID = common.GetRunID()
+	for _, pod := range targetPodList.Items {
 
-	if experimentsDetails.EngineName != "" {
-		msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on " + appName + " pod"
-		types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
-		events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
-	}
+		//Get the target container name of the application pod
+		if experimentsDetails.TargetContainer == "" {
+			experimentsDetails.TargetContainer, err = GetTargetContainer(experimentsDetails, pod.Name, clients)
+			if err != nil {
+				return errors.Errorf("Unable to get the target container name due to, err: %v", err)
+			}
+		}
 
-	// Creating the helper pod to perform network chaos
-	err = CreateHelperPod(experimentsDetails, clients, appName, appNodeName)
-	if err != nil {
-		return errors.Errorf("Unable to create the helper pod, err: %v", err)
-	}
+		log.InfoWithValues("[Info]: Details of application under chaos injection", logrus.Fields{
+			"PodName":       pod.Name,
+			"NodeName":      pod.Spec.NodeName,
+			"ContainerName": experimentsDetails.TargetContainer,
+		})
 
-	//Checking the status of helper pod
-	log.Info("[Status]: Checking the status of the helper pod")
-	err = status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, "name="+experimentsDetails.ExperimentName+"-"+experimentsDetails.RunID, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
-	if err != nil {
-		return errors.Errorf("helper pod is not in running state, err: %v", err)
-	}
+		experimentsDetails.RunID = common.GetRunID()
 
-	// Wait till the completion of helper pod
-	log.Infof("[Wait]: Waiting for %vs till the completion of the helper pod", strconv.Itoa(experimentsDetails.ChaosDuration))
+		if experimentsDetails.EngineName != "" {
+			msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on " + pod.Name + " pod"
+			types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
+			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
+		}
 
-	podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, "name="+experimentsDetails.ExperimentName+"-"+experimentsDetails.RunID, clients, experimentsDetails.ChaosDuration+30, "pumba")
-	if err != nil || podStatus == "Failed" {
-		return errors.Errorf("helper pod failed due to, err: %v", err)
-	}
+		// Creating the helper pod to perform network chaos
+		err = CreateHelperPod(experimentsDetails, clients, pod.Name, pod.Spec.NodeName)
+		if err != nil {
+			return errors.Errorf("Unable to create the helper pod, err: %v", err)
+		}
 
-	//Deleting the helper pod
-	log.Info("[Cleanup]: Deleting the helper pod")
-	err = common.DeletePod(experimentsDetails.ExperimentName+"-"+experimentsDetails.RunID, "name="+experimentsDetails.ExperimentName+"-"+experimentsDetails.RunID, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients)
-	if err != nil {
-		return errors.Errorf("Unable to delete the helper pod, err: %v", err)
+		//Checking the status of helper pod
+		log.Info("[Status]: Checking the status of the helper pod")
+		err = status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, "name="+experimentsDetails.ExperimentName+"-"+experimentsDetails.RunID, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
+		if err != nil {
+			return errors.Errorf("helper pod is not in running state, err: %v", err)
+		}
+
+		// Wait till the completion of helper pod
+		log.Infof("[Wait]: Waiting for %vs till the completion of the helper pod", strconv.Itoa(experimentsDetails.ChaosDuration))
+
+		podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, "name="+experimentsDetails.ExperimentName+"-"+experimentsDetails.RunID, clients, experimentsDetails.ChaosDuration+30, "pumba")
+		if err != nil || podStatus == "Failed" {
+			return errors.Errorf("helper pod failed due to, err: %v", err)
+		}
+
+		//Deleting the helper pod
+		log.Info("[Cleanup]: Deleting the helper pod")
+		err = common.DeletePod(experimentsDetails.ExperimentName+"-"+experimentsDetails.RunID, "name="+experimentsDetails.ExperimentName+"-"+experimentsDetails.RunID, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients)
+		if err != nil {
+			return errors.Errorf("Unable to delete the helper pod, err: %v", err)
+		}
 	}
 
 	//Waiting for the ramp time after chaos injection
