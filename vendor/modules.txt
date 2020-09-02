@@ -57,6 +57,11 @@ github.com/modern-go/reflect2
 github.com/openebs/maya/pkg/util/retry
 # github.com/pkg/errors v0.9.1
 github.com/pkg/errors
+# github.com/rs/zerolog v1.19.0
+github.com/rs/zerolog
+github.com/rs/zerolog/internal/cbor
+github.com/rs/zerolog/internal/json
+github.com/rs/zerolog/log
 # github.com/sirupsen/logrus v1.6.0
 github.com/sirupsen/logrus
 # github.com/spf13/pflag v1.0.5
