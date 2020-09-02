@@ -166,17 +166,14 @@ func GetContainerArguments(experimentsDetails *experimentTypes.ExperimentDetails
 	}
 
 	args := baseArgs
+	args = AddTargetIpsArgs(experimentsDetails, args)
 	if experimentsDetails.ExperimentName == "pod-network-duplication" {
-		args = AddTargetIpsArgs(experimentsDetails, args)
 		args = append(baseArgs, "duplicate", "--percent", strconv.Itoa(experimentsDetails.NetworkPacketDuplicationPercentage))
 	} else if experimentsDetails.ExperimentName == "pod-network-latency" {
-		args = AddTargetIpsArgs(experimentsDetails, args)
 		args = append(args, "delay", "--time", strconv.Itoa(experimentsDetails.NetworkLatency))
 	} else if experimentsDetails.ExperimentName == "pod-network-loss" {
-		args = AddTargetIpsArgs(experimentsDetails, args)
 		args = append(baseArgs, "loss", "--percent", strconv.Itoa(experimentsDetails.NetworkPacketLossPercentage))
 	} else if experimentsDetails.ExperimentName == "pod-network-corruption" {
-		args = AddTargetIpsArgs(experimentsDetails, args)
 		args = append(baseArgs, "corrupt", "--percent", strconv.Itoa(experimentsDetails.NetworkPacketCorruptionPercentage))
 	}
 	args = append(args, "re2:k8s_"+experimentsDetails.TargetContainer+"_"+appName)
