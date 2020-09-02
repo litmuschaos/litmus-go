@@ -28,6 +28,9 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string
 	experimentDetails.PodsAffectedPerc, _ = strconv.Atoi(Getenv("PODS_AFFECTED_PERC", "0"))
 	experimentDetails.Delay, _ = strconv.Atoi(Getenv("STATUS_CHECK_DELAY", "2"))
 	experimentDetails.Timeout, _ = strconv.Atoi(Getenv("STATUS_CHECK_TIMEOUT", "180"))
+	experimentDetails.TargetPod = Getenv("TARGET_POD", "")
+	experimentDetails.ChaosInjectCmd = Getenv("CHAOS_INJECT_COMMAND", "md5sum /dev/zero")
+	experimentDetails.ChaosKillCmd = Getenv("CHAOS_KILL_COMMAND", "kill $(find /proc -name exe -lname '*/md5sum' 2>&1 | grep -v 'Permission denied' | awk -F/ '{print $(NF-1)}' |  head -n 1)")
 }
 
 // Getenv fetch the env and set the default value, if any
@@ -48,5 +51,6 @@ func InitialiseChaosVariables(chaosDetails *types.ChaosDetails, experimentDetail
 	chaosDetails.EngineName = experimentDetails.EngineName
 	chaosDetails.ExperimentName = experimentDetails.ExperimentName
 	chaosDetails.InstanceID = experimentDetails.InstanceID
-
+	chaosDetails.Timeout = experimentDetails.Timeout
+	chaosDetails.Delay = experimentDetails.Delay
 }

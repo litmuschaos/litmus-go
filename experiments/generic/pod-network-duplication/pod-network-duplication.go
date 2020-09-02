@@ -1,12 +1,13 @@
 package main
 
 import (
-	"github.com/litmuschaos/litmus-go/chaoslib/pumba/network_chaos"
+	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/pumba/network-chaos/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/network-chaos/environment"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/network-chaos/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
+	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
@@ -41,11 +42,14 @@ func main() {
 	log.Infof("[PreReq]: Getting the ENV for the %v experiment", experimentsDetails.ExperimentName)
 	experimentEnv.GetENV(&experimentsDetails, "pod-network-duplication")
 
-	// Intialise Chaos Result Parameters
-	types.SetResultAttributes(&resultDetails, experimentsDetails.EngineName, experimentsDetails.ExperimentName)
-
 	// Intialise events Parameters
 	experimentEnv.InitialiseChaosVariables(&chaosDetails, &experimentsDetails)
+
+	// Intialise Chaos Result Parameters
+	types.SetResultAttributes(&resultDetails, chaosDetails)
+
+	// Intialise the probe details
+	probe.InitializeProbesInChaosResultDetails(&chaosDetails, clients, &resultDetails)
 
 	//Updating the chaos result in the beginning of experiment
 	log.Infof("[PreReq]: Updating the chaos result of %v experiment (SOT)", experimentsDetails.ExperimentName)
@@ -61,7 +65,7 @@ func main() {
 	result.SetResultUID(&resultDetails, clients, &chaosDetails)
 
 	//DISPLAY THE APP INFORMATION
-	log.InfoWithValues("The application informations are as follows\n", logrus.Fields{
+	log.InfoWithValues("The application information is as follows\n", logrus.Fields{
 		"Namespace": experimentsDetails.AppNS,
 		"Label":     experimentsDetails.AppLabel,
 		"Ramp Time": experimentsDetails.RampTime,
@@ -76,14 +80,35 @@ func main() {
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
+
 	if experimentsDetails.EngineName != "" {
-		types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, "AUT is Running successfully", "Normal", &chaosDetails)
+		// marking AUT as running, as we already checked the status of application under test
+		msg := "AUT: Running"
+
+		// run the probes in the pre-chaos check
+		if len(resultDetails.ProbeDetails) != 0 {
+
+			err = probe.RunProbes(&chaosDetails, clients, &resultDetails, "PreChaos", &eventsDetails)
+			events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
+			if err != nil {
+				log.Errorf("Probe failed, due to err: %v", err)
+				failStep := "Failed while adding probe"
+				msg := "AUT: Running, Probes: Unsuccessful"
+				types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, msg, "Warning", &chaosDetails)
+				events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
+				result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+				return
+			}
+			msg = "AUT: Running, Probes: Successful"
+		}
+		// generating the events for the pre-chaos check
+		types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, msg, "Normal", &chaosDetails)
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
 	// Including the pumba lib for pod-network-duplication
 	if experimentsDetails.ChaosLib == "pumba" {
-		err = network_chaos.PreparePodNetworkChaos(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
+		err = litmusLIB.PreparePodNetworkChaos(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
 		if err != nil {
 			log.Errorf("Chaos injection failed due to %v\n", err)
 			failStep := "Including the pumba lib for pod-network-duplication"
@@ -110,7 +135,26 @@ func main() {
 	}
 
 	if experimentsDetails.EngineName != "" {
-		types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, "AUT is Running successfully", "Normal", &chaosDetails)
+		// marking AUT as running, as we already checked the status of application under test
+		msg := "AUT: Running"
+
+		// run the probes in the post-chaos check
+		if len(resultDetails.ProbeDetails) != 0 {
+			err = probe.RunProbes(&chaosDetails, clients, &resultDetails, "PostChaos", &eventsDetails)
+			if err != nil {
+				log.Errorf("Unable to Add the probes, due to err: %v", err)
+				failStep := "Failed while adding probe"
+				msg := "AUT: Running, Probes: Unsuccessful"
+				types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, msg, "Warning", &chaosDetails)
+				events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
+				result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+				return
+			}
+			msg = "AUT: Running, Probes: Successful"
+		}
+
+		// generating post chaos event
+		types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, msg, "Normal", &chaosDetails)
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 

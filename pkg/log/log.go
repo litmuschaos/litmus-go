@@ -10,9 +10,15 @@ func Fatalf(msg string, err error) {
 	logrus.WithFields(logrus.Fields{}).Fatalf(msg, err)
 }
 
+//Fatal Logs first and then calls `logger.Exit(1)`
+// logging level is set to Panic.
+func Fatal(msg string) {
+	logrus.WithFields(logrus.Fields{}).Fatal(msg)
+}
+
 //Infof log the General operational entries about what's going on inside the application
-func Infof(msg string, val string) {
-	logrus.WithFields(logrus.Fields{}).Infof(msg, val)
+func Infof(msg string, val ...interface{}) {
+	logrus.WithFields(logrus.Fields{}).Infof(msg, val...)
 }
 
 //Info log the General operational entries about what's going on inside the application
@@ -24,6 +30,12 @@ func Info(msg string) {
 // It also print the extra key values pairs
 func InfoWithValues(msg string, val map[string]interface{}) {
 	logrus.WithFields(val).Info(msg)
+}
+
+// ErrorWithValues log the Error entries happening inside the code
+// It also print the extra key values pairs
+func ErrorWithValues(msg string, val map[string]interface{}) {
+	logrus.WithFields(val).Error(msg)
 }
 
 //Warn log the Non-critical entries that deserve eyes.

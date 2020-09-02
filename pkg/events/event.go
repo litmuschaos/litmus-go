@@ -45,7 +45,7 @@ func CreateEvents(eventsDetails *types.EventDetails, clients clients.ClientSets,
 func GenerateEvents(eventsDetails *types.EventDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, kind string) error {
 
 	var err error
-	event, err := clients.KubeClient.CoreV1().Events(chaosDetails.ChaosNamespace).Get(eventsDetails.Reason+string(eventsDetails.ResourceUID), metav1.GetOptions{})
+	event, _ := clients.KubeClient.CoreV1().Events(chaosDetails.ChaosNamespace).Get(eventsDetails.Reason+string(eventsDetails.ResourceUID), metav1.GetOptions{})
 
 	if event.Name != eventsDetails.Reason+string(eventsDetails.ResourceUID) {
 
@@ -60,6 +60,7 @@ func GenerateEvents(eventsDetails *types.EventDetails, clients clients.ClientSet
 			event.CreationTimestamp = metav1.Time{Time: time.Now()}
 			event.FirstTimestamp = metav1.Time{Time: time.Now()}
 			event.Source.Component = chaosDetails.ChaosPodName
+			event.Type = eventsDetails.Type
 		} else {
 			event.Count = event.Count + 1
 		}

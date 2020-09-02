@@ -29,4 +29,5 @@ type ExperimentDetails struct {
 	TCImage                            string
 	Timeout                            int
 	Delay                              int
+	TargetPod                          string
 }
