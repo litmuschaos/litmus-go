@@ -137,7 +137,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 					Command: []string{
 						"pumba",
 					},
-					Args:            GetContainerArguments(experimentsDetails, appName),
+					Args: GetContainerArguments(experimentsDetails, appName),
 					VolumeMounts: []apiv1.VolumeMount{
 						{
 							Name:      "dockersocket",
