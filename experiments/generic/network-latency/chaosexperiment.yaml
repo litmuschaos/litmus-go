@@ -31,7 +31,7 @@ spec:
           - "patch"
           - "update"
           - "delete"
-    image: "andreas131989/litmus-go:ci"
+    image: "litmuschaos/litmus-go:ci"
     imagePullPolicy: Always
     hostPID: true
     securityContext:
