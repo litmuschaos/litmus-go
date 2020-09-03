@@ -153,7 +153,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 	return err
 }
 
-// AddTargetIpsArgs inserts a comma-separated list of targetIPs (if provided by the user) into the pumba command/args
+// GetNetworkChaosCommands derive the commands for the pumba pod
 func GetContainerArguments(experimentsDetails *experimentTypes.ExperimentDetails, appName string) []string {
 	baseArgs := []string{
 		"netem",
@@ -181,6 +181,7 @@ func GetContainerArguments(experimentsDetails *experimentTypes.ExperimentDetails
 	return args
 }
 
+// AddTargetIpsArgs inserts a comma-separated list of targetIPs (if provided by the user) into the pumba command/args
 func AddTargetIpsArgs(experimentsDetails *experimentTypes.ExperimentDetails, args []string) []string {
 	if experimentsDetails.TargetIPs == "" {
 		return args
