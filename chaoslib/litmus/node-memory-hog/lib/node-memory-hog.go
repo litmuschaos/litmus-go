@@ -113,17 +113,17 @@ func GetNodeName(experimentsDetails *experimentTypes.ExperimentDetails, clients 
 }
 
 // GetNodeMemoryDetails will return the total memory capacity and memory allocatable of an application node
-func GetNodeMemoryDetails(appNodeName string, clients clients.ClientSets) (string, string, error) {
+func GetNodeMemoryDetails(appNodeName string, clients clients.ClientSets) (int, int, error) {
 
 	nodeDetails, err := clients.KubeClient.CoreV1().Nodes().Get(appNodeName, v1.GetOptions{})
 	if err != nil {
-		return "", "", errors.Errorf("Fail to get nodesDetails, due to %v", err)
+		return 0, 0, errors.Errorf("Fail to get nodesDetails, due to %v", err)
 	}
 
-	memoryCapacity := strconv.Itoa(int(nodeDetails.Status.Capacity.Memory().Value()))
-	memoryAllocatable := strconv.Itoa(int(nodeDetails.Status.Allocatable.Memory().Value()))
+	memoryCapacity := int(nodeDetails.Status.Capacity.Memory().Value())
+	memoryAllocatable := int(nodeDetails.Status.Allocatable.Memory().Value())
 
-	if memoryCapacity == "" || memoryAllocatable == "" {
+	if memoryCapacity == 0 || memoryAllocatable == 0 {
 		return memoryCapacity, memoryAllocatable, errors.Errorf("Fail to get memory details of the application node")
 	}
 
@@ -132,20 +132,17 @@ func GetNodeMemoryDetails(appNodeName string, clients clients.ClientSets) (strin
 }
 
 // CalculateMemoryPercentage will calculate the memory percentage under chaos wrt allocatable memory
-func CalculateMemoryPercentage(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, memoryCapacity, memoryAllocatable string) int {
+func CalculateMemoryPercentage(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, memoryCapacity, memoryAllocatable int) int {
 
 	var totalMemoryPercentage int
-	memCapacity, _ := strconv.Atoi(memoryCapacity)
-	memAllocatable, _ := strconv.Atoi(memoryAllocatable)
 
-	if memCapacity > 0 && memAllocatable > 0 {
+	//Getting the total memory under chaos
+	memoryForChaos := ((float64(experimentsDetails.MemoryPercentage) / 100) * float64(memoryCapacity))
 
-		//Getting the total memory under chaos
-		memoryForChaos := ((float64(experimentsDetails.MemoryPercentage) / 100) * float64(memCapacity))
+	//Get the percentage of memory under chaos wrt allocatable memory
+	totalMemoryPercentage = int((float64(memoryForChaos) / float64(memoryAllocatable)) * 100)
 
-		//Get the percentage of memory under chaos wrt allocatable memory
-		totalMemoryPercentage = int((float64(memoryForChaos) / float64(memAllocatable)) * 100)
-	}
+	log.Infof("[Info]: PercentageOfMemoryCapacityToBeUsed: %d, which is %d of Allocatable Memory", experimentsDetails.MemoryPercentage, totalMemoryPercentage)
 
 	return totalMemoryPercentage
 }
