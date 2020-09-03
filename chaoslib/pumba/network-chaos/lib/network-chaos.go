@@ -153,7 +153,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 	return err
 }
 
-// GetNetworkChaosCommands derive the commands for the pumba pod
+// GetContainerArguments derives the args for the pumba pod
 func GetContainerArguments(experimentsDetails *experimentTypes.ExperimentDetails, appName string) []string {
 	baseArgs := []string{
 		"netem",
