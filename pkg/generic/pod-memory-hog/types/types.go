@@ -21,4 +21,8 @@ type ExperimentDetails struct {
 	ChaosPodName      string
 	PodsAffectedPerc  int
 	MemoryConsumption int
+	Timeout           int
+	Delay             int
+	TargetPod         string
+	ChaosKillCmd	  string
 }

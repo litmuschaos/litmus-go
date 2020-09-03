@@ -1,0 +1,75 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: litmus-experiment
+spec:
+  replicas: 1
+  selector: 
+    matchLabels:
+      app: litmus-experiment
+  template:
+    metadata:
+      labels:
+        app: litmus-experiment
+    spec:
+      serviceAccountName: cassandra-pod-delete-sa
+      containers:
+      - name: gotest
+        image: busybox
+        command:
+          - sleep 
+          - "3600"
+        env:
+          - name: APP_NAMESPACE
+            value: ''
+
+          - name: APP_LABEL
+            value: ''
+
+          - name: APP_KIND
+            value: ''
+
+          - name: CASSANDRA_SVC_NAME
+            value: 'cassandra'
+
+          - name: KEYSPACE_REPLICATION_FACTOR
+            value: ''
+
+          - name: CASSANDRA_PORT
+            value: '9042'
+
+          - name: LIVENESS_SVC_PORT
+            value: '8088'
+
+          - name: CASSANDRA_LIVENESS_IMAGE
+            value: 'litmuschaos/cassandra-client:latest'
+
+          - name: TOTAL_CHAOS_DURATION
+            value: '15'
+
+          - name: CHAOS_INTERVAL
+            value: '15'
+
+          - name: KILL_COUNT
+            value: ''
+
+          - name: CASSANDRA_LIVENESS_CHECK
+            value: ''
+
+          - name: RAMP_TIME
+            value: ''
+
+          - name: FORCE
+            value: 'true'
+
+          - name: LIB
+            value: 'litmus'
+
+          - name: CHAOS_NAMESPACE
+            value: ''
+
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name

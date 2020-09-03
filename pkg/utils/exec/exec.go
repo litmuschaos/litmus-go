@@ -21,7 +21,7 @@ type PodDetails struct {
 }
 
 // Exec function will run the provide commands inside the target container
-func Exec(commandDetails *PodDetails, clients clients.ClientSets, command string) (string, error) {
+func Exec(commandDetails *PodDetails, clients clients.ClientSets, command []string) (string, error) {
 
 	req := clients.KubeClient.CoreV1().RESTClient().Post().
 		Resource("pods").
@@ -37,7 +37,7 @@ func Exec(commandDetails *PodDetails, clients clients.ClientSets, command string
 	parameterCodec := runtime.NewParameterCodec(scheme)
 
 	req.VersionedParams(&apiv1.PodExecOptions{
-		Command:   strings.Fields(command),
+		Command:   command,
 		Container: commandDetails.ContainerName,
 		Stdin:     false,
 		Stdout:    true,

@@ -1,68 +1,15 @@
-## Experiment CR for the pod-delete experiment
+## Experiment Metadata
 
-```
-apiVersion: litmuschaos.io/v1alpha1
-description:
-  message: |
-    Deletes a pod belonging to a deployment/statefulset/daemonset
-kind: ChaosExperiment
-metadata:
-  name: pod-delete
-  version: 0.1.0
-spec:
-  definition:
-    permissions:
-      - apiGroups:
-          - ""
-          - "apps"
-          - "batch"
-          - "litmuschaos.io"
-        resources:
-          - "deployments"
-          - "jobs"
-          - "pods"
-          - "pods/log"
-          - "events"
-          - "configmaps"
-          - "chaosengines"
-          - "chaosexperiments"
-          - "chaosresults"
-        verbs:
-          - "create"
-          - "list"
-          - "get"
-          - "patch"
-          - "update"
-          - "delete"
-      - apiGroups:
-          - ""
-        resources: 
-          - "nodes"
-        verbs:
-          - "get"
-          - "list"
-    image: "litmuschaos/go-runner:ci"
-    args:
-    - -c
-    - ./experiments/pod-delete
-    command:
-    - /bin/bash
-    env:
-    - name: TOTAL_CHAOS_DURATION
-      value: '30'
-    - name: CHAOS_INTERVAL
-      value: '10'
-    - name: RAMP_TIME
-      value: ''
-    - name: LIB
-      value: 'litmus'
-    - name: FORCE
-      value: ''
-    - name: KILL_COUNT
-      value: ''
-    - name: LIB_IMAGE
-      value: 'litmuschaos/pod-delete-helper:latest'
-    labels:
-      name: pod-delete
+<table>
+<tr>
+<th> Name </th>
+<th> Description </th>
+<th> Documentation Link </th>
+</tr>
+<tr>
+ <td> Pod Delete </td>
+ <td> This experiment causes (forced/graceful) pod failure of random replicas of an application deployment. It tests deployment sanity (replica availability & uninterrupted service) and recovery workflows of the application pod </td>
+ <td>  <a href="https://docs.litmuschaos.io/docs/pod-delete/"> Here </a> </td>
+ </tr>
+ </table>
 
-```

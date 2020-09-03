@@ -21,4 +21,6 @@ type ExperimentDetails struct {
 	AppNode          string
 	AuxiliaryAppInfo string
 	Taints           string
+	Timeout          int
+	Delay            int
 }
