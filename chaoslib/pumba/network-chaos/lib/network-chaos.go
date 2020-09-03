@@ -177,7 +177,7 @@ func GetContainerArguments(experimentsDetails *experimentTypes.ExperimentDetails
 		args = append(args, "corrupt", "--percent", strconv.Itoa(experimentsDetails.NetworkPacketCorruptionPercentage))
 	}
 	args = append(args, "re2:k8s_"+experimentsDetails.TargetContainer+"_"+appName)
-	log.Infof("%v", args)
+	log.Infof("Arguments for running %v are %v", experimentsDetails.ExperimentName, args)
 	return args
 }
 
