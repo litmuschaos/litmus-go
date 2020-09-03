@@ -153,7 +153,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 	return err
 }
 
-// GetContainerArguments populates the arguments for pumba container
+// AddTargetIpsArgs inserts a comma-separated list of targetIPs (if provided by the user) into the pumba command/args
 func GetContainerArguments(experimentsDetails *experimentTypes.ExperimentDetails, appName string) []string {
 	baseArgs := []string{
 		"netem",
@@ -168,13 +168,13 @@ func GetContainerArguments(experimentsDetails *experimentTypes.ExperimentDetails
 	args := baseArgs
 	args = AddTargetIpsArgs(experimentsDetails, args)
 	if experimentsDetails.ExperimentName == "pod-network-duplication" {
-		args = append(baseArgs, "duplicate", "--percent", strconv.Itoa(experimentsDetails.NetworkPacketDuplicationPercentage))
+		args = append(args, "duplicate", "--percent", strconv.Itoa(experimentsDetails.NetworkPacketDuplicationPercentage))
 	} else if experimentsDetails.ExperimentName == "pod-network-latency" {
 		args = append(args, "delay", "--time", strconv.Itoa(experimentsDetails.NetworkLatency))
 	} else if experimentsDetails.ExperimentName == "pod-network-loss" {
-		args = append(baseArgs, "loss", "--percent", strconv.Itoa(experimentsDetails.NetworkPacketLossPercentage))
+		args = append(args, "loss", "--percent", strconv.Itoa(experimentsDetails.NetworkPacketLossPercentage))
 	} else if experimentsDetails.ExperimentName == "pod-network-corruption" {
-		args = append(baseArgs, "corrupt", "--percent", strconv.Itoa(experimentsDetails.NetworkPacketCorruptionPercentage))
+		args = append(args, "corrupt", "--percent", strconv.Itoa(experimentsDetails.NetworkPacketCorruptionPercentage))
 	}
 	args = append(args, "re2:k8s_"+experimentsDetails.TargetContainer+"_"+appName)
 	log.Infof("%v", args)
