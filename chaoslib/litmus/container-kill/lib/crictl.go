@@ -75,7 +75,7 @@ func GetPodID(experimentsDetails *experimentTypes.ExperimentDetails, targetPod a
 		return "", err
 	}
 
-	// run the commands inside helper pod and fetch the result
+	// run the commands inside helper pod to get the available pods on the target node
 	command := []string{"crictl", "pods"}
 	litmusexec.SetExecCommandAttributes(execCommandDetails, podName, experimentsDetails.ExperimentName, experimentsDetails.ChaosNamespace)
 	allPods, err := litmusexec.Exec(execCommandDetails, clients, command)
@@ -83,7 +83,7 @@ func GetPodID(experimentsDetails *experimentTypes.ExperimentDetails, targetPod a
 		return "", errors.Errorf("Unable to run crictl command, due to err: %v", err)
 	}
 
-	// removing all the extra spaces present inside output of crictl command
+	// removing all the extra spaces present inside output of crictl command and extract the pod id
 	b := []byte(allPods)
 	pods := RemoveExtraSpaces(b)
 	for i := 0; i < len(pods)-1; i++ {
@@ -107,7 +107,7 @@ func GetContainerID(experimentsDetails *experimentTypes.ExperimentDetails, podID
 		return "", errors.Errorf("Unable to run crictl command, due to err: %v", err)
 	}
 
-	// removing all the extra spaces present inside output of crictl command
+	// removing all the extra spaces present inside output of crictl command and extract out the container id
 	b := []byte(allContainers)
 	containers := RemoveExtraSpaces(b)
 	for i := 0; i < len(containers)-1; i++ {

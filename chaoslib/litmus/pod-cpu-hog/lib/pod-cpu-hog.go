@@ -4,7 +4,6 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
-	"strings"
 	"syscall"
 	"time"
 
@@ -106,16 +105,12 @@ func ExperimentCPU(experimentsDetails *experimentTypes.ExperimentDetails, client
 						break loop
 					}
 				}
-				err = KillStressCPU(container.Name, pod.Name, experimentsDetails.AppNS, experimentsDetails.ChaosKillCmd, clients)
-				if err != nil {
-					errorCode := strings.Contains(err.Error(), "143")
-					if errorCode != true {
-						log.Infof("[Chaos]:CPU stress error: %v", err.Error())
-						return err
-					}
+				if err = KillStressCPU(container.Name, pod.Name, experimentsDetails.AppNS, experimentsDetails.ChaosKillCmd, clients); err != nil {
+					return err
 				}
 			}
 		}
+
 	}
 
 	return nil

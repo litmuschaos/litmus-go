@@ -31,4 +31,5 @@ type ExperimentDetails struct {
 	Delay                              int
 	TargetPod                          string
 	PodsAffectedPerc                   int
+	TargetIPs                          string
 }

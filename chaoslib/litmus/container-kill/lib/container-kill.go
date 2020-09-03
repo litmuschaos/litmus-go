@@ -63,6 +63,7 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 	var endTime <-chan time.Time
 	timeDelay := time.Duration(experimentsDetails.ChaosDuration) * time.Second
 
+loop:
 	for count := 0; count < experimentsDetails.Iterations; count++ {
 		for _, pod := range targetPodList.Items {
 
@@ -79,7 +80,7 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 				return err
 			}
 
-			// create the events
+			// create the events for the chaos inject
 			if experimentsDetails.EngineName != "" {
 				msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on " + pod.Name + " pod"
 				types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
@@ -88,11 +89,12 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 		}
 		log.Infof("[Wait]: Waiting for the chaos interval of %v seconds", experimentsDetails.ChaosInterval)
 		common.WaitForDuration(experimentsDetails.ChaosInterval)
+		// terminating the chaos execution when it exceed chaos duration
 		endTime = time.After(timeDelay)
 		select {
 		case <-endTime:
 			log.Infof("[Chaos]: Time is up for experiment: %v", experimentsDetails.ExperimentName)
-			break
+			break loop
 		}
 
 	}

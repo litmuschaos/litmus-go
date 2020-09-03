@@ -2,6 +2,7 @@ package lib
 
 import (
 	"strconv"
+	"strings"
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
@@ -109,8 +110,6 @@ func GetTargetContainer(experimentsDetails *experimentTypes.ExperimentDetails, a
 // CreateHelperPod derive the attributes for helper pod and create the helper pod
 func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, appName, appNodeName string) error {
 
-	command, keyAttibute, valueAttribute := GetNetworkChaosCommands(experimentsDetails)
-
 	helperPod := &apiv1.Pod{
 		ObjectMeta: v1.ObjectMeta{
 			Name:      experimentsDetails.ExperimentName + "-" + experimentsDetails.RunID,
@@ -142,19 +141,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 					Command: []string{
 						"pumba",
 					},
-					Args: []string{
-						"netem",
-						"--tc-image",
-						experimentsDetails.TCImage,
-						"--interface",
-						experimentsDetails.NetworkInterface,
-						"--duration",
-						strconv.Itoa(experimentsDetails.ChaosDuration) + "s",
-						command,
-						keyAttibute,
-						valueAttribute,
-						"re2:k8s_" + experimentsDetails.TargetContainer + "_" + appName,
-					},
+					Args: GetContainerArguments(experimentsDetails, appName),
 					VolumeMounts: []apiv1.VolumeMount{
 						{
 							Name:      "dockersocket",
@@ -170,26 +157,42 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 	return err
 }
 
-// GetNetworkChaosCommands derive the commands for the pumba pod
-func GetNetworkChaosCommands(experimentsDetails *experimentTypes.ExperimentDetails) (string, string, string) {
-
-	var command, keyAttibute, valueAttribute string
-	if experimentsDetails.ExperimentName == "pod-network-duplication" {
-		command = "duplicate"
-		keyAttibute = "--percent"
-		valueAttribute = strconv.Itoa(experimentsDetails.NetworkPacketDuplicationPercentage)
-	} else if experimentsDetails.ExperimentName == "pod-network-latency" {
-		command = "delay"
-		keyAttibute = "--time"
-		valueAttribute = strconv.Itoa(experimentsDetails.NetworkLatency)
-	} else if experimentsDetails.ExperimentName == "pod-network-loss" {
-		command = "loss"
-		keyAttibute = "--percent"
-		valueAttribute = strconv.Itoa(experimentsDetails.NetworkPacketLossPercentage)
-	} else if experimentsDetails.ExperimentName == "pod-network-corruption" {
-		command = "corrupt"
-		keyAttibute = "--percent"
-		valueAttribute = strconv.Itoa(experimentsDetails.NetworkPacketCorruptionPercentage)
+// GetContainerArguments derives the args for the pumba pod
+func GetContainerArguments(experimentsDetails *experimentTypes.ExperimentDetails, appName string) []string {
+	baseArgs := []string{
+		"netem",
+		"--tc-image",
+		experimentsDetails.TCImage,
+		"--interface",
+		experimentsDetails.NetworkInterface,
+		"--duration",
+		strconv.Itoa(experimentsDetails.ChaosDuration) + "s",
 	}
-	return command, keyAttibute, valueAttribute
+
+	args := baseArgs
+	args = AddTargetIpsArgs(experimentsDetails, args)
+	if experimentsDetails.ExperimentName == "pod-network-duplication" {
+		args = append(args, "duplicate", "--percent", strconv.Itoa(experimentsDetails.NetworkPacketDuplicationPercentage))
+	} else if experimentsDetails.ExperimentName == "pod-network-latency" {
+		args = append(args, "delay", "--time", strconv.Itoa(experimentsDetails.NetworkLatency))
+	} else if experimentsDetails.ExperimentName == "pod-network-loss" {
+		args = append(args, "loss", "--percent", strconv.Itoa(experimentsDetails.NetworkPacketLossPercentage))
+	} else if experimentsDetails.ExperimentName == "pod-network-corruption" {
+		args = append(args, "corrupt", "--percent", strconv.Itoa(experimentsDetails.NetworkPacketCorruptionPercentage))
+	}
+	args = append(args, "re2:k8s_"+experimentsDetails.TargetContainer+"_"+appName)
+	log.Infof("Arguments for running %v are %v", experimentsDetails.ExperimentName, args)
+	return args
+}
+
+// AddTargetIpsArgs inserts a comma-separated list of targetIPs (if provided by the user) into the pumba command/args
+func AddTargetIpsArgs(experimentsDetails *experimentTypes.ExperimentDetails, args []string) []string {
+	if experimentsDetails.TargetIPs == "" {
+		return args
+	}
+	ips := strings.Split(experimentsDetails.TargetIPs, ",")
+	for i := range ips {
+		args = append(args, "--target", strings.TrimSpace(ips[i]))
+	}
+	return args
 }

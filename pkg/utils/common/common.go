@@ -71,7 +71,8 @@ func CheckForAvailibiltyOfPod(namespace, name string, clients clients.ClientSets
 	return true, nil
 }
 
-//GetPodList ...
+//GetPodList check for the availibilty of the target pod for the chaos execution
+// if the target pod is not defined it will derive the random target pod list using pod affected percentage
 func GetPodList(namespace, targetPod, appLabels string, podAffPerc int, clients clients.ClientSets) (core_v1.PodList, error) {
 	realpods := core_v1.PodList{}
 	podList, err := clients.KubeClient.CoreV1().Pods(namespace).List(v1.ListOptions{LabelSelector: appLabels})
@@ -102,13 +103,13 @@ func GetPodList(namespace, targetPod, appLabels string, podAffPerc int, clients 
 	return realpods, nil
 }
 
-// DeleteHelperDaemonset ...
+// DeleteHelperDaemonset deletes the specified daemonset and wait until it got terminated
 func DeleteHelperDaemonset(name, labels, namespace string, timeout, delay int, clients clients.ClientSets) error {
 	if err := clients.KubeClient.AppsV1().DaemonSets(namespace).Delete(name, &v1.DeleteOptions{}); err != nil {
 		return err
 	}
 
-	// waiting for the termination of the pod
+	// waiting for the termination of the daemonset
 	err := retry.
 		Times(uint(timeout / delay)).
 		Wait(time.Duration(delay) * time.Second).
