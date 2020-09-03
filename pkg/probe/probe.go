@@ -76,6 +76,7 @@ func SetProbeVerdictAfterFailure(resultDetails *types.ResultDetails) {
 			resultDetails.ProbeDetails[index].Status["Continuous"] = "Better Luck Next Time" + emoji.Sprint(" :thumbsdown:")
 		}
 	}
+
 }
 
 // GetProbesFromEngine fetch the details of the probes from the chaosengines

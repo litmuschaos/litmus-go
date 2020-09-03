@@ -1,7 +1,7 @@
 package main
 
 import (
-	node_drain "github.com/litmuschaos/litmus-go/chaoslib/litmus/node_drain"
+	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/node-drain/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/node-drain/environment"
@@ -120,7 +120,7 @@ func main() {
 
 	// Including the litmus lib for node-drain
 	if experimentsDetails.ChaosLib == "litmus" {
-		err = node_drain.PrepareNodeDrain(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
+		err = litmusLIB.PrepareNodeDrain(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
 		if err != nil {
 			log.Errorf("Chaos injection failed due to %v\n", err)
 			failStep := "Including the litmus lib for node-drain"

@@ -111,6 +111,8 @@ func TriggerContinuousHTTPProbe(probe v1alpha1.HTTPProbeAttributes, chaosresult 
 			break
 		}
 
+		// waiting for the probe polling interval
+		time.Sleep(time.Duration(probe.RunProperties.ProbePollingInterval) * time.Second)
 	}
 
 }

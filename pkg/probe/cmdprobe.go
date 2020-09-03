@@ -97,7 +97,7 @@ func PrepareCmdProbe(cmdProbes []v1alpha1.CmdProbeAttributes, clients clients.Cl
 					litmusexec.SetExecCommandAttributes(&execCommandDetails, chaosDetails.ExperimentName+"-probe-"+runID, chaosDetails.ExperimentName+"-probe", chaosDetails.ChaosNamespace)
 
 					// triggering the cmd probe and storing the output into the out buffer
-					err = TriggerCmdProbe(probe, execCommandDetails, clients)
+					err = TriggerSourceCmdProbe(probe, execCommandDetails, clients)
 
 					// failing the probe, if the success condition doesn't met after the retry & timeout combinations
 					// it will update the status of all the unrun probes as well
@@ -134,7 +134,7 @@ func PrepareCmdProbe(cmdProbes []v1alpha1.CmdProbeAttributes, clients clients.Cl
 					litmusexec.SetExecCommandAttributes(&execCommandDetails, chaosDetails.ExperimentName+"-probe-"+runID, chaosDetails.ExperimentName+"-probe", chaosDetails.ChaosNamespace)
 
 					// trigger the continuous cmd probe
-					go TriggerContinuousCmdProbe(probe, execCommandDetails, clients, resultDetails)
+					go TriggerSourceContinuousCmdProbe(probe, execCommandDetails, clients, resultDetails)
 				}
 				// verify the continuous mode
 				// marked the result of continuous probe
@@ -190,10 +190,10 @@ func TriggerInlineCmdProbe(probe v1alpha1.CmdProbeAttributes) error {
 	return err
 }
 
-// TriggerCmdProbe trigger the cmd probe inside the external pod
-func TriggerCmdProbe(probe v1alpha1.CmdProbeAttributes, execCommandDetails litmusexec.PodDetails, clients clients.ClientSets) error {
+// TriggerSourceCmdProbe trigger the cmd probe inside the external pod
+func TriggerSourceCmdProbe(probe v1alpha1.CmdProbeAttributes, execCommandDetails litmusexec.PodDetails, clients clients.ClientSets) error {
 
-	// running the cmd probe command and matching the ouput
+	// running the cmd probe command and matching the output
 	// it will retry for some retry count, in each iterations of try it contains following things
 	// it contains a timeout per iteration of retry. if the timeout expires without success then it will go to next try
 	// for a timeout, it will run the command, if it fails wait for the iterval and again execute the command until timeout expires
@@ -307,16 +307,18 @@ func TriggerInlineContinuousCmdProbe(probe v1alpha1.CmdProbeAttributes, chaosres
 			break
 		}
 
+		// waiting for the probe polling interval
+		time.Sleep(time.Duration(probe.RunProperties.ProbePollingInterval) * time.Second)
 	}
 
 }
 
-// TriggerContinuousCmdProbe trigger the continuous cmd probes having need some external source image
-func TriggerContinuousCmdProbe(probe v1alpha1.CmdProbeAttributes, execCommandDetails litmusexec.PodDetails, clients clients.ClientSets, chaosresult *types.ResultDetails) {
+// TriggerSourceContinuousCmdProbe trigger the continuous cmd probes having need some external source image
+func TriggerSourceContinuousCmdProbe(probe v1alpha1.CmdProbeAttributes, execCommandDetails litmusexec.PodDetails, clients clients.ClientSets, chaosresult *types.ResultDetails) {
 	// it trigger the cmd probe for the entire duration of chaos and it fails, if any err encounter
 	// it marked the error for the probes, if any
 	for {
-		err = TriggerCmdProbe(probe, execCommandDetails, clients)
+		err = TriggerSourceCmdProbe(probe, execCommandDetails, clients)
 		// record the error inside the probeDetails, we are maintaining a dedicated variable for the err, inside probeDetails
 		if err != nil {
 			for index := range chaosresult.ProbeDetails {
@@ -329,6 +331,8 @@ func TriggerContinuousCmdProbe(probe v1alpha1.CmdProbeAttributes, execCommandDet
 			break
 		}
 
+		// waiting for the probe polling interval
+		time.Sleep(time.Duration(probe.RunProperties.ProbePollingInterval) * time.Second)
 	}
 
 }

@@ -57,7 +57,6 @@ func CheckPodStatus(appNs string, appLabel string, timeout, delay int, clients c
 			if err != nil || len(podSpec.Items) == 0 {
 				return errors.Errorf("Unable to get the pod, err: %v", err)
 			}
-			err = nil
 			for _, pod := range podSpec.Items {
 				if string(pod.Status.Phase) != "Running" {
 					return errors.Errorf("Pod is not yet in running state")
@@ -84,7 +83,6 @@ func CheckContainerStatus(appNs string, appLabel string, timeout, delay int, cli
 			if err != nil || len(podSpec.Items) == 0 {
 				return errors.Errorf("Unable to get the pod, err: %v", err)
 			}
-			err = nil
 			for _, pod := range podSpec.Items {
 				for _, container := range pod.Status.ContainerStatuses {
 					if container.State.Terminated != nil {
@@ -118,7 +116,6 @@ func WaitForCompletion(appNs string, appLabel string, clients clients.ClientSets
 			if err != nil || len(podSpec.Items) == 0 {
 				return errors.Errorf("Unable to get the pod, err: %v", err)
 			}
-			err = nil
 			// it will check for the status of helper pod, if it is Succeeded and target container is completed then it will marked it as completed and return
 			// if it is still running then it will check for the target container, as we can have multiple container inside helper pod (istio)
 			// if the target container is in completed state(ready flag is false), then we will marked the helper pod as completed

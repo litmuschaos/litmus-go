@@ -112,6 +112,7 @@ func TriggerContinuousK8sProbe(probe v1alpha1.K8sProbeAttributes, cmd v1alpha1.K
 			break
 		}
 
+		// waiting for the probe polling interval
+		time.Sleep(time.Duration(probe.RunProperties.ProbePollingInterval) * time.Second)
 	}
-
 }
