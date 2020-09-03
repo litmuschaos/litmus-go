@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/litmuschaos/litmus-go/chaoslib/litmus/pod_memory_hog"
+	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/pod-memory-hog/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/pod-memory-hog/environment"
@@ -110,7 +110,7 @@ func main() {
 
 	// Including the litmus lib for pod-memory-hog
 	if experimentsDetails.ChaosLib == "litmus" {
-		err = pod_memory_hog.PrepareMemoryStress(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
+		err = litmusLIB.PrepareMemoryStress(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
 		if err != nil {
 			log.Errorf("[Error]: pod memory hog failed due to %v\n", err)
 			failStep := "pod memory hog chaos injection failed"

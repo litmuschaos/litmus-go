@@ -28,9 +28,11 @@ type ResultDetails struct {
 
 // ProbeDetails is for collecting all the probe details
 type ProbeDetails struct {
-	Name   string
-	Type   string
-	Status map[string]string
+	Name                   string
+	Type                   string
+	Status                 map[string]string
+	IsProbeFailedWithError error
+	RunID                  string
 }
 
 // EventDetails is for collecting all the events-related details

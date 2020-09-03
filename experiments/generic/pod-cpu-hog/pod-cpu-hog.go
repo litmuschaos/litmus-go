@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/litmuschaos/litmus-go/chaoslib/litmus/pod_cpu_hog"
+	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/pod-cpu-hog/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/pod-cpu-hog/environment"
@@ -109,7 +109,7 @@ func main() {
 
 	// Including the litmus lib for pod-cpu-hog
 	if experimentsDetails.ChaosLib == "litmus" {
-		err = pod_cpu_hog.PrepareCPUstress(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
+		err = litmusLIB.PrepareCPUstress(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
 		if err != nil {
 			log.Errorf("[Error]: CPU hog failed due to %v\n", err)
 			failStep := "CPU hog Chaos injection failed"

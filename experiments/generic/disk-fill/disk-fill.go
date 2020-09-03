@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/litmuschaos/litmus-go/chaoslib/litmus/disk_fill"
+	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/disk-fill/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/disk-fill/environment"
@@ -119,7 +119,7 @@ func main() {
 
 	// Including the litmus lib for disk-fill
 	if experimentsDetails.ChaosLib == "litmus" {
-		err = disk_fill.PrepareDiskFill(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
+		err = litmusLIB.PrepareDiskFill(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
 		if err != nil {
 			log.Errorf("Chaos injection failed due to %v\n", err)
 			failStep := "Including the litmus lib for disk-fill"
