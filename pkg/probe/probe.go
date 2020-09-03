@@ -6,7 +6,9 @@ import (
 	"github.com/kyokomi/emoji"
 	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
 	"github.com/litmuschaos/litmus-go/pkg/clients"
+	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/types"
+	"github.com/sirupsen/logrus"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -54,6 +56,8 @@ func SetProbeVerdict(resultDetails *types.ResultDetails, verdict, probeName, pro
 				resultDetails.ProbeDetails[index].Status["PreChaos"] = verdict + emoji.Sprint(" :thumbsup:")
 			} else if phase == "PostChaos" && (mode == "EOT" || mode == "Edge") {
 				resultDetails.ProbeDetails[index].Status["PostChaos"] = verdict + emoji.Sprint(" :thumbsup:")
+			} else if phase == "PostChaos" && mode == "Continuous" {
+				resultDetails.ProbeDetails[index].Status["Continuous"] = verdict + emoji.Sprint(" :thumbsup:")
 			}
 		}
 	}
@@ -68,7 +72,11 @@ func SetProbeVerdictAfterFailure(resultDetails *types.ResultDetails) {
 		if resultDetails.ProbeDetails[index].Status["PostChaos"] == "Awaited" {
 			resultDetails.ProbeDetails[index].Status["PostChaos"] = "Better Luck Next Time" + emoji.Sprint(" :thumbsdown:")
 		}
+		if resultDetails.ProbeDetails[index].Status["Continuous"] == "Awaited" {
+			resultDetails.ProbeDetails[index].Status["Continuous"] = "Better Luck Next Time" + emoji.Sprint(" :thumbsdown:")
+		}
 	}
+
 }
 
 // GetProbesFromEngine fetch the details of the probes from the chaosengines
@@ -151,9 +159,78 @@ func SetProbeIntialStatus(probeDetails *types.ProbeDetails, mode string) {
 		probeDetails.Status = map[string]string{
 			"PreChaos": "Awaited",
 		}
-	} else {
+	} else if mode == "EOT" {
 		probeDetails.Status = map[string]string{
 			"PostChaos": "Awaited",
 		}
+	} else {
+		probeDetails.Status = map[string]string{
+			"Continuous": "Awaited",
+		}
 	}
+}
+
+//GetRunIDFromProbe return the run_id for the dedicated probe
+// which will used in the continuous cmd probe, run_id is used as suffix in the external pod name
+func GetRunIDFromProbe(resultDetails *types.ResultDetails, probeName, probeType string) string {
+
+	for _, probe := range resultDetails.ProbeDetails {
+		if probe.Name == probeName && probe.Type == probeType {
+			return probe.RunID
+		}
+	}
+	return ""
+}
+
+//SetRunIDForProbe set the run_id for the dedicated probe.
+// which will used in the continuous cmd probe, run_id is used as suffix in the external pod name
+func SetRunIDForProbe(resultDetails *types.ResultDetails, probeName, probeType, runid string) {
+
+	for index, probe := range resultDetails.ProbeDetails {
+		if probe.Name == probeName && probe.Type == probeType {
+			resultDetails.ProbeDetails[index].RunID = runid
+			break
+		}
+	}
+}
+
+// MarkedVerdictInEnd add the probe status in the chaosresult
+func MarkedVerdictInEnd(err error, resultDetails *types.ResultDetails, probeName, mode, probeType, phase string) error {
+	// failing the probe, if the success condition doesn't met after the retry & timeout combinations
+	if err != nil {
+		log.ErrorWithValues("[Probe]: "+probeName+" probe has been Failed "+emoji.Sprint(":cry:"), logrus.Fields{
+			"ProbeName":     probeName,
+			"ProbeType":     probeType,
+			"ProbeInstance": phase,
+			"ProbeStatus":   "Failed",
+		})
+		SetProbeVerdictAfterFailure(resultDetails)
+		return err
+	}
+	// counting the passed probes count to generate the score and mark the verdict as passed
+	// for edge, probe is marked as Passed if passed in both pre/post chaos checks
+	if !((mode == "Edge" || mode == "Continuous") && phase == "PreChaos") {
+		resultDetails.PassedProbeCount++
+	}
+	log.InfoWithValues("[Probe]: "+probeName+" probe has been Passed "+emoji.Sprint(":smile:"), logrus.Fields{
+		"ProbeName":     probeName,
+		"ProbeType":     probeType,
+		"ProbeInstance": phase,
+		"ProbeStatus":   "Passed",
+	})
+	SetProbeVerdict(resultDetails, "Passed", probeName, probeType, mode, phase)
+	return nil
+}
+
+//CheckForErrorInContinuousProbe check for the error in the continuous probes
+func CheckForErrorInContinuousProbe(resultDetails *types.ResultDetails, probeName string) error {
+
+	for index, probe := range resultDetails.ProbeDetails {
+		if probe.Name == probeName {
+			err = resultDetails.ProbeDetails[index].IsProbeFailedWithError
+			return err
+		}
+	}
+
+	return nil
 }
