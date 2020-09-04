@@ -98,3 +98,13 @@ func GetPodAndNodeName(namespace, targetPod, appLabels string, clients clients.C
 
 	return podName, nodeName, nil
 }
+
+// GetChaosPodAnnotation will return the annotation on chaos pod
+func GetChaosPodAnnotation(podName, namespace string, clients clients.ClientSets) (map[string]string, error) {
+
+	pod, err := clients.KubeClient.CoreV1().Pods(namespace).Get(podName, v1.GetOptions{})
+	if err != nil {
+		return nil, errors.Errorf("fail to get the chaos pod annotation, due to %v", err)
+	}
+	return pod.Annotations, nil
+}
