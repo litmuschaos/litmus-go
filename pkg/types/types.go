@@ -68,6 +68,10 @@ func SetResultAttributes(resultDetails *ResultDetails, chaosDetails ChaosDetails
 		resultDetails.Name = chaosDetails.ExperimentName
 	}
 
+	if chaosDetails.InstanceID != "" {
+		resultDetails.Name = resultDetails.Name + "-" + chaosDetails.InstanceID
+	}
+
 }
 
 //SetResultAfterCompletion set all the chaos result ENV in the EOT
