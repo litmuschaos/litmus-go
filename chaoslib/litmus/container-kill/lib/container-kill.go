@@ -59,6 +59,12 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 
+	// Get Chaos Pod Annotation
+	experimentsDetails.Annotations, err = common.GetChaosPodAnnotation(experimentsDetails.ChaosPodName, experimentsDetails.ChaosNamespace, clients)
+	if err != nil {
+		return errors.Errorf("unable to get annotation, due to %v", err)
+	}
+
 	// creating the helper pod to perform container kill chaos
 	err = CreateHelperPod(experimentsDetails, clients, appName, appNodeName)
 	if err != nil {
@@ -143,6 +149,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 				"name":     experimentsDetails.ExperimentName + "-" + experimentsDetails.RunID,
 				"chaosUID": string(experimentsDetails.ChaosUID),
 			},
+			Annotations: experimentsDetails.Annotations,
 		},
 		Spec: apiv1.PodSpec{
 			ServiceAccountName: experimentsDetails.ChaosServiceAccount,
