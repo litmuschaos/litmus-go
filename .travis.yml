@@ -6,7 +6,7 @@ services:
   - docker
 language: go
 go:
-  - 1.13.1
+  - 1.14.2
 
 addons:
   apt:
@@ -14,6 +14,7 @@ addons:
 
 before_script:
   - set -e
+  - sudo apt-get install golint
   # Configure environment so changes are picked up when the Docker daemon is restarted after upgrading
   - echo '{"experimental":true}' | sudo tee /etc/docker/daemon.json
   - export DOCKER_CLI_EXPERIMENTAL=enabled
@@ -31,8 +32,8 @@ before_script:
 script:
   # Installing and configuring dependencies
   - make deps
-  # Building go binaries
-  - make go-build
+  # Includes formatting, linting and check unused packages
+  - make gotasks
   # Build
   - make build
 

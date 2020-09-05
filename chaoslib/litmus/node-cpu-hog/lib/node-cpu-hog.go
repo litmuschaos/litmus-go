@@ -117,7 +117,7 @@ func GetNodeName(experimentsDetails *experimentTypes.ExperimentDetails, clients 
 func SetCPUCapacity(experimentsDetails *experimentTypes.ExperimentDetails, nodeName string, clients clients.ClientSets) error {
 	node, err := clients.KubeClient.CoreV1().Nodes().Get(nodeName, v1.GetOptions{})
 	if err != nil {
-		return errors.Wrapf(err, "Fail to get the application node, due to ", err)
+		return errors.Wrapf(err, "Fail to get the application node, due to %v", err)
 	}
 
 	cpuCapacity, _ := node.Status.Capacity.Cpu().AsInt64()
