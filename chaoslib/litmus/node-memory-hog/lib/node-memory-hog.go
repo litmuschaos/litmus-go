@@ -148,7 +148,7 @@ func CalculateMemoryPercentage(experimentsDetails *experimentTypes.ExperimentDet
 	//Get the percentage of memory under chaos wrt allocatable memory
 	totalMemoryPercentage = int((float64(memoryForChaos) / float64(memoryAllocatable)) * 100)
 
-	log.Infof("[Info]: PercentageOfMemoryCapacityToBeUsed: %d, which is %d of Allocatable Memory", experimentsDetails.MemoryPercentage, totalMemoryPercentage)
+	log.Infof("[Info]: PercentageOfMemoryCapacityToBeUsed: %d, which is %d percent of Allocatable Memory", experimentsDetails.MemoryPercentage, totalMemoryPercentage)
 
 	return totalMemoryPercentage
 }
