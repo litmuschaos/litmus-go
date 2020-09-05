@@ -63,6 +63,12 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 	}
 	log.Infof("restartCount of target container before chaos injection: %v", strconv.Itoa(restartCountBefore))
 
+	// Get Chaos Pod Annotation
+	experimentsDetails.Annotations, err = common.GetChaosPodAnnotation(experimentsDetails.ChaosPodName, experimentsDetails.ChaosNamespace, clients)
+	if err != nil {
+		return errors.Errorf("unable to get annotation, due to %v", err)
+	}
+
 	// Creating the helper pod to perform container-kill chaos
 	err = CreateHelperPod(experimentsDetails, clients, appName, appNodeName)
 	if err != nil {
@@ -172,6 +178,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 				"name":     experimentsDetails.ExperimentName + "-" + experimentsDetails.RunID,
 				"chaosUID": string(experimentsDetails.ChaosUID),
 			},
+			Annotations: experimentsDetails.Annotations,
 		},
 		Spec: apiv1.PodSpec{
 			RestartPolicy: apiv1.RestartPolicyNever,
