@@ -27,4 +27,5 @@ type ExperimentDetails struct {
 	Delay            int
 	LIBImage         string
 	TargetPod        string
+	Annotations      map[string]string
 }

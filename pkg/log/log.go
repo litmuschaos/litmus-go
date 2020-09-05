@@ -43,6 +43,11 @@ func Warn(msg string) {
 	logrus.WithFields(logrus.Fields{}).Warn(msg)
 }
 
+//Warnf log the Non-critical entries that deserve eyes.
+func Warnf(msg string, val ...interface{}) {
+	logrus.WithFields(logrus.Fields{}).Warnf(msg, val...)
+}
+
 //Errorf used for errors that should definitely be noted.
 // Commonly used for hooks to send errors to an error tracking service.
 func Errorf(msg string, err error) {
