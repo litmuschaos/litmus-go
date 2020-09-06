@@ -1,34 +1,34 @@
 # Building go binaries for pod_delete experiment
-go build -o build/_output/pod-delete ./experiments/generic/pod-delete
-# Building go binaries for pod_cpu_hog experiment
-go build -o build/_output/pod-cpu-hog ./experiments/generic/pod-cpu-hog
-# Building go binaries for pod_memory_hog experiment
-go build -o build/_output/pod-memory-hog ./experiments/generic/pod-memory-hog
-# Buiding go binaries for pod_network_duplication experiment
-go build -o build/_output/pod-network-duplication ./experiments/generic/pod-network-duplication
-# Buiding go binaries for pod_network_latency experiment
-go build -o build/_output/pod-network-latency ./experiments/generic/pod-network-latency
-# Buiding go binaries for pod_network_loss experiment
-go build -o build/_output/pod-network-loss ./experiments/generic/pod-network-loss
-# Buiding go binaries for pod_network_corruption experiment
-go build -o build/_output/pod-network-corruption ./experiments/generic/pod-network-corruption
-# Buiding go binaries for node_taint experiment
-go build -o build/_output/node-taint ./experiments/generic/node-taint
-# Buiding go binaries for node_drain experiment
-go build -o build/_output/node-drain ./experiments/generic/node-drain
-# Buiding go binaries for kubelet_service_kill experiment
-go build -o build/_output/kubelet-service-kill ./experiments/generic/kubelet-service-kill
-# Buiding go binaries for node_memory_hog experiment
-go build -o build/_output/node-memory-hog ./experiments/generic/node-memory-hog
-# Buiding go binaries for node_cpu_hog experiment
-go build -o build/_output/node-cpu-hog ./experiments/generic/node-cpu-hog
-# Buiding go binaries for container_kill experiment
-go build -o build/_output/container-kill ./experiments/generic/container-kill
-# Buiding go binaries for disk_fill experiment
-go build -o build/_output/disk-fill ./experiments/generic/disk-fill
-# Buiding go binaries for pod-autoscaler experiment
-go build -o build/_output/pod-autoscaler ./experiments/generic/pod-autoscaler
-# Buiding go binaries for container_kill helper
-go build -o build/_output/container-killer ./chaoslib/litmus/container-kill/helper
-# Buiding go binaries for cassandra-pod-delete
-go build -o build/_output/cassandra-pod-delete ./experiments/cassandra/pod-delete
+env GOOS=linux GOARCH=amd64 go build -o build/_output/pod-delete ./experiments/generic/pod-delete
+# Building env GOOS=linux GOARCH=amd64 go binaries for pod_cpu_hog experiment
+env GOOS=linux GOARCH=amd64 go build -o build/_output/pod-cpu-hog ./experiments/generic/pod-cpu-hog
+# Building env GOOS=linux GOARCH=amd64 go binaries for pod_memory_hog experiment
+env GOOS=linux GOARCH=amd64 go build -o build/_output/pod-memory-hog ./experiments/generic/pod-memory-hog
+# Buiding env GOOS=linux GOARCH=amd64 go binaries for pod_network_duplication experiment
+env GOOS=linux GOARCH=amd64 go build -o build/_output/pod-network-duplication ./experiments/generic/pod-network-duplication
+# Buiding env GOOS=linux GOARCH=amd64 go binaries for pod_network_latency experiment
+env GOOS=linux GOARCH=amd64 go build -o build/_output/pod-network-latency ./experiments/generic/pod-network-latency
+# Buiding env GOOS=linux GOARCH=amd64 go binaries for pod_network_loss experiment
+env GOOS=linux GOARCH=amd64 go build -o build/_output/pod-network-loss ./experiments/generic/pod-network-loss
+# Buiding env GOOS=linux GOARCH=amd64 go binaries for pod_network_corruption experiment
+env GOOS=linux GOARCH=amd64 go build -o build/_output/pod-network-corruption ./experiments/generic/pod-network-corruption
+# Buiding env GOOS=linux GOARCH=amd64 go binaries for node_taint experiment
+env GOOS=linux GOARCH=amd64 go build -o build/_output/node-taint ./experiments/generic/node-taint
+# Buiding env GOOS=linux GOARCH=amd64 go binaries for node_drain experiment
+env GOOS=linux GOARCH=amd64 go build -o build/_output/node-drain ./experiments/generic/node-drain
+# Buiding env GOOS=linux GOARCH=amd64 go binaries for kubelet_service_kill experiment
+env GOOS=linux GOARCH=amd64 go build -o build/_output/kubelet-service-kill ./experiments/generic/kubelet-service-kill
+# Buiding env GOOS=linux GOARCH=amd64 go binaries for node_memory_hog experiment
+env GOOS=linux GOARCH=amd64 go build -o build/_output/node-memory-hog ./experiments/generic/node-memory-hog
+# Buiding env GOOS=linux GOARCH=amd64 go binaries for node_cpu_hog experiment
+env GOOS=linux GOARCH=amd64 go build -o build/_output/node-cpu-hog ./experiments/generic/node-cpu-hog
+# Buiding env GOOS=linux GOARCH=amd64 go binaries for container_kill experiment
+env GOOS=linux GOARCH=amd64 go build -o build/_output/container-kill ./experiments/generic/container-kill
+# Buiding env GOOS=linux GOARCH=amd64 go binaries for disk_fill experiment
+env GOOS=linux GOARCH=amd64 go build -o build/_output/disk-fill ./experiments/generic/disk-fill
+# Buiding env GOOS=linux GOARCH=amd64 go binaries for pod-autoscaler experiment
+env GOOS=linux GOARCH=amd64 go build -o build/_output/pod-autoscaler ./experiments/generic/pod-autoscaler
+# Buiding env GOOS=linux GOARCH=amd64 go binaries for container_kill helper
+env GOOS=linux GOARCH=amd64 go build -o build/_output/container-killer ./chaoslib/litmus/container-kill/helper
+# Buiding env GOOS=linux GOARCH=amd64 go binaries for cassandra-pod-delete
+env GOOS=linux GOARCH=amd64 go build -o build/_output/cassandra-pod-delete ./experiments/cassandra/pod-delete
