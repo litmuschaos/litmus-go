@@ -32,5 +32,5 @@ type ExperimentDetails struct {
 	TargetPod                          string
 	TargetIPs                          string
 	Annotations                        map[string]string
-
+	TargetHosts                        string
 }

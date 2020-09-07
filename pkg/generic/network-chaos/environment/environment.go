@@ -36,7 +36,8 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string
 	experimentDetails.Timeout, _ = strconv.Atoi(Getenv("STATUS_CHECK_TIMEOUT", "180"))
 	experimentDetails.TargetPod = Getenv("TARGET_POD", "")
 	experimentDetails.TargetIPs = Getenv("TARGET_IPs", "")
-	
+	experimentDetails.TargetHosts = Getenv("TARGET_HOSTS", "")
+
 }
 
 // Getenv fetch the env and set the default value, if any
