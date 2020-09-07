@@ -40,7 +40,7 @@ func main() {
 
 	//Fetching all the ENV passed from the runner pod
 	log.Infof("[PreReq]: Getting the ENV for the %v experiment", experimentsDetails.ExperimentName)
-	experimentEnv.GetENV(&experimentsDetails, "pod-network-loss")
+	experimentEnv.GetENV(&experimentsDetails)
 
 	// Intialise events Parameters
 	experimentEnv.InitialiseChaosVariables(&chaosDetails, &experimentsDetails)
