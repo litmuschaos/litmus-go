@@ -55,6 +55,30 @@ func DeletePod(podName, podLabel, namespace string, timeout, delay int, clients 
 	return err
 }
 
+//DeleteAllPod deletes all the pods with matching labels and wait until all the pods got terminated
+func DeleteAllPod(podLabel, namespace string, timeout, delay int, clients clients.ClientSets) error {
+
+	err := clients.KubeClient.CoreV1().Pods(namespace).DeleteCollection(&v1.DeleteOptions{}, v1.ListOptions{LabelSelector: podLabel})
+
+	if err != nil {
+		return err
+	}
+
+	// waiting for the termination of the pod
+	err = retry.
+		Times(uint(timeout / delay)).
+		Wait(time.Duration(delay) * time.Second).
+		Try(func(attempt uint) error {
+			podSpec, err := clients.KubeClient.CoreV1().Pods(namespace).List(v1.ListOptions{LabelSelector: podLabel})
+			if err != nil || len(podSpec.Items) != 0 {
+				return errors.Errorf("Unable to delete the pod, err: %v", err)
+			}
+			return nil
+		})
+
+	return err
+}
+
 // CheckForAvailibiltyOfPod check the availibility of the specified pod
 func CheckForAvailibiltyOfPod(namespace, name string, clients clients.ClientSets) (bool, error) {
 
@@ -103,24 +127,12 @@ func GetPodList(namespace, targetPod, appLabels string, podAffPerc int, clients 
 	return realpods, nil
 }
 
-// DeleteHelperDaemonset deletes the specified daemonset and wait until it got terminated
-func DeleteHelperDaemonset(name, labels, namespace string, timeout, delay int, clients clients.ClientSets) error {
-	if err := clients.KubeClient.AppsV1().DaemonSets(namespace).Delete(name, &v1.DeleteOptions{}); err != nil {
-		return err
+// GetChaosPodAnnotation will return the annotation on chaos pod
+func GetChaosPodAnnotation(podName, namespace string, clients clients.ClientSets) (map[string]string, error) {
+
+	pod, err := clients.KubeClient.CoreV1().Pods(namespace).Get(podName, v1.GetOptions{})
+	if err != nil {
+		return nil, errors.Errorf("fail to get the chaos pod annotation, due to %v", err)
 	}
-
-	// waiting for the termination of the daemonset
-	err := retry.
-		Times(uint(timeout / delay)).
-		Wait(time.Duration(delay) * time.Second).
-		Try(func(attempt uint) error {
-			dsList, err := clients.KubeClient.AppsV1().DaemonSets(namespace).List(v1.ListOptions{LabelSelector: labels})
-			if err != nil || len(dsList.Items) != 0 {
-				return errors.Errorf("Unable to delete the daemonset, err: %v", err)
-			}
-			return nil
-		})
-
-	return err
-
+	return pod.Annotations, nil
 }

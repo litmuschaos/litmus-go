@@ -21,6 +21,7 @@ import (
 // PrepareKubeletKill contains prepration steps before chaos injection
 func PrepareKubeletKill(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
+	var err error
 	if experimentsDetails.AppNode == "" {
 		//Select node for kubelet-service-kill
 		_, appNodeName, err := GetApplicationPod(experimentsDetails, clients)
@@ -49,8 +50,14 @@ func PrepareKubeletKill(experimentsDetails *experimentTypes.ExperimentDetails, c
 		events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 	}
 
+	// Get Chaos Pod Annotation
+	experimentsDetails.Annotations, err = common.GetChaosPodAnnotation(experimentsDetails.ChaosPodName, experimentsDetails.ChaosNamespace, clients)
+	if err != nil {
+		return errors.Errorf("unable to get annotation, due to %v", err)
+	}
+
 	// Creating the helper pod to perform node memory hog
-	err := CreateHelperPod(experimentsDetails, clients, experimentsDetails.AppNode)
+	err = CreateHelperPod(experimentsDetails, clients, experimentsDetails.AppNode)
 	if err != nil {
 		return errors.Errorf("Unable to create the helper pod, err: %v", err)
 	}
@@ -128,6 +135,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 				"name":     experimentsDetails.ExperimentName + "-" + experimentsDetails.RunID,
 				"chaosUID": string(experimentsDetails.ChaosUID),
 			},
+			Annotations: experimentsDetails.Annotations,
 		},
 		Spec: apiv1.PodSpec{
 			RestartPolicy: apiv1.RestartPolicyNever,

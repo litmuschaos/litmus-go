@@ -2,6 +2,7 @@ package main
 
 import (
 	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/pod-delete/lib"
+	powerfulseal "github.com/litmuschaos/litmus-go/chaoslib/powerfulseal/pod-delete/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/pod-delete/environment"
@@ -111,6 +112,16 @@ func main() {
 		if err != nil {
 			log.Errorf("Chaos injection failed due to %v\n", err)
 			failStep := "Including the litmus lib for pod-delete"
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+			return
+		}
+		log.Info("[Confirmation]: The application pod has been deleted successfully")
+		resultDetails.Verdict = "Pass"
+	} else if experimentsDetails.ChaosLib == "powerfulseal" {
+		err = powerfulseal.PreparePodDelete(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
+		if err != nil {
+			log.Errorf("Chaos injection failed due to %v\n", err)
+			failStep := "Including the powerfulseal lib for pod-delete"
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}

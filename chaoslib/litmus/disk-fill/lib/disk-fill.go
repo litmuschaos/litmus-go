@@ -15,7 +15,6 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/utils/exec"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	appsv1 "k8s.io/api/apps/v1"
 	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,19 +39,33 @@ func PrepareDiskFill(experimentsDetails *experimentTypes.ExperimentDetails, clie
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 
-	// generating a unique string which can be appended with the helper pod name & labels for the uniquely identification
-	experimentsDetails.RunID = common.GetRunID()
-
-	// creating the helper daemonset to perform disk-fill chaos
-	if err = CreateHelperDaemonset(experimentsDetails, clients); err != nil {
-		return errors.Errorf("Unable to create the helper daemonset, err: %v", err)
+	// Get Chaos Pod Annotation
+	experimentsDetails.Annotations, err = common.GetChaosPodAnnotation(experimentsDetails.ChaosPodName, experimentsDetails.ChaosNamespace, clients)
+	if err != nil {
+		return errors.Errorf("unable to get annotation, due to %v", err)
 	}
 
-	//checking the status of the helper daemonset, wait till the pod comes to running state else fail the experiment
-	log.Info("[Status]: Checking the status of the helper daemonset pods")
-	err = status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, "name="+experimentsDetails.ExperimentName+"-"+experimentsDetails.RunID, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
+	// generating the chaos inject event in the chaosengine
+	if experimentsDetails.EngineName != "" {
+		msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on application pod"
+		types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
+		events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
+	}
+
+	// creating the helper pod to perform disk-fill chaos
+	for _, pod := range targetPodList.Items {
+		runID := common.GetRunID()
+		err = CreateHelperPod(experimentsDetails, clients, pod.Name, pod.Spec.NodeName, runID)
+		if err != nil {
+			return errors.Errorf("Unable to create the helper pod, err: %v", err)
+		}
+	}
+
+	//checking the status of the helper pods, wait till the pod comes to running state else fail the experiment
+	log.Info("[Status]: Checking the status of the helper pods")
+	err = status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, "app="+experimentsDetails.ExperimentName+"-helper", experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 	if err != nil {
-		return errors.Errorf("helper daemonset pods is not in running state, err: %v", err)
+		return errors.Errorf("helper pods is not in running state, err: %v", err)
 	}
 
 	for _, pod := range targetPodList.Items {
@@ -86,15 +99,8 @@ func PrepareDiskFill(experimentsDetails *experimentTypes.ExperimentDetails, clie
 			"ContainerID":             containerID,
 		})
 
-		// generating the chaos inject event in the chaosengine
-		if experimentsDetails.EngineName != "" {
-			msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on " + pod.Name + " pod"
-			types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
-			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
-		}
-
 		// getting the helper pod name, scheduled on the target node
-		podName, err := GetHelperPodName(pod, clients, experimentsDetails)
+		podName, err := GetHelperPodName(pod, clients, experimentsDetails.ChaosNamespace, "app="+experimentsDetails.ExperimentName+"-helper")
 		if err != nil {
 			return err
 		}
@@ -144,19 +150,26 @@ func PrepareDiskFill(experimentsDetails *experimentTypes.ExperimentDetails, clie
 			return err
 		}
 
+		// getting the helper pod name, scheduled on the target node
+		podName, err := GetHelperPodName(pod, clients, experimentsDetails.ChaosNamespace, "app="+experimentsDetails.ExperimentName+"-helper")
+		if err != nil {
+			return err
+		}
+
 		// It will delete the target pod if target pod is evicted
 		// if target pod is still running then it will delete all the files, which was created earlier during chaos execution
+		exec.SetExecCommandAttributes(&execCommandDetails, podName, "disk-fill", experimentsDetails.ChaosNamespace)
 		err = Remedy(experimentsDetails, clients, containerID, pod.Name, &execCommandDetails)
 		if err != nil {
 			return errors.Errorf("Unable to perform remedy operation due to err: %v", err)
 		}
 	}
 
-	//Deleting the helper daemonset
-	log.Info("[Cleanup]: Deleting the helper daemonset")
-	err = common.DeleteHelperDaemonset(experimentsDetails.ExperimentName+"-"+experimentsDetails.RunID, "name="+experimentsDetails.ExperimentName+"-"+experimentsDetails.RunID, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients)
+	//Deleting all the helper pod for disk-fill chaos
+	log.Info("[Cleanup]: Deleting all the helper pod")
+	err = common.DeleteAllPod("app="+experimentsDetails.ExperimentName+"-helper", experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients)
 	if err != nil {
-		return errors.Errorf("Unable to delete the helper daemonset, err: %v", err)
+		return errors.Errorf("Unable to delete the helper pod, err: %v", err)
 	}
 
 	//Waiting for the ramp time after chaos injection
@@ -178,61 +191,49 @@ func GetTargetContainer(experimentsDetails *experimentTypes.ExperimentDetails, a
 	return pod.Spec.Containers[0].Name, nil
 }
 
-// CreateHelperDaemonset derive the attributes and create the helper daemonset
-func CreateHelperDaemonset(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) error {
+// CreateHelperPod derive the attributes for helper pod and create the helper pod
+func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, appName, appNodeName, runID string) error {
 
 	mountPropagationMode := apiv1.MountPropagationHostToContainer
 
-	helperDaemonset := &appsv1.DaemonSet{
+	helperPod := &apiv1.Pod{
 		ObjectMeta: v1.ObjectMeta{
-			Name:      experimentsDetails.ExperimentName + "-" + experimentsDetails.RunID,
+			Name:      experimentsDetails.ExperimentName + "-" + runID,
 			Namespace: experimentsDetails.ChaosNamespace,
 			Labels: map[string]string{
-				"name":     experimentsDetails.ExperimentName + "-" + experimentsDetails.RunID,
+				"app":      experimentsDetails.ExperimentName + "-helper",
+				"name":     experimentsDetails.ExperimentName + "-" + runID,
 				"chaosUID": string(experimentsDetails.ChaosUID),
 			},
+			Annotations: experimentsDetails.Annotations,
 		},
-		Spec: appsv1.DaemonSetSpec{
-			Selector: &v1.LabelSelector{
-				MatchLabels: map[string]string{
-					"name":     experimentsDetails.ExperimentName + "-" + experimentsDetails.RunID,
-					"chaosUID": string(experimentsDetails.ChaosUID),
-				},
-			},
-			Template: apiv1.PodTemplateSpec{
-				ObjectMeta: v1.ObjectMeta{
-					Labels: map[string]string{
-						"name":     experimentsDetails.ExperimentName + "-" + experimentsDetails.RunID,
-						"chaosUID": string(experimentsDetails.ChaosUID),
-					},
-				},
-				Spec: apiv1.PodSpec{
-					Volumes: []apiv1.Volume{
-						{
-							Name: "udev",
-							VolumeSource: apiv1.VolumeSource{
-								HostPath: &apiv1.HostPathVolumeSource{
-									Path: experimentsDetails.ContainerPath,
-								},
-							},
+		Spec: apiv1.PodSpec{
+			RestartPolicy: apiv1.RestartPolicyNever,
+			NodeName:      appNodeName,
+			Volumes: []apiv1.Volume{
+				{
+					Name: "udev",
+					VolumeSource: apiv1.VolumeSource{
+						HostPath: &apiv1.HostPathVolumeSource{
+							Path: experimentsDetails.ContainerPath,
 						},
 					},
-					Containers: []apiv1.Container{
+				},
+			},
+			Containers: []apiv1.Container{
+				{
+					Name:            experimentsDetails.ExperimentName,
+					Image:           experimentsDetails.LIBImage,
+					ImagePullPolicy: apiv1.PullAlways,
+					Args: []string{
+						"sleep",
+						"10000",
+					},
+					VolumeMounts: []apiv1.VolumeMount{
 						{
-							Name:            experimentsDetails.ExperimentName,
-							Image:           experimentsDetails.LIBImage,
-							ImagePullPolicy: apiv1.PullAlways,
-							Args: []string{
-								"sleep",
-								"10000",
-							},
-							VolumeMounts: []apiv1.VolumeMount{
-								{
-									Name:             "udev",
-									MountPath:        "/diskfill",
-									MountPropagation: &mountPropagationMode,
-								},
-							},
+							Name:             "udev",
+							MountPath:        "/diskfill",
+							MountPropagation: &mountPropagationMode,
 						},
 					},
 				},
@@ -240,9 +241,8 @@ func CreateHelperDaemonset(experimentsDetails *experimentTypes.ExperimentDetails
 		},
 	}
 
-	_, err := clients.KubeClient.AppsV1().DaemonSets(experimentsDetails.ChaosNamespace).Create(helperDaemonset)
+	_, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Create(helperPod)
 	return err
-
 }
 
 // GetEphemeralStorageAttributes derive the ephemeral storage attributes from the target pod
@@ -347,9 +347,9 @@ func Remedy(experimentsDetails *experimentTypes.ExperimentDetails, clients clien
 }
 
 // GetHelperPodName check for the helper pod, which is scheduled on the target node
-func GetHelperPodName(targetPod apiv1.Pod, clients clients.ClientSets, experimentsDetails *experimentTypes.ExperimentDetails) (string, error) {
+func GetHelperPodName(targetPod apiv1.Pod, clients clients.ClientSets, namespace, labels string) (string, error) {
 
-	podList, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).List(v1.ListOptions{LabelSelector: "name=" + experimentsDetails.ExperimentName + "-" + experimentsDetails.RunID})
+	podList, err := clients.KubeClient.CoreV1().Pods(namespace).List(v1.ListOptions{LabelSelector: labels})
 
 	if err != nil || len(podList.Items) == 0 {
 		return "", errors.Errorf("Unable to list the helper pods due to, err: %v", err)

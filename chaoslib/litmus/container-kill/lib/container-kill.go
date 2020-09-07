@@ -2,10 +2,8 @@ package lib
 
 import (
 	"strconv"
-	"time"
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
-	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/container-kill/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/math"
@@ -13,7 +11,6 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/pkg/errors"
-	appsv1 "k8s.io/api/apps/v1"
 	apiv1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -34,9 +31,6 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 
-	// generating a unique string which can be appended with the helper pod name & labels for the uniquely identification
-	experimentsDetails.RunID = common.GetRunID()
-
 	// Getting the serviceAccountName, need permission inside helper pod to create the events
 	if experimentsDetails.ChaosServiceAccount == "" {
 		err = GetServiceAccount(experimentsDetails, clients)
@@ -45,65 +39,52 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 		}
 	}
 
+	//Get the target container name of the application pod
+	if experimentsDetails.TargetContainer == "" {
+		experimentsDetails.TargetContainer, err = GetTargetContainer(experimentsDetails, targetPodList.Items[0].Name, clients)
+		if err != nil {
+			return errors.Errorf("Unable to get the target container name due to, err: %v", err)
+		}
+	}
+
 	//Getting the iteration count for the container-kill
 	GetIterations(experimentsDetails)
 
-	// creating the helper daemonset to perform container kill chaos
-	if err = CreateHelperDaemonset(experimentsDetails, clients); err != nil {
-		return errors.Errorf("Unable to create the helper daemonset, err: %v", err)
-	}
-
-	//checking the status of the helper daemonset, wait till the pod comes to running state else fail the experiment
-	log.Info("[Status]: Checking the status of the helper daemonset pods")
-	err = status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, "name="+experimentsDetails.ExperimentName+"-"+experimentsDetails.RunID, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
+	// Get Chaos Pod Annotation
+	experimentsDetails.Annotations, err = common.GetChaosPodAnnotation(experimentsDetails.ChaosPodName, experimentsDetails.ChaosNamespace, clients)
 	if err != nil {
-		return errors.Errorf("helper daemonset pods is not in running state, err: %v", err)
+		return errors.Errorf("unable to get annotation, due to %v", err)
 	}
 
-	var endTime <-chan time.Time
-	timeDelay := time.Duration(experimentsDetails.ChaosDuration) * time.Second
-
-loop:
-	for count := 0; count < experimentsDetails.Iterations; count++ {
-		for _, pod := range targetPodList.Items {
-
-			//Get the target container name of the application pod
-			if experimentsDetails.TargetContainer == "" {
-				experimentsDetails.TargetContainer, err = GetTargetContainer(experimentsDetails, pod.Name, clients)
-				if err != nil {
-					return errors.Errorf("Unable to get the target container name due to, err: %v", err)
-				}
-			}
-
-			// kill the container
-			if err = KillContainer(experimentsDetails, clients, chaosDetails, pod); err != nil {
-				return err
-			}
-
-			// create the events for the chaos inject
-			if experimentsDetails.EngineName != "" {
-				msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on " + pod.Name + " pod"
-				types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
-				events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
-			}
+	// creating the helper pod to perform container kill chaos
+	for _, pod := range targetPodList.Items {
+		runID := common.GetRunID()
+		err = CreateHelperPod(experimentsDetails, clients, pod.Name, pod.Spec.NodeName, runID)
+		if err != nil {
+			return errors.Errorf("Unable to create the helper pod, err: %v", err)
 		}
-		log.Infof("[Wait]: Waiting for the chaos interval of %v seconds", experimentsDetails.ChaosInterval)
-		common.WaitForDuration(experimentsDetails.ChaosInterval)
-		// terminating the chaos execution when it exceed chaos duration
-		endTime = time.After(timeDelay)
-		select {
-		case <-endTime:
-			log.Infof("[Chaos]: Time is up for experiment: %v", experimentsDetails.ExperimentName)
-			break loop
-		}
-
 	}
 
-	//Deleting the helper daemonset
-	log.Info("[Cleanup]: Deleting the helper daemonset")
-	err = common.DeleteHelperDaemonset(experimentsDetails.ExperimentName+"-"+experimentsDetails.RunID, "name="+experimentsDetails.ExperimentName+"-"+experimentsDetails.RunID, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients)
+	//checking the status of the helper pods, wait till the pod comes to running state else fail the experiment
+	log.Info("[Status]: Checking the status of the helper pods")
+	err = status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, "app="+experimentsDetails.ExperimentName+"-helper", experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 	if err != nil {
-		return errors.Errorf("Unable to delete the helper daemonset, err: %v", err)
+		return errors.Errorf("helper pods is not in running state, err: %v", err)
+	}
+
+	// Wait till the completion of the helper pod
+	// set an upper limit for the waiting time
+	log.Info("[Wait]: waiting till the completion of the helper pod")
+	podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, "app="+experimentsDetails.ExperimentName+"-helper", clients, experimentsDetails.ChaosDuration+experimentsDetails.ChaosInterval+60, experimentsDetails.ExperimentName)
+	if err != nil || podStatus == "Failed" {
+		return errors.Errorf("helper pod failed due to, err: %v", err)
+	}
+
+	//Deleting all the helper pod for container-kill chaos
+	log.Info("[Cleanup]: Deleting all the helper pod")
+	err = common.DeleteAllPod("app="+experimentsDetails.ExperimentName+"-helper", experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients)
+	if err != nil {
+		return errors.Errorf("Unable to delete the helper pod, err: %v", err)
 	}
 
 	//Waiting for the ramp time after chaos injection
@@ -145,89 +126,121 @@ func GetTargetContainer(experimentsDetails *experimentTypes.ExperimentDetails, a
 	return pod.Spec.Containers[0].Name, nil
 }
 
-// CreateHelperDaemonset derive the attributes and create the helper daemonset
-func CreateHelperDaemonset(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) error {
+// CreateHelperPod derive the attributes for helper pod and create the helper pod
+func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, podName, nodeName, runID string) error {
 
 	privilegedEnable := false
 	if experimentsDetails.ContainerRuntime == "crio" {
 		privilegedEnable = true
 	}
 
-	helperDaemonset := &appsv1.DaemonSet{
+	helperPod := &apiv1.Pod{
 		ObjectMeta: v1.ObjectMeta{
-			Name:      experimentsDetails.ExperimentName + "-" + experimentsDetails.RunID,
+			Name:      experimentsDetails.ExperimentName + "-" + runID,
 			Namespace: experimentsDetails.ChaosNamespace,
 			Labels: map[string]string{
-				"name":     experimentsDetails.ExperimentName + "-" + experimentsDetails.RunID,
+				"app":      experimentsDetails.ExperimentName + "-helper",
+				"name":     experimentsDetails.ExperimentName + "-" + runID,
 				"chaosUID": string(experimentsDetails.ChaosUID),
 			},
+			Annotations: experimentsDetails.Annotations,
 		},
-		Spec: appsv1.DaemonSetSpec{
-			Selector: &v1.LabelSelector{
-				MatchLabels: map[string]string{
-					"name":     experimentsDetails.ExperimentName + "-" + experimentsDetails.RunID,
-					"chaosUID": string(experimentsDetails.ChaosUID),
+		Spec: apiv1.PodSpec{
+			ServiceAccountName: experimentsDetails.ChaosServiceAccount,
+			RestartPolicy:      apiv1.RestartPolicyNever,
+			NodeName:           nodeName,
+			Volumes: []apiv1.Volume{
+				{
+					Name: "cri-socket",
+					VolumeSource: apiv1.VolumeSource{
+						HostPath: &apiv1.HostPathVolumeSource{
+							Path: experimentsDetails.ContainerPath,
+						},
+					},
+				},
+				{
+					Name: "cri-config",
+					VolumeSource: apiv1.VolumeSource{
+						HostPath: &apiv1.HostPathVolumeSource{
+							Path: "/etc/crictl.yaml",
+						},
+					},
 				},
 			},
-			Template: apiv1.PodTemplateSpec{
-				ObjectMeta: v1.ObjectMeta{
-					Labels: map[string]string{
-						"name":     experimentsDetails.ExperimentName + "-" + experimentsDetails.RunID,
-						"chaosUID": string(experimentsDetails.ChaosUID),
+			Containers: []apiv1.Container{
+				{
+					Name:            experimentsDetails.ExperimentName,
+					Image:           experimentsDetails.LIBImage,
+					ImagePullPolicy: apiv1.PullAlways,
+					Command: []string{
+						"bin/bash",
 					},
-				},
-				Spec: apiv1.PodSpec{
-					Volumes: []apiv1.Volume{
+					Args: []string{
+						"-c",
+						"./experiments/container-killer",
+					},
+					Env: GetPodEnv(experimentsDetails, podName),
+					VolumeMounts: []apiv1.VolumeMount{
 						{
-							Name: "cri-socket",
-							VolumeSource: apiv1.VolumeSource{
-								HostPath: &apiv1.HostPathVolumeSource{
-									Path: experimentsDetails.ContainerPath,
-								},
-							},
+							Name:      "cri-socket",
+							MountPath: experimentsDetails.ContainerPath,
 						},
 						{
-							Name: "cri-config",
-							VolumeSource: apiv1.VolumeSource{
-								HostPath: &apiv1.HostPathVolumeSource{
-									Path: "/etc/crictl.yaml",
-								},
-							},
+							Name:      "cri-config",
+							MountPath: "/etc/crictl.yaml",
 						},
 					},
-					Containers: []apiv1.Container{
-						{
-							Name:            experimentsDetails.ExperimentName,
-							Image:           experimentsDetails.LIBImage,
-							ImagePullPolicy: apiv1.PullAlways,
-							Command: []string{
-								"/bin/sh",
-							},
-							Args: []string{
-								"-c",
-								"sleep 10000",
-							},
-							VolumeMounts: []apiv1.VolumeMount{
-								{
-									Name:      "cri-socket",
-									MountPath: experimentsDetails.ContainerPath,
-								},
-								{
-									Name:      "cri-config",
-									MountPath: "/etc/crictl.yaml",
-								},
-							},
-							SecurityContext: &apiv1.SecurityContext{
-								Privileged: &privilegedEnable,
-							},
-						},
+					SecurityContext: &apiv1.SecurityContext{
+						Privileged: &privilegedEnable,
 					},
 				},
 			},
 		},
 	}
 
-	_, err := clients.KubeClient.AppsV1().DaemonSets(experimentsDetails.ChaosNamespace).Create(helperDaemonset)
+	_, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Create(helperPod)
 	return err
 
+}
+
+// GetPodEnv derive all the env required for the helper pod
+func GetPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, podName string) []apiv1.EnvVar {
+
+	var envVar []apiv1.EnvVar
+	ENVList := map[string]string{
+		"APP_NS":               experimentsDetails.AppNS,
+		"APP_POD":              podName,
+		"APP_CONTAINER":        experimentsDetails.TargetContainer,
+		"TOTAL_CHAOS_DURATION": strconv.Itoa(experimentsDetails.ChaosDuration),
+		"CHAOS_NAMESPACE":      experimentsDetails.ChaosNamespace,
+		"CHAOS_ENGINE":         experimentsDetails.EngineName,
+		"CHAOS_UID":            string(experimentsDetails.ChaosUID),
+		"CHAOS_INTERVAL":       strconv.Itoa(experimentsDetails.ChaosInterval),
+		"ITERATIONS":           strconv.Itoa(experimentsDetails.Iterations),
+	}
+	for key, value := range ENVList {
+		var perEnv apiv1.EnvVar
+		perEnv.Name = key
+		perEnv.Value = value
+		envVar = append(envVar, perEnv)
+	}
+	// Getting experiment pod name from downward API
+	experimentPodName := GetValueFromDownwardAPI("v1", "metadata.name")
+	var downwardEnv apiv1.EnvVar
+	downwardEnv.Name = "POD_NAME"
+	downwardEnv.ValueFrom = &experimentPodName
+	envVar = append(envVar, downwardEnv)
+
+	return envVar
+}
+
+// GetValueFromDownwardAPI returns the value from downwardApi
+func GetValueFromDownwardAPI(apiVersion string, fieldPath string) apiv1.EnvVarSource {
+	downwardENV := apiv1.EnvVarSource{
+		FieldRef: &apiv1.ObjectFieldSelector{
+			APIVersion: apiVersion,
+			FieldPath:  fieldPath,
+		},
+	}
+	return downwardENV
 }

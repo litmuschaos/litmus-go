@@ -60,10 +60,9 @@ func GetIterations(experimentsDetails *experimentTypes.ExperimentDetails) {
 func PodDeleteChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails) error {
 
 	GracePeriod := int64(0)
-	var endTime <-chan time.Time
-	timeDelay := time.Duration(experimentsDetails.ChaosDuration) * time.Second
+	//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
+	ChaosStartTimeStamp := time.Now().Unix()
 
-loop:
 	for count := 0; count < experimentsDetails.Iterations; count++ {
 
 		// Get the target pod details for the chaos execution
@@ -107,11 +106,16 @@ loop:
 			return err
 		}
 
-		endTime = time.After(timeDelay)
-		select {
-		case <-endTime:
+		//ChaosCurrentTimeStamp contains the current timestamp
+		ChaosCurrentTimeStamp := time.Now().Unix()
+
+		//ChaosDiffTimeStamp contains the difference of current timestamp and start timestamp
+		//It will helpful to track the total chaos duration
+		chaosDiffTimeStamp := ChaosCurrentTimeStamp - ChaosStartTimeStamp
+
+		if int(chaosDiffTimeStamp) >= experimentsDetails.ChaosDuration {
 			log.Infof("[Chaos]: Time is up for experiment: %v", experimentsDetails.ExperimentName)
-			break loop
+			break
 		}
 
 	}

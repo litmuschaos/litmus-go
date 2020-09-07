@@ -8,7 +8,6 @@ import (
 
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/container-kill/types"
 	"github.com/litmuschaos/litmus-go/pkg/types"
-	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 )
 
 //GetENV fetches all the env variables from the runner pod

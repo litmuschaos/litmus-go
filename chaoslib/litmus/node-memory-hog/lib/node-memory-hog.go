@@ -46,6 +46,21 @@ func PrepareNodeMemoryHog(experimentsDetails *experimentTypes.ExperimentDetails,
 		events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 	}
 
+	//Getting node memory details
+	memoryCapacity, memoryAllocatable, err := GetNodeMemoryDetails(appNodeName, clients)
+	if err != nil {
+		return errors.Errorf("Unable to get the node memory details, err: %v", err)
+	}
+
+	// Get the total memory percentage wrt allocatable memory
+	experimentsDetails.MemoryPercentage = CalculateMemoryPercentage(experimentsDetails, clients, memoryCapacity, memoryAllocatable)
+
+	// Get Chaos Pod Annotation
+	experimentsDetails.Annotations, err = common.GetChaosPodAnnotation(experimentsDetails.ChaosPodName, experimentsDetails.ChaosNamespace, clients)
+	if err != nil {
+		return errors.Errorf("unable to get annotation, due to %v", err)
+	}
+
 	// Creating the helper pod to perform node memory hog
 	err = CreateHelperPod(experimentsDetails, clients, appNodeName)
 	if err != nil {
@@ -103,6 +118,41 @@ func GetNodeName(experimentsDetails *experimentTypes.ExperimentDetails, clients 
 	return nodeName, nil
 }
 
+// GetNodeMemoryDetails will return the total memory capacity and memory allocatable of an application node
+func GetNodeMemoryDetails(appNodeName string, clients clients.ClientSets) (int, int, error) {
+
+	nodeDetails, err := clients.KubeClient.CoreV1().Nodes().Get(appNodeName, v1.GetOptions{})
+	if err != nil {
+		return 0, 0, errors.Errorf("Fail to get nodesDetails, due to %v", err)
+	}
+
+	memoryCapacity := int(nodeDetails.Status.Capacity.Memory().Value())
+	memoryAllocatable := int(nodeDetails.Status.Allocatable.Memory().Value())
+
+	if memoryCapacity == 0 || memoryAllocatable == 0 {
+		return memoryCapacity, memoryAllocatable, errors.Errorf("Fail to get memory details of the application node")
+	}
+
+	return memoryCapacity, memoryAllocatable, nil
+
+}
+
+// CalculateMemoryPercentage will calculate the memory percentage under chaos wrt allocatable memory
+func CalculateMemoryPercentage(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, memoryCapacity, memoryAllocatable int) int {
+
+	var totalMemoryPercentage int
+
+	//Getting the total memory under chaos
+	memoryForChaos := ((float64(experimentsDetails.MemoryPercentage) / 100) * float64(memoryCapacity))
+
+	//Get the percentage of memory under chaos wrt allocatable memory
+	totalMemoryPercentage = int((float64(memoryForChaos) / float64(memoryAllocatable)) * 100)
+
+	log.Infof("[Info]: PercentageOfMemoryCapacityToBeUsed: %d, which is %d percent of Allocatable Memory", experimentsDetails.MemoryPercentage, totalMemoryPercentage)
+
+	return totalMemoryPercentage
+}
+
 // CreateHelperPod derive the attributes for helper pod and create the helper pod
 func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, appNodeName string) error {
 
@@ -115,6 +165,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 				"name":     experimentsDetails.ExperimentName + "-" + experimentsDetails.RunID,
 				"chaosUID": string(experimentsDetails.ChaosUID),
 			},
+			Annotations: experimentsDetails.Annotations,
 		},
 		Spec: apiv1.PodSpec{
 			RestartPolicy: apiv1.RestartPolicyNever,
