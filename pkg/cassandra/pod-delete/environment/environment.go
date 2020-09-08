@@ -11,11 +11,11 @@ import (
 )
 
 //GetENV fetches all the env variables from the runner pod
-func GetENV(cassandraDetails *cassandraTypes.ExperimentDetails, expName string) {
+func GetENV(cassandraDetails *cassandraTypes.ExperimentDetails) {
 
 	var ChaoslibDetail exp.ExperimentDetails
 
-	ChaoslibDetail.ExperimentName = expName
+	ChaoslibDetail.ExperimentName = Getenv("EXPERIMENT_NAME", "cassandra-pod-delete")
 	ChaoslibDetail.ChaosNamespace = Getenv("CHAOS_NAMESPACE", "litmus")
 	ChaoslibDetail.EngineName = Getenv("CHAOSENGINE", "")
 	ChaoslibDetail.ChaosDuration, _ = strconv.Atoi(Getenv("TOTAL_CHAOS_DURATION", "30"))
