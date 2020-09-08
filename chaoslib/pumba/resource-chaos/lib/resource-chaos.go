@@ -1,17 +1,17 @@
 package lib
 
 import (
-	"math/rand"
 	"strconv"
 	"time"
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/node-cpu-hog/types"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-cpu-hog/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
+	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	apiv1 "k8s.io/api/core/v1"
@@ -20,26 +20,19 @@ import (
 
 var err error
 
-// PrepareNodeCPUHog contains prepration steps before chaos injection
-func PrepareNodeCPUHog(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+// PreparePodCPUHog contains prepration steps before chaos injection
+func PreparePodCPUHog(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
-	//Select the node name
-	appNodeName, err := GetNodeName(experimentsDetails, clients)
-	if err != nil {
-		return errors.Errorf("Unable to get the node name due to, err: %v", err)
-	}
-
-	// When number of cpu cores for hogging is not defined , it will take it from node capacity
-	if experimentsDetails.NodeCPUcores == 0 {
-		err = SetCPUCapacity(experimentsDetails, appNodeName, clients)
-		if err != nil {
-			return err
-		}
+	var appNodeName string
+	if experimentsDetails.TargetPod == "" {
+		experimentsDetails.TargetPod, appNodeName, err = common.GetPodAndNodeName(experimentsDetails.AppNS, experimentsDetails.TargetPod, experimentsDetails.AppLabel, clients)
+	} else {
+		_, appNodeName, err = common.GetPodAndNodeName(experimentsDetails.AppNS, experimentsDetails.TargetPod, experimentsDetails.AppLabel, clients)
 	}
 
 	log.InfoWithValues("[Info]: Details of application under chaos injection", logrus.Fields{
-		"NodeName":     appNodeName,
-		"NodeCPUcores": experimentsDetails.NodeCPUcores,
+		"NodeName": appNodeName,
+		"AppName":  experimentsDetails.TargetPod,
 	})
 
 	experimentsDetails.RunID = common.GetRunID()
@@ -78,16 +71,9 @@ func PrepareNodeCPUHog(experimentsDetails *experimentTypes.ExperimentDetails, cl
 	// Wait till the completion of helper pod
 	log.Infof("[Wait]: Waiting for %vs till the completion of the helper pod", strconv.Itoa(experimentsDetails.ChaosDuration+30))
 
-	podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, "name="+experimentsDetails.ExperimentName+"-"+experimentsDetails.RunID, clients, experimentsDetails.ChaosDuration+30, experimentsDetails.ExperimentName)
+	podStatus, err := WaitForChaosComplition(experimentsDetails.ChaosNamespace, "name="+experimentsDetails.ExperimentName+"-"+experimentsDetails.RunID, clients, experimentsDetails.ChaosDuration, "pumba-stress")
 	if err != nil || podStatus == "Failed" {
 		return errors.Errorf("helper pod failed due to, err: %v", err)
-	}
-
-	// Checking the status of application node
-	log.Info("[Status]: Getting the status of application node")
-	err = status.CheckNodeStatus(appNodeName, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
-	if err != nil {
-		log.Warn("Application node is not in the ready state, you may need to manually recover the node")
 	}
 
 	//Deleting the helper pod
@@ -105,38 +91,54 @@ func PrepareNodeCPUHog(experimentsDetails *experimentTypes.ExperimentDetails, cl
 	return nil
 }
 
-//GetNodeName will select a random replica of application pod and return the node name of that application pod
-func GetNodeName(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) (string, error) {
-	podList, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).List(v1.ListOptions{LabelSelector: experimentsDetails.AppLabel})
-	if err != nil || len(podList.Items) == 0 {
-		return "", errors.Wrapf(err, "Fail to get the application pod in %v namespace, due to err: %v", experimentsDetails.AppNS, err)
-	}
+// WaitForChaosComplition will check the pods status to be completed for chaos duration
+// if the application pod or container is not completed still it will not throw error
+func WaitForChaosComplition(appNs string, appLabel string, clients clients.ClientSets, duration int, containerName string) (string, error) {
 
-	rand.Seed(time.Now().Unix())
-	randomIndex := rand.Intn(len(podList.Items))
-	nodeName := podList.Items[randomIndex].Spec.NodeName
+	var podStatus string
 
-	return nodeName, nil
-}
+	ChaosStartTimeStamp := time.Now().Unix()
+	err := retry.
+		Times(uint(duration)).
+		Wait(1 * time.Second).
+		Try(func(attempt uint) error {
+			podSpec, err := clients.KubeClient.CoreV1().Pods(appNs).List(v1.ListOptions{LabelSelector: appLabel})
+			if err != nil || len(podSpec.Items) == 0 {
+				return errors.Errorf("Unable to get the pod, err: %v", err)
+			}
 
-//SetCPUCapacity will fetch the node cpu capacity
-func SetCPUCapacity(experimentsDetails *experimentTypes.ExperimentDetails, nodeName string, clients clients.ClientSets) error {
-	node, err := clients.KubeClient.CoreV1().Nodes().Get(nodeName, v1.GetOptions{})
+			for _, pod := range podSpec.Items {
+				podStatus = string(pod.Status.Phase)
+				log.Infof("helper pod status: %v", podStatus)
+				ChaosCurrentTimeStamp := time.Now().Unix()
+				chaosDiffTimeStamp := ChaosCurrentTimeStamp - ChaosStartTimeStamp
+
+				if podStatus != "Succeeded" && podStatus != "Failed" {
+					if chaosDiffTimeStamp < int64(duration) {
+						return errors.Errorf("Chaos Duration is not completed")
+					}
+				}
+
+				log.InfoWithValues("The running status of Pods are as follows", logrus.Fields{
+					"Pod": pod.Name, "Status": podStatus})
+			}
+			return nil
+		})
 	if err != nil {
-		return errors.Wrapf(err, "Fail to get the application node, due to %v", err)
+		return "", err
 	}
+	return podStatus, nil
 
-	cpuCapacity, _ := node.Status.Capacity.Cpu().AsInt64()
-
-	experimentsDetails.NodeCPUcores = int(cpuCapacity)
-
-	return nil
 }
 
 // CreateHelperPod derive the attributes for helper pod and create the helper pod
 func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, appNodeName string) error {
 
 	helperPod := &apiv1.Pod{
+		TypeMeta: v1.TypeMeta{
+			Kind:       "Pod",
+			APIVersion: "v1",
+		},
 		ObjectMeta: v1.ObjectMeta{
 			Name:      experimentsDetails.ExperimentName + "-" + experimentsDetails.RunID,
 			Namespace: experimentsDetails.ChaosNamespace,
@@ -144,25 +146,42 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 				"app":      experimentsDetails.ExperimentName,
 				"name":     experimentsDetails.ExperimentName + "-" + experimentsDetails.RunID,
 				"chaosUID": string(experimentsDetails.ChaosUID),
+				// prevent pumba from killing itself
+				"com.gaiaadm.pumba": "true",
 			},
 			Annotations: experimentsDetails.Annotations,
 		},
 		Spec: apiv1.PodSpec{
 			RestartPolicy: apiv1.RestartPolicyNever,
 			NodeName:      appNodeName,
-			Containers: []apiv1.Container{
-				{
-					Name:            experimentsDetails.ExperimentName,
-					Image:           experimentsDetails.LIBImage,
-					ImagePullPolicy: apiv1.PullAlways,
-					Command: []string{
-						"/stress-ng",
+			Volumes: []apiv1.Volume{
+				apiv1.Volume{
+					Name: "dockersocket",
+					VolumeSource: apiv1.VolumeSource{
+						HostPath: &apiv1.HostPathVolumeSource{
+							Path: "/var/run/docker.sock",
+						},
 					},
-					Args: []string{
-						"--cpu",
-						strconv.Itoa(experimentsDetails.NodeCPUcores),
-						"--timeout",
-						strconv.Itoa(experimentsDetails.ChaosDuration),
+				},
+			},
+			Containers: []apiv1.Container{
+				apiv1.Container{
+					Name:  "pumba-stress",
+					Image: experimentsDetails.LIBImage,
+					Args:  GetContainerArguments(experimentsDetails),
+					VolumeMounts: []apiv1.VolumeMount{
+						apiv1.VolumeMount{
+							Name:      "dockersocket",
+							MountPath: "/var/run/docker.sock",
+						},
+					},
+					ImagePullPolicy: apiv1.PullPolicy("Always"),
+					SecurityContext: &apiv1.SecurityContext{
+						Capabilities: &apiv1.Capabilities{
+							Add: []apiv1.Capability{
+								apiv1.Capability("SYS_ADMIN"),
+							},
+						},
 					},
 				},
 			},
@@ -171,4 +190,21 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 
 	_, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Create(helperPod)
 	return err
+}
+
+// GetContainerArguments derives the args for the pumba stress helper pod
+func GetContainerArguments(experimentsDetails *experimentTypes.ExperimentDetails) []string {
+	stressArgs := []string{
+
+		"--log-level",
+		"debug",
+		"--label",
+		"io.kubernetes.pod.name=" + experimentsDetails.TargetPod + "",
+		"stress",
+		"--duration",
+		strconv.Itoa(experimentsDetails.ChaosDuration) + "s",
+		"--stressors",
+		"--cpu " + strconv.Itoa(experimentsDetails.CPUcores) + " --timeout " + strconv.Itoa(experimentsDetails.ChaosDuration) + "",
+	}
+	return stressArgs
 }
