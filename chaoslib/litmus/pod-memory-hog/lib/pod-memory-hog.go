@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -29,7 +30,7 @@ var err error
 // StressMemory Uses the REST API to exec into the target container of the target pod
 // The function will be constantly increasing the Memory utilisation until it reaches the maximum available or allowed number.
 // Using the TOTAL_CHAOS_DURATION we will need to specify for how long this experiment will last
-func StressMemory(MemoryConsumption, containerName, podName, namespace string, clients clients.ClientSets) error {
+func StressMemory(MemoryConsumption, containerName, podName, namespace string, clients clients.ClientSets, stressErr chan error) {
 
 	log.Infof("The memory consumption is: %v", MemoryConsumption)
 
@@ -41,10 +42,9 @@ func StressMemory(MemoryConsumption, containerName, podName, namespace string, c
 
 	litmusexec.SetExecCommandAttributes(&execCommandDetails, podName, containerName, namespace)
 	_, err := litmusexec.Exec(&execCommandDetails, clients, command)
-	if err != nil {
-		return errors.Errorf("Unable to run stress command inside target container, due to err: %v", err)
-	}
-	return nil
+
+	stressErr <- err
+
 }
 
 //ExperimentMemory function orchestrates the experiment by calling the StressMemory function, of every container, of every pod that is targeted
@@ -91,10 +91,11 @@ func ExperimentMemory(experimentsDetails *experimentTypes.ExperimentDetails, cli
 				types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
 				events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 			}
+			// creating err channel to recieve the error from the go routine
+			stressErr := make(chan error)
+			go StressMemory(strconv.Itoa(experimentsDetails.MemoryConsumption), container.Name, pod.Name, experimentsDetails.AppNS, clients, stressErr)
 
-			go StressMemory(strconv.Itoa(experimentsDetails.MemoryConsumption), container.Name, pod.Name, experimentsDetails.AppNS, clients)
-
-			log.Infof("[Chaos]:Waiting for: %vs", strconv.Itoa(experimentsDetails.ChaosDuration))
+			log.Infof("[Chaos]:Waiting for: %vs", experimentsDetails.ChaosDuration)
 
 			// signChan channel is used to transmit signal notifications.
 			signChan := make(chan os.Signal, 1)
@@ -104,6 +105,16 @@ func ExperimentMemory(experimentsDetails *experimentTypes.ExperimentDetails, cli
 			for {
 				endTime = time.After(timeDelay)
 				select {
+				case err := <-stressErr:
+					// skipping the execution, if recieved any error other than 137, while executing stress command and marked result as fail
+					// it will ignore the error code 137(oom kill), it will skip further execution and marked the result as pass
+					// oom kill is happend if memory to be stressed exceed than the resource limit for the target container
+					if err != nil {
+						if strings.Contains(err.Error(), "137") {
+							return nil
+						}
+						return err
+					}
 				case <-signChan:
 					log.Info("[Chaos]: Killing process started because of terminated signal received")
 					err = KillStressMemory(container.Name, pod.Name, experimentsDetails.AppNS, experimentsDetails.ChaosKillCmd, clients)
