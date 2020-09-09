@@ -119,7 +119,15 @@ func GetPodList(namespace, targetPod, appLabels string, podAffPerc int, clients 
 		realpods.Items = append(realpods.Items, *pod)
 	} else {
 		newPodListLength := math.Maximum(1, math.Adjustment(podAffPerc, len(podList.Items)))
-		realpods.Items = podList.Items[:newPodListLength]
+		rand.Seed(time.Now().UnixNano())
+
+		// it will generate the random podlist
+		// it starts from the random index and choose requirement no of pods next to that index in a circular way.
+		index := rand.Intn(len(podList.Items))
+		for i := 0; i < newPodListLength; i++ {
+			realpods.Items = append(realpods.Items, podList.Items[index])
+			index = (index + 1) % len(podList.Items)
+		}
 
 		log.Infof("[Chaos]:Number of pods targeted: %v", strconv.Itoa(newPodListLength))
 	}
