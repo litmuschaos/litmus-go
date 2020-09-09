@@ -2,7 +2,7 @@ package main
 
 import (
 	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/pod-cpu-hog/lib"
-	pumbaLIB "github.com/litmuschaos/litmus-go/chaoslib/pumba/resource-chaos/lib"
+	pumbaLIB "github.com/litmuschaos/litmus-go/chaoslib/pumba/cpu-chaos/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/pod-cpu-hog/environment"

@@ -24,15 +24,17 @@ var err error
 func PreparePodCPUHog(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	var appNodeName string
-	if experimentsDetails.TargetPod == "" {
-		experimentsDetails.TargetPod, appNodeName, err = common.GetPodAndNodeName(experimentsDetails.AppNS, experimentsDetails.TargetPod, experimentsDetails.AppLabel, clients)
-	} else {
-		_, appNodeName, err = common.GetPodAndNodeName(experimentsDetails.AppNS, experimentsDetails.TargetPod, experimentsDetails.AppLabel, clients)
+	targetPodList, err := common.GetPodList(experimentsDetails.AppNS, experimentsDetails.TargetPod, experimentsDetails.AppLabel, experimentsDetails.PodsAffectedPerc, clients)
+	if err != nil {
+		return errors.Errorf("Unable to get the target pod list due to, err: %v", err)
 	}
+	experimentsDetails.TargetPod = targetPodList.Items[0].Name
+	appNodeName = targetPodList.Items[0].Spec.NodeName
 
 	log.InfoWithValues("[Info]: Details of application under chaos injection", logrus.Fields{
 		"NodeName": appNodeName,
 		"AppName":  experimentsDetails.TargetPod,
+		"CPUcores": experimentsDetails.CPUcores,
 	})
 
 	experimentsDetails.RunID = common.GetRunID()
@@ -44,7 +46,7 @@ func PreparePodCPUHog(experimentsDetails *experimentTypes.ExperimentDetails, cli
 	}
 
 	if experimentsDetails.EngineName != "" {
-		msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on " + appNodeName + " node"
+		msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on " + appNodeName + " pod"
 		types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
 		events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 	}
@@ -55,7 +57,7 @@ func PreparePodCPUHog(experimentsDetails *experimentTypes.ExperimentDetails, cli
 		return errors.Errorf("unable to get annotation, due to %v", err)
 	}
 
-	// Creating the helper pod to perform node cpu hog
+	// Creating the helper pod to perform cpu hog chaos
 	err = CreateHelperPod(experimentsDetails, clients, appNodeName)
 	if err != nil {
 		return errors.Errorf("Unable to create the helper pod, err: %v", err)
@@ -204,7 +206,7 @@ func GetContainerArguments(experimentsDetails *experimentTypes.ExperimentDetails
 		"--duration",
 		strconv.Itoa(experimentsDetails.ChaosDuration) + "s",
 		"--stressors",
-		"--cpu " + strconv.Itoa(experimentsDetails.CPUcores) + " --timeout " + strconv.Itoa(experimentsDetails.ChaosDuration) + "",
+		"--cpu " + strconv.Itoa(experimentsDetails.CPUcores) + " --timeout " + strconv.Itoa(experimentsDetails.ChaosDuration) + "s",
 	}
 	return stressArgs
 }
