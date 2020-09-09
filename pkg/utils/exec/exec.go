@@ -69,7 +69,7 @@ func Exec(commandDetails *PodDetails, clients clients.ClientSets, command []stri
 		errorCode := strings.Contains(err.Error(), "143")
 		if errorCode != true {
 			if strings.Contains(err.Error(), "137") {
-				log.Warn("[Skip]: Skipping chaos execution as stressed value exceed resource limit value")
+				log.Warn("Chaos process OOM killed as the provided value exceeds resource limits")
 			} else {
 				log.Infof("[Prepare]: Unable to run command inside container due to, err : %v", err.Error())
 			}
