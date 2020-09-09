@@ -108,7 +108,7 @@ func ExperimentMemory(experimentsDetails *experimentTypes.ExperimentDetails, cli
 				case err := <-stressErr:
 					// skipping the execution, if recieved any error other than 137, while executing stress command and marked result as fail
 					// it will ignore the error code 137(oom kill), it will skip further execution and marked the result as pass
-					// oom kill is happend if memory to be stressed exceed than the resource limit for the target container
+					// oom kill occurs if memory to be stressed exceed than the resource limit for the target container
 					if err != nil {
 						if strings.Contains(err.Error(), "137") {
 							return nil
