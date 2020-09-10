@@ -29,9 +29,11 @@ type ResultDetails struct {
 
 // ProbeDetails is for collecting all the probe details
 type ProbeDetails struct {
-	Name   string
-	Type   string
-	Status map[string]string
+	Name                   string
+	Type                   string
+	Status                 map[string]string
+	IsProbeFailedWithError error
+	RunID                  string
 }
 
 // EventDetails is for collecting all the events-related details
@@ -65,6 +67,10 @@ func SetResultAttributes(resultDetails *ResultDetails, chaosDetails ChaosDetails
 		resultDetails.Name = chaosDetails.EngineName + "-" + chaosDetails.ExperimentName
 	} else {
 		resultDetails.Name = chaosDetails.ExperimentName
+	}
+
+	if chaosDetails.InstanceID != "" {
+		resultDetails.Name = resultDetails.Name + "-" + chaosDetails.InstanceID
 	}
 
 }

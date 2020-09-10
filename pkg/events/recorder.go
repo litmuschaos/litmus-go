@@ -35,7 +35,7 @@ func generateEventRecorder(kubeClient *kubernetes.Clientset, componentName strin
 	return recorder, nil
 }
 
-// NewEventRecorder initalizes EventRecorder with Resource as ChaosEngine
+// NewEventRecorder initializes EventRecorder with Resource as ChaosEngine
 func NewEventRecorder(clients clients.ClientSets, chaosDetails types.ChaosDetails) (*Recorder, error) {
 	engineForEvent, err := GetChaosEngine(clients, chaosDetails.ChaosNamespace, chaosDetails.EngineName)
 	if err != nil {

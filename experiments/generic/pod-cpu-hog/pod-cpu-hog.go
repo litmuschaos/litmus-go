@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/litmuschaos/litmus-go/chaoslib/litmus/pod_cpu_hog"
+	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/pod-cpu-hog/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/pod-cpu-hog/environment"
@@ -40,7 +40,7 @@ func main() {
 
 	//Fetching all the ENV passed from the runner pod
 	log.Infof("[PreReq]: Getting the ENV for the %v experiment", experimentsDetails.ExperimentName)
-	experimentEnv.GetENV(&experimentsDetails, "pod-cpu-hog")
+	experimentEnv.GetENV(&experimentsDetails)
 
 	// Intialise the chaos attributes
 	experimentEnv.InitialiseChaosVariables(&chaosDetails, &experimentsDetails)
@@ -83,29 +83,33 @@ func main() {
 	}
 
 	if experimentsDetails.EngineName != "" {
+		// marking AUT as running, as we already checked the status of application under test
+		msg := "AUT: Running"
 
 		// run the probes in the pre-chaos check
-		err = probe.RunProbes(&chaosDetails, clients, &resultDetails, "PreChaos", &eventsDetails)
-		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
-		if err != nil {
-			log.Errorf("Probe failed, due to err: %v", err)
-			failStep := "Failed while adding probe"
-			msg := "AUT: Running, Probes: Unsuccessful"
-			types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, msg, "Warning", &chaosDetails)
-			events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
-			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-			return
-		}
+		if len(resultDetails.ProbeDetails) != 0 {
 
-		// generating pre chaos event
-		msg := "AUT: Running, Probes: Successful"
+			err = probe.RunProbes(&chaosDetails, clients, &resultDetails, "PreChaos", &eventsDetails)
+			events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
+			if err != nil {
+				log.Errorf("Probe failed, due to err: %v", err)
+				failStep := "Failed while adding probe"
+				msg := "AUT: Running, Probes: Unsuccessful"
+				types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, msg, "Warning", &chaosDetails)
+				events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
+				result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+				return
+			}
+			msg = "AUT: Running, Probes: Successful"
+		}
+		// generating the events for the pre-chaos check
 		types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, msg, "Normal", &chaosDetails)
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
 	// Including the litmus lib for pod-cpu-hog
 	if experimentsDetails.ChaosLib == "litmus" {
-		err = pod_cpu_hog.PrepareCPUstress(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
+		err = litmusLIB.PrepareCPUstress(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
 		if err != nil {
 			log.Errorf("[Error]: CPU hog failed due to %v\n", err)
 			failStep := "CPU hog Chaos injection failed"
@@ -132,21 +136,25 @@ func main() {
 	}
 
 	if experimentsDetails.EngineName != "" {
+		// marking AUT as running, as we already checked the status of application under test
+		msg := "AUT: Running"
 
 		// run the probes in the post-chaos check
-		err = probe.RunProbes(&chaosDetails, clients, &resultDetails, "PostChaos", &eventsDetails)
-		if err != nil {
-			log.Errorf("Unable to Add the probes, due to err: %v", err)
-			failStep := "Failed while adding probe"
-			msg := "AUT: Running, Probes: Unsuccessful"
-			types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, msg, "Warning", &chaosDetails)
-			events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
-			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-			return
+		if len(resultDetails.ProbeDetails) != 0 {
+			err = probe.RunProbes(&chaosDetails, clients, &resultDetails, "PostChaos", &eventsDetails)
+			if err != nil {
+				log.Errorf("Unable to Add the probes, due to err: %v", err)
+				failStep := "Failed while adding probe"
+				msg := "AUT: Running, Probes: Unsuccessful"
+				types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, msg, "Warning", &chaosDetails)
+				events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
+				result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+				return
+			}
+			msg = "AUT: Running, Probes: Successful"
 		}
 
 		// generating post chaos event
-		msg := "AUT: Running, Probes: Successful"
 		types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, msg, "Normal", &chaosDetails)
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}

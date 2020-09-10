@@ -10,6 +10,12 @@ func Fatalf(msg string, err ...interface{}) {
 	logrus.WithFields(logrus.Fields{}).Fatalf(msg, err)
 }
 
+//Fatal Logs first and then calls `logger.Exit(1)`
+// logging level is set to Panic.
+func Fatal(msg string) {
+	logrus.WithFields(logrus.Fields{}).Fatal(msg)
+}
+
 //Infof log the General operational entries about what's going on inside the application
 func Infof(msg string, val ...interface{}) {
 	logrus.WithFields(logrus.Fields{}).Infof(msg, val...)
@@ -39,7 +45,7 @@ func Warn(msg string) {
 
 //Warnf log the Non-critical entries that deserve eyes.
 func Warnf(msg string, val ...interface{}) {
-	logrus.WithFields(logrus.Fields{}).Warnf(msg, val)
+	logrus.WithFields(logrus.Fields{}).Warnf(msg, val...)
 }
 
 //Errorf used for errors that should definitely be noted.
