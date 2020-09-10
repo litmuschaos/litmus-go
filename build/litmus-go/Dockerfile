@@ -1,32 +1,23 @@
-FROM ubuntu:18.04 as builder
+FROM ubuntu:18.04 
 
 LABEL maintainer="LitmusChaos"
 
+ARG TARGETARCH
+
 # intall gcc and supporting packages
-RUN apt-get update && apt-get install -yq make gcc
+RUN apt-get update && apt-get install -yq make gcc && \
+    apt-get install -y curl
 
 WORKDIR /code
 
 ENV USER_UID=1001 \
     USER_NAME=litmus-go
 
-# download stress-ng sources
-ARG STRESS_NG_VERSION
-ENV STRESS_NG_VERSION ${STRESS_NG_VERSION:-0.10.10}
-ADD https://github.com/ColinIanKing/stress-ng/archive/V${STRESS_NG_VERSION}.tar.gz .
-RUN tar -xf V${STRESS_NG_VERSION}.tar.gz && mv stress-ng-${STRESS_NG_VERSION} stress-ng
+#Install stress-ng
+RUN curl -L https://github.com/uditgaurav/test-tools/releases/download/v0.1.0/stress-ng_amd64 -o /usr/local/bin/stress-ng && \
+    chmod +x /usr/local/bin/stress-ng
 
-# make static version
-WORKDIR /code/stress-ng
-RUN STATIC=1 make
-
-FROM alpine:latest
-
-ARG TARGETARCH
-
-#Installing necessary ubuntu packages
-RUN apk update && apk add curl bash
-RUN apk add --no-cache libc6-compat
+RUN file="$(ls -a /usr/local/bin/)" && echo $file
 
 #Installing Kubectl
 ENV KUBE_LATEST_VERSION="v1.18.0"
@@ -40,8 +31,6 @@ RUN curl -L https://github.com/kubernetes-sigs/cri-tools/releases/download/v1.16
 #Installing pumba binaries
 ENV PUMBA_VERSION="0.6.5"
 RUN curl -L https://github.com/alexei-led/pumba/releases/download/${PUMBA_VERSION}/pumba_linux_${TARGETARCH} --output /usr/local/bin/pumba && chmod +x /usr/local/bin/pumba
-
-COPY --from=builder /code/stress-ng/stress-ng /
 
 #Copying Necessary Files
 COPY ./build/_output/${TARGETARCH} ./experiments
