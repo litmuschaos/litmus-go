@@ -13,6 +13,12 @@ const (
 	Summary string = "Summary"
 	// ChaosInject this stage refer to the main chaos injection
 	ChaosInject string = "ChaosInject"
+	// AwaitedVerdict marked the start of test
+	AwaitedVerdict string = "Awaited"
+	// PassVerdict marked the verdict as passed in the end of experiment
+	PassVerdict string = "Pass"
+	// FailVerdict marked the verdict as failed in the end of experiment
+	FailVerdict string = "Fail"
 )
 
 // ResultDetails is for collecting all the chaos-result-related details
