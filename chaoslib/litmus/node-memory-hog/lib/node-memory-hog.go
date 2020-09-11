@@ -1,9 +1,7 @@
 package lib
 
 import (
-	"math/rand"
 	"strconv"
-	"time"
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
@@ -22,7 +20,7 @@ import (
 func PrepareNodeMemoryHog(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	//Select the node name
-	appNodeName, err := GetNodeName(experimentsDetails, clients)
+	appNodeName, err := common.GetNodeName(experimentsDetails.AppNS, experimentsDetails.AppLabel, clients)
 	if err != nil {
 		return errors.Errorf("Unable to get the node name due to, err: %v", err)
 	}
@@ -102,20 +100,6 @@ func PrepareNodeMemoryHog(experimentsDetails *experimentTypes.ExperimentDetails,
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 	return nil
-}
-
-//GetNodeName will select a random replica of application pod and return the node name of that application pod
-func GetNodeName(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) (string, error) {
-	podList, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).List(v1.ListOptions{LabelSelector: experimentsDetails.AppLabel})
-	if err != nil || len(podList.Items) == 0 {
-		return "", errors.Wrapf(err, "Fail to get the application pod in %v namespace, due to err: %v", experimentsDetails.AppNS, err)
-	}
-
-	rand.Seed(time.Now().Unix())
-	randomIndex := rand.Intn(len(podList.Items))
-	nodeName := podList.Items[randomIndex].Spec.NodeName
-
-	return nodeName, nil
 }
 
 // GetNodeMemoryDetails will return the total memory capacity and memory allocatable of an application node

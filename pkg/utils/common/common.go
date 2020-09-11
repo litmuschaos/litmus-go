@@ -144,3 +144,17 @@ func GetChaosPodAnnotation(podName, namespace string, clients clients.ClientSets
 	}
 	return pod.Annotations, nil
 }
+
+//GetNodeName will select a random replica of application pod and return the node name of that application pod
+func GetNodeName(namespace, labels string, clients clients.ClientSets) (string, error) {
+	podList, err := clients.KubeClient.CoreV1().Pods(namespace).List(v1.ListOptions{LabelSelector: labels})
+	if err != nil || len(podList.Items) == 0 {
+		return "", errors.Wrapf(err, "Fail to get the application pod in %v namespace, due to err: %v", namespace, err)
+	}
+
+	rand.Seed(time.Now().Unix())
+	randomIndex := rand.Intn(len(podList.Items))
+	nodeName := podList.Items[randomIndex].Spec.NodeName
+
+	return nodeName, nil
+}

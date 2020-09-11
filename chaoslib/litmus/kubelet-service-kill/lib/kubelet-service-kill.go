@@ -1,9 +1,7 @@
 package lib
 
 import (
-	"math/rand"
 	"strconv"
-	"time"
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
@@ -24,7 +22,7 @@ func PrepareKubeletKill(experimentsDetails *experimentTypes.ExperimentDetails, c
 	var err error
 	if experimentsDetails.AppNode == "" {
 		//Select node for kubelet-service-kill
-		_, appNodeName, err := GetApplicationPod(experimentsDetails, clients)
+		appNodeName, err := common.GetNodeName(experimentsDetails.AppNS, experimentsDetails.AppLabel, clients)
 		if err != nil {
 			return errors.Errorf("Unable to get the application nodename due to, err: %v", err)
 		}
@@ -104,22 +102,6 @@ func PrepareKubeletKill(experimentsDetails *experimentTypes.ExperimentDetails, c
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 	return nil
-}
-
-//GetApplicationPod will select a random replica of application pod for chaos
-//It will also get the node name of the application pod
-func GetApplicationPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) (string, string, error) {
-	podList, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).List(v1.ListOptions{LabelSelector: experimentsDetails.AppLabel})
-	if err != nil || len(podList.Items) == 0 {
-		return "", "", errors.Wrapf(err, "Fail to get the application pod in %v namespace", experimentsDetails.AppNS)
-	}
-
-	rand.Seed(time.Now().Unix())
-	randomIndex := rand.Intn(len(podList.Items))
-	applicationName := podList.Items[randomIndex].Name
-	nodeName := podList.Items[randomIndex].Spec.NodeName
-
-	return applicationName, nodeName, nil
 }
 
 // CreateHelperPod derive the attributes for helper pod and create the helper pod

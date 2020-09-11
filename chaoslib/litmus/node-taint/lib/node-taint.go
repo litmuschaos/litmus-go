@@ -28,6 +28,16 @@ func PrepareNodeTaint(experimentsDetails *experimentTypes.ExperimentDetails, cli
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 
+	if experimentsDetails.AppNode == "" {
+		//Select node for kubelet-service-kill
+		appNodeName, err := common.GetNodeName(experimentsDetails.AppNS, experimentsDetails.AppLabel, clients)
+		if err != nil {
+			return errors.Errorf("Unable to get the application nodename due to, err: %v", err)
+		}
+
+		experimentsDetails.AppNode = appNodeName
+	}
+
 	if experimentsDetails.EngineName != "" {
 		msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on " + experimentsDetails.AppNode + " node"
 		types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
