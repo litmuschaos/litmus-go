@@ -161,7 +161,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 			Containers: []apiv1.Container{
 				{
 					Name:            experimentsDetails.ExperimentName,
-					Image:           "ubuntu:16.04",
+					Image:           experimentsDetails.LIBImage,
 					ImagePullPolicy: apiv1.PullAlways,
 					Command: []string{
 						"/bin/bash",
