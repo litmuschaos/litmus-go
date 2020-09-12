@@ -24,15 +24,18 @@ var err error
 func PreparePodIOStress(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	var appNodeName string
-	if experimentsDetails.TargetPod == "" {
-		experimentsDetails.TargetPod, appNodeName, err = common.GetPodAndNodeName(experimentsDetails.AppNS, experimentsDetails.TargetPod, experimentsDetails.AppLabel, clients)
-	} else {
-		_, appNodeName, err = common.GetPodAndNodeName(experimentsDetails.AppNS, experimentsDetails.TargetPod, experimentsDetails.AppLabel, clients)
+	targetPodList, err := common.GetPodList(experimentsDetails.AppNS, experimentsDetails.TargetPod, experimentsDetails.AppLabel, experimentsDetails.PodsAffectedPerc, clients)
+	if err != nil {
+		return errors.Errorf("Unable to get the target pod list due to, err: %v", err)
 	}
+	experimentsDetails.TargetPod = targetPodList.Items[0].Name
+	appNodeName = targetPodList.Items[0].Spec.NodeName
 
 	log.InfoWithValues("[Info]: Details of application under chaos injection", logrus.Fields{
-		"NodeName": appNodeName,
-		"AppName":  experimentsDetails.TargetPod,
+		"NodeName":                        appNodeName,
+		"AppName":                         experimentsDetails.TargetPod,
+		"FilesystemUtilizationPercentage": experimentsDetails.FilesystemUtilizationPercentage,
+		"NumberOfWorkers":                 experimentsDetails.NumberOfWorkers,
 	})
 
 	experimentsDetails.RunID = common.GetRunID()
@@ -44,7 +47,7 @@ func PreparePodIOStress(experimentsDetails *experimentTypes.ExperimentDetails, c
 	}
 
 	if experimentsDetails.EngineName != "" {
-		msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on " + appNodeName + " pod scheduled on " + appNodeName + ""
+		msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on " + appNodeName + " pod"
 		types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
 		events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 	}
@@ -71,7 +74,7 @@ func PreparePodIOStress(experimentsDetails *experimentTypes.ExperimentDetails, c
 	// Wait till the completion of helper pod
 	log.Infof("[Wait]: Waiting for %vs till the completion of the helper pod", strconv.Itoa(experimentsDetails.ChaosDuration+30))
 
-	podStatus, err := WaitForChaosComplition(experimentsDetails.ChaosNamespace, "name="+experimentsDetails.ExperimentName+"-"+experimentsDetails.RunID, clients, experimentsDetails.ChaosDuration, "pumba-stress")
+	podStatus, err := WaitForChaosCompletion(experimentsDetails.ChaosNamespace, "name="+experimentsDetails.ExperimentName+"-"+experimentsDetails.RunID, clients, experimentsDetails.ChaosDuration, "pumba-stress")
 	if err != nil || podStatus == "Failed" {
 		return errors.Errorf("helper pod failed due to, err: %v", err)
 	}
@@ -91,9 +94,9 @@ func PreparePodIOStress(experimentsDetails *experimentTypes.ExperimentDetails, c
 	return nil
 }
 
-// WaitForChaosComplition will check the pods status to be completed for chaos duration
+// WaitForChaosCompletion will check the pods status to be completed for chaos duration
 // if the application pod or container is not completed still it will not throw error
-func WaitForChaosComplition(appNs string, appLabel string, clients clients.ClientSets, duration int, containerName string) (string, error) {
+func WaitForChaosCompletion(appNs string, appLabel string, clients clients.ClientSets, duration int, containerName string) (string, error) {
 
 	var podStatus string
 
@@ -194,17 +197,24 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 
 // GetContainerArguments derives the args for the pumba stress helper pod
 func GetContainerArguments(experimentsDetails *experimentTypes.ExperimentDetails) []string {
-	stressArgs := []string{
 
+	var hddbytes string
+	if experimentsDetails.FilesystemUtilizationPercentage != 0 {
+		hddbytes = strconv.Itoa(experimentsDetails.FilesystemUtilizationPercentage) + "%"
+	} else {
+		hddbytes = strconv.Itoa(experimentsDetails.FilesystemUtilizationBytes) + "G"
+	}
+
+	stressArgs := []string{
 		"--log-level",
 		"debug",
 		"--label",
-		"io.kubernetes.pod.name=" + experimentsDetails.TargetPod + "",
+		"io.kubernetes.pod.name=" + experimentsDetails.TargetPod,
 		"stress",
 		"--duration",
 		strconv.Itoa(experimentsDetails.ChaosDuration) + "s",
 		"--stressors",
-		"--cpu 1 --io " + strconv.Itoa(experimentsDetails.NumberOfWorkers) + " --hdd " + strconv.Itoa(experimentsDetails.NumberOfWorkers) + " --hdd-bytes " + strconv.Itoa(experimentsDetails.IOStressPercentage) + "% --timeout " + strconv.Itoa(experimentsDetails.ChaosDuration) + "s",
+		"--cpu 1 --io " + strconv.Itoa(experimentsDetails.NumberOfWorkers) + " --hdd " + strconv.Itoa(experimentsDetails.NumberOfWorkers) + " --hdd-bytes " + hddbytes + " --timeout " + strconv.Itoa(experimentsDetails.ChaosDuration) + "s",
 	}
 	return stressArgs
 }

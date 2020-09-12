@@ -23,13 +23,14 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.ChaosUID = clientTypes.UID(Getenv("CHAOS_UID", ""))
 	experimentDetails.InstanceID = Getenv("INSTANCE_ID", "")
 	experimentDetails.ChaosPodName = Getenv("POD_NAME", "")
-	experimentDetails.IOStressPercentage, _ = strconv.Atoi(Getenv("IO_STRESS_PERCENTAGE", "90"))
+	experimentDetails.FilesystemUtilizationPercentage, _ = strconv.Atoi(Getenv("FILESYSTEM_UTILIZATION_PERCENTAGE", ""))
 	experimentDetails.Delay, _ = strconv.Atoi(Getenv("STATUS_CHECK_DELAY", "2"))
 	experimentDetails.Timeout, _ = strconv.Atoi(Getenv("STATUS_CHECK_TIMEOUT", "180"))
 	experimentDetails.TargetPod = Getenv("TARGET_POD", "")
 	experimentDetails.NumberOfWorkers, _ = strconv.Atoi(Getenv("NUMBER_OF_WORKERS", "4"))
 	experimentDetails.RunID = Getenv("RUN_ID", "")
 	experimentDetails.LIBImage = Getenv("LIB_IMAGE", "gaiaadm/pumba")
+	experimentDetails.FilesystemUtilizationBytes, _ = strconv.Atoi(Getenv("FILESYSTEM_UTILIZATION_BYTES", "10"))
 
 }
 

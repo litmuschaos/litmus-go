@@ -1,7 +1,7 @@
 package main
 
 import (
-	pumbaLIB "github.com/litmuschaos/litmus-go/chaoslib/pumba/resource-chaos/pod-io-stress/lib"
+	pumbaLIB "github.com/litmuschaos/litmus-go/chaoslib/pumba/pod-io-stress/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/pod-io-stress/environment"
@@ -71,12 +71,12 @@ func main() {
 
 	//DISPLAY THE APP INFORMATION
 	log.InfoWithValues("The application information is as follows", logrus.Fields{
-		"Namespace":            experimentsDetails.AppNS,
-		"Label":                experimentsDetails.AppLabel,
-		"Chaos Duration":       experimentsDetails.ChaosDuration,
-		"Ramp Time":            experimentsDetails.RampTime,
-		"Number-of-Workers":    experimentsDetails.NumberOfWorkers,
-		"IO-Stress-Percentage": experimentsDetails.IOStressPercentage,
+		"Namespace":                       experimentsDetails.AppNS,
+		"Label":                           experimentsDetails.AppLabel,
+		"Chaos Duration":                  experimentsDetails.ChaosDuration,
+		"Ramp Time":                       experimentsDetails.RampTime,
+		"FilesystemUtilizationPercentage": experimentsDetails.FilesystemUtilizationPercentage,
+		"NumberOfWorkers":                 experimentsDetails.NumberOfWorkers,
 	})
 
 	//PRE-CHAOS APPLICATION STATUS CHECK

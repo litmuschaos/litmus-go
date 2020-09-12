@@ -33,8 +33,11 @@ spec:
           - name: TOTAL_CHAOS_DURATION
             value: '60'
 
-          - name: IO_STRESS_PERCENTAGE
-            value: '90'
+          - name: FILESYSTEM_UTILIZATION_PERCENTAGE
+            value: ''
+
+          - name: FILESYSTEM_UTILIZATION_BYTES
+            value: ''            
 
           - name: NUMBER_OF_WORKERS
             value: '4'
