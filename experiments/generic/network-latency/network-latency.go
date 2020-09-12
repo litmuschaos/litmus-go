@@ -39,7 +39,7 @@ func main() {
 
 	//Fetching all the ENV passed for the runner pod
 	log.Infof("[PreReq]: Getting the ENV for the %v experiment", experimentsDetails.ExperimentName)
-	environment.GetENV(&experimentsDetails, "kubelet-service-kill")
+	environment.GetENV(&experimentsDetails, "network-service-latency")
 
 	// Intialise Chaos Result Parameters
 	types.SetResultAttributes(&resultDetails, experimentsDetails.EngineName, experimentsDetails.ExperimentName)
@@ -49,7 +49,7 @@ func main() {
 	err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT")
 	if err != nil {
 		log.Errorf("Unable to Create the Chaos Result due to %v", err)
-		failStep := "Updating the chaos result of kubelet-service-kill experiment (SOT)"
+		failStep := "Updating the chaos result ofnetwork-service-latency experiment (SOT)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
