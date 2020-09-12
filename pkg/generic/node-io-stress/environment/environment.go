@@ -23,7 +23,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.ChaosUID = clientTypes.UID(Getenv("CHAOS_UID", ""))
 	experimentDetails.InstanceID = Getenv("INSTANCE_ID", "")
 	experimentDetails.ChaosPodName = Getenv("POD_NAME", "")
-	experimentDetails.IOStressPercentage, _ = strconv.Atoi(Getenv("IO_STRESS_PERCENTAGE", "90"))
+	experimentDetails.FilesystemUtilizationPercentage, _ = strconv.Atoi(Getenv("FILES_SYSTEM_UTILIZATIONPERCENTAGE", "90"))
 	experimentDetails.LIBImage = Getenv("LIB_IMAGE", "litmuschaos/go-runner:latest")
 	experimentDetails.AuxiliaryAppInfo = Getenv("AUXILIARY_APPINFO", "")
 	experimentDetails.Delay, _ = strconv.Atoi(Getenv("STATUS_CHECK_DELAY", "2"))

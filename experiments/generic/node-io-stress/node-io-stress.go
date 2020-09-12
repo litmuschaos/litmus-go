@@ -71,12 +71,12 @@ func main() {
 
 	//DISPLAY THE APP INFORMATION
 	log.InfoWithValues("The application information is as follows", logrus.Fields{
-		"Namespace":            experimentsDetails.AppNS,
-		"Label":                experimentsDetails.AppLabel,
-		"Chaos Duration":       experimentsDetails.ChaosDuration,
-		"Ramp Time":            experimentsDetails.RampTime,
-		"Number-of-Workers":    experimentsDetails.NumberOfWorkers,
-		"IO-Stress-Percentage": experimentsDetails.IOStressPercentage,
+		"Namespace":                          experimentsDetails.AppNS,
+		"Label":                              experimentsDetails.AppLabel,
+		"Chaos Duration":                     experimentsDetails.ChaosDuration,
+		"Ramp Time":                          experimentsDetails.RampTime,
+		"Number-of-Workers":                  experimentsDetails.NumberOfWorkers,
+		"File-System-Utilization-Percentage": experimentsDetails.FilesystemUtilizationPercentage,
 	})
 
 	//PRE-CHAOS APPLICATION STATUS CHECK

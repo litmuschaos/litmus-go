@@ -31,9 +31,9 @@ func PrepareNodeIOStress(experimentsDetails *experimentTypes.ExperimentDetails, 
 	}
 
 	log.InfoWithValues("[Info]: Details of application under chaos injection", logrus.Fields{
-		"NodeName":             experimentsDetails.AppNode,
-		"IO Stress Percentage": experimentsDetails.IOStressPercentage,
-		"Number of workers":    experimentsDetails.NumberOfWorkers,
+		"NodeName":                             experimentsDetails.AppNode,
+		"Filesy-System-Utilization-Percentage": experimentsDetails.FilesystemUtilizationPercentage,
+		"Number-of-workers":                    experimentsDetails.NumberOfWorkers,
 	})
 
 	experimentsDetails.RunID = common.GetRunID()
@@ -130,7 +130,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 						"--hdd",
 						strconv.Itoa(experimentsDetails.NumberOfWorkers),
 						"--hdd-bytes",
-						strconv.Itoa(experimentsDetails.IOStressPercentage) + "%",
+						strconv.Itoa(experimentsDetails.FilesystemUtilizationPercentage) + "%",
 						"--timeout",
 						strconv.Itoa(experimentsDetails.ChaosDuration) + "s",
 					},

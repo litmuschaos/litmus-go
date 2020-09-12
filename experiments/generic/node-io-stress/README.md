@@ -8,7 +8,7 @@
 </tr>
 <tr>
 <td> Node IO Stress </td>
-<td> This experiment causes a disk resource exhaustion on the Kubernetes node. The experiment aims to verify resiliency of applications whose replicas may be evicted on account on nodes turning unschedulable due to lack of Memory resources. </td>
+<td> This experiment causes disk stress on the Kubernetes node. The experiment aims to verify the resiliency of applications that share this disk resource for ephemeral or persistent storage purposes. </td>
 <td>   <a href="https://docs.litmuschaos.io/docs/node-io-stress/"> Here </a> </td>
 </tr> 
 </table>
