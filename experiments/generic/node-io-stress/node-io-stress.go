@@ -71,12 +71,13 @@ func main() {
 
 	//DISPLAY THE APP INFORMATION
 	log.InfoWithValues("The application information is as follows", logrus.Fields{
-		"Namespace":                          experimentsDetails.AppNS,
-		"Label":                              experimentsDetails.AppLabel,
-		"Chaos Duration":                     experimentsDetails.ChaosDuration,
-		"Ramp Time":                          experimentsDetails.RampTime,
-		"Number-of-Workers":                  experimentsDetails.NumberOfWorkers,
-		"File-System-Utilization-Percentage": experimentsDetails.FilesystemUtilizationPercentage,
+		"Namespace":                       experimentsDetails.AppNS,
+		"Label":                           experimentsDetails.AppLabel,
+		"Chaos Duration":                  experimentsDetails.ChaosDuration,
+		"Ramp Time":                       experimentsDetails.RampTime,
+		"NumberOfWorkers":                 experimentsDetails.NumberOfWorkers,
+		"FilesystemUtilizationPercentage": experimentsDetails.FilesystemUtilizationPercentage,
+		"FilesystemUtilizationBytes":      experimentsDetails.FilesystemUtilizationBytes,
 	})
 
 	//PRE-CHAOS APPLICATION STATUS CHECK
@@ -87,6 +88,17 @@ func main() {
 		failStep := "Verify that the AUT (Application Under Test) is running (pre-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
+	}
+	//PRE-CHAOS AUXILIARY APPLICATION STATUS CHECK
+	if experimentsDetails.AuxiliaryAppInfo != "" {
+		log.Info("[Status]: Verify that the Auxiliary Applications are running (pre-chaos)")
+		err = status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
+		if err != nil {
+			log.Errorf("Auxiliary Application status check failed due to %v", err)
+			failStep := "Verify that the Auxiliary Applications are running (pre-chaos)"
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+			return
+		}
 	}
 
 	if experimentsDetails.EngineName != "" {
@@ -140,6 +152,18 @@ func main() {
 		failStep := "Verify that the AUT (Application Under Test) is running (post-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
+	}
+
+	//POST-CHAOS AUXILIARY APPLICATION STATUS CHECK
+	if experimentsDetails.AuxiliaryAppInfo != "" {
+		log.Info("[Status]: Verify that the Auxiliary Applications are running (post-chaos)")
+		err = status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
+		if err != nil {
+			log.Errorf("Auxiliary Application status check failed due to %v", err)
+			failStep := "Verify that the Auxiliary Applications are running (post-chaos)"
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+			return
+		}
 	}
 
 	if experimentsDetails.EngineName != "" {

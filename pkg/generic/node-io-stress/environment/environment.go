@@ -14,7 +14,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.ExperimentName = Getenv("EXPERIMENT_NAME", "node-io-stress")
 	experimentDetails.ChaosNamespace = Getenv("CHAOS_NAMESPACE", "litmus")
 	experimentDetails.EngineName = Getenv("CHAOSENGINE", "")
-	experimentDetails.ChaosDuration, _ = strconv.Atoi(Getenv("TOTAL_CHAOS_DURATION", "60"))
+	experimentDetails.ChaosDuration, _ = strconv.Atoi(Getenv("TOTAL_CHAOS_DURATION", "120"))
 	experimentDetails.RampTime, _ = strconv.Atoi(Getenv("RAMP_TIME", "0"))
 	experimentDetails.ChaosLib = Getenv("LIB", "litmus")
 	experimentDetails.AppNS = Getenv("APP_NAMESPACE", "")
@@ -23,13 +23,15 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.ChaosUID = clientTypes.UID(Getenv("CHAOS_UID", ""))
 	experimentDetails.InstanceID = Getenv("INSTANCE_ID", "")
 	experimentDetails.ChaosPodName = Getenv("POD_NAME", "")
-	experimentDetails.FilesystemUtilizationPercentage, _ = strconv.Atoi(Getenv("FILES_SYSTEM_UTILIZATIONPERCENTAGE", "90"))
+	experimentDetails.FilesystemUtilizationPercentage, _ = strconv.Atoi(Getenv("FILESYSTEM_UTILIZATION_PERCENTAGE", ""))
+	experimentDetails.FilesystemUtilizationBytes, _ = strconv.Atoi(Getenv("FILESYSTEM_UTILIZATION_BYTES", ""))
 	experimentDetails.LIBImage = Getenv("LIB_IMAGE", "litmuschaos/go-runner:latest")
 	experimentDetails.AuxiliaryAppInfo = Getenv("AUXILIARY_APPINFO", "")
 	experimentDetails.Delay, _ = strconv.Atoi(Getenv("STATUS_CHECK_DELAY", "2"))
 	experimentDetails.Timeout, _ = strconv.Atoi(Getenv("STATUS_CHECK_TIMEOUT", "180"))
 	experimentDetails.AppNode = Getenv("APP_NODE", "")
 	experimentDetails.NumberOfWorkers, _ = strconv.Atoi(Getenv("NUMBER_OF_WORKERS", "4"))
+
 }
 
 // Getenv fetch the env and set the default value, if any

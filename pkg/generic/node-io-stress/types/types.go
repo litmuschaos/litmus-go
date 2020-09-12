@@ -18,7 +18,6 @@ type ExperimentDetails struct {
 	InstanceID                      string
 	ChaosNamespace                  string
 	ChaosPodName                    string
-	MemoryPercentage                int
 	RunID                           string
 	LIBImage                        string
 	AuxiliaryAppInfo                string
@@ -27,5 +26,6 @@ type ExperimentDetails struct {
 	Annotations                     map[string]string
 	AppNode                         string
 	FilesystemUtilizationPercentage int
+	FilesystemUtilizationBytes      int
 	NumberOfWorkers                 int
 }

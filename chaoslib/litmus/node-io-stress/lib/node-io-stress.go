@@ -31,9 +31,9 @@ func PrepareNodeIOStress(experimentsDetails *experimentTypes.ExperimentDetails, 
 	}
 
 	log.InfoWithValues("[Info]: Details of application under chaos injection", logrus.Fields{
-		"NodeName":                             experimentsDetails.AppNode,
-		"Filesy-System-Utilization-Percentage": experimentsDetails.FilesystemUtilizationPercentage,
-		"Number-of-workers":                    experimentsDetails.NumberOfWorkers,
+		"NodeName":                        experimentsDetails.AppNode,
+		"FilesystemUtilizationPercentage": experimentsDetails.FilesystemUtilizationPercentage,
+		"NumberOfWorkers":                 experimentsDetails.NumberOfWorkers,
 	})
 
 	experimentsDetails.RunID = common.GetRunID()
@@ -124,16 +124,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 					Command: []string{
 						"/stress-ng",
 					},
-					Args: []string{
-						"--io",
-						strconv.Itoa(experimentsDetails.NumberOfWorkers),
-						"--hdd",
-						strconv.Itoa(experimentsDetails.NumberOfWorkers),
-						"--hdd-bytes",
-						strconv.Itoa(experimentsDetails.FilesystemUtilizationPercentage) + "%",
-						"--timeout",
-						strconv.Itoa(experimentsDetails.ChaosDuration) + "s",
-					},
+					Args: GetContainerArguments(experimentsDetails),
 				},
 			},
 		},
@@ -141,4 +132,37 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 
 	_, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Create(helperPod)
 	return err
+}
+
+// GetContainerArguments derives the args for the pumba stress helper pod
+func GetContainerArguments(experimentsDetails *experimentTypes.ExperimentDetails) []string {
+
+	var hddbytes string
+	if experimentsDetails.FilesystemUtilizationBytes == 0 {
+		if experimentsDetails.FilesystemUtilizationPercentage == 0 {
+			hddbytes = "10%"
+			log.Info("Neither of FilesystemUtilizationPercentage or FilesystemUtilizationBytes provided, proceeding with a default FilesystemUtilizationPercentage value of 10%")
+		} else {
+			hddbytes = strconv.Itoa(experimentsDetails.FilesystemUtilizationPercentage) + "%"
+		}
+	} else {
+		if experimentsDetails.FilesystemUtilizationPercentage == 0 {
+			hddbytes = strconv.Itoa(experimentsDetails.FilesystemUtilizationBytes) + "G" //Util bytes you gave
+		} else {
+			hddbytes = strconv.Itoa(experimentsDetails.FilesystemUtilizationPercentage) + "%" //Util % you gave
+			log.Warn("Both FsUtilPercentage & FsUtilBytes provided as inputs, using the FsUtilPercentage value to proceed with stress exp")
+		}
+	}
+
+	stressArgs := []string{
+		"--io",
+		strconv.Itoa(experimentsDetails.NumberOfWorkers),
+		"--hdd",
+		strconv.Itoa(experimentsDetails.NumberOfWorkers),
+		"--hdd-bytes",
+		hddbytes,
+		"--timeout",
+		strconv.Itoa(experimentsDetails.ChaosDuration) + "s",
+	}
+	return stressArgs
 }
