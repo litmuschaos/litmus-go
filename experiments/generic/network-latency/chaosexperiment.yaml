@@ -1,0 +1,90 @@
+apiVersion: litmuschaos.io/v1alpha1
+description:
+  message: |
+    Introduce network latency
+kind: ChaosExperiment
+metadata:
+  name: network-latency
+spec:
+  definition:
+    scope: Namespaced
+    permissions:
+      - apiGroups:
+          - ""
+          - "apps"
+          - "batch"
+          - "litmuschaos.io"
+        resources:
+          - "jobs"
+          - "pods"
+          - "pods/log"
+          - "pods/exec"
+          - "events"
+          - "configmaps"
+          - "chaosengines"
+          - "chaosexperiments"
+          - "chaosresults"
+        verbs:
+          - "create"
+          - "list"
+          - "get"
+          - "patch"
+          - "update"
+          - "delete"
+    image: "litmuschaos/litmus-go:ci"
+    imagePullPolicy: Always
+    hostPID: true
+    securityContext:
+      containerSecurityContext:
+        privileged: true
+        capabilities:
+          add: ["NET_ADMIN"]
+    args:
+    - -c
+    - ./network-latency
+    command:
+    - /bin/bash
+    env:
+    - name: APP_NAMESPACE
+      value: ''
+    - name: APP_LABEL
+      value: ''
+    - name: CHAOSENGINE
+      value: ''
+    - name: CHAOS_NAMESPACE
+      value: ''
+    - name: LATENCY_NAMESPACE
+      value: ''
+    - name: LATENCY_LABEL
+      value: ''
+    - name: ANSIBLE_STDOUT_CALLBACK
+      value: 'default'
+    - name: TOTAL_CHAOS_DURATION
+      value: ''
+    - name: LIB
+      value: 'litmus'
+    - name: RAMP_TIME
+      value: ''
+    - name: APP_LABEL
+      value: ''
+    - name: LATENCY_PORT
+      value: ''
+    - name: LATENCY
+      value: ''
+    - name: JITTER
+      value: ''
+    - name: CHAOS_NODE
+      value: ''
+    labels:
+      role: logs
+      experiment: network-latency
+    hostFileVolumes:
+    - name: cri-socket
+      mountPath: /var/run/crio/crio.sock
+      nodePath: /var/run/crio/crio.sock
+    - name: cri-yaml
+      mountPath: /etc/crictl.yaml 
+      nodePath: /etc/crictl.yaml 
+    configmaps:
+    - name: dependencies-network-latency
+      mountPath: /mnt
