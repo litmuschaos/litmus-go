@@ -21,22 +21,26 @@ var err error
 // PrepareNodeCPUHog contains prepration steps before chaos injection
 func PrepareNodeCPUHog(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
-	//Select the node name
-	appNodeName, err := common.GetNodeName(experimentsDetails.AppNS, experimentsDetails.AppLabel, clients)
-	if err != nil {
-		return errors.Errorf("Unable to get the node name due to, err: %v", err)
+	if experimentsDetails.AppNode == "" {
+		//Select node for kubelet-service-kill
+		appNodeName, err := common.GetNodeName(experimentsDetails.AppNS, experimentsDetails.AppLabel, clients)
+		if err != nil {
+			return errors.Errorf("Unable to get the application nodename due to, err: %v", err)
+		}
+
+		experimentsDetails.AppNode = appNodeName
 	}
 
 	// When number of cpu cores for hogging is not defined , it will take it from node capacity
 	if experimentsDetails.NodeCPUcores == 0 {
-		err = SetCPUCapacity(experimentsDetails, appNodeName, clients)
+		err = SetCPUCapacity(experimentsDetails, clients)
 		if err != nil {
 			return err
 		}
 	}
 
 	log.InfoWithValues("[Info]: Details of application under chaos injection", logrus.Fields{
-		"NodeName":     appNodeName,
+		"NodeName":     experimentsDetails.AppNode,
 		"NodeCPUcores": experimentsDetails.NodeCPUcores,
 	})
 
@@ -49,7 +53,7 @@ func PrepareNodeCPUHog(experimentsDetails *experimentTypes.ExperimentDetails, cl
 	}
 
 	if experimentsDetails.EngineName != "" {
-		msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on " + appNodeName + " node"
+		msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on " + experimentsDetails.AppNode + " node"
 		types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
 		events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 	}
@@ -61,7 +65,7 @@ func PrepareNodeCPUHog(experimentsDetails *experimentTypes.ExperimentDetails, cl
 	}
 
 	// Creating the helper pod to perform node cpu hog
-	err = CreateHelperPod(experimentsDetails, clients, appNodeName)
+	err = CreateHelperPod(experimentsDetails, clients)
 	if err != nil {
 		return errors.Errorf("Unable to create the helper pod, err: %v", err)
 	}
@@ -83,7 +87,7 @@ func PrepareNodeCPUHog(experimentsDetails *experimentTypes.ExperimentDetails, cl
 
 	// Checking the status of application node
 	log.Info("[Status]: Getting the status of application node")
-	err = status.CheckNodeStatus(appNodeName, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
+	err = status.CheckNodeStatus(experimentsDetails.AppNode, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 	if err != nil {
 		log.Warn("Application node is not in the ready state, you may need to manually recover the node")
 	}
@@ -104,8 +108,8 @@ func PrepareNodeCPUHog(experimentsDetails *experimentTypes.ExperimentDetails, cl
 }
 
 //SetCPUCapacity will fetch the node cpu capacity
-func SetCPUCapacity(experimentsDetails *experimentTypes.ExperimentDetails, nodeName string, clients clients.ClientSets) error {
-	node, err := clients.KubeClient.CoreV1().Nodes().Get(nodeName, v1.GetOptions{})
+func SetCPUCapacity(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) error {
+	node, err := clients.KubeClient.CoreV1().Nodes().Get(experimentsDetails.AppNode, v1.GetOptions{})
 	if err != nil {
 		return errors.Wrapf(err, "Fail to get the application node, due to ", err)
 	}
@@ -118,7 +122,7 @@ func SetCPUCapacity(experimentsDetails *experimentTypes.ExperimentDetails, nodeN
 }
 
 // CreateHelperPod derive the attributes for helper pod and create the helper pod
-func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, appNodeName string) error {
+func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) error {
 
 	helperPod := &apiv1.Pod{
 		ObjectMeta: v1.ObjectMeta{
@@ -133,7 +137,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 		},
 		Spec: apiv1.PodSpec{
 			RestartPolicy: apiv1.RestartPolicyNever,
-			NodeName:      appNodeName,
+			NodeName:      experimentsDetails.AppNode,
 			Containers: []apiv1.Container{
 				{
 					Name:            experimentsDetails.ExperimentName,
