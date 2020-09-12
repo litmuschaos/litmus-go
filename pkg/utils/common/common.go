@@ -158,3 +158,36 @@ func GetNodeName(namespace, labels string, clients clients.ClientSets) (string, 
 
 	return nodeName, nil
 }
+
+//GetPodAndNodeName will select the pod & node name for the chaos
+// if the targetpod is not available it will derive the pod name randomly from the specified labels
+func GetPodAndNodeName(namespace, targetPod, appLabels string, clients clients.ClientSets) (string, string, error) {
+	var podName, nodeName string
+	podList, err := clients.KubeClient.CoreV1().Pods(namespace).List(v1.ListOptions{LabelSelector: appLabels})
+	if err != nil || len(podList.Items) == 0 {
+		return "", "", errors.Wrapf(err, "Fail to get the application pod in %v namespace", namespace)
+	}
+
+	isPodAvailable, err := CheckForAvailibiltyOfPod(namespace, targetPod, clients)
+	if err != nil {
+		return "", "", err
+	}
+
+	// getting the node name, if the target pod is defined
+	// else select a random target pod from the specified labels
+	if isPodAvailable {
+		pod, err := clients.KubeClient.CoreV1().Pods(namespace).Get(targetPod, v1.GetOptions{})
+		if err != nil {
+			return "", "", err
+		}
+		podName = targetPod
+		nodeName = pod.Spec.NodeName
+	} else {
+		rand.Seed(time.Now().Unix())
+		randomIndex := rand.Intn(len(podList.Items))
+		podName = podList.Items[randomIndex].Name
+		nodeName = podList.Items[randomIndex].Spec.NodeName
+	}
+
+	return podName, nodeName, nil
+}
