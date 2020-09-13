@@ -21,7 +21,6 @@ var err error
 // PreparePodIOStress contains prepration steps before chaos injection
 func PreparePodIOStress(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
-	var appNodeName string
 	targetPodList, err := common.GetPodList(experimentsDetails.AppNS, experimentsDetails.TargetPod, experimentsDetails.AppLabel, experimentsDetails.PodsAffectedPerc, clients)
 	if err != nil {
 		return errors.Errorf("Unable to get the target pod list due to, err: %v", err)
@@ -34,7 +33,7 @@ func PreparePodIOStress(experimentsDetails *experimentTypes.ExperimentDetails, c
 	}
 
 	if experimentsDetails.EngineName != "" {
-		msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on " + appNodeName + " pod"
+		msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on target pod"
 		types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
 		events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 	}
@@ -140,7 +139,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 					SecurityContext: &apiv1.SecurityContext{
 						Capabilities: &apiv1.Capabilities{
 							Add: []apiv1.Capability{
-								apiv1.Capability("SYS_ADMIN"),
+								"SYS_ADMIN",
 							},
 						},
 					},
