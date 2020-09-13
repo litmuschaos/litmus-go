@@ -1,12 +1,11 @@
 package main
 
 import (
-	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/pod-memory-hog/lib"
-	pumbaLIB "github.com/litmuschaos/litmus-go/chaoslib/pumba/memory-chaos/lib"
+	pumbaLIB "github.com/litmuschaos/litmus-go/chaoslib/pumba/pod-io-stress/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
-	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/pod-memory-hog/environment"
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-memory-hog/types"
+	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/pod-io-stress/environment"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-io-stress/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/result"
@@ -57,7 +56,7 @@ func main() {
 	err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT")
 	if err != nil {
 		log.Errorf("Unable to Create the Chaos Result due to %v", err)
-		failStep := "Updating the chaos result of pod-memory-hog experiment (SOT)"
+		failStep := "Updating the chaos result of " + experimentsDetails.ExperimentName + " experiment (SOT)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -72,11 +71,12 @@ func main() {
 
 	//DISPLAY THE APP INFORMATION
 	log.InfoWithValues("The application information is as follows", logrus.Fields{
-		"Namespace":          experimentsDetails.AppNS,
-		"Label":              experimentsDetails.AppLabel,
-		"Chaos Duration":     experimentsDetails.ChaosDuration,
-		"Ramp Time":          experimentsDetails.RampTime,
-		"Memory Consumption": experimentsDetails.MemoryConsumption,
+		"Namespace":                       experimentsDetails.AppNS,
+		"Label":                           experimentsDetails.AppLabel,
+		"Chaos Duration":                  experimentsDetails.ChaosDuration,
+		"Ramp Time":                       experimentsDetails.RampTime,
+		"FilesystemUtilizationPercentage": experimentsDetails.FilesystemUtilizationPercentage,
+		"NumberOfWorkers":                 experimentsDetails.NumberOfWorkers,
 	})
 
 	//PRE-CHAOS APPLICATION STATUS CHECK
@@ -114,31 +114,20 @@ func main() {
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
-	// Including the litmus lib for pod-memory-hog
-	if experimentsDetails.ChaosLib == "litmus" {
-		err = litmusLIB.PrepareMemoryStress(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
+	// Including the litmus lib for pod-io-stress
+	if experimentsDetails.ChaosLib == "pumba" {
+		err = pumbaLIB.PreparePodIOStress(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
 		if err != nil {
-			log.Errorf("[Error]: pod memory hog failed due to %v\n", err)
-			failStep := "pod memory hog chaos injection failed"
+			log.Errorf("[Error]: pod io stress chaos failed due to %v\n", err)
+			failStep := "pod io stress chaos injection failed"
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}
-		log.Info("[Confirmation]: Memory of the application pod has been stressed successfully")
+		log.Info("[Confirmation]: Disk of the application pod has been stressed successfully")
 		resultDetails.Verdict = "Pass"
-	} else if experimentsDetails.ChaosLib == "pumba" {
-		err = pumbaLIB.PreparePodMemoryHog(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
-		if err != nil {
-			log.Errorf("[Error]: Memory hog failed due to %v\n", err)
-			failStep := "Memory hog Chaos injection failed"
-			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-			return
-		}
-		log.Info("[Confirmation]: Memory of the application pod has been stressed successfully")
-		resultDetails.Verdict = "Pass"
-
 	} else {
 		log.Error("[Invalid]: Please Provide the correct LIB")
-		failStep := "Including the litmus lib for pod-memory-hog"
+		failStep := "Including the pumba lib for pod-io-stress"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}

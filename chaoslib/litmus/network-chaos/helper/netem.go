@@ -173,22 +173,22 @@ func parsePIDFromJSON(j []byte, runtime string) (int, error) {
 	// in containerd, pid is present inside `info.pid` of inspect output
 	if runtime == "containerd" {
 		var resp InspectResponse
-		if err = json.Unmarshal(j, &resp); err != nil {
+		if err := json.Unmarshal(j, &resp); err != nil {
 			return 0, err
 		}
 		pid = resp.Info.PID
-		log.Infof("pid: %v", pid)
-
-	} else {
+	} else if runtime == "crio" {
 		var resp InfoDetails
-		if err = json.Unmarshal(j, &resp); err != nil {
-			return 0, err
+		if err := json.Unmarshal(j, &resp); err != nil {
+			return 0, errors.Errorf("[cri] Could not find pid field in json: %s", string(j))
 		}
 		pid = resp.PID
+	} else {
+		return 0, errors.Errorf("no supported container runtime, runtime: %v", runtime)
 	}
 
 	if pid == 0 {
-		return 0, errors.Errorf("[cri] Could not find pid field in json: %s", string(j))
+		return 0, errors.Errorf("[cri] no running target container found, pid: %v", string(pid))
 	}
 
 	return pid, nil
