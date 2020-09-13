@@ -2,7 +2,6 @@ package lib
 
 import (
 	"strconv"
-	"time"
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
@@ -11,7 +10,6 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
-	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	apiv1 "k8s.io/api/core/v1"
@@ -28,17 +26,6 @@ func PreparePodIOStress(experimentsDetails *experimentTypes.ExperimentDetails, c
 	if err != nil {
 		return errors.Errorf("Unable to get the target pod list due to, err: %v", err)
 	}
-	experimentsDetails.TargetPod = targetPodList.Items[0].Name
-	appNodeName = targetPodList.Items[0].Spec.NodeName
-
-	log.InfoWithValues("[Info]: Details of application under chaos injection", logrus.Fields{
-		"NodeName":                        appNodeName,
-		"AppName":                         experimentsDetails.TargetPod,
-		"FilesystemUtilizationPercentage": experimentsDetails.FilesystemUtilizationPercentage,
-		"NumberOfWorkers":                 experimentsDetails.NumberOfWorkers,
-	})
-
-	experimentsDetails.RunID = common.GetRunID()
 
 	//Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
@@ -58,30 +45,41 @@ func PreparePodIOStress(experimentsDetails *experimentTypes.ExperimentDetails, c
 		return errors.Errorf("unable to get annotation, due to %v", err)
 	}
 
-	// Creating the helper pod to perform pod io stress chaos
-	err = CreateHelperPod(experimentsDetails, clients, appNodeName)
-	if err != nil {
-		return errors.Errorf("Unable to create the helper pod, err: %v", err)
+	// creating the helper pod to perform network chaos
+	for _, pod := range targetPodList.Items {
+
+		runID := common.GetRunID()
+
+		log.InfoWithValues("[Info]: Details of application under chaos injection", logrus.Fields{
+			"PodName":                         pod.Name,
+			"NodeName":                        pod.Spec.NodeName,
+			"FilesystemUtilizationPercentage": experimentsDetails.FilesystemUtilizationPercentage,
+			"FilesystemUtilizationBytes":      experimentsDetails.FilesystemUtilizationBytes,
+		})
+
+		err = CreateHelperPod(experimentsDetails, clients, pod.Name, pod.Spec.NodeName, runID)
+		if err != nil {
+			return errors.Errorf("Unable to create the helper pod, err: %v", err)
+		}
 	}
 
-	//Checking the status of helper pod
+	//checking the status of the helper pod, wait till the pod comes to running state else fail the experiment
 	log.Info("[Status]: Checking the status of the helper pod")
-	err = status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, "name="+experimentsDetails.ExperimentName+"-"+experimentsDetails.RunID, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
+	err = status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, "app="+experimentsDetails.ExperimentName+"-helper", experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 	if err != nil {
 		return errors.Errorf("helper pod is not in running state, err: %v", err)
 	}
 
 	// Wait till the completion of helper pod
 	log.Infof("[Wait]: Waiting for %vs till the completion of the helper pod", strconv.Itoa(experimentsDetails.ChaosDuration+30))
-
-	podStatus, err := WaitForChaosCompletion(experimentsDetails.ChaosNamespace, "name="+experimentsDetails.ExperimentName+"-"+experimentsDetails.RunID, clients, experimentsDetails.ChaosDuration, "pumba-stress")
+	podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, "app="+experimentsDetails.ExperimentName+"-helper", clients, experimentsDetails.ChaosDuration+30, "pumba-stress")
 	if err != nil || podStatus == "Failed" {
 		return errors.Errorf("helper pod failed due to, err: %v", err)
 	}
 
 	//Deleting the helper pod
 	log.Info("[Cleanup]: Deleting the helper pod")
-	err = common.DeletePod(experimentsDetails.ExperimentName+"-"+experimentsDetails.RunID, "name="+experimentsDetails.ExperimentName+"-"+experimentsDetails.RunID, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients)
+	err = common.DeleteAllPod("app="+experimentsDetails.ExperimentName+"-helper", experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients)
 	if err != nil {
 		return errors.Errorf("Unable to delete the helper pod, err: %v", err)
 	}
@@ -94,48 +92,8 @@ func PreparePodIOStress(experimentsDetails *experimentTypes.ExperimentDetails, c
 	return nil
 }
 
-// WaitForChaosCompletion will check the pods status to be completed for chaos duration
-// if the application pod or container is not completed still it will not throw error
-func WaitForChaosCompletion(appNs string, appLabel string, clients clients.ClientSets, duration int, containerName string) (string, error) {
-
-	var podStatus string
-
-	ChaosStartTimeStamp := time.Now().Unix()
-	err := retry.
-		Times(uint(duration)).
-		Wait(1 * time.Second).
-		Try(func(attempt uint) error {
-			podSpec, err := clients.KubeClient.CoreV1().Pods(appNs).List(v1.ListOptions{LabelSelector: appLabel})
-			if err != nil || len(podSpec.Items) == 0 {
-				return errors.Errorf("Unable to get the pod, err: %v", err)
-			}
-
-			for _, pod := range podSpec.Items {
-				podStatus = string(pod.Status.Phase)
-				log.Infof("helper pod status: %v", podStatus)
-				ChaosCurrentTimeStamp := time.Now().Unix()
-				chaosDiffTimeStamp := ChaosCurrentTimeStamp - ChaosStartTimeStamp
-
-				if podStatus != "Succeeded" && podStatus != "Failed" {
-					if chaosDiffTimeStamp < int64(duration) {
-						return errors.Errorf("Chaos Duration is not completed")
-					}
-				}
-
-				log.InfoWithValues("The running status of Pods are as follows", logrus.Fields{
-					"Pod": pod.Name, "Status": podStatus})
-			}
-			return nil
-		})
-	if err != nil {
-		return "", err
-	}
-	return podStatus, nil
-
-}
-
 // CreateHelperPod derive the attributes for helper pod and create the helper pod
-func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, appNodeName string) error {
+func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, appName, appNodeName, runID string) error {
 
 	helperPod := &apiv1.Pod{
 		TypeMeta: v1.TypeMeta{
@@ -143,11 +101,11 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 			APIVersion: "v1",
 		},
 		ObjectMeta: v1.ObjectMeta{
-			Name:      experimentsDetails.ExperimentName + "-" + experimentsDetails.RunID,
+			Name:      experimentsDetails.ExperimentName + "-" + runID,
 			Namespace: experimentsDetails.ChaosNamespace,
 			Labels: map[string]string{
-				"app":      experimentsDetails.ExperimentName,
-				"name":     experimentsDetails.ExperimentName + "-" + experimentsDetails.RunID,
+				"app":      experimentsDetails.ExperimentName + "-helper",
+				"name":     experimentsDetails.ExperimentName + "-" + runID,
 				"chaosUID": string(experimentsDetails.ChaosUID),
 				// prevent pumba from killing itself
 				"com.gaiaadm.pumba": "true",
@@ -171,7 +129,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 				apiv1.Container{
 					Name:  "pumba-stress",
 					Image: experimentsDetails.LIBImage,
-					Args:  GetContainerArguments(experimentsDetails),
+					Args:  GetContainerArguments(experimentsDetails, appName),
 					VolumeMounts: []apiv1.VolumeMount{
 						apiv1.VolumeMount{
 							Name:      "dockersocket",
@@ -196,20 +154,30 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 }
 
 // GetContainerArguments derives the args for the pumba stress helper pod
-func GetContainerArguments(experimentsDetails *experimentTypes.ExperimentDetails) []string {
+func GetContainerArguments(experimentsDetails *experimentTypes.ExperimentDetails, appName string) []string {
 
 	var hddbytes string
-	if experimentsDetails.FilesystemUtilizationPercentage != 0 {
-		hddbytes = strconv.Itoa(experimentsDetails.FilesystemUtilizationPercentage) + "%"
+	if experimentsDetails.FilesystemUtilizationBytes == 0 {
+		if experimentsDetails.FilesystemUtilizationPercentage == 0 {
+			hddbytes = "10%"
+			log.Info("Neither of FilesystemUtilizationPercentage or FilesystemUtilizationBytes provided, proceeding with a default FilesystemUtilizationPercentage value of 10%")
+		} else {
+			hddbytes = strconv.Itoa(experimentsDetails.FilesystemUtilizationPercentage) + "%"
+		}
 	} else {
-		hddbytes = strconv.Itoa(experimentsDetails.FilesystemUtilizationBytes) + "G"
+		if experimentsDetails.FilesystemUtilizationPercentage == 0 {
+			hddbytes = strconv.Itoa(experimentsDetails.FilesystemUtilizationBytes) + "G"
+		} else {
+			hddbytes = strconv.Itoa(experimentsDetails.FilesystemUtilizationPercentage) + "%"
+			log.Warn("Both FsUtilPercentage & FsUtilBytes provided as inputs, using the FsUtilPercentage value to proceed with stress exp")
+		}
 	}
 
 	stressArgs := []string{
 		"--log-level",
 		"debug",
 		"--label",
-		"io.kubernetes.pod.name=" + experimentsDetails.TargetPod,
+		"io.kubernetes.pod.name=" + appName,
 		"stress",
 		"--duration",
 		strconv.Itoa(experimentsDetails.ChaosDuration) + "s",

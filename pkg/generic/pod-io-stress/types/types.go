@@ -22,10 +22,9 @@ type ExperimentDetails struct {
 	Delay                           int
 	TargetPod                       string
 	FilesystemUtilizationPercentage int
+	FilesystemUtilizationBytes      int
 	NumberOfWorkers                 int
-	RunID                           string
 	Annotations                     map[string]string
 	LIBImage                        string
-	FilesystemUtilizationBytes      int
 	PodsAffectedPerc                int
 }
