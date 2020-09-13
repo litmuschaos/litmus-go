@@ -1,7 +1,8 @@
 package main
 
 import (
-	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/pumba/network-chaos/lib"
+	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/network-chaos/lib"
+	pumbaLIB "github.com/litmuschaos/litmus-go/chaoslib/pumba/network-chaos/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/network-chaos/environment"
@@ -112,7 +113,17 @@ func main() {
 	}
 
 	// Including the pumba lib for pod-network-loss
-	if experimentsDetails.ChaosLib == "pumba" {
+	if experimentsDetails.ChaosLib == "litmus" && experimentsDetails.ContainerRuntime == "docker" {
+		err = pumbaLIB.PreparePodNetworkChaos(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
+		if err != nil {
+			log.Errorf("Chaos injection failed due to %v\n", err)
+			failStep := "Including the pumba lib for pod-network-loss"
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+			return
+		}
+		log.Info("[Confirmation]: The pod network loss chaos has been applied")
+		resultDetails.Verdict = "Pass"
+	} else if experimentsDetails.ChaosLib == "litmus" && (experimentsDetails.ContainerRuntime == "containerd" || experimentsDetails.ContainerRuntime == "crio") {
 		err = litmusLIB.PreparePodNetworkChaos(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
 		if err != nil {
 			log.Errorf("Chaos injection failed due to %v\n", err)
