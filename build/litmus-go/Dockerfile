@@ -21,13 +21,12 @@ RUN apt-get install stress
 WORKDIR /code/stress-ng
 RUN STATIC=1 make
 
-FROM alpine:latest
+FROM ubuntu:bionic
 
 LABEL maintainer="LitmusChaos"
 
 #Installing necessary ubuntu packages
-RUN apk update && apk add curl bash
-RUN apk add --no-cache libc6-compat
+RUN apt-get update && apt-get install -y curl bash systemd 
 
 #Installing Kubectl
 ENV KUBE_LATEST_VERSION="v1.18.0"

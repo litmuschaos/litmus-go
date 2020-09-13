@@ -56,22 +56,15 @@ const (
 	EngineStateStop EngineState = "stop"
 )
 
-// ExperimentStatus is typecasted to string for supporting the values below.
 type ExperimentStatus string
 
 const (
-	// ExperimentStatusRunning is status of Experiment which is currently running
-	ExperimentStatusRunning ExperimentStatus = "Running"
-	// ExperimentStatusCompleted is status of Experiment which has been completed
-	ExperimentStatusCompleted ExperimentStatus = "Completed"
-	// ExperimentStatusWaiting is status of Experiment which will be executed via a Job
-	ExperimentStatusWaiting ExperimentStatus = "Waiting for Job Creation"
-	// ExperimentStatusNotFound is status of Experiment which is not found inside ChaosNamespace
-	ExperimentStatusNotFound ExperimentStatus = "ChaosExperiment Not Found"
-	// ExperimentStatusSuccessful is status of a Successful experiment execution
+	ExperimentStatusRunning    ExperimentStatus = "Running"
+	ExperimentStatusCompleted  ExperimentStatus = "Completed"
+	ExperimentStatusWaiting    ExperimentStatus = "Waiting for Job Creation"
+	ExperimentStatusNotFound   ExperimentStatus = "ChaosExperiment Not Found"
 	ExperimentStatusSuccessful ExperimentStatus = "Execution Successful"
-	// ExperimentStatusAborted is status of a Experiment is forcefully aborted
-	ExperimentStatusAborted ExperimentStatus = "Forcefully Aborted"
+	ExperimentStatusAborted    ExperimentStatus = "Forcefully Aborted"
 )
 
 // EngineStatus provides interface for all supported strings in status.EngineStatus
@@ -102,7 +95,7 @@ const (
 
 // ChaosEngineStatus derives information about status of individual experiments
 type ChaosEngineStatus struct {
-	//EngineStatus is a typed string to support limited values for ChaosEngine Status
+	//
 	EngineStatus EngineStatus `json:"engineStatus"`
 	//Detailed status of individual experiments
 	Experiments []ExperimentStatuses `json:"experiments"`
@@ -137,8 +130,6 @@ type RunnerInfo struct {
 	Command []string `json:"command,omitempty"`
 	//ImagePullPolicy for runner pod
 	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
-	// Runner Annotations that needs to be provided in the pod for pod that is getting created
-	RunnerAnnotation map[string]string `json:"runnerannotation,omitempty"`
 }
 
 // ExperimentList defines information about chaos experiments defined in the chaos engine
@@ -154,8 +145,7 @@ type ExperimentList struct {
 type ExperimentAttributes struct {
 	//Execution priority of the chaos experiment
 	Rank uint32 `json:"rank"`
-	// It contains env, configmaps, secrets, experimentImage, node selector, custom experiment annotation
-	// which can be provided or overridden from the chaos engine
+	//Environment Varibles to override the default values in chaos-experiments
 	Components ExperimentComponents `json:"components,omitempty"`
 	// K8sProbe contains details of k8s probe, which can be applied on the experiments
 	K8sProbe []K8sProbeAttributes `json:"k8sProbe,omitempty"`

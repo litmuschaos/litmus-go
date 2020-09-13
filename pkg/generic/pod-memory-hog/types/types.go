@@ -26,6 +26,5 @@ type ExperimentDetails struct {
 	TargetPod         string
 	ChaosKillCmd      string
 	LIBImage          string
-	RunID             string
 	Annotations       map[string]string
 }

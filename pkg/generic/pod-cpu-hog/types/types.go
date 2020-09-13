@@ -27,6 +27,5 @@ type ExperimentDetails struct {
 	ChaosInjectCmd   string
 	ChaosKillCmd     string
 	LIBImage         string
-	RunID            string
 	Annotations      map[string]string
 }

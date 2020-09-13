@@ -185,8 +185,8 @@ func RecordAfterFailure(chaosDetails *types.ChaosDetails, resultDetails *types.R
 	ChaosResult(chaosDetails, clients, resultDetails, "EOT")
 
 	// add the summary event in chaos result
-	msg := chaosDetails.ExperimentName + " experiment has been " + resultDetails.Verdict + "ed"
-	types.SetResultEventAttributes(eventsDetails, types.Summary, msg, "Warning", resultDetails)
+	msg := "experiment: " + chaosDetails.ExperimentName + ", Result: " + resultDetails.Verdict
+	types.SetResultEventAttributes(eventsDetails, types.FailVerdict, msg, "Warning", resultDetails)
 	events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosResult")
 
 	// add the summary event in chaos engine
