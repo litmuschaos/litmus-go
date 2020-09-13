@@ -2,6 +2,7 @@ package main
 
 import (
 	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/pod-memory-hog/lib"
+	pumbaLIB "github.com/litmuschaos/litmus-go/chaoslib/pumba/memory-chaos/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/pod-memory-hog/environment"
@@ -124,6 +125,17 @@ func main() {
 		}
 		log.Info("[Confirmation]: Memory of the application pod has been stressed successfully")
 		resultDetails.Verdict = "Pass"
+	} else if experimentsDetails.ChaosLib == "pumba" {
+		err = pumbaLIB.PreparePodMemoryHog(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
+		if err != nil {
+			log.Errorf("[Error]: Memory hog failed due to %v\n", err)
+			failStep := "Memory hog Chaos injection failed"
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+			return
+		}
+		log.Info("[Confirmation]: Memory of the application pod has been stressed successfully")
+		resultDetails.Verdict = "Pass"
+
 	} else {
 		log.Error("[Invalid]: Please Provide the correct LIB")
 		failStep := "Including the litmus lib for pod-memory-hog"

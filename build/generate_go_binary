@@ -34,4 +34,5 @@ go build -o build/_output/container-killer ./chaoslib/litmus/container-kill/help
 go build -o build/_output/cassandra-pod-delete ./experiments/cassandra/pod-delete
 # Build go  binaries for pod-io-stress chaos
 go build -o build/_output/pod-io-stress ./experiments/generic/pod-io-stress/
-
+# Building go binaries for node-io-stress experiment
+go build -o build/_output/node-io-stress ./experiments/generic/node-io-stress/

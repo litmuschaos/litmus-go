@@ -14,7 +14,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.ExperimentName = Getenv("EXPERIMENT_NAME", "pod-cpu-hog")
 	experimentDetails.ChaosNamespace = Getenv("CHAOS_NAMESPACE", "litmus")
 	experimentDetails.EngineName = Getenv("CHAOSENGINE", "")
-	experimentDetails.ChaosDuration, _ = strconv.Atoi(Getenv("TOTAL_CHAOS_DURATION", "30"))
+	experimentDetails.ChaosDuration, _ = strconv.Atoi(Getenv("TOTAL_CHAOS_DURATION", "60"))
 	experimentDetails.ChaosInterval, _ = strconv.Atoi(Getenv("CHAOS_INTERVAL", "10"))
 	experimentDetails.RampTime, _ = strconv.Atoi(Getenv("RAMP_TIME", "0"))
 	experimentDetails.ChaosLib = Getenv("LIB", "litmus")
@@ -31,6 +31,8 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.TargetPod = Getenv("TARGET_POD", "")
 	experimentDetails.ChaosInjectCmd = Getenv("CHAOS_INJECT_COMMAND", "md5sum /dev/zero")
 	experimentDetails.ChaosKillCmd = Getenv("CHAOS_KILL_COMMAND", "kill $(find /proc -name exe -lname '*/md5sum' 2>&1 | grep -v 'Permission denied' | awk -F/ '{print $(NF-1)}' |  head -n 1)")
+	experimentDetails.LIBImage = Getenv("LIB_IMAGE", "gaiaadm/pumba")
+
 }
 
 // Getenv fetch the env and set the default value, if any
