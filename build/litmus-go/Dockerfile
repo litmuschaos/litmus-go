@@ -26,7 +26,7 @@ FROM ubuntu:bionic
 LABEL maintainer="LitmusChaos"
 
 #Installing necessary ubuntu packages
-RUN apt-get update && apt-get install -y curl bash systemd 
+RUN apt-get update && apt-get install -y curl bash systemd iproute2
 
 #Installing Kubectl
 ENV KUBE_LATEST_VERSION="v1.18.0"

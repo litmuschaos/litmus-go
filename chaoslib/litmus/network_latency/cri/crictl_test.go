@@ -67,7 +67,7 @@ func TestCrictl(t *testing.T) {
 }`
 
 	expectedPID := 72496
-	PID, err := parsePIDFromJson([]byte(json))
+	PID, err := parsePIDFromJSON([]byte(json), "crio")
 	if err != nil {
 		t.Fatalf("Fail to parse json: %s", err)
 	}
