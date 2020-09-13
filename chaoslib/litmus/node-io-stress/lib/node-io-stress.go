@@ -147,9 +147,9 @@ func GetContainerArguments(experimentsDetails *experimentTypes.ExperimentDetails
 		}
 	} else {
 		if experimentsDetails.FilesystemUtilizationPercentage == 0 {
-			hddbytes = strconv.Itoa(experimentsDetails.FilesystemUtilizationBytes) + "G" //Util bytes you gave
+			hddbytes = strconv.Itoa(experimentsDetails.FilesystemUtilizationBytes) + "G"
 		} else {
-			hddbytes = strconv.Itoa(experimentsDetails.FilesystemUtilizationPercentage) + "%" //Util % you gave
+			hddbytes = strconv.Itoa(experimentsDetails.FilesystemUtilizationPercentage) + "%"
 			log.Warn("Both FsUtilPercentage & FsUtilBytes provided as inputs, using the FsUtilPercentage value to proceed with stress exp")
 		}
 	}
