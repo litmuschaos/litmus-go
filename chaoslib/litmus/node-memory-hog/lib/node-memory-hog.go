@@ -172,7 +172,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 						"--vm-bytes",
 						strconv.Itoa(experimentsDetails.MemoryPercentage) + "%",
 						"--timeout",
-						strconv.Itoa(experimentsDetails.ChaosDuration),
+						strconv.Itoa(experimentsDetails.ChaosDuration) + "s",
 					},
 				},
 			},

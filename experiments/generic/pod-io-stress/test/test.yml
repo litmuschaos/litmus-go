@@ -1,0 +1,64 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: litmus-experiment
+spec:
+  replicas: 1
+  selector: 
+    matchLabels:
+      app: litmus-experiment
+  template:
+    metadata:
+      labels:
+        app: litmus-experiment
+    spec:
+      serviceAccountName: pod-io-stress-sa
+      containers:
+      - name: gotest
+        image: busybox
+        command:
+          - sleep 
+          - "3600"
+        env:
+          - name: APP_NAMESPACE
+            value: 'default'
+
+          - name: APP_LABEL
+            value: 'run=nginx'
+
+          - name: APP_KIND
+            value: 'deployment'
+
+          - name: TOTAL_CHAOS_DURATION
+            value: '60'
+
+          - name: FILESYSTEM_UTILIZATION_PERCENTAGE
+            value: ''
+
+          - name: FILESYSTEM_UTILIZATION_BYTES
+            value: ''            
+
+          - name: NUMBER_OF_WORKERS
+            value: '4'
+
+          ## Percentage of total pods to target
+          - name: PODS_AFFECTED_PERC
+            value: '100'
+
+          - name: LIB
+            value: 'litmus'
+
+          - name: TARGET_POD
+            value: ''
+
+          - name: CHAOS_NAMESPACE
+            value: 'default'
+
+          - name: RAMP_TIME
+            value: ''
+
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
