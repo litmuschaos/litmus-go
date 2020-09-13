@@ -1,7 +1,6 @@
 package lib
 
 import (
-	"math/rand"
 	"strconv"
 	"time"
 
@@ -13,7 +12,6 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
-	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -26,13 +24,14 @@ func PreparePodDelete(experimentsDetails *experimentTypes.ExperimentDetails, cli
 
 	//Getting the iteration count for the pod deletion
 	GetIterations(experimentsDetails)
+
 	//Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
 		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", strconv.Itoa(experimentsDetails.RampTime))
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 
-	err = PodDeleteChaos(experimentsDetails, clients, eventsDetails, chaosDetails)
+	err = PodDeleteChaos(experimentsDetails, clients, eventsDetails, chaosDetails, resultDetails)
 	if err != nil {
 		return errors.Errorf("Unable to delete the application pods, due to %v", err)
 	}
@@ -58,34 +57,20 @@ func GetIterations(experimentsDetails *experimentTypes.ExperimentDetails) {
 }
 
 //PodDeleteChaos deletes the random single/multiple pods
-func PodDeleteChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+func PodDeleteChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails) error {
 
+	GracePeriod := int64(0)
 	//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
 	ChaosStartTimeStamp := time.Now().Unix()
-	GracePeriod := int64(0)
 
-	for x := 0; x < experimentsDetails.Iterations; x++ {
+	for count := 0; count < experimentsDetails.Iterations; count++ {
 
-		targetPodList := []string{}
-
-		isPodAvailable, err := common.CheckForAvailibiltyOfPod(experimentsDetails.AppNS, experimentsDetails.TargetPod, clients)
+		// Get the target pod details for the chaos execution
+		// if the target pod is not defined it will derive the random target pod list using pod affected percentage
+		targetPodList, err := common.GetPodList(experimentsDetails.AppNS, experimentsDetails.TargetPod, experimentsDetails.AppLabel, experimentsDetails.PodsAffectedPerc, clients)
 		if err != nil {
-			return err
+			return errors.Errorf("Unable to get the target pod list due to, err: %v", err)
 		}
-
-		if isPodAvailable {
-			targetPodList = append(targetPodList, experimentsDetails.TargetPod)
-
-		} else {
-			log.Info("selecting a random pod with specified labels")
-			targetPodList, err = PreparePodList(experimentsDetails, clients)
-			if err != nil {
-				return err
-			}
-		}
-
-		log.InfoWithValues("[Info]: Killing the following pods", logrus.Fields{
-			"PodList": targetPodList})
 
 		if experimentsDetails.EngineName != "" {
 			msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on application pod"
@@ -94,15 +79,19 @@ func PodDeleteChaos(experimentsDetails *experimentTypes.ExperimentDetails, clien
 		}
 
 		//Deleting the application pod
-		for _, pods := range targetPodList {
+		for _, pod := range targetPodList.Items {
+
+			log.InfoWithValues("[Info]: Killing the following pods", logrus.Fields{
+				"PodName": pod.Name})
+
 			if experimentsDetails.Force == true {
-				err = clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Delete(pods, &v1.DeleteOptions{GracePeriodSeconds: &GracePeriod})
+				err = clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Delete(pod.Name, &v1.DeleteOptions{GracePeriodSeconds: &GracePeriod})
 			} else {
-				err = clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Delete(pods, &v1.DeleteOptions{})
+				err = clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Delete(pod.Name, &v1.DeleteOptions{})
 			}
-		}
-		if err != nil {
-			return err
+			if err != nil {
+				return err
+			}
 		}
 
 		//Waiting for the chaos interval after chaos injection
@@ -110,6 +99,7 @@ func PodDeleteChaos(experimentsDetails *experimentTypes.ExperimentDetails, clien
 			log.Infof("[Wait]: Wait for the chaos interval %vs", strconv.Itoa(experimentsDetails.ChaosInterval))
 			common.WaitForDuration(experimentsDetails.ChaosInterval)
 		}
+
 		//Verify the status of pod after the chaos injection
 		log.Info("[Status]: Verification for the recreation of application pod")
 		if err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
@@ -124,6 +114,7 @@ func PodDeleteChaos(experimentsDetails *experimentTypes.ExperimentDetails, clien
 		chaosDiffTimeStamp := ChaosCurrentTimeStamp - ChaosStartTimeStamp
 
 		if int(chaosDiffTimeStamp) >= experimentsDetails.ChaosDuration {
+			log.Infof("[Chaos]: Time is up for experiment: %v", experimentsDetails.ExperimentName)
 			break
 		}
 
@@ -131,36 +122,4 @@ func PodDeleteChaos(experimentsDetails *experimentTypes.ExperimentDetails, clien
 	log.Infof("[Completion]: %v chaos is done", experimentsDetails.ExperimentName)
 
 	return nil
-}
-
-//PreparePodList derive the list of target pod for deletion
-//It is based on the KillCount value
-func PreparePodList(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) ([]string, error) {
-
-	var targetPodList []string
-
-	err = retry.
-		Times(uint(experimentsDetails.Timeout / experimentsDetails.Delay)).
-		Wait(time.Duration(experimentsDetails.Delay) * time.Second).
-		Try(func(attempt uint) error {
-			pods, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).List(v1.ListOptions{LabelSelector: experimentsDetails.AppLabel})
-			if err != nil || len(pods.Items) == 0 {
-				return errors.Errorf("Unable to get the pod, err: %v", err)
-			}
-			index := rand.Intn(len(pods.Items))
-			//Adding the first pod only, if KillCount is not set or 0
-			//Otherwise derive the min(KIllCount,len(pod_list)) pod
-			if experimentsDetails.KillCount == 0 {
-				targetPodList = append(targetPodList, pods.Items[index].Name)
-			} else {
-				for i := 0; i < math.Minimum(experimentsDetails.KillCount, len(pods.Items)); i++ {
-					targetPodList = append(targetPodList, pods.Items[index].Name)
-					index = (index + 1) % len(pods.Items)
-				}
-			}
-
-			return nil
-		})
-
-	return targetPodList, err
 }

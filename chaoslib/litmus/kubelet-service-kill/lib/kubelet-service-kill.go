@@ -1,9 +1,7 @@
 package lib
 
 import (
-	"math/rand"
 	"strconv"
-	"time"
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
@@ -21,9 +19,10 @@ import (
 // PrepareKubeletKill contains prepration steps before chaos injection
 func PrepareKubeletKill(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
+	var err error
 	if experimentsDetails.AppNode == "" {
 		//Select node for kubelet-service-kill
-		_, appNodeName, err := GetApplicationPod(experimentsDetails, clients)
+		appNodeName, err := common.GetNodeName(experimentsDetails.AppNS, experimentsDetails.AppLabel, clients)
 		if err != nil {
 			return errors.Errorf("Unable to get the application nodename due to, err: %v", err)
 		}
@@ -49,8 +48,14 @@ func PrepareKubeletKill(experimentsDetails *experimentTypes.ExperimentDetails, c
 		events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 	}
 
+	// Get Chaos Pod Annotation
+	experimentsDetails.Annotations, err = common.GetChaosPodAnnotation(experimentsDetails.ChaosPodName, experimentsDetails.ChaosNamespace, clients)
+	if err != nil {
+		return errors.Errorf("unable to get annotation, due to %v", err)
+	}
+
 	// Creating the helper pod to perform node memory hog
-	err := CreateHelperPod(experimentsDetails, clients, experimentsDetails.AppNode)
+	err = CreateHelperPod(experimentsDetails, clients, experimentsDetails.AppNode)
 	if err != nil {
 		return errors.Errorf("Unable to create the helper pod, err: %v", err)
 	}
@@ -99,22 +104,6 @@ func PrepareKubeletKill(experimentsDetails *experimentTypes.ExperimentDetails, c
 	return nil
 }
 
-//GetApplicationPod will select a random replica of application pod for chaos
-//It will also get the node name of the application pod
-func GetApplicationPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) (string, string, error) {
-	podList, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).List(v1.ListOptions{LabelSelector: experimentsDetails.AppLabel})
-	if err != nil || len(podList.Items) == 0 {
-		return "", "", errors.Wrapf(err, "Fail to get the application pod in %v namespace", experimentsDetails.AppNS)
-	}
-
-	rand.Seed(time.Now().Unix())
-	randomIndex := rand.Intn(len(podList.Items))
-	applicationName := podList.Items[randomIndex].Name
-	nodeName := podList.Items[randomIndex].Spec.NodeName
-
-	return applicationName, nodeName, nil
-}
-
 // CreateHelperPod derive the attributes for helper pod and create the helper pod
 func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, appNodeName string) error {
 
@@ -128,6 +117,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 				"name":     experimentsDetails.ExperimentName + "-" + experimentsDetails.RunID,
 				"chaosUID": string(experimentsDetails.ChaosUID),
 			},
+			Annotations: experimentsDetails.Annotations,
 		},
 		Spec: apiv1.PodSpec{
 			RestartPolicy: apiv1.RestartPolicyNever,
@@ -153,7 +143,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 			Containers: []apiv1.Container{
 				{
 					Name:            experimentsDetails.ExperimentName,
-					Image:           "ubuntu:16.04",
+					Image:           experimentsDetails.LIBImage,
 					ImagePullPolicy: apiv1.PullAlways,
 					Command: []string{
 						"/bin/bash",

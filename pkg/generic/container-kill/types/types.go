@@ -29,4 +29,6 @@ type ExperimentDetails struct {
 	Delay               int
 	TargetPod           string
 	ContainerRuntime    string
+	PodsAffectedPerc    int
+	Annotations         map[string]string
 }

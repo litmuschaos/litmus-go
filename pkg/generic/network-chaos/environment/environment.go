@@ -10,13 +10,13 @@ import (
 )
 
 //GetENV fetches all the env variables from the runner pod
-func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string) {
-	experimentDetails.ExperimentName = expName
+func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
+	experimentDetails.ExperimentName = Getenv("EXPERIMENT_NAME", "")
 	experimentDetails.ChaosNamespace = Getenv("CHAOS_NAMESPACE", "litmus")
 	experimentDetails.EngineName = Getenv("CHAOSENGINE", "")
 	experimentDetails.ChaosDuration, _ = strconv.Atoi(Getenv("TOTAL_CHAOS_DURATION", "60"))
 	experimentDetails.RampTime, _ = strconv.Atoi(Getenv("RAMP_TIME", "0"))
-	experimentDetails.ChaosLib = Getenv("LIB", "pumba")
+	experimentDetails.ChaosLib = Getenv("LIB", "litmus")
 	experimentDetails.AppNS = Getenv("APP_NAMESPACE", "")
 	experimentDetails.AppLabel = Getenv("APP_LABEL", "")
 	experimentDetails.AppKind = Getenv("APP_KIND", "")
@@ -24,7 +24,6 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string
 	experimentDetails.InstanceID = Getenv("INSTANCE_ID", "")
 	experimentDetails.LIBImage = Getenv("LIB_IMAGE", "litmuschaos/go-runner:latest")
 	experimentDetails.ChaosPodName = Getenv("POD_NAME", "")
-	experimentDetails.RunID = Getenv("RunID", "")
 	experimentDetails.NetworkPacketDuplicationPercentage, _ = strconv.Atoi(Getenv("NETWORK_PACKET_DUPLICATION_PERCENTAGE", "100"))
 	experimentDetails.NetworkLatency, _ = strconv.Atoi(Getenv("NETWORK_LATENCY", "60000"))
 	experimentDetails.NetworkPacketLossPercentage, _ = strconv.Atoi(Getenv("NETWORK_PACKET_LOSS_PERCENTAGE", "100"))
@@ -35,7 +34,11 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string
 	experimentDetails.Delay, _ = strconv.Atoi(Getenv("STATUS_CHECK_DELAY", "2"))
 	experimentDetails.Timeout, _ = strconv.Atoi(Getenv("STATUS_CHECK_TIMEOUT", "180"))
 	experimentDetails.TargetPod = Getenv("TARGET_POD", "")
+	experimentDetails.PodsAffectedPerc, _ = strconv.Atoi(Getenv("PODS_AFFECTED_PERC", "0"))
 	experimentDetails.TargetIPs = Getenv("TARGET_IPs", "")
+	experimentDetails.ContainerRuntime = Getenv("CONTAINER_RUNTIME", "docker")
+	experimentDetails.ChaosServiceAccount = Getenv("CHAOS_SERVICE_ACCOUNT", "")
+	experimentDetails.ContainerPath = Getenv("CONTAINER_PATH", "/run/containerd/containerd.sock")
 }
 
 // Getenv fetch the env and set the default value, if any

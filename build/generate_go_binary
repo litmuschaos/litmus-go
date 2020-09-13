@@ -32,3 +32,9 @@ go build -o build/_output/${GOARCH}/pod-autoscaler ./experiments/generic/pod-aut
 go build -o build/_output/${GOARCH}/container-killer ./chaoslib/litmus/container-kill/helper
 # Buiding go binaries for cassandra-pod-delete
 go build -o build/_output/${GOARCH}/cassandra-pod-delete ./experiments/cassandra/pod-delete
+# Buiding go binaries for network_chaos helper
+go build -o build/_output/${GOARCH}/network-chaos ./chaoslib/litmus/network-chaos/helper
+# Build go  binaries for pod-io-stress chaos
+go build -o build/_output/${GOARCH}/pod-io-stress ./experiments/generic/pod-io-stress/
+# Building go binaries for node-io-stress experiment
+go build -o build/_output/${GOARCH}/node-io-stress ./experiments/generic/node-io-stress/

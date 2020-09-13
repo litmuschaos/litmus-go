@@ -11,8 +11,8 @@ import (
 )
 
 //GetENV fetches all the env variables from the runner pod
-func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string) {
-	experimentDetails.ExperimentName = expName
+func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
+	experimentDetails.ExperimentName = Getenv("EXPERIMENT_NAME", "kubelet-service-kill")
 	experimentDetails.ChaosNamespace = Getenv("CHAOS_NAMESPACE", "litmus")
 	experimentDetails.EngineName = Getenv("CHAOSENGINE", "")
 	experimentDetails.ChaosDuration, _ = strconv.Atoi(Getenv("TOTAL_CHAOS_DURATION", "90"))
@@ -28,6 +28,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string
 	experimentDetails.AppNode = Getenv("APP_NODE", "")
 	experimentDetails.Delay, _ = strconv.Atoi(Getenv("STATUS_CHECK_DELAY", "2"))
 	experimentDetails.Timeout, _ = strconv.Atoi(Getenv("STATUS_CHECK_TIMEOUT", "180"))
+	experimentDetails.LIBImage = Getenv("LIB_IMAGE", "litmuschaos/go-runner:ci")
 }
 
 // Getenv fetch the env and set the default value, if any

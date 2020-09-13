@@ -23,4 +23,6 @@ type ExperimentDetails struct {
 	AppNode          string
 	Timeout          int
 	Delay            int
+	Annotations      map[string]string
+	LIBImage         string
 }

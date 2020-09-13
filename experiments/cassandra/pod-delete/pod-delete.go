@@ -39,7 +39,7 @@ func main() {
 
 	//Fetching all the ENV passed from the runner pod
 	log.Info("[PreReq]: Getting the ENV for the cassandra-pod-delete experiment")
-	experimentEnv.GetENV(&experimentsDetails, "cassandra-pod-delete")
+	experimentEnv.GetENV(&experimentsDetails)
 
 	// Intialise the chaos attributes
 	experimentEnv.InitialiseChaosVariables(&chaosDetails, &experimentsDetails)

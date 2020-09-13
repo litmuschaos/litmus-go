@@ -1,9 +1,7 @@
 package lib
 
 import (
-	"math/rand"
 	"strconv"
-	"time"
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
@@ -21,14 +19,18 @@ import (
 // PrepareNodeMemoryHog contains prepration steps before chaos injection
 func PrepareNodeMemoryHog(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
-	//Select the node name
-	appNodeName, err := GetNodeName(experimentsDetails, clients)
-	if err != nil {
-		return errors.Errorf("Unable to get the node name due to, err: %v", err)
+	if experimentsDetails.AppNode == "" {
+		//Select node for kubelet-service-kill
+		appNodeName, err := common.GetNodeName(experimentsDetails.AppNS, experimentsDetails.AppLabel, clients)
+		if err != nil {
+			return errors.Errorf("Unable to get the application nodename due to, err: %v", err)
+		}
+
+		experimentsDetails.AppNode = appNodeName
 	}
 
 	log.InfoWithValues("[Info]: Details of application under chaos injection", logrus.Fields{
-		"NodeName":             appNodeName,
+		"NodeName":             experimentsDetails.AppNode,
 		"MemoryHog Percentage": experimentsDetails.MemoryPercentage,
 	})
 
@@ -41,13 +43,28 @@ func PrepareNodeMemoryHog(experimentsDetails *experimentTypes.ExperimentDetails,
 	}
 
 	if experimentsDetails.EngineName != "" {
-		msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on " + appNodeName + " node"
+		msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on " + experimentsDetails.AppNode + " node"
 		types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
 		events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 	}
 
+	//Getting node memory details
+	memoryCapacity, memoryAllocatable, err := GetNodeMemoryDetails(experimentsDetails.AppNode, clients)
+	if err != nil {
+		return errors.Errorf("Unable to get the node memory details, err: %v", err)
+	}
+
+	// Get the total memory percentage wrt allocatable memory
+	experimentsDetails.MemoryPercentage = CalculateMemoryPercentage(experimentsDetails, clients, memoryCapacity, memoryAllocatable)
+
+	// Get Chaos Pod Annotation
+	experimentsDetails.Annotations, err = common.GetChaosPodAnnotation(experimentsDetails.ChaosPodName, experimentsDetails.ChaosNamespace, clients)
+	if err != nil {
+		return errors.Errorf("unable to get annotation, due to %v", err)
+	}
+
 	// Creating the helper pod to perform node memory hog
-	err = CreateHelperPod(experimentsDetails, clients, appNodeName)
+	err = CreateHelperPod(experimentsDetails, clients)
 	if err != nil {
 		return errors.Errorf("Unable to create the helper pod, err: %v", err)
 	}
@@ -69,7 +86,7 @@ func PrepareNodeMemoryHog(experimentsDetails *experimentTypes.ExperimentDetails,
 
 	// Checking the status of application node
 	log.Info("[Status]: Getting the status of application node")
-	err = status.CheckNodeStatus(appNodeName, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
+	err = status.CheckNodeStatus(experimentsDetails.AppNode, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 	if err != nil {
 		log.Warn("Application node is not in the ready state, you may need to manually recover the node")
 	}
@@ -89,22 +106,43 @@ func PrepareNodeMemoryHog(experimentsDetails *experimentTypes.ExperimentDetails,
 	return nil
 }
 
-//GetNodeName will select a random replica of application pod and return the node name of that application pod
-func GetNodeName(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) (string, error) {
-	podList, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).List(v1.ListOptions{LabelSelector: experimentsDetails.AppLabel})
-	if err != nil || len(podList.Items) == 0 {
-		return "", errors.Wrapf(err, "Fail to get the application pod in %v namespace, due to err: %v", experimentsDetails.AppNS, err)
+// GetNodeMemoryDetails will return the total memory capacity and memory allocatable of an application node
+func GetNodeMemoryDetails(appNodeName string, clients clients.ClientSets) (int, int, error) {
+
+	nodeDetails, err := clients.KubeClient.CoreV1().Nodes().Get(appNodeName, v1.GetOptions{})
+	if err != nil {
+		return 0, 0, errors.Errorf("Fail to get nodesDetails, due to %v", err)
 	}
 
-	rand.Seed(time.Now().Unix())
-	randomIndex := rand.Intn(len(podList.Items))
-	nodeName := podList.Items[randomIndex].Spec.NodeName
+	memoryCapacity := int(nodeDetails.Status.Capacity.Memory().Value())
+	memoryAllocatable := int(nodeDetails.Status.Allocatable.Memory().Value())
 
-	return nodeName, nil
+	if memoryCapacity == 0 || memoryAllocatable == 0 {
+		return memoryCapacity, memoryAllocatable, errors.Errorf("Fail to get memory details of the application node")
+	}
+
+	return memoryCapacity, memoryAllocatable, nil
+
+}
+
+// CalculateMemoryPercentage will calculate the memory percentage under chaos wrt allocatable memory
+func CalculateMemoryPercentage(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, memoryCapacity, memoryAllocatable int) int {
+
+	var totalMemoryPercentage int
+
+	//Getting the total memory under chaos
+	memoryForChaos := ((float64(experimentsDetails.MemoryPercentage) / 100) * float64(memoryCapacity))
+
+	//Get the percentage of memory under chaos wrt allocatable memory
+	totalMemoryPercentage = int((float64(memoryForChaos) / float64(memoryAllocatable)) * 100)
+
+	log.Infof("[Info]: PercentageOfMemoryCapacityToBeUsed: %d, which is %d percent of Allocatable Memory", experimentsDetails.MemoryPercentage, totalMemoryPercentage)
+
+	return totalMemoryPercentage
 }
 
 // CreateHelperPod derive the attributes for helper pod and create the helper pod
-func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, appNodeName string) error {
+func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) error {
 
 	helperPod := &apiv1.Pod{
 		ObjectMeta: v1.ObjectMeta{
@@ -115,10 +153,11 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 				"name":     experimentsDetails.ExperimentName + "-" + experimentsDetails.RunID,
 				"chaosUID": string(experimentsDetails.ChaosUID),
 			},
+			Annotations: experimentsDetails.Annotations,
 		},
 		Spec: apiv1.PodSpec{
 			RestartPolicy: apiv1.RestartPolicyNever,
-			NodeName:      appNodeName,
+			NodeName:      experimentsDetails.AppNode,
 			Containers: []apiv1.Container{
 				{
 					Name:            experimentsDetails.ExperimentName,
@@ -133,7 +172,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 						"--vm-bytes",
 						strconv.Itoa(experimentsDetails.MemoryPercentage) + "%",
 						"--timeout",
-						strconv.Itoa(experimentsDetails.ChaosDuration),
+						strconv.Itoa(experimentsDetails.ChaosDuration) + "s",
 					},
 				},
 			},

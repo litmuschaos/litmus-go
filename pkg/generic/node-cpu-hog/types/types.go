@@ -24,4 +24,6 @@ type ExperimentDetails struct {
 	AuxiliaryAppInfo string
 	Timeout          int
 	Delay            int
+	Annotations      map[string]string
+	AppNode          string
 }
