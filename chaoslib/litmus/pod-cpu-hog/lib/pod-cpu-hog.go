@@ -97,7 +97,7 @@ func ExperimentCPU(experimentsDetails *experimentTypes.ExperimentDetails, client
 						events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 
 						// generating summary event in chaosresult
-						types.SetResultEventAttributes(eventsDetails, types.Summary, msg, "Warning", resultDetails)
+						types.SetResultEventAttributes(eventsDetails, types.StoppedVerdict, msg, "Warning", resultDetails)
 						events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosResult")
 						os.Exit(1)
 					case <-endTime:

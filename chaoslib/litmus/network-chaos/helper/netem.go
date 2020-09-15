@@ -17,6 +17,7 @@ import (
 	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/network-chaos/environment"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/network-chaos/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
+	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/pkg/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,6 +32,7 @@ func main() {
 	clients := clients.ClientSets{}
 	eventsDetails := types.EventDetails{}
 	chaosDetails := types.ChaosDetails{}
+	resultDetails := types.ResultDetails{}
 
 	//Getting kubeConfig and Generate ClientSets
 	if err := clients.GenerateClientSetFromKubeConfig(); err != nil {
@@ -44,7 +46,13 @@ func main() {
 	// Intialise the chaos attributes
 	experimentEnv.InitialiseChaosVariables(&chaosDetails, &experimentsDetails)
 
-	err := PreparePodNetworkChaos(&experimentsDetails, clients, &eventsDetails, &chaosDetails)
+	// Intialise Chaos Result Parameters
+	types.SetResultAttributes(&resultDetails, chaosDetails)
+
+	// Set the chaos result uid
+	result.SetResultUID(&resultDetails, clients, &chaosDetails)
+
+	err := PreparePodNetworkChaos(&experimentsDetails, clients, &eventsDetails, &chaosDetails, &resultDetails)
 	if err != nil {
 		log.Fatalf("helper pod failed due to err: %v", err)
 	}
@@ -52,7 +60,7 @@ func main() {
 }
 
 //PreparePodNetworkChaos contains the prepration steps before chaos injection
-func PreparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+func PreparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails) error {
 
 	// extract out the pid of the target container
 	targetPID, err := GetPID(experimentsDetails, clients)
@@ -88,6 +96,20 @@ loop:
 		select {
 		case <-signChan:
 			log.Info("[Chaos]: Killing process started because of terminated signal received")
+			// updating the chaosresult after stopped
+			failStep := "Network Chaos injection stopped!"
+			types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep)
+			result.ChaosResult(chaosDetails, clients, resultDetails, "EOT")
+
+			// generating summary event in chaosengine
+			msg := experimentsDetails.ExperimentName + " experiment has been aborted"
+			types.SetEngineEventAttributes(eventsDetails, types.Summary, msg, "Warning", chaosDetails)
+			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
+
+			// generating summary event in chaosresult
+			types.SetResultEventAttributes(eventsDetails, types.StoppedVerdict, msg, "Warning", resultDetails)
+			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosResult")
+
 			if err = tc.Killnetem(targetPID); err != nil {
 				log.Errorf("unable to kill netem process, err :%v", err)
 
