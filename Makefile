@@ -85,7 +85,7 @@ litmus-go-push:
 	@echo "-------------------"
 	@echo "--> go-runner image" 
 	@echo "-------------------"
-	REPONAME="litmuschaos" IMGNAME="go-runner" IMGTAG="ci" ./build/push
+	REPONAME="litmuschaos" IMGNAME="go-runner" IMGTAG="dev" ./build/push
 	
 .PHONY: security-checks
 security-checks: trivy-security-check
@@ -94,5 +94,5 @@ trivy-security-check:
 	@echo "------------------------"
 	@echo "--> Trivy Security Check"
 	@echo "------------------------"
-	./trivy --exit-code 0 --severity HIGH --no-progress litmuschaos/go-runner:ci
-	./trivy --exit-code 1 --severity CRITICAL --no-progress litmuschaos/go-runner:ci
+	./trivy --exit-code 0 --severity HIGH --no-progress litmuschaos/go-runner:dev
+	./trivy --exit-code 1 --severity CRITICAL --no-progress litmuschaos/go-runner:dev

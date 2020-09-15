@@ -25,7 +25,6 @@ RUN curl -L https://github.com/alexei-led/pumba/releases/download/${PUMBA_VERSIO
 COPY ./build/_output/${TARGETARCH} ./litmus/experiments
 
 RUN useradd -ms /bin/bash ${USER_NAME} 
-RUN chmod +x litmus
 WORKDIR /litmus
 RUN chown -R ${USER_NAME}:root /litmus
 USER ${USER_NAME}

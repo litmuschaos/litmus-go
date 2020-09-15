@@ -19,6 +19,8 @@ const (
 	PassVerdict string = "Pass"
 	// FailVerdict marked the verdict as failed in the end of experiment
 	FailVerdict string = "Fail"
+	// StoppedVerdict marked the verdict as stopped in the end of experiment
+	StoppedVerdict string = "Stopped"
 )
 
 // ResultDetails is for collecting all the chaos-result-related details

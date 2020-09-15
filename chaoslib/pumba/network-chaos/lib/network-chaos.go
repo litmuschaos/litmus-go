@@ -1,6 +1,7 @@
 package lib
 
 import (
+	"net"
 	"strconv"
 	"strings"
 
@@ -176,7 +177,8 @@ func GetContainerArguments(experimentsDetails *experimentTypes.ExperimentDetails
 	}
 
 	args := baseArgs
-	args = AddTargetIpsArgs(experimentsDetails, args)
+	args = AddTargetIpsArgs(experimentsDetails.TargetIPs, args)
+	args = AddTargetIpsArgs(GetIpsForTargetHosts(experimentsDetails.TargetHosts), args)
 	if experimentsDetails.ExperimentName == "pod-network-duplication" {
 		args = append(args, "duplicate", "--percent", strconv.Itoa(experimentsDetails.NetworkPacketDuplicationPercentage))
 	} else if experimentsDetails.ExperimentName == "pod-network-latency" {
@@ -192,13 +194,34 @@ func GetContainerArguments(experimentsDetails *experimentTypes.ExperimentDetails
 }
 
 // AddTargetIpsArgs inserts a comma-separated list of targetIPs (if provided by the user) into the pumba command/args
-func AddTargetIpsArgs(experimentsDetails *experimentTypes.ExperimentDetails, args []string) []string {
-	if experimentsDetails.TargetIPs == "" {
+func AddTargetIpsArgs(targetIPs string, args []string) []string {
+	if targetIPs == "" {
 		return args
 	}
-	ips := strings.Split(experimentsDetails.TargetIPs, ",")
+	ips := strings.Split(targetIPs, ",")
 	for i := range ips {
 		args = append(args, "--target", strings.TrimSpace(ips[i]))
 	}
 	return args
+}
+
+// GetIpsForTargetHosts resolves IP addresses for comma-separated list of target hosts and returns comma-separated ips
+func GetIpsForTargetHosts(targetHosts string) string {
+	if targetHosts == "" {
+		return ""
+	}
+	hosts := strings.Split(targetHosts, ",")
+	var commaSeparatedIPs []string
+	for i := range hosts {
+		ips, err := net.LookupIP(hosts[i])
+		if err != nil {
+			log.Infof("Unknown host")
+		} else {
+			for j := range ips {
+				log.Infof("IP address: %v", ips[j])
+				commaSeparatedIPs = append(commaSeparatedIPs, ips[j].String())
+			}
+		}
+	}
+	return strings.Join(commaSeparatedIPs, ",")
 }
