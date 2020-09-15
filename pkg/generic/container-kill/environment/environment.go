@@ -11,8 +11,8 @@ import (
 )
 
 //GetENV fetches all the env variables from the runner pod
-func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string) {
-	experimentDetails.ExperimentName = expName
+func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
+	experimentDetails.ExperimentName = Getenv("EXPERIMENT_NAME", "container-kill")
 	experimentDetails.ChaosNamespace = Getenv("CHAOS_NAMESPACE", "")
 	experimentDetails.EngineName = Getenv("CHAOSENGINE", "")
 	experimentDetails.ChaosDuration, _ = strconv.Atoi(Getenv("TOTAL_CHAOS_DURATION", "20"))
@@ -33,6 +33,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string
 	experimentDetails.Timeout, _ = strconv.Atoi(Getenv("STATUS_CHECK_TIMEOUT", "180"))
 	experimentDetails.TargetPod = Getenv("TARGET_POD", "")
 	experimentDetails.ContainerRuntime = Getenv("CONTAINER_RUNTIME", "docker")
+	experimentDetails.PodsAffectedPerc, _ = strconv.Atoi(Getenv("PODS_AFFECTED_PERC", "0"))
 }
 
 // Getenv fetch the env and set the default value, if any

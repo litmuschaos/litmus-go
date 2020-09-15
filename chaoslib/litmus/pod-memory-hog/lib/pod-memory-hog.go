@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -12,15 +13,12 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-memory-hog/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
-	"github.com/litmuschaos/litmus-go/pkg/math"
 	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	litmusexec "github.com/litmuschaos/litmus-go/pkg/utils/exec"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	core_v1 "k8s.io/api/core/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog"
 )
 
@@ -29,7 +27,7 @@ var err error
 // StressMemory Uses the REST API to exec into the target container of the target pod
 // The function will be constantly increasing the Memory utilisation until it reaches the maximum available or allowed number.
 // Using the TOTAL_CHAOS_DURATION we will need to specify for how long this experiment will last
-func StressMemory(MemoryConsumption, containerName, podName, namespace string, clients clients.ClientSets) error {
+func StressMemory(MemoryConsumption, containerName, podName, namespace string, clients clients.ClientSets, stressErr chan error) {
 
 	log.Infof("The memory consumption is: %v", MemoryConsumption)
 
@@ -41,10 +39,9 @@ func StressMemory(MemoryConsumption, containerName, podName, namespace string, c
 
 	litmusexec.SetExecCommandAttributes(&execCommandDetails, podName, containerName, namespace)
 	_, err := litmusexec.Exec(&execCommandDetails, clients, command)
-	if err != nil {
-		return errors.Errorf("Unable to run stress command inside target container, due to err: %v", err)
-	}
-	return nil
+
+	stressErr <- err
+
 }
 
 //ExperimentMemory function orchestrates the experiment by calling the StressMemory function, of every container, of every pod that is targeted
@@ -53,29 +50,14 @@ func ExperimentMemory(experimentsDetails *experimentTypes.ExperimentDetails, cli
 	var endTime <-chan time.Time
 	timeDelay := time.Duration(experimentsDetails.ChaosDuration) * time.Second
 
-	var realpods core_v1.PodList
-
-	isPodAvailable, err := common.CheckForAvailibiltyOfPod(experimentsDetails.AppNS, experimentsDetails.TargetPod, clients)
+	// Get the target pod details for the chaos execution
+	// if the target pod is not defined it will derive the random target pod list using pod affected percentage
+	targetPodList, err := common.GetPodList(experimentsDetails.AppNS, experimentsDetails.TargetPod, experimentsDetails.AppLabel, experimentsDetails.PodsAffectedPerc, clients)
 	if err != nil {
-		return err
+		return errors.Errorf("Unable to get the target pod list due to, err: %v", err)
 	}
 
-	if isPodAvailable {
-		pod, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Get(experimentsDetails.TargetPod, v1.GetOptions{})
-		if err != nil {
-			return err
-		}
-		realpods.Items = append(realpods.Items, *pod)
-
-	} else {
-		log.Info("selecting a random pod with specified labels")
-		realpods, err = PreparePodList(experimentsDetails, clients, resultDetails)
-		if err != nil {
-			return err
-		}
-	}
-
-	for _, pod := range realpods.Items {
+	for _, pod := range targetPodList.Items {
 
 		for _, container := range pod.Status.ContainerStatuses {
 			if container.Ready != true {
@@ -91,10 +73,11 @@ func ExperimentMemory(experimentsDetails *experimentTypes.ExperimentDetails, cli
 				types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
 				events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 			}
+			// creating err channel to recieve the error from the go routine
+			stressErr := make(chan error)
+			go StressMemory(strconv.Itoa(experimentsDetails.MemoryConsumption), container.Name, pod.Name, experimentsDetails.AppNS, clients, stressErr)
 
-			go StressMemory(strconv.Itoa(experimentsDetails.MemoryConsumption), container.Name, pod.Name, experimentsDetails.AppNS, clients)
-
-			log.Infof("[Chaos]:Waiting for: %vs", strconv.Itoa(experimentsDetails.ChaosDuration))
+			log.Infof("[Chaos]:Waiting for: %vs", experimentsDetails.ChaosDuration)
 
 			// signChan channel is used to transmit signal notifications.
 			signChan := make(chan os.Signal, 1)
@@ -104,6 +87,16 @@ func ExperimentMemory(experimentsDetails *experimentTypes.ExperimentDetails, cli
 			for {
 				endTime = time.After(timeDelay)
 				select {
+				case err := <-stressErr:
+					// skipping the execution, if recieved any error other than 137, while executing stress command and marked result as fail
+					// it will ignore the error code 137(oom kill), it will skip further execution and marked the result as pass
+					// oom kill occurs if memory to be stressed exceed than the resource limit for the target container
+					if err != nil {
+						if strings.Contains(err.Error(), "137") {
+							return nil
+						}
+						return err
+					}
 				case <-signChan:
 					log.Info("[Chaos]: Killing process started because of terminated signal received")
 					err = KillStressMemory(container.Name, pod.Name, experimentsDetails.AppNS, experimentsDetails.ChaosKillCmd, clients)
@@ -158,31 +151,6 @@ func PrepareMemoryStress(experimentsDetails *experimentTypes.ExperimentDetails, 
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 	return nil
-}
-
-//PreparePodList will also adjust the number of the target pods depending on the specified percentage in PODS_AFFECTED_PERC variable
-func PreparePodList(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails) (core_v1.PodList, error) {
-
-	log.Infof("[Chaos]:Pods percentage to affect is %v", strconv.Itoa(experimentsDetails.PodsAffectedPerc))
-
-	//Getting the list of pods with the given labels and namespaces
-	pods, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).List(v1.ListOptions{LabelSelector: experimentsDetails.AppLabel})
-	if err != nil {
-		resultDetails.FailStep = "Getting the list of pods with the given labels and namespaces"
-		return core_v1.PodList{}, err
-	}
-
-	//If the default value has changed, means that we are aiming for a subset of the pods.
-	if experimentsDetails.PodsAffectedPerc != 100 {
-
-		newPodlistLength := math.Maximum(1, math.Adjustment(experimentsDetails.PodsAffectedPerc, len(pods.Items)))
-
-		pods.Items = pods.Items[:newPodlistLength]
-
-		log.Infof("[Chaos]:Number of pods targeted: %v", strconv.Itoa(newPodlistLength))
-
-	}
-	return *pods, nil
 }
 
 //KillStressMemory function to kill the experiment. Triggered by either timeout of chaos duration or termination of the experiment

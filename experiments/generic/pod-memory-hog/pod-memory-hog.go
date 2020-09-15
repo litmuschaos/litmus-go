@@ -2,6 +2,7 @@ package main
 
 import (
 	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/pod-memory-hog/lib"
+	pumbaLIB "github.com/litmuschaos/litmus-go/chaoslib/pumba/memory-chaos/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/pod-memory-hog/environment"
@@ -40,7 +41,7 @@ func main() {
 
 	//Fetching all the ENV passed from the runner pod
 	log.Infof("[PreReq]: Getting the ENV for the %v experiment", experimentsDetails.ExperimentName)
-	experimentEnv.GetENV(&experimentsDetails, "pod-memory-hog")
+	experimentEnv.GetENV(&experimentsDetails)
 
 	// Intialise the chaos attributes
 	experimentEnv.InitialiseChaosVariables(&chaosDetails, &experimentsDetails)
@@ -63,6 +64,11 @@ func main() {
 
 	// Set the chaos result uid
 	result.SetResultUID(&resultDetails, clients, &chaosDetails)
+
+	// generating the event in chaosresult to marked the verdict as awaited
+	msg := "experiment: " + experimentsDetails.ExperimentName + ", Result: Awaited"
+	types.SetResultEventAttributes(&eventsDetails, types.AwaitedVerdict, msg, "Normal", &resultDetails)
+	events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosResult")
 
 	//DISPLAY THE APP INFORMATION
 	log.InfoWithValues("The application information is as follows", logrus.Fields{
@@ -119,6 +125,17 @@ func main() {
 		}
 		log.Info("[Confirmation]: Memory of the application pod has been stressed successfully")
 		resultDetails.Verdict = "Pass"
+	} else if experimentsDetails.ChaosLib == "pumba" {
+		err = pumbaLIB.PreparePodMemoryHog(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
+		if err != nil {
+			log.Errorf("[Error]: Memory hog failed due to %v\n", err)
+			failStep := "Memory hog Chaos injection failed"
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+			return
+		}
+		log.Info("[Confirmation]: Memory of the application pod has been stressed successfully")
+		resultDetails.Verdict = "Pass"
+
 	} else {
 		log.Error("[Invalid]: Please Provide the correct LIB")
 		failStep := "Including the litmus lib for pod-memory-hog"
@@ -166,13 +183,22 @@ func main() {
 	if err != nil {
 		log.Fatalf("Unable to Update the Chaos Result due to %v\n", err)
 	}
+
+	// generating the event in chaosresult to marked the verdict as pass/fail
+	msg = "experiment: " + experimentsDetails.ExperimentName + ", Result: " + resultDetails.Verdict
+	reason := types.PassVerdict
+	eventType := "Normal"
+	if resultDetails.Verdict != "Pass" {
+		reason = types.FailVerdict
+		eventType = "Warning"
+	}
+	types.SetResultEventAttributes(&eventsDetails, reason, msg, eventType, &resultDetails)
+	events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosResult")
+
 	if experimentsDetails.EngineName != "" {
 		msg := experimentsDetails.ExperimentName + " experiment has been " + resultDetails.Verdict + "ed"
 		types.SetEngineEventAttributes(&eventsDetails, types.Summary, msg, "Normal", &chaosDetails)
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
-	msg := experimentsDetails.ExperimentName + " experiment has been " + resultDetails.Verdict + "ed"
-	types.SetResultEventAttributes(&eventsDetails, types.Summary, msg, "Normal", &resultDetails)
-	events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosResult")
 }

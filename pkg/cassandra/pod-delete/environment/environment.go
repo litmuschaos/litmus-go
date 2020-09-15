@@ -11,11 +11,11 @@ import (
 )
 
 //GetENV fetches all the env variables from the runner pod
-func GetENV(cassandraDetails *cassandraTypes.ExperimentDetails, expName string) {
+func GetENV(cassandraDetails *cassandraTypes.ExperimentDetails) {
 
 	var ChaoslibDetail exp.ExperimentDetails
 
-	ChaoslibDetail.ExperimentName = expName
+	ChaoslibDetail.ExperimentName = Getenv("EXPERIMENT_NAME", "cassandra-pod-delete")
 	ChaoslibDetail.ChaosNamespace = Getenv("CHAOS_NAMESPACE", "litmus")
 	ChaoslibDetail.EngineName = Getenv("CHAOSENGINE", "")
 	ChaoslibDetail.ChaosDuration, _ = strconv.Atoi(Getenv("TOTAL_CHAOS_DURATION", "30"))
@@ -26,13 +26,13 @@ func GetENV(cassandraDetails *cassandraTypes.ExperimentDetails, expName string) 
 	ChaoslibDetail.AppNS = Getenv("APP_NAMESPACE", "")
 	ChaoslibDetail.AppLabel = Getenv("APP_LABEL", "")
 	ChaoslibDetail.AppKind = Getenv("APP_KIND", "")
-	ChaoslibDetail.KillCount, _ = strconv.Atoi(Getenv("KILL_COUNT", "1"))
 	ChaoslibDetail.ChaosUID = clientTypes.UID(Getenv("CHAOS_UID", ""))
 	ChaoslibDetail.InstanceID = Getenv("INSTANCE_ID", "")
 	ChaoslibDetail.ChaosPodName = Getenv("POD_NAME", "")
 	ChaoslibDetail.Force, _ = strconv.ParseBool(Getenv("FORCE", "false"))
 	ChaoslibDetail.Delay, _ = strconv.Atoi(Getenv("STATUS_CHECK_DELAY", "2"))
 	ChaoslibDetail.Timeout, _ = strconv.Atoi(Getenv("STATUS_CHECK_TIMEOUT", "180"))
+	ChaoslibDetail.PodsAffectedPerc, _ = strconv.Atoi(Getenv("PODS_AFFECTED_PERC", "0"))
 	cassandraDetails.ChaoslibDetail = &ChaoslibDetail
 	cassandraDetails.CassandraServiceName = Getenv("CASSANDRA_SVC_NAME", "")
 	cassandraDetails.KeySpaceReplicaFactor = Getenv("KEYSPACE_REPLICATION_FACTOR", "")
@@ -41,7 +41,6 @@ func GetENV(cassandraDetails *cassandraTypes.ExperimentDetails, expName string) 
 	cassandraDetails.CassandraLivenessImage = Getenv("CASSANDRA_LIVENESS_IMAGE", "litmuschaos/cassandra-client:latest")
 	cassandraDetails.CassandraLivenessCheck = Getenv("CASSANDRA_LIVENESS_CHECK", "")
 	cassandraDetails.RunID = Getenv("RunID", "")
-
 }
 
 // Getenv fetch the env and set the default value, if any

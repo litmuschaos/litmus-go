@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dependencies-network-latency
+data:
+  dependencies.yaml: |
+    experiment:
+      config:
+        dependencies:
+        - name: app.namespace.svc.cluster.local
+          port: 80
+        - name: app2.namespace2.svc.cluster.local
+          port: 8080

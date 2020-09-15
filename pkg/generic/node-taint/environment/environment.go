@@ -11,8 +11,8 @@ import (
 )
 
 //GetENV fetches all the env variables from the runner pod
-func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string) {
-	experimentDetails.ExperimentName = expName
+func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
+	experimentDetails.ExperimentName = Getenv("EXPERIMENT_NAME", "node-taint")
 	experimentDetails.ChaosNamespace = Getenv("CHAOS_NAMESPACE", "litmus")
 	experimentDetails.ChaosDuration, _ = strconv.Atoi(Getenv("TOTAL_CHAOS_DURATION", "60"))
 	experimentDetails.EngineName = Getenv("CHAOSENGINE", "")

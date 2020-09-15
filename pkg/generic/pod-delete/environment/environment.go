@@ -11,8 +11,8 @@ import (
 )
 
 //GetENV fetches all the env variables from the runner pod
-func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string) {
-	experimentDetails.ExperimentName = expName
+func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
+	experimentDetails.ExperimentName = Getenv("EXPERIMENT_NAME", "pod-delete")
 	experimentDetails.ChaosNamespace = Getenv("CHAOS_NAMESPACE", "litmus")
 	experimentDetails.EngineName = Getenv("CHAOSENGINE", "")
 	experimentDetails.ChaosDuration, _ = strconv.Atoi(Getenv("TOTAL_CHAOS_DURATION", "30"))
@@ -23,7 +23,6 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string
 	experimentDetails.AppNS = Getenv("APP_NAMESPACE", "")
 	experimentDetails.AppLabel = Getenv("APP_LABEL", "")
 	experimentDetails.AppKind = Getenv("APP_KIND", "")
-	experimentDetails.KillCount, _ = strconv.Atoi(Getenv("KILL_COUNT", "1"))
 	experimentDetails.ChaosUID = clientTypes.UID(Getenv("CHAOS_UID", ""))
 	experimentDetails.InstanceID = Getenv("INSTANCE_ID", "")
 	experimentDetails.ChaosPodName = Getenv("POD_NAME", "")
@@ -31,6 +30,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string
 	experimentDetails.Delay, _ = strconv.Atoi(Getenv("STATUS_CHECK_DELAY", "2"))
 	experimentDetails.Timeout, _ = strconv.Atoi(Getenv("STATUS_CHECK_TIMEOUT", "180"))
 	experimentDetails.TargetPod = Getenv("TARGET_POD", "")
+	experimentDetails.PodsAffectedPerc, _ = strconv.Atoi(Getenv("PODS_AFFECTED_PERC", "0"))
 }
 
 // Getenv fetch the env and set the default value, if any
