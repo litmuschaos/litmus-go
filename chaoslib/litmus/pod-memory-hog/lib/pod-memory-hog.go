@@ -111,7 +111,7 @@ func ExperimentMemory(experimentsDetails *experimentTypes.ExperimentDetails, cli
 
 					// generating summary event in chaosengine
 					msg := experimentsDetails.ExperimentName + " experiment has been aborted"
-					types.SetEngineEventAttributes(eventsDetails, types.Summary, msg, "Warning", chaosDetails)
+					types.SetEngineEventAttributes(eventsDetails, types.StoppedVerdict, msg, "Warning", chaosDetails)
 					events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 
 					// generating summary event in chaosresult

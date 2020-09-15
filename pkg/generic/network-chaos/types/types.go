@@ -33,6 +33,7 @@ type ExperimentDetails struct {
 	PodsAffectedPerc                   int
 	TargetIPs                          string
 	Annotations                        map[string]string
+	TargetHosts                        string
 	ContainerRuntime                   string
 	ChaosServiceAccount                string
 	ContainerPath                      string
