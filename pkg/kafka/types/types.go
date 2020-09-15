@@ -7,6 +7,7 @@ import (
 // ExperimentDetails is for collecting all the experiment-related details
 type ExperimentDetails struct {
 	ChaoslibDetail        *exp.ExperimentDetails
+	ExperimentName        string
 	KafkaKind             string
 	KafkaLivenessStream   string
 	KafkaLivenessImage    string

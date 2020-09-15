@@ -30,4 +30,11 @@ type ExperimentDetails struct {
 	Timeout                            int
 	Delay                              int
 	TargetPod                          string
+	PodsAffectedPerc                   int
+	TargetIPs                          string
+	Annotations                        map[string]string
+	TargetHosts                        string
+	ContainerRuntime                   string
+	ChaosServiceAccount                string
+	ContainerPath                      string
 }

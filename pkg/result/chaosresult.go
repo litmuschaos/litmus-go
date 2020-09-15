@@ -7,6 +7,7 @@ import (
 	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
+	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/openebs/maya/pkg/util/retry"
 	"github.com/pkg/errors"
@@ -135,11 +136,10 @@ func PatchChaosResult(result *v1alpha1.ChaosResult, clients clients.ClientSets, 
 	result.Status.ProbeStatus = GetProbeStatus(resultDetails)
 	if resultDetails.Phase == "Completed" {
 		if resultDetails.Verdict == "Pass" && len(resultDetails.ProbeDetails) != 0 {
-
 			result.Status.ExperimentStatus.ProbeSuccessPercentage = "100"
 
 		} else if resultDetails.Verdict == "Fail" && len(resultDetails.ProbeDetails) != 0 {
-
+			probe.SetProbeVerdictAfterFailure(resultDetails)
 			result.Status.ExperimentStatus.ProbeSuccessPercentage = strconv.Itoa((resultDetails.PassedProbeCount * 100) / len(resultDetails.ProbeDetails))
 		}
 
@@ -185,8 +185,8 @@ func RecordAfterFailure(chaosDetails *types.ChaosDetails, resultDetails *types.R
 	ChaosResult(chaosDetails, clients, resultDetails, "EOT")
 
 	// add the summary event in chaos result
-	msg := chaosDetails.ExperimentName + " experiment has been " + resultDetails.Verdict + "ed"
-	types.SetResultEventAttributes(eventsDetails, types.Summary, msg, "Warning", resultDetails)
+	msg := "experiment: " + chaosDetails.ExperimentName + ", Result: " + resultDetails.Verdict
+	types.SetResultEventAttributes(eventsDetails, types.FailVerdict, msg, "Warning", resultDetails)
 	events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosResult")
 
 	// add the summary event in chaos engine

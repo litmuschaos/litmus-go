@@ -1,7 +1,9 @@
 package main
 
 import (
-	"github.com/litmuschaos/litmus-go/chaoslib/litmus/pod_delete"
+	"fmt"
+
+	pod_delete "github.com/litmuschaos/litmus-go/chaoslib/litmus/pod-delete/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	"github.com/litmuschaos/litmus-go/pkg/kafka"
@@ -37,11 +39,12 @@ func main() {
 	}
 
 	//Fetching all the ENV passed from the runner pod
-	log.Info("[PreReq]: Getting the ENV for the kafka-broker-pod-failure experiment")
-	experimentEnv.GetENV(&experimentsDetails, "kafka-broker-pod-failure")
+	log.Info("[PreReq]: Getting the ENV for the kafka-broker-pod-failure")
+	experimentEnv.GetENV(&experimentsDetails)
 
 	// Intialise the chaos attributes
 	experimentEnv.InitialiseChaosVariables(&chaosDetails, &experimentsDetails)
+	fmt.Printf(experimentsDetails.ChaoslibDetail.ChaosLib)
 
 	// Intialise Chaos Result Parameters
 	types.SetResultAttributes(&resultDetails, chaosDetails)

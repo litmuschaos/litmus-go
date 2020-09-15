@@ -1,0 +1,254 @@
+package lib
+
+import (
+	"strconv"
+
+	clients "github.com/litmuschaos/litmus-go/pkg/clients"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/network-chaos/types"
+	"github.com/litmuschaos/litmus-go/pkg/log"
+	"github.com/litmuschaos/litmus-go/pkg/status"
+	"github.com/litmuschaos/litmus-go/pkg/types"
+	"github.com/litmuschaos/litmus-go/pkg/utils/common"
+	"github.com/pkg/errors"
+	apiv1 "k8s.io/api/core/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+var err error
+
+//PreparePodNetworkChaos contains the prepration steps before chaos injection
+func PreparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+
+	// Get the target pod details for the chaos execution
+	// if the target pod is not defined it will derive the random target pod list using pod affected percentage
+	targetPodList, err := common.GetPodList(experimentsDetails.AppNS, experimentsDetails.TargetPod, experimentsDetails.AppLabel, experimentsDetails.PodsAffectedPerc, clients)
+	if err != nil {
+		return errors.Errorf("Unable to get the target pod list due to, err: %v", err)
+	}
+
+	//Waiting for the ramp time before chaos injection
+	if experimentsDetails.RampTime != 0 {
+		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", strconv.Itoa(experimentsDetails.RampTime))
+		common.WaitForDuration(experimentsDetails.RampTime)
+	}
+
+	// Getting the serviceAccountName, need permission inside helper pod to create the events
+	if experimentsDetails.ChaosServiceAccount == "" {
+		err = GetServiceAccount(experimentsDetails, clients)
+		if err != nil {
+			return errors.Errorf("Unable to get the serviceAccountName, err: %v", err)
+		}
+	}
+
+	//Get the target container name of the application pod
+	if experimentsDetails.TargetContainer == "" {
+		experimentsDetails.TargetContainer, err = GetTargetContainer(experimentsDetails, targetPodList.Items[0].Name, clients)
+		if err != nil {
+			return errors.Errorf("Unable to get the target container name due to, err: %v", err)
+		}
+	}
+
+	// Get Chaos Pod Annotation
+	experimentsDetails.Annotations, err = common.GetChaosPodAnnotation(experimentsDetails.ChaosPodName, experimentsDetails.ChaosNamespace, clients)
+	if err != nil {
+		return errors.Errorf("unable to get annotation, due to %v", err)
+	}
+
+	// creating the helper pod to perform network chaos
+	for _, pod := range targetPodList.Items {
+		runID := common.GetRunID()
+		err = CreateHelperPod(experimentsDetails, clients, pod.Name, pod.Spec.NodeName, runID)
+		if err != nil {
+			return errors.Errorf("Unable to create the helper pod, err: %v", err)
+		}
+	}
+
+	//checking the status of the helper pods, wait till the pod comes to running state else fail the experiment
+	log.Info("[Status]: Checking the status of the helper pods")
+	err = status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, "app="+experimentsDetails.ExperimentName+"-helper", experimentsDetails.Timeout, experimentsDetails.Delay, clients)
+	if err != nil {
+		return errors.Errorf("helper pods is not in running state, err: %v", err)
+	}
+
+	// Wait till the completion of the helper pod
+	// set an upper limit for the waiting time
+	log.Info("[Wait]: waiting till the completion of the helper pod")
+	podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, "app="+experimentsDetails.ExperimentName+"-helper", clients, experimentsDetails.ChaosDuration+60, experimentsDetails.ExperimentName)
+	if err != nil || podStatus == "Failed" {
+		return errors.Errorf("helper pod failed due to, err: %v", err)
+	}
+
+	//Deleting all the helper pod for container-kill chaos
+	log.Info("[Cleanup]: Deleting all the helper pod")
+	err = common.DeleteAllPod("app="+experimentsDetails.ExperimentName+"-helper", experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients)
+	if err != nil {
+		return errors.Errorf("Unable to delete the helper pod, err: %v", err)
+	}
+
+	return nil
+}
+
+// GetServiceAccount find the serviceAccountName for the helper pod
+func GetServiceAccount(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) error {
+	pod, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Get(experimentsDetails.ChaosPodName, v1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	experimentsDetails.ChaosServiceAccount = pod.Spec.ServiceAccountName
+	return nil
+}
+
+//GetTargetContainer will fetch the container name from application pod
+//This container will be used as target container
+func GetTargetContainer(experimentsDetails *experimentTypes.ExperimentDetails, appName string, clients clients.ClientSets) (string, error) {
+	pod, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Get(appName, v1.GetOptions{})
+	if err != nil {
+		return "", errors.Wrapf(err, "Fail to get the application pod status, due to:%v", err)
+	}
+
+	return pod.Spec.Containers[0].Name, nil
+}
+
+// CreateHelperPod derive the attributes for helper pod and create the helper pod
+func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, podName, nodeName, runID string) error {
+
+	privilegedEnable := false
+	if experimentsDetails.ContainerRuntime == "crio" {
+		privilegedEnable = true
+	}
+
+	helperPod := &apiv1.Pod{
+		ObjectMeta: v1.ObjectMeta{
+			Name:      experimentsDetails.ExperimentName + "-" + runID,
+			Namespace: experimentsDetails.ChaosNamespace,
+			Labels: map[string]string{
+				"app":      experimentsDetails.ExperimentName + "-helper",
+				"name":     experimentsDetails.ExperimentName + "-" + runID,
+				"chaosUID": string(experimentsDetails.ChaosUID),
+			},
+			Annotations: experimentsDetails.Annotations,
+		},
+		Spec: apiv1.PodSpec{
+			HostPID:            true,
+			ServiceAccountName: experimentsDetails.ChaosServiceAccount,
+			RestartPolicy:      apiv1.RestartPolicyNever,
+			NodeName:           nodeName,
+			Volumes: []apiv1.Volume{
+				{
+					Name: "cri-socket",
+					VolumeSource: apiv1.VolumeSource{
+						HostPath: &apiv1.HostPathVolumeSource{
+							Path: experimentsDetails.ContainerPath,
+						},
+					},
+				},
+				{
+					Name: "cri-config",
+					VolumeSource: apiv1.VolumeSource{
+						HostPath: &apiv1.HostPathVolumeSource{
+							Path: "/etc/crictl.yaml",
+						},
+					},
+				},
+			},
+
+			Containers: []apiv1.Container{
+				{
+					Name:            experimentsDetails.ExperimentName,
+					Image:           experimentsDetails.LIBImage,
+					ImagePullPolicy: apiv1.PullAlways,
+					Command: []string{
+						"bin/bash",
+					},
+					Args: []string{
+						"-c",
+						"./experiments/network-chaos",
+					},
+					Env: GetPodEnv(experimentsDetails, podName),
+					VolumeMounts: []apiv1.VolumeMount{
+						{
+							Name:      "cri-socket",
+							MountPath: experimentsDetails.ContainerPath,
+						},
+						{
+							Name:      "cri-config",
+							MountPath: "/etc/crictl.yaml",
+						},
+					},
+					SecurityContext: &apiv1.SecurityContext{
+						Privileged: &privilegedEnable,
+						Capabilities: &apiv1.Capabilities{
+							Add: []apiv1.Capability{
+								"NET_ADMIN",
+								"SYS_ADMIN",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	_, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Create(helperPod)
+	return err
+
+}
+
+// GetPodEnv derive all the env required for the helper pod
+func GetPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, podName string) []apiv1.EnvVar {
+
+	var envVar []apiv1.EnvVar
+	ENVList := map[string]string{
+		"APP_NS":               experimentsDetails.AppNS,
+		"APP_POD":              podName,
+		"APP_CONTAINER":        experimentsDetails.TargetContainer,
+		"TOTAL_CHAOS_DURATION": strconv.Itoa(experimentsDetails.ChaosDuration),
+		"CHAOS_NAMESPACE":      experimentsDetails.ChaosNamespace,
+		"CHAOS_ENGINE":         experimentsDetails.EngineName,
+		"CHAOS_UID":            string(experimentsDetails.ChaosUID),
+		"CONTAINER_RUNTIME":    experimentsDetails.ContainerRuntime,
+		"NETEM_COMMAND":        GetNetemCommand(experimentsDetails),
+		"NETWORK_INTERFACE":    experimentsDetails.NetworkInterface,
+		"EXPERIMENT_NAME":      experimentsDetails.ExperimentName,
+	}
+	for key, value := range ENVList {
+		var perEnv apiv1.EnvVar
+		perEnv.Name = key
+		perEnv.Value = value
+		envVar = append(envVar, perEnv)
+	}
+	// Getting experiment pod name from downward API
+	experimentPodName := GetValueFromDownwardAPI("v1", "metadata.name")
+	var downwardEnv apiv1.EnvVar
+	downwardEnv.Name = "POD_NAME"
+	downwardEnv.ValueFrom = &experimentPodName
+	envVar = append(envVar, downwardEnv)
+
+	return envVar
+}
+
+// GetValueFromDownwardAPI returns the value from downwardApi
+func GetValueFromDownwardAPI(apiVersion string, fieldPath string) apiv1.EnvVarSource {
+	downwardENV := apiv1.EnvVarSource{
+		FieldRef: &apiv1.ObjectFieldSelector{
+			APIVersion: apiVersion,
+			FieldPath:  fieldPath,
+		},
+	}
+	return downwardENV
+}
+
+// GetNetemCommand generate the netem command based on the experiment name
+func GetNetemCommand(experimentDetails *experimentTypes.ExperimentDetails) string {
+	var cmd string
+	if experimentDetails.ExperimentName == "pod-network-loss" {
+		cmd = "loss " + strconv.Itoa(experimentDetails.NetworkPacketLossPercentage)
+	} else if experimentDetails.ExperimentName == "pod-network-latency" {
+		cmd = "delay " + strconv.Itoa(experimentDetails.NetworkLatency) + "ms"
+	} else if experimentDetails.ExperimentName == "pod-network-corruption" {
+		cmd = "corrupt " + strconv.Itoa(experimentDetails.NetworkPacketCorruptionPercentage)
+	} else {
+		cmd = "duplicate " + strconv.Itoa(experimentDetails.NetworkPacketDuplicationPercentage)
+	}
+	return cmd
+}

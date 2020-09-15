@@ -11,11 +11,11 @@ import (
 )
 
 //GetENV fetches all the env variables from the runner pod
-func GetENV(kafkaDetails *kafkaTypes.ExperimentDetails, expName string) {
+func GetENV(kafkaDetails *kafkaTypes.ExperimentDetails) {
 
 	var ChaoslibDetail exp.ExperimentDetails
 
-	ChaoslibDetail.ExperimentName = expName
+	ChaoslibDetail.ExperimentName = Getenv("EXPERIMENT_NAME", "kafka-broker-pod-failure")
 	ChaoslibDetail.ChaosNamespace = Getenv("CHAOS_NAMESPACE", "litmus")
 	ChaoslibDetail.EngineName = Getenv("CHAOSENGINE", "")
 	ChaoslibDetail.ChaosDuration, _ = strconv.Atoi(Getenv("TOTAL_CHAOS_DURATION", "30"))
@@ -26,7 +26,6 @@ func GetENV(kafkaDetails *kafkaTypes.ExperimentDetails, expName string) {
 	ChaoslibDetail.AppNS = Getenv("APP_NAMESPACE", "")
 	ChaoslibDetail.AppLabel = Getenv("APP_LABEL", "")
 	ChaoslibDetail.AppKind = Getenv("APP_KIND", "")
-	ChaoslibDetail.KillCount, _ = strconv.Atoi(Getenv("KILL_COUNT", "1"))
 	ChaoslibDetail.ChaosUID = clientTypes.UID(Getenv("CHAOS_UID", ""))
 	ChaoslibDetail.InstanceID = Getenv("INSTANCE_ID", "")
 	ChaoslibDetail.ChaosPodName = Getenv("POD_NAME", "")
@@ -40,16 +39,16 @@ func GetENV(kafkaDetails *kafkaTypes.ExperimentDetails, expName string) {
 	kafkaDetails.KafkaLivenessImage = Getenv("KAFKA_LIVENESS_IMAGE", "litmuschaos/kafka-client:ci")
 	kafkaDetails.KafkaSaslAuth = Getenv("KAFKA_SASL_AUTH", "disabled")
 	kafkaDetails.KafkaConsumerTimeout, _ = strconv.Atoi(Getenv("KAFKA_CONSUMER_TIMEOUT", "30000"))
-	kafkaDetails.KafkaInstanceName = Getenv("KAFKA_INSTANCE_NAME", "")
-	kafkaDetails.KafkaNamespace = Getenv("KAFKA_NAMESPACE", "")
+	kafkaDetails.KafkaInstanceName = Getenv("KAFKA_INSTANCE_NAME", "kafka")
+	kafkaDetails.KafkaNamespace = Getenv("KAFKA_NAMESPACE", "kafka")
 	kafkaDetails.KafkaBroker = Getenv("KAFKA_BROKER", "")
-	kafkaDetails.KafkaRepliationFactor = Getenv("KAFKA_REPLICATION_FACTOR", "")
-	kafkaDetails.KafkaService = Getenv("KAFKA_SERVICE", "")
-	kafkaDetails.KafkaPort = Getenv("KAFKA_PORT", "")
-	kafkaDetails.ZookeeperNamespace = Getenv("ZOOKEEPER_NAMESPACE", "")
-	kafkaDetails.ZookeeperLabel = Getenv("ZOOKEEPER_LABEL", "")
-	kafkaDetails.ZookeeperService = Getenv("ZOOKEEPER_SERVICE", "")
-	kafkaDetails.ZookeeperPort = Getenv("ZOOKEEPER_PORT", "")
+	kafkaDetails.KafkaRepliationFactor = Getenv("KAFKA_REPLICATION_FACTOR", "3")
+	kafkaDetails.KafkaService = Getenv("KAFKA_SERVICE", "kafka-svc")
+	kafkaDetails.KafkaPort = Getenv("KAFKA_PORT", "9092")
+	kafkaDetails.ZookeeperNamespace = Getenv("ZOOKEEPER_NAMESPACE", "kafka")
+	kafkaDetails.ZookeeperLabel = Getenv("ZOOKEEPER_LABEL", "app=zookeeper")
+	kafkaDetails.ZookeeperService = Getenv("ZOOKEEPER_SERVICE", "zookeeper-instance-cs")
+	kafkaDetails.ZookeeperPort = Getenv("ZOOKEEPER_PORT", "2181")
 	kafkaDetails.Lib = Getenv("LIB", "litmus")
 	kafkaDetails.RunID = Getenv("RunID", "")
 

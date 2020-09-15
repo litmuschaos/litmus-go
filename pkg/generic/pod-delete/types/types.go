@@ -17,7 +17,6 @@ type ExperimentDetails struct {
 	AppNS               string
 	AppLabel            string
 	AppKind             string
-	KillCount           int
 	ChaosUID            clientTypes.UID
 	InstanceID          string
 	ChaosNamespace      string
@@ -26,4 +25,5 @@ type ExperimentDetails struct {
 	Timeout             int
 	Delay               int
 	TargetPod           string
+	PodsAffectedPerc    int
 }

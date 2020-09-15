@@ -49,7 +49,7 @@ func ClusterHealthCheck(experimentsDetails *experimentTypes.ExperimentDetails, c
 		// It will contains all the pod & container details required for exec command
 		execCommandDetails := litmusexec.PodDetails{}
 
-		command := append([]string{"/bin/sh", "-c"}, "-- zkCli.sh -server "+experimentsDetails.ZookeeperService+":"+experimentsDetails.ZookeeperPort+"/"+experimentsDetails.KafkaInstanceName+" ls /brokers/ids | tail -n 1 | tr -d '[],' | tr ' ' '\n'  | wc -l")
+		command := append([]string{"/bin/sh", "-c"}, "zkCli.sh -server "+experimentsDetails.ZookeeperService+":"+experimentsDetails.ZookeeperPort+"/"+experimentsDetails.KafkaInstanceName+" ls /brokers/ids | tail -n 1 | tr -d '[],' | tr ' ' '\n'  | wc -l")
 		litmusexec.SetExecCommandAttributes(&execCommandDetails, ZookeeperPodName, "", experimentsDetails.KafkaNamespace)
 		kafkaAvailableBrokers, err := litmusexec.Exec(&execCommandDetails, clients, command)
 		if err != nil {

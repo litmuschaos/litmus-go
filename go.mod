@@ -10,11 +10,11 @@ require (
 	github.com/imdario/mergo v0.3.9 // indirect
 	github.com/kr/pretty v0.2.0 // indirect
 	github.com/kyokomi/emoji v2.2.4+incompatible
-	//github.com/litmuschaos/chaos-operator v0.0.0-20200813024250-a5d1a83bb863
-	github.com/litmuschaos/chaos-operator v0.0.0-20200813094130-29975d957deb
+	github.com/litmuschaos/chaos-operator v0.0.0-20200903123231-7ac84ddd0bcd
 	github.com/mailru/easyjson v0.7.1 // indirect
 	github.com/openebs/maya v0.0.0-20200411140727-1c81f9e017b0
 	github.com/pkg/errors v0.9.1
+	github.com/rs/zerolog v1.19.0
 	github.com/sirupsen/logrus v1.6.0
 	golang.org/x/crypto v0.0.0-20200429183012-4b2356b1ed79 // indirect
 	golang.org/x/net v0.0.0-20200506145744-7e3656a0809f // indirect

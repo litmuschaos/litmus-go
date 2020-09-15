@@ -68,7 +68,11 @@ func Exec(commandDetails *PodDetails, clients clients.ClientSets, command []stri
 	if err != nil {
 		errorCode := strings.Contains(err.Error(), "143")
 		if errorCode != true {
-			log.Infof("[Prepare]: Unable to run command inside container due to, err : %v", err.Error())
+			if strings.Contains(err.Error(), "137") {
+				log.Warn("Chaos process OOM killed as the provided value exceeds resource limits")
+			} else {
+				log.Infof("[Prepare]: Unable to run command inside container due to, err : %v", err.Error())
+			}
 			return "", err
 		}
 	}
