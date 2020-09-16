@@ -77,7 +77,7 @@ build:
 	@echo "-------------------------"
 	@echo "--> Build go-runner image" 
 	@echo "-------------------------"
-	@sudo docker buildx build --file build/litmus-go/Dockerfile --progress plane --platform linux/arm64,linux/amd64 --tag litmuschaos/go-runner:ci .
+	@sudo docker buildx build --file build/litmus-go/Dockerfile --progress plane --platform linux/arm64,linux/amd64 --tag litmuschaos/go-runner:dev .
 	
 .PHONY: push
 push: litmus-go-push
