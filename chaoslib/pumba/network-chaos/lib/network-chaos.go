@@ -213,12 +213,12 @@ func GetIpsForTargetHosts(targetHosts string) string {
 	hosts := strings.Split(targetHosts, ",")
 	var commaSeparatedIPs []string
 	for i := range hosts {
-		ips,err := net.LookupIP(hosts[i])
+		ips, err := net.LookupIP(hosts[i])
 		if err != nil {
 			log.Infof("Unknown host")
 		} else {
 			for j := range ips {
-				log.Infof("IP address: ", ips[j])
+				log.Infof("IP address: %v", ips[j])
 				commaSeparatedIPs = append(commaSeparatedIPs, ips[j].String())
 			}
 		}
