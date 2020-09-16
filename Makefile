@@ -66,6 +66,7 @@ unused-package-check:
 	fi
 
 
+
 .PHONY: build
 build:
 
@@ -96,3 +97,4 @@ trivy-security-check:
 	@echo "------------------------"
 	./trivy --exit-code 0 --severity HIGH --no-progress litmuschaos/go-runner:dev
 	./trivy --exit-code 1 --severity CRITICAL --no-progress litmuschaos/go-runner:dev
+
