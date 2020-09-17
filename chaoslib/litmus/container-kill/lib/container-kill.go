@@ -154,7 +154,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 					Name: "cri-socket",
 					VolumeSource: apiv1.VolumeSource{
 						HostPath: &apiv1.HostPathVolumeSource{
-							Path: experimentsDetails.ContainerPath,
+							Path: experimentsDetails.SocketPath,
 						},
 					},
 				},
@@ -183,7 +183,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 					VolumeMounts: []apiv1.VolumeMount{
 						{
 							Name:      "cri-socket",
-							MountPath: experimentsDetails.ContainerPath,
+							MountPath: experimentsDetails.SocketPath,
 						},
 						{
 							Name:      "cri-config",
