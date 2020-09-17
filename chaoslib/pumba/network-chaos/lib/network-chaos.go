@@ -36,14 +36,6 @@ func PreparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetail
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 
-	//Get the target container name of the application pod
-	if experimentsDetails.TargetContainer == "" {
-		experimentsDetails.TargetContainer, err = GetTargetContainer(experimentsDetails, targetPodList.Items[0].Name, clients)
-		if err != nil {
-			return errors.Errorf("Unable to get the target container name due to, err: %v", err)
-		}
-	}
-
 	// Get Chaos Pod Annotation
 	experimentsDetails.Annotations, err = common.GetChaosPodAnnotation(experimentsDetails.ChaosPodName, experimentsDetails.ChaosNamespace, clients)
 	if err != nil {
@@ -62,9 +54,8 @@ func PreparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetail
 		runID := common.GetRunID()
 
 		log.InfoWithValues("[Info]: Details of application under chaos injection", logrus.Fields{
-			"PodName":       pod.Name,
-			"NodeName":      pod.Spec.NodeName,
-			"ContainerName": experimentsDetails.TargetContainer,
+			"PodName":  pod.Name,
+			"NodeName": pod.Spec.NodeName,
 		})
 
 		err = CreateHelperPod(experimentsDetails, clients, pod.Name, pod.Spec.NodeName, runID)
@@ -100,17 +91,6 @@ func PreparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetail
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 	return nil
-}
-
-//GetTargetContainer will fetch the container name from application pod
-//This container will be used as target container
-func GetTargetContainer(experimentsDetails *experimentTypes.ExperimentDetails, appName string, clients clients.ClientSets) (string, error) {
-	pod, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Get(appName, v1.GetOptions{})
-	if err != nil {
-		return "", errors.Wrapf(err, "Fail to get the application pod status, due to:%v", err)
-	}
-
-	return pod.Spec.Containers[0].Name, nil
 }
 
 // CreateHelperPod derive the attributes for helper pod and create the helper pod
@@ -188,7 +168,8 @@ func GetContainerArguments(experimentsDetails *experimentTypes.ExperimentDetails
 	} else if experimentsDetails.ExperimentName == "pod-network-corruption" {
 		args = append(args, "corrupt", "--percent", strconv.Itoa(experimentsDetails.NetworkPacketCorruptionPercentage))
 	}
-	args = append(args, "re2:k8s_"+experimentsDetails.TargetContainer+"_"+appName)
+
+	args = append(args, "re2:k8s_POD_"+appName+"_"+experimentsDetails.AppNS)
 	log.Infof("Arguments for running %v are %v", experimentsDetails.ExperimentName, args)
 	return args
 }
@@ -213,7 +194,7 @@ func GetIpsForTargetHosts(targetHosts string) string {
 	hosts := strings.Split(targetHosts, ",")
 	var commaSeparatedIPs []string
 	for i := range hosts {
-		ips,err := net.LookupIP(hosts[i])
+		ips, err := net.LookupIP(hosts[i])
 		if err != nil {
 			log.Infof("Unknown host")
 		} else {
