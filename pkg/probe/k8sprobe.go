@@ -85,7 +85,10 @@ func TriggerK8sProbe(probe v1alpha1.K8sProbeAttributes, cmd v1alpha1.K8sCommand,
 			}
 
 			// using dynamic client to get the resource
-			resourceList, err := clients.DynamicClient.Resource(gvr).Namespace(cmd.Namespace).List(v1.ListOptions{FieldSelector: cmd.FieldSelector})
+			resourceList, err := clients.DynamicClient.Resource(gvr).Namespace(cmd.Namespace).List(v1.ListOptions{
+				FieldSelector: cmd.FieldSelector,
+				LabelSelector: cmd.LabelSelector,
+			})
 			if err != nil || len(resourceList.Items) == 0 {
 				return fmt.Errorf("unable to list the resources with matching selector, err: %v", err)
 			}
