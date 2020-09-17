@@ -1,8 +1,6 @@
 package main
 
 import (
-	"fmt"
-
 	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/pod-delete/lib"
 	"github.com/litmuschaos/litmus-go/pkg/cassandra"
 	experimentEnv "github.com/litmuschaos/litmus-go/pkg/cassandra/pod-delete/environment"
