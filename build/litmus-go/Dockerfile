@@ -26,5 +26,7 @@ COPY ./build/_output/${TARGETARCH} ./litmus/experiments
 
 RUN useradd -ms /bin/bash ${USER_NAME} 
 WORKDIR /litmus
-RUN chown -R ${USER_NAME}:root /litmus
+RUN chown -R ${USER_NAME}:root /litmus && \
+    chown -R ${USER_NAME}:root /var && \
+    chown -R ${USER_NAME}:root /run
 USER ${USER_NAME}
