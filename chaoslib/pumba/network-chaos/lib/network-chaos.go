@@ -20,8 +20,8 @@ import (
 
 var err error
 
-//PreparePodNetworkChaos contains the prepration steps before chaos injection
-func PreparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+//PrepareAndInjectChaos contains the prepration and chaos injection steps
+func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, args []string) error {
 
 	// Get the target pod details for the chaos execution
 	// if the target pod is not defined it will derive the random target pod list using pod affected percentage
@@ -58,7 +58,9 @@ func PreparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetail
 			"NodeName": pod.Spec.NodeName,
 		})
 
-		err = CreateHelperPod(experimentsDetails, clients, pod.Name, pod.Spec.NodeName, runID)
+		args = append(args, "re2:k8s_POD_"+pod.Name+"_"+experimentsDetails.AppNS)
+		log.Infof("Arguments for running %v are %v", experimentsDetails.ExperimentName, args)
+		err = CreateHelperPod(experimentsDetails, clients, pod.Spec.NodeName, runID, args)
 		if err != nil {
 			return errors.Errorf("Unable to create the helper pod, err: %v", err)
 		}
@@ -94,7 +96,7 @@ func PreparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetail
 }
 
 // CreateHelperPod derive the attributes for helper pod and create the helper pod
-func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, appName, appNodeName, runID string) error {
+func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, appNodeName, runID string, args []string) error {
 
 	helperPod := &apiv1.Pod{
 		ObjectMeta: v1.ObjectMeta{
@@ -128,7 +130,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 					Command: []string{
 						"pumba",
 					},
-					Args: GetContainerArguments(experimentsDetails, appName),
+					Args: args,
 					VolumeMounts: []apiv1.VolumeMount{
 						{
 							Name:      "dockersocket",
@@ -142,36 +144,6 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 
 	_, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Create(helperPod)
 	return err
-}
-
-// GetContainerArguments derives the args for the pumba pod
-func GetContainerArguments(experimentsDetails *experimentTypes.ExperimentDetails, appName string) []string {
-	baseArgs := []string{
-		"netem",
-		"--tc-image",
-		experimentsDetails.TCImage,
-		"--interface",
-		experimentsDetails.NetworkInterface,
-		"--duration",
-		strconv.Itoa(experimentsDetails.ChaosDuration) + "s",
-	}
-
-	args := baseArgs
-	args = AddTargetIpsArgs(experimentsDetails.TargetIPs, args)
-	args = AddTargetIpsArgs(GetIpsForTargetHosts(experimentsDetails.TargetHosts), args)
-	if experimentsDetails.ExperimentName == "pod-network-duplication" {
-		args = append(args, "duplicate", "--percent", strconv.Itoa(experimentsDetails.NetworkPacketDuplicationPercentage))
-	} else if experimentsDetails.ExperimentName == "pod-network-latency" {
-		args = append(args, "delay", "--time", strconv.Itoa(experimentsDetails.NetworkLatency))
-	} else if experimentsDetails.ExperimentName == "pod-network-loss" {
-		args = append(args, "loss", "--percent", strconv.Itoa(experimentsDetails.NetworkPacketLossPercentage))
-	} else if experimentsDetails.ExperimentName == "pod-network-corruption" {
-		args = append(args, "corrupt", "--percent", strconv.Itoa(experimentsDetails.NetworkPacketCorruptionPercentage))
-	}
-
-	args = append(args, "re2:k8s_POD_"+appName+"_"+experimentsDetails.AppNS)
-	log.Infof("Arguments for running %v are %v", experimentsDetails.ExperimentName, args)
-	return args
 }
 
 // AddTargetIpsArgs inserts a comma-separated list of targetIPs (if provided by the user) into the pumba command/args
@@ -199,7 +171,7 @@ func GetIpsForTargetHosts(targetHosts string) string {
 			log.Infof("Unknown host")
 		} else {
 			for j := range ips {
-				log.Infof("IP address: ", ips[j])
+				log.Infof("IP address: %v", ips[j])
 				commaSeparatedIPs = append(commaSeparatedIPs, ips[j].String())
 			}
 		}
