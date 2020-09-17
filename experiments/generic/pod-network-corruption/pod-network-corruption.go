@@ -2,7 +2,7 @@ package main
 
 import (
 	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/network-chaos/lib"
-	pumbaLIB "github.com/litmuschaos/litmus-go/chaoslib/pumba/network-chaos/lib"
+	pumbaLIB "github.com/litmuschaos/litmus-go/chaoslib/pumba/network-chaos/lib/corruption"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/network-chaos/environment"
@@ -114,7 +114,7 @@ func main() {
 
 	// Including the pumba lib for pod-network-corruption
 	if experimentsDetails.ChaosLib == "litmus" && experimentsDetails.ContainerRuntime == "docker" {
-		err = pumbaLIB.PreparePodNetworkChaos(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
+		err = pumbaLIB.PodNetworkCorruptionChaos(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
 		if err != nil {
 			log.Errorf("Chaos injection failed due to %v\n", err)
 			failStep := "Including the pumba lib for pod-network-corruption"
