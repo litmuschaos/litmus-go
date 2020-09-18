@@ -3,9 +3,7 @@ FROM ubuntu:bionic
 LABEL maintainer="LitmusChaos"
 
 ARG TARGETARCH
-ENV USER_UID=1001 \
-    USER_NAME=litmus-go
-    
+
 #Installing necessary ubuntu packages
 RUN apt-get update && apt-get install -y curl bash systemd iproute2 stress-ng
 
@@ -24,9 +22,4 @@ RUN curl -L https://github.com/alexei-led/pumba/releases/download/${PUMBA_VERSIO
 
 COPY ./build/_output/${TARGETARCH} ./litmus/experiments
 
-RUN useradd -ms /bin/bash ${USER_NAME} 
 WORKDIR /litmus
-RUN chown -R ${USER_NAME}:root /litmus && \
-    chown -R ${USER_NAME}:root /var && \
-    chown -R ${USER_NAME}:root /run
-USER ${USER_NAME}
