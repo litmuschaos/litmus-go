@@ -1,4 +1,4 @@
-package duplication
+package latency
 
 import (
 	"strconv"
