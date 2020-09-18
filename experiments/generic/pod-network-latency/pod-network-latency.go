@@ -1,7 +1,7 @@
 package main
 
 import (
-	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/network-chaos/lib"
+	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/network-chaos/lib/latency"
 	pumbaLIB "github.com/litmuschaos/litmus-go/chaoslib/pumba/network-chaos/lib/latency"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
@@ -123,7 +123,7 @@ func main() {
 		log.Info("[Confirmation]: The pod network latency chaos has been applied")
 		resultDetails.Verdict = "Pass"
 	} else if experimentsDetails.ChaosLib == "litmus" && (experimentsDetails.ContainerRuntime == "containerd" || experimentsDetails.ContainerRuntime == "crio") {
-		err = litmusLIB.PreparePodNetworkChaos(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
+		err = litmusLIB.PodNetworkLatencyChaos(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
 		if err != nil {
 			log.Errorf("Chaos injection failed due to %v\n", err)
 			failStep := "Including the pumba lib for pod-network-latency"
