@@ -94,7 +94,6 @@ func main() {
 		if len(resultDetails.ProbeDetails) != 0 {
 
 			err = probe.RunProbes(&chaosDetails, clients, &resultDetails, "PreChaos", &eventsDetails)
-			events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 			if err != nil {
 				log.Errorf("Probe failed, due to err: %v", err)
 				failStep := "Failed while adding probe"
