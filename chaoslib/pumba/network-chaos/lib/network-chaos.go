@@ -57,10 +57,12 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 			"PodName":  pod.Name,
 			"NodeName": pod.Spec.NodeName,
 		})
-
-		args = append(args, "re2:k8s_POD_"+pod.Name+"_"+experimentsDetails.AppNS)
-		log.Infof("Arguments for running %v are %v", experimentsDetails.ExperimentName, args)
-		err = CreateHelperPod(experimentsDetails, clients, pod.Spec.NodeName, runID, args)
+		// args contains details of the specific chaos injection
+		// constructing `argsWithRegex` based on updated regex with a diff pod name
+		// without extending/concatenating the args var itself
+		argsWithRegex := append(args, "re2:k8s_POD_"+pod.Name+"_"+experimentsDetails.AppNS)
+		log.Infof("Arguments for running %v are %v", experimentsDetails.ExperimentName, argsWithRegex)
+		err = CreateHelperPod(experimentsDetails, clients, pod.Spec.NodeName, runID, argsWithRegex)
 		if err != nil {
 			return errors.Errorf("Unable to create the helper pod, err: %v", err)
 		}
