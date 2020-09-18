@@ -19,9 +19,6 @@ FROM ubuntu:bionic
 
 LABEL maintainer="LitmusChaos"
 
-ENV USER_UID=1001 \
-    USER_NAME=litmus-go
-
 #Installing necessary ubuntu packages
 RUN apt-get update && apt-get install -y curl bash systemd iproute2
 
@@ -43,10 +40,4 @@ COPY --from=builder /code/stress-ng/stress-ng /
 #Copying Necessary Files
 COPY ./build/_output ./litmus/experiments
 
-RUN useradd -ms /bin/bash ${USER_NAME} 
 WORKDIR /litmus
-RUN chown -R ${USER_NAME}:root /litmus && \
-    chown -R ${USER_NAME}:root /var && \
-    chown -R ${USER_NAME}:root /run
-    
-USER ${USER_NAME}
