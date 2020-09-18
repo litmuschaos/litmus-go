@@ -16,8 +16,8 @@ import (
 
 var err error
 
-//PreparePodNetworkChaos contains the prepration steps before chaos injection
-func PreparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+//PrepareAndInjectChaos contains the prepration & injection steps
+func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, args string) error {
 
 	// Get the target pod details for the chaos execution
 	// if the target pod is not defined it will derive the random target pod list using pod affected percentage
@@ -57,7 +57,7 @@ func PreparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetail
 	// creating the helper pod to perform network chaos
 	for _, pod := range targetPodList.Items {
 		runID := common.GetRunID()
-		err = CreateHelperPod(experimentsDetails, clients, pod.Name, pod.Spec.NodeName, runID)
+		err = CreateHelperPod(experimentsDetails, clients, pod.Name, pod.Spec.NodeName, runID, args)
 		if err != nil {
 			return errors.Errorf("Unable to create the helper pod, err: %v", err)
 		}
@@ -110,7 +110,7 @@ func GetTargetContainer(experimentsDetails *experimentTypes.ExperimentDetails, a
 }
 
 // CreateHelperPod derive the attributes for helper pod and create the helper pod
-func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, podName, nodeName, runID string) error {
+func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, podName, nodeName, runID string, args string) error {
 
 	privilegedEnable := false
 	if experimentsDetails.ContainerRuntime == "crio" {
@@ -138,7 +138,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 					Name: "cri-socket",
 					VolumeSource: apiv1.VolumeSource{
 						HostPath: &apiv1.HostPathVolumeSource{
-							Path: experimentsDetails.ContainerPath,
+							Path: experimentsDetails.SocketPath,
 						},
 					},
 				},
@@ -158,17 +158,17 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 					Image:           experimentsDetails.LIBImage,
 					ImagePullPolicy: apiv1.PullAlways,
 					Command: []string{
-						"bin/bash",
+						"/bin/bash",
 					},
 					Args: []string{
 						"-c",
 						"./experiments/network-chaos",
 					},
-					Env: GetPodEnv(experimentsDetails, podName),
+					Env: GetPodEnv(experimentsDetails, podName, args),
 					VolumeMounts: []apiv1.VolumeMount{
 						{
 							Name:      "cri-socket",
-							MountPath: experimentsDetails.ContainerPath,
+							MountPath: experimentsDetails.SocketPath,
 						},
 						{
 							Name:      "cri-config",
@@ -195,7 +195,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 }
 
 // GetPodEnv derive all the env required for the helper pod
-func GetPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, podName string) []apiv1.EnvVar {
+func GetPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, podName, args string) []apiv1.EnvVar {
 
 	var envVar []apiv1.EnvVar
 	ENVList := map[string]string{
@@ -207,7 +207,7 @@ func GetPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, podName st
 		"CHAOS_ENGINE":         experimentsDetails.EngineName,
 		"CHAOS_UID":            string(experimentsDetails.ChaosUID),
 		"CONTAINER_RUNTIME":    experimentsDetails.ContainerRuntime,
-		"NETEM_COMMAND":        GetNetemCommand(experimentsDetails),
+		"NETEM_COMMAND":        args,
 		"NETWORK_INTERFACE":    experimentsDetails.NetworkInterface,
 		"EXPERIMENT_NAME":      experimentsDetails.ExperimentName,
 	}
@@ -236,19 +236,4 @@ func GetValueFromDownwardAPI(apiVersion string, fieldPath string) apiv1.EnvVarSo
 		},
 	}
 	return downwardENV
-}
-
-// GetNetemCommand generate the netem command based on the experiment name
-func GetNetemCommand(experimentDetails *experimentTypes.ExperimentDetails) string {
-	var cmd string
-	if experimentDetails.ExperimentName == "pod-network-loss" {
-		cmd = "loss " + strconv.Itoa(experimentDetails.NetworkPacketLossPercentage)
-	} else if experimentDetails.ExperimentName == "pod-network-latency" {
-		cmd = "delay " + strconv.Itoa(experimentDetails.NetworkLatency) + "ms"
-	} else if experimentDetails.ExperimentName == "pod-network-corruption" {
-		cmd = "corrupt " + strconv.Itoa(experimentDetails.NetworkPacketCorruptionPercentage)
-	} else {
-		cmd = "duplicate " + strconv.Itoa(experimentDetails.NetworkPacketDuplicationPercentage)
-	}
-	return cmd
 }

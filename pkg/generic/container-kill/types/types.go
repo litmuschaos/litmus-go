@@ -21,7 +21,7 @@ type ExperimentDetails struct {
 	ChaosPodName        string
 	LIBImage            string
 	TargetContainer     string
-	ContainerPath       string
+	SocketPath          string
 	Iterations          int
 	ChaosServiceAccount string
 	RunID               string
