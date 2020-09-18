@@ -38,7 +38,7 @@ func GetContainerArguments(experimentsDetails *experimentTypes.ExperimentDetails
 	args := baseArgs
 	args = network_chaos.AddTargetIpsArgs(experimentsDetails.TargetIPs, args)
 	args = network_chaos.AddTargetIpsArgs(network_chaos.GetIpsForTargetHosts(experimentsDetails.TargetHosts), args)
-	args = append(args, "duplicate "+strconv.Itoa(experimentsDetails.NetworkPacketDuplicationPercentage))
+	args = append(args, "duplicate", "--percent", strconv.Itoa(experimentsDetails.NetworkPacketDuplicationPercentage))
 
 	return args
 }
