@@ -101,7 +101,7 @@ func GetPodList(namespace, targetPod, appLabels string, podAffPerc int, clients 
 	realpods := core_v1.PodList{}
 	podList, err := clients.KubeClient.CoreV1().Pods(namespace).List(v1.ListOptions{LabelSelector: appLabels})
 	if err != nil || len(podList.Items) == 0 {
-		return core_v1.PodList{}, errors.Wrapf(err, "Fail to list the application pod in %v namespace", namespace)
+		return core_v1.PodList{}, errors.Wrapf(err, "Failed to list the application pod in %v namespace", namespace)
 	}
 
 	isPodAvailable, err := CheckForAvailibiltyOfPod(namespace, targetPod, clients)
@@ -140,7 +140,7 @@ func GetChaosPodAnnotation(podName, namespace string, clients clients.ClientSets
 
 	pod, err := clients.KubeClient.CoreV1().Pods(namespace).Get(podName, v1.GetOptions{})
 	if err != nil {
-		return nil, errors.Errorf("fail to get the chaos pod annotation, due to %v", err)
+		return nil, err
 	}
 	return pod.Annotations, nil
 }
@@ -149,7 +149,7 @@ func GetChaosPodAnnotation(podName, namespace string, clients clients.ClientSets
 func GetNodeName(namespace, labels string, clients clients.ClientSets) (string, error) {
 	podList, err := clients.KubeClient.CoreV1().Pods(namespace).List(v1.ListOptions{LabelSelector: labels})
 	if err != nil || len(podList.Items) == 0 {
-		return "", errors.Wrapf(err, "Fail to get the application pod in %v namespace, due to err: %v", namespace, err)
+		return "", errors.Wrapf(err, "Failed to get the application pod in %v namespace, err: %v", namespace, err)
 	}
 
 	rand.Seed(time.Now().Unix())
