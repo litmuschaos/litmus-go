@@ -205,7 +205,7 @@ func TriggerSourceCmdProbe(probe v1alpha1.CmdProbeAttributes, execCommandDetails
 			// exec inside the external pod to get the o/p of given command
 			output, err := litmusexec.Exec(&execCommandDetails, clients, command)
 			if err != nil {
-				return errors.Errorf("Unable to get output of cmd command due to err: %v", err)
+				return errors.Errorf("Unable to get output of cmd command, err: %v", err)
 			}
 			// Trim the extra whitespaces from the output and match the actual output with the expected output
 			if strings.TrimSpace(output) != probe.Inputs.ExpectedResult {

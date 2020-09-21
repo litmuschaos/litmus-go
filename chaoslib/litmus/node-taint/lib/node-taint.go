@@ -2,7 +2,6 @@ package lib
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
@@ -24,7 +23,7 @@ func PrepareNodeTaint(experimentsDetails *experimentTypes.ExperimentDetails, cli
 
 	//Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
-		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", strconv.Itoa(experimentsDetails.RampTime))
+		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", experimentsDetails.RampTime)
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 
@@ -32,7 +31,7 @@ func PrepareNodeTaint(experimentsDetails *experimentTypes.ExperimentDetails, cli
 		//Select node for kubelet-service-kill
 		appNodeName, err := common.GetNodeName(experimentsDetails.AppNS, experimentsDetails.AppLabel, clients)
 		if err != nil {
-			return errors.Errorf("Unable to get the application nodename due to, err: %v", err)
+			return errors.Errorf("Unable to get the application nodename, err: %v", err)
 		}
 
 		experimentsDetails.AppNode = appNodeName
@@ -62,12 +61,12 @@ func PrepareNodeTaint(experimentsDetails *experimentTypes.ExperimentDetails, cli
 		log.Info("[Status]: Verify that the Auxiliary Applications are running")
 		err = status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 		if err != nil {
-			return errors.Errorf("Auxiliary Application status check failed due to %v", err)
+			return errors.Errorf("Auxiliary Applications status check failed, err: %v", err)
 		}
 	}
 
 	// Wait for Chaos Duration
-	log.Infof("[Wait]: Waiting for the %vs chaos duration", strconv.Itoa(experimentsDetails.ChaosDuration))
+	log.Infof("[Wait]: Waiting for the %vs chaos duration", experimentsDetails.ChaosDuration)
 	common.WaitForDuration(experimentsDetails.ChaosDuration)
 
 	// remove taint from the application node
@@ -78,7 +77,7 @@ func PrepareNodeTaint(experimentsDetails *experimentTypes.ExperimentDetails, cli
 
 	//Waiting for the ramp time after chaos injection
 	if experimentsDetails.RampTime != 0 {
-		log.Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", strconv.Itoa(experimentsDetails.RampTime))
+		log.Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", experimentsDetails.RampTime)
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 	return nil
@@ -93,7 +92,7 @@ func TaintNode(experimentsDetails *experimentTypes.ExperimentDetails, clients cl
 	// get the node details
 	node, err := clients.KubeClient.CoreV1().Nodes().Get(experimentsDetails.AppNode, v1.GetOptions{})
 	if err != nil || node == nil {
-		return errors.Errorf("failed to get %v node, due to err: %v", experimentsDetails.AppNode, err)
+		return errors.Errorf("failed to get %v node, err: %v", experimentsDetails.AppNode, err)
 	}
 
 	// check if the taint already exists
@@ -114,11 +113,11 @@ func TaintNode(experimentsDetails *experimentTypes.ExperimentDetails, clients cl
 
 		updatedNodeWithTaint, err := clients.KubeClient.CoreV1().Nodes().Update(node)
 		if err != nil || updatedNodeWithTaint == nil {
-			return fmt.Errorf("failed to update %v node after adding taints, due to err: %v", experimentsDetails.AppNode, err)
+			return fmt.Errorf("failed to update %v node after adding taints, err: %v", experimentsDetails.AppNode, err)
 		}
 	}
 
-	log.Infof("Successfully added taint on node %v", experimentsDetails.AppNode)
+	log.Infof("Successfully added taint in %v node", experimentsDetails.AppNode)
 	return nil
 }
 
@@ -132,7 +131,7 @@ func RemoveTaintFromNode(experimentsDetails *experimentTypes.ExperimentDetails, 
 	// get the node details
 	node, err := clients.KubeClient.CoreV1().Nodes().Get(experimentsDetails.AppNode, v1.GetOptions{})
 	if err != nil || node == nil {
-		return errors.Errorf("failed to get %v node, due to err: %v", experimentsDetails.AppNode, err)
+		return errors.Errorf("failed to get %v node, err: %v", experimentsDetails.AppNode, err)
 	}
 
 	// check if the taint already exists
@@ -155,7 +154,7 @@ func RemoveTaintFromNode(experimentsDetails *experimentTypes.ExperimentDetails, 
 		node.Spec.Taints = Newtaints
 		updatedNodeWithTaint, err := clients.KubeClient.CoreV1().Nodes().Update(node)
 		if err != nil || updatedNodeWithTaint == nil {
-			return fmt.Errorf("failed to update %v node after removing taints, due to err: %v", experimentsDetails.AppNode, err)
+			return fmt.Errorf("failed to update %v node after removing taints, err: %v", experimentsDetails.AppNode, err)
 		}
 	}
 

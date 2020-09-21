@@ -22,23 +22,23 @@ func NodeToolStatusCheck(experimentsDetails *experimentTypes.ExperimentDetails, 
 	if err != nil {
 		return err
 	}
-	log.Infof("[NodeToolStatus]: The application pod name for checking load distribution: %v", targetPodName)
+	log.Infof("[NodeToolStatus]: Selecting %v pod for running `nodetool status` command", targetPodName)
 
 	replicaCount, err = GetApplicationReplicaCount(experimentsDetails, clients)
 	if err != nil {
-		return errors.Errorf("Unable to get app replica count, due to %v", err)
+		return errors.Errorf("Unable to get app replica count, err: %v", err)
 	}
 	log.Info("[Check]: Checking for the distribution of load on the ring")
 
 	// Get the load percentage on the application pod
 	loadPercentage, err := GetLoadDistribution(experimentsDetails, clients, targetPodName)
 	if err != nil {
-		return errors.Errorf("Load distribution check failed, due to %v", err)
+		return errors.Errorf("Failed to get load percentage, err: %v", err)
 	}
 
 	// Check the load precentage
 	if err = CheckLoadPercentage(loadPercentage, replicaCount); err != nil {
-		return errors.Errorf("Load percentage check failed, due to %v", err)
+		return errors.Errorf("Load percentage check failed, err: %v", err)
 	}
 
 	return nil
@@ -48,7 +48,7 @@ func NodeToolStatusCheck(experimentsDetails *experimentTypes.ExperimentDetails, 
 func GetApplicationPodName(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) (string, error) {
 	podList, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaoslibDetail.AppNS).List(metav1.ListOptions{LabelSelector: experimentsDetails.ChaoslibDetail.AppLabel})
 	if err != nil || len(podList.Items) == 0 {
-		return "", errors.Errorf("Fail to get the application pod in %v namespace", experimentsDetails.ChaoslibDetail.AppNS)
+		return "", errors.Errorf("Failed to get the application pod in %v namespace", experimentsDetails.ChaoslibDetail.AppNS)
 	}
 
 	return podList.Items[0].Name, nil
@@ -58,7 +58,7 @@ func GetApplicationPodName(experimentsDetails *experimentTypes.ExperimentDetails
 func GetApplicationReplicaCount(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) (int, error) {
 	podList, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaoslibDetail.AppNS).List(metav1.ListOptions{LabelSelector: experimentsDetails.ChaoslibDetail.AppLabel})
 	if err != nil || len(podList.Items) == 0 {
-		return 0, errors.Errorf("Fail to get the application pod in %v namespace", experimentsDetails.ChaoslibDetail.AppNS)
+		return 0, errors.Errorf("Failed to get the application pod in %v namespace", experimentsDetails.ChaoslibDetail.AppNS)
 	}
 	return len(podList.Items), nil
 }
@@ -69,7 +69,7 @@ func CheckLoadPercentage(loadPercentage []string, replicaCount int) error {
 	// It will make sure that the replica have some load
 	// It will fail if replica has 0% load
 	if len(loadPercentage) != replicaCount {
-		return errors.Errorf("Fail to get the load on every replica")
+		return errors.Errorf("Failed to get the load on every replica")
 	}
 
 	for count := 0; count < len(loadPercentage); count++ {
@@ -93,7 +93,7 @@ func GetLoadDistribution(experimentsDetails *experimentTypes.ExperimentDetails, 
 	litmusexec.SetExecCommandAttributes(&execCommandDetails, targetPod, "cassandra", experimentsDetails.ChaoslibDetail.AppNS)
 	response, err := litmusexec.Exec(&execCommandDetails, clients, command)
 	if err != nil {
-		return nil, errors.Errorf("Unable to get nodetool status details due to err: %v", err)
+		return nil, errors.Errorf("Unable to get nodetool status details, err: %v", err)
 	}
 	split := strings.Split(response, "\n")
 	loadPercentage := split[:len(split)-1]

@@ -67,7 +67,7 @@ func getKubeConfig() (*rest.Config, error) {
 func GenerateK8sClientSet(config *rest.Config) (*kubernetes.Clientset, error) {
 	k8sClientSet, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		return nil, errors.Wrapf(err, "Unable to generate kubernetes clientSet %s: ", err)
+		return nil, errors.Wrapf(err, "Unable to generate kubernetes clientSet, err: %v: ", err)
 	}
 	return k8sClientSet, nil
 }
@@ -76,7 +76,7 @@ func GenerateK8sClientSet(config *rest.Config) (*kubernetes.Clientset, error) {
 func GenerateLitmusClientSet(config *rest.Config) (*chaosClient.LitmuschaosV1alpha1Client, error) {
 	litmusClientSet, err := chaosClient.NewForConfig(config)
 	if err != nil {
-		return nil, errors.Wrapf(err, "Unable to create LitmusClientSet: %v", err)
+		return nil, errors.Wrapf(err, "Unable to create LitmusClientSet, err: %v", err)
 	}
 	return litmusClientSet, nil
 }
