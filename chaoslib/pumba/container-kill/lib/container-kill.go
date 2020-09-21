@@ -24,12 +24,12 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 	// if the target pod is not defined it will derive the random target pod list using pod affected percentage
 	targetPodList, err := common.GetPodList(experimentsDetails.AppNS, experimentsDetails.TargetPod, experimentsDetails.AppLabel, experimentsDetails.PodsAffectedPerc, clients)
 	if err != nil {
-		return errors.Errorf("Unable to get the target pod list due to, err: %v", err)
+		return errors.Errorf("Unable to get the target pod list, err: %v", err)
 	}
 
 	//Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
-		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", strconv.Itoa(experimentsDetails.RampTime))
+		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", experimentsDetails.RampTime)
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 
@@ -37,14 +37,14 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 	if experimentsDetails.TargetContainer == "" {
 		experimentsDetails.TargetContainer, err = GetTargetContainer(experimentsDetails, targetPodList.Items[0].Name, clients)
 		if err != nil {
-			return errors.Errorf("Unable to get the target container name due to, err: %v", err)
+			return errors.Errorf("Unable to get the target container name, err: %v", err)
 		}
 	}
 
 	// Get Chaos Pod Annotation
 	experimentsDetails.Annotations, err = common.GetChaosPodAnnotation(experimentsDetails.ChaosPodName, experimentsDetails.ChaosNamespace, clients)
 	if err != nil {
-		return errors.Errorf("unable to get annotation, due to %v", err)
+		return errors.Errorf("unable to get annotations, err: %v", err)
 	}
 
 	if experimentsDetails.EngineName != "" {
@@ -99,7 +99,7 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 
 	//Waiting for the ramp time after chaos injection
 	if experimentsDetails.RampTime != 0 {
-		log.Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", strconv.Itoa(experimentsDetails.RampTime))
+		log.Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", experimentsDetails.RampTime)
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 	return nil
@@ -110,7 +110,7 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 func GetTargetContainer(experimentsDetails *experimentTypes.ExperimentDetails, appName string, clients clients.ClientSets) (string, error) {
 	pod, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Get(appName, v1.GetOptions{})
 	if err != nil {
-		return "", errors.Wrapf(err, "Fail to get the application pod status, due to:%v", err)
+		return "", err
 	}
 
 	return pod.Spec.Containers[0].Name, nil
@@ -142,7 +142,7 @@ func VerifyRestartCount(experimentsDetails *experimentTypes.ExperimentDetails, p
 			for index := range podList.Items {
 				pod, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Get(podList.Items[index].Name, v1.GetOptions{})
 				if err != nil {
-					return errors.Errorf("Unable to get the application pod, err: %v", err)
+					return err
 				}
 				for _, container := range pod.Status.ContainerStatuses {
 					if container.Name == experimentsDetails.TargetContainer {

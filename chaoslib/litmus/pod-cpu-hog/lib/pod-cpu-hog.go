@@ -30,7 +30,7 @@ func StressCPU(containerName, podName, namespace, cpuHogCmd string, clients clie
 	litmusexec.SetExecCommandAttributes(&execCommandDetails, podName, containerName, namespace)
 	_, err := litmusexec.Exec(&execCommandDetails, clients, command)
 	if err != nil {
-		return errors.Errorf("Unable to run stress command inside target container, due to err: %v", err)
+		return errors.Errorf("Unable to run stress command inside target container, err: %v", err)
 	}
 	return nil
 }
@@ -45,7 +45,7 @@ func ExperimentCPU(experimentsDetails *experimentTypes.ExperimentDetails, client
 	// if the target pod is not defined it will derive the random target pod list using pod affected percentage
 	targetPodList, err := common.GetPodList(experimentsDetails.AppNS, experimentsDetails.TargetPod, experimentsDetails.AppLabel, experimentsDetails.PodsAffectedPerc, clients)
 	if err != nil {
-		return errors.Errorf("Unable to get the target pod list due to, err: %v", err)
+		return errors.Errorf("Unable to get the target pod list, err: %v", err)
 	}
 
 	for _, pod := range targetPodList.Items {
@@ -69,7 +69,7 @@ func ExperimentCPU(experimentsDetails *experimentTypes.ExperimentDetails, client
 
 				go StressCPU(container.Name, pod.Name, experimentsDetails.AppNS, experimentsDetails.ChaosInjectCmd, clients)
 
-				log.Infof("[Chaos]:Waiting for: %vs", strconv.Itoa(experimentsDetails.ChaosDuration))
+				log.Infof("[Chaos]:Waiting for: %vs", experimentsDetails.ChaosDuration)
 
 				// signChan channel is used to transmit signal notifications.
 				signChan := make(chan os.Signal, 1)
@@ -83,7 +83,7 @@ func ExperimentCPU(experimentsDetails *experimentTypes.ExperimentDetails, client
 						log.Info("[Chaos]: Killing process started because of terminated signal received")
 						err = KillStressCPU(container.Name, pod.Name, experimentsDetails.AppNS, experimentsDetails.ChaosKillCmd, clients)
 						if err != nil {
-							klog.V(0).Infof("Error in Kill stress after")
+							klog.V(0).Infof("Error in Kill stress after abortion")
 							return err
 						}
 						// updating the chaosresult after stopped
@@ -121,7 +121,7 @@ func PrepareCPUstress(experimentsDetails *experimentTypes.ExperimentDetails, cli
 
 	//Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
-		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", strconv.Itoa(experimentsDetails.RampTime))
+		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", experimentsDetails.RampTime)
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 	//Starting the CPU stress experiment
@@ -131,7 +131,7 @@ func PrepareCPUstress(experimentsDetails *experimentTypes.ExperimentDetails, cli
 	}
 	//Waiting for the ramp time after chaos injection
 	if experimentsDetails.RampTime != 0 {
-		log.Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", strconv.Itoa(experimentsDetails.RampTime))
+		log.Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", experimentsDetails.RampTime)
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 	return nil
@@ -147,7 +147,7 @@ func KillStressCPU(containerName, podName, namespace, cpuFreeCmd string, clients
 	litmusexec.SetExecCommandAttributes(&execCommandDetails, podName, containerName, namespace)
 	_, err := litmusexec.Exec(&execCommandDetails, clients, command)
 	if err != nil {
-		return errors.Errorf("Unable to kill the stress process, due to err: %v", err)
+		return errors.Errorf("Unable to kill the stress process, err: %v", err)
 	}
 	return nil
 }

@@ -36,7 +36,7 @@ func main() {
 
 	//Getting kubeConfig and Generate ClientSets
 	if err := clients.GenerateClientSetFromKubeConfig(); err != nil {
-		log.Fatalf("Unable to Get the kubeconfig due to %v", err)
+		log.Fatalf("Unable to Get the kubeconfig, err: %v", err)
 	}
 
 	//Fetching all the ENV passed for the runner pod
@@ -54,7 +54,7 @@ func main() {
 
 	err := PreparePodNetworkChaos(&experimentsDetails, clients, &eventsDetails, &chaosDetails, &resultDetails)
 	if err != nil {
-		log.Fatalf("helper pod failed due to err: %v", err)
+		log.Fatalf("helper pod failed, err: %v", err)
 	}
 
 }
@@ -83,7 +83,7 @@ func PreparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetail
 		return err
 	}
 
-	log.Infof("[Chaos]: Waiting for %vs", strconv.Itoa(experimentsDetails.ChaosDuration))
+	log.Infof("[Chaos]: Waiting for %vs", experimentsDetails.ChaosDuration)
 
 	// signChan channel is used to transmit signal notifications.
 	signChan := make(chan os.Signal, 1)
@@ -137,7 +137,7 @@ func GetPID(experimentDetails *experimentTypes.ExperimentDetails, clients client
 
 	pod, err := clients.KubeClient.CoreV1().Pods(experimentDetails.AppNS).Get(experimentDetails.TargetPod, v1.GetOptions{})
 	if err != nil {
-		return 0, errors.Errorf("unable to get the pod")
+		return 0, err
 	}
 
 	var containerID string
@@ -156,17 +156,17 @@ func GetPID(experimentDetails *experimentTypes.ExperimentDetails, clients client
 	// deriving pid from the inspect out of target container
 	out, err := exec.Command("crictl", "inspect", containerID).CombinedOutput()
 	if err != nil {
-		log.Error(fmt.Sprintf("[cri] Failed to run crictl: %s", string(out)))
+		log.Error(fmt.Sprintf("[cri]: Failed to run crictl: %s", string(out)))
 		return 0, err
 	}
 	// parsing data from the json output of inspect command
 	PID, err := parsePIDFromJSON(out, experimentDetails.ContainerRuntime)
 	if err != nil {
-		log.Error(fmt.Sprintf("[cri] Failed to parse json from crictl output: %s", string(out)))
+		log.Error(fmt.Sprintf("[cri]: Failed to parse json from crictl output: %s", string(out)))
 		return 0, err
 	}
 
-	log.Info(fmt.Sprintf("[cri] Container ID=%s has process PID=%d", containerID, PID))
+	log.Info(fmt.Sprintf("[cri]: Container ID=%s has process PID=%d", containerID, PID))
 
 	return PID, nil
 
@@ -202,15 +202,15 @@ func parsePIDFromJSON(j []byte, runtime string) (int, error) {
 	} else if runtime == "crio" {
 		var resp InfoDetails
 		if err := json.Unmarshal(j, &resp); err != nil {
-			return 0, errors.Errorf("[cri] Could not find pid field in json: %s", string(j))
+			return 0, errors.Errorf("[cri]: Could not find pid field in json: %s", string(j))
 		}
 		pid = resp.PID
 	} else {
-		return 0, errors.Errorf("no supported container runtime, runtime: %v", runtime)
+		return 0, errors.Errorf("[cri]: No supported container runtime, runtime: %v", runtime)
 	}
 
 	if pid == 0 {
-		return 0, errors.Errorf("[cri] no running target container found, pid: %v", string(pid))
+		return 0, errors.Errorf("[cri]: No running target container found, pid: %v", string(pid))
 	}
 
 	return pid, nil

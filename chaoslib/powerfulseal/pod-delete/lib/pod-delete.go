@@ -23,7 +23,7 @@ func PreparePodDelete(experimentsDetails *experimentTypes.ExperimentDetails, cli
 
 	//Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
-		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", strconv.Itoa(experimentsDetails.RampTime))
+		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", experimentsDetails.RampTime)
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 
@@ -65,7 +65,7 @@ func PreparePodDelete(experimentsDetails *experimentTypes.ExperimentDetails, cli
 	}
 
 	// Wait for Chaos Duration
-	log.Infof("[Wait]: Waiting for the %vs chaos duration", strconv.Itoa(experimentsDetails.ChaosDuration))
+	log.Infof("[Wait]: Waiting for the %vs chaos duration", experimentsDetails.ChaosDuration)
 	common.WaitForDuration(experimentsDetails.ChaosDuration)
 
 	//Deleting the powerfulseal deployment
@@ -84,7 +84,7 @@ func PreparePodDelete(experimentsDetails *experimentTypes.ExperimentDetails, cli
 
 	//Waiting for the ramp time after chaos injection
 	if experimentsDetails.RampTime != 0 {
-		log.Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", strconv.Itoa(experimentsDetails.RampTime))
+		log.Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", experimentsDetails.RampTime)
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 	return nil

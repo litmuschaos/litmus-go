@@ -35,14 +35,14 @@ func PrepareDiskFill(experimentsDetails *experimentTypes.ExperimentDetails, clie
 
 	//Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
-		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", strconv.Itoa(experimentsDetails.RampTime))
+		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", experimentsDetails.RampTime)
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 
 	// Get Chaos Pod Annotation
 	experimentsDetails.Annotations, err = common.GetChaosPodAnnotation(experimentsDetails.ChaosPodName, experimentsDetails.ChaosNamespace, clients)
 	if err != nil {
-		return errors.Errorf("unable to get annotation, due to %v", err)
+		return errors.Errorf("unable to get annotations, err: %v", err)
 	}
 
 	// generating the chaos inject event in the chaosengine
@@ -65,7 +65,7 @@ func PrepareDiskFill(experimentsDetails *experimentTypes.ExperimentDetails, clie
 	log.Info("[Status]: Checking the status of the helper pods")
 	err = status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, "app="+experimentsDetails.ExperimentName+"-helper", experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 	if err != nil {
-		return errors.Errorf("helper pods is not in running state, err: %v", err)
+		return errors.Errorf("helper pods are not in running state, err: %v", err)
 	}
 
 	for _, pod := range targetPodList.Items {
@@ -74,7 +74,7 @@ func PrepareDiskFill(experimentsDetails *experimentTypes.ExperimentDetails, clie
 		if experimentsDetails.TargetContainer == "" {
 			experimentsDetails.TargetContainer, err = GetTargetContainer(experimentsDetails, pod.Name, clients)
 			if err != nil {
-				return errors.Errorf("Unable to get the target container name due to, err: %v", err)
+				return errors.Errorf("Unable to get the target container name, err: %v", err)
 			}
 		}
 
@@ -111,13 +111,13 @@ func PrepareDiskFill(experimentsDetails *experimentTypes.ExperimentDetails, clie
 		exec.SetExecCommandAttributes(&execCommandDetails, podName, "disk-fill", experimentsDetails.ChaosNamespace)
 		ephemeralStorageDetails, err := exec.Exec(&execCommandDetails, clients, strings.Fields(command))
 		if err != nil {
-			return errors.Errorf("Unable to get ephemeral storage details due to err: %v", err)
+			return errors.Errorf("Unable to get ephemeral storage details, err: %v", err)
 		}
 
 		// filtering out the used ephemeral storage from the output of du command
 		usedEphemeralStorageSize, err := FilterUsedEphemeralStorage(ephemeralStorageDetails)
 		if err != nil {
-			return errors.Errorf("Unable to filter used ephemeral storage size due to err: %v", err)
+			return errors.Errorf("Unable to filter used ephemeral storage size, err: %v", err)
 		}
 		log.Infof("used ephemeral storage space: %v", strconv.Itoa(usedEphemeralStorageSize))
 
@@ -131,7 +131,7 @@ func PrepareDiskFill(experimentsDetails *experimentTypes.ExperimentDetails, clie
 			command := "dd if=/dev/urandom of=/diskfill/" + containerID + "/diskfill bs=4K count=" + strconv.Itoa(sizeTobeFilled/4)
 			_, err = exec.Exec(&execCommandDetails, clients, strings.Fields(command))
 			if err != nil {
-				return errors.Errorf("Unable to to create the files to fill the ephemeral storage due to err: %v", err)
+				return errors.Errorf("Unable to fill the ephemeral storage, err: %v", err)
 			}
 		} else {
 			log.Warn("No required free space found!, It's Housefull")
@@ -139,7 +139,7 @@ func PrepareDiskFill(experimentsDetails *experimentTypes.ExperimentDetails, clie
 	}
 
 	// waiting for the chaos duration
-	log.Infof("[Wait]: Waiting for the %vs after injecting chaos", strconv.Itoa(experimentsDetails.ChaosDuration))
+	log.Infof("[Wait]: Waiting for the %vs after injecting chaos", experimentsDetails.ChaosDuration)
 	common.WaitForDuration(experimentsDetails.ChaosDuration)
 
 	for _, pod := range targetPodList.Items {
@@ -161,7 +161,7 @@ func PrepareDiskFill(experimentsDetails *experimentTypes.ExperimentDetails, clie
 		exec.SetExecCommandAttributes(&execCommandDetails, podName, "disk-fill", experimentsDetails.ChaosNamespace)
 		err = Remedy(experimentsDetails, clients, containerID, pod.Name, &execCommandDetails)
 		if err != nil {
-			return errors.Errorf("Unable to perform remedy operation due to err: %v", err)
+			return errors.Errorf("Unable to perform remedy operation due to %v", err)
 		}
 	}
 
@@ -169,12 +169,12 @@ func PrepareDiskFill(experimentsDetails *experimentTypes.ExperimentDetails, clie
 	log.Info("[Cleanup]: Deleting all the helper pod")
 	err = common.DeleteAllPod("app="+experimentsDetails.ExperimentName+"-helper", experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients)
 	if err != nil {
-		return errors.Errorf("Unable to delete the helper pod, err: %v", err)
+		return errors.Errorf("Unable to delete the helper pod, %v", err)
 	}
 
 	//Waiting for the ramp time after chaos injection
 	if experimentsDetails.RampTime != 0 {
-		log.Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", strconv.Itoa(experimentsDetails.RampTime))
+		log.Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", experimentsDetails.RampTime)
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 	return nil
@@ -185,7 +185,7 @@ func PrepareDiskFill(experimentsDetails *experimentTypes.ExperimentDetails, clie
 func GetTargetContainer(experimentsDetails *experimentTypes.ExperimentDetails, appName string, clients clients.ClientSets) (string, error) {
 	pod, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Get(appName, v1.GetOptions{})
 	if err != nil {
-		return "", errors.Wrapf(err, "Fail to get the application pod status, due to:%v", err)
+		return "", err
 	}
 
 	return pod.Spec.Containers[0].Name, nil
@@ -340,7 +340,7 @@ func Remedy(experimentsDetails *experimentTypes.ExperimentDetails, clients clien
 		command := "rm -rf /diskfill/" + containerID + "/diskfill"
 		_, err = exec.Exec(execCommandDetails, clients, strings.Fields(command))
 		if err != nil {
-			return errors.Errorf("Unable to delete files to clean ephemeral storage due to err: %v", err)
+			return errors.Errorf("Unable to delete files to reset ephemeral storage usage due to err: %v", err)
 		}
 	}
 	return nil
@@ -352,7 +352,7 @@ func GetHelperPodName(targetPod apiv1.Pod, clients clients.ClientSets, namespace
 	podList, err := clients.KubeClient.CoreV1().Pods(namespace).List(v1.ListOptions{LabelSelector: labels})
 
 	if err != nil || len(podList.Items) == 0 {
-		return "", errors.Errorf("Unable to list the helper pods due to, err: %v", err)
+		return "", errors.Errorf("Unable to list the helper pods, %v", err)
 	}
 
 	for _, pod := range podList.Items {
@@ -360,5 +360,5 @@ func GetHelperPodName(targetPod apiv1.Pod, clients clients.ClientSets, namespace
 			return pod.Name, nil
 		}
 	}
-	return "", errors.Errorf("No helper pod is running on %v node", targetPod.Spec.NodeName)
+	return "", errors.Errorf("No helper pod is available on %v node", targetPod.Spec.NodeName)
 }

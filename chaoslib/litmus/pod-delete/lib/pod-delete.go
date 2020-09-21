@@ -1,7 +1,6 @@
 package lib
 
 import (
-	"strconv"
 	"time"
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
@@ -27,18 +26,18 @@ func PreparePodDelete(experimentsDetails *experimentTypes.ExperimentDetails, cli
 
 	//Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
-		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", strconv.Itoa(experimentsDetails.RampTime))
+		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", experimentsDetails.RampTime)
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 
 	err = PodDeleteChaos(experimentsDetails, clients, eventsDetails, chaosDetails, resultDetails)
 	if err != nil {
-		return errors.Errorf("Unable to delete the application pods, due to %v", err)
+		return errors.Errorf("Unable to delete the application pods, err: %v", err)
 	}
 
 	//Waiting for the ramp time after chaos injection
 	if experimentsDetails.RampTime != 0 {
-		log.Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", strconv.Itoa(experimentsDetails.RampTime))
+		log.Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", experimentsDetails.RampTime)
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 	return nil
@@ -69,7 +68,7 @@ func PodDeleteChaos(experimentsDetails *experimentTypes.ExperimentDetails, clien
 		// if the target pod is not defined it will derive the random target pod list using pod affected percentage
 		targetPodList, err := common.GetPodList(experimentsDetails.AppNS, experimentsDetails.TargetPod, experimentsDetails.AppLabel, experimentsDetails.PodsAffectedPerc, clients)
 		if err != nil {
-			return errors.Errorf("Unable to get the target pod list due to, err: %v", err)
+			return errors.Errorf("Unable to get the target pod list, err: %v", err)
 		}
 
 		if experimentsDetails.EngineName != "" {
@@ -96,7 +95,7 @@ func PodDeleteChaos(experimentsDetails *experimentTypes.ExperimentDetails, clien
 
 		//Waiting for the chaos interval after chaos injection
 		if experimentsDetails.ChaosInterval != 0 {
-			log.Infof("[Wait]: Wait for the chaos interval %vs", strconv.Itoa(experimentsDetails.ChaosInterval))
+			log.Infof("[Wait]: Wait for the chaos interval %vs", experimentsDetails.ChaosInterval)
 			common.WaitForDuration(experimentsDetails.ChaosInterval)
 		}
 
