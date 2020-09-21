@@ -173,7 +173,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 					Image:           experimentsDetails.LIBImage,
 					ImagePullPolicy: apiv1.PullAlways,
 					Command: []string{
-						"bin/bash",
+						"/bin/bash",
 					},
 					Args: []string{
 						"-c",
