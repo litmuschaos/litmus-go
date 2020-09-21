@@ -1,7 +1,9 @@
 package lib
 
 import (
+	"net"
 	"strconv"
+	"strings"
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/network-chaos/types"
@@ -210,6 +212,7 @@ func GetPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, podName, a
 		"NETEM_COMMAND":        args,
 		"NETWORK_INTERFACE":    experimentsDetails.NetworkInterface,
 		"EXPERIMENT_NAME":      experimentsDetails.ExperimentName,
+		"TARGET_IPs":           GetTargetIpsArgs(experimentsDetails.TargetIPs, experimentsDetails.TargetHosts),
 	}
 	for key, value := range ENVList {
 		var perEnv apiv1.EnvVar
@@ -236,4 +239,37 @@ func GetValueFromDownwardAPI(apiVersion string, fieldPath string) apiv1.EnvVarSo
 		},
 	}
 	return downwardENV
+}
+
+// GetTargetIpsArgs return the comma separated target ips
+// It fetch the ips from the target ips (if defined by users)
+// it append the ips from the host, if target host is provided
+func GetTargetIpsArgs(targetIPs, targetHosts string) string {
+
+	ipsFromHost := GetIpsForTargetHosts(targetHosts)
+	if ipsFromHost != "" {
+		targetIPs = targetIPs + "," + ipsFromHost
+	}
+	return targetIPs
+}
+
+// GetIpsForTargetHosts resolves IP addresses for comma-separated list of target hosts and returns comma-separated ips
+func GetIpsForTargetHosts(targetHosts string) string {
+	if targetHosts == "" {
+		return ""
+	}
+	hosts := strings.Split(targetHosts, ",")
+	var commaSeparatedIPs []string
+	for i := range hosts {
+		ips, err := net.LookupIP(hosts[i])
+		if err != nil {
+			log.Infof("Unknown host")
+		} else {
+			for j := range ips {
+				log.Infof("IP address: %v", ips[j])
+				commaSeparatedIPs = append(commaSeparatedIPs, ips[j].String())
+			}
+		}
+	}
+	return strings.Join(commaSeparatedIPs, ",")
 }
