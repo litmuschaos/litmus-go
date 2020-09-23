@@ -247,7 +247,9 @@ func GetValueFromDownwardAPI(apiVersion string, fieldPath string) apiv1.EnvVarSo
 func GetTargetIpsArgs(targetIPs, targetHosts string) string {
 
 	ipsFromHost := GetIpsForTargetHosts(targetHosts)
-	if ipsFromHost != "" {
+	if targetIPs == "" {
+		targetIPs = targetHosts
+	} else if ipsFromHost != "" {
 		targetIPs = targetIPs + "," + ipsFromHost
 	}
 	return targetIPs
