@@ -248,7 +248,7 @@ func GetTargetIpsArgs(targetIPs, targetHosts string) string {
 
 	ipsFromHost := GetIpsForTargetHosts(targetHosts)
 	if targetIPs == "" {
-		targetIPs = targetHosts
+		targetIPs = ipsFromHost
 	} else if ipsFromHost != "" {
 		targetIPs = targetIPs + "," + ipsFromHost
 	}
