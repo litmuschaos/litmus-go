@@ -1,23 +1,33 @@
 sudo: required
-dist: xenial
+os: linux
+dist: bionic
 
 services:
   - docker
 language: go
 go:
-  - 1.13.1
+  - 1.14.2
 
 addons:
   apt:
     update: true
 
+before_script:
+  - sudo apt-get update && sudo apt-get install golint
+  - export VERSION=$(curl --silent "https://api.github.com/repos/aquasecurity/trivy/releases/latest" | grep '"tag_name":' | sed -E 's/.*"v([^"]+)".*/\1/')
+  - sudo apt-get install -y rpm
+  - wget https://github.com/aquasecurity/trivy/releases/download/v${VERSION}/trivy_${VERSION}_Linux-64bit.tar.gz
+  - tar zxvf trivy_${VERSION}_Linux-64bit.tar.gz  
+  
 script:
   # Installing and configuring dependencies
   - make deps
-  # Building go binaries
-  - make go-build
+  # Includes formatting, linting and check unused packages
+  - make gotasks
   # Build
   - make build
+  # Running trivy check
+  - make trivy-check
 
 after_success:
   - make push
