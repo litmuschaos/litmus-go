@@ -55,7 +55,7 @@ func CheckPodStatus(appNs string, appLabel string, timeout, delay int, clients c
 		Try(func(attempt uint) error {
 			podSpec, err := clients.KubeClient.CoreV1().Pods(appNs).List(metav1.ListOptions{LabelSelector: appLabel})
 			if err != nil || len(podSpec.Items) == 0 {
-				return errors.Errorf("Unable to get the pod, err: %v", err)
+				return errors.Errorf("Unable to list the pods, err: %v", err)
 			}
 			for _, pod := range podSpec.Items {
 				if string(pod.Status.Phase) != "Running" {
@@ -81,7 +81,7 @@ func CheckContainerStatus(appNs string, appLabel string, timeout, delay int, cli
 		Try(func(attempt uint) error {
 			podSpec, err := clients.KubeClient.CoreV1().Pods(appNs).List(metav1.ListOptions{LabelSelector: appLabel})
 			if err != nil || len(podSpec.Items) == 0 {
-				return errors.Errorf("Unable to get the pod, err: %v", err)
+				return errors.Errorf("Unable to list the pods, err: %v", err)
 			}
 			for _, pod := range podSpec.Items {
 				for _, container := range pod.Status.ContainerStatuses {
@@ -114,7 +114,7 @@ func WaitForCompletion(appNs string, appLabel string, clients clients.ClientSets
 		Try(func(attempt uint) error {
 			podSpec, err := clients.KubeClient.CoreV1().Pods(appNs).List(metav1.ListOptions{LabelSelector: appLabel})
 			if err != nil || len(podSpec.Items) == 0 {
-				return errors.Errorf("Unable to get the pod, err: %v", err)
+				return errors.Errorf("Unable to list the pods, err: %v", err)
 			}
 			// it will check for the status of helper pod, if it is Succeeded and target container is completed then it will marked it as completed and return
 			// if it is still running then it will check for the target container, as we can have multiple container inside helper pod (istio)

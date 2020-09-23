@@ -1,0 +1,407 @@
+name: LitmusGo-CI
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  tests:
+    if: contains(github.event.comment.html_url, '/pull/') && startsWith(github.event.comment.body, '/run-e2e')
+    runs-on: ubuntu-latest
+    steps:
+
+      - name: Notification for e2e Start
+        uses: peter-evans/create-or-update-comment@v1
+        with:
+          comment-id: "${{ github.event.comment.id }}"
+          body: |
+            **Test Status:** The e2e test has been started please wait for the results ... 
+            ****     
+            | Experiment | Result | Runtime |
+            |------------|--------|---------|
+
+      #Using the last commit id of pull request
+      - uses: octokit/request-action@v2.x
+        id: get_PR_commits
+        with:
+          route: GET /repos/:repo/pulls/:pull_number/commits
+          repo: ${{ github.repository }}
+          pull_number: ${{ github.event.issue.number }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: set commit to output
+        id: getcommit
+        run: | 
+           prsha=$(echo $response | jq '.[-1].sha'  | tr -d '"')
+           echo "::set-output name=sha::$prsha" 
+        env: 
+          response:  ${{ steps.get_PR_commits.outputs.data }}
+          
+      - uses: actions/checkout@v2
+        with:
+          ref: ${{steps.getcommit.outputs.sha}}   
+          
+      - name: Generating Go binary and Building docker image
+        run: |
+          make build
+
+      #Install and configure a kind cluster
+      - name: Installing Prerequisites (KinD Cluster)
+        uses: engineerd/setup-kind@v0.4.0
+        with:
+            version: "v0.7.0"
+
+      - name: Configuring and testing the Installation
+        run: |
+          kubectl cluster-info --context kind-kind
+          kind get kubeconfig --internal >$HOME/.kube/config
+          kubectl get nodes            
+
+      - name: Load image on the nodes of the cluster
+        run: |
+          kind load docker-image --name=kind litmuschaos/go-runner:ci
+
+      - name: Deploy a sample application for chaos injection
+        run: |
+          kubectl apply -f https://raw.githubusercontent.com/mayadata-io/chaos-ci-lib/master/app/nginx.yml
+          sleep 30
+          
+      - name: Setting up kubeconfig ENV for Github Chaos Action
+        run: echo ::set-env name=KUBE_CONFIG_DATA::$(base64 -w 0 ~/.kube/config)
+
+      - name: Running Litmus pod delete chaos experiment
+        if: startsWith(github.event.comment.body, '/run-e2e-pod-delete') || startsWith(github.event.comment.body, '/run-e2e-all')
+        uses: mayadata-io/github-chaos-actions@v0.2.0
+        env:
+          INSTALL_LITMUS: true
+          EXPERIMENT_NAME: pod-delete
+          EXPERIMENT_IMAGE: litmuschaos/go-runner
+          EXPERIMENT_IMAGE_TAG: ci
+          IMAGE_PULL_POLICY: IfNotPresent
+          LITMUS_CLEANUP: true
+
+      - name: Update pod delete result
+        if: startsWith(github.event.comment.body, '/run-e2e-pod-delete') || startsWith(github.event.comment.body, '/run-e2e-all')
+        uses: peter-evans/create-or-update-comment@v1
+        with:
+          comment-id: "${{ github.event.comment.id }}"
+          body: |
+            | Pod Delete | Pass | containerd |
+
+      - name: Running container kill chaos experiment
+        if: startsWith(github.event.comment.body, '/run-e2e-container-kill') || startsWith(github.event.comment.body, '/run-e2e-all')
+        uses: mayadata-io/github-chaos-actions@v0.2.0
+        env:
+          INSTALL_LITMUS: true
+          EXPERIMENT_NAME: container-kill
+          EXPERIMENT_IMAGE: litmuschaos/go-runner
+          EXPERIMENT_IMAGE_TAG: ci
+          IMAGE_PULL_POLICY: IfNotPresent
+          CONTAINER_RUNTIME: containerd
+          LITMUS_CLEANUP: true
+
+      - name: Update container-kill result
+        if: startsWith(github.event.comment.body, '/run-e2e-container-kill') || startsWith(github.event.comment.body, '/run-e2e-all')
+        uses: peter-evans/create-or-update-comment@v1
+        with:
+          comment-id: "${{ github.event.comment.id }}"
+          body: |
+            | Container Kill | Pass | containerd |
+
+      - name: Running node-cpu-hog chaos experiment
+        if: startsWith(github.event.comment.body, '/run-e2e-node-cpu-hog') || startsWith(github.event.comment.body, '/run-e2e-resource-chaos') || startsWith(github.event.comment.body, '/run-e2e-all')
+        uses: mayadata-io/github-chaos-actions@v0.2.0
+        env:
+          INSTALL_LITMUS: true
+          EXPERIMENT_NAME: node-cpu-hog
+          EXPERIMENT_IMAGE: litmuschaos/go-runner
+          EXPERIMENT_IMAGE_TAG: ci
+          IMAGE_PULL_POLICY: IfNotPresent
+          LITMUS_CLEANUP: true
+
+      - name: Update node-cpu-hog result
+        if: startsWith(github.event.comment.body, '/run-e2e-node-cpu-hog') || startsWith(github.event.comment.body, '/run-e2e-resource-chaos') || startsWith(github.event.comment.body, '/run-e2e-all')
+        uses: peter-evans/create-or-update-comment@v1
+        with:
+          comment-id: "${{ github.event.comment.id }}"
+          body: |
+            | Node CPU Hog | Pass | containerd |            
+
+      - name: Running node-memory-hog chaos experiment
+        if: startsWith(github.event.comment.body, '/run-e2e-node-memory-hog') || startsWith(github.event.comment.body, '/run-e2e-resource-chaos') || startsWith(github.event.comment.body, '/run-e2e-all')
+        uses: mayadata-io/github-chaos-actions@v0.2.0
+        env:
+          INSTALL_LITMUS: true
+          EXPERIMENT_NAME: node-memory-hog
+          EXPERIMENT_IMAGE: litmuschaos/go-runner
+          EXPERIMENT_IMAGE_TAG: ci
+          IMAGE_PULL_POLICY: IfNotPresent
+          LITMUS_CLEANUP: true
+
+      - name: Update node-memory-hog result
+        if: startsWith(github.event.comment.body, '/run-e2e-node-memory-hog') || startsWith(github.event.comment.body, '/run-e2e-resource-chaos') || startsWith(github.event.comment.body, '/run-e2e-all')
+        uses: peter-evans/create-or-update-comment@v1
+        with:
+          comment-id: "${{ github.event.comment.id }}"
+          body: |
+            | Node MEMORY Hog | Pass | containerd |            
+          
+      - name: Running pod-cpu-hog chaos experiment
+        if: startsWith(github.event.comment.body, '/run-e2e-pod-cpu-hog') || startsWith(github.event.comment.body, '/run-e2e-resource-chaos') || startsWith(github.event.comment.body, '/run-e2e-all')
+        uses: mayadata-io/github-chaos-actions@v0.2.0
+        env:
+          INSTALL_LITMUS: true
+          EXPERIMENT_NAME: pod-cpu-hog
+          EXPERIMENT_IMAGE: litmuschaos/go-runner
+          EXPERIMENT_IMAGE_TAG: ci
+          IMAGE_PULL_POLICY: IfNotPresent      
+          TARGET_CONTAINER: nginx
+          TOTAL_CHAOS_DURATION: 60
+          CPU_CORES: 1
+          LITMUS_CLEANUP: true
+
+      - name: Update pod-cpu-hog result
+        if: startsWith(github.event.comment.body, '/run-e2e-pod-cpu-hog') || startsWith(github.event.comment.body, '/run-e2e-resource-chaos') || startsWith(github.event.comment.body, '/run-e2e-all')
+        uses: peter-evans/create-or-update-comment@v1
+        with:
+          comment-id: "${{ github.event.comment.id }}"
+          body: |
+            | Pod CPU Hog | Pass | containerd |           
+          
+      - name: Running pod-memory-hog chaos experiment
+        if: startsWith(github.event.comment.body, '/run-e2e-pod-memory-hog') || startsWith(github.event.comment.body, '/run-e2e-resource-chaos') || startsWith(github.event.comment.body, '/run-e2e-all')
+        uses: mayadata-io/github-chaos-actions@v0.2.0
+        env:
+          INSTALL_LITMUS: true
+          EXPERIMENT_NAME: pod-cpu-hog
+          EXPERIMENT_IMAGE: litmuschaos/go-runner
+          EXPERIMENT_IMAGE_TAG: ci
+          IMAGE_PULL_POLICY: IfNotPresent      
+          TARGET_CONTAINER: nginx
+          TOTAL_CHAOS_DURATION: 60
+          MEMORY_CONSUMPTION: 500
+          LITMUS_CLEANUP: true
+
+      - name: Update pod-memory-hog result
+        if: startsWith(github.event.comment.body, '/run-e2e-pod-memory-hog') || startsWith(github.event.comment.body, '/run-e2e-resource-chaos') || startsWith(github.event.comment.body, '/run-e2e-all')
+        uses: peter-evans/create-or-update-comment@v1
+        with:
+          comment-id: "${{ github.event.comment.id }}"
+          body: |
+            | Pod Memory Hog | Pass | containerd |         
+          
+      - name: Running pod network corruption chaos experiment
+        if: startsWith(github.event.comment.body, '/run-e2e-pod-network-corruption') || startsWith(github.event.comment.body, '/run-e2e-network-chaos') || startsWith(github.event.comment.body, '/run-e2e-all')
+        uses: mayadata-io/github-chaos-actions@v0.2.0
+        env:
+          INSTALL_LITMUS: true
+          EXPERIMENT_NAME: pod-network-corruption
+          EXPERIMENT_IMAGE: litmuschaos/go-runner
+          EXPERIMENT_IMAGE_TAG: ci
+          IMAGE_PULL_POLICY: IfNotPresent      
+          TARGET_CONTAINER: nginx
+          TOTAL_CHAOS_DURATION: 60
+          NETWORK_INTERFACE: eth0
+          CONTAINER_RUNTIME: containerd
+          LITMUS_CLEANUP: true 
+          
+      - name: Update pod-network-corruption result
+        if: startsWith(github.event.comment.body, '/run-e2e-pod-network-corruption') || startsWith(github.event.comment.body, '/run-e2e-network-chaos') || startsWith(github.event.comment.body, '/run-e2e-all')
+        uses: peter-evans/create-or-update-comment@v1
+        with:
+          comment-id: "${{ github.event.comment.id }}"
+          body: |
+            | Pod Network Corruption | Pass | containerd | 
+
+      - name: Running pod network duplication chaos experiment
+        if: startsWith(github.event.comment.body, '/run-e2e-pod-network-duplication') || startsWith(github.event.comment.body, '/run-e2e-network-chaos') || startsWith(github.event.comment.body, '/run-e2e-all')
+        uses: mayadata-io/github-chaos-actions@v0.2.0
+        env:
+          INSTALL_LITMUS: true
+          EXPERIMENT_NAME: pod-network-duplication
+          EXPERIMENT_IMAGE: litmuschaos/go-runner
+          EXPERIMENT_IMAGE_TAG: ci
+          IMAGE_PULL_POLICY: IfNotPresent      
+          TARGET_CONTAINER: nginx
+          TOTAL_CHAOS_DURATION: 60
+          NETWORK_INTERFACE: eth0
+          CONTAINER_RUNTIME: containerd
+          LITMUS_CLEANUP: true  
+          
+      - name: Update pod-network-duplication result
+        if: startsWith(github.event.comment.body, '/run-e2e-pod-network-duplication') || startsWith(github.event.comment.body, '/run-e2e-network-chaos') || startsWith(github.event.comment.body, '/run-e2e-all')
+        uses: peter-evans/create-or-update-comment@v1
+        with:
+          comment-id: "${{ github.event.comment.id }}"
+          body: |
+            | Pod Network Duplication | Pass | containerd |           
+        
+      - name: Running pod-network-latency chaos experiment
+        if: startsWith(github.event.comment.body, '/run-e2e-pod-network-latency') || startsWith(github.event.comment.body, '/run-e2e-network-chaos') || startsWith(github.event.comment.body, '/run-e2e-all')
+        uses: mayadata-io/github-chaos-actions@v0.2.0
+        env:
+          INSTALL_LITMUS: true
+          EXPERIMENT_NAME: pod-network-latency
+          EXPERIMENT_IMAGE: litmuschaos/go-runner
+          EXPERIMENT_IMAGE_TAG: ci
+          IMAGE_PULL_POLICY: IfNotPresent        
+          TARGET_CONTAINER: nginx
+          TOTAL_CHAOS_DURATION: 60
+          NETWORK_INTERFACE: eth0
+          NETWORK_LATENCY: 60000
+          CONTAINER_RUNTIME: containerd
+          LITMUS_CLEANUP: true
+
+      - name: Update pod-network-latency result
+        if: startsWith(github.event.comment.body, '/run-e2e-pod-network-latency') || startsWith(github.event.comment.body, '/run-e2e-network-chaos') || startsWith(github.event.comment.body, '/run-e2e-all')
+        uses: peter-evans/create-or-update-comment@v1
+        with:
+          comment-id: "${{ github.event.comment.id }}"
+          body: |
+            | Pod Network Latency | Pass | containerd |                  
+
+      - name: Running pod-network-loss chaos experiment
+        uses: mayadata-io/github-chaos-actions@v0.2.0
+        env:
+          INSTALL_LITMUS: true
+          EXPERIMENT_NAME: pod-network-loss
+          EXPERIMENT_IMAGE: litmuschaos/go-runner
+          EXPERIMENT_IMAGE_TAG: ci
+          IMAGE_PULL_POLICY: IfNotPresent      
+          TARGET_CONTAINER: nginx
+          TOTAL_CHAOS_DURATION: 60
+          NETWORK_INTERFACE: eth0
+          NETWORK_PACKET_LOSS_PERCENTAGE: 100
+          CONTAINER_RUNTIME: containerd
+          LITMUS_CLEANUP: true
+
+      - name: Update pod-network-loss result
+        if: startsWith(github.event.comment.body, '/run-e2e-pod-network-loss') || startsWith(github.event.comment.body, '/run-e2e-network-chaos')  || startsWith(github.event.comment.body, '/run-e2e-all')
+        uses: peter-evans/create-or-update-comment@v1
+        with:
+          comment-id: "${{ github.event.comment.id }}"
+          body: |
+            | Pod Network Loss | Pass | containerd |      
+        
+      - name: Running pod autoscaler chaos experiment
+        if: startsWith(github.event.comment.body, '/run-e2e-pod-autoscaler') || startsWith(github.event.comment.body, '/run-e2e-all')
+        uses: mayadata-io/github-chaos-actions@v0.2.0
+        env:
+          INSTALL_LITMUS: true
+          EXPERIMENT_NAME: pod-autoscaler
+          EXPERIMENT_IMAGE: litmuschaos/go-runner
+          EXPERIMENT_IMAGE_TAG: ci
+          IMAGE_PULL_POLICY: IfNotPresent     
+          TOTAL_CHAOS_DURATION: 60
+          LITMUS_CLEANUP: true
+
+      - name: Update pod-autoscaler result
+        if: startsWith(github.event.comment.body, '/run-e2e-pod-autoscaler') || startsWith(github.event.comment.body, '/run-e2e-all')
+        uses: peter-evans/create-or-update-comment@v1
+        with:
+          comment-id: "${{ github.event.comment.id }}"
+          body: |
+            | Pod Autoscaler | Pass | containerd |            
+        
+      - name: Running node-io-stress chaos experiment
+        if: startsWith(github.event.comment.body, '/run-e2e-node-io-stress') || startsWith(github.event.comment.body, '/run-e2e-io-chaos') || startsWith(github.event.comment.body, '/run-e2e-all')
+        uses: mayadata-io/github-chaos-actions@v0.2.0
+        env:
+          INSTALL_LITMUS: true
+          EXPERIMENT_NAME: node-io-stress
+          EXPERIMENT_IMAGE: litmuschaos/go-runner
+          EXPERIMENT_IMAGE_TAG: ci
+          IMAGE_PULL_POLICY: IfNotPresent      
+          TOTAL_CHAOS_DURATION: 120
+          FILESYSTEM_UTILIZATION_PERCENTAGE: 10
+          LITMUS_CLEANUP: true
+          
+      - name: Update node-io-stress result
+        if: startsWith(github.event.comment.body, '/run-e2e-node-io-stress') || startsWith(github.event.comment.body, '/run-e2e-io-chaos') || startsWith(github.event.comment.body, '/run-e2e-all')
+        uses: peter-evans/create-or-update-comment@v1
+        with:
+          comment-id: "${{ github.event.comment.id }}"
+          body: |
+            | Node IO Stress | Pass | containerd |            
+                  
+      - name: Check the test run
+        if: |
+         startsWith(github.event.comment.body, '/run-e2e-pod-delete') || startsWith(github.event.comment.body, '/run-e2e-container-kill') ||
+         startsWith(github.event.comment.body, '/run-e2e-node-cpu-hog') || startsWith(github.event.comment.body, '/run-e2e-node-memory-hog') ||
+         startsWith(github.event.comment.body, '/run-e2e-pod-cpu-hog') || startsWith(github.event.comment.body, '/run-e2e-pod-memory-hog') ||
+         startsWith(github.event.comment.body, '/run-e2e-pod-network-corruption') || startsWith(github.event.comment.body, '/run-e2e-pod-network-loss') ||
+         startsWith(github.event.comment.body, '/run-e2e-pod-network-latency') || startsWith(github.event.comment.body, '/run-e2e-pod-network-duplication') ||
+         startsWith(github.event.comment.body, '/run-e2e-pod-autoscaler') || startsWith(github.event.comment.body, '/run-e2e-node-io-stress') ||
+         startsWith(github.event.comment.body, '/run-e2e-resource-chaos') || startsWith(github.event.comment.body, '/run-e2e-network-chaos') ||         
+         startsWith(github.event.comment.body, '/run-e2e-io-chaos')  || startsWith(github.event.comment.body, '/run-e2e-all')
+        run: |
+          echo ::set-env name=TEST_RUN::true
+
+      - name: Check for all the jobs are succeeded
+        if: ${{ success() && env.TEST_RUN == 'true' }}
+        uses: peter-evans/create-or-update-comment@v1
+        with:
+          comment-id: "${{ github.event.comment.id }}"
+          body: |  
+            ****
+            **Test Result:** All tests are passed
+            **Run ID:** [${{ env.RUN_ID }}](https://github.com/litmuschaos/litmus-go/actions/runs/${{ env.RUN_ID }})                        
+          reactions: hooray         
+        env: 
+          RUN_ID: ${{ github.run_id }}       
+
+      - name: Check for any job failed
+        if: ${{ failure() }}
+        uses: peter-evans/create-or-update-comment@v1
+        with:
+          comment-id: "${{ github.event.comment.id }}"
+          body: |
+            ****
+            **Test Failed:** Some tests are failed please check
+            **Run ID:** [${{ env.RUN_ID }}](https://github.com/litmuschaos/litmus-go/actions/runs/${{ env.RUN_ID }})            
+          reactions: confused
+        env: 
+          RUN_ID: ${{ github.run_id }}
+
+      - name: Deleting KinD cluster
+        if: ${{ always() }}
+        run: kind delete cluster
+
+      - name: Check if any test ran or not
+        if: env.TEST_RUN != 'true'
+        uses: peter-evans/create-or-update-comment@v1
+        with:
+          comment-id: "${{ github.event.comment.id }}"
+          body: |
+            ****
+            **Test Result:** No test found
+            **Run ID:** [${{ env.RUN_ID }}](https://github.com/litmuschaoslitmus-go/actions/runs/${{ env.RUN_ID }})
+          reactions: eyes
+        env: 
+          RUN_ID: ${{ github.run_id }}
+
+  # This job will merge an equipped PR in two steps:
+  # Firstly it will add a merge label on the target PR and then it will merge the PR according to the envs provided.
+  merge:  
+    if: contains(github.event.comment.html_url, '/pull/') && startsWith(github.event.comment.body, '/merge')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Add a merge label 
+        uses: actions-ecosystem/action-add-labels@v1
+        with:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          labels: merge
+
+      # The action will automatically check if the required number of review approvals has been reached.   
+      - name: automerge      
+        uses: "pascalgn/automerge-action@f81beb99aef41bb55ad072857d43073fba833a98"
+        env:          
+          GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+          MERGE_LABELS: "merge,!WIP,!DO NOT MERGE"
+          MERGE_METHOD: "squash"
+          MERGE_FORKS: "false"
+          MERGE_RETRIES: "6"
+          MERGE_RETRY_SLEEP: "10000"
+          UPDATE_LABELS: ""
+          UPDATE_METHOD: "rebase"
+          MERGE_DELETE_BRANCH: true

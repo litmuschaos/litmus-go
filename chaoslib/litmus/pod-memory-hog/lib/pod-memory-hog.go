@@ -54,7 +54,7 @@ func ExperimentMemory(experimentsDetails *experimentTypes.ExperimentDetails, cli
 	// if the target pod is not defined it will derive the random target pod list using pod affected percentage
 	targetPodList, err := common.GetPodList(experimentsDetails.AppNS, experimentsDetails.TargetPod, experimentsDetails.AppLabel, experimentsDetails.PodsAffectedPerc, clients)
 	if err != nil {
-		return errors.Errorf("Unable to get the target pod list due to, err: %v", err)
+		return errors.Errorf("Unable to get the target pod list, err: %v", err)
 	}
 
 	for _, pod := range targetPodList.Items {
@@ -101,7 +101,7 @@ func ExperimentMemory(experimentsDetails *experimentTypes.ExperimentDetails, cli
 					log.Info("[Chaos]: Killing process started because of terminated signal received")
 					err = KillStressMemory(container.Name, pod.Name, experimentsDetails.AppNS, experimentsDetails.ChaosKillCmd, clients)
 					if err != nil {
-						klog.V(0).Infof("Error in Kill stress after")
+						klog.V(0).Infof("Error in Kill stress after abortion")
 						return err
 					}
 					// updating the chaosresult after stopped
@@ -137,7 +137,7 @@ func PrepareMemoryStress(experimentsDetails *experimentTypes.ExperimentDetails, 
 
 	//Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
-		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", strconv.Itoa(experimentsDetails.RampTime))
+		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", experimentsDetails.RampTime)
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 	//Starting the Memory stress experiment
@@ -147,7 +147,7 @@ func PrepareMemoryStress(experimentsDetails *experimentTypes.ExperimentDetails, 
 	}
 	//Waiting for the ramp time after chaos injection
 	if experimentsDetails.RampTime != 0 {
-		log.Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", strconv.Itoa(experimentsDetails.RampTime))
+		log.Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", experimentsDetails.RampTime)
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 	return nil
@@ -163,7 +163,7 @@ func KillStressMemory(containerName, podName, namespace, memFreeCmd string, clie
 	litmusexec.SetExecCommandAttributes(&execCommandDetails, podName, containerName, namespace)
 	_, err := litmusexec.Exec(&execCommandDetails, clients, command)
 	if err != nil {
-		return errors.Errorf("Unable to kill stress process inside target container, due to err: %v", err)
+		return errors.Errorf("Unable to kill stress process inside target container, err: %v", err)
 	}
 	return nil
 }

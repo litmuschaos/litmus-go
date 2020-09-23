@@ -22,12 +22,12 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 	// if the target pod is not defined it will derive the random target pod list using pod affected percentage
 	targetPodList, err := common.GetPodList(experimentsDetails.AppNS, experimentsDetails.TargetPod, experimentsDetails.AppLabel, experimentsDetails.PodsAffectedPerc, clients)
 	if err != nil {
-		return errors.Errorf("Unable to get the target pod list due to, err: %v", err)
+		return errors.Errorf("Unable to get the target pod list, err: %v", err)
 	}
 
 	//Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
-		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", strconv.Itoa(experimentsDetails.RampTime))
+		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", experimentsDetails.RampTime)
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 
@@ -43,7 +43,7 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 	if experimentsDetails.TargetContainer == "" {
 		experimentsDetails.TargetContainer, err = GetTargetContainer(experimentsDetails, targetPodList.Items[0].Name, clients)
 		if err != nil {
-			return errors.Errorf("Unable to get the target container name due to, err: %v", err)
+			return errors.Errorf("Unable to get the target container name, err: %v", err)
 		}
 	}
 
@@ -53,7 +53,7 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 	// Get Chaos Pod Annotation
 	experimentsDetails.Annotations, err = common.GetChaosPodAnnotation(experimentsDetails.ChaosPodName, experimentsDetails.ChaosNamespace, clients)
 	if err != nil {
-		return errors.Errorf("unable to get annotation, due to %v", err)
+		return errors.Errorf("Unable to get annotations, err: %v", err)
 	}
 
 	// creating the helper pod to perform container kill chaos
@@ -69,7 +69,7 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 	log.Info("[Status]: Checking the status of the helper pods")
 	err = status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, "app="+experimentsDetails.ExperimentName+"-helper", experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 	if err != nil {
-		return errors.Errorf("helper pods is not in running state, err: %v", err)
+		return errors.Errorf("helper pods are not in running state, err: %v", err)
 	}
 
 	// Wait till the completion of the helper pod
@@ -77,11 +77,11 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 	log.Info("[Wait]: waiting till the completion of the helper pod")
 	podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, "app="+experimentsDetails.ExperimentName+"-helper", clients, experimentsDetails.ChaosDuration+experimentsDetails.ChaosInterval+60, experimentsDetails.ExperimentName)
 	if err != nil || podStatus == "Failed" {
-		return errors.Errorf("helper pod failed due to, err: %v", err)
+		return errors.Errorf("helper pod failed, err: %v", err)
 	}
 
 	//Deleting all the helper pod for container-kill chaos
-	log.Info("[Cleanup]: Deleting all the helper pod")
+	log.Info("[Cleanup]: Deleting all the helper pods")
 	err = common.DeleteAllPod("app="+experimentsDetails.ExperimentName+"-helper", experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients)
 	if err != nil {
 		return errors.Errorf("Unable to delete the helper pod, err: %v", err)
@@ -89,7 +89,7 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 
 	//Waiting for the ramp time after chaos injection
 	if experimentsDetails.RampTime != 0 {
-		log.Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", strconv.Itoa(experimentsDetails.RampTime))
+		log.Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", experimentsDetails.RampTime)
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 	return nil
@@ -120,7 +120,7 @@ func GetServiceAccount(experimentsDetails *experimentTypes.ExperimentDetails, cl
 func GetTargetContainer(experimentsDetails *experimentTypes.ExperimentDetails, appName string, clients clients.ClientSets) (string, error) {
 	pod, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Get(appName, v1.GetOptions{})
 	if err != nil {
-		return "", errors.Wrapf(err, "Fail to get the application pod status, due to:%v", err)
+		return "", err
 	}
 
 	return pod.Spec.Containers[0].Name, nil
@@ -173,7 +173,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 					Image:           experimentsDetails.LIBImage,
 					ImagePullPolicy: apiv1.PullAlways,
 					Command: []string{
-						"bin/bash",
+						"/bin/bash",
 					},
 					Args: []string{
 						"-c",

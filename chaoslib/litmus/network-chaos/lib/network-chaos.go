@@ -1,7 +1,9 @@
 package lib
 
 import (
+	"net"
 	"strconv"
+	"strings"
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/network-chaos/types"
@@ -23,12 +25,12 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 	// if the target pod is not defined it will derive the random target pod list using pod affected percentage
 	targetPodList, err := common.GetPodList(experimentsDetails.AppNS, experimentsDetails.TargetPod, experimentsDetails.AppLabel, experimentsDetails.PodsAffectedPerc, clients)
 	if err != nil {
-		return errors.Errorf("Unable to get the target pod list due to, err: %v", err)
+		return errors.Errorf("Unable to get the target pod list, err: %v", err)
 	}
 
 	//Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
-		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", strconv.Itoa(experimentsDetails.RampTime))
+		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", experimentsDetails.RampTime)
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 
@@ -44,14 +46,14 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 	if experimentsDetails.TargetContainer == "" {
 		experimentsDetails.TargetContainer, err = GetTargetContainer(experimentsDetails, targetPodList.Items[0].Name, clients)
 		if err != nil {
-			return errors.Errorf("Unable to get the target container name due to, err: %v", err)
+			return errors.Errorf("Unable to get the target container name, err: %v", err)
 		}
 	}
 
 	// Get Chaos Pod Annotation
 	experimentsDetails.Annotations, err = common.GetChaosPodAnnotation(experimentsDetails.ChaosPodName, experimentsDetails.ChaosNamespace, clients)
 	if err != nil {
-		return errors.Errorf("unable to get annotation, due to %v", err)
+		return errors.Errorf("unable to get annotations, err: %v", err)
 	}
 
 	// creating the helper pod to perform network chaos
@@ -67,7 +69,7 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 	log.Info("[Status]: Checking the status of the helper pods")
 	err = status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, "app="+experimentsDetails.ExperimentName+"-helper", experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 	if err != nil {
-		return errors.Errorf("helper pods is not in running state, err: %v", err)
+		return errors.Errorf("helper pods are not in running state, err: %v", err)
 	}
 
 	// Wait till the completion of the helper pod
@@ -82,7 +84,7 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 	log.Info("[Cleanup]: Deleting all the helper pod")
 	err = common.DeleteAllPod("app="+experimentsDetails.ExperimentName+"-helper", experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients)
 	if err != nil {
-		return errors.Errorf("Unable to delete the helper pod, err: %v", err)
+		return errors.Errorf("Unable to delete the helper pods, err: %v", err)
 	}
 
 	return nil
@@ -103,7 +105,7 @@ func GetServiceAccount(experimentsDetails *experimentTypes.ExperimentDetails, cl
 func GetTargetContainer(experimentsDetails *experimentTypes.ExperimentDetails, appName string, clients clients.ClientSets) (string, error) {
 	pod, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Get(appName, v1.GetOptions{})
 	if err != nil {
-		return "", errors.Wrapf(err, "Fail to get the application pod status, due to:%v", err)
+		return "", err
 	}
 
 	return pod.Spec.Containers[0].Name, nil
@@ -210,6 +212,7 @@ func GetPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, podName, a
 		"NETEM_COMMAND":        args,
 		"NETWORK_INTERFACE":    experimentsDetails.NetworkInterface,
 		"EXPERIMENT_NAME":      experimentsDetails.ExperimentName,
+		"TARGET_IPs":           GetTargetIpsArgs(experimentsDetails.TargetIPs, experimentsDetails.TargetHosts),
 	}
 	for key, value := range ENVList {
 		var perEnv apiv1.EnvVar
@@ -236,4 +239,37 @@ func GetValueFromDownwardAPI(apiVersion string, fieldPath string) apiv1.EnvVarSo
 		},
 	}
 	return downwardENV
+}
+
+// GetTargetIpsArgs return the comma separated target ips
+// It fetch the ips from the target ips (if defined by users)
+// it append the ips from the host, if target host is provided
+func GetTargetIpsArgs(targetIPs, targetHosts string) string {
+
+	ipsFromHost := GetIpsForTargetHosts(targetHosts)
+	if ipsFromHost != "" {
+		targetIPs = targetIPs + "," + ipsFromHost
+	}
+	return targetIPs
+}
+
+// GetIpsForTargetHosts resolves IP addresses for comma-separated list of target hosts and returns comma-separated ips
+func GetIpsForTargetHosts(targetHosts string) string {
+	if targetHosts == "" {
+		return ""
+	}
+	hosts := strings.Split(targetHosts, ",")
+	var commaSeparatedIPs []string
+	for i := range hosts {
+		ips, err := net.LookupIP(hosts[i])
+		if err != nil {
+			log.Infof("Unknown host")
+		} else {
+			for j := range ips {
+				log.Infof("IP address: %v", ips[j])
+				commaSeparatedIPs = append(commaSeparatedIPs, ips[j].String())
+			}
+		}
+	}
+	return strings.Join(commaSeparatedIPs, ",")
 }

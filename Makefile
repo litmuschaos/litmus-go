@@ -10,8 +10,7 @@ IS_DOCKER_INSTALLED = $(shell which docker >> /dev/null 2>&1; echo $$?)
 PACKAGES = $(shell go list ./... | grep -v '/vendor/')
 
 .PHONY: all
-all: deps gotasks build push docker-security-check
-
+all: deps gotasks build push trivy-check
 .PHONY: help
 help:
 	@echo ""

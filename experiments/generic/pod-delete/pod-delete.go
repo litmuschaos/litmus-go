@@ -35,7 +35,7 @@ func main() {
 
 	//Getting kubeConfig and Generate ClientSets
 	if err := clients.GenerateClientSetFromKubeConfig(); err != nil {
-		log.Fatalf("Unable to Get the kubeconfig due to %v", err)
+		log.Fatalf("Unable to Get the kubeconfig, err: %v", err)
 	}
 
 	//Fetching all the ENV passed from the runner pod
@@ -55,7 +55,7 @@ func main() {
 	log.Infof("[PreReq]: Updating the chaos result of %v experiment (SOT)", experimentsDetails.ExperimentName)
 	err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT")
 	if err != nil {
-		log.Errorf("Unable to Create the Chaos Result due to %v", err)
+		log.Errorf("Unable to Create the Chaos Result, err: %v", err)
 		failStep := "Updating the chaos result of pod-delete experiment (SOT)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
@@ -80,7 +80,7 @@ func main() {
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (pre-chaos)")
 	err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 	if err != nil {
-		log.Errorf("Application status check failed due to %v\n", err)
+		log.Errorf("Application status check failed, err: %v", err)
 		failStep := "Verify that the AUT (Application Under Test) is running (pre-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
@@ -94,9 +94,8 @@ func main() {
 		if len(resultDetails.ProbeDetails) != 0 {
 
 			err = probe.RunProbes(&chaosDetails, clients, &resultDetails, "PreChaos", &eventsDetails)
-			events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 			if err != nil {
-				log.Errorf("Probe failed, due to err: %v", err)
+				log.Errorf("Probe failed, err: %v", err)
 				failStep := "Failed while adding probe"
 				msg := "AUT: Running, Probes: Unsuccessful"
 				types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, msg, "Warning", &chaosDetails)
@@ -115,8 +114,8 @@ func main() {
 	if experimentsDetails.ChaosLib == "litmus" {
 		err = litmusLIB.PreparePodDelete(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
 		if err != nil {
-			log.Errorf("Chaos injection failed due to %v\n", err)
-			failStep := "Including the litmus lib for pod-delete"
+			log.Errorf("Chaos injection failed, err: %v", err)
+			failStep := "failed in chaos injection phase"
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}
@@ -125,8 +124,8 @@ func main() {
 	} else if experimentsDetails.ChaosLib == "powerfulseal" {
 		err = powerfulseal.PreparePodDelete(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
 		if err != nil {
-			log.Errorf("Chaos injection failed due to %v\n", err)
-			failStep := "Including the powerfulseal lib for pod-delete"
+			log.Errorf("Chaos injection failed, err: %v", err)
+			failStep := "failed in chaos injection phase"
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}
@@ -134,7 +133,7 @@ func main() {
 		resultDetails.Verdict = "Pass"
 	} else {
 		log.Error("[Invalid]: Please Provide the correct LIB")
-		failStep := "Including the litmus lib for pod-delete"
+		failStep := "no match found for specified lib"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -143,7 +142,7 @@ func main() {
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (post-chaos)")
 	err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 	if err != nil {
-		log.Errorf("Application status check failed due to %v\n", err)
+		log.Errorf("Application status check failed, err: %v", err)
 		failStep := "Verify that the AUT (Application Under Test) is running (post-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
@@ -157,7 +156,7 @@ func main() {
 		if len(resultDetails.ProbeDetails) != 0 {
 			err = probe.RunProbes(&chaosDetails, clients, &resultDetails, "PostChaos", &eventsDetails)
 			if err != nil {
-				log.Errorf("Unable to Add the probes, due to err: %v", err)
+				log.Errorf("Unable to Add the probes, err: %v", err)
 				failStep := "Failed while adding probe"
 				msg := "AUT: Running, Probes: Unsuccessful"
 				types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, msg, "Warning", &chaosDetails)
@@ -177,7 +176,7 @@ func main() {
 	log.Infof("[The End]: Updating the chaos result of %v experiment (EOT)", experimentsDetails.ExperimentName)
 	err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 	if err != nil {
-		log.Fatalf("Unable to Update the Chaos Result due to %v\n", err)
+		log.Fatalf("Unable to Update the Chaos Result, err: %v", err)
 	}
 
 	// generating the event in chaosresult to marked the verdict as pass/fail

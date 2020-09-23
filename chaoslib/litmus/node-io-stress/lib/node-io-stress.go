@@ -24,7 +24,7 @@ func PrepareNodeIOStress(experimentsDetails *experimentTypes.ExperimentDetails, 
 		//Select node for node-io-stress
 		appNodeName, err := common.GetNodeName(experimentsDetails.AppNS, experimentsDetails.AppLabel, clients)
 		if err != nil {
-			return errors.Errorf("Unable to get the application nodename due to, err: %v", err)
+			return errors.Errorf("Unable to get the application nodename, err: %v", err)
 		}
 
 		experimentsDetails.AppNode = appNodeName
@@ -40,7 +40,7 @@ func PrepareNodeIOStress(experimentsDetails *experimentTypes.ExperimentDetails, 
 
 	//Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
-		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", strconv.Itoa(experimentsDetails.RampTime))
+		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", experimentsDetails.RampTime)
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 
@@ -53,7 +53,7 @@ func PrepareNodeIOStress(experimentsDetails *experimentTypes.ExperimentDetails, 
 	// Get Chaos Pod Annotation
 	experimentsDetails.Annotations, err = common.GetChaosPodAnnotation(experimentsDetails.ChaosPodName, experimentsDetails.ChaosNamespace, clients)
 	if err != nil {
-		return errors.Errorf("unable to get annotation, due to %v", err)
+		return errors.Errorf("unable to get annotations, err: %v", err)
 	}
 
 	// Creating the helper pod to perform node io stress
@@ -70,7 +70,7 @@ func PrepareNodeIOStress(experimentsDetails *experimentTypes.ExperimentDetails, 
 	}
 
 	// Wait till the completion of helper pod
-	log.Infof("[Wait]: Waiting for %vs till the completion of the helper pod", strconv.Itoa(experimentsDetails.ChaosDuration+30))
+	log.Infof("[Wait]: Waiting for %vs till the completion of the helper pod", experimentsDetails.ChaosDuration+30)
 
 	podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, "name="+experimentsDetails.ExperimentName+"-"+experimentsDetails.RunID, clients, experimentsDetails.ChaosDuration+30, experimentsDetails.ExperimentName)
 	if err != nil || podStatus == "Failed" {
@@ -93,7 +93,7 @@ func PrepareNodeIOStress(experimentsDetails *experimentTypes.ExperimentDetails, 
 
 	//Waiting for the ramp time after chaos injection
 	if experimentsDetails.RampTime != 0 {
-		log.Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", strconv.Itoa(experimentsDetails.RampTime))
+		log.Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", experimentsDetails.RampTime)
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 	return nil
