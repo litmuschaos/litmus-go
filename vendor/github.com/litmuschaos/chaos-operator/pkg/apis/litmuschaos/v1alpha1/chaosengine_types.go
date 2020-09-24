@@ -175,7 +175,9 @@ type K8sProbeAttributes struct {
 	RunProperties RunProperty `json:"runProperties,omitempty"`
 	// mode for k8s probe
 	// it can be SOT, EOT, Edge
-	Mode string `json:"mode,omitempty"`
+	Mode      string `json:"mode,omitempty"`
+	Operation string `json:"operation,omitempty"`
+	Data      string `json:"data,omitempty"`
 }
 
 // CmdProbeAttributes contains details of cmd probe, which can be applied on the experiments
