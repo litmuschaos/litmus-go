@@ -28,4 +28,5 @@ type ExperimentDetails struct {
 	ChaosKillCmd     string
 	LIBImage         string
 	Annotations      map[string]string
+	TargetContainer  string
 }
