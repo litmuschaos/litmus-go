@@ -1,0 +1,75 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: litmus-experiment
+spec:
+  replicas: 1
+  selector: 
+    matchLabels:
+      app: litmus-experiment
+  template:
+    metadata:
+      labels:
+        app: litmus-experiment
+    spec:
+      serviceAccountName: node-restart-sa
+      containers:
+      - name: gotest
+        image: busybox
+        command:
+          - sleep 
+          - "3600"
+        env:
+          - name: APP_NAMESPACE
+            value: 'default'
+
+          - name: APP_LABEL
+            value: 'run=nginx'
+
+          - name: APP_KIND
+            value: 'deployment'
+
+          - name: AUXILIARY_APPINFO
+            value: ''
+
+          - name: TOTAL_CHAOS_DURATION
+            value: '60'
+
+          - name: CHAOS_INTERVAL
+            value: '10'
+
+          - name: LIB
+            value: 'litmus'
+
+          - name: LIB_IMAGE
+            value: 'litmuschaos/go-runner:ci'
+
+          - name: CHAOS_NAMESPACE
+            value: 'default'
+
+          - name: RAMP_TIME
+            value: ''
+
+          - name: SSH_USER
+            value: 'core'
+
+          - name: REBOOT_COMMAND
+            value: 'sudo systemctl reboot'
+
+          - name: SECRET_NAME
+            value: 'id-rsa'
+          
+          - name: SECRET_VALUE
+            value: 'ssh-privatekey'
+
+          - name: TARGET_NODE
+            value: 'node01'
+
+          - name: TARGET_NODE_IP
+            value: '192.168.1.15'
+
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name

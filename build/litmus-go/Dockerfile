@@ -3,7 +3,7 @@ FROM ubuntu:bionic
 LABEL maintainer="LitmusChaos"
 
 #Installing necessary ubuntu packages
-RUN apt-get update && apt-get install -y curl bash systemd iproute2 stress-ng
+RUN apt-get update && apt-get install -y curl bash systemd iproute2 stress-ng openssh-client
 
 #Installing Kubectl
 ENV KUBE_LATEST_VERSION="v1.19.0"
