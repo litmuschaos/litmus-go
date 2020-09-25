@@ -41,10 +41,7 @@ jobs:
         with:
           ref: ${{steps.getcommit.outputs.sha}}   
           
-      - name: Building Experiment Go Binary
-        run: make go-build
-
-      - name: Build docker image
+      - name: Generating Go binary and Building docker image
         run: |
           make build
 
@@ -402,9 +399,9 @@ jobs:
           GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
           MERGE_LABELS: "merge,!WIP,!DO NOT MERGE"
           MERGE_METHOD: "squash"
-          MERGE_FORKS: "false"
+          MERGE_FORKS: "true"
           MERGE_RETRIES: "6"
           MERGE_RETRY_SLEEP: "10000"
           UPDATE_LABELS: ""
-          UPDATE_METHOD: "rebase"
+          UPDATE_METHOD: "merge"
           MERGE_DELETE_BRANCH: true
