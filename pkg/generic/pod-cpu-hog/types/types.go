@@ -29,4 +29,5 @@ type ExperimentDetails struct {
 	LIBImage         string
 	Annotations      map[string]string
 	TargetContainer  string
+	Sequence         string
 }
