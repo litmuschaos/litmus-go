@@ -2,12 +2,17 @@ package lib
 
 import (
 	"fmt"
+	"os"
+	"os/signal"
 	"strings"
+	"syscall"
+	"time"
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/node-taint/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
+	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
@@ -65,9 +70,47 @@ func PrepareNodeTaint(experimentsDetails *experimentTypes.ExperimentDetails, cli
 		}
 	}
 
-	// Wait for Chaos Duration
-	log.Infof("[Wait]: Waiting for the %vs chaos duration", experimentsDetails.ChaosDuration)
-	common.WaitForDuration(experimentsDetails.ChaosDuration)
+	var endTime <-chan time.Time
+	timeDelay := time.Duration(experimentsDetails.ChaosDuration) * time.Second
+
+	log.Infof("[Chaos]: Waiting for %vs", experimentsDetails.ChaosDuration)
+
+	// signChan channel is used to transmit signal notifications.
+	signChan := make(chan os.Signal, 1)
+	// Catch and relay certain signal(s) to signChan channel.
+	signal.Notify(signChan, os.Interrupt, syscall.SIGTERM, syscall.SIGKILL)
+
+loop:
+	for {
+		endTime = time.After(timeDelay)
+		select {
+		case <-signChan:
+			log.Info("[Chaos]: Killing process started because of terminated signal received")
+			// updating the chaosresult after stopped
+			failStep := "Node Taint injection stopped!"
+			types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep)
+			result.ChaosResult(chaosDetails, clients, resultDetails, "EOT")
+
+			// generating summary event in chaosengine
+			msg := experimentsDetails.ExperimentName + " experiment has been aborted"
+			types.SetEngineEventAttributes(eventsDetails, types.Summary, msg, "Warning", chaosDetails)
+			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
+
+			// generating summary event in chaosresult
+			types.SetResultEventAttributes(eventsDetails, types.StoppedVerdict, msg, "Warning", resultDetails)
+			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosResult")
+
+			if err = RemoveTaintFromNode(experimentsDetails, clients); err != nil {
+				log.Errorf("unable to remove taint from the node, err :%v", err)
+
+			}
+			os.Exit(1)
+		case <-endTime:
+			log.Infof("[Chaos]: Time is up for experiment: %v", experimentsDetails.ExperimentName)
+			endTime = nil
+			break loop
+		}
+	}
 
 	// remove taint from the application node
 	err = RemoveTaintFromNode(experimentsDetails, clients)
