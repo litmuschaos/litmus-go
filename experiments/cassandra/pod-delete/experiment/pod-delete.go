@@ -1,4 +1,4 @@
-package main
+package experiment
 
 import (
 	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/pod-delete/lib"
@@ -14,15 +14,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func init() {
-	// Log as JSON instead of the default ASCII formatter.
-	logrus.SetFormatter(&logrus.TextFormatter{
-		FullTimestamp:          true,
-		DisableSorting:         true,
-		DisableLevelTruncation: true,
-	})
-}
-func main() {
+// CasssandraPodDelete inject the cassandra-pod-delete chaos
+func CasssandraPodDelete() {
 
 	var err error
 	var ResourceVersionBefore string

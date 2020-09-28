@@ -19,6 +19,6 @@ ENV PUMBA_VERSION="0.6.5"
 RUN curl -L https://github.com/alexei-led/pumba/releases/download/${PUMBA_VERSION}/pumba_linux_amd64 --output /usr/local/bin/pumba && chmod +x /usr/local/bin/pumba
 
 #Copying Necessary Files
-COPY ./build/_output ./litmus/experiments
+COPY ./build/_output ./litmus
 
 WORKDIR /litmus
