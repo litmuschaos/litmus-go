@@ -11,6 +11,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
+	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/sirupsen/logrus"
 )
 
@@ -76,6 +77,10 @@ func main() {
 		"Ramp Time":              experimentsDetails.ChaoslibDetail.RampTime,
 	})
 
+	// Calling AbortWatcher go routine, it will continuously watch for the abort signal for the entire chaos duration and generate the required events and result
+	// It is being invoked here, as opposed to within the chaoslib, as these experiments do not need additional recovery/chaos revert steps like in case of network experiments
+	go common.AbortWatcher(experimentsDetails.ChaoslibDetail.ExperimentName, clients, &resultDetails, &chaosDetails, &eventsDetails)
+
 	//PRE-CHAOS APPLICATION STATUS CHECK
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (pre-chaos)")
 	err = status.CheckApplicationStatus(experimentsDetails.ChaoslibDetail.AppNS, experimentsDetails.ChaoslibDetail.AppLabel, experimentsDetails.ChaoslibDetail.Timeout, experimentsDetails.ChaoslibDetail.Delay, clients)
@@ -93,7 +98,7 @@ func main() {
 
 	// Checking the load distribution on the ring (pre-chaos)
 	log.Info("[Status]: Checking the load distribution on the ring (pre-chaos)")
-	err = cassandra.NodeToolStatusCheck(&experimentsDetails, clients)
+	err = cassandra.NodeToolStatusCheck(&experimentsDetails, clients, &resultDetails, "PreChaos NodeTool")
 	if err != nil {
 		log.Fatalf("[Status]: Chaos node tool status check is failed, err: %v", err)
 	}
@@ -146,7 +151,7 @@ func main() {
 
 	// Checking the load distribution on the ring (post-chaos)
 	log.Info("[Status]: Checking the load distribution on the ring (post-chaos)")
-	err = cassandra.NodeToolStatusCheck(&experimentsDetails, clients)
+	err = cassandra.NodeToolStatusCheck(&experimentsDetails, clients, &resultDetails, "PostChaos NodeTool")
 	if err != nil {
 		log.Fatalf("[Status]: Chaos node tool status check is failed, err: %v", err)
 	}

@@ -3,6 +3,7 @@ package cassandra
 import (
 	"strings"
 
+	"github.com/litmuschaos/litmus-go/pkg/types"
 	litmusexec "github.com/litmuschaos/litmus-go/pkg/utils/exec"
 	"github.com/pkg/errors"
 
@@ -13,7 +14,7 @@ import (
 )
 
 // NodeToolStatusCheck checks for the distribution of the load on the ring
-func NodeToolStatusCheck(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) error {
+func NodeToolStatusCheck(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, key string) error {
 	var err error
 	var replicaCount int
 
@@ -31,7 +32,7 @@ func NodeToolStatusCheck(experimentsDetails *experimentTypes.ExperimentDetails, 
 	log.Info("[Check]: Checking for the distribution of load on the ring")
 
 	// Get the load percentage on the application pod
-	loadPercentage, err := GetLoadDistribution(experimentsDetails, clients, targetPodName)
+	loadPercentage, err := GetLoadDistribution(experimentsDetails, clients, targetPodName, resultDetails, key)
 	if err != nil {
 		return errors.Errorf("Failed to get load percentage, err: %v", err)
 	}
@@ -84,7 +85,7 @@ func CheckLoadPercentage(loadPercentage []string, replicaCount int) error {
 }
 
 // GetLoadDistribution will get the load distribution on all the replicas of the application pod in an array formats
-func GetLoadDistribution(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, targetPod string) ([]string, error) {
+func GetLoadDistribution(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, targetPod string, resultDetails *types.ResultDetails, key string) ([]string, error) {
 
 	// It will contains all the pod & container details required for exec command
 	execCommandDetails := litmusexec.PodDetails{}
@@ -95,6 +96,23 @@ func GetLoadDistribution(experimentsDetails *experimentTypes.ExperimentDetails, 
 	if err != nil {
 		return nil, errors.Errorf("Unable to get nodetool status details, err: %v", err)
 	}
+
+	nodetoolCommand := append([]string{"/bin/sh", "-c"}, "nodetool status")
+	litmusexec.SetExecCommandAttributes(&execCommandDetails, targetPod, "cassandra", experimentsDetails.ChaoslibDetail.AppNS)
+	nodetoolResponse, err := litmusexec.Exec(&execCommandDetails, clients, nodetoolCommand)
+	if err != nil {
+		return nil, errors.Errorf("Unable to get nodetool status details due to err: %v", err)
+	}
+
+	if key == "PreChaos NodeTool" {
+		resultDetails.Data = map[string]string{
+
+			key: nodetoolResponse,
+		}
+	} else {
+		resultDetails.Data[key] = nodetoolResponse
+	}
+
 	split := strings.Split(response, "\n")
 	loadPercentage := split[:len(split)-1]
 
