@@ -49,6 +49,12 @@ spec:
           - name: TARGET_POD
             value: ''
 
+          - name: TARGET_CONTAINER
+            value: ''
+
+          - name: SEQUENCE
+            value: 'parallel'
+
           - name: CHAOS_NAMESPACE
             value: 'default'
 
