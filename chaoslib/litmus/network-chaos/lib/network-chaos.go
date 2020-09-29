@@ -1,7 +1,9 @@
 package lib
 
 import (
+	"net"
 	"strconv"
+	"strings"
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/network-chaos/types"
@@ -16,19 +18,19 @@ import (
 
 var err error
 
-//PreparePodNetworkChaos contains the prepration steps before chaos injection
-func PreparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+//PrepareAndInjectChaos contains the prepration & injection steps
+func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, args string) error {
 
 	// Get the target pod details for the chaos execution
 	// if the target pod is not defined it will derive the random target pod list using pod affected percentage
 	targetPodList, err := common.GetPodList(experimentsDetails.AppNS, experimentsDetails.TargetPod, experimentsDetails.AppLabel, experimentsDetails.PodsAffectedPerc, clients)
 	if err != nil {
-		return errors.Errorf("Unable to get the target pod list due to, err: %v", err)
+		return errors.Errorf("Unable to get the target pod list, err: %v", err)
 	}
 
 	//Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
-		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", strconv.Itoa(experimentsDetails.RampTime))
+		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", experimentsDetails.RampTime)
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 
@@ -44,20 +46,20 @@ func PreparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetail
 	if experimentsDetails.TargetContainer == "" {
 		experimentsDetails.TargetContainer, err = GetTargetContainer(experimentsDetails, targetPodList.Items[0].Name, clients)
 		if err != nil {
-			return errors.Errorf("Unable to get the target container name due to, err: %v", err)
+			return errors.Errorf("Unable to get the target container name, err: %v", err)
 		}
 	}
 
 	// Get Chaos Pod Annotation
 	experimentsDetails.Annotations, err = common.GetChaosPodAnnotation(experimentsDetails.ChaosPodName, experimentsDetails.ChaosNamespace, clients)
 	if err != nil {
-		return errors.Errorf("unable to get annotation, due to %v", err)
+		return errors.Errorf("unable to get annotations, err: %v", err)
 	}
 
 	// creating the helper pod to perform network chaos
 	for _, pod := range targetPodList.Items {
 		runID := common.GetRunID()
-		err = CreateHelperPod(experimentsDetails, clients, pod.Name, pod.Spec.NodeName, runID)
+		err = CreateHelperPod(experimentsDetails, clients, pod.Name, pod.Spec.NodeName, runID, args)
 		if err != nil {
 			return errors.Errorf("Unable to create the helper pod, err: %v", err)
 		}
@@ -67,7 +69,7 @@ func PreparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetail
 	log.Info("[Status]: Checking the status of the helper pods")
 	err = status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, "app="+experimentsDetails.ExperimentName+"-helper", experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 	if err != nil {
-		return errors.Errorf("helper pods is not in running state, err: %v", err)
+		return errors.Errorf("helper pods are not in running state, err: %v", err)
 	}
 
 	// Wait till the completion of the helper pod
@@ -82,7 +84,7 @@ func PreparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetail
 	log.Info("[Cleanup]: Deleting all the helper pod")
 	err = common.DeleteAllPod("app="+experimentsDetails.ExperimentName+"-helper", experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients)
 	if err != nil {
-		return errors.Errorf("Unable to delete the helper pod, err: %v", err)
+		return errors.Errorf("Unable to delete the helper pods, err: %v", err)
 	}
 
 	return nil
@@ -103,14 +105,14 @@ func GetServiceAccount(experimentsDetails *experimentTypes.ExperimentDetails, cl
 func GetTargetContainer(experimentsDetails *experimentTypes.ExperimentDetails, appName string, clients clients.ClientSets) (string, error) {
 	pod, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Get(appName, v1.GetOptions{})
 	if err != nil {
-		return "", errors.Wrapf(err, "Fail to get the application pod status, due to:%v", err)
+		return "", err
 	}
 
 	return pod.Spec.Containers[0].Name, nil
 }
 
 // CreateHelperPod derive the attributes for helper pod and create the helper pod
-func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, podName, nodeName, runID string) error {
+func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, podName, nodeName, runID string, args string) error {
 
 	privilegedEnable := false
 	if experimentsDetails.ContainerRuntime == "crio" {
@@ -138,7 +140,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 					Name: "cri-socket",
 					VolumeSource: apiv1.VolumeSource{
 						HostPath: &apiv1.HostPathVolumeSource{
-							Path: experimentsDetails.ContainerPath,
+							Path: experimentsDetails.SocketPath,
 						},
 					},
 				},
@@ -158,17 +160,17 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 					Image:           experimentsDetails.LIBImage,
 					ImagePullPolicy: apiv1.PullAlways,
 					Command: []string{
-						"bin/bash",
+						"/bin/bash",
 					},
 					Args: []string{
 						"-c",
 						"./experiments/network-chaos",
 					},
-					Env: GetPodEnv(experimentsDetails, podName),
+					Env: GetPodEnv(experimentsDetails, podName, args),
 					VolumeMounts: []apiv1.VolumeMount{
 						{
 							Name:      "cri-socket",
-							MountPath: experimentsDetails.ContainerPath,
+							MountPath: experimentsDetails.SocketPath,
 						},
 						{
 							Name:      "cri-config",
@@ -195,7 +197,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 }
 
 // GetPodEnv derive all the env required for the helper pod
-func GetPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, podName string) []apiv1.EnvVar {
+func GetPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, podName, args string) []apiv1.EnvVar {
 
 	var envVar []apiv1.EnvVar
 	ENVList := map[string]string{
@@ -207,9 +209,10 @@ func GetPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, podName st
 		"CHAOS_ENGINE":         experimentsDetails.EngineName,
 		"CHAOS_UID":            string(experimentsDetails.ChaosUID),
 		"CONTAINER_RUNTIME":    experimentsDetails.ContainerRuntime,
-		"NETEM_COMMAND":        GetNetemCommand(experimentsDetails),
+		"NETEM_COMMAND":        args,
 		"NETWORK_INTERFACE":    experimentsDetails.NetworkInterface,
 		"EXPERIMENT_NAME":      experimentsDetails.ExperimentName,
+		"TARGET_IPs":           GetTargetIpsArgs(experimentsDetails.TargetIPs, experimentsDetails.TargetHosts),
 	}
 	for key, value := range ENVList {
 		var perEnv apiv1.EnvVar
@@ -238,17 +241,37 @@ func GetValueFromDownwardAPI(apiVersion string, fieldPath string) apiv1.EnvVarSo
 	return downwardENV
 }
 
-// GetNetemCommand generate the netem command based on the experiment name
-func GetNetemCommand(experimentDetails *experimentTypes.ExperimentDetails) string {
-	var cmd string
-	if experimentDetails.ExperimentName == "pod-network-loss" {
-		cmd = "loss " + strconv.Itoa(experimentDetails.NetworkPacketLossPercentage)
-	} else if experimentDetails.ExperimentName == "pod-network-latency" {
-		cmd = "delay " + strconv.Itoa(experimentDetails.NetworkLatency) + "ms"
-	} else if experimentDetails.ExperimentName == "pod-network-corruption" {
-		cmd = "corrupt " + strconv.Itoa(experimentDetails.NetworkPacketCorruptionPercentage)
-	} else {
-		cmd = "duplicate " + strconv.Itoa(experimentDetails.NetworkPacketDuplicationPercentage)
+// GetTargetIpsArgs return the comma separated target ips
+// It fetch the ips from the target ips (if defined by users)
+// it append the ips from the host, if target host is provided
+func GetTargetIpsArgs(targetIPs, targetHosts string) string {
+
+	ipsFromHost := GetIpsForTargetHosts(targetHosts)
+	if targetIPs == "" {
+		targetIPs = ipsFromHost
+	} else if ipsFromHost != "" {
+		targetIPs = targetIPs + "," + ipsFromHost
 	}
-	return cmd
+	return targetIPs
+}
+
+// GetIpsForTargetHosts resolves IP addresses for comma-separated list of target hosts and returns comma-separated ips
+func GetIpsForTargetHosts(targetHosts string) string {
+	if targetHosts == "" {
+		return ""
+	}
+	hosts := strings.Split(targetHosts, ",")
+	var commaSeparatedIPs []string
+	for i := range hosts {
+		ips, err := net.LookupIP(hosts[i])
+		if err != nil {
+			log.Infof("Unknown host")
+		} else {
+			for j := range ips {
+				log.Infof("IP address: %v", ips[j])
+				commaSeparatedIPs = append(commaSeparatedIPs, ips[j].String())
+			}
+		}
+	}
+	return strings.Join(commaSeparatedIPs, ",")
 }

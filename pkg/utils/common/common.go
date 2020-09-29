@@ -2,12 +2,18 @@ package common
 
 import (
 	"math/rand"
+	"os"
+	"os/signal"
 	"strconv"
+	"syscall"
 	"time"
 
 	"github.com/litmuschaos/litmus-go/pkg/clients"
+	"github.com/litmuschaos/litmus-go/pkg/events"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/math"
+	"github.com/litmuschaos/litmus-go/pkg/result"
+	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
 	"github.com/pkg/errors"
 	core_v1 "k8s.io/api/core/v1"
@@ -101,7 +107,7 @@ func GetPodList(namespace, targetPod, appLabels string, podAffPerc int, clients 
 	realpods := core_v1.PodList{}
 	podList, err := clients.KubeClient.CoreV1().Pods(namespace).List(v1.ListOptions{LabelSelector: appLabels})
 	if err != nil || len(podList.Items) == 0 {
-		return core_v1.PodList{}, errors.Wrapf(err, "Fail to list the application pod in %v namespace", namespace)
+		return core_v1.PodList{}, errors.Wrapf(err, "Failed to list the application pod in %v namespace", namespace)
 	}
 
 	isPodAvailable, err := CheckForAvailibiltyOfPod(namespace, targetPod, clients)
@@ -140,7 +146,7 @@ func GetChaosPodAnnotation(podName, namespace string, clients clients.ClientSets
 
 	pod, err := clients.KubeClient.CoreV1().Pods(namespace).Get(podName, v1.GetOptions{})
 	if err != nil {
-		return nil, errors.Errorf("fail to get the chaos pod annotation, due to %v", err)
+		return nil, err
 	}
 	return pod.Annotations, nil
 }
@@ -149,7 +155,7 @@ func GetChaosPodAnnotation(podName, namespace string, clients clients.ClientSets
 func GetNodeName(namespace, labels string, clients clients.ClientSets) (string, error) {
 	podList, err := clients.KubeClient.CoreV1().Pods(namespace).List(v1.ListOptions{LabelSelector: labels})
 	if err != nil || len(podList.Items) == 0 {
-		return "", errors.Wrapf(err, "Fail to get the application pod in %v namespace, due to err: %v", namespace, err)
+		return "", errors.Wrapf(err, "Failed to get the application pod in %v namespace, err: %v", namespace, err)
 	}
 
 	rand.Seed(time.Now().Unix())
@@ -157,4 +163,35 @@ func GetNodeName(namespace, labels string, clients clients.ClientSets) (string, 
 	nodeName := podList.Items[randomIndex].Spec.NodeName
 
 	return nodeName, nil
+}
+
+// AbortWatcher continuosly watch for the abort signals
+// it will update chaosresult w/ failed step and create an abort event, if it recieved abort signal during chaos
+func AbortWatcher(expname string, clients clients.ClientSets, resultDetails *types.ResultDetails, chaosDetails *types.ChaosDetails, eventsDetails *types.EventDetails) {
+
+	// signChan channel is used to transmit signal notifications.
+	signChan := make(chan os.Signal, 1)
+	// Catch and relay certain signal(s) to signChan channel.
+	signal.Notify(signChan, os.Interrupt, syscall.SIGTERM, syscall.SIGKILL)
+
+	for {
+		select {
+		case <-signChan:
+			log.Info("[Chaos]: Chaos Experiment Abortion started because of terminated signal received")
+			// updating the chaosresult after stopped
+			failStep := "Chaos injection stopped!"
+			types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep)
+			result.ChaosResult(chaosDetails, clients, resultDetails, "EOT")
+
+			// generating summary event in chaosengine
+			msg := expname + " experiment has been aborted"
+			types.SetEngineEventAttributes(eventsDetails, types.Summary, msg, "Warning", chaosDetails)
+			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
+
+			// generating summary event in chaosresult
+			types.SetResultEventAttributes(eventsDetails, types.StoppedVerdict, msg, "Warning", resultDetails)
+			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosResult")
+			os.Exit(1)
+		}
+	}
 }

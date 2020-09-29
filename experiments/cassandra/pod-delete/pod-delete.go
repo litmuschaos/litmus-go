@@ -36,7 +36,7 @@ func main() {
 
 	//Getting kubeConfig and Generate ClientSets
 	if err := clients.GenerateClientSetFromKubeConfig(); err != nil {
-		log.Fatalf("Unable to Get the kubeconfig due to %v", err)
+		log.Fatalf("Unable to Get the kubeconfig, err: %v", err)
 	}
 
 	//Fetching all the ENV passed from the runner pod
@@ -54,7 +54,7 @@ func main() {
 	log.Infof("[PreReq]: Updating the chaos result of %v experiment (SOT)", experimentsDetails.ChaoslibDetail.ExperimentName)
 	err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT")
 	if err != nil {
-		log.Errorf("Unable to Create the Chaos Result due to %v", err)
+		log.Errorf("Unable to Create the Chaos Result, err: %v", err)
 		failStep := "Updating the chaos result of pod-delete experiment (SOT)"
 		types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
 		err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
@@ -63,6 +63,11 @@ func main() {
 
 	// Set the chaos result uid
 	result.SetResultUID(&resultDetails, clients, &chaosDetails)
+
+	// generating the event in chaosresult to marked the verdict as awaited
+	msg := "experiment: " + experimentsDetails.ChaoslibDetail.ExperimentName + ", Result: Awaited"
+	types.SetResultEventAttributes(&eventsDetails, types.AwaitedVerdict, msg, "Normal", &resultDetails)
+	events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosResult")
 
 	//DISPLAY THE APP INFORMATION
 	log.InfoWithValues("The application informations are as follows", logrus.Fields{
@@ -78,7 +83,7 @@ func main() {
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (pre-chaos)")
 	err = status.CheckApplicationStatus(experimentsDetails.ChaoslibDetail.AppNS, experimentsDetails.ChaoslibDetail.AppLabel, experimentsDetails.ChaoslibDetail.Timeout, experimentsDetails.ChaoslibDetail.Delay, clients)
 	if err != nil {
-		log.Errorf("Application status check failed due to %v\n", err)
+		log.Errorf("Application status check failed, err: %v", err)
 		failStep := "Verify that the AUT (Application Under Test) is running (pre-chaos)"
 		types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
 		result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
@@ -93,16 +98,16 @@ func main() {
 	log.Info("[Status]: Checking the load distribution on the ring (pre-chaos)")
 	err = cassandra.NodeToolStatusCheck(&experimentsDetails, clients)
 	if err != nil {
-		log.Fatalf("[Status]: Chaos node tool status check is failed due to %v\n", err)
+		log.Fatalf("[Status]: Chaos node tool status check is failed, err: %v", err)
 	}
 
 	// Cassandra liveness check
 	if experimentsDetails.CassandraLivenessCheck == "enabled" {
 		ResourceVersionBefore, err = cassandra.LivenessCheck(&experimentsDetails, clients)
 		if err != nil {
-			log.Fatalf("[Liveness]: Cassandra liveness check failed, due to %v\n", err)
+			log.Fatalf("[Liveness]: Cassandra liveness check failed, err: %v", err)
 		}
-		log.Info("[Confirmation]: The cassandra application liveness pod deployed successfully")
+		log.Info("[Confirmation]: The cassandra application liveness pod created successfully")
 	} else {
 		log.Warn("[Liveness]: Cassandra Liveness check skipped as it was not enabled")
 	}
@@ -111,8 +116,8 @@ func main() {
 	if experimentsDetails.ChaoslibDetail.ChaosLib == "litmus" {
 		err = litmusLIB.PreparePodDelete(experimentsDetails.ChaoslibDetail, clients, &resultDetails, &eventsDetails, &chaosDetails)
 		if err != nil {
-			log.Errorf("Chaos injection failed due to %v\n", err)
-			failStep := "Including the litmus lib for cassandra-pod-delete"
+			log.Errorf("Chaos injection failed, err: %v", err)
+			failStep := "failed in chaos injection phase"
 			types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
 			result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 			return
@@ -121,7 +126,7 @@ func main() {
 		resultDetails.Verdict = "Pass"
 	} else {
 		log.Error("[Invalid]: Please Provide the correct LIB")
-		failStep := "Including the litmus lib for cassandra-pod-delete"
+		failStep := "no match found for specified lib"
 		types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
 		result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 		return
@@ -131,7 +136,7 @@ func main() {
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (post-chaos)")
 	err = status.CheckApplicationStatus(experimentsDetails.ChaoslibDetail.AppNS, experimentsDetails.ChaoslibDetail.AppLabel, experimentsDetails.ChaoslibDetail.Timeout, experimentsDetails.ChaoslibDetail.Delay, clients)
 	if err != nil {
-		log.Errorf("Application status check failed due to %v\n", err)
+		log.Errorf("Application status check failed, err: %v", err)
 		failStep := "Verify that the AUT (Application Under Test) is running (post-chaos)"
 		types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
 		result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
@@ -146,7 +151,7 @@ func main() {
 	log.Info("[Status]: Checking the load distribution on the ring (post-chaos)")
 	err = cassandra.NodeToolStatusCheck(&experimentsDetails, clients)
 	if err != nil {
-		log.Fatalf("[Status]: Chaos node tool status check is failed due to %v\n", err)
+		log.Fatalf("[Status]: Chaos node tool status check is failed, err: %v", err)
 	}
 
 	// Cassandra statefulset liveness check (post-chaos)
@@ -155,26 +160,36 @@ func main() {
 	if experimentsDetails.CassandraLivenessCheck == "enabled" {
 		err = status.CheckApplicationStatus(experimentsDetails.ChaoslibDetail.AppNS, "name=cassandra-liveness-deploy-"+experimentsDetails.RunID, experimentsDetails.ChaoslibDetail.Timeout, experimentsDetails.ChaoslibDetail.Delay, clients)
 		if err != nil {
-			log.Fatalf("Liveness status check failed due to %v\n", err)
+			log.Fatalf("Liveness status check failed, err: %v", err)
 		}
 		err = cassandra.LivenessCleanup(&experimentsDetails, clients, ResourceVersionBefore)
 		if err != nil {
-			log.Fatalf("Liveness cleanup failed due to %v\n", err)
+			log.Fatalf("Liveness cleanup failed, err: %v", err)
 		}
 	}
 	//Updating the chaosResult in the end of experiment
 	log.Info("[The End]: Updating the chaos result of cassandra pod delete experiment (EOT)")
 	err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 	if err != nil {
-		log.Fatalf("Unable to Update the Chaos Result due to %v\n", err)
+		log.Fatalf("Unable to Update the Chaos Result, err: %v", err)
 	}
+
+	// generating the event in chaosresult to marked the verdict as pass/fail
+	msg = "experiment: " + experimentsDetails.ChaoslibDetail.ExperimentName + ", Result: " + resultDetails.Verdict
+	reason := types.PassVerdict
+	eventType := "Normal"
+	if resultDetails.Verdict != "Pass" {
+		reason = types.FailVerdict
+		eventType = "Warning"
+	}
+
+	types.SetResultEventAttributes(&eventsDetails, reason, msg, eventType, &resultDetails)
+	events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosResult")
+
 	if experimentsDetails.ChaoslibDetail.EngineName != "" {
 		msg := experimentsDetails.ChaoslibDetail.ExperimentName + " experiment has been " + resultDetails.Verdict + "ed"
 		types.SetEngineEventAttributes(&eventsDetails, types.Summary, msg, "Normal", &chaosDetails)
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
-	msg := experimentsDetails.ChaoslibDetail.ExperimentName + " experiment has been " + resultDetails.Verdict + "ed"
-	types.SetResultEventAttributes(&eventsDetails, types.Summary, msg, "Normal", &resultDetails)
-	events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosResult")
 }

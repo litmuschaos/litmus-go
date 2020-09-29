@@ -23,12 +23,12 @@ func PreparePodCPUHog(experimentsDetails *experimentTypes.ExperimentDetails, cli
 
 	targetPodList, err := common.GetPodList(experimentsDetails.AppNS, experimentsDetails.TargetPod, experimentsDetails.AppLabel, experimentsDetails.PodsAffectedPerc, clients)
 	if err != nil {
-		return errors.Errorf("Unable to get the target pod list due to, err: %v", err)
+		return errors.Errorf("Unable to get the target pod list, err: %v", err)
 	}
 
 	//Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
-		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", strconv.Itoa(experimentsDetails.RampTime))
+		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", experimentsDetails.RampTime)
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 
@@ -41,7 +41,7 @@ func PreparePodCPUHog(experimentsDetails *experimentTypes.ExperimentDetails, cli
 	// Get Chaos Pod Annotation
 	experimentsDetails.Annotations, err = common.GetChaosPodAnnotation(experimentsDetails.ChaosPodName, experimentsDetails.ChaosNamespace, clients)
 	if err != nil {
-		return errors.Errorf("unable to get annotation, due to %v", err)
+		return errors.Errorf("unable to get annotations, err: %v", err)
 	}
 
 	// creating the helper pod to perform cpu chaos
@@ -84,7 +84,7 @@ func PreparePodCPUHog(experimentsDetails *experimentTypes.ExperimentDetails, cli
 
 	//Waiting for the ramp time after chaos injection
 	if experimentsDetails.RampTime != 0 {
-		log.Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", strconv.Itoa(experimentsDetails.RampTime))
+		log.Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", experimentsDetails.RampTime)
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 	return nil
@@ -114,7 +114,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 			RestartPolicy: apiv1.RestartPolicyNever,
 			NodeName:      appNodeName,
 			Volumes: []apiv1.Volume{
-				apiv1.Volume{
+				{
 					Name: "dockersocket",
 					VolumeSource: apiv1.VolumeSource{
 						HostPath: &apiv1.HostPathVolumeSource{
@@ -124,12 +124,12 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 				},
 			},
 			Containers: []apiv1.Container{
-				apiv1.Container{
+				{
 					Name:  "pumba-stress",
 					Image: experimentsDetails.LIBImage,
 					Args:  GetContainerArguments(experimentsDetails, appName),
 					VolumeMounts: []apiv1.VolumeMount{
-						apiv1.VolumeMount{
+						{
 							Name:      "dockersocket",
 							MountPath: "/var/run/docker.sock",
 						},
