@@ -1,10 +1,8 @@
 package kafka
 
 import (
-	"bytes"
-	"fmt"
-	"os/exec"
 	"strconv"
+	"strings"
 
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/kafka/types"
@@ -15,15 +13,13 @@ import (
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/klog"
 )
 
 // LivenessStream will generate kafka liveness deployment on the basic of given condition
 func LivenessStream(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) (string, error) {
 	var err error
 	var ordinality string
-	var out bytes.Buffer
-	var stderr bytes.Buffer
+	var LivenessTopicLeader string
 
 	// Generate a random string as suffix to topic name
 	log.Info("[Liveness]: Set the kafka topic name")
@@ -47,7 +43,7 @@ func LivenessStream(experimentsDetails *experimentTypes.ExperimentDetails, clien
 	log.Info("[Liveness]: Confirm that the kafka liveness pod is running")
 	err = status.CheckApplicationStatus(experimentsDetails.KafkaNamespace, "name=kafka-liveness", experimentsDetails.ChaoslibDetail.Timeout, experimentsDetails.ChaoslibDetail.Delay, clients)
 	if err != nil {
-		return "", errors.Errorf("Liveness pod status check failed, due to %v", err)
+		return "", errors.Errorf("Liveness pod status check failed err: %v", err)
 	}
 
 	log.Info("[Liveness]: Obtain the leader broker ordinality for the topic (partition) created by kafka-liveness")
@@ -55,36 +51,35 @@ func LivenessStream(experimentsDetails *experimentTypes.ExperimentDetails, clien
 
 		execCommandDetails := litmusexec.PodDetails{}
 
-		command := append([]string{"/bin/sh", "-c"}, "-- kafka-topics --topic "+KafkaTopicName+" --describe --zookeeper "+experimentsDetails.ZookeeperService+":"+experimentsDetails.ZookeeperPort+" | grep -o 'Leader: [^[:space:]]*' | awk '{print $2}'")
-		litmusexec.SetExecCommandAttributes(&execCommandDetails, "kafka-liveness", "kafka-consumer", experimentsDetails.KafkaNamespace)
+		command := append([]string{"/bin/sh", "-c"}, "kafka-topics --topic "+KafkaTopicName+" --describe --zookeeper "+experimentsDetails.ZookeeperService+":"+experimentsDetails.ZookeeperPort+" | grep -o 'Leader: [^[:space:]]*' | awk '{print $2}'")
+		litmusexec.SetExecCommandAttributes(&execCommandDetails, "kafka-liveness-"+experimentsDetails.RunID, "kafka-consumer", experimentsDetails.KafkaNamespace)
 		ordinality, err = litmusexec.Exec(&execCommandDetails, clients, command)
 		if err != nil {
-			return "", errors.Errorf("Unable to get ordinality details, due to err: %v", err)
+			return "", errors.Errorf("Unable to get ordinality details err: %v", err)
 		}
 	} else {
 		// It will contains all the pod & container details required for exec command
 		execCommandDetails := litmusexec.PodDetails{}
 
-		command := append([]string{"/bin/sh", "-c"}, "-- kafka-topics --topic "+KafkaTopicName+" --describe --zookeeper "+experimentsDetails.ZookeeperService+":"+experimentsDetails.ZookeeperPort+"/"+experimentsDetails.KafkaInstanceName+" | grep -o 'Leader: [^[:space:]]*' | awk '{print $2}'")
-		litmusexec.SetExecCommandAttributes(&execCommandDetails, "kafka-liveness", "kafka-consumer", experimentsDetails.KafkaNamespace)
+		command := append([]string{"/bin/sh", "-c"}, "kafka-topics --topic "+KafkaTopicName+" --describe --zookeeper "+experimentsDetails.ZookeeperService+":"+experimentsDetails.ZookeeperPort+"/"+experimentsDetails.KafkaInstanceName+" | grep -o 'Leader: [^[:space:]]*' | awk '{print $2}'")
+		litmusexec.SetExecCommandAttributes(&execCommandDetails, "kafka-liveness-"+experimentsDetails.RunID, "kafka-consumer", experimentsDetails.KafkaNamespace)
 		ordinality, err = litmusexec.Exec(&execCommandDetails, clients, command)
 		if err != nil {
-			return "", errors.Errorf("Unable to get ordinality details, due to err: %v", err)
+			return "", errors.Errorf("Unable to get ordinality details err: %v", err)
 		}
 
 	}
+
 	log.Info("[Liveness]: Determine the leader broker pod name")
-	cmd := exec.Command("sh", "-c", `kubectl get pods -l `+experimentsDetails.KafkaLabel+` --no-headers -o custom-columns=:metadata.name -n `+experimentsDetails.KafkaNamespace+` | grep '^.*-`+ordinality+`$'`)
-	cmd.Stdout = &out
-	cmd.Stderr = &stderr
-	err = cmd.Run()
+	podList, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.KafkaNamespace).List(metav1.ListOptions{LabelSelector: experimentsDetails.KafkaLabel})
 	if err != nil {
-		klog.Infof(fmt.Sprint(err) + ": " + stderr.String())
-		klog.Infof("Error: %v", err)
-		return "", errors.Errorf("Fail to get leader broker pod name, due to %v", err)
+		return "", errors.Errorf("unable to get the pods err: %v", err)
 	}
-	response := fmt.Sprint(out.String())
-	LivenessTopicLeader := response
+	for _, pod := range podList.Items {
+		if strings.Contains(pod.Name, ordinality) {
+			LivenessTopicLeader = pod.Name
+		}
+	}
 
 	return LivenessTopicLeader, nil
 }
@@ -98,7 +93,7 @@ func CreateLivenessNonAuth(experimentsDetails *experimentTypes.ExperimentDetails
 			APIVersion: "v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "kafka-liveness",
+			Name: "kafka-liveness-" + experimentsDetails.RunID,
 			Labels: map[string]string{
 				"name": "kafka-liveness",
 			},
@@ -114,23 +109,23 @@ func CreateLivenessNonAuth(experimentsDetails *experimentTypes.ExperimentDetails
 						"./topic.sh",
 					},
 					Env: []corev1.EnvVar{
-						corev1.EnvVar{
+						{
 							Name:  "TOPIC_NAME",
 							Value: KafkaTopicName,
 						},
-						corev1.EnvVar{
+						{
 							Name:  "KAFKA_INSTANCE_NAME",
-							Value: "" + experimentsDetails.KafkaInstanceName + "",
+							Value: experimentsDetails.KafkaInstanceName,
 						},
-						corev1.EnvVar{
+						{
 							Name:  "ZOOKEEPER_SERVICE",
 							Value: experimentsDetails.ZookeeperService,
 						},
-						corev1.EnvVar{
+						{
 							Name:  "ZOOKEEPER_PORT",
 							Value: experimentsDetails.ZookeeperPort,
 						},
-						corev1.EnvVar{
+						{
 							Name:  "REPLICATION_FACTOR",
 							Value: experimentsDetails.KafkaRepliationFactor,
 						},
@@ -149,15 +144,15 @@ func CreateLivenessNonAuth(experimentsDetails *experimentTypes.ExperimentDetails
 						"stdbuf -oL ./producer.sh",
 					},
 					Env: []corev1.EnvVar{
-						corev1.EnvVar{
+						{
 							Name:  "TOPIC_NAME",
 							Value: KafkaTopicName,
 						},
-						corev1.EnvVar{
+						{
 							Name:  "KAFKA_SERVICE",
 							Value: experimentsDetails.KafkaService,
 						},
-						corev1.EnvVar{
+						{
 							Name:  "KAFKA_PORT",
 							Value: experimentsDetails.KafkaPort,
 						},
@@ -174,19 +169,19 @@ func CreateLivenessNonAuth(experimentsDetails *experimentTypes.ExperimentDetails
 						"stdbuf -oL ./consumer.sh",
 					},
 					Env: []corev1.EnvVar{
-						corev1.EnvVar{
+						{
 							Name:  "KAFKA_CONSUMER_TIMEOUT",
 							Value: strconv.Itoa(experimentsDetails.KafkaConsumerTimeout),
 						},
-						corev1.EnvVar{
+						{
 							Name:  "TOPIC_NAME",
 							Value: KafkaTopicName,
 						},
-						corev1.EnvVar{
+						{
 							Name:  "KAFKA_SERVICE",
 							Value: experimentsDetails.KafkaService,
 						},
-						corev1.EnvVar{
+						{
 							Name:  "KAFKA_PORT",
 							Value: experimentsDetails.KafkaPort,
 						},
@@ -201,7 +196,7 @@ func CreateLivenessNonAuth(experimentsDetails *experimentTypes.ExperimentDetails
 
 	_, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.KafkaNamespace).Create(LivenessNonAuth)
 	if err != nil {
-		return errors.Errorf("Unable to create Liveness Non Auth pod, due to %v", err)
+		return errors.Errorf("Unable to create Liveness Non Auth pod err: %v", err)
 	}
 	return nil
 
@@ -216,7 +211,7 @@ func CreateLivenessSaslAuth(experimentsDetails *experimentTypes.ExperimentDetail
 			APIVersion: "v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "kafka-liveness",
+			Name: "kafka-liveness" + experimentsDetails.RunID,
 			Labels: map[string]string{
 				"name": "kafka-liveness",
 			},
@@ -264,23 +259,23 @@ func CreateLivenessSaslAuth(experimentsDetails *experimentTypes.ExperimentDetail
 						"./topic.sh",
 					},
 					Env: []corev1.EnvVar{
-						corev1.EnvVar{
+						{
 							Name:  "TOPIC_NAME",
 							Value: KafkaTopicName,
 						},
-						corev1.EnvVar{
+						{
 							Name:  "KAFKA_INSTANCE_NAME",
 							Value: experimentsDetails.KafkaInstanceName,
 						},
-						corev1.EnvVar{
+						{
 							Name:  "ZOOKEEPER_SERVICE",
 							Value: experimentsDetails.ZookeeperService,
 						},
-						corev1.EnvVar{
+						{
 							Name:  "ZOOKEEPER_PORT",
 							Value: experimentsDetails.ZookeeperPort,
 						},
-						corev1.EnvVar{
+						{
 							Name:  "REPLICATION_FACTOR",
 							Value: experimentsDetails.KafkaRepliationFactor,
 						},
@@ -299,24 +294,23 @@ func CreateLivenessSaslAuth(experimentsDetails *experimentTypes.ExperimentDetail
 						"stdbuf -oL ./producer.sh",
 					},
 					Env: []corev1.EnvVar{
-						corev1.EnvVar{
+						{
 							Name:  "TOPIC_NAME",
 							Value: KafkaTopicName,
 						},
-						corev1.EnvVar{
+						{
 							Name:  "KAFKA_SERVICE",
 							Value: experimentsDetails.KafkaService,
 						},
-						corev1.EnvVar{
+						{
 							Name:  "KAFKA_PORT",
 							Value: experimentsDetails.KafkaPort,
 						},
-						corev1.EnvVar{
+						{
 							Name:  "KAFKA_OPTS",
 							Value: "-Djava.security.auth.login.config=/opt/jaas.conf",
 						},
 					},
-					Resources: corev1.ResourceRequirements{},
 					VolumeMounts: []corev1.VolumeMount{
 						corev1.VolumeMount{
 							Name:      "jaas-properties",
@@ -342,28 +336,27 @@ func CreateLivenessSaslAuth(experimentsDetails *experimentTypes.ExperimentDetail
 						"stdbuf -oL ./consumer.sh",
 					},
 					Env: []corev1.EnvVar{
-						corev1.EnvVar{
+						{
 							Name:  "KAFKA_CONSUMER_TIMEOUT",
 							Value: strconv.Itoa(experimentsDetails.KafkaConsumerTimeout),
 						},
-						corev1.EnvVar{
+						{
 							Name:  "TOPIC_NAME",
 							Value: KafkaTopicName,
 						},
-						corev1.EnvVar{
+						{
 							Name:  "KAFKA_SERVICE",
 							Value: experimentsDetails.KafkaService,
 						},
-						corev1.EnvVar{
+						{
 							Name:  "KAFKA_PORT",
 							Value: experimentsDetails.KafkaPort,
 						},
-						corev1.EnvVar{
+						{
 							Name:  "KAFKA_OPTS",
 							Value: "-Djava.security.auth.login.config=/opt/jaas.conf",
 						},
 					},
-					Resources: corev1.ResourceRequirements{},
 					VolumeMounts: []corev1.VolumeMount{
 						corev1.VolumeMount{
 							Name:      "jaas-properties",
@@ -386,7 +379,7 @@ func CreateLivenessSaslAuth(experimentsDetails *experimentTypes.ExperimentDetail
 	}
 	_, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.KafkaNamespace).Create(LivenessSaslAuth)
 	if err != nil {
-		return errors.Errorf("Unable to create Liveness Non Auth pod, due to %v", err)
+		return errors.Errorf("Unable to create Liveness Non Auth pod err: %v", err)
 	}
 	return nil
 }

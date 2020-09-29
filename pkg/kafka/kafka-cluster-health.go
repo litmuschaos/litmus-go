@@ -1,8 +1,10 @@
 package kafka
 
 import (
+	"math/rand"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/kafka/types"
@@ -21,14 +23,14 @@ func ClusterHealthCheck(experimentsDetails *experimentTypes.ExperimentDetails, c
 	log.Info("[Status]: Verify that all kafka pods are running")
 	err = status.CheckApplicationStatus(experimentsDetails.KafkaNamespace, experimentsDetails.KafkaLabel, experimentsDetails.ChaoslibDetail.Timeout, experimentsDetails.ChaoslibDetail.Delay, clients)
 	if err != nil {
-		log.Errorf("Kafka pod status check failed due to %v\n", err)
+		log.Errorf("Kafka pod status check failed err: %v", err)
 		return err
 	}
 
 	log.Info("[Status]: Verify that all zookeeper pods are running")
 	err = status.CheckApplicationStatus(experimentsDetails.ZookeeperNamespace, experimentsDetails.ZookeeperLabel, experimentsDetails.ChaoslibDetail.Timeout, experimentsDetails.ChaoslibDetail.Delay, clients)
 	if err != nil {
-		log.Errorf("Zookeeper status check failed due to %v\n", err)
+		log.Errorf("Zookeeper status check failed err: %v", err)
 		return err
 	}
 
@@ -48,17 +50,16 @@ func ClusterHealthCheck(experimentsDetails *experimentTypes.ExperimentDetails, c
 
 		// It will contains all the pod & container details required for exec command
 		execCommandDetails := litmusexec.PodDetails{}
-
 		command := append([]string{"/bin/sh", "-c"}, "zkCli.sh -server "+experimentsDetails.ZookeeperService+":"+experimentsDetails.ZookeeperPort+"/"+experimentsDetails.KafkaInstanceName+" ls /brokers/ids | tail -n 1 | tr -d '[],' | tr ' ' '\n'  | wc -l")
-		litmusexec.SetExecCommandAttributes(&execCommandDetails, ZookeeperPodName, "", experimentsDetails.KafkaNamespace)
+		litmusexec.SetExecCommandAttributes(&execCommandDetails, ZookeeperPodName, "kubernetes-zookeeper", experimentsDetails.KafkaNamespace)
 		kafkaAvailableBrokers, err := litmusexec.Exec(&execCommandDetails, clients, command)
 		if err != nil {
-			return errors.Errorf("Unable to get kafka available brokers details, due to err: %v", err)
+			return errors.Errorf("Unable to get kafka available brokers details err: %v", err)
 		}
-		if strings.Contains(kafkaAvailableBrokers, strconv.Itoa(ReplicaCount)) {
+		if !strings.Contains(strings.TrimSpace(kafkaAvailableBrokers), strconv.Itoa(ReplicaCount)) {
 			return errors.Errorf("All Kafka brokers are not alive")
 		}
-		log.Info("All Kafka brokers are alive")
+		log.Info("[Status]: All Kafka brokers are alive")
 	}
 
 	return nil
@@ -67,18 +68,20 @@ func ClusterHealthCheck(experimentsDetails *experimentTypes.ExperimentDetails, c
 // GetRandomPodName will return the first pod name from the list of pods obtained from label and namespace
 func GetRandomPodName(PodNamespace, PodLabel string, clients clients.ClientSets) (string, error) {
 
-	PodList, err := clients.KubeClient.CoreV1().Pods(PodNamespace).List(metav1.ListOptions{LabelSelector: PodLabel})
+	podList, err := clients.KubeClient.CoreV1().Pods(PodNamespace).List(metav1.ListOptions{LabelSelector: PodLabel})
 	if err != nil {
-		return "", errors.Errorf("unable to get the pods, due to %v", err)
+		return "", errors.Errorf("unable to get the pods err: %v", err)
 	}
-	return PodList.Items[0].Name, nil
+	rand.Seed(time.Now().Unix())
+	randomIndex := rand.Intn(len(podList.Items))
+	return podList.Items[randomIndex].Name, nil
 }
 
 // GetReplicaCount will return the number of replicas present
 func GetReplicaCount(PodNamespace, PodLabel string, clients clients.ClientSets) (int, error) {
 	PodList, err := clients.KubeClient.CoreV1().Pods(PodNamespace).List(metav1.ListOptions{LabelSelector: PodLabel})
 	if err != nil {
-		return 0, errors.Errorf("Unable to get the pods, due to %v", err)
+		return 0, errors.Errorf("Unable to get the pods err: %v", err)
 	}
 
 	return len(PodList.Items), nil

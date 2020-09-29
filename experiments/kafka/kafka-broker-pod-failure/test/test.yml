@@ -21,9 +21,6 @@ spec:
         - sleep 
         - "3600"
         env:
-          - name: ANSIBLE_STDOUT_CALLBACK
-            value: 'default'
-
           - name: KAFKA_KIND
             value: 'statefulset'
 
@@ -84,7 +81,7 @@ spec:
             value: ''
 
             ## env var that describes the library used to execute the chaos
-            ## default: litmus. Supported values: litmus, powerfulseal
+            ## default: litmus. Supported values: litmus
           - name: LIB
             value: ''
             

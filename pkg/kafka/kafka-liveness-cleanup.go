@@ -25,7 +25,7 @@ func LivenessCleanup(experimentsDetails *experimentTypes.ExperimentDetails, clie
 // DeleteLivenessPod will check the deletion of liveness pod
 func DeleteLivenessPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) error {
 
-	if err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaoslibDetail.AppNS).Delete("kafka-liveness", &metav1.DeleteOptions{}); err != nil {
+	if err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaoslibDetail.AppNS).Delete("kafka-liveness-"+experimentsDetails.RunID, &metav1.DeleteOptions{}); err != nil {
 		return errors.Errorf("Fail to delete liveness deployment, due to %v", err)
 	}
 

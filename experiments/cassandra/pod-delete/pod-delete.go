@@ -1,8 +1,6 @@
 package main
 
 import (
-	"fmt"
-
 	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/pod-delete/lib"
 	"github.com/litmuschaos/litmus-go/pkg/cassandra"
 	experimentEnv "github.com/litmuschaos/litmus-go/pkg/cassandra/pod-delete/environment"
@@ -42,7 +40,6 @@ func main() {
 	//Fetching all the ENV passed from the runner pod
 	log.Info("[PreReq]: Getting the ENV for the cassandra-pod-delete experiment")
 	experimentEnv.GetENV(&experimentsDetails)
-	fmt.Printf(experimentsDetails.ChaoslibDetail.ChaosLib)
 
 	// Intialise the chaos attributes
 	experimentEnv.InitialiseChaosVariables(&chaosDetails, &experimentsDetails)

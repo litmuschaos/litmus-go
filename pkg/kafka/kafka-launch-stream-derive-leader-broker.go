@@ -3,7 +3,6 @@ package kafka
 import (
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/kafka/types"
-	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/pkg/errors"
 )
 
@@ -15,9 +14,7 @@ func LaunchStreamDeriveLeader(experimentsDetails *experimentTypes.ExperimentDeta
 		return errors.Errorf("liveness stream failed, due to %v", err)
 	}
 	experimentsDetails.ChaoslibDetail.TargetPod, err = SelectBroker(experimentsDetails, LivenessTopicLeader, clients)
-	log.Infof("Broker pod is %v", experimentsDetails.ChaoslibDetail.TargetPod)
-
-	DisplayKafkaBrocker(experimentsDetails)
+	DisplayKafkaBroker(experimentsDetails)
 
 	return nil
 }
