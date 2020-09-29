@@ -94,20 +94,20 @@ func KillContainer(experimentsDetails *experimentTypes.ExperimentDetails, client
 
 		//Waiting for the chaos interval after chaos injection
 		if experimentsDetails.ChaosInterval != 0 {
-			log.Infof("[Wait]: Wait for the chaos interval %vs", strconv.Itoa(experimentsDetails.ChaosInterval))
+			log.Infof("[Wait]: Wait for the chaos interval %vs", experimentsDetails.ChaosInterval)
 			waitForChaosInterval(experimentsDetails)
 		}
 
 		//Check the status of restarted container
 		err = CheckContainerStatus(experimentsDetails, clients, experimentsDetails.TargetPod)
 		if err != nil {
-			return errors.Errorf("Application container is not running, %v", err)
+			return errors.Errorf("Application container is not in running state, %v", err)
 		}
 
 		// It will verify that the restart count of container should increase after chaos injection
 		err = VerifyRestartCount(experimentsDetails, experimentsDetails.TargetPod, clients, restartCountBefore)
 		if err != nil {
-			return errors.Errorf("Target container is not restarted , err: %v", err)
+			return err
 		}
 
 		// generating the total duration of the experiment run
@@ -120,7 +120,7 @@ func KillContainer(experimentsDetails *experimentTypes.ExperimentDetails, client
 		}
 
 	}
-	log.Infof("[Completion]: %v chaos is done", experimentsDetails.ExperimentName)
+	log.Infof("[Completion]: %v chaos has been completed", experimentsDetails.ExperimentName)
 	return nil
 
 }
@@ -140,7 +140,7 @@ func GetPodID(experimentsDetails *experimentTypes.ExperimentDetails) (string, er
 
 	}
 
-	return "", fmt.Errorf("The application pod is unavailable")
+	return "", fmt.Errorf("%v pod is unavailable", experimentsDetails.TargetPod)
 }
 
 //GetContainerID  derive the container id of the application container
@@ -158,7 +158,7 @@ func GetContainerID(experimentsDetails *experimentTypes.ExperimentDetails, podID
 
 	}
 
-	return "", fmt.Errorf("The application container is unavailable")
+	return "", fmt.Errorf("%v container is unavailable", experimentsDetails.TargetContainer)
 
 }
 
@@ -178,7 +178,7 @@ func CheckContainerStatus(experimentsDetails *experimentTypes.ExperimentDetails,
 		Try(func(attempt uint) error {
 			pod, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Get(appName, v1.GetOptions{})
 			if err != nil {
-				return errors.Errorf("Unable to list the pod, err: %v", err)
+				return errors.Errorf("Unable to list the pod, due to %v", err)
 			}
 			for _, container := range pod.Status.ContainerStatuses {
 				if container.Ready != true {
@@ -252,7 +252,7 @@ func VerifyRestartCount(experimentsDetails *experimentTypes.ExperimentDetails, p
 		Try(func(attempt uint) error {
 			pod, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Get(podName, v1.GetOptions{})
 			if err != nil {
-				return errors.Errorf("Unable to get the application pod, err: %v", err)
+				return errors.Errorf("Unable to get the application pod, due to %v", err)
 			}
 			for _, container := range pod.Status.ContainerStatuses {
 				if container.Name == experimentsDetails.TargetContainer {

@@ -138,7 +138,7 @@ func PatchChaosResult(result *v1alpha1.ChaosResult, clients clients.ClientSets, 
 		if resultDetails.Verdict == "Pass" && len(resultDetails.ProbeDetails) != 0 {
 			result.Status.ExperimentStatus.ProbeSuccessPercentage = "100"
 
-		} else if resultDetails.Verdict == "Fail" && len(resultDetails.ProbeDetails) != 0 {
+		} else if (resultDetails.Verdict == "Fail" || resultDetails.Verdict == "Stopped") && len(resultDetails.ProbeDetails) != 0 {
 			probe.SetProbeVerdictAfterFailure(resultDetails)
 			result.Status.ExperimentStatus.ProbeSuccessPercentage = strconv.Itoa((resultDetails.PassedProbeCount * 100) / len(resultDetails.ProbeDetails))
 		}

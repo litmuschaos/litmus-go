@@ -1,6 +1,6 @@
 ## Steps to Bootstrap a Chaos Experiment
 
-The artefacts associated with a chaos-experiment are summarized below: 
+The artifacts associated with a chaos-experiment are summarized below: 
 
 - Submitted in the litmuschaos/litmus-go repository, under the experiments/*chaos-category*/*experiment-name* folder 
 
@@ -19,7 +19,7 @@ The artefacts associated with a chaos-experiment are summarized below:
 
   Example: [pod delete experiment in chaos-charts](https://github.com/litmuschaos/chaos-charts/tree/master/charts/generic/pod-delete)
 
-The *generate_experiment.go* script is a simple way to bootstrap your experiment, and helps create the aforementioned artefacts in the 
+The *generate_experiment.go* script is a simple way to bootstrap your experiment, and helps create the aforementioned artifacts in the 
 appropriate directory (i.e., as per the chaos-category) based on an attributes file provided as input by the chart-developer. The 
 scaffolded files consist of placeholders which can then be filled as desired.  
 
@@ -88,7 +88,7 @@ scaffolded files consist of placeholders which can then be filled as desired.
 
   ```
 
-- Run the following command to generate the necessary artefacts for submitting the `sample-category` chaos chart with 
+- Run the following command to generate the necessary artifacts for submitting the `sample-category` chaos chart with 
   `pod-delete` experiment.
 
   ```
@@ -97,7 +97,7 @@ scaffolded files consist of placeholders which can then be filled as desired.
 
   **Note**: In the `-generateType` attribute, select the appropriate type of manifests to be generated, where, 
   - `chart`: Just the chaos-chart metadata, i.e., chartserviceversion yaml 
-  - `experiment`: Chaos experiment artefacts belonging to a an existing OR new chart. 
+  - `experiment`: Chaos experiment artifacts belonging to a an existing OR new chart. 
 
   View the generated files in `/experiments/chaos-category` folder.
 
