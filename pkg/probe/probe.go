@@ -144,6 +144,7 @@ func InitializeProbesInChaosResultDetails(chaosDetails *types.ChaosDetails, clie
 	}
 
 	chaosresult.ProbeDetails = probeDetails
+	chaosresult.Register = map[string]string{}
 
 	return nil
 }

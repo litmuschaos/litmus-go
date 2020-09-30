@@ -3,6 +3,7 @@ package probe
 import (
 	"bytes"
 	"fmt"
+	"html/template"
 	"math/rand"
 	"os/exec"
 	"strings"
@@ -51,7 +52,7 @@ func PrepareCmdProbe(cmdProbes []v1alpha1.CmdProbeAttributes, clients clients.Cl
 				// if mode is Edge then independent of phase, it will trigger Probes in both Pre/Post Chaos section
 				if (probe.Mode == "SOT" && phase == "PreChaos") || (probe.Mode == "EOT" && phase == "PostChaos") || probe.Mode == "Edge" {
 
-					err = TriggerInlineCmdProbe(probe)
+					err = TriggerInlineCmdProbe(probe, resultDetails)
 
 					// failing the probe, if the success condition doesn't met after the retry & timeout combinations
 					// it will update the status of all the unrun probes as well
@@ -163,7 +164,11 @@ func PrepareCmdProbe(cmdProbes []v1alpha1.CmdProbeAttributes, clients clients.Cl
 }
 
 // TriggerInlineCmdProbe trigger the cmd probe and storing the output into the out buffer
-func TriggerInlineCmdProbe(probe v1alpha1.CmdProbeAttributes) error {
+func TriggerInlineCmdProbe(probe v1alpha1.CmdProbeAttributes, resultDetails *types.ResultDetails) error {
+
+	if err = ParseCommand(&probe, resultDetails); err != nil {
+		return err
+	}
 
 	// running the cmd probe command and storing the output into the out buffer
 	// it will retry for some retry count, in each iterations of try it contains following things
@@ -185,6 +190,8 @@ func TriggerInlineCmdProbe(probe v1alpha1.CmdProbeAttributes) error {
 				log.Warnf("The %v cmd probe has been Failed", probe.Name)
 				return fmt.Errorf("The probe output didn't match with expected output, %v", out.String())
 			}
+
+			resultDetails.Register["probe1Register"] = strings.TrimSpace(out.String())
 			return nil
 		})
 	return err
@@ -294,7 +301,7 @@ func TriggerInlineContinuousCmdProbe(probe v1alpha1.CmdProbeAttributes, chaosres
 	// it trigger the inline cmd probe for the entire duration of chaos and it fails, if any err encounter
 	// it marked the error for the probes, if any
 	for {
-		err = TriggerInlineCmdProbe(probe)
+		err = TriggerInlineCmdProbe(probe, chaosresult)
 		// record the error inside the probeDetails, we are maintaining a dedicated variable for the err, inside probeDetails
 		if err != nil {
 			for index := range chaosresult.ProbeDetails {
@@ -335,4 +342,26 @@ func TriggerSourceContinuousCmdProbe(probe v1alpha1.CmdProbeAttributes, execComm
 		time.Sleep(time.Duration(probe.RunProperties.ProbePollingInterval) * time.Second)
 	}
 
+}
+
+// ParseCommand ...
+func ParseCommand(probe *v1alpha1.CmdProbeAttributes, resultDetails *types.ResultDetails) error {
+
+	register := resultDetails.Register
+	//var card2 = map[string]string{"probe": "helllo"}
+	log.Infof("register: %v", register)
+
+	t := template.Must(template.New("t1").Parse(probe.Inputs.Command))
+
+	// store the bootstraped file in the buffer
+	var out bytes.Buffer
+	if err = t.Execute(&out, register); err != nil {
+		return err
+	}
+
+	probe.Inputs.Command = out.String()
+
+	log.Infof("ans: %v", probe.Inputs.Command)
+
+	return nil
 }
