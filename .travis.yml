@@ -14,10 +14,9 @@ addons:
 
 before_script:
   - sudo apt-get update && sudo apt-get install golint
-  - export VERSION=$(curl --silent "https://api.github.com/repos/aquasecurity/trivy/releases/latest" | grep '"tag_name":' | sed -E 's/.*"v([^"]+)".*/\1/')
   - sudo apt-get install -y rpm
-  - wget https://github.com/aquasecurity/trivy/releases/download/v${VERSION}/trivy_${VERSION}_Linux-64bit.tar.gz
-  - tar zxvf trivy_${VERSION}_Linux-64bit.tar.gz  
+  - wget https://github.com/aquasecurity/trivy/releases/download/v0.11.0/trivy_0.11.0_Linux-64bit.tar.gz
+  - tar zxvf trivy_0.11.0_Linux-64bit.tar.gz  
   
 script:
   # Installing and configuring dependencies
