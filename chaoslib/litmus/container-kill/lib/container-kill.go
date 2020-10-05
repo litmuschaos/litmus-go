@@ -177,7 +177,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 					},
 					Args: []string{
 						"-c",
-						"./experiments/container-killer",
+						"./helper/container-killer",
 					},
 					Env: GetPodEnv(experimentsDetails, podName),
 					VolumeMounts: []apiv1.VolumeMount{

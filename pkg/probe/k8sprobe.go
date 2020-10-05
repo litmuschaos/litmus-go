@@ -11,7 +11,9 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer/yaml"
 )
 
 // PrepareK8sProbe contains the steps to prepare the k8s probe
@@ -79,14 +81,38 @@ func TriggerK8sProbe(probe v1alpha1.ProbeAttributes, cmd v1alpha1.K8sCommand, cl
 				Resource: cmd.Resource,
 			}
 
-			// using dynamic client to get the resource
-			resourceList, err := clients.DynamicClient.Resource(gvr).Namespace(cmd.Namespace).List(v1.ListOptions{
-				FieldSelector: cmd.FieldSelector,
-				LabelSelector: cmd.LabelSelector,
-			})
-			if err != nil || len(resourceList.Items) == 0 {
-				return fmt.Errorf("unable to list the resources with matching selector, err: %v", err)
+			switch probe.Operation {
+			case "create", "Create":
+				if err = CreateResource(probe, gvr, clients); err != nil {
+					return err
+				}
+			case "delete", "Delete":
+				if err = DeleteResource(probe, gvr, clients); err != nil {
+					return err
+				}
+			case "present", "Present":
+				resourceList, err := clients.DynamicClient.Resource(gvr).Namespace(cmd.Namespace).List(v1.ListOptions{
+					FieldSelector: cmd.FieldSelector,
+					LabelSelector: cmd.LabelSelector,
+				})
+				if err != nil || len(resourceList.Items) == 0 {
+					return fmt.Errorf("unable to list the resources with matching selector, err: %v", err)
+				}
+			case "absent", "Absent":
+				resourceList, err := clients.DynamicClient.Resource(gvr).Namespace(cmd.Namespace).List(v1.ListOptions{
+					FieldSelector: cmd.FieldSelector,
+					LabelSelector: cmd.LabelSelector,
+				})
+				if err != nil {
+					return fmt.Errorf("unable to list the resources with matching selector, err: %v", err)
+				}
+				if len(resourceList.Items) != 0 {
+					return fmt.Errorf("Resource is not deleted yet due to, err: %v", err)
+				}
+			default:
+				return fmt.Errorf("operation type '%s' not supported in the k8s probe", probe.Operation)
 			}
+
 			return nil
 		})
 	return err
@@ -113,4 +139,38 @@ func TriggerContinuousK8sProbe(probe v1alpha1.ProbeAttributes, cmd v1alpha1.K8sC
 		// waiting for the probe polling interval
 		time.Sleep(time.Duration(probe.RunProperties.ProbePollingInterval) * time.Second)
 	}
+}
+
+// CreateResource creates the resource from the data provided inside data field
+func CreateResource(probe v1alpha1.ProbeAttributes, gvr schema.GroupVersionResource, clients clients.ClientSets) error {
+	decUnstructured := yaml.NewDecodingSerializer(unstructured.UnstructuredJSONScheme)
+	// Decode YAML manifest into unstructured.Unstructured
+	data := &unstructured.Unstructured{}
+	_, _, err = decUnstructured.Decode([]byte(probe.Data), nil, data)
+	if err != nil {
+		return err
+	}
+
+	_, err := clients.DynamicClient.Resource(gvr).Namespace(probe.K8sProbeInputs.Command.Namespace).Create(data, v1.CreateOptions{})
+
+	return err
+}
+
+// DeleteResource deletes the resource with matching label & field selector
+func DeleteResource(probe v1alpha1.ProbeAttributes, gvr schema.GroupVersionResource, clients clients.ClientSets) error {
+	resourceList, err := clients.DynamicClient.Resource(gvr).Namespace(probe.K8sProbeInputs.Command.Namespace).List(v1.ListOptions{
+		FieldSelector: probe.K8sProbeInputs.Command.FieldSelector,
+		LabelSelector: probe.K8sProbeInputs.Command.LabelSelector,
+	})
+	if err != nil || len(resourceList.Items) == 0 {
+		return fmt.Errorf("unable to list the resources with matching selector, err: %v", err)
+	}
+
+	for index := range resourceList.Items {
+		if err = clients.DynamicClient.Resource(gvr).Namespace(probe.K8sProbeInputs.Command.Namespace).Delete(resourceList.Items[index].GetName(), &v1.DeleteOptions{}); err != nil {
+			return err
+		}
+
+	}
+	return nil
 }
