@@ -36,7 +36,7 @@ func PrepareNodeTaint(experimentsDetails *experimentTypes.ExperimentDetails, cli
 		//Select node for kubelet-service-kill
 		appNodeName, err := common.GetNodeName(experimentsDetails.AppNS, experimentsDetails.AppLabel, clients)
 		if err != nil {
-			return errors.Errorf("Unable to get the application nodename, err: %v", err)
+			return err
 		}
 
 		experimentsDetails.AppNode = appNodeName
@@ -58,7 +58,7 @@ func PrepareNodeTaint(experimentsDetails *experimentTypes.ExperimentDetails, cli
 	log.Info("[Status]: Verify the status of AUT after reschedule")
 	err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 	if err != nil {
-		return errors.Errorf("Application status check failed due to, err: %v", err)
+		return errors.Errorf("Application status check failed, err: %v", err)
 	}
 
 	// Verify the status of Auxiliary Applications after reschedule

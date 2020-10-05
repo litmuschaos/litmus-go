@@ -68,7 +68,7 @@ func PodDeleteChaos(experimentsDetails *experimentTypes.ExperimentDetails, clien
 		// if the target pod is not defined it will derive the random target pod list using pod affected percentage
 		targetPodList, err := common.GetPodList(experimentsDetails.AppNS, experimentsDetails.TargetPod, experimentsDetails.AppLabel, experimentsDetails.PodsAffectedPerc, clients)
 		if err != nil {
-			return errors.Errorf("Unable to get the target pod list, err: %v", err)
+			return err
 		}
 
 		if experimentsDetails.EngineName != "" {

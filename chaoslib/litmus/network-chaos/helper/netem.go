@@ -39,7 +39,7 @@ func main() {
 		log.Fatalf("Unable to Get the kubeconfig, err: %v", err)
 	}
 
-	//Fetching all the ENV passed for the runner pod
+	//Fetching all the ENV passed for the helper pod
 	log.Info("[PreReq]: Getting the ENV variables")
 	GetENV(&experimentsDetails)
 
