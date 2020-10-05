@@ -23,7 +23,7 @@ func PreparePodMemoryHog(experimentsDetails *experimentTypes.ExperimentDetails, 
 
 	targetPodList, err := common.GetPodList(experimentsDetails.AppNS, experimentsDetails.TargetPod, experimentsDetails.AppLabel, experimentsDetails.PodsAffectedPerc, clients)
 	if err != nil {
-		return errors.Errorf("Unable to get the target pod list, err: %v", err)
+		return err
 	}
 
 	//Waiting for the ramp time before chaos injection

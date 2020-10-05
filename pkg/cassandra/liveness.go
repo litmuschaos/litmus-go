@@ -25,7 +25,7 @@ import (
 func LivenessCheck(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) (string, error) {
 	var err error
 
-	// Generate the run_id
+	// Generate the run_id for the liveness pod
 	experimentsDetails.RunID = common.GetRunID()
 
 	// Creating liveness deployment

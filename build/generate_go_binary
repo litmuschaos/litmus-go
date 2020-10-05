@@ -1,42 +1,6 @@
-# Building go binaries for pod_delete experiment
-go build -o build/_output/pod-delete ./experiments/generic/pod-delete
-# Building go binaries for pod_cpu_hog experiment
-go build -o build/_output/pod-cpu-hog ./experiments/generic/pod-cpu-hog
-# Building go binaries for pod_memory_hog experiment
-go build -o build/_output/pod-memory-hog ./experiments/generic/pod-memory-hog
-# Buiding go binaries for pod_network_duplication experiment
-go build -o build/_output/pod-network-duplication ./experiments/generic/pod-network-duplication
-# Buiding go binaries for pod_network_latency experiment
-go build -o build/_output/pod-network-latency ./experiments/generic/pod-network-latency
-# Buiding go binaries for pod_network_loss experiment
-go build -o build/_output/pod-network-loss ./experiments/generic/pod-network-loss
-# Buiding go binaries for pod_network_corruption experiment
-go build -o build/_output/pod-network-corruption ./experiments/generic/pod-network-corruption
-# Buiding go binaries for node_taint experiment
-go build -o build/_output/node-taint ./experiments/generic/node-taint
-# Buiding go binaries for node_drain experiment
-go build -o build/_output/node-drain ./experiments/generic/node-drain
-# Buiding go binaries for kubelet_service_kill experiment
-go build -o build/_output/kubelet-service-kill ./experiments/generic/kubelet-service-kill
-# Buiding go binaries for node_memory_hog experiment
-go build -o build/_output/node-memory-hog ./experiments/generic/node-memory-hog
-# Buiding go binaries for node_cpu_hog experiment
-go build -o build/_output/node-cpu-hog ./experiments/generic/node-cpu-hog
-# Buiding go binaries for container_kill experiment
-go build -o build/_output/container-kill ./experiments/generic/container-kill
-# Buiding go binaries for disk_fill experiment
-go build -o build/_output/disk-fill ./experiments/generic/disk-fill
-# Buiding go binaries for pod-autoscaler experiment
-go build -o build/_output/pod-autoscaler ./experiments/generic/pod-autoscaler
 # Buiding go binaries for container_kill helper
-go build -o build/_output/container-killer ./chaoslib/litmus/container_kill/helper
-# Buiding go binaries for kafka_broker_pod_failure
-go build -o build/_output/kafka-broker-pod-failure ./experiments/kafka/kafka-broker-pod-failure/
-# Buiding go binaries for cassandra-pod-delete
-go build -o build/_output/cassandra-pod-delete ./experiments/cassandra/pod-delete
+go build -o build/_output/helper/container-killer ./chaoslib/litmus/container-kill/helper
 # Buiding go binaries for network_chaos helper
-go build -o build/_output/network-chaos ./chaoslib/litmus/network-chaos/helper
-# Build go  binaries for pod-io-stress chaos
-go build -o build/_output/pod-io-stress ./experiments/generic/pod-io-stress/
-# Building go binaries for node-io-stress experiment
-go build -o build/_output/node-io-stress ./experiments/generic/node-io-stress/
+go build -o build/_output/helper/network-chaos ./chaoslib/litmus/network-chaos/helper
+# Building go binaries for all experiments
+go build -o build/_output/experiments ./bin

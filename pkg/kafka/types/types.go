@@ -11,7 +11,6 @@ type ExperimentDetails struct {
 	KafkaKind             string
 	KafkaLivenessStream   string
 	KafkaLivenessImage    string
-	KafkaSaslAuth         string
 	KafkaConsumerTimeout  int
 	KafkaInstanceName     string
 	KafkaNamespace        string

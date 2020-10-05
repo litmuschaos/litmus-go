@@ -30,10 +30,10 @@ func main() {
 
 	//Getting kubeConfig and Generate ClientSets
 	if err := clients.GenerateClientSetFromKubeConfig(); err != nil {
-		log.Fatalf("Unable to Get the kubeconfig due to %v", err)
+		log.Fatalf("Unable to Get the kubeconfig, err: %v", err)
 	}
 
-	//Fetching all the ENV passed for the runner pod
+	//Fetching all the ENV passed in the helper pod
 	log.Info("[PreReq]: Getting the ENV variables")
 	GetENV(&experimentsDetails, "container-kill")
 
@@ -42,7 +42,7 @@ func main() {
 
 	err := KillContainer(&experimentsDetails, clients, &eventsDetails, &chaosDetails)
 	if err != nil {
-		log.Fatalf("helper pod failed due to err: %v", err)
+		log.Fatalf("helper pod failed, err: %v", err)
 	}
 
 }
@@ -60,7 +60,7 @@ func KillContainer(experimentsDetails *experimentTypes.ExperimentDetails, client
 		//Obtain the pod ID of the application pod
 		podID, err := GetPodID(experimentsDetails)
 		if err != nil {
-			return errors.Errorf("Unable to get the pod id %v", err)
+			return errors.Errorf("Unable to get the pod id, %v", err)
 		}
 
 		//GetRestartCount return the restart count of target container
@@ -178,7 +178,7 @@ func CheckContainerStatus(experimentsDetails *experimentTypes.ExperimentDetails,
 		Try(func(attempt uint) error {
 			pod, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Get(appName, v1.GetOptions{})
 			if err != nil {
-				return errors.Errorf("Unable to list the pod, due to %v", err)
+				return errors.Errorf("Unable to find the pod with name %v, err: %v", appName, err)
 			}
 			for _, container := range pod.Status.ContainerStatuses {
 				if container.Ready != true {
@@ -252,7 +252,7 @@ func VerifyRestartCount(experimentsDetails *experimentTypes.ExperimentDetails, p
 		Try(func(attempt uint) error {
 			pod, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Get(podName, v1.GetOptions{})
 			if err != nil {
-				return errors.Errorf("Unable to get the application pod, due to %v", err)
+				return errors.Errorf("Unable to find the pod with name %v, err: %v", podName, err)
 			}
 			for _, container := range pod.Status.ContainerStatuses {
 				if container.Name == experimentsDetails.TargetContainer {

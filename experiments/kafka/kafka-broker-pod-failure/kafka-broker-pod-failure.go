@@ -1,4 +1,4 @@
-package main
+package experiment
 
 import (
 	pod_delete "github.com/litmuschaos/litmus-go/chaoslib/litmus/pod-delete/lib"
@@ -12,19 +12,10 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/sirupsen/logrus"
-	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 )
 
-func init() {
-	// Log as JSON instead of the default ASCII formatter.
-	logrus.SetFormatter(&logrus.TextFormatter{
-		FullTimestamp:          true,
-		DisableSorting:         true,
-		DisableLevelTruncation: true,
-	})
-}
-
-func main() {
+// KafkaBrokerPodFailure inject the kafka-broker-pod-failure chaos
+func KafkaBrokerPodFailure() {
 
 	var err error
 	experimentsDetails := experimentTypes.ExperimentDetails{}
@@ -79,7 +70,7 @@ func main() {
 	log.Info("[Status]: Verify that the Kafka cluster is healthy(pre-chaos)")
 	err = kafka.ClusterHealthCheck(&experimentsDetails, clients)
 	if err != nil {
-		log.Errorf("Cluster status check failed err: %v\n", err)
+		log.Errorf("Cluster status check failed err: %v", err)
 		failStep := "Verify that the AUT (Application Under Test) is running (pre-chaos)"
 		types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
 		result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
@@ -158,7 +149,7 @@ func main() {
 	if experimentsDetails.KafkaLivenessStream != "" {
 		err = status.CheckApplicationStatus(experimentsDetails.ChaoslibDetail.AppNS, "name=kafka-liveness", experimentsDetails.ChaoslibDetail.Timeout, experimentsDetails.ChaoslibDetail.Delay, clients)
 		if err != nil {
-			log.Fatalf("Application liveness check failed err: %v\n", err)
+			log.Fatalf("Application liveness check failed err: %v", err)
 		}
 		if err := kafka.LivenessCleanup(&experimentsDetails, clients); err != nil {
 			log.Fatalf("Error in liveness cleanup err: %v", err)

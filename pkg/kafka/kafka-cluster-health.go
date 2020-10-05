@@ -2,15 +2,12 @@ package kafka
 
 import (
 	"math/rand"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/kafka/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/status"
-	litmusexec "github.com/litmuschaos/litmus-go/pkg/utils/exec"
 	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -34,33 +31,33 @@ func ClusterHealthCheck(experimentsDetails *experimentTypes.ExperimentDetails, c
 		return err
 	}
 
-	log.Info("[Status]: Obtain pod name of any one of the zookeeper pods")
-	ZookeeperPodName, err := GetRandomPodName(experimentsDetails.ZookeeperNamespace, experimentsDetails.ZookeeperLabel, clients)
-	if err != nil {
-		return err
-	}
+	// log.Info("[Status]: Obtain pod name of any one of the zookeeper pods")
+	// ZookeeperPodName, err := GetRandomPodName(experimentsDetails.ZookeeperNamespace, experimentsDetails.ZookeeperLabel, clients)
+	// if err != nil {
+	// 	return err
+	// }
 
-	log.Info("[Status]: Obtain the desired replica count of the Kafka statefulset")
-	ReplicaCount, err := GetReplicaCount(experimentsDetails.KafkaNamespace, experimentsDetails.KafkaLabel, clients)
-	if err != nil {
-		return err
-	}
+	// log.Info("[Status]: Obtain the desired replica count of the Kafka statefulset")
+	// ReplicaCount, err := GetReplicaCount(experimentsDetails.KafkaNamespace, experimentsDetails.KafkaLabel, clients)
+	// if err != nil {
+	// 	return err
+	// }
 
-	if experimentsDetails.KafkaInstanceName != "" {
+	// if experimentsDetails.KafkaInstanceName != "" {
 
-		// It will contains all the pod & container details required for exec command
-		execCommandDetails := litmusexec.PodDetails{}
-		command := append([]string{"/bin/sh", "-c"}, "zkCli.sh -server "+experimentsDetails.ZookeeperService+":"+experimentsDetails.ZookeeperPort+"/"+experimentsDetails.KafkaInstanceName+" ls /brokers/ids | tail -n 1 | tr -d '[],' | tr ' ' '\n'  | wc -l")
-		litmusexec.SetExecCommandAttributes(&execCommandDetails, ZookeeperPodName, "kubernetes-zookeeper", experimentsDetails.KafkaNamespace)
-		kafkaAvailableBrokers, err := litmusexec.Exec(&execCommandDetails, clients, command)
-		if err != nil {
-			return errors.Errorf("Unable to get kafka available brokers details err: %v", err)
-		}
-		if !strings.Contains(strings.TrimSpace(kafkaAvailableBrokers), strconv.Itoa(ReplicaCount)) {
-			return errors.Errorf("All Kafka brokers are not alive")
-		}
-		log.Info("[Status]: All Kafka brokers are alive")
-	}
+	// 	// It will contains all the pod & container details required for exec command
+	// 	execCommandDetails := litmusexec.PodDetails{}
+	// 	command := append([]string{"/bin/sh", "-c"}, "zkCli.sh -server "+experimentsDetails.ZookeeperService+":"+experimentsDetails.ZookeeperPort+"/"+experimentsDetails.KafkaInstanceName+" ls /brokers/ids | tail -n 1 | tr -d '[],' | tr ' ' '\n'  | wc -l")
+	// 	litmusexec.SetExecCommandAttributes(&execCommandDetails, ZookeeperPodName, "kubernetes-zookeeper", experimentsDetails.KafkaNamespace)
+	// 	kafkaAvailableBrokers, err := litmusexec.Exec(&execCommandDetails, clients, command)
+	// 	if err != nil {
+	// 		return errors.Errorf("Unable to get kafka available brokers details err: %v", err)
+	// 	}
+	// 	if !strings.Contains(strings.TrimSpace(kafkaAvailableBrokers), strconv.Itoa(ReplicaCount)) {
+	// 		return errors.Errorf("All Kafka brokers are not alive")
+	// 	}
+	// 	log.Info("[Status]: All Kafka brokers are alive")
+	// }
 
 	return nil
 }
