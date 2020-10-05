@@ -24,7 +24,7 @@ func PrepareNodeIOStress(experimentsDetails *experimentTypes.ExperimentDetails, 
 		//Select node for node-io-stress
 		appNodeName, err := common.GetNodeName(experimentsDetails.AppNS, experimentsDetails.AppLabel, clients)
 		if err != nil {
-			return errors.Errorf("Unable to get the application nodename, err: %v", err)
+			return err
 		}
 
 		experimentsDetails.AppNode = appNodeName

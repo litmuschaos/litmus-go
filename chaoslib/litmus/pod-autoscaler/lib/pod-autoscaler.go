@@ -22,7 +22,7 @@ func PreparePodAutoscaler(experimentsDetails *experimentTypes.ExperimentDetails,
 
 	appName, replicaCount, err := GetApplicationDetails(experimentsDetails, clients)
 	if err != nil {
-		return errors.Errorf("Unable to get the relicaCount of the application, err: %v", err)
+		return errors.Errorf("Unable to get the replicaCount of the application, err: %v", err)
 	}
 
 	//Waiting for the ramp time before chaos injection
@@ -57,7 +57,7 @@ func GetApplicationDetails(experimentsDetails *experimentTypes.ExperimentDetails
 	// Get Deployment replica count
 	applicationList, err := clients.KubeClient.AppsV1().Deployments(experimentsDetails.AppNS).List(metav1.ListOptions{LabelSelector: experimentsDetails.AppLabel})
 	if err != nil || len(applicationList.Items) == 0 {
-		return "", 0, errors.Errorf("Unable to list the application, err: %v", err)
+		return "", 0, errors.Errorf("Unable to find the application pods with matching labels, err: %v", err)
 	}
 	for _, app := range applicationList.Items {
 		appReplica = int(*app.Spec.Replicas)
@@ -111,7 +111,7 @@ func ApplicationPodStatusCheck(experimentsDetails *experimentTypes.ExperimentDet
 		Try(func(attempt uint) error {
 			applicationDeploy, err := applicationClient.Get(appName, metav1.GetOptions{})
 			if err != nil {
-				return errors.Errorf("Unable to get the application, err: %v", err)
+				return errors.Errorf("Unable to find the pod with name %v, err: %v", appName, err)
 			}
 			if int(applicationDeploy.Status.AvailableReplicas) != experimentsDetails.Replicas {
 				log.Infof("Application Pod Available Count is: %v", applicationDeploy.Status.AvailableReplicas)
@@ -126,7 +126,7 @@ func ApplicationPodStatusCheck(experimentsDetails *experimentTypes.ExperimentDet
 		if err != nil {
 			return errors.Errorf("Unable to perform autoscaling, err: %v", err)
 		}
-		return errors.Errorf("Failed to scale the appplication, err: %v", err)
+		return errors.Errorf("Failed to scale the application, err: %v", err)
 	} else if err != nil {
 		return err
 	}
@@ -149,7 +149,7 @@ func AutoscalerRecovery(experimentsDetails *experimentTypes.ExperimentDetails, c
 		// RetryOnConflict uses exponential backoff to avoid exhausting the apiserver
 		appUnderTest, err := applicationClient.Get(appName, metav1.GetOptions{})
 		if err != nil {
-			return errors.Errorf("Failed to get latest version of Application Deployment, err: %v", err)
+			return errors.Errorf("Failed to find the latest version of Application Deployment with name %v, err: %v", appName, err)
 		}
 
 		appUnderTest.Spec.Replicas = int32Ptr(int32(replicaCount)) // modify replica count
@@ -157,7 +157,7 @@ func AutoscalerRecovery(experimentsDetails *experimentTypes.ExperimentDetails, c
 		return updateErr
 	})
 	if retryErr != nil {
-		return errors.Errorf("Unable to scale the, err: %v", retryErr)
+		return errors.Errorf("Unable to scale the application pod, err: %v", retryErr)
 	}
 	log.Info("[Info]: Application pod started rolling back")
 
@@ -167,7 +167,7 @@ func AutoscalerRecovery(experimentsDetails *experimentTypes.ExperimentDetails, c
 		Try(func(attempt uint) error {
 			applicationDeploy, err := applicationClient.Get(appName, metav1.GetOptions{})
 			if err != nil {
-				return errors.Errorf("Unable to get the application, err: %v", err)
+				return errors.Errorf("Unable to find the pod with name %v, err: %v", appName, err)
 			}
 			if int(applicationDeploy.Status.AvailableReplicas) != experimentsDetails.Replicas {
 				log.Infof("Application Pod Available Count is: %v", applicationDeploy.Status.AvailableReplicas)
