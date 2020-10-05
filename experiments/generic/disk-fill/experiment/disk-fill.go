@@ -1,30 +1,21 @@
-package main
+package experiment
 
 import (
-	pumbaLIB "github.com/litmuschaos/litmus-go/chaoslib/pumba/pod-io-stress/lib"
+	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/disk-fill/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
-	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/pod-io-stress/environment"
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-io-stress/types"
+	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/disk-fill/environment"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/disk-fill/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/sirupsen/logrus"
-	"k8s.io/klog"
 )
 
-func init() {
-	// Log as JSON instead of the default ASCII formatter.
-	logrus.SetFormatter(&logrus.TextFormatter{
-		FullTimestamp:          true,
-		DisableSorting:         true,
-		DisableLevelTruncation: true,
-	})
-}
-
-func main() {
+// DiskFill inject the disk-fill chaos
+func DiskFill() {
 
 	var err error
 	experimentsDetails := experimentTypes.ExperimentDetails{}
@@ -56,7 +47,7 @@ func main() {
 	err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT")
 	if err != nil {
 		log.Errorf("Unable to Create the Chaos Result, err: %v", err)
-		failStep := "Updating the chaos result of " + experimentsDetails.ExperimentName + " experiment (SOT)"
+		failStep := "Updating the chaos result of disk-fill experiment (SOT)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -71,12 +62,9 @@ func main() {
 
 	//DISPLAY THE APP INFORMATION
 	log.InfoWithValues("The application information is as follows", logrus.Fields{
-		"Namespace":                       experimentsDetails.AppNS,
-		"Label":                           experimentsDetails.AppLabel,
-		"Chaos Duration":                  experimentsDetails.ChaosDuration,
-		"Ramp Time":                       experimentsDetails.RampTime,
-		"FilesystemUtilizationPercentage": experimentsDetails.FilesystemUtilizationPercentage,
-		"NumberOfWorkers":                 experimentsDetails.NumberOfWorkers,
+		"Namespace": experimentsDetails.AppNS,
+		"Label":     experimentsDetails.AppLabel,
+		"Ramp Time": experimentsDetails.RampTime,
 	})
 
 	//PRE-CHAOS APPLICATION STATUS CHECK
@@ -87,6 +75,18 @@ func main() {
 		failStep := "Verify that the AUT (Application Under Test) is running (pre-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
+	}
+
+	//PRE-CHAOS AUXILIARY APPLICATION STATUS CHECK
+	if experimentsDetails.AuxiliaryAppInfo != "" {
+		log.Info("[Status]: Verify that the Auxiliary Applications are running (pre-chaos)")
+		err = status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
+		if err != nil {
+			log.Errorf("Auxiliary Application status check failed, err: %v", err)
+			failStep := "Verify that the Auxiliary Applications are running (pre-chaos)"
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+			return
+		}
 	}
 
 	if experimentsDetails.EngineName != "" {
@@ -113,16 +113,16 @@ func main() {
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
-	// Including the litmus lib for pod-io-stress
-	if experimentsDetails.ChaosLib == "pumba" {
-		err = pumbaLIB.PreparePodIOStress(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
+	// Including the litmus lib for disk-fill
+	if experimentsDetails.ChaosLib == "litmus" {
+		err = litmusLIB.PrepareDiskFill(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
 		if err != nil {
-			log.Errorf("[Error]: pod io stress chaos failed, err: %v", err)
+			log.Errorf("Chaos injection failed, err: %v", err)
 			failStep := "failed in chaos injection phase"
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}
-		log.Info("[Confirmation]: Disk of the application pod has been stressed successfully")
+		log.Info("[Confirmation]: disk fill chaos has been injected successfully")
 		resultDetails.Verdict = "Pass"
 	} else {
 		log.Error("[Invalid]: Please Provide the correct LIB")
@@ -135,10 +135,22 @@ func main() {
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (post-chaos)")
 	err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 	if err != nil {
-		klog.V(0).Infof("Application status check failed, err: %v", err)
+		log.Errorf("Application status check failed, err: %v", err)
 		failStep := "Verify that the AUT (Application Under Test) is running (post-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
+	}
+
+	//POST-CHAOS AUXILIARY APPLICATION STATUS CHECK
+	if experimentsDetails.AuxiliaryAppInfo != "" {
+		log.Info("[Status]: Verify that the Auxiliary Applications are running (post-chaos)")
+		err = status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
+		if err != nil {
+			log.Errorf("Auxiliary Application status check failed, err: %v", err)
+			failStep := "Verify that the Auxiliary Applications are running (post-chaos)"
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+			return
+		}
 	}
 
 	if experimentsDetails.EngineName != "" {
@@ -169,7 +181,7 @@ func main() {
 	log.Infof("[The End]: Updating the chaos result of %v experiment (EOT)", experimentsDetails.ExperimentName)
 	err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 	if err != nil {
-		log.Fatalf("Unable to Update the Chaos Result, err: %v", err)
+		log.Fatalf("Unable to Update the Chaos Result err:  %v\n", err)
 	}
 
 	// generating the event in chaosresult to marked the verdict as pass/fail

@@ -1,36 +1,31 @@
-package main
+package experiment
 
 import (
-	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/kubelet-service-kill/lib"
+	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/network-chaos/lib/duplication"
+	pumbaLIB "github.com/litmuschaos/litmus-go/chaoslib/pumba/network-chaos/lib/duplication"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
-	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/kubelet-service-kill/environment"
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/kubelet-service-kill/types"
+	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/network-chaos/environment"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/network-chaos/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
+	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/sirupsen/logrus"
+	"k8s.io/klog"
 )
 
-func init() {
-	// Log as JSON instead of the default ASCII formatter.
-	logrus.SetFormatter(&logrus.TextFormatter{
-		FullTimestamp:          true,
-		DisableSorting:         true,
-		DisableLevelTruncation: true,
-	})
-}
-
-func main() {
+// PodNetworkDuplication inject the pod-network-duplication chaos
+func PodNetworkDuplication() {
 
 	var err error
 	experimentsDetails := experimentTypes.ExperimentDetails{}
 	resultDetails := types.ResultDetails{}
+	chaosDetails := types.ChaosDetails{}
 	eventsDetails := types.EventDetails{}
 	clients := clients.ClientSets{}
-	chaosDetails := types.ChaosDetails{}
 
 	//Getting kubeConfig and Generate ClientSets
 	if err := clients.GenerateClientSetFromKubeConfig(); err != nil {
@@ -41,7 +36,7 @@ func main() {
 	log.Infof("[PreReq]: Getting the ENV for the %v experiment", experimentsDetails.ExperimentName)
 	experimentEnv.GetENV(&experimentsDetails)
 
-	// Intialise the chaos attributes
+	// Intialise events Parameters
 	experimentEnv.InitialiseChaosVariables(&chaosDetails, &experimentsDetails)
 
 	// Intialise Chaos Result Parameters
@@ -55,7 +50,7 @@ func main() {
 	err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT")
 	if err != nil {
 		log.Errorf("Unable to Create the Chaos Result, err: %v", err)
-		failStep := "Updating the chaos result of kubelet-service-kill experiment (SOT)"
+		failStep := "Updating the chaos result of pod-network-duplication experiment (SOT)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -69,7 +64,7 @@ func main() {
 	events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosResult")
 
 	//DISPLAY THE APP INFORMATION
-	log.InfoWithValues("The application information is as follows", logrus.Fields{
+	log.InfoWithValues("The application information is as follows\n", logrus.Fields{
 		"Namespace": experimentsDetails.AppNS,
 		"Label":     experimentsDetails.AppLabel,
 		"Ramp Time": experimentsDetails.RampTime,
@@ -83,18 +78,6 @@ func main() {
 		failStep := "Verify that the AUT (Application Under Test) is running (pre-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
-	}
-
-	//PRE-CHAOS AUXILIARY APPLICATION STATUS CHECK
-	if experimentsDetails.AuxiliaryAppInfo != "" {
-		log.Info("[Status]: Verify that the Auxiliary Applications are running (pre-chaos)")
-		err = status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
-		if err != nil {
-			log.Errorf("Auxiliary Application status check failed, err: %v", err)
-			failStep := "Verify that the Auxiliary Applications are running (pre-chaos)"
-			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-			return
-		}
 	}
 
 	if experimentsDetails.EngineName != "" {
@@ -121,16 +104,29 @@ func main() {
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
-	// Including the litmus lib for kubelet-service-kill
-	if experimentsDetails.ChaosLib == "litmus" {
-		err = litmusLIB.PrepareKubeletKill(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
+	// Including the pumba lib for pod-network-duplication
+	if experimentsDetails.ChaosLib == "litmus" && experimentsDetails.ContainerRuntime == "docker" {
+		// Calling AbortWatcher go routine, it will continuously watch for the abort signal for the entire chaos duration and generate the required events and result
+		// It is being invoked here, as opposed to within the chaoslib, as these experiments do not need additional recovery/chaos revert steps like in case of network experiments
+		go common.AbortWatcher(experimentsDetails.ExperimentName, clients, &resultDetails, &chaosDetails, &eventsDetails)
+		err = pumbaLIB.PodNetworkDuplicationChaos(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
 		if err != nil {
 			log.Errorf("Chaos injection failed, err: %v", err)
 			failStep := "failed in chaos injection phase"
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}
-		log.Info("[Confirmation]: kubelet-service-kill chaos has been injected successfully")
+		log.Info("[Confirmation]: The pod network duplication chaos has been applied")
+		resultDetails.Verdict = "Pass"
+	} else if experimentsDetails.ChaosLib == "litmus" && (experimentsDetails.ContainerRuntime == "containerd" || experimentsDetails.ContainerRuntime == "crio") {
+		err = litmusLIB.PodNetworkDuplicationChaos(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
+		if err != nil {
+			log.Errorf("Chaos injection failed, err: %v", err)
+			failStep := "failed in chaos injection phase"
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+			return
+		}
+		log.Info("[Confirmation]: The pod network duplication chaos has been applied")
 		resultDetails.Verdict = "Pass"
 	} else {
 		log.Error("[Invalid]: Please Provide the correct LIB")
@@ -143,22 +139,10 @@ func main() {
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (post-chaos)")
 	err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 	if err != nil {
-		log.Errorf("Application status check failed, err: %v", err)
+		klog.V(0).Infof("Application status check failed, err: %v", err)
 		failStep := "Verify that the AUT (Application Under Test) is running (post-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
-	}
-
-	//POST-CHAOS AUXILIARY APPLICATION STATUS CHECK
-	if experimentsDetails.AuxiliaryAppInfo != "" {
-		log.Info("[Status]: Verify that the Auxiliary Applications are running (post-chaos)")
-		err = status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
-		if err != nil {
-			log.Errorf("Auxiliary Application status check failed, err: %v", err)
-			failStep := "Verify that the Auxiliary Applications are running (post-chaos)"
-			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-			return
-		}
 	}
 
 	if experimentsDetails.EngineName != "" {

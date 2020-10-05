@@ -1,37 +1,31 @@
-package main
+package experiment
 
 import (
-	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/node-cpu-hog/lib"
+	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/pod-memory-hog/lib"
+	pumbaLIB "github.com/litmuschaos/litmus-go/chaoslib/pumba/memory-chaos/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
-	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/node-cpu-hog/environment"
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/node-cpu-hog/types"
+	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/pod-memory-hog/environment"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-memory-hog/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
+	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/sirupsen/logrus"
 	"k8s.io/klog"
 )
 
-func init() {
-	// Log as JSON instead of the default ASCII formatter.
-	logrus.SetFormatter(&logrus.TextFormatter{
-		FullTimestamp:          true,
-		DisableSorting:         true,
-		DisableLevelTruncation: true,
-	})
-}
-
-func main() {
+// PodMemoryHog inject the pod-memory-hog chaos
+func PodMemoryHog() {
 
 	var err error
 	experimentsDetails := experimentTypes.ExperimentDetails{}
 	resultDetails := types.ResultDetails{}
 	eventsDetails := types.EventDetails{}
-	chaosDetails := types.ChaosDetails{}
 	clients := clients.ClientSets{}
+	chaosDetails := types.ChaosDetails{}
 
 	//Getting kubeConfig and Generate ClientSets
 	if err := clients.GenerateClientSetFromKubeConfig(); err != nil {
@@ -56,7 +50,7 @@ func main() {
 	err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT")
 	if err != nil {
 		log.Errorf("Unable to Create the Chaos Result, err: %v", err)
-		failStep := "Updating the chaos result of pod-cpu-hog experiment (SOT)"
+		failStep := "Updating the chaos result of pod-memory-hog experiment (SOT)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -71,32 +65,21 @@ func main() {
 
 	//DISPLAY THE APP INFORMATION
 	log.InfoWithValues("The application information is as follows", logrus.Fields{
-		"Namespace":      experimentsDetails.AppNS,
-		"Label":          experimentsDetails.AppLabel,
-		"Chaos Duration": experimentsDetails.ChaosDuration,
-		"Ramp Time":      experimentsDetails.RampTime,
+		"Namespace":          experimentsDetails.AppNS,
+		"Label":              experimentsDetails.AppLabel,
+		"Chaos Duration":     experimentsDetails.ChaosDuration,
+		"Ramp Time":          experimentsDetails.RampTime,
+		"Memory Consumption": experimentsDetails.MemoryConsumption,
 	})
 
 	//PRE-CHAOS APPLICATION STATUS CHECK
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (pre-chaos)")
 	err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 	if err != nil {
-		log.Errorf("Application status check failed, err: %v", err)
+		log.Errorf("Application status check failed,, err: %v", err)
 		failStep := "Verify that the AUT (Application Under Test) is running (pre-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
-	}
-
-	//PRE-CHAOS AUXILIARY APPLICATION STATUS CHECK
-	if experimentsDetails.AuxiliaryAppInfo != "" {
-		log.Info("[Status]: Verify that the Auxiliary Applications are running (pre-chaos)")
-		err = status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
-		if err != nil {
-			log.Errorf("Auxiliary Application status check failed, err: %v", err)
-			failStep := "Verify that the Auxiliary Applications are running (pre-chaos)"
-			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-			return
-		}
 	}
 
 	if experimentsDetails.EngineName != "" {
@@ -123,17 +106,31 @@ func main() {
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
-	// Including the litmus lib for node-cpu-hog
+	// Including the litmus lib for pod-memory-hog
 	if experimentsDetails.ChaosLib == "litmus" {
-		err = litmusLIB.PrepareNodeCPUHog(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
+		err = litmusLIB.PrepareMemoryStress(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
 		if err != nil {
-			log.Errorf("[Error]: CPU hog failed, err: %v", err)
+			log.Errorf("[Error]: pod memory hog failed,, err: %v", err)
 			failStep := "failed in chaos injection phase"
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}
-		log.Info("[Confirmation]: CPU of the application node has been stressed successfully")
+		log.Info("[Confirmation]: Memory of the application pod has been stressed successfully")
 		resultDetails.Verdict = "Pass"
+	} else if experimentsDetails.ChaosLib == "pumba" {
+		// Calling AbortWatcher go routine, it will continuously watch for the abort signal for the entire chaos duration and generate the required events and result
+		// It is being invoked here, as opposed to within the chaoslib, as these experiments do not need additional recovery/chaos revert steps like in case of network experiments
+		go common.AbortWatcher(experimentsDetails.ExperimentName, clients, &resultDetails, &chaosDetails, &eventsDetails)
+		err = pumbaLIB.PreparePodMemoryHog(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
+		if err != nil {
+			log.Errorf("[Error]: Memory hog failed, err: %v", err)
+			failStep := "failed in chaos injection phase"
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+			return
+		}
+		log.Info("[Confirmation]: Memory of the application pod has been stressed successfully")
+		resultDetails.Verdict = "Pass"
+
 	} else {
 		log.Error("[Invalid]: Please Provide the correct LIB")
 		failStep := "no match found for specified lib"
@@ -149,18 +146,6 @@ func main() {
 		failStep := "Verify that the AUT (Application Under Test) is running (post-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
-	}
-
-	//POST-CHAOS AUXILIARY APPLICATION STATUS CHECK
-	if experimentsDetails.AuxiliaryAppInfo != "" {
-		log.Info("[Status]: Verify that the Auxiliary Applications are running (post-chaos)")
-		err = status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
-		if err != nil {
-			log.Errorf("Auxiliary Application status check failed, err: %v", err)
-			failStep := "Verify that the Auxiliary Applications are running (post-chaos)"
-			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-			return
-		}
 	}
 
 	if experimentsDetails.EngineName != "" {

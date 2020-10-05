@@ -164,7 +164,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 					},
 					Args: []string{
 						"-c",
-						"./experiments/network-chaos",
+						"./helper/network-chaos",
 					},
 					Env: GetPodEnv(experimentsDetails, podName, args),
 					VolumeMounts: []apiv1.VolumeMount{

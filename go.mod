@@ -10,7 +10,7 @@ require (
 	github.com/imdario/mergo v0.3.9 // indirect
 	github.com/kr/pretty v0.2.0 // indirect
 	github.com/kyokomi/emoji v2.2.4+incompatible
-	github.com/litmuschaos/chaos-operator v0.0.0-20200917035646-2633098da932
+	github.com/litmuschaos/chaos-operator v0.0.0-20201005085043-a2a0664927f6
 	github.com/mailru/easyjson v0.7.1 // indirect
 	github.com/openebs/maya v0.0.0-20200411140727-1c81f9e017b0
 	github.com/pkg/errors v0.9.1
@@ -29,7 +29,6 @@ require (
 	k8s.io/client-go v12.0.0+incompatible
 	k8s.io/klog v1.0.0
 	k8s.io/kube-openapi v0.0.0-20200121204235-bf4fb3bd569c // indirect
-	k8s.io/kubernetes v1.16.2
 	k8s.io/utils v0.0.0-20200414100711-2df71ebbae66 // indirect
 	sigs.k8s.io/yaml v1.2.0 // indirect
 )

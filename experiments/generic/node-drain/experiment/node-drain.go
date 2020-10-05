@@ -1,11 +1,11 @@
-package main
+package experiment
 
 import (
-	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/node-taint/lib"
+	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/node-drain/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
-	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/node-taint/environment"
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/node-taint/types"
+	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/node-drain/environment"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/node-drain/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/result"
@@ -14,16 +14,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func init() {
-	// Log as JSON instead of the default ASCII formatter.
-	logrus.SetFormatter(&logrus.TextFormatter{
-		FullTimestamp:          true,
-		DisableSorting:         true,
-		DisableLevelTruncation: true,
-	})
-}
-
-func main() {
+//NodeDrain inject the node-drain chaos
+func NodeDrain() {
 
 	var err error
 	experimentsDetails := experimentTypes.ExperimentDetails{}
@@ -55,7 +47,7 @@ func main() {
 	err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT")
 	if err != nil {
 		log.Errorf("Unable to Create the Chaos Result, err: %v", err)
-		failStep := "Updating the chaos result of node-taint experiment (SOT)"
+		failStep := "Updating the chaos result of node-drain experiment (SOT)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -69,10 +61,11 @@ func main() {
 	events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosResult")
 
 	//DISPLAY THE APP INFORMATION
-	log.InfoWithValues("The application information is as follows", logrus.Fields{
+	log.InfoWithValues("[Info]: The application information is as follows", logrus.Fields{
 		"Namespace": experimentsDetails.AppNS,
 		"Label":     experimentsDetails.AppLabel,
 		"Ramp Time": experimentsDetails.RampTime,
+		"Node Name": experimentsDetails.AppNode,
 	})
 
 	//PRE-CHAOS APPLICATION STATUS CHECK
@@ -121,16 +114,16 @@ func main() {
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
-	// Including the litmus lib for node-taint
+	// Including the litmus lib for node-drain
 	if experimentsDetails.ChaosLib == "litmus" {
-		err = litmusLIB.PrepareNodeTaint(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
+		err = litmusLIB.PrepareNodeDrain(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
 		if err != nil {
 			log.Errorf("Chaos injection failed, err: %v", err)
 			failStep := "failed in chaos injection phase"
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}
-		log.Info("[Confirmation]: The application node has been tainted successfully")
+		log.Info("[Confirmation]: The application node has been drained successfully")
 		resultDetails.Verdict = "Pass"
 	} else {
 		log.Error("[Invalid]: Please Provide the correct LIB")
