@@ -3,7 +3,7 @@ package experiment
 import (
 	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/pod-delete/lib"
 	powerfulseal "github.com/litmuschaos/litmus-go/chaoslib/powerfulseal/pod-delete/lib"
-	clients "github.com/litmuschaos/litmus-go/pkg/clients"
+	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/pod-delete/environment"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-delete/types"
@@ -17,19 +17,13 @@ import (
 )
 
 // PodDelete inject the pod-delete chaos
-func PodDelete() {
+func PodDelete(clients clients.ClientSets) {
 
 	var err error
 	experimentsDetails := experimentTypes.ExperimentDetails{}
 	resultDetails := types.ResultDetails{}
 	eventsDetails := types.EventDetails{}
-	clients := clients.ClientSets{}
 	chaosDetails := types.ChaosDetails{}
-
-	//Getting kubeConfig and Generate ClientSets
-	if err := clients.GenerateClientSetFromKubeConfig(); err != nil {
-		log.Fatalf("Unable to Get the kubeconfig, err: %v", err)
-	}
 
 	//Fetching all the ENV passed from the runner pod
 	log.Infof("[PreReq]: Getting the ENV for the %v experiment", experimentsDetails.ExperimentName)
