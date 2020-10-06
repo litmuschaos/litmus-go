@@ -8,6 +8,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/types"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -19,27 +20,41 @@ var err error
 func RunProbes(chaosDetails *types.ChaosDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, phase string, eventsDetails *types.EventDetails) error {
 
 	// get the probes details from the chaosengine
-	k8sProbes, cmdProbes, httpProbes, err := GetProbesFromEngine(chaosDetails, clients)
+	probes, err := GetProbesFromEngine(chaosDetails, clients)
 	if err != nil {
 		return err
 	}
 
-	// it contains steps to prepare the k8s probe
-	err = PrepareK8sProbe(k8sProbes, resultDetails, clients, phase, eventsDetails, chaosDetails)
-	if err != nil {
-		return err
-	}
+	if probes != nil {
 
-	// it contains steps to prepare cmd probe
-	err = PrepareCmdProbe(cmdProbes, clients, chaosDetails, resultDetails, phase, eventsDetails)
-	if err != nil {
-		return err
-	}
+		for _, probe := range probes {
 
-	// it contains steps to prepare http probe
-	err = PrepareHTTPProbe(httpProbes, clients, chaosDetails, resultDetails, phase, eventsDetails)
-	if err != nil {
-		return err
+			switch probe.Type {
+
+			case "k8sProbe", "K8sProbe":
+				// it contains steps to prepare the k8s probe
+				err = PrepareK8sProbe(probe, resultDetails, clients, phase, eventsDetails, chaosDetails)
+				if err != nil {
+					return err
+				}
+
+			case "cmdProbe", "CmdProbe":
+				// it contains steps to prepare cmd probe
+				err = PrepareCmdProbe(probe, clients, chaosDetails, resultDetails, phase, eventsDetails)
+				if err != nil {
+					return err
+				}
+			case "httpProbe", "HTTPProbe":
+				// it contains steps to prepare http probe
+				err = PrepareHTTPProbe(probe, clients, chaosDetails, resultDetails, phase, eventsDetails)
+				if err != nil {
+					return err
+				}
+			default:
+				return errors.Errorf("No supported probe type found, type: %v", probe.Type)
+
+			}
+		}
 	}
 
 	return nil
@@ -80,17 +95,14 @@ func SetProbeVerdictAfterFailure(resultDetails *types.ResultDetails) {
 }
 
 // GetProbesFromEngine fetch the details of the probes from the chaosengines
-func GetProbesFromEngine(chaosDetails *types.ChaosDetails, clients clients.ClientSets) ([]v1alpha1.K8sProbeAttributes, []v1alpha1.CmdProbeAttributes, []v1alpha1.HTTPProbeAttributes, error) {
+func GetProbesFromEngine(chaosDetails *types.ChaosDetails, clients clients.ClientSets) ([]v1alpha1.ProbeAttributes, error) {
+
+	var Probes []v1alpha1.ProbeAttributes
 
 	engine, err := clients.LitmusClient.ChaosEngines(chaosDetails.ChaosNamespace).Get(chaosDetails.EngineName, v1.GetOptions{})
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("Unable to Get the chaosengine due to %v", err)
+		return nil, fmt.Errorf("Unable to Get the chaosengine, err: %v", err)
 	}
-
-	// define all the probes
-	var k8sProbes []v1alpha1.K8sProbeAttributes
-	var httpProbes []v1alpha1.HTTPProbeAttributes
-	var cmdProbes []v1alpha1.CmdProbeAttributes
 
 	// get all the probes defined inside chaosengine for the corresponding experiment
 	experimentSpec := engine.Spec.Experiments
@@ -98,13 +110,11 @@ func GetProbesFromEngine(chaosDetails *types.ChaosDetails, clients clients.Clien
 
 		if experiment.Name == chaosDetails.ExperimentName {
 
-			k8sProbes = experiment.Spec.K8sProbe
-			httpProbes = experiment.Spec.HTTPProbe
-			cmdProbes = experiment.Spec.CmdProbe
+			Probes = experiment.Spec.Probe
 		}
 	}
 
-	return k8sProbes, cmdProbes, httpProbes, nil
+	return Probes, nil
 }
 
 // InitializeProbesInChaosResultDetails set the probe inside chaos result
@@ -114,37 +124,21 @@ func InitializeProbesInChaosResultDetails(chaosDetails *types.ChaosDetails, clie
 	probeDetails := []types.ProbeDetails{}
 	probeDetail := types.ProbeDetails{}
 	// get the probes from the chaosengine
-	k8sProbes, cmdProbes, httpProbes, err := GetProbesFromEngine(chaosDetails, clients)
+	probes, err := GetProbesFromEngine(chaosDetails, clients)
 	if err != nil {
 		return err
 	}
 
 	// set the probe details for k8s probe
-	for _, probe := range k8sProbes {
+	for _, probe := range probes {
 		probeDetail.Name = probe.Name
-		probeDetail.Type = "K8sProbe"
-		SetProbeIntialStatus(&probeDetail, probe.Mode)
-		probeDetails = append(probeDetails, probeDetail)
-	}
-
-	// set the probe details for http probe
-	for _, probe := range httpProbes {
-		probeDetail.Name = probe.Name
-		probeDetail.Type = "HTTPProbe"
-		SetProbeIntialStatus(&probeDetail, probe.Mode)
-		probeDetails = append(probeDetails, probeDetail)
-	}
-
-	// set the probe details for cmd probe
-	for _, probe := range cmdProbes {
-		probeDetail.Name = probe.Name
-		probeDetail.Type = "CmdProbe"
+		probeDetail.Type = probe.Type
 		SetProbeIntialStatus(&probeDetail, probe.Mode)
 		probeDetails = append(probeDetails, probeDetail)
 	}
 
 	chaosresult.ProbeDetails = probeDetails
-	chaosresult.Register = map[string]string{}
+	chaosresult.ProbeArtifacts = map[string]types.ProbeArtifact{}
 
 	return nil
 }

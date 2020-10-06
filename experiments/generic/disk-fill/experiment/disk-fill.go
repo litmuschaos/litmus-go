@@ -1,4 +1,4 @@
-package main
+package experiment
 
 import (
 	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/disk-fill/lib"
@@ -14,16 +14,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func init() {
-	// Log as JSON instead of the default ASCII formatter.
-	logrus.SetFormatter(&logrus.TextFormatter{
-		FullTimestamp:          true,
-		DisableSorting:         true,
-		DisableLevelTruncation: true,
-	})
-}
-
-func main() {
+// DiskFill inject the disk-fill chaos
+func DiskFill() {
 
 	var err error
 	experimentsDetails := experimentTypes.ExperimentDetails{}

@@ -1,11 +1,12 @@
-package main
+package experiment
 
 import (
-	pumbaLIB "github.com/litmuschaos/litmus-go/chaoslib/pumba/pod-io-stress/lib"
+	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/container-kill/lib"
+	pumbaLIB "github.com/litmuschaos/litmus-go/chaoslib/pumba/container-kill/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
-	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/pod-io-stress/environment"
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-io-stress/types"
+	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/container-kill/environment"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/container-kill/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/result"
@@ -13,19 +14,10 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/sirupsen/logrus"
-	"k8s.io/klog"
 )
 
-func init() {
-	// Log as JSON instead of the default ASCII formatter.
-	logrus.SetFormatter(&logrus.TextFormatter{
-		FullTimestamp:          true,
-		DisableSorting:         true,
-		DisableLevelTruncation: true,
-	})
-}
-
-func main() {
+// ContainerKill inject the container-kill chaos
+func ContainerKill() {
 
 	var err error
 	experimentsDetails := experimentTypes.ExperimentDetails{}
@@ -57,7 +49,7 @@ func main() {
 	err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT")
 	if err != nil {
 		log.Errorf("Unable to Create the Chaos Result, err: %v", err)
-		failStep := "Updating the chaos result of " + experimentsDetails.ExperimentName + " experiment (SOT)"
+		failStep := "Updating the chaos result of container-kill experiment (SOT)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -72,12 +64,9 @@ func main() {
 
 	//DISPLAY THE APP INFORMATION
 	log.InfoWithValues("The application information is as follows", logrus.Fields{
-		"Namespace":                       experimentsDetails.AppNS,
-		"Label":                           experimentsDetails.AppLabel,
-		"Chaos Duration":                  experimentsDetails.ChaosDuration,
-		"Ramp Time":                       experimentsDetails.RampTime,
-		"FilesystemUtilizationPercentage": experimentsDetails.FilesystemUtilizationPercentage,
-		"NumberOfWorkers":                 experimentsDetails.NumberOfWorkers,
+		"Namespace": experimentsDetails.AppNS,
+		"Label":     experimentsDetails.AppLabel,
+		"Ramp Time": experimentsDetails.RampTime,
 	})
 
 	// Calling AbortWatcher go routine, it will continuously watch for the abort signal for the entire chaos duration and generate the required events and result
@@ -118,29 +107,35 @@ func main() {
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
-	// Including the litmus lib for pod-io-stress
-	if experimentsDetails.ChaosLib == "pumba" {
-		err = pumbaLIB.PreparePodIOStress(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
+	// Including the litmus lib for container-kill
+	if experimentsDetails.ChaosLib == "litmus" && (experimentsDetails.ContainerRuntime == "containerd" || experimentsDetails.ContainerRuntime == "crio") {
+		err = litmusLIB.PrepareContainerKill(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
 		if err != nil {
-			log.Errorf("[Error]: pod io stress chaos failed, err: %v", err)
 			failStep := "failed in chaos injection phase"
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-			return
+			log.Fatalf("Chaos injection failed, err: %v", err)
 		}
-		log.Info("[Confirmation]: Disk of the application pod has been stressed successfully")
-		resultDetails.Verdict = "Pass"
+	} else if experimentsDetails.ChaosLib == "litmus" && experimentsDetails.ContainerRuntime == "docker" {
+		err = pumbaLIB.PrepareContainerKill(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
+		if err != nil {
+			failStep := "failed in chaos injection phase"
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+			log.Fatalf("Chaos injection failed, err: %v", err)
+		}
 	} else {
-		log.Error("[Invalid]: Please Provide the correct LIB")
-		failStep := "no match found for specified lib"
+		failStep := "lib and container-runtime combination not supported!"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-		return
+		log.Fatal("lib and container-runtime combination not supported, provide the correct value of lib & container-runtime")
 	}
+
+	log.Infof("[Confirmation]: %v chaos has been injected successfully", experimentsDetails.ExperimentName)
+	resultDetails.Verdict = "Pass"
 
 	//POST-CHAOS APPLICATION STATUS CHECK
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (post-chaos)")
 	err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 	if err != nil {
-		klog.V(0).Infof("Application status check failed, err: %v", err)
+		log.Errorf("Application status check failed, err: %v", err)
 		failStep := "Verify that the AUT (Application Under Test) is running (post-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
@@ -185,6 +180,7 @@ func main() {
 		reason = types.FailVerdict
 		eventType = "Warning"
 	}
+
 	types.SetResultEventAttributes(&eventsDetails, reason, msg, eventType, &resultDetails)
 	events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosResult")
 

@@ -28,7 +28,7 @@ func ChaosResult(chaosDetails *types.ChaosDetails, clients clients.ClientSets, r
 		Try(func(attempt uint) error {
 			result, err := clients.LitmusClient.ChaosResults(chaosDetails.ChaosNamespace).List(metav1.ListOptions{LabelSelector: "name=" + resultDetails.Name})
 			if err != nil {
-				return errors.Errorf("Unable to list the chaosresult, err: %v", err)
+				return errors.Errorf("Unable to find the chaosresult with matching labels, err: %v", err)
 			}
 			resultList = result
 			return nil
@@ -95,7 +95,7 @@ func InitializeChaosResult(chaosDetails *types.ChaosDetails, clients clients.Cli
 	if k8serrors.IsAlreadyExists(err) {
 		chaosResult, err = clients.LitmusClient.ChaosResults(chaosDetails.ChaosNamespace).Get(resultDetails.Name, metav1.GetOptions{})
 		if err != nil {
-			return errors.Errorf("Unable to get the chaosresult, err: %v", err)
+			return errors.Errorf("Unable to find the chaosresult with name %v, err: %v", resultDetails.Name, err)
 		}
 		// adding the labels to the chaosresult
 		chaosResult.ObjectMeta.Labels = map[string]string{

@@ -103,11 +103,12 @@ func CheckForAvailibiltyOfPod(namespace, name string, clients clients.ClientSets
 
 //GetPodList check for the availibilty of the target pod for the chaos execution
 // if the target pod is not defined it will derive the random target pod list using pod affected percentage
-func GetPodList(namespace, targetPod, appLabels string, podAffPerc int, clients clients.ClientSets) (core_v1.PodList, error) {
+func GetPodList(namespace, targetPod, appLabels, uid string, podAffPerc int, clients clients.ClientSets) (core_v1.PodList, error) {
 	realpods := core_v1.PodList{}
+	nonChaosPods := core_v1.PodList{}
 	podList, err := clients.KubeClient.CoreV1().Pods(namespace).List(v1.ListOptions{LabelSelector: appLabels})
 	if err != nil || len(podList.Items) == 0 {
-		return core_v1.PodList{}, errors.Wrapf(err, "Failed to list the application pod in %v namespace", namespace)
+		return core_v1.PodList{}, errors.Wrapf(err, "Failed to find the pod with matching labels in %v namespace", namespace)
 	}
 
 	isPodAvailable, err := CheckForAvailibiltyOfPod(namespace, targetPod, clients)
@@ -124,15 +125,29 @@ func GetPodList(namespace, targetPod, appLabels string, podAffPerc int, clients 
 		}
 		realpods.Items = append(realpods.Items, *pod)
 	} else {
-		newPodListLength := math.Maximum(1, math.Adjustment(podAffPerc, len(podList.Items)))
+
+		if appLabels == "" {
+			// ignore chaos pods
+			for index, pod := range podList.Items {
+				if !(pod.Labels["chaosUID"] == uid || pod.Labels["name"] == "chaos-operator") {
+					nonChaosPods.Items = append(nonChaosPods.Items, podList.Items[index])
+				}
+
+			}
+
+		} else {
+			nonChaosPods.Items = podList.Items
+		}
+
+		newPodListLength := math.Maximum(1, math.Adjustment(podAffPerc, len(nonChaosPods.Items)))
 		rand.Seed(time.Now().UnixNano())
 
 		// it will generate the random podlist
 		// it starts from the random index and choose requirement no of pods next to that index in a circular way.
-		index := rand.Intn(len(podList.Items))
+		index := rand.Intn(len(nonChaosPods.Items))
 		for i := 0; i < newPodListLength; i++ {
-			realpods.Items = append(realpods.Items, podList.Items[index])
-			index = (index + 1) % len(podList.Items)
+			realpods.Items = append(realpods.Items, nonChaosPods.Items[index])
+			index = (index + 1) % len(nonChaosPods.Items)
 		}
 
 		log.Infof("[Chaos]:Number of pods targeted: %v", strconv.Itoa(newPodListLength))
@@ -155,7 +170,7 @@ func GetChaosPodAnnotation(podName, namespace string, clients clients.ClientSets
 func GetNodeName(namespace, labels string, clients clients.ClientSets) (string, error) {
 	podList, err := clients.KubeClient.CoreV1().Pods(namespace).List(v1.ListOptions{LabelSelector: labels})
 	if err != nil || len(podList.Items) == 0 {
-		return "", errors.Wrapf(err, "Failed to get the application pod in %v namespace, err: %v", namespace, err)
+		return "", errors.Wrapf(err, "Failed to find the application pods with matching labels in %v namespace, err: %v", namespace, err)
 	}
 
 	rand.Seed(time.Now().Unix())

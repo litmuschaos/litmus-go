@@ -32,7 +32,17 @@ type ResultDetails struct {
 	ResultUID        clientTypes.UID
 	ProbeDetails     []ProbeDetails
 	PassedProbeCount int
-	Register         map[string]string
+	ProbeArtifacts   map[string]ProbeArtifact
+}
+
+// ProbeArtifact contains the probe artifacts
+type ProbeArtifact struct {
+	ProbeArtifacts RegisterDetails
+}
+
+// RegisterDetails contains the output of the corresponding probe
+type RegisterDetails struct {
+	Register string
 }
 
 // ProbeDetails is for collecting all the probe details

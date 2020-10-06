@@ -1,4 +1,4 @@
-package main
+package experiment
 
 import (
 	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/pod-cpu-hog/lib"
@@ -17,16 +17,8 @@ import (
 	"k8s.io/klog"
 )
 
-func init() {
-	// Log as JSON instead of the default ASCII formatter.
-	logrus.SetFormatter(&logrus.TextFormatter{
-		FullTimestamp:          true,
-		DisableSorting:         true,
-		DisableLevelTruncation: true,
-	})
-}
-
-func main() {
+// PodCPUHog inject the pod-cpu-hog chaos
+func PodCPUHog() {
 
 	var err error
 	experimentsDetails := experimentTypes.ExperimentDetails{}
