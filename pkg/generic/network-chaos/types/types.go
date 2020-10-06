@@ -37,4 +37,5 @@ type ExperimentDetails struct {
 	ContainerRuntime                   string
 	ChaosServiceAccount                string
 	SocketPath                         string
+	Sequence                           string
 }
