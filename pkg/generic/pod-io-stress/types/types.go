@@ -27,4 +27,5 @@ type ExperimentDetails struct {
 	Annotations                     map[string]string
 	LIBImage                        string
 	PodsAffectedPerc                int
+	Sequence                        string
 }

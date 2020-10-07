@@ -31,6 +31,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.NumberOfWorkers, _ = strconv.Atoi(Getenv("NUMBER_OF_WORKERS", "4"))
 	experimentDetails.LIBImage = Getenv("LIB_IMAGE", "gaiaadm/pumba")
 	experimentDetails.PodsAffectedPerc, _ = strconv.Atoi(Getenv("PODS_AFFECTED_PERC", "0"))
+	experimentDetails.Sequence = Getenv("SEQUENCE", "parallel")
 
 }
 

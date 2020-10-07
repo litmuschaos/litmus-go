@@ -56,6 +56,58 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 		return errors.Errorf("unable to get annotations, err: %v", err)
 	}
 
+	if experimentsDetails.Sequence == "serial" {
+		if err = InjectChaosInSerialMode(experimentsDetails, targetPodList, clients, chaosDetails, args); err != nil {
+			return err
+		}
+	} else {
+		if err = InjectChaosInParallelMode(experimentsDetails, targetPodList, clients, chaosDetails, args); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// InjectChaosInSerialMode inject the network chaos in all target application serially (one by one)
+func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, args string) error {
+
+	// creating the helper pod to perform network chaos
+	for _, pod := range targetPodList.Items {
+		runID := common.GetRunID()
+		err = CreateHelperPod(experimentsDetails, clients, pod.Name, pod.Spec.NodeName, runID, args)
+		if err != nil {
+			return errors.Errorf("Unable to create the helper pod, err: %v", err)
+		}
+
+		//checking the status of the helper pods, wait till the pod comes to running state else fail the experiment
+		log.Info("[Status]: Checking the status of the helper pods")
+		err = status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, "app="+experimentsDetails.ExperimentName+"-helper", experimentsDetails.Timeout, experimentsDetails.Delay, clients)
+		if err != nil {
+			return errors.Errorf("helper pods are not in running state, err: %v", err)
+		}
+
+		// Wait till the completion of the helper pod
+		// set an upper limit for the waiting time
+		log.Info("[Wait]: waiting till the completion of the helper pod")
+		podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, "app="+experimentsDetails.ExperimentName+"-helper", clients, experimentsDetails.ChaosDuration+60, experimentsDetails.ExperimentName)
+		if err != nil || podStatus == "Failed" {
+			return errors.Errorf("helper pod failed due to, err: %v", err)
+		}
+
+		//Deleting all the helper pod for container-kill chaos
+		log.Info("[Cleanup]: Deleting the the helper pod")
+		err = common.DeletePod(experimentsDetails.ExperimentName+"-"+runID, "app="+experimentsDetails.ExperimentName+"-helper", experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients)
+		if err != nil {
+			return errors.Errorf("Unable to delete the helper pods, err: %v", err)
+		}
+	}
+
+	return nil
+}
+
+// InjectChaosInParallelMode inject the network chaos in all target application in parallel mode (all at once)
+func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, args string) error {
+
 	// creating the helper pod to perform network chaos
 	for _, pod := range targetPodList.Items {
 		runID := common.GetRunID()
