@@ -15,19 +15,13 @@ import (
 )
 
 // DiskFill inject the disk-fill chaos
-func DiskFill() {
+func DiskFill(clients clients.ClientSets) {
 
 	var err error
 	experimentsDetails := experimentTypes.ExperimentDetails{}
 	resultDetails := types.ResultDetails{}
 	eventsDetails := types.EventDetails{}
-	clients := clients.ClientSets{}
 	chaosDetails := types.ChaosDetails{}
-
-	//Getting kubeConfig and Generate ClientSets
-	if err := clients.GenerateClientSetFromKubeConfig(); err != nil {
-		log.Fatalf("Unable to Get the kubeconfig, err: %v", err)
-	}
 
 	//Fetching all the ENV passed from the runner pod
 	log.Infof("[PreReq]: Getting the ENV for the %v experiment", experimentsDetails.ExperimentName)

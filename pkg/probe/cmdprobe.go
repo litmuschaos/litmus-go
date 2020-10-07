@@ -29,7 +29,7 @@ import (
 func PrepareCmdProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, phase string, eventsDetails *types.EventDetails) error {
 
 	//DISPLAY THE cmd PROBE INFO
-	if !((probe.Mode == "SOT" || probe.Mode == "Continuous") && phase == "PreChaos") {
+	if EligibleForPrint(probe.Mode, phase) {
 		log.InfoWithValues("[Probe]: The cmd probe information is as follows", logrus.Fields{
 			"Name":            probe.Name,
 			"Command":         probe.CmdProbeInputs.Command,
@@ -37,6 +37,7 @@ func PrepareCmdProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets,
 			"Source":          probe.CmdProbeInputs.Source,
 			"Run Properties":  probe.RunProperties,
 			"Mode":            probe.Mode,
+			"Phase":           phase,
 		})
 	}
 
@@ -160,6 +161,8 @@ func PrepareCmdProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets,
 // TriggerInlineCmdProbe trigger the cmd probe and storing the output into the out buffer
 func TriggerInlineCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails) error {
 
+	// It parse the templated command and return normal string
+	// if command doesn't have template, it will return the same command
 	if err = ParseCommand(&probe, resultDetails); err != nil {
 		return err
 	}
@@ -188,7 +191,6 @@ func TriggerInlineCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.
 			probes := types.ProbeArtifact{}
 			probes.ProbeArtifacts.Register = strings.TrimSpace(out.String())
 			resultDetails.ProbeArtifacts[probe.Name] = probes
-			log.Infof("data: %v", resultDetails.ProbeArtifacts)
 			return nil
 		})
 	return err
@@ -197,6 +199,8 @@ func TriggerInlineCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.
 // TriggerSourceCmdProbe trigger the cmd probe inside the external pod
 func TriggerSourceCmdProbe(probe v1alpha1.ProbeAttributes, execCommandDetails litmusexec.PodDetails, clients clients.ClientSets, resultDetails *types.ResultDetails) error {
 
+	// It parse the templated command and return normal string
+	// if command doesn't have template, it will return the same command
 	if err = ParseCommand(&probe, resultDetails); err != nil {
 		return err
 	}
@@ -224,7 +228,6 @@ func TriggerSourceCmdProbe(probe v1alpha1.ProbeAttributes, execCommandDetails li
 			probes := types.ProbeArtifact{}
 			probes.ProbeArtifacts.Register = strings.TrimSpace(output)
 			resultDetails.ProbeArtifacts[probe.Name] = probes
-			log.Infof("data: %v", resultDetails.ProbeArtifacts)
 			return nil
 		})
 	return err
@@ -351,6 +354,7 @@ func TriggerSourceContinuousCmdProbe(probe v1alpha1.ProbeAttributes, execCommand
 }
 
 // ParseCommand parse the templated command and replace the templated value by actual value
+// if command doesn't have template, it will return the same command
 func ParseCommand(probe *v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails) error {
 
 	register := resultDetails.ProbeArtifacts

@@ -15,20 +15,14 @@ import (
 )
 
 // CasssandraPodDelete inject the cassandra-pod-delete chaos
-func CasssandraPodDelete() {
+func CasssandraPodDelete(clients clients.ClientSets) {
 
 	var err error
 	var ResourceVersionBefore string
 	experimentsDetails := experimentTypes.ExperimentDetails{}
 	resultDetails := types.ResultDetails{}
 	eventsDetails := types.EventDetails{}
-	clients := clients.ClientSets{}
 	chaosDetails := types.ChaosDetails{}
-
-	//Getting kubeConfig and Generate ClientSets
-	if err := clients.GenerateClientSetFromKubeConfig(); err != nil {
-		log.Fatalf("Unable to Get the kubeconfig, err: %v", err)
-	}
 
 	//Fetching all the ENV passed from the runner pod
 	log.Info("[PreReq]: Getting the ENV for the cassandra-pod-delete experiment")

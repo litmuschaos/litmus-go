@@ -8,21 +8,20 @@ import (
 
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-delete/types"
 	"github.com/litmuschaos/litmus-go/pkg/types"
-	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 )
 
 //GetENV fetches all the env variables from the runner pod
 func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.ExperimentName = Getenv("EXPERIMENT_NAME", "pod-delete")
-	experimentDetails.ChaosNamespace = Getenv("CHAOS_NAMESPACE", "shubham")
-	experimentDetails.EngineName = Getenv("CHAOSENGINE", "probe")
+	experimentDetails.ChaosNamespace = Getenv("CHAOS_NAMESPACE", "litmus")
+	experimentDetails.EngineName = Getenv("CHAOSENGINE", "")
 	experimentDetails.ChaosDuration, _ = strconv.Atoi(Getenv("TOTAL_CHAOS_DURATION", "30"))
 	experimentDetails.ChaosInterval, _ = strconv.Atoi(Getenv("CHAOS_INTERVAL", "10"))
 	experimentDetails.RampTime, _ = strconv.Atoi(Getenv("RAMP_TIME", "0"))
 	experimentDetails.ChaosLib = Getenv("LIB", "litmus")
 	experimentDetails.ChaosServiceAccount = Getenv("CHAOS_SERVICE_ACCOUNT", "")
-	experimentDetails.AppNS = Getenv("APP_NAMESPACE", "shubham")
-	experimentDetails.AppLabel = Getenv("APP_LABEL", "run=nginx")
+	experimentDetails.AppNS = Getenv("APP_NAMESPACE", "")
+	experimentDetails.AppLabel = Getenv("APP_LABEL", "")
 	experimentDetails.AppKind = Getenv("APP_KIND", "")
 	experimentDetails.ChaosUID = clientTypes.UID(Getenv("CHAOS_UID", ""))
 	experimentDetails.InstanceID = Getenv("INSTANCE_ID", "")

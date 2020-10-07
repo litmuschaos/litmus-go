@@ -2,7 +2,7 @@ package experiment
 
 import (
 	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/node-drain/lib"
-	clients "github.com/litmuschaos/litmus-go/pkg/clients"
+	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/node-drain/environment"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/node-drain/types"
@@ -15,19 +15,13 @@ import (
 )
 
 //NodeDrain inject the node-drain chaos
-func NodeDrain() {
+func NodeDrain(clients clients.ClientSets) {
 
 	var err error
 	experimentsDetails := experimentTypes.ExperimentDetails{}
 	resultDetails := types.ResultDetails{}
 	eventsDetails := types.EventDetails{}
-	clients := clients.ClientSets{}
 	chaosDetails := types.ChaosDetails{}
-
-	//Getting kubeConfig and Generate ClientSets
-	if err := clients.GenerateClientSetFromKubeConfig(); err != nil {
-		log.Fatalf("Unable to Get the kubeconfig, err: %v", err)
-	}
 
 	//Fetching all the ENV passed from the runner pod
 	log.Infof("[PreReq]: Getting the ENV for the %v experiment", experimentsDetails.ExperimentName)

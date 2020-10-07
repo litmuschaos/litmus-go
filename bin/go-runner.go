@@ -4,7 +4,7 @@ import (
 	"flag"
 
 	// Uncomment to load all auth plugins
-	_ "k8s.io/client-go/plugin/pkg/client/auth"
+	// _ "k8s.io/client-go/plugin/pkg/client/auth"
 	//
 	// Or uncomment to load specific auth plugins
 	// _ "k8s.io/client-go/plugin/pkg/client/auth/azure"
@@ -62,43 +62,42 @@ func main() {
 	// invoke the corresponding experiment based on the the (-name) flag
 	switch *experimentName {
 	case "container-kill":
-		containerKill.ContainerKill()
+		containerKill.ContainerKill(clients)
 	case "disk-fill":
-		diskFill.DiskFill()
+		diskFill.DiskFill(clients)
 	case "kubelet-service-kill":
-		kubeletServiceKill.KubeletServiceKill()
+		kubeletServiceKill.KubeletServiceKill(clients)
 	case "node-cpu-hog":
-		nodeCPUHog.NodeCPUHog()
+		nodeCPUHog.NodeCPUHog(clients)
 	case "node-drain":
-		nodeDrain.NodeDrain()
+		nodeDrain.NodeDrain(clients)
 	case "node-io-stress":
-		nodeIOStress.NodeIOStress()
+		nodeIOStress.NodeIOStress(clients)
 	case "node-memory-hog":
-		nodeMemoryHog.NodeMemoryHog()
+		nodeMemoryHog.NodeMemoryHog(clients)
 	case "node-taint":
-		nodeTaint.NodeTaint()
+		nodeTaint.NodeTaint(clients)
 	case "pod-autoscaler":
-		podAutoscaler.PodAutoscaler()
+		podAutoscaler.PodAutoscaler(clients)
 	case "pod-cpu-hog":
-		podCPUHog.PodCPUHog()
+		podCPUHog.PodCPUHog(clients)
 	case "pod-delete":
 		podDelete.PodDelete(clients)
 	case "pod-io-stress":
-		podIOStress.PodIOStress()
+		podIOStress.PodIOStress(clients)
 	case "pod-memory-hog":
-		podMemoryHog.PodMemoryHog()
+		podMemoryHog.PodMemoryHog(clients)
 	case "pod-network-corruption":
-		podNetworkCorruption.PodNetworkCorruption()
+		podNetworkCorruption.PodNetworkCorruption(clients)
 	case "pod-network-duplication":
-		podNetworkDuplication.PodNetworkDuplication()
+		podNetworkDuplication.PodNetworkDuplication(clients)
 	case "pod-network-latency":
-		podNetworkLatency.PodNetworkLatency()
+		podNetworkLatency.PodNetworkLatency(clients)
 	case "pod-network-loss":
-		podNetworkLoss.PodNetworkLoss()
+		podNetworkLoss.PodNetworkLoss(clients)
 	case "cassandra-pod-delete":
-		cassandraPodDelete.CasssandraPodDelete()
+		cassandraPodDelete.CasssandraPodDelete(clients)
 	default:
 		log.Fatalf("Unsupported -name %v, please provide the correct value of -name args", *experimentName)
 	}
-
 }
