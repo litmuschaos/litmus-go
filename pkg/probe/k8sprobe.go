@@ -20,7 +20,7 @@ import (
 // k8s probe can be used to add the probe which needs client-go for command execution, no extra binaries/command
 func PrepareK8sProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails, clients clients.ClientSets, phase string, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
-	if !((probe.Mode == "SOT" || probe.Mode == "Continuous") && phase == "PreChaos") {
+	if EligibleForPrint(probe.Mode, phase) {
 		//DISPLAY THE K8S PROBE INFO
 		log.InfoWithValues("[Probe]: The k8s probe information is as follows", logrus.Fields{
 			"Name":            probe.Name,
@@ -28,6 +28,7 @@ func PrepareK8sProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Result
 			"Expected Result": probe.K8sProbeInputs.ExpectedResult,
 			"Run Properties":  probe.RunProperties,
 			"Mode":            probe.Mode,
+			"Phase":           phase,
 		})
 	}
 

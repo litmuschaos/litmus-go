@@ -3,6 +3,7 @@ package probe
 import (
 	"bytes"
 	"fmt"
+	"html/template"
 	"math/rand"
 	"os/exec"
 	"strings"
@@ -28,7 +29,7 @@ import (
 func PrepareCmdProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, phase string, eventsDetails *types.EventDetails) error {
 
 	//DISPLAY THE cmd PROBE INFO
-	if !((probe.Mode == "SOT" || probe.Mode == "Continuous") && phase == "PreChaos") {
+	if EligibleForPrint(probe.Mode, phase) {
 		log.InfoWithValues("[Probe]: The cmd probe information is as follows", logrus.Fields{
 			"Name":            probe.Name,
 			"Command":         probe.CmdProbeInputs.Command,
@@ -36,6 +37,7 @@ func PrepareCmdProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets,
 			"Source":          probe.CmdProbeInputs.Source,
 			"Run Properties":  probe.RunProperties,
 			"Mode":            probe.Mode,
+			"Phase":           phase,
 		})
 	}
 
@@ -48,7 +50,7 @@ func PrepareCmdProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets,
 		// if mode is Edge then independent of phase, it will trigger Probes in both Pre/Post Chaos section
 		if (probe.Mode == "SOT" && phase == "PreChaos") || (probe.Mode == "EOT" && phase == "PostChaos") || probe.Mode == "Edge" {
 
-			err = TriggerInlineCmdProbe(probe)
+			err = TriggerInlineCmdProbe(probe, resultDetails)
 
 			// failing the probe, if the success condition doesn't met after the retry & timeout combinations
 			// it will update the status of all the unrun probes as well
@@ -94,7 +96,7 @@ func PrepareCmdProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets,
 			litmusexec.SetExecCommandAttributes(&execCommandDetails, chaosDetails.ExperimentName+"-probe-"+runID, chaosDetails.ExperimentName+"-probe", chaosDetails.ChaosNamespace)
 
 			// triggering the cmd probe and storing the output into the out buffer
-			err = TriggerSourceCmdProbe(probe, execCommandDetails, clients)
+			err = TriggerSourceCmdProbe(probe, execCommandDetails, clients, resultDetails)
 
 			// failing the probe, if the success condition doesn't met after the retry & timeout combinations
 			// it will update the status of all the unrun probes as well
@@ -157,7 +159,13 @@ func PrepareCmdProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets,
 }
 
 // TriggerInlineCmdProbe trigger the cmd probe and storing the output into the out buffer
-func TriggerInlineCmdProbe(probe v1alpha1.ProbeAttributes) error {
+func TriggerInlineCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails) error {
+
+	// It parse the templated command and return normal string
+	// if command doesn't have template, it will return the same command
+	if err = ParseCommand(&probe, resultDetails); err != nil {
+		return err
+	}
 
 	// running the cmd probe command and storing the output into the out buffer
 	// it will retry for some retry count, in each iterations of try it contains following things
@@ -179,13 +187,23 @@ func TriggerInlineCmdProbe(probe v1alpha1.ProbeAttributes) error {
 				log.Warnf("The %v cmd probe has been Failed", probe.Name)
 				return fmt.Errorf("The probe output didn't match with expected output, %v", out.String())
 			}
+
+			probes := types.ProbeArtifact{}
+			probes.ProbeArtifacts.Register = strings.TrimSpace(out.String())
+			resultDetails.ProbeArtifacts[probe.Name] = probes
 			return nil
 		})
 	return err
 }
 
 // TriggerSourceCmdProbe trigger the cmd probe inside the external pod
-func TriggerSourceCmdProbe(probe v1alpha1.ProbeAttributes, execCommandDetails litmusexec.PodDetails, clients clients.ClientSets) error {
+func TriggerSourceCmdProbe(probe v1alpha1.ProbeAttributes, execCommandDetails litmusexec.PodDetails, clients clients.ClientSets, resultDetails *types.ResultDetails) error {
+
+	// It parse the templated command and return normal string
+	// if command doesn't have template, it will return the same command
+	if err = ParseCommand(&probe, resultDetails); err != nil {
+		return err
+	}
 
 	// running the cmd probe command and matching the output
 	// it will retry for some retry count, in each iterations of try it contains following things
@@ -206,6 +224,10 @@ func TriggerSourceCmdProbe(probe v1alpha1.ProbeAttributes, execCommandDetails li
 				log.Warnf("The %v cmd probe has been Failed", probe.Name)
 				return fmt.Errorf("The probe output didn't match with expected output, %v", output)
 			}
+
+			probes := types.ProbeArtifact{}
+			probes.ProbeArtifacts.Register = strings.TrimSpace(output)
+			resultDetails.ProbeArtifacts[probe.Name] = probes
 			return nil
 		})
 	return err
@@ -288,7 +310,7 @@ func TriggerInlineContinuousCmdProbe(probe v1alpha1.ProbeAttributes, chaosresult
 	// it trigger the inline cmd probe for the entire duration of chaos and it fails, if any err encounter
 	// it marked the error for the probes, if any
 	for {
-		err = TriggerInlineCmdProbe(probe)
+		err = TriggerInlineCmdProbe(probe, chaosresult)
 		// record the error inside the probeDetails, we are maintaining a dedicated variable for the err, inside probeDetails
 		if err != nil {
 			for index := range chaosresult.ProbeDetails {
@@ -312,7 +334,7 @@ func TriggerSourceContinuousCmdProbe(probe v1alpha1.ProbeAttributes, execCommand
 	// it trigger the cmd probe for the entire duration of chaos and it fails, if any err encounter
 	// it marked the error for the probes, if any
 	for {
-		err = TriggerSourceCmdProbe(probe, execCommandDetails, clients)
+		err = TriggerSourceCmdProbe(probe, execCommandDetails, clients, chaosresult)
 		// record the error inside the probeDetails, we are maintaining a dedicated variable for the err, inside probeDetails
 		if err != nil {
 			for index := range chaosresult.ProbeDetails {
@@ -329,4 +351,23 @@ func TriggerSourceContinuousCmdProbe(probe v1alpha1.ProbeAttributes, execCommand
 		time.Sleep(time.Duration(probe.RunProperties.ProbePollingInterval) * time.Second)
 	}
 
+}
+
+// ParseCommand parse the templated command and replace the templated value by actual value
+// if command doesn't have template, it will return the same command
+func ParseCommand(probe *v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails) error {
+
+	register := resultDetails.ProbeArtifacts
+
+	t := template.Must(template.New("t1").Parse(probe.CmdProbeInputs.Command))
+
+	// store the parsed output in the buffer
+	var out bytes.Buffer
+	if err = t.Execute(&out, register); err != nil {
+		return err
+	}
+
+	probe.CmdProbeInputs.Command = out.String()
+
+	return nil
 }
