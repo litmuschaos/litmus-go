@@ -1,8 +1,7 @@
-package main
+package cmd
 
 import (
 	"bytes"
-	"flag"
 	"io/ioutil"
 	"log"
 	"os"
@@ -14,11 +13,8 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-func main() {
-
-	attributeFile := flag.String("attributes", "", "metadata to generate chartserviceversion yaml")
-	generationType := flag.String("generateType", "experiment", "scaffold a new chart or experiment into existing chart")
-	flag.Parse()
+// GenerateExperiment ...
+func GenerateExperiment(attributeFile, generationType *string) {
 
 	// Fetch all the required attributes from the given file
 	// Experiment contains all the required attributes
