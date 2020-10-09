@@ -157,9 +157,10 @@ func CreatePowerfulsealDeployment(experimentsDetails *experimentTypes.Experiment
 			Name:      "powerfulseal-" + runID,
 			Namespace: experimentsDetails.ChaosNamespace,
 			Labels: map[string]string{
-				"app":      "powerfulseal",
-				"name":     "powerfulseal-" + runID,
-				"chaosUID": string(experimentsDetails.ChaosUID),
+				"app":                       "powerfulseal",
+				"name":                      "powerfulseal-" + runID,
+				"chaosUID":                  string(experimentsDetails.ChaosUID),
+				"app.kubernetes.io/part-of": "litmus",
 			},
 		},
 		Spec: appsv1.DeploymentSpec{
