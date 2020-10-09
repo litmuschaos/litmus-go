@@ -40,7 +40,15 @@ func ChaosResult(chaosDetails *types.ChaosDetails, clients clients.ClientSets, r
 
 	// if there is no chaos-result with given label, it will create a new chaos-result
 	if len(resultList.Items) == 0 {
-		return InitializeChaosResult(chaosDetails, clients, resultDetails)
+
+		// Getting chaos pod label and passing it in chaos result
+		chaosPod, err := clients.KubeClient.CoreV1().Pods(chaosDetails.ChaosNamespace).Get(chaosDetails.ChaosPodName, metav1.GetOptions{})
+		if err != nil {
+			return errors.Errorf("fail to get chaos pod err: %v", err)
+		}
+		chaosResultLabel := chaosPod.Labels
+		chaosResultLabel["name"] = resultDetails.Name
+		return InitializeChaosResult(chaosDetails, clients, resultDetails, chaosResultLabel)
 	}
 
 	for _, result := range resultList.Items {
@@ -59,16 +67,14 @@ func ChaosResult(chaosDetails *types.ChaosDetails, clients clients.ClientSets, r
 }
 
 //InitializeChaosResult create the chaos result
-func InitializeChaosResult(chaosDetails *types.ChaosDetails, clients clients.ClientSets, resultDetails *types.ResultDetails) error {
+func InitializeChaosResult(chaosDetails *types.ChaosDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, chaosResultLabel map[string]string) error {
 
 	probeStatus := GetProbeStatus(resultDetails)
 	chaosResult := &v1alpha1.ChaosResult{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      resultDetails.Name,
 			Namespace: chaosDetails.ChaosNamespace,
-			Labels: map[string]string{
-				"name": resultDetails.Name,
-			},
+			Labels:    chaosResultLabel,
 		},
 		Spec: v1alpha1.ChaosResultSpec{
 			EngineName:     chaosDetails.EngineName,
