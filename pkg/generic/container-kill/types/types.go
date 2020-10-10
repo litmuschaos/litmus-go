@@ -31,4 +31,5 @@ type ExperimentDetails struct {
 	ContainerRuntime    string
 	PodsAffectedPerc    int
 	Annotations         map[string]string
+	Sequence            string
 }

@@ -20,7 +20,7 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 
 	// Get the target pod details for the chaos execution
 	// if the target pod is not defined it will derive the random target pod list using pod affected percentage
-	targetPodList, err := common.GetPodList(experimentsDetails.AppNS, experimentsDetails.TargetPod, experimentsDetails.AppLabel, experimentsDetails.PodsAffectedPerc, clients)
+	targetPodList, err := common.GetPodList(experimentsDetails.AppNS, experimentsDetails.TargetPod, experimentsDetails.AppLabel, string(experimentsDetails.ChaosUID), experimentsDetails.PodsAffectedPerc, clients)
 	if err != nil {
 		return err
 	}
@@ -56,10 +56,68 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 		return errors.Errorf("Unable to get annotations, err: %v", err)
 	}
 
+	if experimentsDetails.Sequence == "serial" {
+		if err = InjectChaosInSerialMode(experimentsDetails, targetPodList, clients, chaosDetails); err != nil {
+			return err
+		}
+	} else {
+		if err = InjectChaosInParallelMode(experimentsDetails, targetPodList, clients, chaosDetails); err != nil {
+			return err
+		}
+	}
+
+	//Waiting for the ramp time after chaos injection
+	if experimentsDetails.RampTime != 0 {
+		log.Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", experimentsDetails.RampTime)
+		common.WaitForDuration(experimentsDetails.RampTime)
+	}
+	return nil
+}
+
+// InjectChaosInSerialMode kill the container of all target application serially (one by one)
+func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
+
 	// creating the helper pod to perform container kill chaos
 	for _, pod := range targetPodList.Items {
 		runID := common.GetRunID()
-		err = CreateHelperPod(experimentsDetails, clients, pod.Name, pod.Spec.NodeName, runID)
+		err := CreateHelperPod(experimentsDetails, clients, pod.Name, pod.Spec.NodeName, runID)
+		if err != nil {
+			return errors.Errorf("Unable to create the helper pod, err: %v", err)
+		}
+
+		//checking the status of the helper pods, wait till the pod comes to running state else fail the experiment
+		log.Info("[Status]: Checking the status of the helper pods")
+		err = status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, "app="+experimentsDetails.ExperimentName+"-helper", experimentsDetails.Timeout, experimentsDetails.Delay, clients)
+		if err != nil {
+			return errors.Errorf("helper pods are not in running state, err: %v", err)
+		}
+
+		// Wait till the completion of the helper pod
+		// set an upper limit for the waiting time
+		log.Info("[Wait]: waiting till the completion of the helper pod")
+		podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, "app="+experimentsDetails.ExperimentName+"-helper", clients, experimentsDetails.ChaosDuration+experimentsDetails.ChaosInterval+60, experimentsDetails.ExperimentName)
+		if err != nil || podStatus == "Failed" {
+			return errors.Errorf("helper pod failed, err: %v", err)
+		}
+
+		//Deleting all the helper pod for container-kill chaos
+		log.Info("[Cleanup]: Deleting all the helper pods")
+		err = common.DeletePod(experimentsDetails.ExperimentName+"-"+runID, "app="+experimentsDetails.ExperimentName+"-helper", experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients)
+		if err != nil {
+			return errors.Errorf("Unable to delete the helper pod, err: %v", err)
+		}
+	}
+	return nil
+
+}
+
+// InjectChaosInParallelMode kill the container of all target application in parallel mode (all at once)
+func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
+
+	// creating the helper pod to perform container kill chaos
+	for _, pod := range targetPodList.Items {
+		runID := common.GetRunID()
+		err := CreateHelperPod(experimentsDetails, clients, pod.Name, pod.Spec.NodeName, runID)
 		if err != nil {
 			return errors.Errorf("Unable to create the helper pod, err: %v", err)
 		}
@@ -67,7 +125,7 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 
 	//checking the status of the helper pods, wait till the pod comes to running state else fail the experiment
 	log.Info("[Status]: Checking the status of the helper pods")
-	err = status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, "app="+experimentsDetails.ExperimentName+"-helper", experimentsDetails.Timeout, experimentsDetails.Delay, clients)
+	err := status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, "app="+experimentsDetails.ExperimentName+"-helper", experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 	if err != nil {
 		return errors.Errorf("helper pods are not in running state, err: %v", err)
 	}
@@ -87,12 +145,8 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 		return errors.Errorf("Unable to delete the helper pod, err: %v", err)
 	}
 
-	//Waiting for the ramp time after chaos injection
-	if experimentsDetails.RampTime != 0 {
-		log.Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", experimentsDetails.RampTime)
-		common.WaitForDuration(experimentsDetails.RampTime)
-	}
 	return nil
+
 }
 
 //GetIterations derive the iterations value from given parameters
@@ -139,9 +193,10 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 			Name:      experimentsDetails.ExperimentName + "-" + runID,
 			Namespace: experimentsDetails.ChaosNamespace,
 			Labels: map[string]string{
-				"app":      experimentsDetails.ExperimentName + "-helper",
-				"name":     experimentsDetails.ExperimentName + "-" + runID,
-				"chaosUID": string(experimentsDetails.ChaosUID),
+				"app":                       experimentsDetails.ExperimentName + "-helper",
+				"name":                      experimentsDetails.ExperimentName + "-" + runID,
+				"chaosUID":                  string(experimentsDetails.ChaosUID),
+				"app.kubernetes.io/part-of": "litmus",
 			},
 			Annotations: experimentsDetails.Annotations,
 		},

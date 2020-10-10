@@ -31,34 +31,6 @@ func ClusterHealthCheck(experimentsDetails *experimentTypes.ExperimentDetails, c
 		return err
 	}
 
-	// log.Info("[Status]: Obtain pod name of any one of the zookeeper pods")
-	// ZookeeperPodName, err := GetRandomPodName(experimentsDetails.ZookeeperNamespace, experimentsDetails.ZookeeperLabel, clients)
-	// if err != nil {
-	// 	return err
-	// }
-
-	// log.Info("[Status]: Obtain the desired replica count of the Kafka statefulset")
-	// ReplicaCount, err := GetReplicaCount(experimentsDetails.KafkaNamespace, experimentsDetails.KafkaLabel, clients)
-	// if err != nil {
-	// 	return err
-	// }
-
-	// if experimentsDetails.KafkaInstanceName != "" {
-
-	// 	// It will contains all the pod & container details required for exec command
-	// 	execCommandDetails := litmusexec.PodDetails{}
-	// 	command := append([]string{"/bin/sh", "-c"}, "zkCli.sh -server "+experimentsDetails.ZookeeperService+":"+experimentsDetails.ZookeeperPort+"/"+experimentsDetails.KafkaInstanceName+" ls /brokers/ids | tail -n 1 | tr -d '[],' | tr ' ' '\n'  | wc -l")
-	// 	litmusexec.SetExecCommandAttributes(&execCommandDetails, ZookeeperPodName, "kubernetes-zookeeper", experimentsDetails.KafkaNamespace)
-	// 	kafkaAvailableBrokers, err := litmusexec.Exec(&execCommandDetails, clients, command)
-	// 	if err != nil {
-	// 		return errors.Errorf("Unable to get kafka available brokers details err: %v", err)
-	// 	}
-	// 	if !strings.Contains(strings.TrimSpace(kafkaAvailableBrokers), strconv.Itoa(ReplicaCount)) {
-	// 		return errors.Errorf("All Kafka brokers are not alive")
-	// 	}
-	// 	log.Info("[Status]: All Kafka brokers are alive")
-	// }
-
 	return nil
 }
 
@@ -67,7 +39,7 @@ func GetRandomPodName(PodNamespace, PodLabel string, clients clients.ClientSets)
 
 	podList, err := clients.KubeClient.CoreV1().Pods(PodNamespace).List(metav1.ListOptions{LabelSelector: PodLabel})
 	if err != nil {
-		return "", errors.Errorf("unable to get the pods err: %v", err)
+		return "", errors.Errorf("unable to find the pods err: %v", err)
 	}
 	rand.Seed(time.Now().Unix())
 	randomIndex := rand.Intn(len(podList.Items))
@@ -78,7 +50,7 @@ func GetRandomPodName(PodNamespace, PodLabel string, clients clients.ClientSets)
 func GetReplicaCount(PodNamespace, PodLabel string, clients clients.ClientSets) (int, error) {
 	PodList, err := clients.KubeClient.CoreV1().Pods(PodNamespace).List(metav1.ListOptions{LabelSelector: PodLabel})
 	if err != nil {
-		return 0, errors.Errorf("Unable to get the pods err: %v", err)
+		return 0, errors.Errorf("Unable to find the pods err: %v", err)
 	}
 
 	return len(PodList.Items), nil

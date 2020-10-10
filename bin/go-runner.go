@@ -5,7 +5,7 @@ import (
 
 	// Uncomment to load all auth plugins
 	// _ "k8s.io/client-go/plugin/pkg/client/auth"
-	//
+
 	// Or uncomment to load specific auth plugins
 	// _ "k8s.io/client-go/plugin/pkg/client/auth/azure"
 	// _ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
@@ -32,6 +32,7 @@ import (
 	podNetworkLoss "github.com/litmuschaos/litmus-go/experiments/generic/pod-network-loss/experiment"
 	kafkaBrokerPodFailure "github.com/litmuschaos/litmus-go/experiments/kafka/kafka-broker-pod-failure/experiment"
 
+	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/sirupsen/logrus"
 )
@@ -47,54 +48,59 @@ func init() {
 
 func main() {
 
+	clients := clients.ClientSets{}
+
 	// parse the experiment name
 	experimentName := flag.String("name", "pod-delete", "name of the chaos experiment")
-	flag.Parse()
+
+	//Getting kubeConfig and Generate ClientSets
+	if err := clients.GenerateClientSetFromKubeConfig(); err != nil {
+		log.Fatalf("Unable to Get the kubeconfig, err: %v", err)
+	}
 
 	log.Infof("Experiment Name: %v", *experimentName)
 
 	// invoke the corresponding experiment based on the the (-name) flag
 	switch *experimentName {
 	case "container-kill":
-		containerKill.ContainerKill()
+		containerKill.ContainerKill(clients)
 	case "disk-fill":
-		diskFill.DiskFill()
-	case "kubelet-service-kill":
-		kubeletServiceKill.KubeletServiceKill()
-	case "node-cpu-hog":
-		nodeCPUHog.NodeCPUHog()
-	case "node-drain":
-		nodeDrain.NodeDrain()
-	case "node-io-stress":
-		nodeIOStress.NodeIOStress()
-	case "node-memory-hog":
-		nodeMemoryHog.NodeMemoryHog()
-	case "node-taint":
-		nodeTaint.NodeTaint()
-	case "pod-autoscaler":
-		podAutoscaler.PodAutoscaler()
-	case "pod-cpu-hog":
-		podCPUHog.PodCPUHog()
-	case "pod-delete":
-		podDelete.PodDelete()
-	case "pod-io-stress":
-		podIOStress.PodIOStress()
-	case "pod-memory-hog":
-		podMemoryHog.PodMemoryHog()
-	case "pod-network-corruption":
-		podNetworkCorruption.PodNetworkCorruption()
-	case "pod-network-duplication":
-		podNetworkDuplication.PodNetworkDuplication()
-	case "pod-network-latency":
-		podNetworkLatency.PodNetworkLatency()
-	case "pod-network-loss":
-		podNetworkLoss.PodNetworkLoss()
-	case "cassandra-pod-delete":
-		cassandraPodDelete.CasssandraPodDelete()
+		diskFill.DiskFill(clients)
 	case "kafka-broker-pod-failure":
-		kafkaBrokerPodFailure.KafkaBrokerPodFailure()
+		kafkaBrokerPodFailure.KafkaBrokerPodFailure(clients)
+	case "kubelet-service-kill":
+		kubeletServiceKill.KubeletServiceKill(clients)
+	case "node-cpu-hog":
+		nodeCPUHog.NodeCPUHog(clients)
+	case "node-drain":
+		nodeDrain.NodeDrain(clients)
+	case "node-io-stress":
+		nodeIOStress.NodeIOStress(clients)
+	case "node-memory-hog":
+		nodeMemoryHog.NodeMemoryHog(clients)
+	case "node-taint":
+		nodeTaint.NodeTaint(clients)
+	case "pod-autoscaler":
+		podAutoscaler.PodAutoscaler(clients)
+	case "pod-cpu-hog":
+		podCPUHog.PodCPUHog(clients)
+	case "pod-delete":
+		podDelete.PodDelete(clients)
+	case "pod-io-stress":
+		podIOStress.PodIOStress(clients)
+	case "pod-memory-hog":
+		podMemoryHog.PodMemoryHog(clients)
+	case "pod-network-corruption":
+		podNetworkCorruption.PodNetworkCorruption(clients)
+	case "pod-network-duplication":
+		podNetworkDuplication.PodNetworkDuplication(clients)
+	case "pod-network-latency":
+		podNetworkLatency.PodNetworkLatency(clients)
+	case "pod-network-loss":
+		podNetworkLoss.PodNetworkLoss(clients)
+	case "cassandra-pod-delete":
+		cassandraPodDelete.CasssandraPodDelete(clients)
 	default:
 		log.Fatalf("Unsupported -name %v, please provide the correct value of -name args", *experimentName)
 	}
-
 }

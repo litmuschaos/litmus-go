@@ -29,4 +29,5 @@ type ExperimentDetails struct {
 	TargetPod        string
 	PodsAffectedPerc int
 	Annotations      map[string]string
+	Sequence         string
 }

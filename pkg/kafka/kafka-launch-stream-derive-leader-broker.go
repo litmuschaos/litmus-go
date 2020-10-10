@@ -22,11 +22,7 @@ func LaunchStreamDeriveLeader(experimentsDetails *experimentTypes.ExperimentDeta
 // SelectBroker will select leader broker as per the liveness topic (partition)
 func SelectBroker(experimentsDetails *experimentTypes.ExperimentDetails, LivenessTopicLeader string, clients clients.ClientSets) (string, error) {
 	if experimentsDetails.KafkaLivenessStream == "enabled" {
-
 		return LivenessTopicLeader, nil
-	} else if experimentsDetails.KafkaLivenessStream != "enabled" {
-		return "", nil
 	}
-
 	return "", nil
 }

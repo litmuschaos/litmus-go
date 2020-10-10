@@ -19,7 +19,7 @@ import (
 // http probe can be used to add the probe which will send a request to given url and match the status code
 func PrepareHTTPProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, phase string, eventsDetails *types.EventDetails) error {
 
-	if !((probe.Mode == "SOT" || probe.Mode == "Continuous") && phase == "PreChaos") {
+	if EligibleForPrint(probe.Mode, phase) {
 		//DISPLAY THE K8S PROBE INFO
 		log.InfoWithValues("[Probe]: The http probe information is as follows", logrus.Fields{
 			"Name":                     probe.Name,
@@ -27,6 +27,7 @@ func PrepareHTTPProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets
 			"Expecected Response Code": probe.HTTPProbeInputs.ExpectedResponseCode,
 			"Run Properties":           probe.RunProperties,
 			"Mode":                     probe.Mode,
+			"Phase":                    phase,
 		})
 	}
 

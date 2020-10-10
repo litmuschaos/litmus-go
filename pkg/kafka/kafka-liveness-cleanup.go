@@ -10,15 +10,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// LivenessCleanup will generate kafka liveness deployment on the basic of given condition
+// LivenessCleanup will delete the kafka liveness deployment
 func LivenessCleanup(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) error {
-	var err error
 
+	var err error
 	err = DeleteLivenessPod(experimentsDetails, clients)
 	if err != nil {
 		return err
 	}
-
 	return nil
 }
 
