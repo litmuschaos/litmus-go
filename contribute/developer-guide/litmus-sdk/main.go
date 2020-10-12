@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 
 	cmd1 "github.com/litmuschaos/litmus-go/contribute/developer-guide"
 	"github.com/spf13/cobra"
@@ -10,24 +11,54 @@ import (
 func main() {
 
 	var filePath string
-	var Type string
 
-	var create = &cobra.Command{
-		Use:   "create [flags]",
+	var generate = &cobra.Command{
+		Use:   "generate [flags]",
 		Short: "Create a new custom experiment",
 		Long:  "Create a new custom experiment",
-		Args:  cobra.MaximumNArgs(0),
+		Args:  cobra.MinimumNArgs(1),
+	}
+
+	var experiment = &cobra.Command{
+		Use:                   "experiment [flags]",
+		Short:                 "Create a new custom experiment",
+		Long:                  "Create a new custom experiment",
+		Args:                  cobra.MaximumNArgs(0),
+		DisableFlagsInUseLine: true,
 		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Printf("args: %v, type: %v, filePath: %v\n", args, Type, filePath)
-			cmd1.GenerateExperiment(&filePath, &Type)
-			fmt.Println("created successfully")
+			if filePath == "" {
+				log.Fatal("Error: must specify -f")
+			}
+			if err := cmd1.GenerateExperiment(&filePath, "experiment"); err != nil {
+				log.Fatalf("error: %v", err)
+			}
+			fmt.Println("experiment created successfully")
 		},
 	}
 
-	create.Flags().StringVarP(&Type, "type", "t", "experiment", "experiment type")
-	create.Flags().StringVarP(&filePath, "file", "f", "", "file detail")
+	var chart = &cobra.Command{
+		Use:                   "chart [flags]",
+		Short:                 "Create the chart and experiment metadata",
+		Long:                  "Create the chart and experiment metadata",
+		Args:                  cobra.MaximumNArgs(0),
+		DisableFlagsInUseLine: true,
+		Run: func(cmd *cobra.Command, args []string) {
+			if filePath == "" {
+				log.Fatal("Error: must specify -f")
+			}
+			if err := cmd1.GenerateExperiment(&filePath, "chart"); err != nil {
+				log.Fatalf("error: %v", err)
+			}
+			fmt.Println("chart created successfully")
+		},
+	}
+
+	experiment.Flags().StringVarP(&filePath, "file", "f", "", "file detail")
+	chart.Flags().StringVarP(&filePath, "file", "f", "", "file detail")
 
 	var rootCmd = &cobra.Command{Use: "litmus-sdk"}
-	rootCmd.AddCommand(create)
+	generate.AddCommand(experiment)
+	generate.AddCommand(chart)
+	rootCmd.AddCommand(generate)
 	rootCmd.Execute()
 }

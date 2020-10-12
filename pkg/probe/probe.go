@@ -138,6 +138,7 @@ func InitializeProbesInChaosResultDetails(chaosDetails *types.ChaosDetails, clie
 	}
 
 	chaosresult.ProbeDetails = probeDetails
+	chaosresult.ProbeArtifacts = map[string]types.ProbeArtifact{}
 
 	return nil
 }
@@ -227,4 +228,12 @@ func CheckForErrorInContinuousProbe(resultDetails *types.ResultDetails, probeNam
 	}
 
 	return nil
+}
+
+// EligibleForPrint check whether the probe detail print is required or not
+func EligibleForPrint(mode, phase string) bool {
+	if (mode == "EOT" && phase == "PreChaos") || ((mode == "SOT" || mode == "Continuous") && phase == "PostChaos") {
+		return false
+	}
+	return true
 }

@@ -34,6 +34,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.TargetPod = Getenv("TARGET_POD", "")
 	experimentDetails.ContainerRuntime = Getenv("CONTAINER_RUNTIME", "docker")
 	experimentDetails.PodsAffectedPerc, _ = strconv.Atoi(Getenv("PODS_AFFECTED_PERC", "0"))
+	experimentDetails.Sequence = Getenv("SEQUENCE", "parallel")
 }
 
 // Getenv fetch the env and set the default value, if any

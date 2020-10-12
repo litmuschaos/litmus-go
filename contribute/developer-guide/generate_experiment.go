@@ -3,28 +3,30 @@ package cmd
 import (
 	"bytes"
 	"io/ioutil"
-	"log"
 	"os"
 	"path"
 	"path/filepath"
 	"text/template"
 
 	"github.com/litmuschaos/litmus-go/contribute/developer-guide/types"
+	"github.com/pkg/errors"
 	"gopkg.in/yaml.v2"
 )
 
 // GenerateExperiment ...
-func GenerateExperiment(attributeFile, generationType *string) {
+func GenerateExperiment(attributeFile *string, generationType string) error {
 
 	// Fetch all the required attributes from the given file
 	// Experiment contains all the required attributes
 	var experimentDetails types.Experiment
-	GetConfig(&experimentDetails, *attributeFile)
+	if err := GetConfig(&experimentDetails, *attributeFile); err != nil {
+		return err
+	}
 
 	// getting the current directory name
 	currDir, err := os.Getwd()
 	if err != nil {
-		panic(err)
+		return err
 	}
 	// generating the parent directory name
 	// so that it can be utilise to get the relative path of all files from there
@@ -35,12 +37,16 @@ func GenerateExperiment(attributeFile, generationType *string) {
 	chartDIR := litmusRootDir + "/experiments/" + experimentDetails.Category
 	CreateDirectoryIfNotPresent(chartDIR)
 
-	if *generationType == "chart" {
+	if generationType == "chart" {
 		csvFilePath := chartDIR + "/" + experimentDetails.Category + ".chartserviceversion.yaml"
-		GenerateFile(experimentDetails, csvFilePath, "./templates/chartserviceversion.tmpl")
+		if err = GenerateFile(experimentDetails, csvFilePath, "./templates/chartserviceversion.tmpl"); err != nil {
+			return err
+		}
 		packageFilePath := chartDIR + "/" + experimentDetails.Category + ".package.yaml"
-		GenerateFile(experimentDetails, packageFilePath, "./templates/package.tmpl")
-	} else if *generationType == "experiment" {
+		if err = GenerateFile(experimentDetails, packageFilePath, "./templates/package.tmpl"); err != nil {
+			return err
+		}
+	} else if generationType == "experiment" {
 
 		// creating the directory for the experiment, if not present
 		experimentDIR := chartDIR + "/" + experimentDetails.Name
@@ -68,79 +74,96 @@ func GenerateExperiment(attributeFile, generationType *string) {
 
 		// generating the experiement.go file
 		experimentFilePath := experimentDIR + "/" + experimentDetails.Name + ".go"
-		GenerateFile(experimentDetails, experimentFilePath, "./templates/experiment.tmpl")
+		if err = GenerateFile(experimentDetails, experimentFilePath, "./templates/experiment.tmpl"); err != nil {
+			return err
+		}
 
 		// generating the csv file
 		csvFilePath := experimentDIR + "/" + experimentDetails.Name + ".chartserviceversion.yaml"
-		GenerateFile(experimentDetails, csvFilePath, "./templates/chartserviceversion.tmpl")
+		if err = GenerateFile(experimentDetails, csvFilePath, "./templates/chartserviceversion.tmpl"); err != nil {
+			return err
+		}
 
 		// generating the chart file
 		chartFilePath := experimentDIR + "/" + "experiment.yaml"
-		GenerateFile(experimentDetails, chartFilePath, "./templates/experiment_custom_resource.tmpl")
+		if err = GenerateFile(experimentDetails, chartFilePath, "./templates/experiment_custom_resource.tmpl"); err != nil {
+			return err
+		}
 
 		// generating the rbac file
 		rbacFilePath := experimentDIR + "/" + "rbac.yaml"
-		GenerateFile(experimentDetails, rbacFilePath, "./templates/experiment_rbac.tmpl")
+		if err = GenerateFile(experimentDetails, rbacFilePath, "./templates/experiment_rbac.tmpl"); err != nil {
+			return err
+		}
 
 		// generating the engine file
 		engineFilePath := experimentDIR + "/" + "engine.yaml"
-		GenerateFile(experimentDetails, engineFilePath, "./templates/experiment_engine.tmpl")
+		if err = GenerateFile(experimentDetails, engineFilePath, "./templates/experiment_engine.tmpl"); err != nil {
+			return err
+		}
 
 		// generating the test deployment file
 		testDeploymentFilePath := testDIR + "/" + "test.yml"
-		GenerateFile(experimentDetails, testDeploymentFilePath, "./templates/experiment_k8s_deployment.tmpl")
+		if err = GenerateFile(experimentDetails, testDeploymentFilePath, "./templates/experiment_k8s_deployment.tmpl"); err != nil {
+			return err
+		}
 
 		// generating the chaoslib file
 		chaoslibFilePath := chaoslibDIR + "/" + experimentDetails.Name + ".go"
-		GenerateFile(experimentDetails, chaoslibFilePath, "./templates/chaoslib.tmpl")
+		if err = GenerateFile(experimentDetails, chaoslibFilePath, "./templates/chaoslib.tmpl"); err != nil {
+			return err
+		}
 
 		// generating the environment var file
 		environmentFilePath := environmentDIR + "/" + "environment.go"
-		GenerateFile(experimentDetails, environmentFilePath, "./templates/environment.tmpl")
+		if err = GenerateFile(experimentDetails, environmentFilePath, "./templates/environment.tmpl"); err != nil {
+			return err
+		}
 
 		// generating the types.go file
 		typesFilePath := typesDIR + "/" + "types.go"
-		GenerateFile(experimentDetails, typesFilePath, "./templates/types.tmpl")
+		if err = GenerateFile(experimentDetails, typesFilePath, "./templates/types.tmpl"); err != nil {
+			return err
+		}
 
 	}
-
+	return nil
 }
 
 // GetConfig load data from YAML file into a structure
 // the object of structure can be further use to bootstrap the provided template for the experiment
-func GetConfig(experimentDetails *types.Experiment, attributeFile string) *types.Experiment {
+func GetConfig(experimentDetails *types.Experiment, attributeFile string) error {
 
 	yamlFile, err := ioutil.ReadFile(attributeFile)
 	if err != nil {
-		log.Printf("Unable to read the yaml file, due to err: %v", err)
+		return errors.Errorf("Unable to read the yaml file, err: %v", err)
 	}
 	err = yaml.Unmarshal(yamlFile, experimentDetails)
 	if err != nil {
-		log.Fatalf("Unable to unmarshal due to err : %v", err)
+		return errors.Errorf("Unable to unmarshal, err: %v", err)
 	}
 
-	return experimentDetails
+	return nil
 }
 
 // GenerateFile bootstrap the file from the template
-func GenerateFile(experimentDetails types.Experiment, fileName string, templatePath string) {
+func GenerateFile(experimentDetails types.Experiment, fileName string, templatePath string) error {
 
 	// parse the experiment template
 	tpl, err := template.ParseFiles(templatePath)
 	if err != nil {
-		log.Fatalln(err)
+		return err
 	}
 	// store the bootstraped file in the buffer
 	var out bytes.Buffer
 	err = tpl.Execute(&out, experimentDetails)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	// write the date into the destination file
 	err = ioutil.WriteFile(fileName, out.Bytes(), 0644)
-	check(err)
-
+	return err
 }
 
 // CreateDirectoryIfNotPresent check for the directory and create if not present
@@ -151,11 +174,4 @@ func CreateDirectoryIfNotPresent(path string) {
 		os.Mkdir(path, 0755)
 	}
 
-}
-
-// It will check for the err to be nil
-func check(e error) {
-	if e != nil {
-		panic(e)
-	}
 }
