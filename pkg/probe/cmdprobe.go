@@ -3,7 +3,6 @@ package probe
 import (
 	"bytes"
 	"fmt"
-	"html/template"
 	"math/rand"
 	"os/exec"
 	"strings"
@@ -163,7 +162,8 @@ func TriggerInlineCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.
 
 	// It parse the templated command and return normal string
 	// if command doesn't have template, it will return the same command
-	if err = ParseCommand(&probe, resultDetails); err != nil {
+	probe.CmdProbeInputs.Command, err = ParseCommand(probe.CmdProbeInputs.Command, resultDetails)
+	if err != nil {
 		return err
 	}
 
@@ -201,7 +201,8 @@ func TriggerSourceCmdProbe(probe v1alpha1.ProbeAttributes, execCommandDetails li
 
 	// It parse the templated command and return normal string
 	// if command doesn't have template, it will return the same command
-	if err = ParseCommand(&probe, resultDetails); err != nil {
+	probe.CmdProbeInputs.Command, err = ParseCommand(probe.CmdProbeInputs.Command, resultDetails)
+	if err != nil {
 		return err
 	}
 
@@ -351,23 +352,4 @@ func TriggerSourceContinuousCmdProbe(probe v1alpha1.ProbeAttributes, execCommand
 		time.Sleep(time.Duration(probe.RunProperties.ProbePollingInterval) * time.Second)
 	}
 
-}
-
-// ParseCommand parse the templated command and replace the templated value by actual value
-// if command doesn't have template, it will return the same command
-func ParseCommand(probe *v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails) error {
-
-	register := resultDetails.ProbeArtifacts
-
-	t := template.Must(template.New("t1").Parse(probe.CmdProbeInputs.Command))
-
-	// store the parsed output in the buffer
-	var out bytes.Buffer
-	if err = t.Execute(&out, register); err != nil {
-		return err
-	}
-
-	probe.CmdProbeInputs.Command = out.String()
-
-	return nil
 }
