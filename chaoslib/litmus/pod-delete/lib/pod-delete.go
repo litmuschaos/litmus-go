@@ -47,7 +47,7 @@ func PreparePodDelete(experimentsDetails *experimentTypes.ExperimentDetails, cli
 	return nil
 }
 
-// InjectChaosInSerialMode kill the container of all target application serially (one by one)
+// InjectChaosInSerialMode delete the target application pods serial mode(one by one)
 func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, eventsDetails *types.EventDetails) error {
 
 	GracePeriod := int64(0)
@@ -116,7 +116,7 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 
 }
 
-// InjectChaosInParallelMode kill the container of all target application in parallel mode (all at once)
+// InjectChaosInParallelMode delete the target application pods in parallel mode (all at once)
 func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, eventsDetails *types.EventDetails) error {
 
 	GracePeriod := int64(0)

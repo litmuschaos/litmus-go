@@ -13,19 +13,8 @@ import (
 // LivenessCleanup will delete the kafka liveness deployment
 func LivenessCleanup(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) error {
 
-	var err error
-	err = DeleteLivenessPod(experimentsDetails, clients)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-// DeleteLivenessPod will check the deletion of liveness pod
-func DeleteLivenessPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) error {
-
 	if err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaoslibDetail.AppNS).Delete("kafka-liveness-"+experimentsDetails.RunID, &metav1.DeleteOptions{}); err != nil {
-		return errors.Errorf("Fail to delete liveness deployment, due to %v", err)
+		return errors.Errorf("Fail to delete liveness deployment, err: %v", err)
 	}
 
 	err := retry.
@@ -38,5 +27,6 @@ func DeleteLivenessPod(experimentsDetails *experimentTypes.ExperimentDetails, cl
 			}
 			return nil
 		})
+
 	return err
 }

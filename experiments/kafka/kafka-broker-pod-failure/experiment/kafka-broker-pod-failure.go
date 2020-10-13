@@ -81,7 +81,7 @@ func KafkaBrokerPodFailure(clients clients.ClientSets) {
 		if experimentsDetails.KafkaLivenessStream == "enabled" {
 			_, err := kafka.LivenessStream(&experimentsDetails, clients)
 			if err != nil {
-				log.Errorf("Liveness check failed err: %v", err)
+				log.Errorf("Liveness check failed, err: %v", err)
 				failStep := "Verify liveness check (pre-chaos)"
 				types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
 				result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
@@ -178,7 +178,7 @@ func KafkaBrokerPodFailure(clients clients.ClientSets) {
 	log.Info("[The End]: Updating the chaos result of kafka pod delete experiment (EOT)")
 	err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 	if err != nil {
-		log.Errorf("Unable to Update the Chaos Result err: %v", err)
+		log.Errorf("Unable to Update the Chaos Result, err: %v", err)
 	}
 
 	// generating the event in chaosresult to marked the verdict as pass/fail

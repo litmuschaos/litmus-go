@@ -50,7 +50,7 @@ func PreparePodDelete(kafkaDetails *kafkaTypes.ExperimentDetails, experimentsDet
 	return nil
 }
 
-// InjectChaosInSerialMode kill the container of all target application serially (one by one)
+// InjectChaosInSerialMode delete the kafka broker pods in serial mode(one by one)
 func InjectChaosInSerialMode(kafkaDetails *kafkaTypes.ExperimentDetails, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, eventsDetails *types.EventDetails) error {
 
 	GracePeriod := int64(0)
@@ -63,7 +63,7 @@ func InjectChaosInSerialMode(kafkaDetails *kafkaTypes.ExperimentDetails, experim
 		if kafkaDetails.ChaoslibDetail.TargetPod == "" {
 			err = kafka.LaunchStreamDeriveLeader(kafkaDetails, clients)
 			if err != nil {
-				return errors.Errorf("fail to derive the leader err: %v", err)
+				return errors.Errorf("fail to derive the leader, err: %v", err)
 			}
 		}
 
@@ -127,7 +127,7 @@ func InjectChaosInSerialMode(kafkaDetails *kafkaTypes.ExperimentDetails, experim
 
 }
 
-// InjectChaosInParallelMode kill the container of all target application in parallel mode (all at once)
+// InjectChaosInParallelMode delete the kafka broker pods in parallel mode (all at once)
 func InjectChaosInParallelMode(kafkaDetails *kafkaTypes.ExperimentDetails, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, eventsDetails *types.EventDetails) error {
 
 	GracePeriod := int64(0)
@@ -140,7 +140,7 @@ func InjectChaosInParallelMode(kafkaDetails *kafkaTypes.ExperimentDetails, exper
 		if kafkaDetails.ChaoslibDetail.TargetPod == "" {
 			err = kafka.LaunchStreamDeriveLeader(kafkaDetails, clients)
 			if err != nil {
-				return errors.Errorf("fail to derive the leader err: %v", err)
+				return errors.Errorf("fail to derive the leader, err: %v", err)
 			}
 		}
 

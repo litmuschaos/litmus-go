@@ -9,7 +9,7 @@ import (
 func DisplayKafkaBroker(experimentsDetails *experimentTypes.ExperimentDetails) {
 
 	if experimentsDetails.ChaoslibDetail.TargetPod != "" {
-		log.Infof("Kafka partition leader is: %v", experimentsDetails.ChaoslibDetail.TargetPod)
+		log.Infof("Kafka partition leader is %v", experimentsDetails.ChaoslibDetail.TargetPod)
 	} else if experimentsDetails.ChaoslibDetail.TargetPod == "" {
 		log.Info("kafka broker will be selected randomly across the cluster")
 	}

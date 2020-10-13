@@ -24,7 +24,7 @@ func LivenessStream(experimentsDetails *experimentTypes.ExperimentDetails, clien
 
 	podList, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.KafkaNamespace).List(metav1.ListOptions{LabelSelector: "name=kafka-liveness"})
 	if err != nil {
-		return "", errors.Errorf("unable to get the liveness stream err: %v", err)
+		return "", errors.Errorf("unable to find the liveness pod with matching labels, err: %v", err)
 	}
 	if len(podList.Items) == 0 {
 
@@ -42,7 +42,7 @@ func LivenessStream(experimentsDetails *experimentTypes.ExperimentDetails, clien
 		log.Info("[Liveness]: Confirm that the kafka liveness pod is running")
 		err = status.CheckApplicationStatus(experimentsDetails.KafkaNamespace, "name=kafka-liveness", experimentsDetails.ChaoslibDetail.Timeout, experimentsDetails.ChaoslibDetail.Delay, clients)
 		if err != nil {
-			return "", errors.Errorf("Liveness pod status check failed err: %v", err)
+			return "", errors.Errorf("Liveness pod status check failed, err: %v", err)
 		}
 	}
 
@@ -55,7 +55,7 @@ func LivenessStream(experimentsDetails *experimentTypes.ExperimentDetails, clien
 		litmusexec.SetExecCommandAttributes(&execCommandDetails, "kafka-liveness-"+experimentsDetails.RunID, "kafka-consumer", experimentsDetails.KafkaNamespace)
 		ordinality, err = litmusexec.Exec(&execCommandDetails, clients, command)
 		if err != nil {
-			return "", errors.Errorf("Unable to get ordinality details err: %v", err)
+			return "", errors.Errorf("Unable to get ordinality details, err: %v", err)
 		}
 	} else {
 		// It will contains all the pod & container details required for exec command
@@ -65,14 +65,14 @@ func LivenessStream(experimentsDetails *experimentTypes.ExperimentDetails, clien
 		litmusexec.SetExecCommandAttributes(&execCommandDetails, "kafka-liveness-"+experimentsDetails.RunID, "kafka-consumer", experimentsDetails.KafkaNamespace)
 		ordinality, err = litmusexec.Exec(&execCommandDetails, clients, command)
 		if err != nil {
-			return "", errors.Errorf("Unable to get ordinality details err: %v", err)
+			return "", errors.Errorf("Unable to get ordinality details, err: %v", err)
 		}
 	}
 
 	log.Info("[Liveness]: Determine the leader broker pod name")
 	podList, err = clients.KubeClient.CoreV1().Pods(experimentsDetails.KafkaNamespace).List(metav1.ListOptions{LabelSelector: experimentsDetails.KafkaLabel})
 	if err != nil {
-		return "", errors.Errorf("unable to get the pods err: %v", err)
+		return "", errors.Errorf("unable to find the pods with matching labels, err: %v", err)
 	}
 
 	for _, pod := range podList.Items {
@@ -102,7 +102,7 @@ func CreateLivenessPod(experimentsDetails *experimentTypes.ExperimentDetails, Ka
 		},
 		Spec: corev1.PodSpec{
 			InitContainers: []corev1.Container{
-				corev1.Container{
+				{
 					Name:  "kafka-topic-creator",
 					Image: experimentsDetails.KafkaLivenessImage,
 					Command: []string{
@@ -136,7 +136,7 @@ func CreateLivenessPod(experimentsDetails *experimentTypes.ExperimentDetails, Ka
 				},
 			},
 			Containers: []corev1.Container{
-				corev1.Container{
+				{
 					Name:  "kafka-producer",
 					Image: experimentsDetails.KafkaLivenessImage,
 					Command: []string{
@@ -160,7 +160,7 @@ func CreateLivenessPod(experimentsDetails *experimentTypes.ExperimentDetails, Ka
 					},
 					ImagePullPolicy: corev1.PullPolicy("Always"),
 				},
-				corev1.Container{
+				{
 					Name:  "kafka-consumer",
 					Image: experimentsDetails.KafkaLivenessImage,
 					Command: []string{
@@ -186,7 +186,6 @@ func CreateLivenessPod(experimentsDetails *experimentTypes.ExperimentDetails, Ka
 							Value: experimentsDetails.KafkaPort,
 						},
 					},
-					Resources:       corev1.ResourceRequirements{},
 					ImagePullPolicy: corev1.PullPolicy("Always"),
 				},
 			},
@@ -196,7 +195,7 @@ func CreateLivenessPod(experimentsDetails *experimentTypes.ExperimentDetails, Ka
 
 	_, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.KafkaNamespace).Create(LivenessPod)
 	if err != nil {
-		return errors.Errorf("Unable to create Liveness pod err: %v", err)
+		return errors.Errorf("Unable to create Liveness pod, err: %v", err)
 	}
 	return nil
 

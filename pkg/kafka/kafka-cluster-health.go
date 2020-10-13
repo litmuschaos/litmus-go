@@ -20,14 +20,14 @@ func ClusterHealthCheck(experimentsDetails *experimentTypes.ExperimentDetails, c
 	log.Info("[Status]: Verify that all kafka pods are running")
 	err = status.CheckApplicationStatus(experimentsDetails.KafkaNamespace, experimentsDetails.KafkaLabel, experimentsDetails.ChaoslibDetail.Timeout, experimentsDetails.ChaoslibDetail.Delay, clients)
 	if err != nil {
-		log.Errorf("Kafka pod status check failed err: %v", err)
+		log.Errorf("Kafka pod status check failed, err: %v", err)
 		return err
 	}
 
 	log.Info("[Status]: Verify that all zookeeper pods are running")
 	err = status.CheckApplicationStatus(experimentsDetails.ZookeeperNamespace, experimentsDetails.ZookeeperLabel, experimentsDetails.ChaoslibDetail.Timeout, experimentsDetails.ChaoslibDetail.Delay, clients)
 	if err != nil {
-		log.Errorf("Zookeeper status check failed err: %v", err)
+		log.Errorf("Zookeeper status check failed, err: %v", err)
 		return err
 	}
 
@@ -39,7 +39,7 @@ func GetRandomPodName(PodNamespace, PodLabel string, clients clients.ClientSets)
 
 	podList, err := clients.KubeClient.CoreV1().Pods(PodNamespace).List(metav1.ListOptions{LabelSelector: PodLabel})
 	if err != nil {
-		return "", errors.Errorf("unable to find the pods err: %v", err)
+		return "", errors.Errorf("unable to find the pods with matching labels, err: %v", err)
 	}
 	rand.Seed(time.Now().Unix())
 	randomIndex := rand.Intn(len(podList.Items))
@@ -50,7 +50,7 @@ func GetRandomPodName(PodNamespace, PodLabel string, clients clients.ClientSets)
 func GetReplicaCount(PodNamespace, PodLabel string, clients clients.ClientSets) (int, error) {
 	PodList, err := clients.KubeClient.CoreV1().Pods(PodNamespace).List(metav1.ListOptions{LabelSelector: PodLabel})
 	if err != nil {
-		return 0, errors.Errorf("Unable to find the pods err: %v", err)
+		return 0, errors.Errorf("Unable to find the pods with matching labels, err: %v", err)
 	}
 
 	return len(PodList.Items), nil
