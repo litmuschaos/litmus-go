@@ -24,7 +24,7 @@ func LivenessStream(experimentsDetails *experimentTypes.ExperimentDetails, clien
 
 	podList, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.KafkaNamespace).List(metav1.ListOptions{LabelSelector: "name=kafka-liveness"})
 	if err != nil {
-		return "", errors.Errorf("unable to find the liveness stream with matching labels, err: %v", err)
+		return "", errors.Errorf("unable to find the liveness pod with matching labels, err: %v", err)
 	}
 	if len(podList.Items) == 0 {
 

@@ -61,7 +61,7 @@ func CheckPodStatus(appNs string, appLabel string, timeout, delay int, clients c
 				if string(pod.Status.Phase) != "Running" {
 					return errors.Errorf("Pod is not yet in running state")
 				}
-				log.InfoWithValues("The running status of Pods are as follows", logrus.Fields{
+				log.InfoWithValues("[Status]: The running status of Pods are as follows", logrus.Fields{
 					"Pod": pod.Name, "Status": pod.Status.Phase})
 			}
 			return nil
@@ -91,7 +91,7 @@ func CheckContainerStatus(appNs string, appLabel string, timeout, delay int, cli
 					if container.Ready != true {
 						return errors.Errorf("containers are not yet in running state")
 					}
-					log.InfoWithValues("The running status of container are as follows", logrus.Fields{
+					log.InfoWithValues("[Status]: The running status of container are as follows", logrus.Fields{
 						"container": container.Name, "Pod": pod.Name, "Status": pod.Status.Phase})
 				}
 			}
@@ -131,7 +131,7 @@ func WaitForCompletion(appNs string, appLabel string, clients clients.ClientSets
 						}
 					}
 				}
-				log.InfoWithValues("The running status of Pods are as follows", logrus.Fields{
+				log.InfoWithValues("[Status]: The running status of Pods are as follows", logrus.Fields{
 					"Pod": pod.Name, "Status": podStatus})
 			}
 			return nil

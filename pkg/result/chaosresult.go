@@ -17,6 +17,7 @@ import (
 
 //ChaosResult Create and Update the chaos result
 func ChaosResult(chaosDetails *types.ChaosDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, state string) error {
+	experimentLabel := map[string]string{}
 
 	// It will list all the chaos-result with matching label
 	// it will retries until it got chaos result list or met the timeout(3 mins)
@@ -38,12 +39,14 @@ func ChaosResult(chaosDetails *types.ChaosDetails, clients clients.ClientSets, r
 		return err
 	}
 
-	// Getting chaos pod label and passing it in chaos result
-	chaosPod, err := clients.KubeClient.CoreV1().Pods(chaosDetails.ChaosNamespace).Get(chaosDetails.ChaosPodName, metav1.GetOptions{})
-	if err != nil {
-		return errors.Errorf("failed to find chaos pod with name: %v, err: %v", chaosDetails.ChaosPodName, err)
+	if chaosDetails.EngineName != "" {
+		// Getting chaos pod label and passing it in chaos result
+		chaosPod, err := clients.KubeClient.CoreV1().Pods(chaosDetails.ChaosNamespace).Get(chaosDetails.ChaosPodName, metav1.GetOptions{})
+		if err != nil {
+			return errors.Errorf("failed to find chaos pod with name: %v, err: %v", chaosDetails.ChaosPodName, err)
+		}
+		experimentLabel = chaosPod.Labels
 	}
-	experimentLabel := chaosPod.Labels
 	experimentLabel["name"] = resultDetails.Name
 
 	// if there is no chaos-result with given label, it will create a new chaos-result
