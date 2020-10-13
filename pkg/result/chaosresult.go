@@ -41,7 +41,7 @@ func ChaosResult(chaosDetails *types.ChaosDetails, clients clients.ClientSets, r
 	// Getting chaos pod label and passing it in chaos result
 	chaosPod, err := clients.KubeClient.CoreV1().Pods(chaosDetails.ChaosNamespace).Get(chaosDetails.ChaosPodName, metav1.GetOptions{})
 	if err != nil {
-		return errors.Errorf("fail to get chaos pod err: %v", err)
+		return errors.Errorf("failed to find chaos pod with name: %v, err: %v", chaosDetails.ChaosPodName, err)
 	}
 	experimentLabel := chaosPod.Labels
 	experimentLabel["name"] = resultDetails.Name
