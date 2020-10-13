@@ -1,7 +1,9 @@
 package probe
 
 import (
+	"bytes"
 	"fmt"
+	"html/template"
 
 	"github.com/kyokomi/emoji"
 	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
@@ -236,4 +238,22 @@ func EligibleForPrint(mode, phase string) bool {
 		return false
 	}
 	return true
+}
+
+// ParseCommand parse the templated command and replace the templated value by actual value
+// if command doesn't have template, it will return the same command
+func ParseCommand(templatedCommand string, resultDetails *types.ResultDetails) (string, error) {
+
+	register := resultDetails.ProbeArtifacts
+
+	t := template.Must(template.New("t1").Parse(templatedCommand))
+
+	// store the parsed output in the buffer
+	var out bytes.Buffer
+	if err = t.Execute(&out, register); err != nil {
+		return "", err
+	}
+
+	return out.String(), nil
+
 }

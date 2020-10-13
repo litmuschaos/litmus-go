@@ -38,7 +38,7 @@ func PrepareHTTPProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets
 	if (probe.Mode == "SOT" && phase == "PreChaos") || (probe.Mode == "EOT" && phase == "PostChaos") || probe.Mode == "Edge" {
 
 		// trigger the http probe
-		err = TriggerHTTPProbe(probe)
+		err = TriggerHTTPProbe(probe, resultDetails)
 
 		// failing the probe, if the success condition doesn't met after the retry & timeout combinations
 		// it will update the status of all the unrun probes as well
@@ -64,7 +64,14 @@ func PrepareHTTPProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets
 }
 
 // TriggerHTTPProbe run the http probe command
-func TriggerHTTPProbe(probe v1alpha1.ProbeAttributes) error {
+func TriggerHTTPProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails) error {
+
+	// It parse the templated url and return normal string
+	// if command doesn't have template, it will return the same command
+	probe.HTTPProbeInputs.URL, err = ParseCommand(probe.HTTPProbeInputs.URL, resultDetails)
+	if err != nil {
+		return err
+	}
 
 	// it will retry for some retry count, in each iterations of try it contains following things
 	// it contains a timeout per iteration of retry. if the timeout expires without success then it will go to next try
@@ -94,7 +101,7 @@ func TriggerContinuousHTTPProbe(probe v1alpha1.ProbeAttributes, chaosresult *typ
 	// it trigger the http probe for the entire duration of chaos and it fails, if any error encounter
 	// it marked the error for the probes, if any
 	for {
-		err = TriggerHTTPProbe(probe)
+		err = TriggerHTTPProbe(probe, chaosresult)
 		// record the error inside the probeDetails, we are maintaining a dedicated variable for the err, inside probeDetails
 		if err != nil {
 			for index := range chaosresult.ProbeDetails {
