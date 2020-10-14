@@ -124,7 +124,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 					Image:           experimentsDetails.LIBImage,
 					ImagePullPolicy: apiv1.PullAlways,
 					Command: []string{
-						"/stress-ng",
+						"stress-ng",
 					},
 					Args: GetContainerArguments(experimentsDetails),
 				},
