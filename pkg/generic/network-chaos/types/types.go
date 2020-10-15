@@ -36,5 +36,6 @@ type ExperimentDetails struct {
 	TargetHosts                        string
 	ContainerRuntime                   string
 	ChaosServiceAccount                string
-	ContainerPath                      string
+	SocketPath                         string
+	Sequence                           string
 }

@@ -49,7 +49,22 @@ spec:
             value: ''
 
           - name: LIB 
-            value: 'pumba'
+            value: 'litmus'
+
+          # provide the container runtime path
+          # applicable only for containerd and crio runtime
+          - name: SOCKET_PATH
+            value: '/run/containerd/containerd.sock'
+
+          # provide the name of container runtime
+          # it supports docker, containerd, crio
+          # default to docker
+          - name: CONTAINER_RUNTIME
+            value: 'docker'
+
+           ## percentage of total pods to target
+          - name: PODS_AFFECTED_PERC
+            value: ''
           
           - name: TARGET_POD
             value: ''

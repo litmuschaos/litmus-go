@@ -65,8 +65,6 @@ unused-package-check:
 		echo "go mod tidy checking failed!"; echo "$${tidy}"; echo; \
 	fi
 
-
-
 .PHONY: build
 build:
 
@@ -77,7 +75,7 @@ build:
 	@echo "-------------------------"
 	@echo "--> Build go-runner image" 
 	@echo "-------------------------"
-	@sudo docker buildx build --file build/litmus-go/Dockerfile --progress plane --platform linux/arm64,linux/amd64 --tag litmuschaos/go-runner:dev .
+	@sudo docker buildx build --file build/litmus-go/Dockerfile --progress plane --platform linux/arm64,linux/amd64 --tag litmuschaos/go-runner:multiarch-1.9.0 .
 	
 .PHONY: push
 push: litmus-go-push
@@ -86,7 +84,7 @@ litmus-go-push:
 	@echo "-------------------"
 	@echo "--> go-runner image" 
 	@echo "-------------------"
-	REPONAME="litmuschaos" IMGNAME="go-runner" IMGTAG="dev" ./build/push
+	REPONAME="litmuschaos" IMGNAME="go-runner" IMGTAG="multiarch-1.9.0" ./build/push
 	
 .PHONY: security-checks
 security-checks: trivy-security-check
@@ -95,6 +93,6 @@ trivy-security-check:
 	@echo "------------------------"
 	@echo "--> Trivy Security Check"
 	@echo "------------------------"
-	./trivy --exit-code 0 --severity HIGH --no-progress litmuschaos/go-runner:dev
-	./trivy --exit-code 1 --severity CRITICAL --no-progress litmuschaos/go-runner:dev
+	./trivy --exit-code 0 --severity HIGH --no-progress litmuschaos/go-runner:multiarch-1.9.0
+	./trivy --exit-code 1 --severity CRITICAL --no-progress litmuschaos/go-runner:multiarch-1.9.0
 

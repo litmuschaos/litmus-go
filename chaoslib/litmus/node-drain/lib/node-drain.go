@@ -3,14 +3,17 @@ package lib
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"os/exec"
-	"strconv"
+	"os/signal"
+	"syscall"
 	"time"
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/node-drain/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
+	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
@@ -26,7 +29,7 @@ func PrepareNodeDrain(experimentsDetails *experimentTypes.ExperimentDetails, cli
 
 	//Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
-		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", strconv.Itoa(experimentsDetails.RampTime))
+		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", experimentsDetails.RampTime)
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 
@@ -34,7 +37,7 @@ func PrepareNodeDrain(experimentsDetails *experimentTypes.ExperimentDetails, cli
 		//Select node for kubelet-service-kill
 		appNodeName, err := common.GetNodeName(experimentsDetails.AppNS, experimentsDetails.AppLabel, clients)
 		if err != nil {
-			return errors.Errorf("Unable to get the application nodename due to, err: %v", err)
+			return err
 		}
 
 		experimentsDetails.AppNode = appNodeName
@@ -56,7 +59,7 @@ func PrepareNodeDrain(experimentsDetails *experimentTypes.ExperimentDetails, cli
 	log.Info("[Status]: Verify the status of AUT after reschedule")
 	err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 	if err != nil {
-		return errors.Errorf("Application status check failed due to, err: %v", err)
+		return errors.Errorf("Application status check failed, err: %v", err)
 	}
 
 	// Verify the status of Auxiliary Applications after reschedule
@@ -64,13 +67,51 @@ func PrepareNodeDrain(experimentsDetails *experimentTypes.ExperimentDetails, cli
 		log.Info("[Status]: Verify that the Auxiliary Applications are running")
 		err = status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 		if err != nil {
-			return errors.Errorf("Auxiliary Application status check failed due to %v", err)
+			return errors.Errorf("Auxiliary Applications status check failed, err: %v", err)
 		}
 	}
 
-	// Wait for Chaos Duration
-	log.Infof("[Wait]: Waiting for the %vs chaos duration", strconv.Itoa(experimentsDetails.ChaosDuration))
-	common.WaitForDuration(experimentsDetails.ChaosDuration)
+	var endTime <-chan time.Time
+	timeDelay := time.Duration(experimentsDetails.ChaosDuration) * time.Second
+
+	log.Infof("[Chaos]: Waiting for %vs", experimentsDetails.ChaosDuration)
+
+	// signChan channel is used to transmit signal notifications.
+	signChan := make(chan os.Signal, 1)
+	// Catch and relay certain signal(s) to signChan channel.
+	signal.Notify(signChan, os.Interrupt, syscall.SIGTERM, syscall.SIGKILL)
+
+loop:
+	for {
+		endTime = time.After(timeDelay)
+		select {
+		case <-signChan:
+			log.Info("[Chaos]: Killing process started because of terminated signal received")
+			// updating the chaosresult after stopped
+			failStep := "Node Drain injection stopped!"
+			types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep)
+			result.ChaosResult(chaosDetails, clients, resultDetails, "EOT")
+
+			// generating summary event in chaosengine
+			msg := experimentsDetails.ExperimentName + " experiment has been aborted"
+			types.SetEngineEventAttributes(eventsDetails, types.Summary, msg, "Warning", chaosDetails)
+			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
+
+			// generating summary event in chaosresult
+			types.SetResultEventAttributes(eventsDetails, types.StoppedVerdict, msg, "Warning", resultDetails)
+			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosResult")
+
+			if err = UncordonNode(experimentsDetails, clients); err != nil {
+				log.Errorf("unable to uncordon node, err :%v", err)
+
+			}
+			os.Exit(1)
+		case <-endTime:
+			log.Infof("[Chaos]: Time is up for experiment: %v", experimentsDetails.ExperimentName)
+			endTime = nil
+			break loop
+		}
+	}
 
 	// Uncordon the application node
 	err = UncordonNode(experimentsDetails, clients)
@@ -80,7 +121,7 @@ func PrepareNodeDrain(experimentsDetails *experimentTypes.ExperimentDetails, cli
 
 	//Waiting for the ramp time after chaos injection
 	if experimentsDetails.RampTime != 0 {
-		log.Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", strconv.Itoa(experimentsDetails.RampTime))
+		log.Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", experimentsDetails.RampTime)
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 	return nil
@@ -106,10 +147,10 @@ func DrainNode(experimentsDetails *experimentTypes.ExperimentDetails, clients cl
 		Try(func(attempt uint) error {
 			nodeSpec, err := clients.KubeClient.CoreV1().Nodes().Get(experimentsDetails.AppNode, v1.GetOptions{})
 			if err != nil {
-				return errors.Errorf("Unable to get the %v node, err: %v", experimentsDetails.AppNode, err)
+				return err
 			}
 			if !nodeSpec.Spec.Unschedulable {
-				return errors.Errorf("Unable to drain %v node", experimentsDetails.AppNode)
+				return errors.Errorf("%v node is not in unschedulable state", experimentsDetails.AppNode)
 			}
 			return nil
 		})
@@ -137,10 +178,10 @@ func UncordonNode(experimentsDetails *experimentTypes.ExperimentDetails, clients
 		Try(func(attempt uint) error {
 			nodeSpec, err := clients.KubeClient.CoreV1().Nodes().Get(experimentsDetails.AppNode, v1.GetOptions{})
 			if err != nil {
-				return errors.Errorf("Unable to get the %v node, err: %v", experimentsDetails.AppNode, err)
+				return err
 			}
 			if nodeSpec.Spec.Unschedulable {
-				return errors.Errorf("Unable to uncordon %v node", experimentsDetails.AppNode)
+				return errors.Errorf("%v node is in unschedulable state", experimentsDetails.AppNode)
 			}
 			return nil
 		})

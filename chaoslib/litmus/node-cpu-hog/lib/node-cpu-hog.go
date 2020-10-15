@@ -25,7 +25,7 @@ func PrepareNodeCPUHog(experimentsDetails *experimentTypes.ExperimentDetails, cl
 		//Select node for kubelet-service-kill
 		appNodeName, err := common.GetNodeName(experimentsDetails.AppNS, experimentsDetails.AppLabel, clients)
 		if err != nil {
-			return errors.Errorf("Unable to get the application nodename due to, err: %v", err)
+			return err
 		}
 
 		experimentsDetails.AppNode = appNodeName
@@ -48,7 +48,7 @@ func PrepareNodeCPUHog(experimentsDetails *experimentTypes.ExperimentDetails, cl
 
 	//Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
-		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", strconv.Itoa(experimentsDetails.RampTime))
+		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", experimentsDetails.RampTime)
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 
@@ -58,10 +58,12 @@ func PrepareNodeCPUHog(experimentsDetails *experimentTypes.ExperimentDetails, cl
 		events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 	}
 
-	// Get Chaos Pod Annotation
-	experimentsDetails.Annotations, err = common.GetChaosPodAnnotation(experimentsDetails.ChaosPodName, experimentsDetails.ChaosNamespace, clients)
-	if err != nil {
-		return errors.Errorf("unable to get annotation, due to %v", err)
+	if experimentsDetails.EngineName != "" {
+		// Get Chaos Pod Annotation
+		experimentsDetails.Annotations, err = common.GetChaosPodAnnotation(experimentsDetails.ChaosPodName, experimentsDetails.ChaosNamespace, clients)
+		if err != nil {
+			return errors.Errorf("unable to get annotations, err: %v", err)
+		}
 	}
 
 	// Creating the helper pod to perform node cpu hog
@@ -78,7 +80,7 @@ func PrepareNodeCPUHog(experimentsDetails *experimentTypes.ExperimentDetails, cl
 	}
 
 	// Wait till the completion of helper pod
-	log.Infof("[Wait]: Waiting for %vs till the completion of the helper pod", strconv.Itoa(experimentsDetails.ChaosDuration+30))
+	log.Infof("[Wait]: Waiting for %vs till the completion of the helper pod", experimentsDetails.ChaosDuration+30)
 
 	podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, "name="+experimentsDetails.ExperimentName+"-"+experimentsDetails.RunID, clients, experimentsDetails.ChaosDuration+30, experimentsDetails.ExperimentName)
 	if err != nil || podStatus == "Failed" {
@@ -101,17 +103,17 @@ func PrepareNodeCPUHog(experimentsDetails *experimentTypes.ExperimentDetails, cl
 
 	//Waiting for the ramp time after chaos injection
 	if experimentsDetails.RampTime != 0 {
-		log.Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", strconv.Itoa(experimentsDetails.RampTime))
+		log.Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", experimentsDetails.RampTime)
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 	return nil
 }
 
-//SetCPUCapacity will fetch the node cpu capacity
+//SetCPUCapacity fetch the node cpu capacity
 func SetCPUCapacity(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) error {
 	node, err := clients.KubeClient.CoreV1().Nodes().Get(experimentsDetails.AppNode, v1.GetOptions{})
 	if err != nil {
-		return errors.Wrapf(err, "Fail to get the application node, due to %v", err)
+		return err
 	}
 
 	cpuCapacity, _ := node.Status.Capacity.Cpu().AsInt64()
@@ -129,9 +131,10 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 			Name:      experimentsDetails.ExperimentName + "-" + experimentsDetails.RunID,
 			Namespace: experimentsDetails.ChaosNamespace,
 			Labels: map[string]string{
-				"app":      experimentsDetails.ExperimentName,
-				"name":     experimentsDetails.ExperimentName + "-" + experimentsDetails.RunID,
-				"chaosUID": string(experimentsDetails.ChaosUID),
+				"app":                       experimentsDetails.ExperimentName,
+				"name":                      experimentsDetails.ExperimentName + "-" + experimentsDetails.RunID,
+				"chaosUID":                  string(experimentsDetails.ChaosUID),
+				"app.kubernetes.io/part-of": "litmus",
 			},
 			Annotations: experimentsDetails.Annotations,
 		},
@@ -144,7 +147,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 					Image:           experimentsDetails.LIBImage,
 					ImagePullPolicy: apiv1.PullAlways,
 					Command: []string{
-						"/stress-ng",
+						"stress-ng",
 					},
 					Args: []string{
 						"--cpu",
