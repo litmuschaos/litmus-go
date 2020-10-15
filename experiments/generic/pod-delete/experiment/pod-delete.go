@@ -35,10 +35,9 @@ func PodDelete(clients clients.ClientSets) {
 	// Intialise Chaos Result Parameters
 	types.SetResultAttributes(&resultDetails, chaosDetails)
 
-	// Intialise the probe details
+	// Intialise the probe details. Bail out upon error, as we haven't entered exp business logic yet
 	if err := probe.InitializeProbesInChaosResultDetails(&chaosDetails, clients, &resultDetails); err != nil {
 		log.Fatalf("Unable to initialise probes details from chaosengine, err: %v", err)
-
 	}
 
 	//Updating the chaos result in the beginning of experiment
