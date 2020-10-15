@@ -47,11 +47,15 @@ func main() {
 	} else if *generationType == "experiment" {
 
 		// creating the directory for the experiment, if not present
-		experimentDIR := chartDIR + "/" + experimentDetails.Name
+		experimentRootDIR := chartDIR + "/" + experimentDetails.Name
+		CreateDirectoryIfNotPresent(experimentRootDIR)
+		experimentDIR := experimentRootDIR + "/experiment"
 		CreateDirectoryIfNotPresent(experimentDIR)
 
 		// creating the directory for the chaoslib, if not present
-		chaoslibDIR := litmusRootDir + "/chaoslib/litmus/" + experimentDetails.Name
+		chaoslibRootDIR := litmusRootDir + "/chaoslib/litmus/" + experimentDetails.Name
+		CreateDirectoryIfNotPresent(chaoslibRootDIR)
+		chaoslibDIR := chaoslibRootDIR + "/lib"
 		CreateDirectoryIfNotPresent(chaoslibDIR)
 
 		// creating the directory for the environment variables file, if not present
@@ -63,11 +67,11 @@ func main() {
 		CreateDirectoryIfNotPresent(environmentDIR)
 
 		// creating the directory for the types.go file, if not present
-		typesDIR := experimentPKGSubDirectory + "/environment"
+		typesDIR := experimentPKGSubDirectory + "/types"
 		CreateDirectoryIfNotPresent(typesDIR)
 
 		//creating the directory for test deployment
-		testDIR := experimentDIR + "/" + "test"
+		testDIR := experimentRootDIR + "/" + "test"
 		CreateDirectoryIfNotPresent(testDIR)
 
 		// generating the experiement.go file
@@ -75,19 +79,19 @@ func main() {
 		GenerateFile(experimentDetails, experimentFilePath, "./templates/experiment.tmpl")
 
 		// generating the csv file
-		csvFilePath := experimentDIR + "/" + experimentDetails.Name + ".chartserviceversion.yaml"
+		csvFilePath := experimentRootDIR + "/" + experimentDetails.Name + ".chartserviceversion.yaml"
 		GenerateFile(experimentDetails, csvFilePath, "./templates/chartserviceversion.tmpl")
 
 		// generating the chart file
-		chartFilePath := experimentDIR + "/" + "experiment.yaml"
+		chartFilePath := experimentRootDIR + "/" + "experiment.yaml"
 		GenerateFile(experimentDetails, chartFilePath, "./templates/experiment_custom_resource.tmpl")
 
 		// generating the rbac file
-		rbacFilePath := experimentDIR + "/" + "rbac.yaml"
+		rbacFilePath := experimentRootDIR + "/" + "rbac.yaml"
 		GenerateFile(experimentDetails, rbacFilePath, "./templates/experiment_rbac.tmpl")
 
 		// generating the engine file
-		engineFilePath := experimentDIR + "/" + "engine.yaml"
+		engineFilePath := experimentRootDIR + "/" + "engine.yaml"
 		GenerateFile(experimentDetails, engineFilePath, "./templates/experiment_engine.tmpl")
 
 		// generating the test deployment file

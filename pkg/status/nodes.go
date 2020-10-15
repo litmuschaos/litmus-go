@@ -20,7 +20,7 @@ func CheckNodeStatus(nodeName string, timeout, delay int, clients clients.Client
 		Try(func(attempt uint) error {
 			node, err := clients.KubeClient.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
 			if err != nil {
-				return errors.Errorf("Unable to get the node, err: %v", err)
+				return err
 			}
 			conditions := node.Status.Conditions
 			isReady := false
@@ -53,7 +53,7 @@ func CheckNodeNotReadyState(nodeName string, timeout, delay int, clients clients
 		Try(func(attempt uint) error {
 			node, err := clients.KubeClient.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
 			if err != nil {
-				return errors.Errorf("Unable to get the node, err: %v", err)
+				return err
 			}
 			conditions := node.Status.Conditions
 			isReady := false

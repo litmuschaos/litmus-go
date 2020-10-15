@@ -2,7 +2,6 @@ package lib
 
 import (
 	"net"
-	"strconv"
 	"strings"
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
@@ -20,34 +19,28 @@ import (
 
 var err error
 
-//PreparePodNetworkChaos contains the prepration steps before chaos injection
-func PreparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+//PrepareAndInjectChaos contains the prepration and chaos injection steps
+func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, args []string) error {
 
 	// Get the target pod details for the chaos execution
 	// if the target pod is not defined it will derive the random target pod list using pod affected percentage
-	targetPodList, err := common.GetPodList(experimentsDetails.AppNS, experimentsDetails.TargetPod, experimentsDetails.AppLabel, experimentsDetails.PodsAffectedPerc, clients)
+	targetPodList, err := common.GetPodList(experimentsDetails.AppNS, experimentsDetails.TargetPod, experimentsDetails.AppLabel, string(experimentsDetails.ChaosUID), experimentsDetails.PodsAffectedPerc, clients)
 	if err != nil {
-		return errors.Errorf("Unable to get the target pod list due to, err: %v", err)
+		return err
 	}
 
 	//Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
-		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", strconv.Itoa(experimentsDetails.RampTime))
+		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", experimentsDetails.RampTime)
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 
-	//Get the target container name of the application pod
-	if experimentsDetails.TargetContainer == "" {
-		experimentsDetails.TargetContainer, err = GetTargetContainer(experimentsDetails, targetPodList.Items[0].Name, clients)
+	if experimentsDetails.EngineName != "" {
+		// Get Chaos Pod Annotation
+		experimentsDetails.Annotations, err = common.GetChaosPodAnnotation(experimentsDetails.ChaosPodName, experimentsDetails.ChaosNamespace, clients)
 		if err != nil {
-			return errors.Errorf("Unable to get the target container name due to, err: %v", err)
+			return errors.Errorf("unable to get annotations, err: %v", err)
 		}
-	}
-
-	// Get Chaos Pod Annotation
-	experimentsDetails.Annotations, err = common.GetChaosPodAnnotation(experimentsDetails.ChaosPodName, experimentsDetails.ChaosNamespace, clients)
-	if err != nil {
-		return errors.Errorf("unable to get annotation, due to %v", err)
 	}
 
 	if experimentsDetails.EngineName != "" {
@@ -56,18 +49,89 @@ func PreparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetail
 		events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 	}
 
+	if experimentsDetails.Sequence == "serial" {
+		if err = InjectChaosInSerialMode(experimentsDetails, targetPodList, clients, chaosDetails, args); err != nil {
+			return err
+		}
+	} else {
+		if err = InjectChaosInParallelMode(experimentsDetails, targetPodList, clients, chaosDetails, args); err != nil {
+			return err
+		}
+	}
+
+	//Waiting for the ramp time after chaos injection
+	if experimentsDetails.RampTime != 0 {
+		log.Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", experimentsDetails.RampTime)
+		common.WaitForDuration(experimentsDetails.RampTime)
+	}
+	return nil
+}
+
+// InjectChaosInSerialMode stress the cpu of all target application serially (one by one)
+func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, args []string) error {
+
 	// creating the helper pod to perform network chaos
 	for _, pod := range targetPodList.Items {
 
 		runID := common.GetRunID()
 
 		log.InfoWithValues("[Info]: Details of application under chaos injection", logrus.Fields{
-			"PodName":       pod.Name,
-			"NodeName":      pod.Spec.NodeName,
-			"ContainerName": experimentsDetails.TargetContainer,
+			"PodName":  pod.Name,
+			"NodeName": pod.Spec.NodeName,
 		})
+		// args contains details of the specific chaos injection
+		// constructing `argsWithRegex` based on updated regex with a diff pod name
+		// without extending/concatenating the args var itself
+		argsWithRegex := append(args, "re2:k8s_POD_"+pod.Name+"_"+experimentsDetails.AppNS)
+		log.Infof("Arguments for running %v are %v", experimentsDetails.ExperimentName, argsWithRegex)
+		err = CreateHelperPod(experimentsDetails, clients, pod.Spec.NodeName, runID, argsWithRegex)
+		if err != nil {
+			return errors.Errorf("Unable to create the helper pod, err: %v", err)
+		}
 
-		err = CreateHelperPod(experimentsDetails, clients, pod.Name, pod.Spec.NodeName, runID)
+		//checking the status of the helper pod, wait till the pod comes to running state else fail the experiment
+		log.Info("[Status]: Checking the status of the helper pod")
+		err = status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, "app="+experimentsDetails.ExperimentName+"-helper", experimentsDetails.Timeout, experimentsDetails.Delay, clients)
+		if err != nil {
+			return errors.Errorf("helper pod is not in running state, err: %v", err)
+		}
+
+		// Wait till the completion of helper pod
+		log.Infof("[Wait]: Waiting for %vs till the completion of the helper pod", experimentsDetails.ChaosDuration)
+		podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, "app="+experimentsDetails.ExperimentName+"-helper", clients, experimentsDetails.ChaosDuration+30, chaosDetails.ExperimentName)
+		if err != nil || podStatus == "Failed" {
+			return errors.Errorf("helper pod failed, err: %v", err)
+		}
+
+		//Deleting the helper pod
+		log.Info("[Cleanup]: Deleting the helper pod")
+		err = common.DeletePod(experimentsDetails.ExperimentName+"-"+runID, "app="+experimentsDetails.ExperimentName+"-helper", experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients)
+		if err != nil {
+			return errors.Errorf("Unable to delete the helper pod, err: %v", err)
+		}
+	}
+
+	return nil
+}
+
+// InjectChaosInParallelMode kill the container of all target application in parallel mode (all at once)
+func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, args []string) error {
+
+	// creating the helper pod to perform network chaos
+	for _, pod := range targetPodList.Items {
+
+		runID := common.GetRunID()
+
+		log.InfoWithValues("[Info]: Details of application under chaos injection", logrus.Fields{
+			"PodName":  pod.Name,
+			"NodeName": pod.Spec.NodeName,
+		})
+		// args contains details of the specific chaos injection
+		// constructing `argsWithRegex` based on updated regex with a diff pod name
+		// without extending/concatenating the args var itself
+		argsWithRegex := append(args, "re2:k8s_POD_"+pod.Name+"_"+experimentsDetails.AppNS)
+		log.Infof("Arguments for running %v are %v", experimentsDetails.ExperimentName, argsWithRegex)
+		err = CreateHelperPod(experimentsDetails, clients, pod.Spec.NodeName, runID, argsWithRegex)
 		if err != nil {
 			return errors.Errorf("Unable to create the helper pod, err: %v", err)
 		}
@@ -84,7 +148,7 @@ func PreparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetail
 	log.Infof("[Wait]: Waiting for %vs till the completion of the helper pod", experimentsDetails.ChaosDuration)
 	podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, "app="+experimentsDetails.ExperimentName+"-helper", clients, experimentsDetails.ChaosDuration+30, chaosDetails.ExperimentName)
 	if err != nil || podStatus == "Failed" {
-		return errors.Errorf("helper pod failed due to, err: %v", err)
+		return errors.Errorf("helper pod failed, err: %v", err)
 	}
 
 	//Deleting the helper pod
@@ -94,36 +158,21 @@ func PreparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetail
 		return errors.Errorf("Unable to delete the helper pod, err: %v", err)
 	}
 
-	//Waiting for the ramp time after chaos injection
-	if experimentsDetails.RampTime != 0 {
-		log.Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", strconv.Itoa(experimentsDetails.RampTime))
-		common.WaitForDuration(experimentsDetails.RampTime)
-	}
 	return nil
 }
 
-//GetTargetContainer will fetch the container name from application pod
-//This container will be used as target container
-func GetTargetContainer(experimentsDetails *experimentTypes.ExperimentDetails, appName string, clients clients.ClientSets) (string, error) {
-	pod, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Get(appName, v1.GetOptions{})
-	if err != nil {
-		return "", errors.Wrapf(err, "Fail to get the application pod status, due to:%v", err)
-	}
-
-	return pod.Spec.Containers[0].Name, nil
-}
-
 // CreateHelperPod derive the attributes for helper pod and create the helper pod
-func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, appName, appNodeName, runID string) error {
+func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, appNodeName, runID string, args []string) error {
 
 	helperPod := &apiv1.Pod{
 		ObjectMeta: v1.ObjectMeta{
 			Name:      experimentsDetails.ExperimentName + "-" + runID,
 			Namespace: experimentsDetails.ChaosNamespace,
 			Labels: map[string]string{
-				"app":      experimentsDetails.ExperimentName + "-helper",
-				"name":     experimentsDetails.ExperimentName + "-" + runID,
-				"chaosUID": string(experimentsDetails.ChaosUID),
+				"app":                       experimentsDetails.ExperimentName + "-helper",
+				"name":                      experimentsDetails.ExperimentName + "-" + runID,
+				"chaosUID":                  string(experimentsDetails.ChaosUID),
+				"app.kubernetes.io/part-of": "litmus",
 			},
 			Annotations: experimentsDetails.Annotations,
 		},
@@ -148,7 +197,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 					Command: []string{
 						"pumba",
 					},
-					Args: GetContainerArguments(experimentsDetails, appName),
+					Args: args,
 					VolumeMounts: []apiv1.VolumeMount{
 						{
 							Name:      "dockersocket",
@@ -162,35 +211,6 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 
 	_, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Create(helperPod)
 	return err
-}
-
-// GetContainerArguments derives the args for the pumba pod
-func GetContainerArguments(experimentsDetails *experimentTypes.ExperimentDetails, appName string) []string {
-	baseArgs := []string{
-		"netem",
-		"--tc-image",
-		experimentsDetails.TCImage,
-		"--interface",
-		experimentsDetails.NetworkInterface,
-		"--duration",
-		strconv.Itoa(experimentsDetails.ChaosDuration) + "s",
-	}
-
-	args := baseArgs
-	args = AddTargetIpsArgs(experimentsDetails.TargetIPs, args)
-	args = AddTargetIpsArgs(GetIpsForTargetHosts(experimentsDetails.TargetHosts), args)
-	if experimentsDetails.ExperimentName == "pod-network-duplication" {
-		args = append(args, "duplicate", "--percent", strconv.Itoa(experimentsDetails.NetworkPacketDuplicationPercentage))
-	} else if experimentsDetails.ExperimentName == "pod-network-latency" {
-		args = append(args, "delay", "--time", strconv.Itoa(experimentsDetails.NetworkLatency))
-	} else if experimentsDetails.ExperimentName == "pod-network-loss" {
-		args = append(args, "loss", "--percent", strconv.Itoa(experimentsDetails.NetworkPacketLossPercentage))
-	} else if experimentsDetails.ExperimentName == "pod-network-corruption" {
-		args = append(args, "corrupt", "--percent", strconv.Itoa(experimentsDetails.NetworkPacketCorruptionPercentage))
-	}
-	args = append(args, "re2:k8s_"+experimentsDetails.TargetContainer+"_"+appName)
-	log.Infof("Arguments for running %v are %v", experimentsDetails.ExperimentName, args)
-	return args
 }
 
 // AddTargetIpsArgs inserts a comma-separated list of targetIPs (if provided by the user) into the pumba command/args

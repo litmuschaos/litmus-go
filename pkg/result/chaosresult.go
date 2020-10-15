@@ -17,6 +17,7 @@ import (
 
 //ChaosResult Create and Update the chaos result
 func ChaosResult(chaosDetails *types.ChaosDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, state string) error {
+	experimentLabel := map[string]string{}
 
 	// It will list all the chaos-result with matching label
 	// it will retries until it got chaos result list or met the timeout(3 mins)
@@ -28,7 +29,7 @@ func ChaosResult(chaosDetails *types.ChaosDetails, clients clients.ClientSets, r
 		Try(func(attempt uint) error {
 			result, err := clients.LitmusClient.ChaosResults(chaosDetails.ChaosNamespace).List(metav1.ListOptions{LabelSelector: "name=" + resultDetails.Name})
 			if err != nil {
-				return errors.Errorf("Unable to list the chaosresult, err: %v", err)
+				return errors.Errorf("Unable to find the chaosresult with matching labels, err: %v", err)
 			}
 			resultList = result
 			return nil
@@ -38,9 +39,21 @@ func ChaosResult(chaosDetails *types.ChaosDetails, clients clients.ClientSets, r
 		return err
 	}
 
+	// as the chaos pod won't be available for stopped phase
+	// skipping the derivation of labels from chaos pod, if phase is stopped
+	if chaosDetails.EngineName != "" && resultDetails.Phase != "Stopped" {
+		// Getting chaos pod label and passing it in chaos result
+		chaosPod, err := clients.KubeClient.CoreV1().Pods(chaosDetails.ChaosNamespace).Get(chaosDetails.ChaosPodName, metav1.GetOptions{})
+		if err != nil {
+			return errors.Errorf("failed to find chaos pod with name: %v, err: %v", chaosDetails.ChaosPodName, err)
+		}
+		experimentLabel = chaosPod.Labels
+	}
+	experimentLabel["name"] = resultDetails.Name
+
 	// if there is no chaos-result with given label, it will create a new chaos-result
 	if len(resultList.Items) == 0 {
-		return InitializeChaosResult(chaosDetails, clients, resultDetails)
+		return InitializeChaosResult(chaosDetails, clients, resultDetails, experimentLabel)
 	}
 
 	for _, result := range resultList.Items {
@@ -48,27 +61,25 @@ func ChaosResult(chaosDetails *types.ChaosDetails, clients clients.ClientSets, r
 		// the chaos-result is already present with matching labels
 		// it will patch the new parameters in the same chaos-result
 		if state == "SOT" {
-			return PatchChaosResult(&result, clients, chaosDetails, resultDetails)
+			return PatchChaosResult(&result, clients, chaosDetails, resultDetails, experimentLabel)
 		}
 
 		// it will patch the chaos-result in the end of experiment
 		resultDetails.Phase = "Completed"
-		return PatchChaosResult(&result, clients, chaosDetails, resultDetails)
+		return PatchChaosResult(&result, clients, chaosDetails, resultDetails, experimentLabel)
 	}
 	return nil
 }
 
 //InitializeChaosResult create the chaos result
-func InitializeChaosResult(chaosDetails *types.ChaosDetails, clients clients.ClientSets, resultDetails *types.ResultDetails) error {
+func InitializeChaosResult(chaosDetails *types.ChaosDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, chaosResultLabel map[string]string) error {
 
 	probeStatus := GetProbeStatus(resultDetails)
 	chaosResult := &v1alpha1.ChaosResult{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      resultDetails.Name,
 			Namespace: chaosDetails.ChaosNamespace,
-			Labels: map[string]string{
-				"name": resultDetails.Name,
-			},
+			Labels:    chaosResultLabel,
 		},
 		Spec: v1alpha1.ChaosResultSpec{
 			EngineName:     chaosDetails.EngineName,
@@ -95,14 +106,11 @@ func InitializeChaosResult(chaosDetails *types.ChaosDetails, clients clients.Cli
 	if k8serrors.IsAlreadyExists(err) {
 		chaosResult, err = clients.LitmusClient.ChaosResults(chaosDetails.ChaosNamespace).Get(resultDetails.Name, metav1.GetOptions{})
 		if err != nil {
-			return errors.Errorf("Unable to get the chaosresult, err: %v", err)
+			return errors.Errorf("Unable to find the chaosresult with name %v, err: %v", resultDetails.Name, err)
 		}
-		// adding the labels to the chaosresult
-		chaosResult.ObjectMeta.Labels = map[string]string{
-			"name": resultDetails.Name,
-		}
+
 		// updating the chaosresult with new values
-		err = PatchChaosResult(chaosResult, clients, chaosDetails, resultDetails)
+		err = PatchChaosResult(chaosResult, clients, chaosDetails, resultDetails, chaosResultLabel)
 		if err != nil {
 			return err
 		}
@@ -127,18 +135,20 @@ func GetProbeStatus(resultDetails *types.ResultDetails) []v1alpha1.ProbeStatus {
 }
 
 //PatchChaosResult Update the chaos result
-func PatchChaosResult(result *v1alpha1.ChaosResult, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails) error {
+func PatchChaosResult(result *v1alpha1.ChaosResult, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, chaosResultLabel map[string]string) error {
 
 	result.Status.ExperimentStatus.Phase = resultDetails.Phase
 	result.Status.ExperimentStatus.Verdict = resultDetails.Verdict
 	result.Spec.InstanceID = chaosDetails.InstanceID
 	result.Status.ExperimentStatus.FailStep = resultDetails.FailStep
+	// for existing chaos result resource it will patch the label
+	result.ObjectMeta.Labels = chaosResultLabel
 	result.Status.ProbeStatus = GetProbeStatus(resultDetails)
 	if resultDetails.Phase == "Completed" {
 		if resultDetails.Verdict == "Pass" && len(resultDetails.ProbeDetails) != 0 {
 			result.Status.ExperimentStatus.ProbeSuccessPercentage = "100"
 
-		} else if resultDetails.Verdict == "Fail" && len(resultDetails.ProbeDetails) != 0 {
+		} else if (resultDetails.Verdict == "Fail" || resultDetails.Verdict == "Stopped") && len(resultDetails.ProbeDetails) != 0 {
 			probe.SetProbeVerdictAfterFailure(resultDetails)
 			result.Status.ExperimentStatus.ProbeSuccessPercentage = strconv.Itoa((resultDetails.PassedProbeCount * 100) / len(resultDetails.ProbeDetails))
 		}

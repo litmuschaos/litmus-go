@@ -18,13 +18,13 @@ func InterfaceName(PID int) (string, error) {
 	out, err := cmd.CombinedOutput()
 	log.Info(fmt.Sprintf("[ip] %s", cmd))
 	if err != nil {
-		log.Error(fmt.Sprintf("[ip] Failed to run ip command: %s", string(out)))
+		log.Error(fmt.Sprintf("[ip]: Failed to run ip command: %s", string(out)))
 		return "", err
 	}
 
 	links, err := parseLinksResponse(out)
 	if err != nil {
-		log.Errorf("[ip] Failed to parse json response from ip command", err)
+		log.Errorf("[ip] Failed to parse json response from ip command, err: %v", err)
 		return "", err
 	}
 
