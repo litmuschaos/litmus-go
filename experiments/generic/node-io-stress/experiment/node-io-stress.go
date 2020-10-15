@@ -35,8 +35,10 @@ func NodeIOStress(clients clients.ClientSets) {
 	// Intialise Chaos Result Parameters
 	types.SetResultAttributes(&resultDetails, chaosDetails)
 
-	// Intialise the probe details
-	probe.InitializeProbesInChaosResultDetails(&chaosDetails, clients, &resultDetails)
+	// Intialise the probe details. Bail out upon error, as we haven't entered exp business logic yet
+	if err = probe.InitializeProbesInChaosResultDetails(&chaosDetails, clients, &resultDetails); err != nil {
+		log.Fatalf("Unable to initialize the probes, err: %v", err)
+	}
 
 	//Updating the chaos result in the beginning of experiment
 	log.Infof("[PreReq]: Updating the chaos result of %v experiment (SOT)", experimentsDetails.ExperimentName)
