@@ -39,7 +39,9 @@ func ChaosResult(chaosDetails *types.ChaosDetails, clients clients.ClientSets, r
 		return err
 	}
 
-	if chaosDetails.EngineName != "" {
+	// as the chaos pod won't be available for stopped phase
+	// skipping the derivation of labels from chaos pod, if phase is stopped
+	if chaosDetails.EngineName != "" && resultDetails.Phase != "Stopped" {
 		// Getting chaos pod label and passing it in chaos result
 		chaosPod, err := clients.KubeClient.CoreV1().Pods(chaosDetails.ChaosNamespace).Get(chaosDetails.ChaosPodName, metav1.GetOptions{})
 		if err != nil {
