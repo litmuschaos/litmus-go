@@ -14,7 +14,7 @@ func CreateEvents(eventsDetails *types.EventDetails, clients clients.ClientSets,
 
 	events := &apiv1.Event{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      eventsDetails.Reason + string(eventsDetails.ResourceUID),
+			Name:      eventsDetails.Reason + chaosDetails.ExperimentName + string(chaosDetails.ChaosUID),
 			Namespace: chaosDetails.ChaosNamespace,
 		},
 		Source: apiv1.EventSource{
@@ -47,7 +47,7 @@ func GenerateEvents(eventsDetails *types.EventDetails, clients clients.ClientSet
 	var err error
 	event, _ := clients.KubeClient.CoreV1().Events(chaosDetails.ChaosNamespace).Get(eventsDetails.Reason+string(eventsDetails.ResourceUID), metav1.GetOptions{})
 
-	if event.Name != eventsDetails.Reason+string(eventsDetails.ResourceUID) {
+	if event.Name != eventsDetails.Reason+chaosDetails.ExperimentName+string(chaosDetails.ChaosUID) {
 
 		err = CreateEvents(eventsDetails, clients, chaosDetails, kind)
 
