@@ -39,7 +39,7 @@ func PrepareK8sProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Result
 	if (probe.Mode == "SOT" && phase == "PreChaos") || (probe.Mode == "EOT" && phase == "PostChaos") || probe.Mode == "Edge" {
 
 		// triggering the k8s probe
-		err = TriggerK8sProbe(probe, probe.K8sProbeInputs.Command, clients)
+		err = TriggerK8sProbe(probe, clients, resultDetails)
 
 		// failing the probe, if the success condition doesn't met after the retry & timeout combinations
 		// it will update the status of all the unrun probes as well
@@ -49,7 +49,7 @@ func PrepareK8sProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Result
 	}
 	// trigger probes for the continuous mode
 	if probe.Mode == "Continuous" && phase == "PreChaos" {
-		go TriggerContinuousK8sProbe(probe, probe.K8sProbeInputs.Command, clients, resultDetails)
+		go TriggerContinuousK8sProbe(probe, clients, resultDetails)
 	}
 	// verify the continuous mode and marked the result of the probes
 	if probe.Mode == "Continuous" && phase == "PostChaos" {
@@ -65,7 +65,21 @@ func PrepareK8sProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Result
 }
 
 // TriggerK8sProbe run the k8s probe command
-func TriggerK8sProbe(probe v1alpha1.ProbeAttributes, cmd v1alpha1.K8sCommand, clients clients.ClientSets) error {
+func TriggerK8sProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets, resultDetails *types.ResultDetails) error {
+
+	cmd := probe.K8sProbeInputs.Command
+
+	// It parse the templated command and return normal string
+	// if command doesn't have template, it will return the same command
+	cmd.FieldSelector, err = ParseCommand(cmd.FieldSelector, resultDetails)
+	if err != nil {
+		return err
+	}
+
+	cmd.LabelSelector, err = ParseCommand(cmd.LabelSelector, resultDetails)
+	if err != nil {
+		return err
+	}
 
 	// it will retry for some retry count, in each iterations of try it contains following things
 	// it contains a timeout per iteration of retry. if the timeout expires without success then it will go to next try
@@ -120,11 +134,11 @@ func TriggerK8sProbe(probe v1alpha1.ProbeAttributes, cmd v1alpha1.K8sCommand, cl
 }
 
 // TriggerContinuousK8sProbe trigger the continuous k8s probes
-func TriggerContinuousK8sProbe(probe v1alpha1.ProbeAttributes, cmd v1alpha1.K8sCommand, clients clients.ClientSets, chaosresult *types.ResultDetails) {
+func TriggerContinuousK8sProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets, chaosresult *types.ResultDetails) {
 	// it trigger the k8s probe for the entire duration of chaos and it fails, if any error encounter
 	// marked the error for the probes, if any
 	for {
-		err = TriggerK8sProbe(probe, cmd, clients)
+		err = TriggerK8sProbe(probe, clients, chaosresult)
 		// record the error inside the probeDetails, we are maintaining a dedicated variable for the err, inside probeDetails
 		if err != nil {
 			for index := range chaosresult.ProbeDetails {

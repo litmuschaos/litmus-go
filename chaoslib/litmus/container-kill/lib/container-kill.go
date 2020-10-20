@@ -50,10 +50,12 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 	//Getting the iteration count for the container-kill
 	GetIterations(experimentsDetails)
 
-	// Get Chaos Pod Annotation
-	experimentsDetails.Annotations, err = common.GetChaosPodAnnotation(experimentsDetails.ChaosPodName, experimentsDetails.ChaosNamespace, clients)
-	if err != nil {
-		return errors.Errorf("Unable to get annotations, err: %v", err)
+	if experimentsDetails.EngineName != "" {
+		// Get Chaos Pod Annotation
+		experimentsDetails.Annotations, err = common.GetChaosPodAnnotation(experimentsDetails.ChaosPodName, experimentsDetails.ChaosNamespace, clients)
+		if err != nil {
+			return errors.Errorf("Unable to get annotations, err: %v", err)
+		}
 	}
 
 	if experimentsDetails.Sequence == "serial" {

@@ -38,10 +38,12 @@ func PreparePodMemoryHog(experimentsDetails *experimentTypes.ExperimentDetails, 
 		events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 	}
 
-	// Get Chaos Pod Annotation
-	experimentsDetails.Annotations, err = common.GetChaosPodAnnotation(experimentsDetails.ChaosPodName, experimentsDetails.ChaosNamespace, clients)
-	if err != nil {
-		return errors.Errorf("unable to get annotations, err: %v", err)
+	if experimentsDetails.EngineName != "" {
+		// Get Chaos Pod Annotation
+		experimentsDetails.Annotations, err = common.GetChaosPodAnnotation(experimentsDetails.ChaosPodName, experimentsDetails.ChaosNamespace, clients)
+		if err != nil {
+			return errors.Errorf("unable to get annotations, err: %v", err)
+		}
 	}
 
 	if experimentsDetails.Sequence == "serial" {

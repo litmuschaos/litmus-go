@@ -141,7 +141,7 @@ func ApplicationPodStatusCheck(experimentsDetails *experimentTypes.ExperimentDet
 //AutoscalerRecovery scale back to initial number of replica
 func AutoscalerRecovery(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, replicaCount int, appName string) error {
 
-	applicationClient := clients.KubeClient.AppsV1().Deployments(experimentsDetails.ChaosNamespace)
+	applicationClient := clients.KubeClient.AppsV1().Deployments(experimentsDetails.AppNS)
 
 	// Scale back to initial number of replicas
 	retryErr := retries.RetryOnConflict(retries.DefaultRetry, func() error {

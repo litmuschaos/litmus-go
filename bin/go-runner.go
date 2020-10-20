@@ -5,7 +5,7 @@ import (
 
 	// Uncomment to load all auth plugins
 	// _ "k8s.io/client-go/plugin/pkg/client/auth"
-	//
+
 	// Or uncomment to load specific auth plugins
 	// _ "k8s.io/client-go/plugin/pkg/client/auth/azure"
 	// _ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
@@ -30,6 +30,7 @@ import (
 	podNetworkDuplication "github.com/litmuschaos/litmus-go/experiments/generic/pod-network-duplication/experiment"
 	podNetworkLatency "github.com/litmuschaos/litmus-go/experiments/generic/pod-network-latency/experiment"
 	podNetworkLoss "github.com/litmuschaos/litmus-go/experiments/generic/pod-network-loss/experiment"
+	kafkaBrokerPodFailure "github.com/litmuschaos/litmus-go/experiments/kafka/kafka-broker-pod-failure/experiment"
 
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/log"
@@ -65,6 +66,8 @@ func main() {
 		containerKill.ContainerKill(clients)
 	case "disk-fill":
 		diskFill.DiskFill(clients)
+	case "kafka-broker-pod-failure":
+		kafkaBrokerPodFailure.KafkaBrokerPodFailure(clients)
 	case "kubelet-service-kill":
 		kubeletServiceKill.KubeletServiceKill(clients)
 	case "node-cpu-hog":

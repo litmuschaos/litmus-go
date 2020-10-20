@@ -82,14 +82,20 @@ func CasssandraPodDelete(clients clients.ClientSets) {
 	log.Info("[Status]: Checking the load distribution on the ring (pre-chaos)")
 	err = cassandra.NodeToolStatusCheck(&experimentsDetails, clients)
 	if err != nil {
-		log.Fatalf("[Status]: Chaos node tool status check is failed, err: %v", err)
+		log.Errorf("[Status]: Chaos node tool status check is failed, err: %v", err)
+		failStep := "Checking for load distribution on the ring(pre-chaos)"
+		types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
+		result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 	}
 
 	// Cassandra liveness check
 	if experimentsDetails.CassandraLivenessCheck == "enabled" {
 		ResourceVersionBefore, err = cassandra.LivenessCheck(&experimentsDetails, clients)
 		if err != nil {
-			log.Fatalf("[Liveness]: Cassandra liveness check failed, err: %v", err)
+			log.Errorf("[Liveness]: Cassandra liveness check failed, err: %v", err)
+			failStep := "failed while creating liveness pod"
+			types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
+			result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 		}
 		log.Info("[Confirmation]: The cassandra application liveness pod created successfully")
 	} else {
@@ -135,7 +141,10 @@ func CasssandraPodDelete(clients clients.ClientSets) {
 	log.Info("[Status]: Checking the load distribution on the ring (post-chaos)")
 	err = cassandra.NodeToolStatusCheck(&experimentsDetails, clients)
 	if err != nil {
-		log.Fatalf("[Status]: Chaos node tool status check is failed, err: %v", err)
+		log.Errorf("[Status]: Chaos node tool status check is failed, err: %v", err)
+		failStep := "Checking for load distribution on the ring(post-chaos)"
+		types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
+		result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 	}
 
 	// Cassandra statefulset liveness check (post-chaos)
@@ -144,11 +153,17 @@ func CasssandraPodDelete(clients clients.ClientSets) {
 	if experimentsDetails.CassandraLivenessCheck == "enabled" {
 		err = status.CheckApplicationStatus(experimentsDetails.ChaoslibDetail.AppNS, "name=cassandra-liveness-deploy-"+experimentsDetails.RunID, experimentsDetails.ChaoslibDetail.Timeout, experimentsDetails.ChaoslibDetail.Delay, clients)
 		if err != nil {
-			log.Fatalf("Liveness status check failed, err: %v", err)
+			log.Errorf("Liveness status check failed, err: %v", err)
+			failStep := "failed while checking the status of liveness pod"
+			types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
+			result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 		}
 		err = cassandra.LivenessCleanup(&experimentsDetails, clients, ResourceVersionBefore)
 		if err != nil {
-			log.Fatalf("Liveness cleanup failed, err: %v", err)
+			log.Errorf("Liveness cleanup failed, err: %v", err)
+			failStep := "failed while deleting liveness pod"
+			types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
+			result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 		}
 	}
 	//Updating the chaosResult in the end of experiment

@@ -1,4 +1,4 @@
-package main
+package experiment
 
 import (
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
@@ -13,16 +13,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func init() {
-	// Log as JSON instead of the default ASCII formatter.
-	logrus.SetFormatter(&logrus.TextFormatter{
-		FullTimestamp: true,
-		DisableSorting:         true,
-		DisableLevelTruncation: true,
-	})
-}
-
-func main() {
+func {{ .Name }}(clients clients.ClientSets)
 
 	var err error
 	experimentsDetails := experimentTypes.ExperimentDetails{}
@@ -33,12 +24,12 @@ func main() {
 	
 	//Getting kubeConfig and Generate ClientSets
 	if err := clients.GenerateClientSetFromKubeConfig(); err != nil {
-		log.Fatalf("Unable to Get the kubeconfig due to %v", err)
+		log.Fatalf("Unable to Get the kubeconfig, err: %v", err)
 	}
 
 	//Fetching all the ENV passed from the runner pod
 	log.Infof("[PreReq]: Getting the ENV for the %v experiment", experimentsDetails.ExperimentName)
-	experimentEnv.GetENV(&experimentsDetails, "{{ .Name }}")
+	experimentEnv.GetENV(&experimentsDetails)
 
 	// Intialise the chaos attributes
 	experimentEnv.InitialiseChaosVariables(&chaosDetails, &experimentsDetails)
@@ -53,7 +44,7 @@ func main() {
 	log.Infof("[PreReq]: Updating the chaos result of %v experiment (SOT)", experimentsDetails.ExperimentName)
 	err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT")
 	if err != nil {
-		log.Errorf("Unable to Create the Chaos Result due to %v", err)
+		log.Errorf("Unable to Create the Chaos Result, err: %v", err)
 		failStep := "Updating the chaos result of pod-delete experiment (SOT)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
@@ -61,6 +52,11 @@ func main() {
 
 	// Set the chaos result uid
 	result.SetResultUID(&resultDetails, clients, &chaosDetails)
+
+	// generating the event in chaosresult to marked the verdict as awaited
+	msg := "experiment: " + experimentsDetails.ExperimentName + ", Result: Awaited"
+	types.SetResultEventAttributes(&eventsDetails, types.AwaitedVerdict, msg, "Normal", &resultDetails)
+	events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosResult")
 
 	//DISPLAY THE APP INFORMATION
 	log.InfoWithValues("[Info]: The application information is as follows", logrus.Fields{
@@ -76,7 +72,7 @@ func main() {
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (pre-chaos)")
 	err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, clients)
 	if err != nil {
-		log.Errorf("Application status check failed due to %v\n", err)
+		log.Errorf("Application status check failed, err: %v", err)
 		failStep := "Verify that the AUT (Application Under Test) is running (pre-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
@@ -87,7 +83,7 @@ func main() {
 	log.Info("[Status]: Verify that the Auxiliary Applications are running (pre-chaos)")
 	err = status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, clients)
 	if err != nil {
-		log.Errorf("Auxiliary Application status check failed due to %v", err)
+		log.Errorf("Auxiliary Application status check failed, err: %v", err)
 		failStep := "Verify that the Auxiliary Applications are running (pre-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
@@ -103,9 +99,8 @@ func main() {
 		if len(resultDetails.ProbeDetails) != 0 {
 
 			err = probe.RunProbes(&chaosDetails, clients, &resultDetails, "PreChaos", &eventsDetails)
-			events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 			if err != nil {
-				log.Errorf("Probe failed, due to err: %v", err)
+				log.Errorf("Probe failed, err: %v", err)
 				failStep := "Failed while adding probe"
 				msg := "AUT: Running, Probes: Unsuccessful"
 				types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, msg, "Warning", &chaosDetails)
@@ -124,12 +119,12 @@ func main() {
 	// THE BUSINESS LOGIC OF THE ACTUAL CHAOS
     // IT CAN BE A NEW CHAOSLIB YOU HAVE CREATED SPECIALLY FOR THIS EXPERIMENT OR ANY EXISTING ONE 
    
-	// Including the litmus lib for pod-delete
+	// Including the litmus lib
 	if experimentsDetails.ChaosLib == "litmus" {
 		err = {{ .Name }}.{{ .Name }}()
 		if err != nil {
-			log.Errorf("Chaos injection failed due to %v\n", err)
-			failStep := "failed inside chaoslib"
+			log.Errorf("Chaos injection failed, err: %v", err)
+			failStep := "failed in chaos injection phase"
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}
@@ -137,7 +132,7 @@ func main() {
 		resultDetails.Verdict="Pass"
 	}else {
 		log.Error("[Invalid]: Please Provide the correct LIB")
-		failStep := "while invoking the chaos lib"
+		failStep := "no match found for specified lib"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -149,7 +144,7 @@ func main() {
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (post-chaos)")
 	err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, clients)
 	if err != nil {
-		log.Errorf("Application status check failed due to %v\n", err)
+		log.Errorf("Application status check failed, err: %v", err)
 		failStep := "Verify that the AUT (Application Under Test) is running (post-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
@@ -160,7 +155,7 @@ func main() {
 	log.Info("[Status]: Verify that the Auxiliary Applications are running (post-chaos)")
 	err = status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, clients)
 	if err != nil {
-		log.Errorf("Auxiliary Application status check failed due to %v", err)
+		log.Errorf("Auxiliary Application status check failed, err: %v", err)
 		failStep := "Verify that the Auxiliary Applications are running (post-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
@@ -176,7 +171,7 @@ func main() {
 		if len(resultDetails.ProbeDetails) != 0 {
 			err = probe.RunProbes(&chaosDetails, clients, &resultDetails, "PostChaos", &eventsDetails)
 			if err != nil {
-				log.Errorf("Unable to Add the probes, due to err: %v", err)
+				log.Errorf("Unable to Add the probes, err: %v", err)
 				failStep := "Failed while adding probe"
 				msg := "AUT: Running, Probes: Unsuccessful"
 				types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, msg, "Warning", &chaosDetails)
@@ -197,16 +192,23 @@ func main() {
 	log.Infof("[The End]: Updating the chaos result of %v experiment (EOT)", experimentsDetails.ExperimentName)
 	err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 	if err != nil {
-		log.Fatalf("Unable to Update the Chaos Result due to %v\n", err)
+		log.Fatalf("Unable to Update the Chaos Result, err: %v", err)
 	}
+
+	// generating the event in chaosresult to marked the verdict as pass/fail
+	msg = "experiment: " + experimentsDetails.ExperimentName + ", Result: " + resultDetails.Verdict
+	reason := types.PassVerdict
+	eventType := "Normal"
+	if resultDetails.Verdict != "Pass" {
+		reason = types.FailVerdict
+		eventType = "Warning"
+	}
+	types.SetResultEventAttributes(&eventsDetails, reason, msg, eventType, &resultDetails)
+	events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosResult")
 
 	if experimentsDetails.EngineName != "" {
 		msg := experimentsDetails.ExperimentName + " experiment has been " + resultDetails.Verdict + "ed"
 		types.SetEngineEventAttributes(&eventsDetails, types.Summary, msg, "Normal", &chaosDetails)
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
-
-	msg := experimentsDetails.ExperimentName + " experiment has been " + resultDetails.Verdict + "ed"
-	types.SetResultEventAttributes(&eventsDetails, types.Summary, msg, "Normal", &resultDetails)
-	events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosResult")
 }

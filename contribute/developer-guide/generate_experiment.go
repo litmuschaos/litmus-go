@@ -13,7 +13,7 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-// GenerateExperiment ...
+// GenerateExperiment generate the new/custom chaos experiment based on specified attribute file
 func GenerateExperiment(attributeFile *string, generationType string) error {
 
 	// Fetch all the required attributes from the given file
@@ -49,11 +49,15 @@ func GenerateExperiment(attributeFile *string, generationType string) error {
 	} else if generationType == "experiment" {
 
 		// creating the directory for the experiment, if not present
-		experimentDIR := chartDIR + "/" + experimentDetails.Name
+		experimentRootDIR := chartDIR + "/" + experimentDetails.Name
+		CreateDirectoryIfNotPresent(experimentRootDIR)
+		experimentDIR := experimentRootDIR + "/experiment"
 		CreateDirectoryIfNotPresent(experimentDIR)
 
 		// creating the directory for the chaoslib, if not present
-		chaoslibDIR := litmusRootDir + "/chaoslib/litmus/" + experimentDetails.Name
+		chaoslibRootDIR := litmusRootDir + "/chaoslib/litmus/" + experimentDetails.Name
+		CreateDirectoryIfNotPresent(chaoslibRootDIR)
+		chaoslibDIR := chaoslibRootDIR + "/lib"
 		CreateDirectoryIfNotPresent(chaoslibDIR)
 
 		// creating the directory for the environment variables file, if not present
@@ -65,11 +69,11 @@ func GenerateExperiment(attributeFile *string, generationType string) error {
 		CreateDirectoryIfNotPresent(environmentDIR)
 
 		// creating the directory for the types.go file, if not present
-		typesDIR := experimentPKGSubDirectory + "/environment"
+		typesDIR := experimentPKGSubDirectory + "/types"
 		CreateDirectoryIfNotPresent(typesDIR)
 
 		//creating the directory for test deployment
-		testDIR := experimentDIR + "/" + "test"
+		testDIR := experimentRootDIR + "/" + "test"
 		CreateDirectoryIfNotPresent(testDIR)
 
 		// generating the experiement.go file
@@ -79,25 +83,23 @@ func GenerateExperiment(attributeFile *string, generationType string) error {
 		}
 
 		// generating the csv file
-		csvFilePath := experimentDIR + "/" + experimentDetails.Name + ".chartserviceversion.yaml"
+		csvFilePath := experimentRootDIR + "/" + experimentDetails.Name + ".chartserviceversion.yaml"
 		if err = GenerateFile(experimentDetails, csvFilePath, "./templates/chartserviceversion.tmpl"); err != nil {
 			return err
 		}
 
 		// generating the chart file
-		chartFilePath := experimentDIR + "/" + "experiment.yaml"
-		if err = GenerateFile(experimentDetails, chartFilePath, "./templates/experiment_custom_resource.tmpl"); err != nil {
-			return err
-		}
+		chartFilePath := experimentRootDIR + "/" + "experiment.yaml"
+		GenerateFile(experimentDetails, chartFilePath, "./templates/experiment_custom_resource.tmpl")
 
 		// generating the rbac file
-		rbacFilePath := experimentDIR + "/" + "rbac.yaml"
+		rbacFilePath := experimentRootDIR + "/" + "rbac.yaml"
 		if err = GenerateFile(experimentDetails, rbacFilePath, "./templates/experiment_rbac.tmpl"); err != nil {
 			return err
 		}
 
 		// generating the engine file
-		engineFilePath := experimentDIR + "/" + "engine.yaml"
+		engineFilePath := experimentRootDIR + "/" + "engine.yaml"
 		if err = GenerateFile(experimentDetails, engineFilePath, "./templates/experiment_engine.tmpl"); err != nil {
 			return err
 		}
