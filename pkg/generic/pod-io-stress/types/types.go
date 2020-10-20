@@ -28,4 +28,5 @@ type ExperimentDetails struct {
 	LIBImage                        string
 	PodsAffectedPerc                int
 	Sequence                        string
+	VolumeMountPath                 string
 }
