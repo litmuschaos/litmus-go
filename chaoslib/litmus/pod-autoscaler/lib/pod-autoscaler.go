@@ -1,6 +1,7 @@
 package lib
 
 import (
+	"strings"
 	"time"
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
@@ -10,20 +11,20 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	retries "k8s.io/client-go/util/retry"
 
 	"github.com/pkg/errors"
 )
 
-var err error
+var (
+	err                     error
+	appsv1DeploymentClient  appsv1.DeploymentInterface
+	appsv1StatefulsetClient appsv1.StatefulSetInterface
+)
 
 //PreparePodAutoscaler contains the prepration steps before chaos injection
 func PreparePodAutoscaler(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-
-	appName, replicaCount, err := GetApplicationDetails(experimentsDetails, clients)
-	if err != nil {
-		return errors.Errorf("Unable to get the replicaCount of the application, err: %v", err)
-	}
 
 	//Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
@@ -31,14 +32,47 @@ func PreparePodAutoscaler(experimentsDetails *experimentTypes.ExperimentDetails,
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 
-	err = PodAutoscalerChaos(experimentsDetails, clients, replicaCount, appName, resultDetails, eventsDetails, chaosDetails)
-	if err != nil {
-		return errors.Errorf("Unable to perform autoscaling, err: %v", err)
-	}
+	// initialise the resource clients
+	appsv1DeploymentClient = clients.KubeClient.AppsV1().Deployments(experimentsDetails.AppNS)
+	appsv1StatefulsetClient = clients.KubeClient.AppsV1().StatefulSets(experimentsDetails.AppNS)
 
-	err = AutoscalerRecovery(experimentsDetails, clients, replicaCount, appName)
-	if err != nil {
-		return errors.Errorf("Unable to recover the auto scaling, err: %v", err)
+	switch strings.ToLower(experimentsDetails.AppKind) {
+	case "deployment", "deployments":
+
+		appName, replicaCount, err := GetDeploymentDetails(experimentsDetails, clients)
+		if err != nil {
+			return errors.Errorf("Unable to get the name & replicaCount of the deployment, err: %v", err)
+		}
+
+		err = PodAutoscalerChaosInDeployment(experimentsDetails, clients, replicaCount, appName, resultDetails, eventsDetails, chaosDetails)
+		if err != nil {
+			return errors.Errorf("Unable to perform autoscaling, err: %v", err)
+		}
+
+		err = AutoscalerRecoveryInDeployment(experimentsDetails, clients, replicaCount, appName)
+		if err != nil {
+			return errors.Errorf("Unable to rollback the autoscaling, err: %v", err)
+		}
+
+	case "statefulset", "statefulsets":
+
+		appName, replicaCount, err := GetStatefulsetDetails(experimentsDetails, clients)
+		if err != nil {
+			return errors.Errorf("Unable to get the name & replicaCount of the statefulset, err: %v", err)
+		}
+
+		err = PodAutoscalerChaosInStatefulset(experimentsDetails, clients, replicaCount, appName, resultDetails, eventsDetails, chaosDetails)
+		if err != nil {
+			return errors.Errorf("Unable to perform autoscaling, err: %v", err)
+		}
+
+		err = AutoscalerRecoveryInStatefulset(experimentsDetails, clients, replicaCount, appName)
+		if err != nil {
+			return errors.Errorf("Unable to rollback the autoscaling, err: %v", err)
+		}
+
+	default:
+		return errors.Errorf("application type '%s' is not supported for the chaos", experimentsDetails.AppKind)
 	}
 
 	//Waiting for the ramp time after chaos injection
@@ -49,50 +83,64 @@ func PreparePodAutoscaler(experimentsDetails *experimentTypes.ExperimentDetails,
 	return nil
 }
 
-//GetApplicationDetails is used to get the name and total number of replicas of the application
-func GetApplicationDetails(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) (string, int, error) {
+//GetDeploymentDetails is used to get the name and total number of replicas of the deployment
+func GetDeploymentDetails(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) (string, int, error) {
 
 	var appReplica int
 	var appName string
-	// Get Deployment replica count
-	applicationList, err := clients.KubeClient.AppsV1().Deployments(experimentsDetails.AppNS).List(metav1.ListOptions{LabelSelector: experimentsDetails.AppLabel})
-	if err != nil || len(applicationList.Items) == 0 {
-		return "", 0, errors.Errorf("Unable to find the application pods with matching labels, err: %v", err)
+
+	deploymentList, err := appsv1DeploymentClient.List(metav1.ListOptions{LabelSelector: experimentsDetails.AppLabel})
+	if err != nil || len(deploymentList.Items) == 0 {
+		return "", 0, errors.Errorf("Unable to find the deployments with matching labels, err: %v", err)
 	}
-	for _, app := range applicationList.Items {
+	for _, app := range deploymentList.Items {
 		appReplica = int(*app.Spec.Replicas)
 		appName = app.Name
-
 	}
-	return appName, appReplica, nil
 
+	return appName, appReplica, nil
 }
 
-//PodAutoscalerChaos scales up the application pod replicas
-func PodAutoscalerChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, replicaCount int, appName string, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+//GetStatefulsetDetails is used to get the name and total number of replicas of the statefulsets
+func GetStatefulsetDetails(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) (string, int, error) {
 
-	applicationClient := clients.KubeClient.AppsV1().Deployments(experimentsDetails.AppNS)
+	var appReplica int
+	var appName string
 
-	replicas := int32(experimentsDetails.Replicas)
+	statefulsetList, err := appsv1StatefulsetClient.List(metav1.ListOptions{LabelSelector: experimentsDetails.AppLabel})
+	if err != nil || len(statefulsetList.Items) == 0 {
+		return "", 0, errors.Errorf("Unable to find the statefulsets with matching labels, err: %v", err)
+	}
+	for _, app := range statefulsetList.Items {
+		appReplica = int(*app.Spec.Replicas)
+		appName = app.Name
+	}
+
+	return appName, appReplica, nil
+}
+
+//PodAutoscalerChaosInDeployment scales up the replicas of deployment and verify the status
+func PodAutoscalerChaosInDeployment(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, replicaCount int, appName string, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+
 	// Scale Application
 	retryErr := retries.RetryOnConflict(retries.DefaultRetry, func() error {
 		// Retrieve the latest version of Deployment before attempting update
 		// RetryOnConflict uses exponential backoff to avoid exhausting the apiserver
-		appUnderTest, err := applicationClient.Get(appName, metav1.GetOptions{})
+		appUnderTest, err := appsv1DeploymentClient.Get(appName, metav1.GetOptions{})
 		if err != nil {
 			return errors.Errorf("Failed to get latest version of Application Deployment, err: %v", err)
 		}
 		// modifying the replica count
-		appUnderTest.Spec.Replicas = int32Ptr(replicas)
-		_, updateErr := applicationClient.Update(appUnderTest)
+		appUnderTest.Spec.Replicas = int32Ptr(int32(experimentsDetails.Replicas))
+		_, updateErr := appsv1DeploymentClient.Update(appUnderTest)
 		return updateErr
 	})
 	if retryErr != nil {
-		return errors.Errorf("Unable to scale the application, err: %v", retryErr)
+		return errors.Errorf("Unable to scale the deployment, err: %v", retryErr)
 	}
 	log.Info("Application Started Scaling")
 
-	err = ApplicationPodStatusCheck(experimentsDetails, appName, clients, replicaCount, resultDetails, eventsDetails, chaosDetails)
+	err = DeploymentStatusCheck(experimentsDetails, appName, clients, replicaCount, resultDetails, eventsDetails, chaosDetails)
 	if err != nil {
 		return errors.Errorf("Status Check failed, err: %v", err)
 	}
@@ -100,29 +148,59 @@ func PodAutoscalerChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 	return nil
 }
 
-// ApplicationPodStatusCheck checks the status of the application pod
-func ApplicationPodStatusCheck(experimentsDetails *experimentTypes.ExperimentDetails, appName string, clients clients.ClientSets, replicaCount int, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	applicationClient := clients.KubeClient.AppsV1().Deployments(experimentsDetails.AppNS)
+//PodAutoscalerChaosInStatefulset scales up the replicas of statefulset and verify the status
+func PodAutoscalerChaosInStatefulset(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, replicaCount int, appName string, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+
+	// Scale Application
+	retryErr := retries.RetryOnConflict(retries.DefaultRetry, func() error {
+		// Retrieve the latest version of Statefulset before attempting update
+		// RetryOnConflict uses exponential backoff to avoid exhausting the apiserver
+		appUnderTest, err := appsv1StatefulsetClient.Get(appName, metav1.GetOptions{})
+		if err != nil {
+			return errors.Errorf("Failed to get latest version of Application Statefulset, err: %v", err)
+		}
+		// modifying the replica count
+		appUnderTest.Spec.Replicas = int32Ptr(int32(experimentsDetails.Replicas))
+		_, updateErr := appsv1StatefulsetClient.Update(appUnderTest)
+		return updateErr
+	})
+	if retryErr != nil {
+		return errors.Errorf("Unable to scale the statefulset, err: %v", retryErr)
+	}
+	log.Info("Application Started Scaling")
+
+	err = StatefulsetStatusCheck(experimentsDetails, appName, clients, replicaCount, resultDetails, eventsDetails, chaosDetails)
+	if err != nil {
+		return errors.Errorf("Status Check failed, err: %v", err)
+	}
+
+	return nil
+}
+
+// DeploymentStatusCheck check the status of deployment and verify the available replicas
+func DeploymentStatusCheck(experimentsDetails *experimentTypes.ExperimentDetails, appName string, clients clients.ClientSets, replicaCount int, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+
 	isFailed := false
 
-	err := retry.
+	err = retry.
 		Times(uint(experimentsDetails.Timeout / experimentsDetails.Delay)).
 		Wait(time.Duration(experimentsDetails.Delay) * time.Second).
 		Try(func(attempt uint) error {
-			applicationDeploy, err := applicationClient.Get(appName, metav1.GetOptions{})
+			deployment, err := appsv1DeploymentClient.Get(appName, metav1.GetOptions{})
 			if err != nil {
-				return errors.Errorf("Unable to find the pod with name %v, err: %v", appName, err)
+				return errors.Errorf("Unable to find the deployment with name %v, err: %v", appName, err)
 			}
-			if int(applicationDeploy.Status.AvailableReplicas) != experimentsDetails.Replicas {
-				log.Infof("Application Pod Available Count is: %v", applicationDeploy.Status.AvailableReplicas)
+			log.Infof("Deployment's Available Replica Count is %v", deployment.Status.AvailableReplicas)
+			if int(deployment.Status.AvailableReplicas) != experimentsDetails.Replicas {
 				isFailed = true
 				return errors.Errorf("Application is not scaled yet, err: %v", err)
 			}
 			isFailed = false
 			return nil
 		})
+
 	if isFailed {
-		err = AutoscalerRecovery(experimentsDetails, clients, replicaCount, appName)
+		err = AutoscalerRecoveryInDeployment(experimentsDetails, clients, replicaCount, appName)
 		if err != nil {
 			return errors.Errorf("Unable to perform autoscaling, err: %v", err)
 		}
@@ -138,26 +216,63 @@ func ApplicationPodStatusCheck(experimentsDetails *experimentTypes.ExperimentDet
 	return nil
 }
 
-//AutoscalerRecovery scale back to initial number of replica
-func AutoscalerRecovery(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, replicaCount int, appName string) error {
+// StatefulsetStatusCheck check the status of statefulset and verify the available replicas
+func StatefulsetStatusCheck(experimentsDetails *experimentTypes.ExperimentDetails, appName string, clients clients.ClientSets, replicaCount int, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
-	applicationClient := clients.KubeClient.AppsV1().Deployments(experimentsDetails.AppNS)
+	isFailed := false
+
+	err = retry.
+		Times(uint(experimentsDetails.Timeout / experimentsDetails.Delay)).
+		Wait(time.Duration(experimentsDetails.Delay) * time.Second).
+		Try(func(attempt uint) error {
+			statefulset, err := appsv1StatefulsetClient.Get(appName, metav1.GetOptions{})
+			if err != nil {
+				return errors.Errorf("Unable to find the statefulset with name %v, err: %v", appName, err)
+			}
+			log.Infof("Statefulset's Ready Replica Count is: %v", statefulset.Status.ReadyReplicas)
+			if int(statefulset.Status.ReadyReplicas) != experimentsDetails.Replicas {
+				isFailed = true
+				return errors.Errorf("Application is not scaled yet, err: %v", err)
+			}
+			isFailed = false
+			return nil
+		})
+
+	if isFailed {
+		err = AutoscalerRecoveryInStatefulset(experimentsDetails, clients, replicaCount, appName)
+		if err != nil {
+			return errors.Errorf("Unable to perform autoscaling, err: %v", err)
+		}
+		return errors.Errorf("Failed to scale the application, err: %v", err)
+	} else if err != nil {
+		return err
+	}
+
+	// Keeping a wait time of 10s after all pod comes in running state
+	// This is optional and used just for viewing the pod status
+	time.Sleep(10 * time.Second)
+
+	return nil
+}
+
+//AutoscalerRecoveryInDeployment rollback the replicas to initial values in deployment
+func AutoscalerRecoveryInDeployment(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, replicaCount int, appName string) error {
 
 	// Scale back to initial number of replicas
 	retryErr := retries.RetryOnConflict(retries.DefaultRetry, func() error {
 		// Retrieve the latest version of Deployment before attempting update
 		// RetryOnConflict uses exponential backoff to avoid exhausting the apiserver
-		appUnderTest, err := applicationClient.Get(appName, metav1.GetOptions{})
+		appUnderTest, err := appsv1DeploymentClient.Get(appName, metav1.GetOptions{})
 		if err != nil {
 			return errors.Errorf("Failed to find the latest version of Application Deployment with name %v, err: %v", appName, err)
 		}
 
 		appUnderTest.Spec.Replicas = int32Ptr(int32(replicaCount)) // modify replica count
-		_, updateErr := applicationClient.Update(appUnderTest)
+		_, updateErr := appsv1DeploymentClient.Update(appUnderTest)
 		return updateErr
 	})
 	if retryErr != nil {
-		return errors.Errorf("Unable to scale the application pod, err: %v", retryErr)
+		return errors.Errorf("Unable to rollback the deployment, err: %v", retryErr)
 	}
 	log.Info("[Info]: Application pod started rolling back")
 
@@ -165,12 +280,56 @@ func AutoscalerRecovery(experimentsDetails *experimentTypes.ExperimentDetails, c
 		Times(uint(experimentsDetails.Timeout / experimentsDetails.Delay)).
 		Wait(time.Duration(experimentsDetails.Delay) * time.Second).
 		Try(func(attempt uint) error {
-			applicationDeploy, err := applicationClient.Get(appName, metav1.GetOptions{})
+			applicationDeploy, err := appsv1DeploymentClient.Get(appName, metav1.GetOptions{})
 			if err != nil {
-				return errors.Errorf("Unable to find the pod with name %v, err: %v", appName, err)
+				return errors.Errorf("Unable to find the deployment with name %v, err: %v", appName, err)
 			}
 			if int(applicationDeploy.Status.AvailableReplicas) != experimentsDetails.Replicas {
-				log.Infof("Application Pod Available Count is: %v", applicationDeploy.Status.AvailableReplicas)
+				log.Infof("Application Available Replica Count is: %v", applicationDeploy.Status.AvailableReplicas)
+				return errors.Errorf("Unable to rollback to older replica count, err: %v", err)
+			}
+			return nil
+		})
+
+	if err != nil {
+		return err
+	}
+	log.Info("[RollBack]: Application Pod roll back to initial number of replicas")
+
+	return nil
+}
+
+//AutoscalerRecoveryInStatefulset rollback the replicas to initial values in deployment
+func AutoscalerRecoveryInStatefulset(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, replicaCount int, appName string) error {
+
+	// Scale back to initial number of replicas
+	retryErr := retries.RetryOnConflict(retries.DefaultRetry, func() error {
+		// Retrieve the latest version of Statefulset before attempting update
+		// RetryOnConflict uses exponential backoff to avoid exhausting the apiserver
+		appUnderTest, err := appsv1StatefulsetClient.Get(appName, metav1.GetOptions{})
+		if err != nil {
+			return errors.Errorf("Failed to find the latest version of Statefulset with name %v, err: %v", appName, err)
+		}
+
+		appUnderTest.Spec.Replicas = int32Ptr(int32(replicaCount)) // modify replica count
+		_, updateErr := appsv1StatefulsetClient.Update(appUnderTest)
+		return updateErr
+	})
+	if retryErr != nil {
+		return errors.Errorf("Unable to rollback the statefulset, err: %v", retryErr)
+	}
+	log.Info("[Info]: Application pod started rolling back")
+
+	err = retry.
+		Times(uint(experimentsDetails.Timeout / experimentsDetails.Delay)).
+		Wait(time.Duration(experimentsDetails.Delay) * time.Second).
+		Try(func(attempt uint) error {
+			applicationDeploy, err := appsv1StatefulsetClient.Get(appName, metav1.GetOptions{})
+			if err != nil {
+				return errors.Errorf("Unable to find the statefulset with name %v, err: %v", appName, err)
+			}
+			if int(applicationDeploy.Status.ReadyReplicas) != experimentsDetails.Replicas {
+				log.Infof("Application Ready Replica Count is: %v", applicationDeploy.Status.ReadyReplicas)
 				return errors.Errorf("Unable to roll back to older replica count, err: %v", err)
 			}
 			return nil
