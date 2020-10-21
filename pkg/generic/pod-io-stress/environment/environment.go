@@ -32,6 +32,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.LIBImage = Getenv("LIB_IMAGE", "gaiaadm/pumba")
 	experimentDetails.PodsAffectedPerc, _ = strconv.Atoi(Getenv("PODS_AFFECTED_PERC", "0"))
 	experimentDetails.Sequence = Getenv("SEQUENCE", "parallel")
+	experimentDetails.VolumeMountPath = Getenv("VOLUME_MOUNT_PATH", "")
 
 }
 
