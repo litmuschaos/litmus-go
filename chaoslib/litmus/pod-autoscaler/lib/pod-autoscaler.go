@@ -36,6 +36,9 @@ func PreparePodAutoscaler(experimentsDetails *experimentTypes.ExperimentDetails,
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 
+	//calling go routine which will continuously watch for the abort signal
+	go AbortPodAutoScalerChaos(replicaCount, appName, experimentsDetails, clients, resultDetails, eventsDetails, chaosDetails)
+
 	err = PodAutoscalerChaos(experimentsDetails, clients, replicaCount, appName, resultDetails, eventsDetails, chaosDetails)
 	if err != nil {
 		return errors.Errorf("Unable to perform autoscaling, err: %v", err)
@@ -67,8 +70,10 @@ func GetApplicationDetails(experimentsDetails *experimentTypes.ExperimentDetails
 	for _, app := range applicationList.Items {
 		appReplica = int(*app.Spec.Replicas)
 		appName = app.Name
+
 	}
 	return appName, appReplica, nil
+
 }
 
 //PodAutoscalerChaos scales up the application pod replicas
@@ -105,10 +110,6 @@ func PodAutoscalerChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 
 // ApplicationPodStatusCheck checks the status of the application pod
 func ApplicationPodStatusCheck(experimentsDetails *experimentTypes.ExperimentDetails, appName string, clients clients.ClientSets, replicaCount int, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-
-	var endTime <-chan time.Time
-	timeDelay := time.Duration(experimentsDetails.ChaosDuration) * time.Second
-
 	applicationClient := clients.KubeClient.AppsV1().Deployments(experimentsDetails.AppNS)
 	isFailed := false
 
@@ -116,40 +117,6 @@ func ApplicationPodStatusCheck(experimentsDetails *experimentTypes.ExperimentDet
 		Times(uint(experimentsDetails.Timeout / experimentsDetails.Delay)).
 		Wait(time.Duration(experimentsDetails.Delay) * time.Second).
 		Try(func(attempt uint) error {
-			// signChan channel is used to transmit signal notifications.
-			signChan := make(chan os.Signal, 1)
-			// Catch and relay certain signal(s) to signChan channel.
-			signal.Notify(signChan, os.Interrupt, syscall.SIGTERM, syscall.SIGKILL)
-		loop:
-			for {
-				endTime = time.After(timeDelay)
-				select {
-				case <-signChan:
-					log.Info("[Chaos]: Killing process started because of terminated signal received")
-					// updating the chaosresult after stopped
-					failStep := "Pod Autoscaler experiment stopped!"
-					types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep)
-					result.ChaosResult(chaosDetails, clients, resultDetails, "EOT")
-
-					// generating summary event in chaosengine
-					msg := experimentsDetails.ExperimentName + " experiment has been aborted"
-					types.SetEngineEventAttributes(eventsDetails, types.Summary, msg, "Warning", chaosDetails)
-					events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
-
-					// generating summary event in chaosresult
-					types.SetResultEventAttributes(eventsDetails, types.StoppedVerdict, msg, "Warning", resultDetails)
-					events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosResult")
-
-					if err = AutoscalerRecovery(experimentsDetails, clients, replicaCount, appName); err != nil {
-						log.Errorf("Unable to perform autoscaling, err: %v", err)
-					}
-					os.Exit(1)
-				case <-endTime:
-					log.Infof("[Chaos]: Time is up for experiment: %v", experimentsDetails.ExperimentName)
-					endTime = nil
-					break loop
-				}
-			}
 			applicationDeploy, err := applicationClient.Get(appName, metav1.GetOptions{})
 			if err != nil {
 				return errors.Errorf("Unable to find the pod with name %v, err: %v", appName, err)
@@ -157,12 +124,10 @@ func ApplicationPodStatusCheck(experimentsDetails *experimentTypes.ExperimentDet
 			if int(applicationDeploy.Status.AvailableReplicas) != experimentsDetails.Replicas {
 				log.Infof("Application Pod Available Count is: %v", applicationDeploy.Status.AvailableReplicas)
 				isFailed = true
-
 				return errors.Errorf("Application is not scaled yet, err: %v", err)
 			}
 			isFailed = false
 			return nil
-
 		})
 	if isFailed {
 		err = AutoscalerRecovery(experimentsDetails, clients, replicaCount, appName)
@@ -228,3 +193,37 @@ func AutoscalerRecovery(experimentsDetails *experimentTypes.ExperimentDetails, c
 }
 
 func int32Ptr(i int32) *int32 { return &i }
+
+//AbortPodAutoScalerChaos go routine will continuously watch for the abort signal for the entire chaos duration and generate the required events and result
+func AbortPodAutoScalerChaos(replicaCount int, appName string, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+
+	// signChan channel is used to transmit signal notifications.
+	signChan := make(chan os.Signal, 1)
+	// Catch and relay certain signal(s) to signChan channel.
+	signal.Notify(signChan, os.Interrupt, syscall.SIGTERM, syscall.SIGKILL)
+
+	for {
+		select {
+		case <-signChan:
+			log.Info("[Chaos]: Chaos Experiment Abortion started because of terminated signal received")
+			// updating the chaosresult after stopped
+			failStep := "Chaos injection stopped!"
+			types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep)
+			result.ChaosResult(chaosDetails, clients, resultDetails, "EOT")
+
+			// generating summary event in chaosengine
+			msg := experimentsDetails.ExperimentName + " experiment has been aborted"
+			types.SetEngineEventAttributes(eventsDetails, types.Summary, msg, "Warning", chaosDetails)
+			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
+
+			// generating summary event in chaosresult
+			types.SetResultEventAttributes(eventsDetails, types.StoppedVerdict, msg, "Warning", resultDetails)
+			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosResult")
+
+			if err := AutoscalerRecovery(experimentsDetails, clients, replicaCount, appName); err != nil {
+				log.Errorf("the recovery after abortion failed err: %v", err)
+			}
+			os.Exit(1)
+		}
+	}
+}
