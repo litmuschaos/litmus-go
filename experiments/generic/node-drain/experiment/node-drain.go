@@ -61,7 +61,6 @@ func NodeDrain(clients clients.ClientSets) {
 		"Namespace": experimentsDetails.AppNS,
 		"Label":     experimentsDetails.AppLabel,
 		"Ramp Time": experimentsDetails.RampTime,
-		"Node Name": experimentsDetails.AppNode,
 	})
 
 	//PRE-CHAOS APPLICATION STATUS CHECK
