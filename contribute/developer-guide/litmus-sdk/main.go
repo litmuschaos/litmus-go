@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 
-	cmd1 "github.com/litmuschaos/litmus-go/contribute/developer-guide"
+	sdkCmd "github.com/litmuschaos/litmus-go/contribute/developer-guide"
 	"github.com/spf13/cobra"
 )
 
@@ -29,7 +29,7 @@ func main() {
 			if filePath == "" {
 				log.Fatal("Error: must specify -f")
 			}
-			if err := cmd1.GenerateExperiment(&filePath, "experiment"); err != nil {
+			if err := sdkCmd.GenerateExperiment(&filePath, "experiment"); err != nil {
 				log.Fatalf("error: %v", err)
 			}
 			fmt.Println("experiment created successfully")
@@ -46,7 +46,7 @@ func main() {
 			if filePath == "" {
 				log.Fatal("Error: must specify -f")
 			}
-			if err := cmd1.GenerateExperiment(&filePath, "chart"); err != nil {
+			if err := sdkCmd.GenerateExperiment(&filePath, "chart"); err != nil {
 				log.Fatalf("error: %v", err)
 			}
 			fmt.Println("chart created successfully")
