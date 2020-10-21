@@ -245,7 +245,12 @@ func GetContainerArguments(experimentsDetails *experimentTypes.ExperimentDetails
 		"--duration",
 		strconv.Itoa(experimentsDetails.ChaosDuration) + "s",
 		"--stressors",
-		"--cpu 1 --io " + strconv.Itoa(experimentsDetails.NumberOfWorkers) + " --hdd " + strconv.Itoa(experimentsDetails.NumberOfWorkers) + " --hdd-bytes " + hddbytes + " --timeout " + strconv.Itoa(experimentsDetails.ChaosDuration) + "s",
 	}
-	return stressArgs
+	args := stressArgs
+	if experimentsDetails.VolumeMountPath == "" {
+		args = append(args, "--cpu 1 --io "+strconv.Itoa(experimentsDetails.NumberOfWorkers)+" --hdd "+strconv.Itoa(experimentsDetails.NumberOfWorkers)+" --hdd-bytes "+hddbytes+" --timeout "+strconv.Itoa(experimentsDetails.ChaosDuration)+"s")
+	} else {
+		args = append(args, "--cpu 1 --io "+strconv.Itoa(experimentsDetails.NumberOfWorkers)+" --hdd "+strconv.Itoa(experimentsDetails.NumberOfWorkers)+" --hdd-bytes "+hddbytes+" --temp-path "+experimentsDetails.VolumeMountPath+" --timeout "+strconv.Itoa(experimentsDetails.ChaosDuration)+"s")
+	}
+	return args
 }
