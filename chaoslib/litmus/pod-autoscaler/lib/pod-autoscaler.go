@@ -1,12 +1,17 @@
 package lib
 
 import (
+	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
+	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-autoscaler/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
+	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
@@ -44,6 +49,9 @@ func PreparePodAutoscaler(experimentsDetails *experimentTypes.ExperimentDetails,
 			return errors.Errorf("Unable to get the name & replicaCount of the deployment, err: %v", err)
 		}
 
+		//calling go routine which will continuously watch for the abort signal
+		go AbortPodAutoScalerChaos(replicaCount, appName, experimentsDetails, clients, resultDetails, eventsDetails, chaosDetails)
+
 		err = PodAutoscalerChaosInDeployment(experimentsDetails, clients, replicaCount, appName, resultDetails, eventsDetails, chaosDetails)
 		if err != nil {
 			return errors.Errorf("Unable to perform autoscaling, err: %v", err)
@@ -60,6 +68,9 @@ func PreparePodAutoscaler(experimentsDetails *experimentTypes.ExperimentDetails,
 		if err != nil {
 			return errors.Errorf("Unable to get the name & replicaCount of the statefulset, err: %v", err)
 		}
+
+		//calling go routine which will continuously watch for the abort signal
+		go AbortPodAutoScalerChaos(replicaCount, appName, experimentsDetails, clients, resultDetails, eventsDetails, chaosDetails)
 
 		err = PodAutoscalerChaosInStatefulset(experimentsDetails, clients, replicaCount, appName, resultDetails, eventsDetails, chaosDetails)
 		if err != nil {
@@ -344,3 +355,59 @@ func AutoscalerRecoveryInStatefulset(experimentsDetails *experimentTypes.Experim
 }
 
 func int32Ptr(i int32) *int32 { return &i }
+
+//AbortPodAutoScalerChaos go routine will continuously watch for the abort signal for the entire chaos duration and generate the required events and result
+func AbortPodAutoScalerChaos(replicaCount int, appName string, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+
+	// signChan channel is used to transmit signal notifications.
+	signChan := make(chan os.Signal, 1)
+	// Catch and relay certain signal(s) to signChan channel.
+	signal.Notify(signChan, os.Interrupt, syscall.SIGTERM, syscall.SIGKILL)
+
+	for {
+		select {
+		case <-signChan:
+			log.Info("[Chaos]: Chaos Experiment Abortion started because of terminated signal received")
+			// updating the chaosresult after stopped
+			failStep := "Chaos injection stopped!"
+			types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep)
+			result.ChaosResult(chaosDetails, clients, resultDetails, "EOT")
+
+			// generating summary event in chaosengine
+			msg := experimentsDetails.ExperimentName + " experiment has been aborted"
+			types.SetEngineEventAttributes(eventsDetails, types.Summary, msg, "Warning", chaosDetails)
+			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
+
+			// generating summary event in chaosresult
+			types.SetResultEventAttributes(eventsDetails, types.StoppedVerdict, msg, "Warning", resultDetails)
+			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosResult")
+
+			// Note that we are attempting recovery (in this case scaling down to original replica count) after ..
+			// .. the tasks to patch results & generate events. This is so because the func AutoscalerRecovery..
+			// ..takes more time to complete - it involves a status check post the downscale. We have a period of ..
+			// .. few seconds before the pod deletion/removal occurs from the time the TERM is caught and thereby..
+			// ..run the risk of not updating the status of the objects/create events. With the current approach..
+			// ..tests indicate we succeed with the downscale/patch call, even if the status checks take longer
+			// As such, this is a workaround, and other solutions such as usage of pre-stop hooks etc., need to be explored
+			// Other experiments have simpler "recoveries" that are more or less guaranteed to work.
+			switch strings.ToLower(experimentsDetails.AppKind) {
+			case "deployment", "deployments":
+
+				if err := AutoscalerRecoveryInDeployment(experimentsDetails, clients, replicaCount, appName); err != nil {
+					log.Errorf("the recovery after abortion failed err: %v", err)
+				}
+
+			case "statefulset", "statefulsets":
+
+				if err := AutoscalerRecoveryInStatefulset(experimentsDetails, clients, replicaCount, appName); err != nil {
+					log.Errorf("the recovery after abortion failed err: %v", err)
+				}
+
+			default:
+				return errors.Errorf("application type '%s' is not supported for the chaos", experimentsDetails.AppKind)
+			}
+
+			os.Exit(1)
+		}
+	}
+}
