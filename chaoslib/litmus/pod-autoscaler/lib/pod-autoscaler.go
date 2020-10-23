@@ -220,6 +220,14 @@ func AbortPodAutoScalerChaos(replicaCount int, appName string, experimentsDetail
 			types.SetResultEventAttributes(eventsDetails, types.StoppedVerdict, msg, "Warning", resultDetails)
 			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosResult")
 
+			// Note that we are attempting recovery (in this case scaling down to original replica count) after ..
+			// .. the tasks to patch results & generate events. This is so because the func AutoscalerRecovery..
+			// ..takes more time to complete - it involves a status check post the downscale. We have a period of ..
+			// .. few seconds before the pod deletion/removal occurs from the time the TERM is caught and thereby..
+			// ..run the risk of not updating the status of the objects/create events. With the current approach..
+			// ..tests indicate we succeed with the downscale/patch call, even if the status checks take longer
+			// As such, this is a workaround, and other solutions such as usage of pre-stop hooks etc., need to be explored
+			// Other experiments have simpler "recoveries" that are more or less guaranteed to work.
 			if err := AutoscalerRecovery(experimentsDetails, clients, replicaCount, appName); err != nil {
 				log.Errorf("the recovery after abortion failed err: %v", err)
 			}
