@@ -28,8 +28,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.TargetNode = Getenv("TARGET_NODE", "")
 	experimentDetails.Delay, _ = strconv.Atoi(Getenv("STATUS_CHECK_DELAY", "2"))
 	experimentDetails.Timeout, _ = strconv.Atoi(Getenv("STATUS_CHECK_TIMEOUT", "180"))
-	experimentDetails.NodesAffectedPerc, _ = strconv.Atoi(Getenv("NODES_AFFECTED_PERC", "0"))
-	experimentDetails.Sequence = Getenv("SEQUENCE", "parallel")
+
 }
 
 // Getenv fetch the env and set the default value, if any

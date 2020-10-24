@@ -26,7 +26,7 @@ func PrepareNodeMemoryHog(experimentsDetails *experimentTypes.ExperimentDetails,
 	}
 
 	//Select node for node-memory-hog
-	targetNodeList, err := common.GetNodeList(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.TargetNode, experimentsDetails.NodesAffectedPerc, clients)
+	targetNodeList, err := common.GetNodeList(experimentsDetails.TargetNode, experimentsDetails.NodesAffectedPerc, clients)
 	if err != nil {
 		return err
 	}

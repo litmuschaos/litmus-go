@@ -28,7 +28,7 @@ func PrepareNodeCPUHog(experimentsDetails *experimentTypes.ExperimentDetails, cl
 	}
 
 	//Select node for node-cpu-hog
-	targetNodeList, err := common.GetNodeList(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.TargetNode, experimentsDetails.NodesAffectedPerc, clients)
+	targetNodeList, err := common.GetNodeList(experimentsDetails.TargetNode, experimentsDetails.NodesAffectedPerc, clients)
 	if err != nil {
 		return err
 	}

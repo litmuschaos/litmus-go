@@ -182,7 +182,7 @@ func GetNodeName(namespace, labels string, clients clients.ClientSets) (string, 
 
 //GetNodeList check for the availibilty of the application node for the chaos execution
 // if the application node is not defined it will derive the random target node list using node affected percentage
-func GetNodeList(namespace, labels, nodeName string, nodeAffPerc int, clients clients.ClientSets) ([]string, error) {
+func GetNodeList(nodeName string, nodeAffPerc int, clients clients.ClientSets) ([]string, error) {
 
 	var nodeList []string
 
