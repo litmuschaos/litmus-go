@@ -9,7 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	awslib "github.com/litmuschaos/litmus-go/pkg/cloud/aws"
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/ec2-terminate/types"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/kube-aws/ec2-terminate/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
@@ -36,16 +36,20 @@ func InjectEC2Terminate(experimentsDetails *experimentTypes.ExperimentDetails, c
 	}
 
 	//Wait for ec2 instance to completely stop
-	log.Info("[Wait]: Wait for EC2 instance to get in stopped state")
+	log.Info("[Wait]: Wait for EC2 instance to come in stopped state")
 	if err = WaitForEC2Down(experimentsDetails); err != nil {
 		return errors.Errorf("unable to stop the ec2 instance err: %v", err)
 	}
+
+	//Wait for chaos duration
+	log.Infof("[Wait]: Waiting for chaos duration of %vs before starting the instance", experimentsDetails.ChaosDuration)
+	time.Sleep(time.Duration(experimentsDetails.ChaosDuration) * time.Second)
 
 	//Starting the EC2 instance
 	log.Info("[Chaos]: Starting back the EC2 instance")
 	err = EC2Start(experimentsDetails)
 	if err != nil {
-		return errors.Errorf("ec2 instance failed to stop err: %v", err)
+		return errors.Errorf("ec2 instance failed to start err: %v", err)
 	}
 
 	//Wait for ec2 instance to come in running state
@@ -91,10 +95,10 @@ func EC2Stop(experimentsDetails *experimentTypes.ExperimentDetails) error {
 		}
 	}
 
-	log.InfoWithValues("Stoping an ec2 instance:", logrus.Fields{
+	log.InfoWithValues("Stopping an ec2 instance:", logrus.Fields{
 		"CurrentState":  *result.StoppingInstances[0].CurrentState.Name,
 		"PreviousState": *result.StoppingInstances[0].PreviousState.Name,
-		"InstanceId":    *result.StoppingInstances[0].PreviousState,
+		"InstanceId":    *result.StoppingInstances[0].InstanceId,
 	})
 
 	return nil
@@ -133,7 +137,7 @@ func EC2Start(experimentsDetails *experimentTypes.ExperimentDetails) error {
 	log.InfoWithValues("Starting ec2 instance:", logrus.Fields{
 		"CurrentState":  *result.StartingInstances[0].CurrentState.Name,
 		"PreviousState": *result.StartingInstances[0].PreviousState.Name,
-		"InstanceId":    *result.StartingInstances[0].PreviousState,
+		"InstanceId":    *result.StartingInstances[0].InstanceId,
 	})
 
 	return nil

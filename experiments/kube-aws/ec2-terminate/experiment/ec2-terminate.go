@@ -5,12 +5,15 @@ import (
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/cloud/aws"
 	"github.com/litmuschaos/litmus-go/pkg/events"
-	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/ec2-terminate/environment"
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/ec2-terminate/types"
+	experimentEnv "github.com/litmuschaos/litmus-go/pkg/kube-aws/ec2-terminate/environment"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/kube-aws/ec2-terminate/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/result"
+	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
+	"github.com/sirupsen/logrus"
+	"k8s.io/klog"
 )
 
 // EC2Terminate inject the ebs volume loss chaos
@@ -42,13 +45,43 @@ func EC2Terminate(clients clients.ClientSets) {
 	err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT")
 	if err != nil {
 		log.Errorf("Unable to Create the Chaos Result, err: %v", err)
-		failStep := "Updating the chaos result of disk-loss experiment (SOT)"
+		failStep := "Updating the chaos result of ec2 terminate experiment (SOT)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
 
 	// Set the chaos result uid
 	result.SetResultUID(&resultDetails, clients, &chaosDetails)
+
+	//DISPLAY THE APP INFORMATION
+	log.InfoWithValues("The application information is as follows", logrus.Fields{
+		"Namespace":      experimentsDetails.AppNS,
+		"Label":          experimentsDetails.AppLabel,
+		"Chaos Duration": experimentsDetails.ChaosDuration,
+		"Ramp Time":      experimentsDetails.RampTime,
+	})
+
+	//PRE-CHAOS APPLICATION STATUS CHECK
+	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (pre-chaos)")
+	err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
+	if err != nil {
+		log.Errorf("Application status check failed, err: %v", err)
+		failStep := "Verify that the AUT (Application Under Test) is running (pre-chaos)"
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+		return
+	}
+
+	//PRE-CHAOS AUXILIARY APPLICATION STATUS CHECK
+	if experimentsDetails.AuxiliaryAppInfo != "" {
+		log.Info("[Status]: Verify that the Auxiliary Applications are running (pre-chaos)")
+		err = status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
+		if err != nil {
+			log.Errorf("Auxiliary Application status check failed, err: %v", err)
+			failStep := "Verify that the Auxiliary Applications are running (pre-chaos)"
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+			return
+		}
+	}
 
 	// generating the event in chaosresult to marked the verdict as awaited
 	msg := "experiment: " + experimentsDetails.ExperimentName + ", Result: Awaited"
@@ -130,12 +163,34 @@ func EC2Terminate(clients clients.ClientSets) {
 		return
 	}
 	if instanceState != "running" {
-		log.Errorf("fail to get the ec2 instance status as running (post chaos)")
+		log.Errorf("fail to get the ec2 instance status as running (post-chaos)")
 		failStep := "Verify the AWS ec2 instance status (post-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
 	log.Info("[Status]: EC2 instance is in running state (post chaos)")
+
+	//POST-CHAOS APPLICATION STATUS CHECK
+	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (post-chaos)")
+	err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
+	if err != nil {
+		klog.V(0).Infof("Application status check failed, err: %v", err)
+		failStep := "Verify that the AUT (Application Under Test) is running (post-chaos)"
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+		return
+	}
+
+	//POST-CHAOS AUXILIARY APPLICATION STATUS CHECK
+	if experimentsDetails.AuxiliaryAppInfo != "" {
+		log.Info("[Status]: Verify that the Auxiliary Applications are running (post-chaos)")
+		err = status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
+		if err != nil {
+			log.Errorf("Auxiliary Application status check failed, err: %v", err)
+			failStep := "Verify that the Auxiliary Applications are running (post-chaos)"
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+			return
+		}
+	}
 
 	if experimentsDetails.EngineName != "" {
 		// marking AUT as running, as we already checked the status of application under test

@@ -4,14 +4,13 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/ec2-terminate/types"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/kube-aws/ec2-terminate/types"
 	"github.com/pkg/errors"
 )
 
 //GetEC2InstanceStatus will verify and give the ec2 instance details along with ebs volume idetails.
 func GetEC2InstanceStatus(experimentsDetails *experimentTypes.ExperimentDetails) (string, error) {
 
-	var isFound bool
 	// Load session from shared config
 	sess := session.Must(session.NewSessionWithOptions(session.Options{
 		SharedConfigState: session.SharedConfigEnable,
@@ -27,21 +26,14 @@ func GetEC2InstanceStatus(experimentsDetails *experimentTypes.ExperimentDetails)
 		return "", err
 	}
 
-	isFound = false
 	for _, reservationDetails := range result.Reservations {
 
 		for _, instanceDetails := range reservationDetails.Instances {
 
 			if *instanceDetails.InstanceId == experimentsDetails.Ec2InstanceID {
-				isFound = true
 				return *instanceDetails.State.Name, nil
 			}
 		}
 	}
-
-	if isFound == false {
-		return "", errors.Errorf("fail to get the status of ec2 instance with instanceID %v", experimentsDetails.Ec2InstanceID)
-	}
-
-	return "", nil
+	return "", errors.Errorf("fail to get the status of ec2 instance with instanceID %v", experimentsDetails.Ec2InstanceID)
 }

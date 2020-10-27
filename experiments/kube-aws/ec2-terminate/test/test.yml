@@ -13,7 +13,7 @@ spec:
       labels:
         app: litmus-experiment
     spec:
-      serviceAccountName: ebs-loss-sa
+      serviceAccountName: ec2-terminate-sa
       containers:
       - name: gotest
         image: busybox
@@ -21,29 +21,11 @@ spec:
           - sleep 
           - "3600"
         env:
-          - name: APP_NAMESPACE
-            value: 'default'
-
-          - name: APP_LABEL
-            value: 'run=nginx'
-
-          - name: APP_KIND
-            value: 'deployment'
-
-          - name: TOTAL_CHAOS_DURATION
-            value: '60'
-
           - name: LIB
             value: 'litmus'
 
           - name: EC2_INSTANCE_ID
             value: ''
-
-          - name: EBS_VOL_ID
-            value: ''
-
-          - name: DEVICE_NAME
-            value: '/dev/sdf'
 
           - name: CHAOS_NAMESPACE
             value: 'default'
@@ -58,3 +40,7 @@ spec:
             valueFrom:
               fieldRef:
                 fieldPath: metadata.name
+
+          secrets:
+            - name: cloud-secret
+              mountPath: /tmp/                 
