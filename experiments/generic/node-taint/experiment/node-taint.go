@@ -58,9 +58,10 @@ func NodeTaint(clients clients.ClientSets) {
 
 	//DISPLAY THE APP INFORMATION
 	log.InfoWithValues("The application information is as follows", logrus.Fields{
-		"Namespace": experimentsDetails.AppNS,
-		"Label":     experimentsDetails.AppLabel,
-		"Ramp Time": experimentsDetails.RampTime,
+		"Namespace":   experimentsDetails.AppNS,
+		"Label":       experimentsDetails.AppLabel,
+		"Target Node": experimentsDetails.TargetNode,
+		"Ramp Time":   experimentsDetails.RampTime,
 	})
 
 	//PRE-CHAOS APPLICATION STATUS CHECK
