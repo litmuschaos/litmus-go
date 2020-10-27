@@ -22,7 +22,6 @@ type ExperimentDetails struct {
 	RunID            string
 	Timeout          int
 	Delay            int
-	AppCheck         string
 	Ec2InstanceID    string
 	EBSVolumeID      string
 	DeviceName       string

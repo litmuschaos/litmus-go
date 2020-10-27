@@ -58,3 +58,6 @@ spec:
             valueFrom:
               fieldRef:
                 fieldPath: metadata.name
+          secrets:
+            - name: cloud-secret
+              mountPath: /tmp/

@@ -9,7 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	ebs "github.com/litmuschaos/litmus-go/pkg/cloud/aws"
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/ebs-loss/types"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/kube-aws/ebs-loss/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
@@ -138,6 +138,10 @@ func EBSVolumeAttach(experimentsDetails *experimentTypes.ExperimentDetails) erro
 		"Device":     *result.Device,
 		"InstanceId": *result.InstanceId,
 	})
+
+	//Wait for instance to get attached
+	log.Info("[Wait]: Wait for ebs vol to reattach")
+	time.Sleep(10 * time.Second)
 
 	return nil
 }

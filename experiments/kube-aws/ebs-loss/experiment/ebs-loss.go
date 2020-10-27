@@ -5,8 +5,8 @@ import (
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/cloud/aws"
 	"github.com/litmuschaos/litmus-go/pkg/events"
-	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/ebs-loss/environment"
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/ebs-loss/types"
+	experimentEnv "github.com/litmuschaos/litmus-go/pkg/kube-aws/ebs-loss/environment"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/kube-aws/ebs-loss/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/result"
@@ -44,7 +44,7 @@ func EBSLoss(clients clients.ClientSets) {
 	err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT")
 	if err != nil {
 		log.Errorf("Unable to Create the Chaos Result, err: %v", err)
-		failStep := "Updating the chaos result of disk-loss experiment (SOT)"
+		failStep := "Updating the chaos result of ebs-loss experiment (SOT)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -59,22 +59,19 @@ func EBSLoss(clients clients.ClientSets) {
 
 	//DISPLAY THE APP INFORMATION
 	log.InfoWithValues("The application information is as follows", logrus.Fields{
-		"Namespace":   experimentsDetails.AppNS,
-		"Label":       experimentsDetails.AppLabel,
-		"Ramp Time":   experimentsDetails.RampTime,
-		"Device Name": experimentsDetails.DeviceName,
+		"App Namespace": experimentsDetails.AppNS,
+		"AppLabel":      experimentsDetails.AppLabel,
+		"Ramp Time":     experimentsDetails.RampTime,
 	})
 
 	//PRE-CHAOS APPLICATION STATUS CHECK
-	if experimentsDetails.AppCheck == "true" {
-		log.Info("[Status]: Verify thadisk-status-check.got the AUT (Application Under Test) is running (pre-chaos)")
-		err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
-		if err != nil {
-			log.Errorf("Application status check failed, err: %v", err)
-			failStep := "Verify that the AUT (Application Under Test) is running (pre-chaos)"
-			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-			return
-		}
+	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (pre-chaos)")
+	err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
+	if err != nil {
+		log.Errorf("Application status check failed, err: %v", err)
+		failStep := "Verify that the AUT (Application Under Test) is running (pre-chaos)"
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+		return
 	}
 
 	if experimentsDetails.EngineName != "" {
@@ -102,7 +99,7 @@ func EBSLoss(clients clients.ClientSets) {
 	}
 
 	//PRE-CHAOS AUXILIARY APPLICATION STATUS CHECK
-	if experimentsDetails.AuxiliaryAppInfo != "" && experimentsDetails.AppCheck == "true" {
+	if experimentsDetails.AuxiliaryAppInfo != "" {
 		log.Info("[Status]: Verify that the Auxiliary Applications are running (pre-chaos)")
 		err = status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 		if err != nil {
@@ -124,8 +121,8 @@ func EBSLoss(clients clients.ClientSets) {
 	//Verify the aws ec2 instance is attached to ebs volume
 	EBSStatus, err := aws.GetEBSStatus(&experimentsDetails)
 	if err != nil || EBSStatus != "attached" {
-		log.Errorf("fail to verify the ec2 instance attachment with ebs pre chaos err: %v", err)
-		failStep := "Verify the AWS ec2 instance is attached to ebs volume (pre-chaos)"
+		log.Errorf("fail to verify the ebs volume is attached to an ec2 instance pre chaos err: %v", err)
+		failStep := "Verify the ebs volume is attached to an ec2 instance (pre-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -149,20 +146,17 @@ func EBSLoss(clients clients.ClientSets) {
 	}
 
 	//POST-CHAOS APPLICATION STATUS CHECK
-	if experimentsDetails.AppCheck == "true" {
-
-		log.Info("[Status]: Verify that the AUT (Application Under Test) is running (post-chaos)")
-		err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
-		if err != nil {
-			log.Errorf("Application status check failed, err: %v", err)
-			failStep := "Verify that the AUT (Application Under Test) is running (post-chaos)"
-			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-			return
-		}
+	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (post-chaos)")
+	err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
+	if err != nil {
+		log.Errorf("Application status check failed, err: %v", err)
+		failStep := "Verify that the AUT (Application Under Test) is running (post-chaos)"
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+		return
 	}
 
 	//POST-CHAOS AUXILIARY APPLICATION STATUS CHECK
-	if experimentsDetails.AuxiliaryAppInfo != "" && experimentsDetails.AppCheck == "true" {
+	if experimentsDetails.AuxiliaryAppInfo != "" {
 		log.Info("[Status]: Verify that the Auxiliary Applications are running (post-chaos)")
 		err = status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 		if err != nil {
@@ -176,8 +170,8 @@ func EBSLoss(clients clients.ClientSets) {
 	//Verify the aws ec2 instance is attached to ebs volume
 	EBSStatus, err = aws.GetEBSStatus(&experimentsDetails)
 	if err != nil || EBSStatus != "attached" {
-		log.Errorf("fail to verify the ec2 instance attachment with ebs post chaos err: %v", err)
-		failStep := "Verify the AWS ec2 instance is attached to ebs volume (pre-chaos)"
+		log.Errorf("fai to verify the ebs volume is attached to an ec2 instance post chaos err: %v", err)
+		failStep := "Verify the ebs volume is attached to an ec2 instance (post-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
