@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/rand"
 	"os/exec"
+	"strconv"
 	"strings"
 	"time"
 
@@ -30,13 +31,13 @@ func PrepareCmdProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets,
 	//DISPLAY THE cmd PROBE INFO
 	if EligibleForPrint(probe.Mode, phase) {
 		log.InfoWithValues("[Probe]: The cmd probe information is as follows", logrus.Fields{
-			"Name":            probe.Name,
-			"Command":         probe.CmdProbeInputs.Command,
-			"Expected Result": probe.CmdProbeInputs.ExpectedResult,
-			"Source":          probe.CmdProbeInputs.Source,
-			"Run Properties":  probe.RunProperties,
-			"Mode":            probe.Mode,
-			"Phase":           phase,
+			"Name":           probe.Name,
+			"Command":        probe.CmdProbeInputs.Command,
+			"Comparator":     probe.CmdProbeInputs.Comparator,
+			"Source":         probe.CmdProbeInputs.Source,
+			"Run Properties": probe.RunProperties,
+			"Mode":           probe.Mode,
+			"Phase":          phase,
 		})
 	}
 
@@ -182,10 +183,10 @@ func TriggerInlineCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.
 			if err := cmd.Run(); err != nil {
 				return fmt.Errorf("Unable to run command, err: %v", err)
 			}
-			// Trim the extra whitespaces from the output and match the actual output with the expected output
-			if strings.TrimSpace(out.String()) != probe.CmdProbeInputs.ExpectedResult {
+
+			if err = ValidateResult(probe.CmdProbeInputs.Comparator, strings.TrimSpace(out.String())); err != nil {
 				log.Warnf("The %v cmd probe has been Failed", probe.Name)
-				return fmt.Errorf("The probe output didn't match with expected output, %v", out.String())
+				return err
 			}
 
 			probes := types.ProbeArtifact{}
@@ -220,10 +221,10 @@ func TriggerSourceCmdProbe(probe v1alpha1.ProbeAttributes, execCommandDetails li
 			if err != nil {
 				return errors.Errorf("Unable to get output of cmd command, err: %v", err)
 			}
-			// Trim the extra whitespaces from the output and match the actual output with the expected output
-			if strings.TrimSpace(output) != probe.CmdProbeInputs.ExpectedResult {
+
+			if err = ValidateResult(probe.CmdProbeInputs.Comparator, strings.TrimSpace(output)); err != nil {
 				log.Warnf("The %v cmd probe has been Failed", probe.Name)
-				return fmt.Errorf("The probe output didn't match with expected output, %v", output)
+				return err
 			}
 
 			probes := types.ProbeArtifact{}
@@ -352,4 +353,49 @@ func TriggerSourceContinuousCmdProbe(probe v1alpha1.ProbeAttributes, execCommand
 		time.Sleep(time.Duration(probe.RunProperties.ProbePollingInterval) * time.Second)
 	}
 
+}
+
+// ValidateResult ...
+func ValidateResult(comparator v1alpha1.ComparatorInfo, cmdOutput string) error {
+	switch comparator.Type {
+	case "int", "Int":
+		expectedOutput, err := strconv.Atoi(comparator.Value)
+		if err != nil {
+			return err
+		}
+		actualOutput, err := strconv.Atoi(cmdOutput)
+		if err != nil {
+			return err
+		}
+
+		if err = CompareInt(actualOutput, expectedOutput, comparator.Criteria); err != nil {
+			return err
+		}
+
+	case "float", "Float":
+
+		expectedOutput, err := strconv.ParseFloat(comparator.Value, 64)
+		if err != nil {
+			return err
+		}
+		actualOutput, err := strconv.ParseFloat(cmdOutput, 64)
+		if err != nil {
+			return err
+		}
+
+		if err = CompareFloat(actualOutput, expectedOutput, comparator.Criteria); err != nil {
+			return err
+		}
+
+	case "string", "String":
+
+		if err = CompareString(cmdOutput, comparator.Value, comparator.Criteria); err != nil {
+			return err
+		}
+
+	default:
+		return fmt.Errorf("comparator type '%s' not supported in the cmd probe", comparator.Type)
+	}
+
+	return nil
 }

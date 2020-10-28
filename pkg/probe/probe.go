@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"html/template"
+	"strings"
 
 	"github.com/kyokomi/emoji"
 	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
@@ -256,4 +257,91 @@ func ParseCommand(templatedCommand string, resultDetails *types.ResultDetails) (
 
 	return out.String(), nil
 
+}
+
+// CompareString ...
+func CompareString(actualOutput, expectedOutput string, operator string) error {
+	switch operator {
+	case "equal", "Equal":
+		if !(actualOutput == expectedOutput) {
+			return fmt.Errorf("The probe output didn't match with expected criteria")
+		}
+	case "notEqual", "NotEqual":
+		if !(actualOutput != expectedOutput) {
+			return fmt.Errorf("The probe output didn't match with expected criteria")
+		}
+	case "contains", "Contains":
+		if !strings.Contains(actualOutput, expectedOutput) {
+			return fmt.Errorf("The probe output didn't match with expected criteria")
+		}
+	default:
+		return fmt.Errorf("criteria '%s' not supported in the cmd probe", operator)
+	}
+	return nil
+}
+
+// CompareInt ...
+func CompareInt(actualOutput, expectedOutput int, operator string) error {
+	switch operator {
+	case ">=":
+		if !(actualOutput >= expectedOutput) {
+			return fmt.Errorf("The probe output didn't match with expected criteria")
+		}
+	case "<=":
+		if !(actualOutput <= expectedOutput) {
+			return fmt.Errorf("The probe output didn't match with expected criteria")
+		}
+	case ">":
+		if !(actualOutput > expectedOutput) {
+			return fmt.Errorf("The probe output didn't match with expected criteria")
+		}
+	case "<":
+		if !(actualOutput < expectedOutput) {
+			return fmt.Errorf("The probe output didn't match with expected criteria")
+		}
+	case "==":
+		if !(actualOutput == expectedOutput) {
+			return fmt.Errorf("The probe output didn't match with expected criteria")
+		}
+	case "!= ":
+		if !(actualOutput != expectedOutput) {
+			return fmt.Errorf("The probe output didn't match with expected criteria")
+		}
+	default:
+		return fmt.Errorf("criteria '%s' not supported in the cmd probe", operator)
+	}
+	return nil
+}
+
+// CompareFloat ...
+func CompareFloat(actualOutput, expectedOutput float64, operator string) error {
+	switch operator {
+	case ">=":
+		if !(actualOutput >= expectedOutput) {
+			return fmt.Errorf("The probe output didn't match with expected criteria")
+		}
+	case "<=":
+		if !(actualOutput <= expectedOutput) {
+			return fmt.Errorf("The probe output didn't match with expected criteria")
+		}
+	case ">":
+		if !(actualOutput > expectedOutput) {
+			return fmt.Errorf("The probe output didn't match with expected criteria")
+		}
+	case "<":
+		if !(actualOutput < expectedOutput) {
+			return fmt.Errorf("The probe output didn't match with expected criteria")
+		}
+	case "==":
+		if !(actualOutput == expectedOutput) {
+			return fmt.Errorf("The probe output didn't match with expected criteria")
+		}
+	case "!= ":
+		if !(actualOutput != expectedOutput) {
+			return fmt.Errorf("The probe output didn't match with expected criteria")
+		}
+	default:
+		return fmt.Errorf("criteria '%s' not supported in the cmd probe", operator)
+	}
+	return nil
 }
