@@ -31,6 +31,7 @@ import (
 	podNetworkLatency "github.com/litmuschaos/litmus-go/experiments/generic/pod-network-latency/experiment"
 	podNetworkLoss "github.com/litmuschaos/litmus-go/experiments/generic/pod-network-loss/experiment"
 	kafkaBrokerPodFailure "github.com/litmuschaos/litmus-go/experiments/kafka/kafka-broker-pod-failure/experiment"
+	ec2terminate "github.com/litmuschaos/litmus-go/experiments/kube-aws/ec2-terminate/experiment"
 	ebsLoss "github.com/litmuschaos/litmus-go/experiments/kube-aws/ebs-loss/experiment"
 
 	"github.com/litmuschaos/litmus-go/pkg/clients"
@@ -101,6 +102,8 @@ func main() {
 		podNetworkLoss.PodNetworkLoss(clients)
 	case "cassandra-pod-delete":
 		cassandraPodDelete.CasssandraPodDelete(clients)
+	case "ec2-terminate":
+		ec2terminate.EC2Terminate(clients)
 	case "ebs-loss":
 		ebsLoss.EBSLoss(clients)
 	default:
