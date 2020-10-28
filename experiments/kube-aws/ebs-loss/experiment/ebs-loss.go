@@ -1,11 +1,12 @@
 package experiment
 
 import (
-	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/node-taint/lib"
+	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/ebs-loss/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
+	"github.com/litmuschaos/litmus-go/pkg/cloud/aws"
 	"github.com/litmuschaos/litmus-go/pkg/events"
-	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/node-taint/environment"
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/node-taint/types"
+	experimentEnv "github.com/litmuschaos/litmus-go/pkg/kube-aws/ebs-loss/environment"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/kube-aws/ebs-loss/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/result"
@@ -14,8 +15,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// NodeTaint inject the node-taint chaos
-func NodeTaint(clients clients.ClientSets) {
+// EBSLoss inject the ebs volume loss chaos
+func EBSLoss(clients clients.ClientSets) {
 
 	var err error
 	experimentsDetails := experimentTypes.ExperimentDetails{}
@@ -43,7 +44,7 @@ func NodeTaint(clients clients.ClientSets) {
 	err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT")
 	if err != nil {
 		log.Errorf("Unable to Create the Chaos Result, err: %v", err)
-		failStep := "Updating the chaos result of node-taint experiment (SOT)"
+		failStep := "Updating the chaos result of ebs-loss experiment (SOT)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -58,10 +59,9 @@ func NodeTaint(clients clients.ClientSets) {
 
 	//DISPLAY THE APP INFORMATION
 	log.InfoWithValues("The application information is as follows", logrus.Fields{
-		"Namespace":   experimentsDetails.AppNS,
-		"Label":       experimentsDetails.AppLabel,
-		"Target Node": experimentsDetails.TargetNode,
-		"Ramp Time":   experimentsDetails.RampTime,
+		"App Namespace": experimentsDetails.AppNS,
+		"AppLabel":      experimentsDetails.AppLabel,
+		"Ramp Time":     experimentsDetails.RampTime,
 	})
 
 	//PRE-CHAOS APPLICATION STATUS CHECK
@@ -72,18 +72,6 @@ func NodeTaint(clients clients.ClientSets) {
 		failStep := "Verify that the AUT (Application Under Test) is running (pre-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
-	}
-
-	//PRE-CHAOS AUXILIARY APPLICATION STATUS CHECK
-	if experimentsDetails.AuxiliaryAppInfo != "" {
-		log.Info("[Status]: Verify that the Auxiliary Applications are running (pre-chaos)")
-		err = status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
-		if err != nil {
-			log.Errorf("Auxiliary Application status check failed, err: %v", err)
-			failStep := "Verify that the Auxiliary Applications are running (pre-chaos)"
-			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-			return
-		}
 	}
 
 	if experimentsDetails.EngineName != "" {
@@ -110,16 +98,45 @@ func NodeTaint(clients clients.ClientSets) {
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
-	// Including the litmus lib for node-taint
+	//PRE-CHAOS AUXILIARY APPLICATION STATUS CHECK
+	if experimentsDetails.AuxiliaryAppInfo != "" {
+		log.Info("[Status]: Verify that the Auxiliary Applications are running (pre-chaos)")
+		err = status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
+		if err != nil {
+			log.Errorf("Auxiliary Application status check failed, err: %v", err)
+			failStep := "Verify that the Auxiliary Applications are running (pre-chaos)"
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+			return
+		}
+	}
+
+	//Configure AWS Credentials
+	if err = aws.ConfigureAWS(); err != nil {
+		log.Errorf("AWS authentication failed err: %v", err)
+		failStep := "Configure AWS configuration (pre-chaos)"
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+		return
+	}
+
+	//Verify the aws ec2 instance is attached to ebs volume
+	EBSStatus, err := aws.GetEBSStatus(&experimentsDetails)
+	if err != nil || EBSStatus != "attached" {
+		log.Errorf("fail to verify the ebs volume is attached to an ec2 instance pre chaos err: %v", err)
+		failStep := "Verify the ebs volume is attached to an ec2 instance (pre-chaos)"
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+		return
+	}
+
+	// Including the litmus lib for ebs-loss
 	if experimentsDetails.ChaosLib == "litmus" {
-		err = litmusLIB.PrepareNodeTaint(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
+		err = litmusLIB.InjectEBSLoss(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
 		if err != nil {
 			log.Errorf("Chaos injection failed, err: %v", err)
 			failStep := "failed in chaos injection phase"
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}
-		log.Info("[Confirmation]: The application node has been tainted successfully")
+		log.Info("[Confirmation]: EBS loss chaos has been injected successfully")
 		resultDetails.Verdict = "Pass"
 	} else {
 		log.Error("[Invalid]: Please Provide the correct LIB")
@@ -150,6 +167,15 @@ func NodeTaint(clients clients.ClientSets) {
 		}
 	}
 
+	//Verify the aws ec2 instance is attached to ebs volume
+	EBSStatus, err = aws.GetEBSStatus(&experimentsDetails)
+	if err != nil || EBSStatus != "attached" {
+		log.Errorf("fai to verify the ebs volume is attached to an ec2 instance post chaos err: %v", err)
+		failStep := "Verify the ebs volume is attached to an ec2 instance (post-chaos)"
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+		return
+	}
+
 	if experimentsDetails.EngineName != "" {
 		// marking AUT as running, as we already checked the status of application under test
 		msg := "AUT: Running"
@@ -178,7 +204,7 @@ func NodeTaint(clients clients.ClientSets) {
 	log.Infof("[The End]: Updating the chaos result of %v experiment (EOT)", experimentsDetails.ExperimentName)
 	err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 	if err != nil {
-		log.Fatalf("Unable to Update the Chaos Result, err: %v", err)
+		log.Fatalf("Unable to Update the Chaos Result err:  %v\n", err)
 	}
 
 	// generating the event in chaosresult to marked the verdict as pass/fail

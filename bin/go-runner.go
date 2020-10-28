@@ -32,6 +32,7 @@ import (
 	podNetworkLoss "github.com/litmuschaos/litmus-go/experiments/generic/pod-network-loss/experiment"
 	kafkaBrokerPodFailure "github.com/litmuschaos/litmus-go/experiments/kafka/kafka-broker-pod-failure/experiment"
 	ec2terminate "github.com/litmuschaos/litmus-go/experiments/kube-aws/ec2-terminate/experiment"
+	ebsLoss "github.com/litmuschaos/litmus-go/experiments/kube-aws/ebs-loss/experiment"
 
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/log"
@@ -103,6 +104,8 @@ func main() {
 		cassandraPodDelete.CasssandraPodDelete(clients)
 	case "ec2-terminate":
 		ec2terminate.EC2Terminate(clients)
+	case "ebs-loss":
+		ebsLoss.EBSLoss(clients)
 	default:
 		log.Fatalf("Unsupported -name %v, please provide the correct value of -name args", *experimentName)
 	}

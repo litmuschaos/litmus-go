@@ -20,9 +20,10 @@ type ExperimentDetails struct {
 	ChaosPodName     string
 	AuxiliaryAppInfo string
 	RunID            string
-	TargetNode       string
 	Timeout          int
 	Delay            int
-	Annotations      map[string]string
-	LIBImage         string
+	Ec2InstanceID    string
+	EBSVolumeID      string
+	DeviceName       string
+	Region           string
 }
