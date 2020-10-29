@@ -35,7 +35,13 @@ func PrepareHTTPProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets
 	// if mode is SOT & phase is PreChaos, it will trigger Probes in PreChaos section
 	// if mode is EOT & phase is PostChaos, it will trigger Probes in PostChaos section
 	// if mode is Edge then independent of phase, it will trigger Probes in both Pre/Post Chaos section
-	if (probe.Mode == "SOT" && phase == "PreChaos") || (probe.Mode == "EOT" && phase == "PostChaos") || probe.Mode == "Edge" {
+	if ValidMPCombinationForNonContinuousMode(probe.Mode, phase) {
+
+		// waiting for initial delay
+		if probe.RunProperties.InitialDelaySeconds != 0 {
+			log.Infof("[Wait]: Waiting for %vs before probe execution", probe.RunProperties.InitialDelaySeconds)
+			time.Sleep(time.Duration(probe.RunProperties.InitialDelaySeconds) * time.Second)
+		}
 
 		// trigger the http probe
 		err = TriggerHTTPProbe(probe, resultDetails)
@@ -47,11 +53,11 @@ func PrepareHTTPProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets
 		}
 	}
 	// trigger probes for the continuous mode
-	if probe.Mode == "Continuous" && phase == "PreChaos" {
+	if ValidMPCombinationForContinuousMode(probe.Mode, phase) {
 		go TriggerContinuousHTTPProbe(probe, resultDetails)
 	}
 	// verify the continuous mode and marked the result of probes
-	if probe.Mode == "Continuous" && phase == "PostChaos" {
+	if (probe.Mode == "Continuous" || probe.Mode == "OnChaos") && phase == "PostChaos" {
 		// it will check for the error, It will detect the error if any error encountered in probe during chaos
 		err = CheckForErrorInContinuousProbe(resultDetails, probe.Name)
 		// failing the probe, if the success condition doesn't met after the retry & timeout combinations
@@ -98,6 +104,13 @@ func TriggerHTTPProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 
 // TriggerContinuousHTTPProbe trigger the continuous http probes
 func TriggerContinuousHTTPProbe(probe v1alpha1.ProbeAttributes, chaosresult *types.ResultDetails) {
+
+	// waiting for initial delay
+	if probe.RunProperties.InitialDelaySeconds != 0 {
+		log.Infof("[Wait]: Waiting for %vs before probe execution", probe.RunProperties.InitialDelaySeconds)
+		time.Sleep(time.Duration(probe.RunProperties.InitialDelaySeconds) * time.Second)
+	}
+
 	// it trigger the http probe for the entire duration of chaos and it fails, if any error encounter
 	// it marked the error for the probes, if any
 	for {

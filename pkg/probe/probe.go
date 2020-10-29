@@ -15,7 +15,17 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-var err error
+var (
+	err error
+	// PhaseModeMap contains valid phase and mode combination
+	PhaseModeMap = map[string][]string{
+		"SOT":        {"PreChaos"},
+		"EOT":        {"PostChaos"},
+		"Edge":       {"PreChaos", "PostChaos"},
+		"Continuous": {"PreChaos"},
+		"OnChaos":    {"DuringChaos"},
+	}
+)
 
 // RunProbes contains the steps to trigger the probes
 // It contains steps to trigger all three probes: k8sprobe, httpprobe, cmdprobe
@@ -69,12 +79,12 @@ func SetProbeVerdict(resultDetails *types.ResultDetails, verdict, probeName, pro
 	for index, probe := range resultDetails.ProbeDetails {
 		if probe.Name == probeName && probe.Type == probeType {
 
-			if phase == "PreChaos" && (mode == "SOT" || mode == "Edge") {
-				resultDetails.ProbeDetails[index].Status["PreChaos"] = verdict + emoji.Sprint(" :thumbsup:")
-			} else if phase == "PostChaos" && (mode == "EOT" || mode == "Edge") {
-				resultDetails.ProbeDetails[index].Status["PostChaos"] = verdict + emoji.Sprint(" :thumbsup:")
+			if ValidMPCombinationForNonContinuousMode(mode, phase) {
+				resultDetails.ProbeDetails[index].Status[phase] = verdict + emoji.Sprint(" :thumbsup:")
 			} else if phase == "PostChaos" && mode == "Continuous" {
 				resultDetails.ProbeDetails[index].Status["Continuous"] = verdict + emoji.Sprint(" :thumbsup:")
+			} else if phase == "PostChaos" && mode == "OnChaos" {
+				resultDetails.ProbeDetails[index].Status["OnChaos"] = verdict + emoji.Sprint(" :thumbsup:")
 			}
 		}
 	}
@@ -91,6 +101,9 @@ func SetProbeVerdictAfterFailure(resultDetails *types.ResultDetails) {
 		}
 		if resultDetails.ProbeDetails[index].Status["Continuous"] == "Awaited" {
 			resultDetails.ProbeDetails[index].Status["Continuous"] = "Better Luck Next Time" + emoji.Sprint(" :thumbsdown:")
+		}
+		if resultDetails.ProbeDetails[index].Status["OnChaos"] == "Awaited" {
+			resultDetails.ProbeDetails[index].Status["OnChaos"] = "Better Luck Next Time" + emoji.Sprint(" :thumbsdown:")
 		}
 	}
 
@@ -160,9 +173,13 @@ func SetProbeIntialStatus(probeDetails *types.ProbeDetails, mode string) {
 		probeDetails.Status = map[string]string{
 			"PostChaos": "Awaited",
 		}
-	} else {
+	} else if mode == "Continuous" {
 		probeDetails.Status = map[string]string{
 			"Continuous": "Awaited",
+		}
+	} else {
+		probeDetails.Status = map[string]string{
+			"OnChaos": "Awaited",
 		}
 	}
 }
@@ -206,7 +223,7 @@ func MarkedVerdictInEnd(err error, resultDetails *types.ResultDetails, probeName
 	}
 	// counting the passed probes count to generate the score and mark the verdict as passed
 	// for edge, probe is marked as Passed if passed in both pre/post chaos checks
-	if !((mode == "Edge" || mode == "Continuous") && phase == "PreChaos") {
+	if !((mode == "Edge" && phase == "PreChaos") || ValidMPCombinationForContinuousMode(mode, phase)) {
 		resultDetails.PassedProbeCount++
 	}
 	log.InfoWithValues("[Probe]: "+probeName+" probe has been Passed "+emoji.Sprint(":smile:"), logrus.Fields{
@@ -232,12 +249,35 @@ func CheckForErrorInContinuousProbe(resultDetails *types.ResultDetails, probeNam
 	return nil
 }
 
-// EligibleForPrint check whether the probe detail print is required or not
+// EligibleForPrint check whether the mode-phase combination is eligible for print or not
 func EligibleForPrint(mode, phase string) bool {
-	if (mode == "EOT" && phase == "PreChaos") || ((mode == "SOT" || mode == "Continuous") && phase == "PostChaos") {
+	return Contains(PhaseModeMap[mode], phase)
+}
+
+// ValidMPCombinationForContinuousMode ...
+func ValidMPCombinationForContinuousMode(mode, phase string) bool {
+	if mode != "Continuous" && mode != "OnChaos" {
 		return false
 	}
-	return true
+	return Contains(PhaseModeMap[mode], phase)
+}
+
+// ValidMPCombinationForNonContinuousMode ...
+func ValidMPCombinationForNonContinuousMode(mode, phase string) bool {
+	if mode == "Continuous" || mode == "OnChaos" {
+		return false
+	}
+	return Contains(PhaseModeMap[mode], phase)
+}
+
+// Contains check for the existance of element inside slice
+func Contains(array []string, val string) bool {
+	for index := range array {
+		if array[index] == val {
+			return true
+		}
+	}
+	return false
 }
 
 // ParseCommand parse the templated command and replace the templated value by actual value

@@ -36,7 +36,13 @@ func PrepareK8sProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Result
 	// if mode is SOT & phase is PreChaos, it will trigger Probes in PreChaos section
 	// if mode is EOT & phase is PostChaos, it will trigger Probes in PostChaos section
 	// if mode is Edge then independent of phase, it will trigger Probes in both Pre/Post Chaos section
-	if (probe.Mode == "SOT" && phase == "PreChaos") || (probe.Mode == "EOT" && phase == "PostChaos") || probe.Mode == "Edge" {
+	if ValidMPCombinationForNonContinuousMode(probe.Mode, phase) {
+
+		// waiting for initial delay
+		if probe.RunProperties.InitialDelaySeconds != 0 {
+			log.Infof("[Wait]: Waiting for %vs before probe execution", probe.RunProperties.InitialDelaySeconds)
+			time.Sleep(time.Duration(probe.RunProperties.InitialDelaySeconds) * time.Second)
+		}
 
 		// triggering the k8s probe
 		err = TriggerK8sProbe(probe, clients, resultDetails)
@@ -48,11 +54,11 @@ func PrepareK8sProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Result
 		}
 	}
 	// trigger probes for the continuous mode
-	if probe.Mode == "Continuous" && phase == "PreChaos" {
+	if ValidMPCombinationForContinuousMode(probe.Mode, phase) {
 		go TriggerContinuousK8sProbe(probe, clients, resultDetails)
 	}
 	// verify the continuous mode and marked the result of the probes
-	if probe.Mode == "Continuous" && phase == "PostChaos" {
+	if (probe.Mode == "Continuous" || probe.Mode == "OnChaos") && phase == "PostChaos" {
 		// it will check for the error, It will detect the error if any error encountered in probe during chaos
 		err = CheckForErrorInContinuousProbe(resultDetails, probe.Name)
 		// failing the probe, if the success condition doesn't met after the retry & timeout combinations
@@ -135,6 +141,13 @@ func TriggerK8sProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets,
 
 // TriggerContinuousK8sProbe trigger the continuous k8s probes
 func TriggerContinuousK8sProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets, chaosresult *types.ResultDetails) {
+
+	// waiting for initial delay
+	if probe.RunProperties.InitialDelaySeconds != 0 {
+		log.Infof("[Wait]: Waiting for %vs before probe execution", probe.RunProperties.InitialDelaySeconds)
+		time.Sleep(time.Duration(probe.RunProperties.InitialDelaySeconds) * time.Second)
+	}
+
 	// it trigger the k8s probe for the entire duration of chaos and it fails, if any error encounter
 	// marked the error for the probes, if any
 	for {

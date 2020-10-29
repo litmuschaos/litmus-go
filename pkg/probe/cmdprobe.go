@@ -47,7 +47,13 @@ func PrepareCmdProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets,
 		// if mode is SOT & phase is PreChaos, it will trigger Probes in PreChaos section
 		// if mode is EOT & phase is PostChaos, it will trigger Probes in PostChaos section
 		// if mode is Edge then independent of phase, it will trigger Probes in both Pre/Post Chaos section
-		if (probe.Mode == "SOT" && phase == "PreChaos") || (probe.Mode == "EOT" && phase == "PostChaos") || probe.Mode == "Edge" {
+		if ValidMPCombinationForNonContinuousMode(probe.Mode, phase) {
+
+			// waiting for initial delay
+			if probe.RunProperties.InitialDelaySeconds != 0 {
+				log.Infof("[Wait]: Waiting for %vs before probe execution", probe.RunProperties.InitialDelaySeconds)
+				time.Sleep(time.Duration(probe.RunProperties.InitialDelaySeconds) * time.Second)
+			}
 
 			err = TriggerInlineCmdProbe(probe, resultDetails)
 
@@ -58,12 +64,13 @@ func PrepareCmdProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets,
 			}
 		}
 		// trigger probes for the continuous mode
-		if probe.Mode == "Continuous" && phase == "PreChaos" {
+		if ValidMPCombinationForContinuousMode(probe.Mode, phase) {
+
 			go TriggerInlineContinuousCmdProbe(probe, resultDetails)
 		}
 		// verify the continuous probe status
 		// marked the result of continuous probe
-		if probe.Mode == "Continuous" && phase == "PostChaos" {
+		if (probe.Mode == "Continuous" || probe.Mode == "OnChaos") && phase == "PostChaos" {
 			// it will check for the error, It will detect the error if any error encountered in probe during chaos
 			err = CheckForErrorInContinuousProbe(resultDetails, probe.Name)
 			// failing the probe, if the success condition doesn't met after the retry & timeout combinations
@@ -73,7 +80,7 @@ func PrepareCmdProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets,
 		}
 	} else {
 
-		if (probe.Mode == "SOT" && phase == "PreChaos") || (probe.Mode == "EOT" && phase == "PostChaos") || probe.Mode == "Edge" {
+		if ValidMPCombinationForNonContinuousMode(probe.Mode, phase) {
 			// Generate the run_id
 			runID := GetRunID()
 
@@ -88,6 +95,12 @@ func PrepareCmdProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets,
 			err = status.CheckApplicationStatus(chaosDetails.ChaosNamespace, "name="+chaosDetails.ExperimentName+"-probe-"+runID, chaosDetails.Timeout, chaosDetails.Delay, clients)
 			if err != nil {
 				return errors.Errorf("probe pod is not in running state, err: %v", err)
+			}
+
+			// waiting for initial delay
+			if probe.RunProperties.InitialDelaySeconds != 0 {
+				log.Infof("[Wait]: Waiting for %vs before probe execution", probe.RunProperties.InitialDelaySeconds)
+				time.Sleep(time.Duration(probe.RunProperties.InitialDelaySeconds) * time.Second)
 			}
 
 			// setting the attributes for the exec command
@@ -109,7 +122,7 @@ func PrepareCmdProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets,
 			}
 		}
 		// trigger probes for the continuous mode
-		if probe.Mode == "Continuous" && phase == "PreChaos" {
+		if ValidMPCombinationForContinuousMode(probe.Mode, phase) {
 			// Generate the run_id
 			runID := GetRunID()
 			SetRunIDForProbe(resultDetails, probe.Name, probe.Type, runID)
@@ -136,7 +149,7 @@ func PrepareCmdProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets,
 		}
 		// verify the continuous mode
 		// marked the result of continuous probe
-		if probe.Mode == "Continuous" && phase == "PostChaos" {
+		if (probe.Mode == "Continuous" || probe.Mode == "OnChaos") && phase == "PostChaos" {
 			// it will check for the error, It will detect the error if any error encountered in probe during chaos
 			err = CheckForErrorInContinuousProbe(resultDetails, probe.Name)
 
@@ -308,6 +321,13 @@ func GetRunID() string {
 
 // TriggerInlineContinuousCmdProbe trigger the inline continuous cmd probes
 func TriggerInlineContinuousCmdProbe(probe v1alpha1.ProbeAttributes, chaosresult *types.ResultDetails) {
+
+	// waiting for initial delay
+	if probe.RunProperties.InitialDelaySeconds != 0 {
+		log.Infof("[Wait]: Waiting for %vs before probe execution", probe.RunProperties.InitialDelaySeconds)
+		time.Sleep(time.Duration(probe.RunProperties.InitialDelaySeconds) * time.Second)
+	}
+
 	// it trigger the inline cmd probe for the entire duration of chaos and it fails, if any err encounter
 	// it marked the error for the probes, if any
 	for {
@@ -332,6 +352,13 @@ func TriggerInlineContinuousCmdProbe(probe v1alpha1.ProbeAttributes, chaosresult
 
 // TriggerSourceContinuousCmdProbe trigger the continuous cmd probes having need some external source image
 func TriggerSourceContinuousCmdProbe(probe v1alpha1.ProbeAttributes, execCommandDetails litmusexec.PodDetails, clients clients.ClientSets, chaosresult *types.ResultDetails) {
+
+	// waiting for initial delay
+	if probe.RunProperties.InitialDelaySeconds != 0 {
+		log.Infof("[Wait]: Waiting for %vs before probe execution", probe.RunProperties.InitialDelaySeconds)
+		time.Sleep(time.Duration(probe.RunProperties.InitialDelaySeconds) * time.Second)
+	}
+
 	// it trigger the cmd probe for the entire duration of chaos and it fails, if any err encounter
 	// it marked the error for the probes, if any
 	for {
