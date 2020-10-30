@@ -13,10 +13,10 @@ import (
 )
 
 // CheckApplicationStatus checks the status of the AUT
-func CheckApplicationStatus(appNs string, appLabel string, timeout, delay int, clients clients.ClientSets) error {
+func CheckApplicationStatus(appNs, appLabel string, timeout, delay int, clients clients.ClientSets) error {
 
-	// Checking whether application containers are in running state
-	log.Info("[Status]: Checking whether application containers are in running state")
+	// Checking whether application containers are in ready state
+	log.Info("[Status]: Checking whether application containers are in ready state")
 	err := CheckContainerStatus(appNs, appLabel, timeout, delay, clients)
 	if err != nil {
 		return err
@@ -48,7 +48,7 @@ func CheckAuxiliaryApplicationStatus(AuxiliaryAppDetails string, timeout, delay 
 }
 
 // CheckPodStatus checks the running status of the application pod
-func CheckPodStatus(appNs string, appLabel string, timeout, delay int, clients clients.ClientSets) error {
+func CheckPodStatus(appNs, appLabel string, timeout, delay int, clients clients.ClientSets) error {
 	err := retry.
 		Times(uint(timeout / delay)).
 		Wait(time.Duration(delay) * time.Second).
@@ -73,7 +73,7 @@ func CheckPodStatus(appNs string, appLabel string, timeout, delay int, clients c
 }
 
 // CheckContainerStatus checks the status of the application container
-func CheckContainerStatus(appNs string, appLabel string, timeout, delay int, clients clients.ClientSets) error {
+func CheckContainerStatus(appNs, appLabel string, timeout, delay int, clients clients.ClientSets) error {
 
 	err := retry.
 		Times(uint(timeout / delay)).
@@ -91,8 +91,8 @@ func CheckContainerStatus(appNs string, appLabel string, timeout, delay int, cli
 					if container.Ready != true {
 						return errors.Errorf("containers are not yet in running state")
 					}
-					log.InfoWithValues("[Status]: The running status of container are as follows", logrus.Fields{
-						"container": container.Name, "Pod": pod.Name, "Status": pod.Status.Phase})
+					log.InfoWithValues("[Status]: The Container status are as follows", logrus.Fields{
+						"container": container.Name, "Pod": pod.Name, "Ready": container.Ready})
 				}
 			}
 			return nil
@@ -104,7 +104,7 @@ func CheckContainerStatus(appNs string, appLabel string, timeout, delay int, cli
 }
 
 // WaitForCompletion wait until the completion of pod
-func WaitForCompletion(appNs string, appLabel string, clients clients.ClientSets, duration int, containerName string) (string, error) {
+func WaitForCompletion(appNs, appLabel string, clients clients.ClientSets, duration int, containerName string) (string, error) {
 	var podStatus string
 	// It will wait till the completion of target container
 	// it will retries until the target container completed or met the timeout(chaos duration)

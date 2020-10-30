@@ -35,5 +35,5 @@ func GetEC2InstanceStatus(experimentsDetails *experimentTypes.ExperimentDetails)
 			}
 		}
 	}
-	return "", errors.Errorf("fail to get the status of ec2 instance with instanceID %v", experimentsDetails.Ec2InstanceID)
+	return "", errors.Errorf("failed to get the status of ec2 instance with instanceID %v", experimentsDetails.Ec2InstanceID)
 }

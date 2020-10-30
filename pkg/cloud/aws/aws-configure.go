@@ -21,13 +21,13 @@ func ConfigureAWS() error {
 	log.Info("[Authentication]: Creating credential file in aws directory")
 	err = CreateFile("/root/.aws/credentials")
 	if err != nil {
-		return errors.Errorf("fail to create the credential file err: %v", err)
+		return errors.Errorf("failed to create the credential file, err: %v", err)
 	}
 
 	log.Info("[Authentication]: Copying aws credentials from cloud_config secret")
 	err = Copy("/tmp/cloud_config.yml", "/root/.aws/credentials")
 	if err != nil {
-		return errors.Errorf("failed to copy credentials err: %v", err)
+		return errors.Errorf("failed to copy the credentials, err: %v", err)
 	}
 
 	return nil
