@@ -92,7 +92,7 @@ func CheckContainerStatus(appNs, appLabel string, timeout, delay int, clients cl
 						return errors.Errorf("containers are not yet in running state")
 					}
 					log.InfoWithValues("[Status]: The Container status are as follows", logrus.Fields{
-						"container": container.Name, "Pod": pod.Name, "Ready": container.Ready})
+						"container": container.Name, "Pod": pod.Name, "Readiness": container.Ready})
 				}
 			}
 			return nil
