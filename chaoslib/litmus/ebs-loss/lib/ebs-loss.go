@@ -31,7 +31,7 @@ func InjectEBSLoss(experimentsDetails *experimentTypes.ExperimentDetails, client
 	log.Info("[Chaos]: Detaching the EBS volume from the instance")
 	err = EBSVolumeDetach(experimentsDetails)
 	if err != nil {
-		return errors.Errorf("ebs detachment failed err: %v", err)
+		return errors.Errorf("ebs detachment failed, err: %v", err)
 	}
 
 	//Wait for chaos duration
@@ -41,7 +41,7 @@ func InjectEBSLoss(experimentsDetails *experimentTypes.ExperimentDetails, client
 	//Getting the Ebs status
 	EBSStatus, err := ebs.GetEBSStatus(experimentsDetails)
 	if err != nil {
-		return errors.Errorf("fail to get the ebs status err: %v", err)
+		return errors.Errorf("failed to get the ebs status, err: %v", err)
 	}
 
 	if EBSStatus != "attached" {
@@ -49,7 +49,7 @@ func InjectEBSLoss(experimentsDetails *experimentTypes.ExperimentDetails, client
 		log.Info("[Chaos]: Attaching the EBS volume from the instance")
 		err = EBSVolumeAttach(experimentsDetails)
 		if err != nil {
-			return errors.Errorf("ebs attachment failed err: %v", err)
+			return errors.Errorf("ebs attachment failed, err: %v", err)
 		}
 	} else {
 		log.Info("[Skip]: The EBS volume is already attached")
@@ -140,7 +140,7 @@ func EBSVolumeAttach(experimentsDetails *experimentTypes.ExperimentDetails) erro
 	})
 
 	//Wait for instance to get attached
-	log.Info("[Wait]: Wait for ebs vol to reattach")
+	log.Info("[Wait]: Waiting for ebs vol to reattach")
 	time.Sleep(10 * time.Second)
 
 	return nil

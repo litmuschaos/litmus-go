@@ -114,7 +114,7 @@ func EC2Terminate(clients clients.ClientSets) {
 
 	//Configure AWS Credentials
 	if err = aws.ConfigureAWS(); err != nil {
-		log.Errorf("AWS authentication failed err: %v", err)
+		log.Errorf("AWS authentication failed, err: %v", err)
 		failStep := "Configure AWS configuration (pre-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
@@ -123,13 +123,13 @@ func EC2Terminate(clients clients.ClientSets) {
 	//Verify the aws ec2 instance is running (pre chaos)
 	instanceState, err := aws.GetEC2InstanceStatus(&experimentsDetails)
 	if err != nil {
-		log.Errorf("fail to get the ec2 instance status err: %v", err)
+		log.Errorf("failed to get the ec2 instance status, err: %v", err)
 		failStep := "Verify the AWS ec2 instance status (pre-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
 	if instanceState != "running" {
-		log.Errorf("fail to get the ec2 instance status as running (pre chaos)")
+		log.Errorf("failed to get the ec2 instance status as running (pre chaos)")
 		failStep := "Verify the AWS ec2 instance status (pre-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
@@ -157,13 +157,13 @@ func EC2Terminate(clients clients.ClientSets) {
 	//Verify the aws ec2 instance is running (post chaos)
 	instanceState, err = aws.GetEC2InstanceStatus(&experimentsDetails)
 	if err != nil {
-		log.Errorf("fail to get the ec2 instance status err: %v", err)
+		log.Errorf("failed to get the ec2 instance status, err: %v", err)
 		failStep := "Verify the AWS ec2 instance status (post-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
 	if instanceState != "running" {
-		log.Errorf("fail to get the ec2 instance status as running (post-chaos)")
+		log.Errorf("failed to get the ec2 instance status as running (post-chaos)")
 		failStep := "Verify the AWS ec2 instance status (post-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
@@ -220,7 +220,7 @@ func EC2Terminate(clients clients.ClientSets) {
 	log.Infof("[The End]: Updating the chaos result of %v experiment (EOT)", experimentsDetails.ExperimentName)
 	err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 	if err != nil {
-		log.Fatalf("Unable to Update the Chaos Result err:  %v\n", err)
+		log.Fatalf("Unable to Update the Chaos Result, err:  %v", err)
 	}
 
 	// generating the event in chaosresult to marked the verdict as pass/fail
