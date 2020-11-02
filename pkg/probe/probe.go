@@ -223,7 +223,7 @@ func MarkedVerdictInEnd(err error, resultDetails *types.ResultDetails, probeName
 	}
 	// counting the passed probes count to generate the score and mark the verdict as passed
 	// for edge, probe is marked as Passed if passed in both pre/post chaos checks
-	if !((mode == "Edge" && phase == "PreChaos") || ValidMPCombinationForContinuousMode(mode, phase)) {
+	if !(((mode == "Edge" || mode == "Continuous") && phase == "PreChaos") || (mode == "OnChaos" && phase == "DuringChaos")) {
 		resultDetails.PassedProbeCount++
 	}
 	log.InfoWithValues("[Probe]: "+probeName+" probe has been Passed "+emoji.Sprint(":smile:"), logrus.Fields{
@@ -241,8 +241,7 @@ func CheckForErrorInContinuousProbe(resultDetails *types.ResultDetails, probeNam
 
 	for index, probe := range resultDetails.ProbeDetails {
 		if probe.Name == probeName {
-			err = resultDetails.ProbeDetails[index].IsProbeFailedWithError
-			return err
+			return resultDetails.ProbeDetails[index].IsProbeFailedWithError
 		}
 	}
 
@@ -254,15 +253,8 @@ func EligibleForPrint(mode, phase string) bool {
 	return Contains(PhaseModeMap[mode], phase)
 }
 
-// ValidMPCombinationForContinuousMode ...
-func ValidMPCombinationForContinuousMode(mode, phase string) bool {
-	if mode != "Continuous" && mode != "OnChaos" {
-		return false
-	}
-	return Contains(PhaseModeMap[mode], phase)
-}
-
-// ValidMPCombinationForNonContinuousMode ...
+// ValidMPCombinationForNonContinuousMode check for the valid mode-phase combinations for non continous mode
+// it contains SOT, EOT, Edge modes
 func ValidMPCombinationForNonContinuousMode(mode, phase string) bool {
 	if mode == "Continuous" || mode == "OnChaos" {
 		return false

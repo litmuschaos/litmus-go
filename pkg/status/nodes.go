@@ -34,7 +34,7 @@ func CheckNodeStatus(nodeName string, timeout, delay int, clients clients.Client
 			if !isReady {
 				return errors.Errorf("Node is not in ready state")
 			}
-			log.InfoWithValues("The running status of Nodes are as follows", logrus.Fields{
+			log.InfoWithValues("The Node status are as follows", logrus.Fields{
 				"Node": node.Name, "Ready": isReady})
 
 			return nil
@@ -68,7 +68,7 @@ func CheckNodeNotReadyState(nodeName string, timeout, delay int, clients clients
 			if isReady {
 				return errors.Errorf("Node is not in NotReady state")
 			}
-			log.InfoWithValues("The running status of Nodes are as follows", logrus.Fields{
+			log.InfoWithValues("The Node status are as follows", logrus.Fields{
 				"Node": node.Name, "Ready": isReady})
 
 			return nil

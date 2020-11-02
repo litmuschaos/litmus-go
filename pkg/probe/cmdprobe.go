@@ -11,6 +11,7 @@ import (
 	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/log"
+	"github.com/litmuschaos/litmus-go/pkg/math"
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	litmusexec "github.com/litmuschaos/litmus-go/pkg/utils/exec"
@@ -64,13 +65,18 @@ func PrepareCmdProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets,
 			}
 		}
 		// trigger probes for the continuous mode
-		if ValidMPCombinationForContinuousMode(probe.Mode, phase) {
+		if probe.Mode == "Continuous" && phase == "PreChaos" {
 
 			go TriggerInlineContinuousCmdProbe(probe, resultDetails)
 		}
+		// trigger probes for the onchaos mode
+		if probe.Mode == "OnChaos" && phase == "DuringChaos" {
+
+			go TriggerInlineOnChaosCmdProbe(probe, resultDetails, chaosDetails.ChaosDuration)
+		}
 		// verify the continuous probe status
 		// marked the result of continuous probe
-		if (probe.Mode == "Continuous" || probe.Mode == "OnChaos") && phase == "PostChaos" {
+		if (probe.Mode == "Continuous" && phase == "PostChaos") || (probe.Mode == "OnChaos" && phase == "AfterChaos") {
 			// it will check for the error, It will detect the error if any error encountered in probe during chaos
 			err = CheckForErrorInContinuousProbe(resultDetails, probe.Name)
 			// failing the probe, if the success condition doesn't met after the retry & timeout combinations
@@ -122,7 +128,7 @@ func PrepareCmdProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets,
 			}
 		}
 		// trigger probes for the continuous mode
-		if ValidMPCombinationForContinuousMode(probe.Mode, phase) {
+		if probe.Mode == "Continuous" && phase == "PreChaos" {
 			// Generate the run_id
 			runID := GetRunID()
 			SetRunIDForProbe(resultDetails, probe.Name, probe.Type, runID)
@@ -147,9 +153,35 @@ func PrepareCmdProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets,
 			// trigger the continuous cmd probe
 			go TriggerSourceContinuousCmdProbe(probe, execCommandDetails, clients, resultDetails)
 		}
-		// verify the continuous mode
-		// marked the result of continuous probe
-		if (probe.Mode == "Continuous" || probe.Mode == "OnChaos") && phase == "PostChaos" {
+		// trigger probes for the onchaos mode
+		if probe.Mode == "OnChaos" && phase == "DuringChaos" {
+			// Generate the run_id
+			runID := GetRunID()
+			SetRunIDForProbe(resultDetails, probe.Name, probe.Type, runID)
+
+			// create the external pod with source image for cmd probe
+			err := CreateProbePod(clients, chaosDetails, runID, probe.CmdProbeInputs.Source)
+			if err != nil {
+				return err
+			}
+
+			// verify the running status of external probe pod
+			log.Info("[Status]: Checking the status of the probe pod")
+			err = status.CheckApplicationStatus(chaosDetails.ChaosNamespace, "name="+chaosDetails.ExperimentName+"-probe-"+runID, chaosDetails.Timeout, chaosDetails.Delay, clients)
+			if err != nil {
+				return errors.Errorf("probe pod is not in running state, err: %v", err)
+			}
+
+			// setting the attributes for the exec command
+			execCommandDetails := litmusexec.PodDetails{}
+			litmusexec.SetExecCommandAttributes(&execCommandDetails, chaosDetails.ExperimentName+"-probe-"+runID, chaosDetails.ExperimentName+"-probe", chaosDetails.ChaosNamespace)
+
+			// trigger the onchaos cmd probe
+			go TriggerSourceOnChaosCmdProbe(probe, execCommandDetails, clients, resultDetails, chaosDetails.ChaosDuration)
+		}
+		// verify the probe for continuous & onchaos mode
+		// marked the result of continuous & onchaos probe
+		if (probe.Mode == "Continuous" && phase == "PostChaos") || (probe.Mode == "OnChaos" && phase == "AfterChaos") {
 			// it will check for the error, It will detect the error if any error encountered in probe during chaos
 			err = CheckForErrorInContinuousProbe(resultDetails, probe.Name)
 
@@ -377,6 +409,89 @@ func TriggerSourceContinuousCmdProbe(probe v1alpha1.ProbeAttributes, execCommand
 
 		// waiting for the probe polling interval
 		time.Sleep(time.Duration(probe.RunProperties.ProbePollingInterval) * time.Second)
+	}
+
+}
+
+// TriggerInlineOnChaosCmdProbe trigger the inline onchaos cmd probes
+func TriggerInlineOnChaosCmdProbe(probe v1alpha1.ProbeAttributes, chaosresult *types.ResultDetails, duration int) {
+
+	// waiting for initial delay
+	if probe.RunProperties.InitialDelaySeconds != 0 {
+		log.Infof("[Wait]: Waiting for %vs before probe execution", probe.RunProperties.InitialDelaySeconds)
+		time.Sleep(time.Duration(probe.RunProperties.InitialDelaySeconds) * time.Second)
+		duration = math.Maximum(0, duration-probe.RunProperties.InitialDelaySeconds)
+	}
+
+	var endTime <-chan time.Time
+	timeDelay := time.Duration(duration) * time.Second
+
+	// it trigger the inline cmd probe for the entire duration of chaos and it fails, if any err encounter
+	// it marked the error for the probes, if any
+loop:
+	for {
+		endTime = time.After(timeDelay)
+		select {
+		case <-endTime:
+			log.Infof("[Chaos]: Time is up for the %v probe", probe.Name)
+			endTime = nil
+			break loop
+		default:
+			err = TriggerInlineCmdProbe(probe, chaosresult)
+			// record the error inside the probeDetails, we are maintaining a dedicated variable for the err, inside probeDetails
+			if err != nil {
+				for index := range chaosresult.ProbeDetails {
+					if chaosresult.ProbeDetails[index].Name == probe.Name {
+						chaosresult.ProbeDetails[index].IsProbeFailedWithError = err
+						break loop
+					}
+
+				}
+			}
+			// waiting for the probe polling interval
+			time.Sleep(time.Duration(probe.RunProperties.ProbePollingInterval) * time.Second)
+		}
+	}
+
+}
+
+// TriggerSourceOnChaosCmdProbe trigger the onchaos cmd probes having need some external source image
+func TriggerSourceOnChaosCmdProbe(probe v1alpha1.ProbeAttributes, execCommandDetails litmusexec.PodDetails, clients clients.ClientSets, chaosresult *types.ResultDetails, duration int) {
+
+	// waiting for initial delay
+	if probe.RunProperties.InitialDelaySeconds != 0 {
+		log.Infof("[Wait]: Waiting for %vs before probe execution", probe.RunProperties.InitialDelaySeconds)
+		time.Sleep(time.Duration(probe.RunProperties.InitialDelaySeconds) * time.Second)
+		duration = math.Maximum(0, duration-probe.RunProperties.InitialDelaySeconds)
+	}
+
+	var endTime <-chan time.Time
+	timeDelay := time.Duration(duration) * time.Second
+
+	// it trigger the cmd probe for the entire duration of chaos and it fails, if any err encounter
+	// it marked the error for the probes, if any
+loop:
+	for {
+		endTime = time.After(timeDelay)
+		select {
+		case <-endTime:
+			log.Infof("[Chaos]: Time is up for the %v probe", probe.Name)
+			endTime = nil
+			break loop
+		default:
+			// record the error inside the probeDetails, we are maintaining a dedicated variable for the err, inside probeDetails
+			if err = TriggerSourceCmdProbe(probe, execCommandDetails, clients, chaosresult); err != nil {
+				for index := range chaosresult.ProbeDetails {
+					if chaosresult.ProbeDetails[index].Name == probe.Name {
+						chaosresult.ProbeDetails[index].IsProbeFailedWithError = err
+						break loop
+					}
+
+				}
+			}
+			// waiting for the probe polling interval
+			time.Sleep(time.Duration(probe.RunProperties.ProbePollingInterval) * time.Second)
+		}
 	}
 
 }

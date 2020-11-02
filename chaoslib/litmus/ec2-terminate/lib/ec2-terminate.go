@@ -32,13 +32,13 @@ func InjectEC2Terminate(experimentsDetails *experimentTypes.ExperimentDetails, c
 	log.Info("[Chaos]: Stoping the desired EC2 instance")
 	err = EC2Stop(experimentsDetails)
 	if err != nil {
-		return errors.Errorf("ec2 instance failed to stop err: %v", err)
+		return errors.Errorf("ec2 instance failed to stop, err: %v", err)
 	}
 
 	//Wait for ec2 instance to completely stop
 	log.Info("[Wait]: Wait for EC2 instance to come in stopped state")
 	if err = WaitForEC2Down(experimentsDetails); err != nil {
-		return errors.Errorf("unable to stop the ec2 instance err: %v", err)
+		return errors.Errorf("unable to stop the ec2 instance, err: %v", err)
 	}
 
 	//Wait for chaos duration
@@ -49,13 +49,13 @@ func InjectEC2Terminate(experimentsDetails *experimentTypes.ExperimentDetails, c
 	log.Info("[Chaos]: Starting back the EC2 instance")
 	err = EC2Start(experimentsDetails)
 	if err != nil {
-		return errors.Errorf("ec2 instance failed to start err: %v", err)
+		return errors.Errorf("ec2 instance failed to start, err: %v", err)
 	}
 
 	//Wait for ec2 instance to come in running state
 	log.Info("[Wait]: Wait for EC2 instance to get in running state")
 	if err = WaitForEC2Up(experimentsDetails); err != nil {
-		return errors.Errorf("unable to start the ec2 instance err: %v", err)
+		return errors.Errorf("unable to start the ec2 instance, err: %v", err)
 	}
 
 	//Waiting for the ramp time after chaos injection
@@ -154,7 +154,7 @@ func WaitForEC2Down(experimentsDetails *experimentTypes.ExperimentDetails) error
 
 			instanceState, err := awslib.GetEC2InstanceStatus(experimentsDetails)
 			if err != nil {
-				return errors.Errorf("fail to get the instance status")
+				return errors.Errorf("failed to get the instance status")
 			}
 			if instanceState != "stopped" {
 				log.Infof("The instance state is %v", instanceState)
@@ -180,7 +180,7 @@ func WaitForEC2Up(experimentsDetails *experimentTypes.ExperimentDetails) error {
 
 			instanceState, err := awslib.GetEC2InstanceStatus(experimentsDetails)
 			if err != nil {
-				return errors.Errorf("fail to get the instance status")
+				return errors.Errorf("failed to get the instance status")
 			}
 			if instanceState != "running" {
 				log.Infof("The instance state is %v", instanceState)

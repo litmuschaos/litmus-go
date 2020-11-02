@@ -10,6 +10,7 @@ import (
 	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/log"
+	"github.com/litmuschaos/litmus-go/pkg/math"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
 	"github.com/sirupsen/logrus"
@@ -53,11 +54,15 @@ func PrepareHTTPProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets
 		}
 	}
 	// trigger probes for the continuous mode
-	if ValidMPCombinationForContinuousMode(probe.Mode, phase) {
+	if probe.Mode == "Continuous" && phase == "PreChaos" {
 		go TriggerContinuousHTTPProbe(probe, resultDetails)
 	}
+	// trigger probes for the onchaos mode
+	if probe.Mode == "OnChaos" && phase == "DuringChaos" {
+		go TriggerOnChaosHTTPProbe(probe, resultDetails, chaosDetails.ChaosDuration)
+	}
 	// verify the continuous mode and marked the result of probes
-	if (probe.Mode == "Continuous" || probe.Mode == "OnChaos") && phase == "PostChaos" {
+	if (probe.Mode == "Continuous" && phase == "PostChaos") || (probe.Mode == "OnChaos" && phase == "AfterChaos") {
 		// it will check for the error, It will detect the error if any error encountered in probe during chaos
 		err = CheckForErrorInContinuousProbe(resultDetails, probe.Name)
 		// failing the probe, if the success condition doesn't met after the retry & timeout combinations
@@ -129,6 +134,49 @@ func TriggerContinuousHTTPProbe(probe v1alpha1.ProbeAttributes, chaosresult *typ
 
 		// waiting for the probe polling interval
 		time.Sleep(time.Duration(probe.RunProperties.ProbePollingInterval) * time.Second)
+	}
+
+}
+
+// TriggerOnChaosHTTPProbe trigger the onchaos http probes
+func TriggerOnChaosHTTPProbe(probe v1alpha1.ProbeAttributes, chaosresult *types.ResultDetails, duration int) {
+
+	// waiting for initial delay
+	if probe.RunProperties.InitialDelaySeconds != 0 {
+		log.Infof("[Wait]: Waiting for %vs before probe execution", probe.RunProperties.InitialDelaySeconds)
+		time.Sleep(time.Duration(probe.RunProperties.InitialDelaySeconds) * time.Second)
+		duration = math.Maximum(0, duration-probe.RunProperties.InitialDelaySeconds)
+	}
+
+	var endTime <-chan time.Time
+	timeDelay := time.Duration(duration) * time.Second
+
+	// it trigger the http probe for the entire duration of chaos and it fails, if any error encounter
+	// it marked the error for the probes, if any
+loop:
+	for {
+		endTime = time.After(timeDelay)
+		select {
+		case <-endTime:
+			log.Infof("[Chaos]: Time is up for the %v probe", probe.Name)
+			endTime = nil
+			break loop
+		default:
+			err = TriggerHTTPProbe(probe, chaosresult)
+			// record the error inside the probeDetails, we are maintaining a dedicated variable for the err, inside probeDetails
+			if err != nil {
+				for index := range chaosresult.ProbeDetails {
+					if chaosresult.ProbeDetails[index].Name == probe.Name {
+						chaosresult.ProbeDetails[index].IsProbeFailedWithError = err
+						break loop
+					}
+
+				}
+			}
+
+			// waiting for the probe polling interval
+			time.Sleep(time.Duration(probe.RunProperties.ProbePollingInterval) * time.Second)
+		}
 	}
 
 }
