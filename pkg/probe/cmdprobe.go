@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math/rand"
 	"os/exec"
-	"strconv"
 	"strings"
 	"time"
 
@@ -355,47 +354,33 @@ func TriggerSourceContinuousCmdProbe(probe v1alpha1.ProbeAttributes, execCommand
 
 }
 
-// ValidateResult ...
+// ValidateResult validate the probe result to specified comparison operation
+// it supports int, float, string operands
 func ValidateResult(comparator v1alpha1.ComparatorInfo, cmdOutput string) error {
 	switch comparator.Type {
 	case "int", "Int":
-		expectedOutput, err := strconv.Atoi(comparator.Value)
-		if err != nil {
+		if err = FirstValue(comparator.Value).
+			SecondValue(cmdOutput).
+			Criteria(comparator.Criteria).
+			CompareInt(); err != nil {
 			return err
 		}
-		actualOutput, err := strconv.Atoi(cmdOutput)
-		if err != nil {
-			return err
-		}
-
-		if err = CompareInt(actualOutput, expectedOutput, comparator.Criteria); err != nil {
-			return err
-		}
-
 	case "float", "Float":
-
-		expectedOutput, err := strconv.ParseFloat(comparator.Value, 64)
-		if err != nil {
+		if err = FirstValue(comparator.Value).
+			SecondValue(cmdOutput).
+			Criteria(comparator.Criteria).
+			CompareFloat(); err != nil {
 			return err
 		}
-		actualOutput, err := strconv.ParseFloat(cmdOutput, 64)
-		if err != nil {
-			return err
-		}
-
-		if err = CompareFloat(actualOutput, expectedOutput, comparator.Criteria); err != nil {
-			return err
-		}
-
 	case "string", "String":
-
-		if err = CompareString(cmdOutput, comparator.Value, comparator.Criteria); err != nil {
+		if err = FirstValue(comparator.Value).
+			SecondValue(cmdOutput).
+			Criteria(comparator.Criteria).
+			CompareString(); err != nil {
 			return err
 		}
-
 	default:
 		return fmt.Errorf("comparator type '%s' not supported in the cmd probe", comparator.Type)
 	}
-
 	return nil
 }
