@@ -94,6 +94,16 @@ func NodeIOStress(clients clients.ClientSets) {
 		}
 	}
 
+	// Checking the status of application node
+	log.Info("[Status]: Getting the status of application node")
+	err = status.CheckNodeStatus(experimentsDetails.TargetNode, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
+	if err != nil {
+		log.Errorf("Application node is not in the ready state")
+		failStep := "Checking the node status (pre-chaos)"
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+		return
+	}
+
 	if experimentsDetails.EngineName != "" {
 		// marking AUT as running, as we already checked the status of application under test
 		msg := "AUT: Running"

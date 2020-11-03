@@ -117,6 +117,13 @@ loop:
 		return err
 	}
 
+	// Checking the status of application node
+	log.Info("[Status]: Getting the status of application node")
+	err = status.CheckNodeStatus(experimentsDetails.TargetNode, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
+	if err != nil {
+		log.Warn("Application node is not in the ready state, you may need to manually recover the node")
+	}
+
 	//Waiting for the ramp time after chaos injection
 	if experimentsDetails.RampTime != 0 {
 		log.Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", experimentsDetails.RampTime)
