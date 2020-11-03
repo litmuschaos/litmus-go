@@ -191,12 +191,15 @@ func PodAutoscalerChaosInStatefulset(experimentsDetails *experimentTypes.Experim
 // DeploymentStatusCheck check the status of deployment and verify the available replicas
 func DeploymentStatusCheck(experimentsDetails *experimentTypes.ExperimentDetails, appName string, clients clients.ClientSets, replicaCount int, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
+	//Record start timestamp
+	ChaosStartTimeStamp := time.Now().Unix()
 	isFailed := false
 
 	err = retry.
-		Times(uint(experimentsDetails.Timeout / experimentsDetails.Delay)).
+		Times(uint(experimentsDetails.ChaosDuration / experimentsDetails.Delay)).
 		Wait(time.Duration(experimentsDetails.Delay) * time.Second).
 		Try(func(attempt uint) error {
+
 			deployment, err := appsv1DeploymentClient.Get(appName, metav1.GetOptions{})
 			if err != nil {
 				return errors.Errorf("Unable to find the deployment with name %v, err: %v", appName, err)
@@ -215,14 +218,17 @@ func DeploymentStatusCheck(experimentsDetails *experimentTypes.ExperimentDetails
 		if err != nil {
 			return errors.Errorf("Unable to perform autoscaling, err: %v", err)
 		}
-		return errors.Errorf("Failed to scale the application, err: %v", err)
+		return errors.Errorf("Failed to scale the application")
 	} else if err != nil {
 		return err
 	}
 
-	// Keeping a wait time of 10s after all pod comes in running state
-	// This is optional and used just for viewing the pod status
-	time.Sleep(10 * time.Second)
+	//ChaosCurrentTimeStamp contains the current timestamp
+	ChaosCurrentTimeStamp := time.Now().Unix()
+	if int(ChaosCurrentTimeStamp-ChaosStartTimeStamp) <= experimentsDetails.ChaosDuration {
+		log.Info("[Wait]: Waiting for completion of chaos duration")
+		time.Sleep(time.Duration(experimentsDetails.ChaosDuration-int(ChaosCurrentTimeStamp-ChaosStartTimeStamp)) * time.Second)
+	}
 
 	return nil
 }
@@ -230,10 +236,12 @@ func DeploymentStatusCheck(experimentsDetails *experimentTypes.ExperimentDetails
 // StatefulsetStatusCheck check the status of statefulset and verify the available replicas
 func StatefulsetStatusCheck(experimentsDetails *experimentTypes.ExperimentDetails, appName string, clients clients.ClientSets, replicaCount int, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
+	//Record start timestamp
+	ChaosStartTimeStamp := time.Now().Unix()
 	isFailed := false
 
 	err = retry.
-		Times(uint(experimentsDetails.Timeout / experimentsDetails.Delay)).
+		Times(uint(experimentsDetails.ChaosDuration / experimentsDetails.Delay)).
 		Wait(time.Duration(experimentsDetails.Delay) * time.Second).
 		Try(func(attempt uint) error {
 			statefulset, err := appsv1StatefulsetClient.Get(appName, metav1.GetOptions{})
@@ -254,14 +262,17 @@ func StatefulsetStatusCheck(experimentsDetails *experimentTypes.ExperimentDetail
 		if err != nil {
 			return errors.Errorf("Unable to perform autoscaling, err: %v", err)
 		}
-		return errors.Errorf("Failed to scale the application, err: %v", err)
+		return errors.Errorf("Failed to scale the application")
 	} else if err != nil {
 		return err
 	}
 
-	// Keeping a wait time of 10s after all pod comes in running state
-	// This is optional and used just for viewing the pod status
-	time.Sleep(10 * time.Second)
+	//ChaosCurrentTimeStamp contains the current timestamp
+	ChaosCurrentTimeStamp := time.Now().Unix()
+	if int(ChaosCurrentTimeStamp-ChaosStartTimeStamp) <= experimentsDetails.ChaosDuration {
+		log.Info("[Wait]: Waiting for completion of chaos duration")
+		time.Sleep(time.Duration(experimentsDetails.ChaosDuration-int(ChaosCurrentTimeStamp-ChaosStartTimeStamp)) * time.Second)
+	}
 
 	return nil
 }
