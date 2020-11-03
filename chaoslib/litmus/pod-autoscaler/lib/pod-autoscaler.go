@@ -295,7 +295,7 @@ func AutoscalerRecoveryInDeployment(experimentsDetails *experimentTypes.Experime
 			if err != nil {
 				return errors.Errorf("Unable to find the deployment with name %v, err: %v", appName, err)
 			}
-			if int(applicationDeploy.Status.AvailableReplicas) != experimentsDetails.Replicas {
+			if int(applicationDeploy.Status.AvailableReplicas) != replicaCount {
 				log.Infof("Application Available Replica Count is: %v", applicationDeploy.Status.AvailableReplicas)
 				return errors.Errorf("Unable to rollback to older replica count, err: %v", err)
 			}
@@ -339,7 +339,7 @@ func AutoscalerRecoveryInStatefulset(experimentsDetails *experimentTypes.Experim
 			if err != nil {
 				return errors.Errorf("Unable to find the statefulset with name %v, err: %v", appName, err)
 			}
-			if int(applicationDeploy.Status.ReadyReplicas) != experimentsDetails.Replicas {
+			if int(applicationDeploy.Status.ReadyReplicas) != replicaCount {
 				log.Infof("Application Ready Replica Count is: %v", applicationDeploy.Status.ReadyReplicas)
 				return errors.Errorf("Unable to roll back to older replica count, err: %v", err)
 			}
