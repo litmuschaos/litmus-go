@@ -19,47 +19,18 @@ import (
 // http probe can be used to add the probe which will send a request to given url and match the status code
 func PrepareHTTPProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, phase string, eventsDetails *types.EventDetails) error {
 
-	if EligibleForPrint(probe.Mode, phase) {
-		//DISPLAY THE K8S PROBE INFO
-		log.InfoWithValues("[Probe]: The http probe information is as follows", logrus.Fields{
-			"Name":                     probe.Name,
-			"URL":                      probe.HTTPProbeInputs.URL,
-			"Expecected Response Code": probe.HTTPProbeInputs.ExpectedResponseCode,
-			"Run Properties":           probe.RunProperties,
-			"Mode":                     probe.Mode,
-			"Phase":                    phase,
-		})
-	}
-
-	// triggering probes on the basis of mode & phase so that probe will only run when they are requested to run
-	// if mode is SOT & phase is PreChaos, it will trigger Probes in PreChaos section
-	// if mode is EOT & phase is PostChaos, it will trigger Probes in PostChaos section
-	// if mode is Edge then independent of phase, it will trigger Probes in both Pre/Post Chaos section
-	if (probe.Mode == "SOT" && phase == "PreChaos") || (probe.Mode == "EOT" && phase == "PostChaos") || probe.Mode == "Edge" {
-
-		// trigger the http probe
-		err = TriggerHTTPProbe(probe, resultDetails)
-
-		// failing the probe, if the success condition doesn't met after the retry & timeout combinations
-		// it will update the status of all the unrun probes as well
-		if err = MarkedVerdictInEnd(err, resultDetails, probe.Name, probe.Mode, probe.Type, phase); err != nil {
+	switch phase {
+	case "PreChaos":
+		if err := PreChaosHTTPProbe(probe, resultDetails, clients, chaosDetails); err != nil {
 			return err
 		}
-	}
-	// trigger probes for the continuous mode
-	if probe.Mode == "Continuous" && phase == "PreChaos" {
-		go TriggerContinuousHTTPProbe(probe, resultDetails)
-	}
-	// verify the continuous mode and marked the result of probes
-	if probe.Mode == "Continuous" && phase == "PostChaos" {
-		// it will check for the error, It will detect the error if any error encountered in probe during chaos
-		err = CheckForErrorInContinuousProbe(resultDetails, probe.Name)
-		// failing the probe, if the success condition doesn't met after the retry & timeout combinations
-		if err = MarkedVerdictInEnd(err, resultDetails, probe.Name, probe.Mode, probe.Type, phase); err != nil {
+	case "PostChaos":
+		if err := PostChaosHTTPProbe(probe, resultDetails, clients, chaosDetails); err != nil {
 			return err
 		}
+	default:
+		return fmt.Errorf("phase '%s' not supported in the http probe", phase)
 	}
-
 	return nil
 }
 
@@ -118,4 +89,77 @@ func TriggerContinuousHTTPProbe(probe v1alpha1.ProbeAttributes, chaosresult *typ
 		time.Sleep(time.Duration(probe.RunProperties.ProbePollingInterval) * time.Second)
 	}
 
+}
+
+//PreChaosHTTPProbe trigger the http probe for prechaos phase
+func PreChaosHTTPProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
+
+	switch probe.Mode {
+	case "SOT", "Edge":
+
+		//DISPLAY THE HTTP PROBE INFO
+		log.InfoWithValues("[Probe]: The http probe information is as follows", logrus.Fields{
+			"Name":                     probe.Name,
+			"URL":                      probe.HTTPProbeInputs.URL,
+			"Expecected Response Code": probe.HTTPProbeInputs.ExpectedResponseCode,
+			"Run Properties":           probe.RunProperties,
+			"Mode":                     probe.Mode,
+			"Phase":                    "PreChaos",
+		})
+		// trigger the http probe
+		err = TriggerHTTPProbe(probe, resultDetails)
+
+		// failing the probe, if the success condition doesn't met after the retry & timeout combinations
+		// it will update the status of all the unrun probes as well
+		if err = MarkedVerdictInEnd(err, resultDetails, probe.Name, probe.Mode, probe.Type, "PreChaos"); err != nil {
+			return err
+		}
+	case "Continuous":
+
+		//DISPLAY THE HTTP PROBE INFO
+		log.InfoWithValues("[Probe]: The http probe information is as follows", logrus.Fields{
+			"Name":                     probe.Name,
+			"URL":                      probe.HTTPProbeInputs.URL,
+			"Expecected Response Code": probe.HTTPProbeInputs.ExpectedResponseCode,
+			"Run Properties":           probe.RunProperties,
+			"Mode":                     probe.Mode,
+			"Phase":                    "PreChaos",
+		})
+		go TriggerContinuousHTTPProbe(probe, resultDetails)
+	}
+	return nil
+}
+
+//PostChaosHTTPProbe trigger the http probe for postchaos phase
+func PostChaosHTTPProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
+
+	switch probe.Mode {
+	case "EOT", "Edge":
+
+		//DISPLAY THE HTTP PROBE INFO
+		log.InfoWithValues("[Probe]: The http probe information is as follows", logrus.Fields{
+			"Name":                     probe.Name,
+			"URL":                      probe.HTTPProbeInputs.URL,
+			"Expecected Response Code": probe.HTTPProbeInputs.ExpectedResponseCode,
+			"Run Properties":           probe.RunProperties,
+			"Mode":                     probe.Mode,
+			"Phase":                    "PostChaos",
+		})
+		// trigger the http probe
+		err = TriggerHTTPProbe(probe, resultDetails)
+
+		// failing the probe, if the success condition doesn't met after the retry & timeout combinations
+		// it will update the status of all the unrun probes as well
+		if err = MarkedVerdictInEnd(err, resultDetails, probe.Name, probe.Mode, probe.Type, "PostChaos"); err != nil {
+			return err
+		}
+	case "Continuous":
+		// it will check for the error, It will detect the error if any error encountered in probe during chaos
+		err = CheckForErrorInContinuousProbe(resultDetails, probe.Name)
+		// failing the probe, if the success condition doesn't met after the retry & timeout combinations
+		if err = MarkedVerdictInEnd(err, resultDetails, probe.Name, probe.Mode, probe.Type, "PostChaos"); err != nil {
+			return err
+		}
+	}
+	return nil
 }
