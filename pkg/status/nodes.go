@@ -28,7 +28,7 @@ func CheckNodeStatus(nodeName string, timeout, delay int, clients clients.Client
 				nodeList.Items = append(nodeList.Items, *node)
 			} else {
 				nodes, err := clients.KubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
-				if err != nil || len(nodes.Items) == 0 {
+				if err != nil {
 					return err
 				}
 				nodeList = *nodes

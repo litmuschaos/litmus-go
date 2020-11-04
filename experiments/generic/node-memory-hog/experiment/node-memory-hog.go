@@ -81,12 +81,12 @@ func NodeMemoryHog(clients clients.ClientSets) {
 		return
 	}
 
-	// Checking the status of application node
-	log.Info("[Status]: Getting the status of application node")
+	// Checking the status of target nodes
+	log.Info("[Status]: Getting the status of target nodes")
 	err = status.CheckNodeStatus(experimentsDetails.TargetNode, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 	if err != nil {
-		log.Errorf("Application node is not in the ready state")
-		failStep := "Checking the node status (pre-chaos)"
+		log.Errorf("Target nodes are not in the ready state, err: %v", err)
+		failStep := "Checking the status of nodes"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
