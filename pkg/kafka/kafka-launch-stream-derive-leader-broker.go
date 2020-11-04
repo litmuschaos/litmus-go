@@ -13,7 +13,7 @@ func LaunchStreamDeriveLeader(experimentsDetails *experimentTypes.ExperimentDeta
 	if err != nil {
 		return errors.Errorf("liveness stream failed, err: %v", err)
 	}
-	experimentsDetails.ChaoslibDetail.TargetPod, err = SelectBroker(experimentsDetails, LivenessTopicLeader, clients)
+	experimentsDetails.TargetPod, err = SelectBroker(experimentsDetails, LivenessTopicLeader, clients)
 	DisplayKafkaBroker(experimentsDetails)
 
 	return nil
