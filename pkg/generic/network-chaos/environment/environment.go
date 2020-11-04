@@ -35,7 +35,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.Timeout, _ = strconv.Atoi(Getenv("STATUS_CHECK_TIMEOUT", "180"))
 	experimentDetails.TargetPod = Getenv("TARGET_POD", "")
 	experimentDetails.PodsAffectedPerc, _ = strconv.Atoi(Getenv("PODS_AFFECTED_PERC", "0"))
-	experimentDetails.TargetIPs = Getenv("TARGET_IPs", "")
+	experimentDetails.TargetIPs = Getenv("TARGET_IPS", "")
 	experimentDetails.TargetHosts = Getenv("TARGET_HOSTS", "")
 	experimentDetails.ContainerRuntime = Getenv("CONTAINER_RUNTIME", "docker")
 	experimentDetails.ChaosServiceAccount = Getenv("CHAOS_SERVICE_ACCOUNT", "")
