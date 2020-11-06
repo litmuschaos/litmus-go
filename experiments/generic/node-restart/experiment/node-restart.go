@@ -41,7 +41,7 @@ func NodeRestart(clients clients.ClientSets) {
 	log.Infof("[PreReq]: Updating the chaos result of %v experiment (SOT)", experimentsDetails.ExperimentName)
 	err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT")
 	if err != nil {
-		log.Errorf("Unable to Create the Chaos Result due to %v", err)
+		log.Errorf("Unable to Create the Chaos Result, err: %v", err)
 		failStep := "Updating the chaos result of node-restart experiment (SOT)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
@@ -54,6 +54,7 @@ func NodeRestart(clients clients.ClientSets) {
 	log.InfoWithValues("The application information is as follows", logrus.Fields{
 		"Namespace":      experimentsDetails.AppNS,
 		"Label":          experimentsDetails.AppLabel,
+		"NodeName":       experimentsDetails.TargetNode,
 		"Chaos Duration": experimentsDetails.ChaosDuration,
 		"Ramp Time":      experimentsDetails.RampTime,
 	})
@@ -62,7 +63,7 @@ func NodeRestart(clients clients.ClientSets) {
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (pre-chaos)")
 	err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 	if err != nil {
-		log.Errorf("Application status check failed due to %v\n", err)
+		log.Errorf("Application status check failed, err: %v", err)
 		failStep := "Verify that the AUT (Application Under Test) is running (pre-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
@@ -73,7 +74,7 @@ func NodeRestart(clients clients.ClientSets) {
 		log.Info("[Status]: Verify that the Auxiliary Applications are running (pre-chaos)")
 		err = status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 		if err != nil {
-			log.Errorf("Auxiliary Application status check failed due to %v", err)
+			log.Errorf("Auxiliary Application status check failed, err: %v", err)
 			failStep := "Verify that the Auxiliary Applications are running (pre-chaos)"
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
@@ -90,8 +91,8 @@ func NodeRestart(clients clients.ClientSets) {
 			err = probe.RunProbes(&chaosDetails, clients, &resultDetails, "PreChaos", &eventsDetails)
 			events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 			if err != nil {
-				log.Errorf("Probe failed, due to err: %v", err)
-				failStep := "Failed while adding probe"
+				log.Errorf("Probe Failed, err: %v", err)
+				failStep := "Failed while running probes"
 				msg := "AUT: Running, Probes: Unsuccessful"
 				types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, msg, "Warning", &chaosDetails)
 				events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
@@ -109,7 +110,7 @@ func NodeRestart(clients clients.ClientSets) {
 	if experimentsDetails.ChaosLib == "litmus" {
 		err = litmusLIB.PrepareNodeRestart(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
 		if err != nil {
-			log.Errorf("[Error]: Node restart failed due to %v\n", err)
+			log.Errorf("[Error]: Node restart failed, err: %v", err)
 			failStep := " Node restart Chaos injection failed"
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
@@ -127,7 +128,7 @@ func NodeRestart(clients clients.ClientSets) {
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (post-chaos)")
 	err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 	if err != nil {
-		klog.V(0).Infof("Application status check failed due to %v\n", err)
+		klog.V(0).Infof("Application status check failed, err: %v", err)
 		failStep := "Verify that the AUT (Application Under Test) is running (post-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
@@ -138,7 +139,7 @@ func NodeRestart(clients clients.ClientSets) {
 		log.Info("[Status]: Verify that the Auxiliary Applications are running (post-chaos)")
 		err = status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 		if err != nil {
-			log.Errorf("Auxiliary Application status check failed due to %v", err)
+			log.Errorf("Auxiliary Application status check failed, err: %v", err)
 			failStep := "Verify that the Auxiliary Applications are running (post-chaos)"
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
@@ -153,8 +154,8 @@ func NodeRestart(clients clients.ClientSets) {
 		if len(resultDetails.ProbeDetails) != 0 {
 			err = probe.RunProbes(&chaosDetails, clients, &resultDetails, "PostChaos", &eventsDetails)
 			if err != nil {
-				log.Errorf("Unable to Add the probes, due to err: %v", err)
-				failStep := "Failed while adding probe"
+				log.Errorf("Probes Failed, err: %v", err)
+				failStep := "Failed while running probes"
 				msg := "AUT: Running, Probes: Unsuccessful"
 				types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, msg, "Warning", &chaosDetails)
 				events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
@@ -173,7 +174,7 @@ func NodeRestart(clients clients.ClientSets) {
 	log.Infof("[The End]: Updating the chaos result of %v experiment (EOT)", experimentsDetails.ExperimentName)
 	err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 	if err != nil {
-		log.Fatalf("Unable to Update the Chaos Result due to %v\n", err)
+		log.Fatalf("Unable to Update the Chaos Result, err: %v", err)
 	}
 	if experimentsDetails.EngineName != "" {
 		msg := experimentsDetails.ExperimentName + " experiment has been " + resultDetails.Verdict + "ed"

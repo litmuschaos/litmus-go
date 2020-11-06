@@ -87,7 +87,7 @@ func PrepareKubeletKill(experimentsDetails *experimentTypes.ExperimentDetails, c
 	log.Info("[Status]: Getting the status of application node")
 	err = status.CheckNodeStatus(experimentsDetails.TargetNode, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 	if err != nil {
-		return errors.Errorf("application node is not in ready state, err: %v", err)
+		log.Warnf("Application node is not in the ready state, you may need to manually recover the node, err: %v", err)
 	}
 
 	//Deleting the helper pod

@@ -13,7 +13,6 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/sirupsen/logrus"
-	"k8s.io/klog"
 )
 
 // EC2Terminate inject the ebs volume loss chaos
@@ -97,8 +96,8 @@ func EC2Terminate(clients clients.ClientSets) {
 
 			err = probe.RunProbes(&chaosDetails, clients, &resultDetails, "PreChaos", &eventsDetails)
 			if err != nil {
-				log.Errorf("Probe failed, err: %v", err)
-				failStep := "Failed while adding probe"
+				log.Errorf("Probe Failed, err: %v", err)
+				failStep := "Failed while running probes"
 				msg := "AUT: Running, Probes: Unsuccessful"
 				types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, msg, "Warning", &chaosDetails)
 				events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
@@ -129,12 +128,12 @@ func EC2Terminate(clients clients.ClientSets) {
 		return
 	}
 	if instanceState != "running" {
-		log.Errorf("failed to get the ec2 instance status as running (pre chaos)")
+		log.Errorf("failed to get the ec2 instance status as running")
 		failStep := "Verify the AWS ec2 instance status (pre-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
-	log.Info("[Status]: EC2 instance is in running state (pre chaos)")
+	log.Info("[Status]: EC2 instance is in running state")
 
 	// Including the litmus lib for ec2-terminate
 	if experimentsDetails.ChaosLib == "litmus" {
@@ -163,7 +162,7 @@ func EC2Terminate(clients clients.ClientSets) {
 		return
 	}
 	if instanceState != "running" {
-		log.Errorf("failed to get the ec2 instance status as running (post-chaos)")
+		log.Errorf("failed to get the ec2 instance status as running")
 		failStep := "Verify the AWS ec2 instance status (post-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
@@ -174,7 +173,7 @@ func EC2Terminate(clients clients.ClientSets) {
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (post-chaos)")
 	err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 	if err != nil {
-		klog.V(0).Infof("Application status check failed, err: %v", err)
+		log.Errorf("Application status check failed, err: %v", err)
 		failStep := "Verify that the AUT (Application Under Test) is running (post-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
@@ -200,8 +199,8 @@ func EC2Terminate(clients clients.ClientSets) {
 		if len(resultDetails.ProbeDetails) != 0 {
 			err = probe.RunProbes(&chaosDetails, clients, &resultDetails, "PostChaos", &eventsDetails)
 			if err != nil {
-				log.Errorf("Unable to Add the probes, err: %v", err)
-				failStep := "Failed while adding probe"
+				log.Errorf("Probes Failed, err: %v", err)
+				failStep := "Failed while running probes"
 				msg := "AUT: Running, Probes: Unsuccessful"
 				types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, msg, "Warning", &chaosDetails)
 				events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")

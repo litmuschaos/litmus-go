@@ -51,7 +51,7 @@ func PrepareNodeRestart(experimentsDetails *experimentTypes.ExperimentDetails, c
 	log.Info("[Status]: Getting the status of target node")
 	err = status.CheckNodeStatus(experimentsDetails.TargetNode, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 	if err != nil {
-		return errors.Errorf("Target node is not in the ready state, you may need to manually recover the node: %v", err)
+		return errors.Errorf("Target node is not in ready state, err: %v", err)
 	}
 
 	experimentsDetails.RunID = common.GetRunID()
@@ -72,7 +72,7 @@ func PrepareNodeRestart(experimentsDetails *experimentTypes.ExperimentDetails, c
 	// Get Chaos Pod Annotation
 	experimentsDetails.Annotations, err = common.GetChaosPodAnnotation(experimentsDetails.ChaosPodName, experimentsDetails.ChaosNamespace, clients)
 	if err != nil {
-		return errors.Errorf("unable to get annotation, due to %v", err)
+		return errors.Errorf("unable to get annotation, err: %v", err)
 	}
 
 	// Creating the helper pod to perform node restart
@@ -100,7 +100,7 @@ func PrepareNodeRestart(experimentsDetails *experimentTypes.ExperimentDetails, c
 	log.Info("[Status]: Getting the status of application node")
 	err = status.CheckNodeStatus(experimentsDetails.TargetNode, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 	if err != nil {
-		log.Warn("Application node is not in the ready state, you may need to manually recover the node")
+		log.Warnf("Application node is not in the ready state, you may need to manually recover the node, err: %v", err)
 	}
 
 	//Deleting the helper pod
@@ -186,12 +186,12 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 func GetNode(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) (*k8stypes.Pod, error) {
 	podList, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).List(v1.ListOptions{LabelSelector: experimentsDetails.AppLabel})
 	if err != nil || len(podList.Items) == 0 {
-		return nil, errors.Wrapf(err, "Fail to get the application pod in %v namespace, due to err: %v", experimentsDetails.AppNS, err)
+		return nil, errors.Wrapf(err, "Fail to get the application pod in %v namespace, err: %v", experimentsDetails.AppNS, err)
 	}
 
 	rand.Seed(time.Now().Unix())
 	randomIndex := rand.Intn(len(podList.Items))
-	node := podList.Items[randomIndex]
+	podForNodeCandidate := podList.Items[randomIndex]
 
-	return &node, nil
+	return &podForNodeCandidate, nil
 }
