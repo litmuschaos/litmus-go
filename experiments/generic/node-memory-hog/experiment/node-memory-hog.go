@@ -81,6 +81,16 @@ func NodeMemoryHog(clients clients.ClientSets) {
 		return
 	}
 
+	// Checking the status of target nodes
+	log.Info("[Status]: Getting the status of target nodes")
+	err = status.CheckNodeStatus(experimentsDetails.TargetNode, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
+	if err != nil {
+		log.Errorf("Target nodes are not in the ready state, err: %v", err)
+		failStep := "Checking the status of nodes"
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+		return
+	}
+
 	if experimentsDetails.EngineName != "" {
 		// marking AUT as running, as we already checked the status of application under test
 		msg := "AUT: Running"

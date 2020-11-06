@@ -117,6 +117,13 @@ loop:
 		return err
 	}
 
+	// Checking the status of target nodes
+	log.Info("[Status]: Getting the status of target nodes")
+	err = status.CheckNodeStatus(experimentsDetails.TargetNode, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
+	if err != nil {
+		log.Warnf("Target nodes are not in the ready state, you may need to manually recover the node, err: %v", err)
+	}
+
 	//Waiting for the ramp time after chaos injection
 	if experimentsDetails.RampTime != 0 {
 		log.Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", experimentsDetails.RampTime)
