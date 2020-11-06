@@ -8,6 +8,7 @@ import (
 	experimentEnv "github.com/litmuschaos/litmus-go/pkg/kafka/environment"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/kafka/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
+	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
@@ -33,11 +34,16 @@ func KafkaBrokerPodFailure(clients clients.ClientSets) {
 	// Intialise Chaos Result Parameters
 	types.SetResultAttributes(&resultDetails, chaosDetails)
 
+	// Intialise the probe details. Bail out upon error, as we haven't entered exp business logic yet
+	if err = probe.InitializeProbesInChaosResultDetails(&chaosDetails, clients, &resultDetails); err != nil {
+		log.Fatalf("Unable to initialize the probes, err: %v", err)
+	}
+
 	//Updating the chaos result in the beginning of experiment
 	log.Infof("[PreReq]: Updating the chaos result of %v experiment (SOT)", experimentsDetails.ChaoslibDetail.ExperimentName)
 	err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT")
 	if err != nil {
-		log.Errorf("Unable to Create the Chaos Result err: %v", err)
+		log.Errorf("Unable to Create the Chaos Result, err: %v", err)
 		failStep := "Updating the chaos result of kafka-broker-pod-failure experiment (SOT)"
 		types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
 		err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
@@ -64,14 +70,33 @@ func KafkaBrokerPodFailure(clients clients.ClientSets) {
 	log.Info("[Status]: Verify that the Kafka cluster is healthy(pre-chaos)")
 	err = kafka.ClusterHealthCheck(&experimentsDetails, clients)
 	if err != nil {
-		log.Errorf("Cluster status check failed err: %v", err)
+		log.Errorf("Cluster status check failed, err: %v", err)
 		failStep := "Verify that the AUT (Application Under Test) is running (pre-chaos)"
 		types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
 		result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 		return
 	}
 	if experimentsDetails.ChaoslibDetail.EngineName != "" {
-		types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, "AUT is Running successfully", "Normal", &chaosDetails)
+		// marking AUT as running, as we already checked the status of application under test
+		msg := "AUT: Running"
+
+		// run the probes in the pre-chaos check
+		if len(resultDetails.ProbeDetails) != 0 {
+
+			err = probe.RunProbes(&chaosDetails, clients, &resultDetails, "PreChaos", &eventsDetails)
+			if err != nil {
+				log.Errorf("Probes Failed, err: %v", err)
+				failStep := "Failed while running probes"
+				msg := "AUT: Running, Probes: Unsuccessful"
+				types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, msg, "Warning", &chaosDetails)
+				events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
+				result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+				return
+			}
+			msg = "AUT: Running, Probes: Successful"
+		}
+		// generating the events for the pre-chaos check
+		types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, msg, "Normal", &chaosDetails)
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
@@ -122,7 +147,7 @@ func KafkaBrokerPodFailure(clients clients.ClientSets) {
 	if experimentsDetails.ChaoslibDetail.ChaosLib == "litmus" {
 		err = kafka_broker_pod_failure.PreparePodDelete(&experimentsDetails, experimentsDetails.ChaoslibDetail, clients, &resultDetails, &eventsDetails, &chaosDetails)
 		if err != nil {
-			log.Errorf("Chaos injection failed err: %v", err)
+			log.Errorf("Chaos injection failed, err: %v", err)
 			failStep := "Including the litmus lib for kafka-broker-pod-failure"
 			types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
 			result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
@@ -142,14 +167,33 @@ func KafkaBrokerPodFailure(clients clients.ClientSets) {
 	log.Info("[Status]: Verify that the Kafka cluster is healthy(post-chaos)")
 	err = kafka.ClusterHealthCheck(&experimentsDetails, clients)
 	if err != nil {
-		log.Errorf("Cluster status check failederr: %v", err)
+		log.Errorf("Cluster status check failed, err: %v", err)
 		failStep := "Verify that the AUT (Application Under Test) is running (pre-chaos)"
 		types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
 		result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 		return
 	}
 	if experimentsDetails.ChaoslibDetail.EngineName != "" {
-		types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, "AUT is Running successfully", "Normal", &chaosDetails)
+		// marking AUT as running, as we already checked the status of application under test
+		msg := "AUT: Running"
+
+		// run the probes in the post-chaos check
+		if len(resultDetails.ProbeDetails) != 0 {
+			err = probe.RunProbes(&chaosDetails, clients, &resultDetails, "PostChaos", &eventsDetails)
+			if err != nil {
+				log.Errorf("Probe Failed, err: %v", err)
+				failStep := "Failed while running probes"
+				msg := "AUT: Running, Probes: Unsuccessful"
+				types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, msg, "Warning", &chaosDetails)
+				events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
+				result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+				return
+			}
+			msg = "AUT: Running, Probes: Successful"
+		}
+
+		// generating post chaos event
+		types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, msg, "Normal", &chaosDetails)
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
@@ -157,7 +201,7 @@ func KafkaBrokerPodFailure(clients clients.ClientSets) {
 	if experimentsDetails.KafkaLivenessStream != "" {
 		err = status.CheckApplicationStatus(experimentsDetails.ChaoslibDetail.AppNS, "name=kafka-liveness", experimentsDetails.ChaoslibDetail.Timeout, experimentsDetails.ChaoslibDetail.Delay, clients)
 		if err != nil {
-			log.Errorf("Application liveness check failed err: %v", err)
+			log.Errorf("Application liveness check failed, err: %v", err)
 			failStep := "Verify that the AUT (Application Under Test) is running (post-chaos)"
 			types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
 			result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
@@ -165,7 +209,7 @@ func KafkaBrokerPodFailure(clients clients.ClientSets) {
 		}
 
 		if err := kafka.LivenessCleanup(&experimentsDetails, clients); err != nil {
-			log.Errorf("liveness cleanup failed err: %v", err)
+			log.Errorf("liveness cleanup failed, err: %v", err)
 			failStep := "Performing cleanup post chaos"
 			types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
 			result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")

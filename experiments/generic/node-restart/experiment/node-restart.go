@@ -1,24 +1,22 @@
 package experiment
 
 import (
-	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/pod-memory-hog/lib"
-	pumbaLIB "github.com/litmuschaos/litmus-go/chaoslib/pumba/memory-chaos/lib"
+	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/node-restart/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
-	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/pod-memory-hog/environment"
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-memory-hog/types"
+	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/node-restart/environment"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/node-restart/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
-	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/sirupsen/logrus"
 	"k8s.io/klog"
 )
 
-// PodMemoryHog inject the pod-memory-hog chaos
-func PodMemoryHog(clients clients.ClientSets) {
+// NodeRestart inject the node-restart chaos
+func NodeRestart(clients clients.ClientSets) {
 
 	var err error
 	experimentsDetails := experimentTypes.ExperimentDetails{}
@@ -28,7 +26,7 @@ func PodMemoryHog(clients clients.ClientSets) {
 
 	//Fetching all the ENV passed from the runner pod
 	log.Infof("[PreReq]: Getting the ENV for the %v experiment", experimentsDetails.ExperimentName)
-	experimentEnv.GetENV(&experimentsDetails)
+	experimentEnv.GetENV(&experimentsDetails, "node-restart")
 
 	// Intialise the chaos attributes
 	experimentEnv.InitialiseChaosVariables(&chaosDetails, &experimentsDetails)
@@ -36,17 +34,15 @@ func PodMemoryHog(clients clients.ClientSets) {
 	// Intialise Chaos Result Parameters
 	types.SetResultAttributes(&resultDetails, chaosDetails)
 
-	// Intialise the probe details. Bail out upon error, as we haven't entered exp business logic yet
-	if err = probe.InitializeProbesInChaosResultDetails(&chaosDetails, clients, &resultDetails); err != nil {
-		log.Fatalf("Unable to initialize the probes, err: %v", err)
-	}
+	// Intialise the probe details
+	probe.InitializeProbesInChaosResultDetails(&chaosDetails, clients, &resultDetails)
 
 	//Updating the chaos result in the beginning of experiment
 	log.Infof("[PreReq]: Updating the chaos result of %v experiment (SOT)", experimentsDetails.ExperimentName)
 	err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT")
 	if err != nil {
 		log.Errorf("Unable to Create the Chaos Result, err: %v", err)
-		failStep := "Updating the chaos result of pod-memory-hog experiment (SOT)"
+		failStep := "Updating the chaos result of node-restart experiment (SOT)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -54,28 +50,35 @@ func PodMemoryHog(clients clients.ClientSets) {
 	// Set the chaos result uid
 	result.SetResultUID(&resultDetails, clients, &chaosDetails)
 
-	// generating the event in chaosresult to marked the verdict as awaited
-	msg := "experiment: " + experimentsDetails.ExperimentName + ", Result: Awaited"
-	types.SetResultEventAttributes(&eventsDetails, types.AwaitedVerdict, msg, "Normal", &resultDetails)
-	events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosResult")
-
 	//DISPLAY THE APP INFORMATION
 	log.InfoWithValues("The application information is as follows", logrus.Fields{
-		"Namespace":          experimentsDetails.AppNS,
-		"Label":              experimentsDetails.AppLabel,
-		"Chaos Duration":     experimentsDetails.ChaosDuration,
-		"Ramp Time":          experimentsDetails.RampTime,
-		"Memory Consumption": experimentsDetails.MemoryConsumption,
+		"Namespace":      experimentsDetails.AppNS,
+		"Label":          experimentsDetails.AppLabel,
+		"NodeName":       experimentsDetails.TargetNode,
+		"Chaos Duration": experimentsDetails.ChaosDuration,
+		"Ramp Time":      experimentsDetails.RampTime,
 	})
 
 	//PRE-CHAOS APPLICATION STATUS CHECK
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (pre-chaos)")
 	err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 	if err != nil {
-		log.Errorf("Application status check failed,, err: %v", err)
+		log.Errorf("Application status check failed, err: %v", err)
 		failStep := "Verify that the AUT (Application Under Test) is running (pre-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
+	}
+
+	//PRE-CHAOS AUXILIARY APPLICATION STATUS CHECK
+	if experimentsDetails.AuxiliaryAppInfo != "" {
+		log.Info("[Status]: Verify that the Auxiliary Applications are running (pre-chaos)")
+		err = status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
+		if err != nil {
+			log.Errorf("Auxiliary Application status check failed, err: %v", err)
+			failStep := "Verify that the Auxiliary Applications are running (pre-chaos)"
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+			return
+		}
 	}
 
 	if experimentsDetails.EngineName != "" {
@@ -86,6 +89,7 @@ func PodMemoryHog(clients clients.ClientSets) {
 		if len(resultDetails.ProbeDetails) != 0 {
 
 			err = probe.RunProbes(&chaosDetails, clients, &resultDetails, "PreChaos", &eventsDetails)
+			events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 			if err != nil {
 				log.Errorf("Probe Failed, err: %v", err)
 				failStep := "Failed while running probes"
@@ -102,34 +106,20 @@ func PodMemoryHog(clients clients.ClientSets) {
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
-	// Including the litmus lib for pod-memory-hog
+	// Including the litmus lib for node-restart
 	if experimentsDetails.ChaosLib == "litmus" {
-		err = litmusLIB.PrepareMemoryStress(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
+		err = litmusLIB.PrepareNodeRestart(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
 		if err != nil {
-			log.Errorf("[Error]: pod memory hog failed,, err: %v", err)
-			failStep := "failed in chaos injection phase"
+			log.Errorf("[Error]: Node restart failed, err: %v", err)
+			failStep := " Node restart Chaos injection failed"
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}
-		log.Info("[Confirmation]: Memory of the application pod has been stressed successfully")
+		log.Info("[Confirmation]: Node restart has been done successfully")
 		resultDetails.Verdict = "Pass"
-	} else if experimentsDetails.ChaosLib == "pumba" {
-		// Calling AbortWatcher go routine, it will continuously watch for the abort signal for the entire chaos duration and generate the required events and result
-		// It is being invoked here, as opposed to within the chaoslib, as these experiments do not need additional recovery/chaos revert steps like in case of network experiments
-		go common.AbortWatcher(experimentsDetails.ExperimentName, clients, &resultDetails, &chaosDetails, &eventsDetails)
-		err = pumbaLIB.PreparePodMemoryHog(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
-		if err != nil {
-			log.Errorf("[Error]: Memory hog failed, err: %v", err)
-			failStep := "failed in chaos injection phase"
-			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-			return
-		}
-		log.Info("[Confirmation]: Memory of the application pod has been stressed successfully")
-		resultDetails.Verdict = "Pass"
-
 	} else {
 		log.Error("[Invalid]: Please Provide the correct LIB")
-		failStep := "no match found for specified lib"
+		failStep := "Including the litmus lib for node-restart"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -142,6 +132,18 @@ func PodMemoryHog(clients clients.ClientSets) {
 		failStep := "Verify that the AUT (Application Under Test) is running (post-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
+	}
+
+	//POST-CHAOS AUXILIARY APPLICATION STATUS CHECK
+	if experimentsDetails.AuxiliaryAppInfo != "" {
+		log.Info("[Status]: Verify that the Auxiliary Applications are running (post-chaos)")
+		err = status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
+		if err != nil {
+			log.Errorf("Auxiliary Application status check failed, err: %v", err)
+			failStep := "Verify that the Auxiliary Applications are running (post-chaos)"
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+			return
+		}
 	}
 
 	if experimentsDetails.EngineName != "" {
@@ -174,22 +176,13 @@ func PodMemoryHog(clients clients.ClientSets) {
 	if err != nil {
 		log.Fatalf("Unable to Update the Chaos Result, err: %v", err)
 	}
-
-	// generating the event in chaosresult to marked the verdict as pass/fail
-	msg = "experiment: " + experimentsDetails.ExperimentName + ", Result: " + resultDetails.Verdict
-	reason := types.PassVerdict
-	eventType := "Normal"
-	if resultDetails.Verdict != "Pass" {
-		reason = types.FailVerdict
-		eventType = "Warning"
-	}
-	types.SetResultEventAttributes(&eventsDetails, reason, msg, eventType, &resultDetails)
-	events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosResult")
-
 	if experimentsDetails.EngineName != "" {
 		msg := experimentsDetails.ExperimentName + " experiment has been " + resultDetails.Verdict + "ed"
 		types.SetEngineEventAttributes(&eventsDetails, types.Summary, msg, "Normal", &chaosDetails)
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
+	msg := experimentsDetails.ExperimentName + " experiment has been " + resultDetails.Verdict + "ed"
+	types.SetResultEventAttributes(&eventsDetails, types.Summary, msg, "Normal", &resultDetails)
+	events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosResult")
 }
