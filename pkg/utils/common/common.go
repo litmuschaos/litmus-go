@@ -102,8 +102,8 @@ func CheckForAvailibiltyOfPod(namespace, name string, clients clients.ClientSets
 	return true, nil
 }
 
-// CheckForAvailibiltyOfPods check the availibility of list of pods
-func CheckForAvailibiltyOfPods(namespace, pods string, clients clients.ClientSets) (bool, error) {
+// VerifyExistanceOfPods check the availibility of list of pods
+func VerifyExistanceOfPods(namespace, pods string, clients clients.ClientSets) (bool, error) {
 
 	if pods == "" {
 		return false, nil
@@ -132,7 +132,7 @@ func GetPodList(namespace, targetPods, appLabels, uid string, podAffPerc int, cl
 		return core_v1.PodList{}, errors.Wrapf(err, "Failed to find the pod with matching labels in %v namespace", namespace)
 	}
 
-	isPodsAvailable, err := CheckForAvailibiltyOfPods(namespace, targetPods, clients)
+	isPodsAvailable, err := VerifyExistanceOfPods(namespace, targetPods, clients)
 	if err != nil {
 		return core_v1.PodList{}, err
 	}
