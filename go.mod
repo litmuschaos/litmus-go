@@ -18,6 +18,7 @@ require (
 	github.com/rs/zerolog v1.19.0
 	github.com/sirupsen/logrus v1.6.0
 	github.com/spf13/cobra v1.0.0
+	github.com/sqs/goreturns v0.0.0-20181028201513-538ac6014518 // indirect
 	golang.org/x/net v0.0.0-20200822124328-c89045814202 // indirect
 	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d // indirect
 	golang.org/x/sys v0.0.0-20200509044756-6aff5f38e54f // indirect

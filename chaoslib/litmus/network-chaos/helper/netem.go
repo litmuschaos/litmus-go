@@ -135,7 +135,7 @@ loop:
 //GetPID extract out the pid of target container
 func GetPID(experimentDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) (int, error) {
 
-	pod, err := clients.KubeClient.CoreV1().Pods(experimentDetails.AppNS).Get(experimentDetails.TargetPod, v1.GetOptions{})
+	pod, err := clients.KubeClient.CoreV1().Pods(experimentDetails.AppNS).Get(experimentDetails.TargetPods, v1.GetOptions{})
 	if err != nil {
 		return 0, err
 	}
@@ -314,7 +314,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.ExperimentName = Getenv("EXPERIMENT_NAME", "")
 	experimentDetails.AppNS = Getenv("APP_NS", "")
 	experimentDetails.TargetContainer = Getenv("APP_CONTAINER", "")
-	experimentDetails.TargetPod = Getenv("APP_POD", "")
+	experimentDetails.TargetPods = Getenv("APP_POD", "")
 	experimentDetails.AppLabel = Getenv("APP_LABEL", "")
 	experimentDetails.ChaosDuration, _ = strconv.Atoi(Getenv("TOTAL_CHAOS_DURATION", "30"))
 	experimentDetails.ChaosNamespace = Getenv("CHAOS_NAMESPACE", "litmus")

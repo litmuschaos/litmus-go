@@ -29,7 +29,7 @@ type ExperimentDetails struct {
 	TCImage                            string
 	Timeout                            int
 	Delay                              int
-	TargetPod                          string
+	TargetPods                         string
 	PodsAffectedPerc                   int
 	TargetIPs                          string
 	Annotations                        map[string]string

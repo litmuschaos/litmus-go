@@ -33,7 +33,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.TCImage = Getenv("TC_IMAGE", "gaiadocker/iproute2")
 	experimentDetails.Delay, _ = strconv.Atoi(Getenv("STATUS_CHECK_DELAY", "2"))
 	experimentDetails.Timeout, _ = strconv.Atoi(Getenv("STATUS_CHECK_TIMEOUT", "180"))
-	experimentDetails.TargetPod = Getenv("TARGET_POD", "")
+	experimentDetails.TargetPods = Getenv("TARGET_PODS", "")
 	experimentDetails.PodsAffectedPerc, _ = strconv.Atoi(Getenv("PODS_AFFECTED_PERC", "0"))
 	experimentDetails.TargetIPs = Getenv("TARGET_IPS", "")
 	experimentDetails.TargetHosts = Getenv("TARGET_HOSTS", "")
