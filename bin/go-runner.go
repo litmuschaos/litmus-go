@@ -20,6 +20,7 @@ import (
 	nodeDrain "github.com/litmuschaos/litmus-go/experiments/generic/node-drain/experiment"
 	nodeIOStress "github.com/litmuschaos/litmus-go/experiments/generic/node-io-stress/experiment"
 	nodeMemoryHog "github.com/litmuschaos/litmus-go/experiments/generic/node-memory-hog/experiment"
+	nodeRestart "github.com/litmuschaos/litmus-go/experiments/generic/node-restart/experiment"
 	nodeTaint "github.com/litmuschaos/litmus-go/experiments/generic/node-taint/experiment"
 	podAutoscaler "github.com/litmuschaos/litmus-go/experiments/generic/pod-autoscaler/experiment"
 	podCPUHog "github.com/litmuschaos/litmus-go/experiments/generic/pod-cpu-hog/experiment"
@@ -31,8 +32,8 @@ import (
 	podNetworkLatency "github.com/litmuschaos/litmus-go/experiments/generic/pod-network-latency/experiment"
 	podNetworkLoss "github.com/litmuschaos/litmus-go/experiments/generic/pod-network-loss/experiment"
 	kafkaBrokerPodFailure "github.com/litmuschaos/litmus-go/experiments/kafka/kafka-broker-pod-failure/experiment"
-	ec2terminate "github.com/litmuschaos/litmus-go/experiments/kube-aws/ec2-terminate/experiment"
 	ebsLoss "github.com/litmuschaos/litmus-go/experiments/kube-aws/ebs-loss/experiment"
+	ec2terminate "github.com/litmuschaos/litmus-go/experiments/kube-aws/ec2-terminate/experiment"
 
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/log"
@@ -106,6 +107,8 @@ func main() {
 		ec2terminate.EC2Terminate(clients)
 	case "ebs-loss":
 		ebsLoss.EBSLoss(clients)
+	case "node-restart":
+		nodeRestart.NodeRestart(clients)
 	default:
 		log.Fatalf("Unsupported -name %v, please provide the correct value of -name args", *experimentName)
 	}

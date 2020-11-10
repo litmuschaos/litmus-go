@@ -64,7 +64,7 @@ func KillContainer(experimentsDetails *experimentTypes.ExperimentDetails, client
 		}
 
 		//GetRestartCount return the restart count of target container
-		restartCountBefore, err := GetRestartCount(experimentsDetails, experimentsDetails.TargetPod, clients)
+		restartCountBefore, err := GetRestartCount(experimentsDetails, experimentsDetails.TargetPods, clients)
 		if err != nil {
 			return err
 		}
@@ -77,7 +77,7 @@ func KillContainer(experimentsDetails *experimentTypes.ExperimentDetails, client
 		}
 
 		log.InfoWithValues("[Info]: Details of application under chaos injection", logrus.Fields{
-			"PodName":            experimentsDetails.TargetPod,
+			"PodName":            experimentsDetails.TargetPods,
 			"ContainerName":      experimentsDetails.TargetContainer,
 			"RestartCountBefore": restartCountBefore,
 		})
@@ -99,13 +99,13 @@ func KillContainer(experimentsDetails *experimentTypes.ExperimentDetails, client
 		}
 
 		//Check the status of restarted container
-		err = CheckContainerStatus(experimentsDetails, clients, experimentsDetails.TargetPod)
+		err = CheckContainerStatus(experimentsDetails, clients, experimentsDetails.TargetPods)
 		if err != nil {
 			return errors.Errorf("Application container is not in running state, %v", err)
 		}
 
 		// It will verify that the restart count of container should increase after chaos injection
-		err = VerifyRestartCount(experimentsDetails, experimentsDetails.TargetPod, clients, restartCountBefore)
+		err = VerifyRestartCount(experimentsDetails, experimentsDetails.TargetPods, clients, restartCountBefore)
 		if err != nil {
 			return err
 		}
@@ -134,13 +134,13 @@ func GetPodID(experimentsDetails *experimentTypes.ExperimentDetails) (string, er
 	pods := RemoveExtraSpaces(stdout)
 	for i := 0; i < len(pods)-1; i++ {
 		attributes := strings.Split(pods[i], " ")
-		if attributes[3] == experimentsDetails.TargetPod {
+		if attributes[3] == experimentsDetails.TargetPods {
 			return attributes[0], nil
 		}
 
 	}
 
-	return "", fmt.Errorf("%v pod is unavailable", experimentsDetails.TargetPod)
+	return "", fmt.Errorf("%v pod is unavailable", experimentsDetails.TargetPods)
 }
 
 //GetContainerID  derive the container id of the application container
@@ -277,7 +277,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, name string) {
 	experimentDetails.ExperimentName = name
 	experimentDetails.AppNS = Getenv("APP_NS", "")
 	experimentDetails.TargetContainer = Getenv("APP_CONTAINER", "")
-	experimentDetails.TargetPod = Getenv("APP_POD", "")
+	experimentDetails.TargetPods = Getenv("APP_POD", "")
 	experimentDetails.ChaosDuration, _ = strconv.Atoi(Getenv("TOTAL_CHAOS_DURATION", "30"))
 	experimentDetails.ChaosInterval, _ = strconv.Atoi(Getenv("CHAOS_INTERVAL", "10"))
 	experimentDetails.Iterations, _ = strconv.Atoi(Getenv("ITERATIONS", "3"))
