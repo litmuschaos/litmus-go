@@ -111,13 +111,6 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 			return errors.Errorf("helper pod failed, err: %v", err)
 		}
 
-		// run the probes after chaos
-		if len(resultDetails.ProbeDetails) != 0 {
-			if err = probe.RunProbes(chaosDetails, clients, resultDetails, "AfterChaos", eventsDetails); err != nil {
-				return err
-			}
-		}
-
 		//Deleting the helper pod
 		log.Info("[Cleanup]: Deleting the helper pod")
 		err = common.DeletePod(experimentsDetails.ExperimentName+"-"+runID, "app="+experimentsDetails.ExperimentName+"-helper", experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients)
@@ -171,13 +164,6 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 	podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, "app="+experimentsDetails.ExperimentName+"-helper", clients, experimentsDetails.ChaosDuration+30, chaosDetails.ExperimentName)
 	if err != nil || podStatus == "Failed" {
 		return errors.Errorf("helper pod failed, err: %v", err)
-	}
-
-	// run the probes after chaos
-	if len(resultDetails.ProbeDetails) != 0 {
-		if err = probe.RunProbes(chaosDetails, clients, resultDetails, "AfterChaos", eventsDetails); err != nil {
-			return err
-		}
 	}
 
 	//Deleting the helper pod

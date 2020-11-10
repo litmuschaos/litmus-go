@@ -20,58 +20,20 @@ import (
 // PrepareK8sProbe contains the steps to prepare the k8s probe
 // k8s probe can be used to add the probe which needs client-go for command execution, no extra binaries/command
 func PrepareK8sProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails, clients clients.ClientSets, phase string, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-
-	if EligibleForPrint(probe.Mode, phase) {
-		//DISPLAY THE K8S PROBE INFO
-		log.InfoWithValues("[Probe]: The k8s probe information is as follows", logrus.Fields{
-			"Name":            probe.Name,
-			"Command":         probe.K8sProbeInputs.Command,
-			"Expected Result": probe.K8sProbeInputs.ExpectedResult,
-			"Run Properties":  probe.RunProperties,
-			"Mode":            probe.Mode,
-			"Phase":           phase,
-		})
-	}
-
-	// triggering probes on the basis of mode & phase so that probe will only run when they are requested to run
-	// if mode is SOT & phase is PreChaos, it will trigger Probes in PreChaos section
-	// if mode is EOT & phase is PostChaos, it will trigger Probes in PostChaos section
-	// if mode is Edge then independent of phase, it will trigger Probes in both Pre/Post Chaos section
-	if ValidMPCombinationForNonContinuousMode(probe.Mode, phase) {
-
-		// waiting for initial delay
-		if probe.RunProperties.InitialDelaySeconds != 0 {
-			log.Infof("[Wait]: Waiting for %vs before probe execution", probe.RunProperties.InitialDelaySeconds)
-			time.Sleep(time.Duration(probe.RunProperties.InitialDelaySeconds) * time.Second)
-		}
-
-		// triggering the k8s probe
-		err = TriggerK8sProbe(probe, clients, resultDetails)
-
-		// failing the probe, if the success condition doesn't met after the retry & timeout combinations
-		// it will update the status of all the unrun probes as well
-		if err = MarkedVerdictInEnd(err, resultDetails, probe.Name, probe.Mode, probe.Type, phase); err != nil {
+	switch phase {
+	case "PreChaos":
+		if err := PreChaosK8sProbe(probe, resultDetails, clients, chaosDetails); err != nil {
 			return err
 		}
-	}
-	// trigger probes for the continuous mode
-	if probe.Mode == "Continuous" && phase == "PreChaos" {
-		go TriggerContinuousK8sProbe(probe, clients, resultDetails)
-	}
-	// trigger probes for the onchaos mode
-	if probe.Mode == "OnChaos" && phase == "DuringChaos" {
-		go TriggerOnChaosK8sProbe(probe, clients, resultDetails, chaosDetails.ChaosDuration)
-	}
-	// verify the continuous mode and marked the result of the probes
-	if (probe.Mode == "Continuous" && phase == "PostChaos") || (probe.Mode == "OnChaos" && phase == "AfterChaos") {
-		// it will check for the error, It will detect the error if any error encountered in probe during chaos
-		err = CheckForErrorInContinuousProbe(resultDetails, probe.Name)
-		// failing the probe, if the success condition doesn't met after the retry & timeout combinations
-		if err = MarkedVerdictInEnd(err, resultDetails, probe.Name, probe.Mode, probe.Type, phase); err != nil {
+	case "PostChaos":
+		if err := PostChaosK8sProbe(probe, resultDetails, clients, chaosDetails); err != nil {
 			return err
 		}
+	case "DuringChaos":
+		OnChaosK8sProbe(probe, resultDetails, clients, chaosDetails)
+	default:
+		return fmt.Errorf("phase '%s' not supported in the k8s probe", phase)
 	}
-
 	return nil
 }
 
@@ -174,6 +136,144 @@ func TriggerContinuousK8sProbe(probe v1alpha1.ProbeAttributes, clients clients.C
 	}
 }
 
+// CreateResource creates the resource from the data provided inside data field
+func CreateResource(probe v1alpha1.ProbeAttributes, gvr schema.GroupVersionResource, clients clients.ClientSets) error {
+	decUnstructured := yaml.NewDecodingSerializer(unstructured.UnstructuredJSONScheme)
+	// Decode YAML manifest into unstructured.Unstructured
+	data := &unstructured.Unstructured{}
+	_, _, err = decUnstructured.Decode([]byte(probe.Data), nil, data)
+	if err != nil {
+		return err
+	}
+
+	_, err := clients.DynamicClient.Resource(gvr).Namespace(probe.K8sProbeInputs.Command.Namespace).Create(data, v1.CreateOptions{})
+
+	return err
+}
+
+// DeleteResource deletes the resource with matching label & field selector
+func DeleteResource(probe v1alpha1.ProbeAttributes, gvr schema.GroupVersionResource, clients clients.ClientSets) error {
+	resourceList, err := clients.DynamicClient.Resource(gvr).Namespace(probe.K8sProbeInputs.Command.Namespace).List(v1.ListOptions{
+		FieldSelector: probe.K8sProbeInputs.Command.FieldSelector,
+		LabelSelector: probe.K8sProbeInputs.Command.LabelSelector,
+	})
+	if err != nil || len(resourceList.Items) == 0 {
+		return fmt.Errorf("unable to list the resources with matching selector, err: %v", err)
+	}
+
+	for index := range resourceList.Items {
+		if err = clients.DynamicClient.Resource(gvr).Namespace(probe.K8sProbeInputs.Command.Namespace).Delete(resourceList.Items[index].GetName(), &v1.DeleteOptions{}); err != nil {
+			return err
+		}
+
+	}
+	return nil
+}
+
+//PreChaosK8sProbe trigger the k8s probe for prechaos phase
+func PreChaosK8sProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
+
+	switch probe.Mode {
+	case "SOT", "Edge":
+
+		//DISPLAY THE K8S PROBE INFO
+		log.InfoWithValues("[Probe]: The k8s probe information is as follows", logrus.Fields{
+			"Name":            probe.Name,
+			"Command":         probe.K8sProbeInputs.Command,
+			"Expected Result": probe.K8sProbeInputs.ExpectedResult,
+			"Run Properties":  probe.RunProperties,
+			"Mode":            probe.Mode,
+			"Phase":           "PreChaos",
+		})
+		// waiting for initial delay
+		if probe.RunProperties.InitialDelaySeconds != 0 {
+			log.Infof("[Wait]: Waiting for %vs before probe execution", probe.RunProperties.InitialDelaySeconds)
+			time.Sleep(time.Duration(probe.RunProperties.InitialDelaySeconds) * time.Second)
+		}
+		// triggering the k8s probe
+		err = TriggerK8sProbe(probe, clients, resultDetails)
+
+		// failing the probe, if the success condition doesn't met after the retry & timeout combinations
+		// it will update the status of all the unrun probes as well
+		if err = MarkedVerdictInEnd(err, resultDetails, probe.Name, probe.Mode, probe.Type, "PreChaos"); err != nil {
+			return err
+		}
+	case "Continuous":
+
+		//DISPLAY THE K8S PROBE INFO
+		log.InfoWithValues("[Probe]: The k8s probe information is as follows", logrus.Fields{
+			"Name":            probe.Name,
+			"Command":         probe.K8sProbeInputs.Command,
+			"Expected Result": probe.K8sProbeInputs.ExpectedResult,
+			"Run Properties":  probe.RunProperties,
+			"Mode":            probe.Mode,
+			"Phase":           "PreChaos",
+		})
+		go TriggerContinuousK8sProbe(probe, clients, resultDetails)
+	}
+	return nil
+}
+
+//PostChaosK8sProbe trigger the k8s probe for postchaos phase
+func PostChaosK8sProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
+
+	switch probe.Mode {
+	case "EOT", "Edge":
+
+		//DISPLAY THE K8S PROBE INFO
+		log.InfoWithValues("[Probe]: The k8s probe information is as follows", logrus.Fields{
+			"Name":            probe.Name,
+			"Command":         probe.K8sProbeInputs.Command,
+			"Expected Result": probe.K8sProbeInputs.ExpectedResult,
+			"Run Properties":  probe.RunProperties,
+			"Mode":            probe.Mode,
+			"Phase":           "PostChaos",
+		})
+		// waiting for initial delay
+		if probe.RunProperties.InitialDelaySeconds != 0 {
+			log.Infof("[Wait]: Waiting for %vs before probe execution", probe.RunProperties.InitialDelaySeconds)
+			time.Sleep(time.Duration(probe.RunProperties.InitialDelaySeconds) * time.Second)
+		}
+		// triggering the k8s probe
+		err = TriggerK8sProbe(probe, clients, resultDetails)
+
+		// failing the probe, if the success condition doesn't met after the retry & timeout combinations
+		// it will update the status of all the unrun probes as well
+		if err = MarkedVerdictInEnd(err, resultDetails, probe.Name, probe.Mode, probe.Type, "PostChaos"); err != nil {
+			return err
+		}
+	case "Continuous", "OnChaos":
+		// it will check for the error, It will detect the error if any error encountered in probe during chaos
+		err = CheckForErrorInContinuousProbe(resultDetails, probe.Name)
+		// failing the probe, if the success condition doesn't met after the retry & timeout combinations
+		if err = MarkedVerdictInEnd(err, resultDetails, probe.Name, probe.Mode, probe.Type, "PostChaos"); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+//OnChaosK8sProbe trigger the k8s probe for DuringChaos phase
+func OnChaosK8sProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) {
+
+	switch probe.Mode {
+	case "OnChaos":
+
+		//DISPLAY THE K8S PROBE INFO
+		log.InfoWithValues("[Probe]: The k8s probe information is as follows", logrus.Fields{
+			"Name":            probe.Name,
+			"Command":         probe.K8sProbeInputs.Command,
+			"Expected Result": probe.K8sProbeInputs.ExpectedResult,
+			"Run Properties":  probe.RunProperties,
+			"Mode":            probe.Mode,
+			"Phase":           "DuringChaos",
+		})
+		go TriggerOnChaosK8sProbe(probe, clients, resultDetails, chaosDetails.ChaosDuration)
+
+	}
+
+}
+
 // TriggerOnChaosK8sProbe trigger the onchaos k8s probes
 func TriggerOnChaosK8sProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets, chaosresult *types.ResultDetails, duration int) {
 
@@ -212,38 +312,4 @@ loop:
 			time.Sleep(time.Duration(probe.RunProperties.ProbePollingInterval) * time.Second)
 		}
 	}
-}
-
-// CreateResource creates the resource from the data provided inside data field
-func CreateResource(probe v1alpha1.ProbeAttributes, gvr schema.GroupVersionResource, clients clients.ClientSets) error {
-	decUnstructured := yaml.NewDecodingSerializer(unstructured.UnstructuredJSONScheme)
-	// Decode YAML manifest into unstructured.Unstructured
-	data := &unstructured.Unstructured{}
-	_, _, err = decUnstructured.Decode([]byte(probe.Data), nil, data)
-	if err != nil {
-		return err
-	}
-
-	_, err := clients.DynamicClient.Resource(gvr).Namespace(probe.K8sProbeInputs.Command.Namespace).Create(data, v1.CreateOptions{})
-
-	return err
-}
-
-// DeleteResource deletes the resource with matching label & field selector
-func DeleteResource(probe v1alpha1.ProbeAttributes, gvr schema.GroupVersionResource, clients clients.ClientSets) error {
-	resourceList, err := clients.DynamicClient.Resource(gvr).Namespace(probe.K8sProbeInputs.Command.Namespace).List(v1.ListOptions{
-		FieldSelector: probe.K8sProbeInputs.Command.FieldSelector,
-		LabelSelector: probe.K8sProbeInputs.Command.LabelSelector,
-	})
-	if err != nil || len(resourceList.Items) == 0 {
-		return fmt.Errorf("unable to list the resources with matching selector, err: %v", err)
-	}
-
-	for index := range resourceList.Items {
-		if err = clients.DynamicClient.Resource(gvr).Namespace(probe.K8sProbeInputs.Command.Namespace).Delete(resourceList.Items[index].GetName(), &v1.DeleteOptions{}); err != nil {
-			return err
-		}
-
-	}
-	return nil
 }
