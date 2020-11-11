@@ -13,6 +13,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
+	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -34,11 +35,17 @@ func InjectEBSLoss(experimentsDetails *experimentTypes.ExperimentDetails, client
 		return errors.Errorf("ebs detachment failed, err: %v", err)
 	}
 
+	//Wait for ebs volume detachment
+	log.Info("[Wait]: Wait for EBS volume detachment")
+	if err = WaitForVolumeDetachment(experimentsDetails); err != nil {
+		return errors.Errorf("unable to detach the ebs volume to the ec2 instance, err: %v", err)
+	}
+
 	//Wait for chaos duration
 	log.Infof("[Wait]: Waiting for the chaos duration of %vs", experimentsDetails.ChaosDuration)
 	time.Sleep(time.Duration(experimentsDetails.ChaosDuration) * time.Second)
 
-	//Getting the Ebs status
+	//Getting the EBS volume attachment status
 	EBSStatus, err := ebs.GetEBSStatus(experimentsDetails)
 	if err != nil {
 		return errors.Errorf("failed to get the ebs status, err: %v", err)
@@ -50,6 +57,12 @@ func InjectEBSLoss(experimentsDetails *experimentTypes.ExperimentDetails, client
 		err = EBSVolumeAttach(experimentsDetails)
 		if err != nil {
 			return errors.Errorf("ebs attachment failed, err: %v", err)
+		}
+
+		//Wait for ebs volume attachment
+		log.Info("[Wait]: Wait for EBS volume attachment")
+		if err = WaitForVolumeAttachment(experimentsDetails); err != nil {
+			return errors.Errorf("unable to attach the ebs volume to the ec2 instance, err: %v", err)
 		}
 	} else {
 		log.Info("[Skip]: The EBS volume is already attached")
@@ -138,10 +151,57 @@ func EBSVolumeAttach(experimentsDetails *experimentTypes.ExperimentDetails) erro
 		"Device":     *result.Device,
 		"InstanceId": *result.InstanceId,
 	})
+	return nil
+}
 
-	//Wait for instance to get attached
-	log.Info("[Wait]: Waiting for ebs vol to reattach")
-	time.Sleep(10 * time.Second)
+// WaitForVolumeDetachment will wait the ebs volume to completely detach
+func WaitForVolumeDetachment(experimentsDetails *experimentTypes.ExperimentDetails) error {
 
+	log.Info("[Status]: Checking ebs volume status for detachment")
+	err := retry.
+		Times(uint(experimentsDetails.Timeout / experimentsDetails.Delay)).
+		Wait(time.Duration(experimentsDetails.Delay) * time.Second).
+		Try(func(attempt uint) error {
+
+			instanceState, err := ebs.GetEBSStatus(experimentsDetails)
+			if err != nil {
+				return errors.Errorf("failed to get the instance status")
+			}
+			if instanceState != "detached" {
+				log.Infof("The instance state is %v", instanceState)
+				return errors.Errorf("instance is not yet in detached state")
+			}
+			log.Infof("The instance state is %v", instanceState)
+			return nil
+		})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// WaitForVolumeAttachment will wait for the ebs volume to get attached on ec2 instance
+func WaitForVolumeAttachment(experimentsDetails *experimentTypes.ExperimentDetails) error {
+
+	log.Info("[Status]: Checking ebs volume status for attachment")
+	err := retry.
+		Times(uint(experimentsDetails.Timeout / experimentsDetails.Delay)).
+		Wait(time.Duration(experimentsDetails.Delay) * time.Second).
+		Try(func(attempt uint) error {
+
+			instanceState, err := ebs.GetEBSStatus(experimentsDetails)
+			if err != nil {
+				return errors.Errorf("failed to get the instance status")
+			}
+			if instanceState != "attached" {
+				log.Infof("The instance state is %v", instanceState)
+				return errors.Errorf("instance is not yet in attached state")
+			}
+			log.Infof("The instance state is %v", instanceState)
+			return nil
+		})
+	if err != nil {
+		return err
+	}
 	return nil
 }
