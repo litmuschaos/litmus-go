@@ -25,7 +25,7 @@ type ExperimentDetails struct {
 	Timeout           int
 	Delay             int
 	Annotations       map[string]string
-	TargetNode        string
+	TargetNodes       string
 	NodesAffectedPerc int
 	Sequence          string
 }

@@ -28,10 +28,11 @@ func PrepareNodeCPUHog(experimentsDetails *experimentTypes.ExperimentDetails, cl
 	}
 
 	//Select node for node-cpu-hog
-	targetNodeList, err := common.GetNodeList(experimentsDetails.TargetNode, experimentsDetails.NodesAffectedPerc, clients)
+	targetNodeList, err := common.GetNodeList(experimentsDetails.TargetNodes, experimentsDetails.NodesAffectedPerc, clients)
 	if err != nil {
 		return err
 	}
+	log.Infof("Number of targeted nodes, %v", len(targetNodeList))
 
 	if experimentsDetails.Sequence == "serial" {
 		if err = InjectChaosInSerialMode(experimentsDetails, targetNodeList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {

@@ -63,6 +63,7 @@ func NodeCPUHog(clients clients.ClientSets) {
 		"Namespace":      experimentsDetails.AppNS,
 		"Label":          experimentsDetails.AppLabel,
 		"Chaos Duration": experimentsDetails.ChaosDuration,
+		"Target Nodes":   experimentsDetails.TargetNodes,
 		"Ramp Time":      experimentsDetails.RampTime,
 	})
 
@@ -94,7 +95,7 @@ func NodeCPUHog(clients clients.ClientSets) {
 
 	// Checking the status of target nodes
 	log.Info("[Status]: Getting the status of target nodes")
-	err = status.CheckNodeStatus(experimentsDetails.TargetNode, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
+	err = status.CheckNodeStatus(experimentsDetails.TargetNodes, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 	if err != nil {
 		log.Errorf("Target nodes are not in the ready state, err: %v", err)
 		failStep := "Checking the status of nodes"
