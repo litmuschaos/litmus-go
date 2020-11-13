@@ -83,8 +83,8 @@ func EBSLoss(clients clients.ClientSets) {
 
 			err = probe.RunProbes(&chaosDetails, clients, &resultDetails, "PreChaos", &eventsDetails)
 			if err != nil {
-				log.Errorf("Probe failed, err: %v", err)
-				failStep := "Failed while adding probe"
+				log.Errorf("Probe Failed, err: %v", err)
+				failStep := "Failed while running probes"
 				msg := "AUT: Running, Probes: Unsuccessful"
 				types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, msg, "Warning", &chaosDetails)
 				events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
@@ -112,7 +112,7 @@ func EBSLoss(clients clients.ClientSets) {
 
 	//Configure AWS Credentials
 	if err = aws.ConfigureAWS(); err != nil {
-		log.Errorf("AWS authentication failed err: %v", err)
+		log.Errorf("AWS authentication failed, err: %v", err)
 		failStep := "Configure AWS configuration (pre-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
@@ -121,7 +121,7 @@ func EBSLoss(clients clients.ClientSets) {
 	//Verify the aws ec2 instance is attached to ebs volume
 	EBSStatus, err := aws.GetEBSStatus(&experimentsDetails)
 	if err != nil || EBSStatus != "attached" {
-		log.Errorf("fail to verify the ebs volume is attached to an ec2 instance pre chaos err: %v", err)
+		log.Errorf("failed to verify the ebs volume is attached to an ec2 instance, err: %v", err)
 		failStep := "Verify the ebs volume is attached to an ec2 instance (pre-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
@@ -170,7 +170,7 @@ func EBSLoss(clients clients.ClientSets) {
 	//Verify the aws ec2 instance is attached to ebs volume
 	EBSStatus, err = aws.GetEBSStatus(&experimentsDetails)
 	if err != nil || EBSStatus != "attached" {
-		log.Errorf("fai to verify the ebs volume is attached to an ec2 instance post chaos err: %v", err)
+		log.Errorf("failed to verify the ebs volume is attached to an ec2 instance, err: %v", err)
 		failStep := "Verify the ebs volume is attached to an ec2 instance (post-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
@@ -184,8 +184,8 @@ func EBSLoss(clients clients.ClientSets) {
 		if len(resultDetails.ProbeDetails) != 0 {
 			err = probe.RunProbes(&chaosDetails, clients, &resultDetails, "PostChaos", &eventsDetails)
 			if err != nil {
-				log.Errorf("Unable to Add the probes, err: %v", err)
-				failStep := "Failed while adding probe"
+				log.Errorf("Probes Failed, err: %v", err)
+				failStep := "Failed while running probes"
 				msg := "AUT: Running, Probes: Unsuccessful"
 				types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, msg, "Warning", &chaosDetails)
 				events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
@@ -204,7 +204,7 @@ func EBSLoss(clients clients.ClientSets) {
 	log.Infof("[The End]: Updating the chaos result of %v experiment (EOT)", experimentsDetails.ExperimentName)
 	err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 	if err != nil {
-		log.Fatalf("Unable to Update the Chaos Result err:  %v\n", err)
+		log.Fatalf("Unable to Update the Chaos Result, err: %v", err)
 	}
 
 	// generating the event in chaosresult to marked the verdict as pass/fail

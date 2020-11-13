@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -101,9 +102,29 @@ func CheckForAvailibiltyOfPod(namespace, name string, clients clients.ClientSets
 	return true, nil
 }
 
+// VerifyExistanceOfPods check the availibility of list of pods
+func VerifyExistanceOfPods(namespace, pods string, clients clients.ClientSets) (bool, error) {
+
+	if pods == "" {
+		return false, nil
+	}
+
+	podList := strings.Split(pods, ",")
+	for index := range podList {
+		isPodsAvailable, err := CheckForAvailibiltyOfPod(namespace, podList[index], clients)
+		if err != nil {
+			return false, err
+		}
+		if !isPodsAvailable {
+			return isPodsAvailable, nil
+		}
+	}
+	return true, nil
+}
+
 //GetPodList check for the availibilty of the target pod for the chaos execution
 // if the target pod is not defined it will derive the random target pod list using pod affected percentage
-func GetPodList(namespace, targetPod, appLabels, uid string, podAffPerc int, clients clients.ClientSets) (core_v1.PodList, error) {
+func GetPodList(namespace, targetPods, appLabels, uid string, podAffPerc int, clients clients.ClientSets) (core_v1.PodList, error) {
 	realpods := core_v1.PodList{}
 	nonChaosPods := core_v1.PodList{}
 	podList, err := clients.KubeClient.CoreV1().Pods(namespace).List(v1.ListOptions{LabelSelector: appLabels})
@@ -111,21 +132,23 @@ func GetPodList(namespace, targetPod, appLabels, uid string, podAffPerc int, cli
 		return core_v1.PodList{}, errors.Wrapf(err, "Failed to find the pod with matching labels in %v namespace", namespace)
 	}
 
-	isPodAvailable, err := CheckForAvailibiltyOfPod(namespace, targetPod, clients)
+	isPodsAvailable, err := VerifyExistanceOfPods(namespace, targetPods, clients)
 	if err != nil {
 		return core_v1.PodList{}, err
 	}
 
 	// getting the node name, if the target pod is defined
 	// else select a random target pod from the specified labels
-	if isPodAvailable {
-		pod, err := clients.KubeClient.CoreV1().Pods(namespace).Get(targetPod, v1.GetOptions{})
-		if err != nil {
-			return core_v1.PodList{}, err
+	if isPodsAvailable {
+		targetPodsList := strings.Split(targetPods, ",")
+		for _, pod := range podList.Items {
+			for index := range targetPodsList {
+				if targetPodsList[index] == pod.Name {
+					realpods.Items = append(realpods.Items, pod)
+				}
+			}
 		}
-		realpods.Items = append(realpods.Items, *pod)
 	} else {
-
 		if appLabels == "" {
 			// ignore chaos pods
 			for index, pod := range podList.Items {

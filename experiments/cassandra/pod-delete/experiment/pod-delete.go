@@ -8,6 +8,7 @@ import (
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	"github.com/litmuschaos/litmus-go/pkg/log"
+	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
@@ -33,6 +34,11 @@ func CasssandraPodDelete(clients clients.ClientSets) {
 
 	// Intialise Chaos Result Parameters
 	types.SetResultAttributes(&resultDetails, chaosDetails)
+
+	// Intialise the probe details. Bail out upon error, as we haven't entered exp business logic yet
+	if err = probe.InitializeProbesInChaosResultDetails(&chaosDetails, clients, &resultDetails); err != nil {
+		log.Fatalf("Unable to initialize the probes, err: %v", err)
+	}
 
 	//Updating the chaos result in the beginning of experiment
 	log.Infof("[PreReq]: Updating the chaos result of %v experiment (SOT)", experimentsDetails.ChaoslibDetail.ExperimentName)
@@ -73,8 +79,28 @@ func CasssandraPodDelete(clients clients.ClientSets) {
 		result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 		return
 	}
+
 	if experimentsDetails.ChaoslibDetail.EngineName != "" {
-		types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, "AUT is Running successfully", "Normal", &chaosDetails)
+		// marking AUT as running, as we already checked the status of application under test
+		msg := "AUT: Running"
+
+		// run the probes in the pre-chaos check
+		if len(resultDetails.ProbeDetails) != 0 {
+
+			err = probe.RunProbes(&chaosDetails, clients, &resultDetails, "PreChaos", &eventsDetails)
+			if err != nil {
+				log.Errorf("Probes Failed, err: %v", err)
+				failStep := "Failed while running probes"
+				msg := "AUT: Running, Probes: Unsuccessful"
+				types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, msg, "Warning", &chaosDetails)
+				events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
+				result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+				return
+			}
+			msg = "AUT: Running, Probes: Successful"
+		}
+		// generating the events for the pre-chaos check
+		types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, msg, "Normal", &chaosDetails)
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
@@ -82,7 +108,7 @@ func CasssandraPodDelete(clients clients.ClientSets) {
 	log.Info("[Status]: Checking the load distribution on the ring (pre-chaos)")
 	err = cassandra.NodeToolStatusCheck(&experimentsDetails, clients)
 	if err != nil {
-		log.Errorf("[Status]: Chaos node tool status check is failed, err: %v", err)
+		log.Errorf("[Status]: Chaos node tool status check failed, err: %v", err)
 		failStep := "Checking for load distribution on the ring(pre-chaos)"
 		types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
 		result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
@@ -133,7 +159,26 @@ func CasssandraPodDelete(clients clients.ClientSets) {
 		return
 	}
 	if experimentsDetails.ChaoslibDetail.EngineName != "" {
-		types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, "AUT is Running successfully", "Normal", &chaosDetails)
+		// marking AUT as running, as we already checked the status of application under test
+		msg := "AUT: Running"
+
+		// run the probes in the post-chaos check
+		if len(resultDetails.ProbeDetails) != 0 {
+			err = probe.RunProbes(&chaosDetails, clients, &resultDetails, "PostChaos", &eventsDetails)
+			if err != nil {
+				log.Errorf("Probes Failed, err: %v", err)
+				failStep := "Failed while running probes"
+				msg := "AUT: Running, Probes: Unsuccessful"
+				types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, msg, "Warning", &chaosDetails)
+				events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
+				result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+				return
+			}
+			msg = "AUT: Running, Probes: Successful"
+		}
+
+		// generating post chaos event
+		types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, msg, "Normal", &chaosDetails)
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
