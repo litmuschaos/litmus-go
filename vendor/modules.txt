@@ -79,7 +79,7 @@ github.com/json-iterator/go
 github.com/konsorten/go-windows-terminal-sequences
 # github.com/kyokomi/emoji v2.2.4+incompatible
 github.com/kyokomi/emoji
-# github.com/litmuschaos/chaos-operator v0.0.0-20201113105525-6eccea134e46
+# github.com/litmuschaos/chaos-operator v0.0.0-20201113182537-520679f26f3d
 github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1
 github.com/litmuschaos/chaos-operator/pkg/client/clientset/versioned/scheme
 github.com/litmuschaos/chaos-operator/pkg/client/clientset/versioned/typed/litmuschaos/v1alpha1

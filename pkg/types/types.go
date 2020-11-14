@@ -73,6 +73,7 @@ type ChaosDetails struct {
 	ExperimentName string
 	Timeout        int
 	Delay          int
+	ChaosDuration  int
 }
 
 //SetResultAttributes initialise all the chaos result ENV
