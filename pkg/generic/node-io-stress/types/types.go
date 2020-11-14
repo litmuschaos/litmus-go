@@ -24,7 +24,7 @@ type ExperimentDetails struct {
 	Timeout                         int
 	Delay                           int
 	Annotations                     map[string]string
-	TargetNode                      string
+	TargetNodes                     string
 	FilesystemUtilizationPercentage int
 	FilesystemUtilizationBytes      int
 	NumberOfWorkers                 int

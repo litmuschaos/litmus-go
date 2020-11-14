@@ -55,7 +55,7 @@ func GetEBSStatus(experimentsDetails *experimentTypes.ExperimentDetails) (string
 					return *volumeDetails.Attachments[0].State, nil
 				}
 			}
-			return "", nil
+			return "detached", nil
 		}
 	}
 	return "", errors.Errorf("unable to find the ebs volume with volumeId %v", experimentsDetails.EBSVolumeID)
