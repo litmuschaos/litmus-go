@@ -58,9 +58,10 @@ func KubeletServiceKill(clients clients.ClientSets) {
 
 	//DISPLAY THE APP INFORMATION
 	log.InfoWithValues("The application information is as follows", logrus.Fields{
-		"Namespace": experimentsDetails.AppNS,
-		"Label":     experimentsDetails.AppLabel,
-		"Ramp Time": experimentsDetails.RampTime,
+		"Namespace":   experimentsDetails.AppNS,
+		"Label":       experimentsDetails.AppLabel,
+		"Target Node": experimentsDetails.TargetNode,
+		"Ramp Time":   experimentsDetails.RampTime,
 	})
 
 	//PRE-CHAOS APPLICATION STATUS CHECK
@@ -85,6 +86,16 @@ func KubeletServiceKill(clients clients.ClientSets) {
 		}
 	}
 
+	// Checking the status of target nodes
+	log.Info("[Status]: Getting the status of target nodes")
+	err = status.CheckNodeStatus(experimentsDetails.TargetNode, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
+	if err != nil {
+		log.Errorf("Target nodes are not in the ready state, err: %v", err)
+		failStep := "Checking the status of nodes"
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+		return
+	}
+
 	if experimentsDetails.EngineName != "" {
 		// marking AUT as running, as we already checked the status of application under test
 		msg := "AUT: Running"
@@ -94,8 +105,8 @@ func KubeletServiceKill(clients clients.ClientSets) {
 
 			err = probe.RunProbes(&chaosDetails, clients, &resultDetails, "PreChaos", &eventsDetails)
 			if err != nil {
-				log.Errorf("Probe failed, err: %v", err)
-				failStep := "Failed while adding probe"
+				log.Errorf("Probe Failed, err: %v", err)
+				failStep := "Failed while running probes"
 				msg := "AUT: Running, Probes: Unsuccessful"
 				types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, msg, "Warning", &chaosDetails)
 				events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
@@ -118,7 +129,7 @@ func KubeletServiceKill(clients clients.ClientSets) {
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}
-		log.Info("[Confirmation]: kubelet-service-kill chaos has been injected successfully")
+		log.Infof("[Confirmation]: %v chaos has been injected successfully", experimentsDetails.ExperimentName)
 		resultDetails.Verdict = "Pass"
 	} else {
 		log.Error("[Invalid]: Please Provide the correct LIB")
@@ -157,8 +168,8 @@ func KubeletServiceKill(clients clients.ClientSets) {
 		if len(resultDetails.ProbeDetails) != 0 {
 			err = probe.RunProbes(&chaosDetails, clients, &resultDetails, "PostChaos", &eventsDetails)
 			if err != nil {
-				log.Errorf("Unable to Add the probes, err: %v", err)
-				failStep := "Failed while adding probe"
+				log.Errorf("Probes Failed, err: %v", err)
+				failStep := "Failed while running probes"
 				msg := "AUT: Running, Probes: Unsuccessful"
 				types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, msg, "Warning", &chaosDetails)
 				events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")

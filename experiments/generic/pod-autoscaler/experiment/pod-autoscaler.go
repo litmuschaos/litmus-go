@@ -7,6 +7,7 @@ import (
 	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/pod-autoscaler/environment"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-autoscaler/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
+	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
@@ -32,6 +33,11 @@ func PodAutoscaler(clients clients.ClientSets) {
 	// Intialise Chaos Result Parameters
 	types.SetResultAttributes(&resultDetails, chaosDetails)
 
+	// Intialise the probe details. Bail out upon error, as we haven't entered exp business logic yet
+	if err = probe.InitializeProbesInChaosResultDetails(&chaosDetails, clients, &resultDetails); err != nil {
+		log.Fatalf("Unable to initialize the probes, err: %v", err)
+	}
+
 	//Updating the chaos result in the beginning of experiment
 	log.Infof("[PreReq]: Updating the chaos result of %v experiment (SOT)", experimentsDetails.ExperimentName)
 	err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT")
@@ -53,6 +59,7 @@ func PodAutoscaler(clients clients.ClientSets) {
 	//DISPLAY THE APP INFORMATION
 	log.InfoWithValues("The application informations are as follows", logrus.Fields{
 		"Namespace": experimentsDetails.AppNS,
+		"AppKind":   experimentsDetails.AppKind,
 		"Label":     experimentsDetails.AppLabel,
 		"Ramp Time": experimentsDetails.RampTime,
 	})
@@ -68,7 +75,26 @@ func PodAutoscaler(clients clients.ClientSets) {
 		return
 	}
 	if experimentsDetails.EngineName != "" {
-		types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, "AUT is Running successfully", "Normal", &chaosDetails)
+		// marking AUT as running, as we already checked the status of application under test
+		msg := "AUT: Running"
+
+		// run the probes in the pre-chaos check
+		if len(resultDetails.ProbeDetails) != 0 {
+
+			err = probe.RunProbes(&chaosDetails, clients, &resultDetails, "PreChaos", &eventsDetails)
+			if err != nil {
+				log.Errorf("Probe Failed, err: %v", err)
+				failStep := "Failed while running probes"
+				msg := "AUT: Running, Probes: Unsuccessful"
+				types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, msg, "Warning", &chaosDetails)
+				events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
+				result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+				return
+			}
+			msg = "AUT: Running, Probes: Successful"
+		}
+		// generating the events for the pre-chaos check
+		types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, msg, "Normal", &chaosDetails)
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
@@ -103,7 +129,26 @@ func PodAutoscaler(clients clients.ClientSets) {
 		return
 	}
 	if experimentsDetails.EngineName != "" {
-		types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, "AUT is Running successfully", "Normal", &chaosDetails)
+		// marking AUT as running, as we already checked the status of application under test
+		msg := "AUT: Running"
+
+		// run the probes in the post-chaos check
+		if len(resultDetails.ProbeDetails) != 0 {
+			err = probe.RunProbes(&chaosDetails, clients, &resultDetails, "PostChaos", &eventsDetails)
+			if err != nil {
+				log.Errorf("Probes Failed, err: %v", err)
+				failStep := "Failed while running probes"
+				msg := "AUT: Running, Probes: Unsuccessful"
+				types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, msg, "Warning", &chaosDetails)
+				events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
+				result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+				return
+			}
+			msg = "AUT: Running, Probes: Successful"
+		}
+
+		// generating post chaos event
+		types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, msg, "Normal", &chaosDetails)
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 

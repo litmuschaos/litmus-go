@@ -20,7 +20,7 @@ type ExperimentDetails struct {
 	ChaosPodName                    string
 	Timeout                         int
 	Delay                           int
-	TargetPod                       string
+	TargetPods                      string
 	FilesystemUtilizationPercentage int
 	FilesystemUtilizationBytes      int
 	NumberOfWorkers                 int
@@ -28,4 +28,5 @@ type ExperimentDetails struct {
 	LIBImage                        string
 	PodsAffectedPerc                int
 	Sequence                        string
+	VolumeMountPath                 string
 }

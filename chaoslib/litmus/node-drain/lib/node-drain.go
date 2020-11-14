@@ -33,18 +33,16 @@ func PrepareNodeDrain(experimentsDetails *experimentTypes.ExperimentDetails, cli
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 
-	if experimentsDetails.AppNode == "" {
+	if experimentsDetails.TargetNode == "" {
 		//Select node for kubelet-service-kill
-		appNodeName, err := common.GetNodeName(experimentsDetails.AppNS, experimentsDetails.AppLabel, clients)
+		experimentsDetails.TargetNode, err = common.GetNodeName(experimentsDetails.AppNS, experimentsDetails.AppLabel, clients)
 		if err != nil {
 			return err
 		}
-
-		experimentsDetails.AppNode = appNodeName
 	}
 
 	if experimentsDetails.EngineName != "" {
-		msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on " + experimentsDetails.AppNode + " node"
+		msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on " + experimentsDetails.TargetNode + " node"
 		types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
 		events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 	}
@@ -119,6 +117,13 @@ loop:
 		return err
 	}
 
+	// Checking the status of target nodes
+	log.Info("[Status]: Getting the status of target nodes")
+	err = status.CheckNodeStatus(experimentsDetails.TargetNode, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
+	if err != nil {
+		log.Warnf("Target nodes are not in the ready state, you may need to manually recover the node, err: %v", err)
+	}
+
 	//Waiting for the ramp time after chaos injection
 	if experimentsDetails.RampTime != 0 {
 		log.Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", experimentsDetails.RampTime)
@@ -130,27 +135,27 @@ loop:
 // DrainNode drain the application node
 func DrainNode(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) error {
 
-	log.Infof("[Inject]: Draining the %v node", experimentsDetails.AppNode)
+	log.Infof("[Inject]: Draining the %v node", experimentsDetails.TargetNode)
 
-	command := exec.Command("kubectl", "drain", experimentsDetails.AppNode, "--ignore-daemonsets", "--delete-local-data", "--force")
+	command := exec.Command("kubectl", "drain", experimentsDetails.TargetNode, "--ignore-daemonsets", "--delete-local-data", "--force")
 	var out, stderr bytes.Buffer
 	command.Stdout = &out
 	command.Stderr = &stderr
 	if err := command.Run(); err != nil {
 		log.Infof("Error String: %v", stderr.String())
-		return fmt.Errorf("Unable to drain the %v node, err: %v", experimentsDetails.AppNode, err)
+		return fmt.Errorf("Unable to drain the %v node, err: %v", experimentsDetails.TargetNode, err)
 	}
 
 	err = retry.
 		Times(90).
 		Wait(1 * time.Second).
 		Try(func(attempt uint) error {
-			nodeSpec, err := clients.KubeClient.CoreV1().Nodes().Get(experimentsDetails.AppNode, v1.GetOptions{})
+			nodeSpec, err := clients.KubeClient.CoreV1().Nodes().Get(experimentsDetails.TargetNode, v1.GetOptions{})
 			if err != nil {
 				return err
 			}
 			if !nodeSpec.Spec.Unschedulable {
-				return errors.Errorf("%v node is not in unschedulable state", experimentsDetails.AppNode)
+				return errors.Errorf("%v node is not in unschedulable state", experimentsDetails.TargetNode)
 			}
 			return nil
 		})
@@ -161,27 +166,27 @@ func DrainNode(experimentsDetails *experimentTypes.ExperimentDetails, clients cl
 // UncordonNode uncordon the application node
 func UncordonNode(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) error {
 
-	log.Infof("[Recover]: Uncordon the %v node", experimentsDetails.AppNode)
+	log.Infof("[Recover]: Uncordon the %v node", experimentsDetails.TargetNode)
 
-	command := exec.Command("kubectl", "uncordon", experimentsDetails.AppNode)
+	command := exec.Command("kubectl", "uncordon", experimentsDetails.TargetNode)
 	var out, stderr bytes.Buffer
 	command.Stdout = &out
 	command.Stderr = &stderr
 	if err := command.Run(); err != nil {
 		log.Infof("Error String: %v", stderr.String())
-		return fmt.Errorf("Unable to uncordon the %v node, err: %v", experimentsDetails.AppNode, err)
+		return fmt.Errorf("Unable to uncordon the %v node, err: %v", experimentsDetails.TargetNode, err)
 	}
 
 	err = retry.
 		Times(90).
 		Wait(1 * time.Second).
 		Try(func(attempt uint) error {
-			nodeSpec, err := clients.KubeClient.CoreV1().Nodes().Get(experimentsDetails.AppNode, v1.GetOptions{})
+			nodeSpec, err := clients.KubeClient.CoreV1().Nodes().Get(experimentsDetails.TargetNode, v1.GetOptions{})
 			if err != nil {
 				return err
 			}
 			if nodeSpec.Spec.Unschedulable {
-				return errors.Errorf("%v node is in unschedulable state", experimentsDetails.AppNode)
+				return errors.Errorf("%v node is in unschedulable state", experimentsDetails.TargetNode)
 			}
 			return nil
 		})

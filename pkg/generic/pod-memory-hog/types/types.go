@@ -23,7 +23,7 @@ type ExperimentDetails struct {
 	MemoryConsumption int
 	Timeout           int
 	Delay             int
-	TargetPod         string
+	TargetPods        string
 	ChaosKillCmd      string
 	LIBImage          string
 	Annotations       map[string]string
