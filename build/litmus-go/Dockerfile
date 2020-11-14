@@ -5,7 +5,7 @@ LABEL maintainer="LitmusChaos"
 ARG TARGETARCH
 
 #Installing necessary ubuntu packages
-RUN apt-get update && apt-get install -y curl bash systemd iproute2 stress-ng
+RUN apt-get update && apt-get install -y curl bash systemd iproute2 stress-ng openssh-client
 
 #Installing Kubectl
 ENV KUBE_LATEST_VERSION="v1.18.0"
@@ -20,6 +20,7 @@ RUN curl -L https://github.com/kubernetes-sigs/cri-tools/releases/download/v1.16
 ENV PUMBA_VERSION="0.6.5"
 RUN curl -L https://github.com/alexei-led/pumba/releases/download/${PUMBA_VERSION}/pumba_linux_${TARGETARCH} --output /usr/local/bin/pumba && chmod +x /usr/local/bin/pumba
 
-COPY ./build/_output/${TARGETARCH} ./litmus/experiments
+#Copying Necessary Files
+COPY ./build/_output/${TARGETARCH} ./litmus
 
 WORKDIR /litmus
