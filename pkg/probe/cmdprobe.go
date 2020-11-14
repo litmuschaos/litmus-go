@@ -67,10 +67,10 @@ func TriggerInlineCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.
 			if err := cmd.Run(); err != nil {
 				return fmt.Errorf("Unable to run command, err: %v", err)
 			}
-			// Trim the extra whitespaces from the output and match the actual output with the expected output
-			if strings.TrimSpace(out.String()) != probe.CmdProbeInputs.ExpectedResult {
+
+			if err = ValidateResult(probe.CmdProbeInputs.Comparator, strings.TrimSpace(out.String())); err != nil {
 				log.Warnf("The %v cmd probe has been Failed", probe.Name)
-				return fmt.Errorf("The probe output didn't match with expected output, %v", out.String())
+				return err
 			}
 
 			probes := types.ProbeArtifact{}
@@ -105,10 +105,10 @@ func TriggerSourceCmdProbe(probe v1alpha1.ProbeAttributes, execCommandDetails li
 			if err != nil {
 				return errors.Errorf("Unable to get output of cmd command, err: %v", err)
 			}
-			// Trim the extra whitespaces from the output and match the actual output with the expected output
-			if strings.TrimSpace(output) != probe.CmdProbeInputs.ExpectedResult {
+
+			if err = ValidateResult(probe.CmdProbeInputs.Comparator, strings.TrimSpace(output)); err != nil {
 				log.Warnf("The %v cmd probe has been Failed", probe.Name)
-				return fmt.Errorf("The probe output didn't match with expected output, %v", output)
+				return err
 			}
 
 			probes := types.ProbeArtifact{}
@@ -239,6 +239,37 @@ func TriggerSourceContinuousCmdProbe(probe v1alpha1.ProbeAttributes, execCommand
 
 }
 
+// ValidateResult validate the probe result to specified comparison operation
+// it supports int, float, string operands
+func ValidateResult(comparator v1alpha1.ComparatorInfo, cmdOutput string) error {
+	switch comparator.Type {
+	case "int", "Int":
+		if err = FirstValue(comparator.Value).
+			SecondValue(cmdOutput).
+			Criteria(comparator.Criteria).
+			CompareInt(); err != nil {
+			return err
+		}
+	case "float", "Float":
+		if err = FirstValue(comparator.Value).
+			SecondValue(cmdOutput).
+			Criteria(comparator.Criteria).
+			CompareFloat(); err != nil {
+			return err
+		}
+	case "string", "String":
+		if err = FirstValue(comparator.Value).
+			SecondValue(cmdOutput).
+			Criteria(comparator.Criteria).
+			CompareString(); err != nil {
+			return err
+		}
+	default:
+		return fmt.Errorf("comparator type '%s' not supported in the cmd probe", comparator.Type)
+	}
+	return nil
+}
+
 //PreChaosCmdProbe trigger the cmd probe for prechaos phase
 func PreChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
 
@@ -247,13 +278,13 @@ func PreChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 
 		//DISPLAY THE Cmd PROBE INFO
 		log.InfoWithValues("[Probe]: The cmd probe information is as follows", logrus.Fields{
-			"Name":            probe.Name,
-			"Command":         probe.CmdProbeInputs.Command,
-			"Expected Result": probe.CmdProbeInputs.ExpectedResult,
-			"Source":          probe.CmdProbeInputs.Source,
-			"Run Properties":  probe.RunProperties,
-			"Mode":            probe.Mode,
-			"Phase":           "PreChaos",
+			"Name":           probe.Name,
+			"Command":        probe.CmdProbeInputs.Command,
+			"Comparator":     probe.CmdProbeInputs.Comparator,
+			"Source":         probe.CmdProbeInputs.Source,
+			"Run Properties": probe.RunProperties,
+			"Mode":           probe.Mode,
+			"Phase":          "PreChaos",
 		})
 
 		// triggering the cmd probe for the inline mode
@@ -294,13 +325,13 @@ func PreChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 
 		//DISPLAY THE Cmd PROBE INFO
 		log.InfoWithValues("[Probe]: The cmd probe information is as follows", logrus.Fields{
-			"Name":            probe.Name,
-			"Command":         probe.CmdProbeInputs.Command,
-			"Expected Result": probe.CmdProbeInputs.ExpectedResult,
-			"Source":          probe.CmdProbeInputs.Source,
-			"Run Properties":  probe.RunProperties,
-			"Mode":            probe.Mode,
-			"Phase":           "PreChaos",
+			"Name":           probe.Name,
+			"Command":        probe.CmdProbeInputs.Command,
+			"Comparator":     probe.CmdProbeInputs.Comparator,
+			"Source":         probe.CmdProbeInputs.Source,
+			"Run Properties": probe.RunProperties,
+			"Mode":           probe.Mode,
+			"Phase":          "PreChaos",
 		})
 		if probe.CmdProbeInputs.Source == "inline" {
 			go TriggerInlineContinuousCmdProbe(probe, resultDetails)
@@ -326,13 +357,13 @@ func PostChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resu
 
 		//DISPLAY THE Cmd PROBE INFO
 		log.InfoWithValues("[Probe]: The cmd probe information is as follows", logrus.Fields{
-			"Name":            probe.Name,
-			"Command":         probe.CmdProbeInputs.Command,
-			"Expected Result": probe.CmdProbeInputs.ExpectedResult,
-			"Source":          probe.CmdProbeInputs.Source,
-			"Run Properties":  probe.RunProperties,
-			"Mode":            probe.Mode,
-			"Phase":           "PostChaos",
+			"Name":           probe.Name,
+			"Command":        probe.CmdProbeInputs.Command,
+			"Comparator":     probe.CmdProbeInputs.Comparator,
+			"Source":         probe.CmdProbeInputs.Source,
+			"Run Properties": probe.RunProperties,
+			"Mode":           probe.Mode,
+			"Phase":          "PostChaos",
 		})
 
 		// triggering the cmd probe for the inline mode

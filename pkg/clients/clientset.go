@@ -49,17 +49,8 @@ func (clientSets *ClientSets) GenerateClientSetFromKubeConfig() error {
 func getKubeConfig() (*rest.Config, error) {
 	kubeconfig := flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
 	flag.Parse()
-	// Use in-cluster config if kubeconfig path is specified
-	if *kubeconfig == "" {
-		config, err := rest.InClusterConfig()
-		if err != nil {
-			return config, err
-		}
-	}
+	// It uses in-cluster config, if kubeconfig path is not specified
 	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
-	if err != nil {
-		return config, err
-	}
 	return config, err
 }
 
