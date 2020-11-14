@@ -20,7 +20,7 @@ type ExperimentDetails struct {
 	ChaosPodName     string
 	AuxiliaryAppInfo string
 	RunID            string
-	AppNode          string
+	TargetNode       string
 	Timeout          int
 	Delay            int
 	Annotations      map[string]string

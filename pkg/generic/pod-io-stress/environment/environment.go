@@ -27,11 +27,12 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.FilesystemUtilizationBytes, _ = strconv.Atoi(Getenv("FILESYSTEM_UTILIZATION_BYTES", ""))
 	experimentDetails.Delay, _ = strconv.Atoi(Getenv("STATUS_CHECK_DELAY", "2"))
 	experimentDetails.Timeout, _ = strconv.Atoi(Getenv("STATUS_CHECK_TIMEOUT", "180"))
-	experimentDetails.TargetPod = Getenv("TARGET_POD", "")
+	experimentDetails.TargetPods = Getenv("TARGET_PODS", "")
 	experimentDetails.NumberOfWorkers, _ = strconv.Atoi(Getenv("NUMBER_OF_WORKERS", "4"))
 	experimentDetails.LIBImage = Getenv("LIB_IMAGE", "gaiaadm/pumba")
 	experimentDetails.PodsAffectedPerc, _ = strconv.Atoi(Getenv("PODS_AFFECTED_PERC", "0"))
 	experimentDetails.Sequence = Getenv("SEQUENCE", "parallel")
+	experimentDetails.VolumeMountPath = Getenv("VOLUME_MOUNT_PATH", "")
 
 }
 

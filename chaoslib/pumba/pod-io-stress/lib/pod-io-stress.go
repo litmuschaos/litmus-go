@@ -21,7 +21,7 @@ var err error
 // PreparePodIOStress contains prepration steps before chaos injection
 func PreparePodIOStress(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
-	targetPodList, err := common.GetPodList(experimentsDetails.AppNS, experimentsDetails.TargetPod, experimentsDetails.AppLabel, string(experimentsDetails.ChaosUID), experimentsDetails.PodsAffectedPerc, clients)
+	targetPodList, err := common.GetPodList(experimentsDetails.AppNS, experimentsDetails.TargetPods, experimentsDetails.AppLabel, string(experimentsDetails.ChaosUID), experimentsDetails.PodsAffectedPerc, clients)
 	if err != nil {
 		return err
 	}
@@ -245,7 +245,12 @@ func GetContainerArguments(experimentsDetails *experimentTypes.ExperimentDetails
 		"--duration",
 		strconv.Itoa(experimentsDetails.ChaosDuration) + "s",
 		"--stressors",
-		"--cpu 1 --io " + strconv.Itoa(experimentsDetails.NumberOfWorkers) + " --hdd " + strconv.Itoa(experimentsDetails.NumberOfWorkers) + " --hdd-bytes " + hddbytes + " --timeout " + strconv.Itoa(experimentsDetails.ChaosDuration) + "s",
 	}
-	return stressArgs
+	args := stressArgs
+	if experimentsDetails.VolumeMountPath == "" {
+		args = append(args, "--cpu 1 --io "+strconv.Itoa(experimentsDetails.NumberOfWorkers)+" --hdd "+strconv.Itoa(experimentsDetails.NumberOfWorkers)+" --hdd-bytes "+hddbytes+" --timeout "+strconv.Itoa(experimentsDetails.ChaosDuration)+"s")
+	} else {
+		args = append(args, "--cpu 1 --io "+strconv.Itoa(experimentsDetails.NumberOfWorkers)+" --hdd "+strconv.Itoa(experimentsDetails.NumberOfWorkers)+" --hdd-bytes "+hddbytes+" --temp-path "+experimentsDetails.VolumeMountPath+" --timeout "+strconv.Itoa(experimentsDetails.ChaosDuration)+"s")
+	}
+	return args
 }

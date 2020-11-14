@@ -19,85 +19,27 @@ import (
 // PrepareNodeMemoryHog contains prepration steps before chaos injection
 func PrepareNodeMemoryHog(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
-	if experimentsDetails.AppNode == "" {
-		//Select node for kubelet-service-kill
-		appNodeName, err := common.GetNodeName(experimentsDetails.AppNS, experimentsDetails.AppLabel, clients)
-		if err != nil {
-			return err
-		}
-
-		experimentsDetails.AppNode = appNodeName
-	}
-
-	log.InfoWithValues("[Info]: Details of application under chaos injection", logrus.Fields{
-		"NodeName":             experimentsDetails.AppNode,
-		"MemoryHog Percentage": experimentsDetails.MemoryPercentage,
-	})
-
-	experimentsDetails.RunID = common.GetRunID()
-
 	//Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
 		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", experimentsDetails.RampTime)
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 
-	if experimentsDetails.EngineName != "" {
-		msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on " + experimentsDetails.AppNode + " node"
-		types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
-		events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
-	}
-
-	//Getting node memory details
-	memoryCapacity, memoryAllocatable, err := GetNodeMemoryDetails(experimentsDetails.AppNode, clients)
+	//Select node for node-memory-hog
+	targetNodeList, err := common.GetNodeList(experimentsDetails.TargetNodes, experimentsDetails.NodesAffectedPerc, clients)
 	if err != nil {
-		return errors.Errorf("Unable to get the node memory details, err: %v", err)
+		return err
 	}
+	log.Infof("Number of targeted nodes, %v", len(targetNodeList))
 
-	// Get the total memory percentage wrt allocatable memory
-	experimentsDetails.MemoryPercentage = CalculateMemoryPercentage(experimentsDetails, clients, memoryCapacity, memoryAllocatable)
-
-	if experimentsDetails.EngineName != "" {
-		// Get Chaos Pod Annotation
-		experimentsDetails.Annotations, err = common.GetChaosPodAnnotation(experimentsDetails.ChaosPodName, experimentsDetails.ChaosNamespace, clients)
-		if err != nil {
-			return errors.Errorf("unable to get annotations, err: %v", err)
+	if experimentsDetails.Sequence == "serial" {
+		if err = InjectChaosInSerialMode(experimentsDetails, targetNodeList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+			return err
 		}
-	}
-
-	// Creating the helper pod to perform node memory hog
-	err = CreateHelperPod(experimentsDetails, clients)
-	if err != nil {
-		return errors.Errorf("Unable to create the helper pod, err: %v", err)
-	}
-
-	//Checking the status of helper pod
-	log.Info("[Status]: Checking the status of the helper pod")
-	err = status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, "name="+experimentsDetails.ExperimentName+"-"+experimentsDetails.RunID, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
-	if err != nil {
-		return errors.Errorf("helper pod is not in running state, err: %v", err)
-	}
-
-	// Wait till the completion of helper pod
-	log.Infof("[Wait]: Waiting for %vs till the completion of the helper pod", experimentsDetails.ChaosDuration+30)
-
-	podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, "name="+experimentsDetails.ExperimentName+"-"+experimentsDetails.RunID, clients, experimentsDetails.ChaosDuration+30, experimentsDetails.ExperimentName)
-	if err != nil || podStatus == "Failed" {
-		return errors.Errorf("helper pod failed due to, err: %v", err)
-	}
-
-	// Checking the status of application node
-	log.Info("[Status]: Getting the status of application node")
-	err = status.CheckNodeStatus(experimentsDetails.AppNode, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
-	if err != nil {
-		log.Warn("Application node is not in the ready state, you may need to manually recover the node")
-	}
-
-	//Deleting the helper pod
-	log.Info("[Cleanup]: Deleting the helper pod")
-	err = common.DeletePod(experimentsDetails.ExperimentName+"-"+experimentsDetails.RunID, "name="+experimentsDetails.ExperimentName+"-"+experimentsDetails.RunID, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients)
-	if err != nil {
-		return errors.Errorf("Unable to delete the helper pod, err: %v", err)
+	} else {
+		if err = InjectChaosInParallelMode(experimentsDetails, targetNodeList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+			return err
+		}
 	}
 
 	//Waiting for the ramp time after chaos injection
@@ -105,6 +47,156 @@ func PrepareNodeMemoryHog(experimentsDetails *experimentTypes.ExperimentDetails,
 		log.Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", experimentsDetails.RampTime)
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
+	return nil
+}
+
+// InjectChaosInSerialMode stress the memory of all the target nodes serially (one by one)
+func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, targetNodeList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+
+	for _, appNode := range targetNodeList {
+
+		if experimentsDetails.EngineName != "" {
+			msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on " + appNode + " node"
+			types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
+			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
+		}
+
+		log.InfoWithValues("[Info]: Details of Node under chaos injection", logrus.Fields{
+			"NodeName":             appNode,
+			"MemoryHog Percentage": experimentsDetails.MemoryPercentage,
+		})
+
+		experimentsDetails.RunID = common.GetRunID()
+
+		//Getting node memory details
+		memoryCapacity, memoryAllocatable, err := GetNodeMemoryDetails(appNode, clients)
+		if err != nil {
+			return errors.Errorf("Unable to get the node memory details, err: %v", err)
+		}
+
+		// Get the total memory percentage wrt allocatable memory
+		experimentsDetails.MemoryPercentage = CalculateMemoryPercentage(experimentsDetails, clients, memoryCapacity, memoryAllocatable)
+
+		if experimentsDetails.EngineName != "" {
+			// Get Chaos Pod Annotation
+			experimentsDetails.Annotations, err = common.GetChaosPodAnnotation(experimentsDetails.ChaosPodName, experimentsDetails.ChaosNamespace, clients)
+			if err != nil {
+				return errors.Errorf("unable to get annotations, err: %v", err)
+			}
+		}
+
+		// Creating the helper pod to perform node memory hog
+		err = CreateHelperPod(experimentsDetails, appNode, clients)
+		if err != nil {
+			return errors.Errorf("Unable to create the helper pod, err: %v", err)
+		}
+
+		//Checking the status of helper pod
+		log.Info("[Status]: Checking the status of the helper pod")
+		err = status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, "name="+experimentsDetails.ExperimentName+"-"+experimentsDetails.RunID, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
+		if err != nil {
+			return errors.Errorf("helper pod is not in running state, err: %v", err)
+		}
+
+		// Wait till the completion of helper pod
+		log.Infof("[Wait]: Waiting for %vs till the completion of the helper pod", experimentsDetails.ChaosDuration+30)
+
+		podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, "name="+experimentsDetails.ExperimentName+"-"+experimentsDetails.RunID, clients, experimentsDetails.ChaosDuration+30, experimentsDetails.ExperimentName)
+		if err != nil || podStatus == "Failed" {
+			return errors.Errorf("helper pod failed due to, err: %v", err)
+		}
+
+		// Checking the status of target nodes
+		log.Info("[Status]: Getting the status of target nodes")
+		err = status.CheckNodeStatus(appNode, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
+		if err != nil {
+			log.Warnf("Target nodes are not in the ready state, you may need to manually recover the node, err: %v", err)
+		}
+
+		//Deleting the helper pod
+		log.Info("[Cleanup]: Deleting the helper pod")
+		err = common.DeletePod(experimentsDetails.ExperimentName+"-"+experimentsDetails.RunID, "name="+experimentsDetails.ExperimentName+"-"+experimentsDetails.RunID, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients)
+		if err != nil {
+			return errors.Errorf("Unable to delete the helper pod, err: %v", err)
+		}
+	}
+	return nil
+}
+
+// InjectChaosInParallelMode stress the memory all the target nodes in parallel mode (all at once)
+func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, targetNodeList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+
+	for _, appNode := range targetNodeList {
+
+		if experimentsDetails.EngineName != "" {
+			msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on " + appNode + " node"
+			types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
+			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
+		}
+
+		log.InfoWithValues("[Info]: Details of Node under chaos injection", logrus.Fields{
+			"NodeName":             appNode,
+			"MemoryHog Percentage": experimentsDetails.MemoryPercentage,
+		})
+
+		experimentsDetails.RunID = common.GetRunID()
+
+		//Getting node memory details
+		memoryCapacity, memoryAllocatable, err := GetNodeMemoryDetails(appNode, clients)
+		if err != nil {
+			return errors.Errorf("Unable to get the node memory details, err: %v", err)
+		}
+
+		// Get the total memory percentage wrt allocatable memory
+		experimentsDetails.MemoryPercentage = CalculateMemoryPercentage(experimentsDetails, clients, memoryCapacity, memoryAllocatable)
+
+		if experimentsDetails.EngineName != "" {
+			// Get Chaos Pod Annotation
+			experimentsDetails.Annotations, err = common.GetChaosPodAnnotation(experimentsDetails.ChaosPodName, experimentsDetails.ChaosNamespace, clients)
+			if err != nil {
+				return errors.Errorf("unable to get annotations, err: %v", err)
+			}
+		}
+
+		// Creating the helper pod to perform node memory hog
+		err = CreateHelperPod(experimentsDetails, appNode, clients)
+		if err != nil {
+			return errors.Errorf("Unable to create the helper pod, err: %v", err)
+		}
+
+		//Checking the status of helper pod
+		log.Info("[Status]: Checking the status of the helper pod")
+		err = status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, "name="+experimentsDetails.ExperimentName+"-"+experimentsDetails.RunID, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
+		if err != nil {
+			return errors.Errorf("helper pod is not in running state, err: %v", err)
+		}
+	}
+
+	// Wait till the completion of helper pod
+	log.Infof("[Wait]: Waiting for %vs till the completion of the helper pod", experimentsDetails.ChaosDuration+30)
+
+	podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, "app="+experimentsDetails.ExperimentName+"-helper", clients, experimentsDetails.ChaosDuration+30, experimentsDetails.ExperimentName)
+	if err != nil || podStatus == "Failed" {
+		return errors.Errorf("helper pod failed due to, err: %v", err)
+	}
+
+	for _, appNode := range targetNodeList {
+
+		// Checking the status of application node
+		log.Info("[Status]: Getting the status of application node")
+		err = status.CheckNodeStatus(appNode, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
+		if err != nil {
+			log.Warn("Application node is not in the ready state, you may need to manually recover the node")
+		}
+	}
+
+	//Deleting the helper pod
+	log.Info("[Cleanup]: Deleting the helper pod")
+	err = common.DeleteAllPod("app="+experimentsDetails.ExperimentName+"-helper", experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients)
+	if err != nil {
+		return errors.Errorf("Unable to delete the helper pod, err: %v", err)
+	}
+
 	return nil
 }
 
@@ -144,14 +236,14 @@ func CalculateMemoryPercentage(experimentsDetails *experimentTypes.ExperimentDet
 }
 
 // CreateHelperPod derive the attributes for helper pod and create the helper pod
-func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) error {
+func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, appNode string, clients clients.ClientSets) error {
 
 	helperPod := &apiv1.Pod{
 		ObjectMeta: v1.ObjectMeta{
 			Name:      experimentsDetails.ExperimentName + "-" + experimentsDetails.RunID,
 			Namespace: experimentsDetails.ChaosNamespace,
 			Labels: map[string]string{
-				"app":                       experimentsDetails.ExperimentName,
+				"app":                       experimentsDetails.ExperimentName + "-helper",
 				"name":                      experimentsDetails.ExperimentName + "-" + experimentsDetails.RunID,
 				"chaosUID":                  string(experimentsDetails.ChaosUID),
 				"app.kubernetes.io/part-of": "litmus",
@@ -160,7 +252,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 		},
 		Spec: apiv1.PodSpec{
 			RestartPolicy: apiv1.RestartPolicyNever,
-			NodeName:      experimentsDetails.AppNode,
+			NodeName:      appNode,
 			Containers: []apiv1.Container{
 				{
 					Name:            experimentsDetails.ExperimentName,

@@ -32,18 +32,17 @@ func PrepareNodeTaint(experimentsDetails *experimentTypes.ExperimentDetails, cli
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 
-	if experimentsDetails.AppNode == "" {
+	if experimentsDetails.TargetNode == "" {
 		//Select node for kubelet-service-kill
-		appNodeName, err := common.GetNodeName(experimentsDetails.AppNS, experimentsDetails.AppLabel, clients)
+		experimentsDetails.TargetNode, err = common.GetNodeName(experimentsDetails.AppNS, experimentsDetails.AppLabel, clients)
 		if err != nil {
 			return err
 		}
 
-		experimentsDetails.AppNode = appNodeName
 	}
 
 	if experimentsDetails.EngineName != "" {
-		msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on " + experimentsDetails.AppNode + " node"
+		msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on " + experimentsDetails.TargetNode + " node"
 		types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
 		events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 	}
@@ -118,6 +117,13 @@ loop:
 		return err
 	}
 
+	// Checking the status of target nodes
+	log.Info("[Status]: Getting the status of target nodes")
+	err = status.CheckNodeStatus(experimentsDetails.TargetNode, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
+	if err != nil {
+		log.Warnf("Target nodes are not in the ready state, you may need to manually recover the node, err: %v", err)
+	}
+
 	//Waiting for the ramp time after chaos injection
 	if experimentsDetails.RampTime != 0 {
 		log.Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", experimentsDetails.RampTime)
@@ -133,9 +139,9 @@ func TaintNode(experimentsDetails *experimentTypes.ExperimentDetails, clients cl
 	TaintKey, TaintValue, TaintEffect := GetTaintDetails(experimentsDetails)
 
 	// get the node details
-	node, err := clients.KubeClient.CoreV1().Nodes().Get(experimentsDetails.AppNode, v1.GetOptions{})
+	node, err := clients.KubeClient.CoreV1().Nodes().Get(experimentsDetails.TargetNode, v1.GetOptions{})
 	if err != nil || node == nil {
-		return errors.Errorf("failed to get %v node, err: %v", experimentsDetails.AppNode, err)
+		return errors.Errorf("failed to get %v node, err: %v", experimentsDetails.TargetNode, err)
 	}
 
 	// check if the taint already exists
@@ -156,11 +162,11 @@ func TaintNode(experimentsDetails *experimentTypes.ExperimentDetails, clients cl
 
 		updatedNodeWithTaint, err := clients.KubeClient.CoreV1().Nodes().Update(node)
 		if err != nil || updatedNodeWithTaint == nil {
-			return fmt.Errorf("failed to update %v node after adding taints, err: %v", experimentsDetails.AppNode, err)
+			return fmt.Errorf("failed to update %v node after adding taints, err: %v", experimentsDetails.TargetNode, err)
 		}
 	}
 
-	log.Infof("Successfully added taint in %v node", experimentsDetails.AppNode)
+	log.Infof("Successfully added taint in %v node", experimentsDetails.TargetNode)
 	return nil
 }
 
@@ -172,9 +178,9 @@ func RemoveTaintFromNode(experimentsDetails *experimentTypes.ExperimentDetails, 
 	TaintKey := strings.Split(TaintLabel[0], "=")[0]
 
 	// get the node details
-	node, err := clients.KubeClient.CoreV1().Nodes().Get(experimentsDetails.AppNode, v1.GetOptions{})
+	node, err := clients.KubeClient.CoreV1().Nodes().Get(experimentsDetails.TargetNode, v1.GetOptions{})
 	if err != nil || node == nil {
-		return errors.Errorf("failed to get %v node, err: %v", experimentsDetails.AppNode, err)
+		return errors.Errorf("failed to get %v node, err: %v", experimentsDetails.TargetNode, err)
 	}
 
 	// check if the taint already exists
@@ -197,7 +203,7 @@ func RemoveTaintFromNode(experimentsDetails *experimentTypes.ExperimentDetails, 
 		node.Spec.Taints = Newtaints
 		updatedNodeWithTaint, err := clients.KubeClient.CoreV1().Nodes().Update(node)
 		if err != nil || updatedNodeWithTaint == nil {
-			return fmt.Errorf("failed to update %v node after removing taints, err: %v", experimentsDetails.AppNode, err)
+			return fmt.Errorf("failed to update %v node after removing taints, err: %v", experimentsDetails.TargetNode, err)
 		}
 	}
 
