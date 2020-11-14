@@ -1,7 +1,6 @@
 package probe
 
 import (
-	"fmt"
 	"strconv"
 	"time"
 
@@ -10,8 +9,10 @@ import (
 	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/log"
+	"github.com/litmuschaos/litmus-go/pkg/math"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -28,8 +29,10 @@ func PrepareHTTPProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets
 		if err := PostChaosHTTPProbe(probe, resultDetails, clients, chaosDetails); err != nil {
 			return err
 		}
+	case "DuringChaos":
+		OnChaosHTTPProbe(probe, resultDetails, clients, chaosDetails)
 	default:
-		return fmt.Errorf("phase '%s' not supported in the http probe", phase)
+		return errors.Errorf("phase '%s' not supported in the http probe", phase)
 	}
 	return nil
 }
@@ -59,7 +62,7 @@ func TriggerHTTPProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 			code, _ := strconv.Atoi(probe.HTTPProbeInputs.ExpectedResponseCode)
 			// matching the status code w/ expected code
 			if resp.StatusCode != code {
-				return fmt.Errorf("The response status code doesn't match with expected status code, code: %v", resp.StatusCode)
+				return errors.Errorf("The response status code doesn't match with expected status code, code: %v", resp.StatusCode)
 			}
 
 			return nil
@@ -69,6 +72,13 @@ func TriggerHTTPProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 
 // TriggerContinuousHTTPProbe trigger the continuous http probes
 func TriggerContinuousHTTPProbe(probe v1alpha1.ProbeAttributes, chaosresult *types.ResultDetails) {
+
+	// waiting for initial delay
+	if probe.RunProperties.InitialDelaySeconds != 0 {
+		log.Infof("[Wait]: Waiting for %vs before probe execution", probe.RunProperties.InitialDelaySeconds)
+		time.Sleep(time.Duration(probe.RunProperties.InitialDelaySeconds) * time.Second)
+	}
+
 	// it trigger the http probe for the entire duration of chaos and it fails, if any error encounter
 	// it marked the error for the probes, if any
 	for {
@@ -106,6 +116,12 @@ func PreChaosHTTPProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resu
 			"Mode":                     probe.Mode,
 			"Phase":                    "PreChaos",
 		})
+
+		// waiting for initial delay
+		if probe.RunProperties.InitialDelaySeconds != 0 {
+			log.Infof("[Wait]: Waiting for %vs before probe execution", probe.RunProperties.InitialDelaySeconds)
+			time.Sleep(time.Duration(probe.RunProperties.InitialDelaySeconds) * time.Second)
+		}
 		// trigger the http probe
 		err = TriggerHTTPProbe(probe, resultDetails)
 
@@ -145,6 +161,13 @@ func PostChaosHTTPProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Res
 			"Mode":                     probe.Mode,
 			"Phase":                    "PostChaos",
 		})
+
+		// waiting for initial delay
+		if probe.RunProperties.InitialDelaySeconds != 0 {
+			log.Infof("[Wait]: Waiting for %vs before probe execution", probe.RunProperties.InitialDelaySeconds)
+			time.Sleep(time.Duration(probe.RunProperties.InitialDelaySeconds) * time.Second)
+		}
+
 		// trigger the http probe
 		err = TriggerHTTPProbe(probe, resultDetails)
 
@@ -153,7 +176,7 @@ func PostChaosHTTPProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Res
 		if err = MarkedVerdictInEnd(err, resultDetails, probe.Name, probe.Mode, probe.Type, "PostChaos"); err != nil {
 			return err
 		}
-	case "Continuous":
+	case "Continuous", "OnChaos":
 		// it will check for the error, It will detect the error if any error encountered in probe during chaos
 		err = CheckForErrorInContinuousProbe(resultDetails, probe.Name)
 		// failing the probe, if the success condition doesn't met after the retry & timeout combinations
@@ -162,4 +185,67 @@ func PostChaosHTTPProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Res
 		}
 	}
 	return nil
+}
+
+// TriggerOnChaosHTTPProbe trigger the onchaos http probes
+func TriggerOnChaosHTTPProbe(probe v1alpha1.ProbeAttributes, chaosresult *types.ResultDetails, duration int) {
+
+	// waiting for initial delay
+	if probe.RunProperties.InitialDelaySeconds != 0 {
+		log.Infof("[Wait]: Waiting for %vs before probe execution", probe.RunProperties.InitialDelaySeconds)
+		time.Sleep(time.Duration(probe.RunProperties.InitialDelaySeconds) * time.Second)
+		duration = math.Maximum(0, duration-probe.RunProperties.InitialDelaySeconds)
+	}
+
+	var endTime <-chan time.Time
+	timeDelay := time.Duration(duration) * time.Second
+
+	// it trigger the http probe for the entire duration of chaos and it fails, if any error encounter
+	// it marked the error for the probes, if any
+loop:
+	for {
+		endTime = time.After(timeDelay)
+		select {
+		case <-endTime:
+			log.Infof("[Chaos]: Time is up for the %v probe", probe.Name)
+			endTime = nil
+			break loop
+		default:
+			err = TriggerHTTPProbe(probe, chaosresult)
+			// record the error inside the probeDetails, we are maintaining a dedicated variable for the err, inside probeDetails
+			if err != nil {
+				for index := range chaosresult.ProbeDetails {
+					if chaosresult.ProbeDetails[index].Name == probe.Name {
+						chaosresult.ProbeDetails[index].IsProbeFailedWithError = err
+						break loop
+					}
+
+				}
+			}
+
+			// waiting for the probe polling interval
+			time.Sleep(time.Duration(probe.RunProperties.ProbePollingInterval) * time.Second)
+		}
+	}
+
+}
+
+//OnChaosHTTPProbe trigger the http probe for DuringChaos phase
+func OnChaosHTTPProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) {
+
+	switch probe.Mode {
+	case "OnChaos":
+
+		//DISPLAY THE HTTP PROBE INFO
+		log.InfoWithValues("[Probe]: The http probe information is as follows", logrus.Fields{
+			"Name":                     probe.Name,
+			"URL":                      probe.HTTPProbeInputs.URL,
+			"Expecected Response Code": probe.HTTPProbeInputs.ExpectedResponseCode,
+			"Run Properties":           probe.RunProperties,
+			"Mode":                     probe.Mode,
+			"Phase":                    "DuringChaos",
+		})
+		go TriggerOnChaosHTTPProbe(probe, resultDetails, chaosDetails.ChaosDuration)
+
+	}
 }
