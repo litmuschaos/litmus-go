@@ -19,7 +19,7 @@ then
   sudo docker login -u "${DNAME}" -p "${DPASS}";
   # Push image to docker hub
   echo "Pushing ${REPONAME}/${IMGNAME}:${IMGTAG} ..."; 
-  sudo docker push ${REPONAME}/${IMGNAME}:${IMGTAG} ;
+  sudo docker buildx build --file build/litmus-go/Dockerfile --push --progress plane --platform linux/arm64,linux/amd64 --no-cache --tag ${REPONAME}/${IMGNAME}:${IMGTAG} .
   if [ ! -z "${TRAVIS_TAG}" ] ; 
   then
     # Push with different tags if tagged as a release
@@ -27,10 +27,12 @@ then
     # set the release tag in env TRAVIS_TAG
     echo "Pushing ${REPONAME}/${IMGNAME}:${TRAVIS_TAG} ..."; 
     sudo docker tag ${IMAGEID} ${REPONAME}/${IMGNAME}:${TRAVIS_TAG}
+    sudo docker buildx build --file build/litmus-go/Dockerfile --push --progress plane --platform linux/arm64,linux/amd64 --no-cache --tag ${REPONAME}/${IMGNAME}:${TRAVIS_TAG} .
+
     sudo docker push ${REPONAME}/${IMGNAME}:${TRAVIS_TAG}; 
     echo "Pushing ${REPONAME}/${IMGNAME}:latest ..."; 
     sudo docker tag ${IMAGEID} ${REPONAME}/${IMGNAME}:latest
-    sudo docker push ${REPONAME}/${IMGNAME}:latest; 
+    sudo docker buildx build --file build/litmus-go/Dockerfile --push --progress plane --platform linux/arm64,linux/amd64 --no-cache --tag ${REPONAME}/${IMGNAME}:latest .
   fi;
 else
   echo "No docker credentials provided. Skip uploading ${REPONAME}/${IMGNAME}:${IMGTAG} to docker hub"; 

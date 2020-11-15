@@ -10,7 +10,8 @@ IS_DOCKER_INSTALLED = $(shell which docker >> /dev/null 2>&1; echo $$?)
 PACKAGES = $(shell go list ./... | grep -v '/vendor/')
 
 .PHONY: all
-all: deps gotasks build push trivy-check
+all: deps gotasks build push trivy-check build-amd64 push-amd64
+
 .PHONY: help
 help:
 	@echo ""
@@ -64,27 +65,47 @@ unused-package-check:
 		echo "go mod tidy checking failed!"; echo "$${tidy}"; echo; \
 	fi
 
-
 .PHONY: build
 build:
 
 	@echo "------------------------------"
 	@echo "--> Build experiment go binary" 
 	@echo "------------------------------"
-	@sh build/generate_go_binary
-	@echo "------------------"
+	@./build/go-multiarch-build.sh build/generate_go_binary
+	@echo "-------------------------"
 	@echo "--> Build go-runner image" 
-	@echo "------------------"
-	sudo docker build . -f build/litmus-go/Dockerfile -t litmuschaos/go-runner:ci
+	@echo "-------------------------"
+	@sudo docker buildx build --file build/litmus-go/Dockerfile --progress plane --platform linux/arm64,linux/amd64 --no-cache --tag litmuschaos/go-runner:ci .
 
+.PHONY: build-amd64
+build-amd64:
+
+	@echo "------------------------------"
+	@echo "--> Build experiment go binary" 
+	@echo "------------------------------"
+	@env GOOS=linux GOARCH=amd64 sh build/generate_go_binary
+	@echo "-------------------------"
+	@echo "--> Build go-runner image" 
+	@echo "-------------------------"
+	@sudo docker build --file build/litmus-go/Dockerfile --tag litmuschaos/go-runner:ci . --build-arg TARGETARCH=amd64
+
+.PHONY: push-amd64
+push-amd64:
+
+	@echo "------------------------------"
+	@echo "--> Pushing image" 
+	@echo "------------------------------"
+	@sudo docker push litmuschaos/go-runner:ci
+	
 .PHONY: push
-push: 
+push: litmus-go-push
 
-	@echo "------------------"
+litmus-go-push:
+	@echo "-------------------"
 	@echo "--> go-runner image" 
-	@echo "------------------"
+	@echo "-------------------"
 	REPONAME="litmuschaos" IMGNAME="go-runner" IMGTAG="ci" ./build/push
-
+	
 .PHONY: trivy-check
 trivy-check:
 
@@ -93,3 +114,4 @@ trivy-check:
 	@echo "------------------------"
 	@./trivy --exit-code 0 --severity HIGH --no-progress litmuschaos/go-runner:ci
 	@./trivy --exit-code 0 --severity CRITICAL --no-progress litmuschaos/go-runner:ci
+
