@@ -1,3 +1,4 @@
+ 
 sudo: required
 os: linux
 dist: bionic
@@ -17,7 +18,21 @@ before_script:
   - sudo apt-get install -y rpm
   - wget https://github.com/aquasecurity/trivy/releases/download/v0.11.0/trivy_0.11.0_Linux-64bit.tar.gz
   - tar zxvf trivy_0.11.0_Linux-64bit.tar.gz  
-  
+  - set -e
+  # Configure environment so changes are picked up when the Docker daemon is restarted after upgrading
+  - echo '{"experimental":true}' | sudo tee /etc/docker/daemon.json
+  - export DOCKER_CLI_EXPERIMENTAL=enabled
+  - docker run --rm --privileged docker/binfmt:a7996909642ee92942dcd6cff44b9b95f08dad64
+  # Upgrade to Docker CE 19.03 for BuildKit support
+  - curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+  - sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+  - sudo apt-get update
+  - sudo apt-get -y -o Dpkg::Options::="--force-confnew" install docker-ce=5:19.03.8~3-0~ubuntu-bionic # pin version for reproducibility
+  # Show info to simplify debugging and create a builder
+  - docker info
+  - docker buildx create --name builder --use
+  - docker buildx ls
+ 
 script:
   # Installing and configuring dependencies
   - make deps
@@ -26,7 +41,7 @@ script:
   # Build
   - make build
   # Running trivy check
-  - make trivy-check
+  - make trivy-check  
 
 after_success:
   - make push
