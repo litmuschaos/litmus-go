@@ -26,12 +26,8 @@ then
     # When github is tagged with a release, then Travis will 
     # set the release tag in env TRAVIS_TAG
     echo "Pushing ${REPONAME}/${IMGNAME}:${TRAVIS_TAG} ..."; 
-    sudo docker tag ${IMAGEID} ${REPONAME}/${IMGNAME}:${TRAVIS_TAG}
     sudo docker buildx build --file build/litmus-go/Dockerfile --push --progress plane --platform linux/arm64,linux/amd64 --no-cache --tag ${REPONAME}/${IMGNAME}:${TRAVIS_TAG} .
-
-    sudo docker push ${REPONAME}/${IMGNAME}:${TRAVIS_TAG}; 
     echo "Pushing ${REPONAME}/${IMGNAME}:latest ..."; 
-    sudo docker tag ${IMAGEID} ${REPONAME}/${IMGNAME}:latest
     sudo docker buildx build --file build/litmus-go/Dockerfile --push --progress plane --platform linux/arm64,linux/amd64 --no-cache --tag ${REPONAME}/${IMGNAME}:latest .
   fi;
 else
