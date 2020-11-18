@@ -3,6 +3,7 @@ package common
 import (
 	"math/rand"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/litmuschaos/litmus-go/pkg/clients"
@@ -75,28 +76,49 @@ func GetChaosPodAnnotation(podName, namespace string, clients clients.ClientSets
 	return pod.Annotations, nil
 }
 
+// VerifyExistanceOfPods check the availibility of list of pods
+func VerifyExistanceOfPods(namespace, pods string, clients clients.ClientSets) (bool, error) {
+
+	if pods == "" {
+		return false, nil
+	}
+
+	podList := strings.Split(pods, ",")
+	for index := range podList {
+		isPodsAvailable, err := CheckForAvailibiltyOfPod(namespace, podList[index], clients)
+		if err != nil {
+			return false, err
+		}
+		if !isPodsAvailable {
+			return isPodsAvailable, nil
+		}
+	}
+	return true, nil
+}
+
 //GetPodList check for the availibilty of the target pod for the chaos execution
 // if the target pod is not defined it will derive the random target pod list using pod affected percentage
-func GetPodList(targetPod string, podAffPerc int, clients clients.ClientSets, chaosDetails *types.ChaosDetails) (core_v1.PodList, error) {
+func GetPodList(targetPods string, podAffPerc int, clients clients.ClientSets, chaosDetails *types.ChaosDetails) (core_v1.PodList, error) {
 	realpods := core_v1.PodList{}
 	podList, err := clients.KubeClient.CoreV1().Pods(chaosDetails.AppDetail.Namespace).List(v1.ListOptions{LabelSelector: chaosDetails.AppDetail.Label})
 	if err != nil || len(podList.Items) == 0 {
 		return core_v1.PodList{}, errors.Wrapf(err, "Failed to find the pod with matching labels in %v namespace", chaosDetails.AppDetail.Namespace)
 	}
-	isPodAvailable, err := CheckForAvailibiltyOfPod(chaosDetails.AppDetail.Namespace, targetPod, clients)
+
+	isPodsAvailable, err := VerifyExistanceOfPods(chaosDetails.AppDetail.Namespace, targetPods, clients)
 	if err != nil {
 		return core_v1.PodList{}, err
 	}
 
-	// getting the pod, if the target pod is defined
+	// getting the pod, if the target pods is defined
 	// else select a random target pod from the specified labels
-	switch isPodAvailable {
+	switch isPodsAvailable {
 	case true:
-		pod, err := GetTargetPodsWhenTargetPodsENVSet(targetPod, clients, chaosDetails)
+		podList, err := GetTargetPodsWhenTargetPodsENVSet(targetPods, clients, chaosDetails)
 		if err != nil {
 			return core_v1.PodList{}, err
 		}
-		realpods.Items = append(realpods.Items, pod)
+		realpods.Items = append(realpods.Items, podList.Items...)
 	default:
 		nonChaosPods := FilterNonChaosPods(*podList, chaosDetails)
 		realpods, err = GetTargetPodsWhenTargetPodsENVNotSet(podAffPerc, clients, nonChaosPods, chaosDetails)
@@ -125,8 +147,8 @@ func CheckForAvailibiltyOfPod(namespace, name string, clients clients.ClientSets
 	return true, nil
 }
 
-// IsPodAnnotated ...
-func IsPodAnnotated(clients clients.ClientSets, targetPod core_v1.Pod, chaosDetails *types.ChaosDetails) (bool, error) {
+// IsPodParentAnnotated check whether the target pod's parent is annotated or not
+func IsPodParentAnnotated(clients clients.ClientSets, targetPod core_v1.Pod, chaosDetails *types.ChaosDetails) (bool, error) {
 
 	switch chaosDetails.AppDetail.Kind {
 	case "deployment", "deployments":
@@ -198,10 +220,19 @@ func IsPodAnnotated(clients clients.ClientSets, targetPod core_v1.Pod, chaosDeta
 		for _, dc := range deploymentConfigList.Items {
 			annotations := dc.GetAnnotations()
 			if annotations[chaosDetails.AppDetail.AnnotationKey] == chaosDetails.AppDetail.AnnotationValue {
-				ownerRef := dc.GetOwnerReferences()
-				for _, own := range ownerRef {
-					if own.Kind == "DeploymentConfig" && own.Name == dc.GetName() {
-						return true, nil
+				rcOwnerRef := targetPod.OwnerReferences
+				for _, own := range rcOwnerRef {
+					if own.Kind == "ReplicationController" {
+						rc, err := clients.KubeClient.CoreV1().ReplicationControllers(chaosDetails.AppDetail.Namespace).Get(own.Name, v1.GetOptions{})
+						if err != nil {
+							return false, err
+						}
+						ownerRef := rc.OwnerReferences
+						for _, own := range ownerRef {
+							if own.Kind == "DeploymentConfig" && own.Name == dc.GetName() {
+								return true, nil
+							}
+						}
 					}
 				}
 			}
@@ -219,12 +250,22 @@ func IsPodAnnotated(clients clients.ClientSets, targetPod core_v1.Pod, chaosDeta
 		for _, ro := range rolloutList.Items {
 			annotations := ro.GetAnnotations()
 			if annotations[chaosDetails.AppDetail.AnnotationKey] == chaosDetails.AppDetail.AnnotationValue {
-				ownerRef := ro.GetOwnerReferences()
-				for _, own := range ownerRef {
-					if own.Kind == "Rollout" && own.Name == ro.GetName() {
-						return true, nil
+				rsOwnerRef := targetPod.OwnerReferences
+				for _, own := range rsOwnerRef {
+					if own.Kind == "ReplicaSet" {
+						rs, err := clients.KubeClient.AppsV1().ReplicaSets(chaosDetails.AppDetail.Namespace).Get(own.Name, v1.GetOptions{})
+						if err != nil {
+							return false, err
+						}
+						ownerRef := rs.OwnerReferences
+						for _, own := range ownerRef {
+							if own.Kind == "Rollout" && own.Name == ro.GetName() {
+								return true, nil
+							}
+						}
 					}
 				}
+
 			}
 		}
 	default:
@@ -233,7 +274,8 @@ func IsPodAnnotated(clients clients.ClientSets, targetPod core_v1.Pod, chaosDeta
 	return false, nil
 }
 
-//FilterNonChaosPods ...
+//FilterNonChaosPods remove the chaos pods(operator, runner) for the podList
+// it filter when the applabels are not defined and it will select random pods from appns
 func FilterNonChaosPods(podList core_v1.PodList, chaosDetails *types.ChaosDetails) core_v1.PodList {
 	if chaosDetails.AppDetail.Label == "" {
 		nonChaosPods := core_v1.PodList{}
@@ -248,61 +290,68 @@ func FilterNonChaosPods(podList core_v1.PodList, chaosDetails *types.ChaosDetail
 	return podList
 }
 
-// GetTargetPodsWhenTargetPodsENVSet ...
-func GetTargetPodsWhenTargetPodsENVSet(targetPod string, clients clients.ClientSets, chaosDetails *types.ChaosDetails) (core_v1.Pod, error) {
-	pod, err := clients.KubeClient.CoreV1().Pods(chaosDetails.AppDetail.Namespace).Get(targetPod, v1.GetOptions{})
-	if err != nil {
-		return core_v1.Pod{}, err
+// GetTargetPodsWhenTargetPodsENVSet derive the specific target pods, if TARGET_PODS env is set
+func GetTargetPodsWhenTargetPodsENVSet(targetPods string, clients clients.ClientSets, chaosDetails *types.ChaosDetails) (core_v1.PodList, error) {
+	podList, err := clients.KubeClient.CoreV1().Pods(chaosDetails.AppDetail.Namespace).List(v1.ListOptions{LabelSelector: chaosDetails.AppDetail.Label})
+	if err != nil || len(podList.Items) == 0 {
+		return core_v1.PodList{}, errors.Wrapf(err, "Failed to find the pods with matching labels in %v namespace", chaosDetails.AppDetail.Namespace)
 	}
 
-	switch chaosDetails.AppDetail.AnnotationCheck {
-	case true:
-		isPodAnnotated, err := IsPodAnnotated(clients, *pod, chaosDetails)
-		if err != nil {
-			return core_v1.Pod{}, err
-		}
-		if !isPodAnnotated {
-			return core_v1.Pod{}, errors.Errorf("%v target pod is not annotated", targetPod)
-		}
-	default:
-		return *pod, nil
-	}
+	targetPodsList := strings.Split(targetPods, ",")
+	realPods := core_v1.PodList{}
 
-	return *pod, nil
+	for _, pod := range podList.Items {
+		for index := range targetPodsList {
+			if targetPodsList[index] == pod.Name {
+				switch chaosDetails.AppDetail.AnnotationCheck {
+				case true:
+					isPodAnnotated, err := IsPodParentAnnotated(clients, pod, chaosDetails)
+					if err != nil {
+						return core_v1.PodList{}, err
+					}
+					if !isPodAnnotated {
+						return core_v1.PodList{}, errors.Errorf("%v target pods are not annotated", targetPods)
+					}
+				}
+				realPods.Items = append(realPods.Items, pod)
+			}
+		}
+	}
+	return realPods, nil
 }
 
-// GetTargetPodsWhenTargetPodsENVNotSet ...
+// GetTargetPodsWhenTargetPodsENVNotSet derives the random target pod list, if TARGET_PODS env is not set
 func GetTargetPodsWhenTargetPodsENVNotSet(podAffPerc int, clients clients.ClientSets, nonChaosPods core_v1.PodList, chaosDetails *types.ChaosDetails) (core_v1.PodList, error) {
-	annotatedPods := core_v1.PodList{}
+	filteredPods := core_v1.PodList{}
 	realPods := core_v1.PodList{}
 
 	switch chaosDetails.AppDetail.AnnotationCheck {
 	case true:
 		for _, pod := range nonChaosPods.Items {
-			isPodAnnotated, err := IsPodAnnotated(clients, pod, chaosDetails)
+			isPodAnnotated, err := IsPodParentAnnotated(clients, pod, chaosDetails)
 			if err != nil {
 				return core_v1.PodList{}, err
 			}
 			if isPodAnnotated {
-				annotatedPods.Items = append(annotatedPods.Items, pod)
+				filteredPods.Items = append(filteredPods.Items, pod)
 			}
 		}
-		if len(annotatedPods.Items) == 0 {
-			return annotatedPods, errors.Errorf("No annotated target pod found")
+		if len(filteredPods.Items) == 0 {
+			return filteredPods, errors.Errorf("No annotated target pod found")
 		}
 	default:
-		annotatedPods = nonChaosPods
+		filteredPods = nonChaosPods
 	}
 
-	newPodListLength := math.Maximum(1, math.Adjustment(podAffPerc, len(annotatedPods.Items)))
+	newPodListLength := math.Maximum(1, math.Adjustment(podAffPerc, len(filteredPods.Items)))
 	rand.Seed(time.Now().UnixNano())
 
 	// it will generate the random podlist
 	// it starts from the random index and choose requirement no of pods next to that index in a circular way.
-	index := rand.Intn(len(annotatedPods.Items))
+	index := rand.Intn(len(filteredPods.Items))
 	for i := 0; i < newPodListLength; i++ {
-		realPods.Items = append(realPods.Items, annotatedPods.Items[index])
-		index = (index + 1) % len(annotatedPods.Items)
+		realPods.Items = append(realPods.Items, filteredPods.Items[index])
+		index = (index + 1) % len(filteredPods.Items)
 	}
 	return realPods, nil
 }
