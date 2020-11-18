@@ -17,6 +17,7 @@ import (
 	apiv1 "k8s.io/api/core/v1"
 	k8stypes "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 )
 
 var err error
@@ -137,7 +138,23 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 		},
 		Spec: apiv1.PodSpec{
 			RestartPolicy: apiv1.RestartPolicyNever,
-			NodeName:      experimentsDetails.TargetNode,
+			Affinity: &k8stypes.Affinity{
+				NodeAffinity: &k8stypes.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &k8stypes.NodeSelector{
+						NodeSelectorTerms: []k8stypes.NodeSelectorTerm{
+							{
+								MatchFields: []k8stypes.NodeSelectorRequirement{
+									{
+										Key:      schedulerapi.NodeFieldSelectorKeyNodeName,
+										Operator: k8stypes.NodeSelectorOpNotIn,
+										Values:   []string{experimentsDetails.TargetNode},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
 			Containers: []apiv1.Container{
 				{
 					Name:            experimentsDetails.ExperimentName,
@@ -146,7 +163,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 					Command: []string{
 						"/bin/sh",
 					},
-					Args: []string{"-c", fmt.Sprintf("cp %[1]s %[2]s && chmod 400 %[2]s && ssh -o \"StrictHostKeyChecking=no\" -i %[2]s %[3]s@%[4]s %[5]s", privateKeyPath, emptyDirPath, experimentsDetails.SSHUser, experimentsDetails.TargetNodeIP, experimentsDetails.RebootCommand)},
+					Args: []string{"-c", fmt.Sprintf("cp %[1]s %[2]s && chmod 400 %[2]s && ssh -o \"StrictHostKeyChecking=no\" -o \"UserKnownHostsFile=/dev/null\" -i %[2]s %[3]s@%[4]s %[5]s", privateKeyPath, emptyDirPath, experimentsDetails.SSHUser, experimentsDetails.TargetNodeIP, experimentsDetails.RebootCommand)},
 					VolumeMounts: []apiv1.VolumeMount{
 						{
 							Name:      privateKeySecret + experimentsDetails.RunID,

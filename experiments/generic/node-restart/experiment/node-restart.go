@@ -26,7 +26,7 @@ func NodeRestart(clients clients.ClientSets) {
 
 	//Fetching all the ENV passed from the runner pod
 	log.Infof("[PreReq]: Getting the ENV for the %v experiment", experimentsDetails.ExperimentName)
-	experimentEnv.GetENV(&experimentsDetails, "node-restart")
+	experimentEnv.GetENV(&experimentsDetails)
 
 	// Intialise the chaos attributes
 	experimentEnv.InitialiseChaosVariables(&chaosDetails, &experimentsDetails)
@@ -54,7 +54,7 @@ func NodeRestart(clients clients.ClientSets) {
 	log.InfoWithValues("The application information is as follows", logrus.Fields{
 		"Namespace":      experimentsDetails.AppNS,
 		"Label":          experimentsDetails.AppLabel,
-		"NodeName":       experimentsDetails.TargetNode,
+		"Target Node":    experimentsDetails.TargetNode,
 		"Chaos Duration": experimentsDetails.ChaosDuration,
 		"Ramp Time":      experimentsDetails.RampTime,
 	})

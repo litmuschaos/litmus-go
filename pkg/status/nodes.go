@@ -1,6 +1,7 @@
 package status
 
 import (
+	"strings"
 	"time"
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
@@ -13,19 +14,22 @@ import (
 )
 
 // CheckNodeStatus checks the status of the node
-func CheckNodeStatus(nodeName string, timeout, delay int, clients clients.ClientSets) error {
+func CheckNodeStatus(nodes string, timeout, delay int, clients clients.ClientSets) error {
 
 	nodeList := apiv1.NodeList{}
 	err := retry.
 		Times(uint(timeout / delay)).
 		Wait(time.Duration(delay) * time.Second).
 		Try(func(attempt uint) error {
-			if nodeName != "" {
-				node, err := clients.KubeClient.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
-				if err != nil {
-					return err
+			if nodes != "" {
+				targetNodes := strings.Split(nodes, ",")
+				for index := range targetNodes {
+					node, err := clients.KubeClient.CoreV1().Nodes().Get(targetNodes[index], metav1.GetOptions{})
+					if err != nil {
+						return err
+					}
+					nodeList.Items = append(nodeList.Items, *node)
 				}
-				nodeList.Items = append(nodeList.Items, *node)
 			} else {
 				nodes, err := clients.KubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
 				if err != nil {

@@ -68,13 +68,11 @@ func SetProbeVerdict(resultDetails *types.ResultDetails, verdict, probeName, pro
 
 	for index, probe := range resultDetails.ProbeDetails {
 		if probe.Name == probeName && probe.Type == probeType {
-
-			if phase == "PreChaos" && (mode == "SOT" || mode == "Edge") {
-				resultDetails.ProbeDetails[index].Status["PreChaos"] = verdict + emoji.Sprint(" :thumbsup:")
-			} else if phase == "PostChaos" && (mode == "EOT" || mode == "Edge") {
-				resultDetails.ProbeDetails[index].Status["PostChaos"] = verdict + emoji.Sprint(" :thumbsup:")
-			} else if phase == "PostChaos" && mode == "Continuous" {
-				resultDetails.ProbeDetails[index].Status["Continuous"] = verdict + emoji.Sprint(" :thumbsup:")
+			switch mode {
+			case "SOT", "EOT", "Edge":
+				resultDetails.ProbeDetails[index].Status[phase] = verdict + emoji.Sprint(" :thumbsup:")
+			case "Continuous", "OnChaos":
+				resultDetails.ProbeDetails[index].Status[mode] = verdict + emoji.Sprint(" :thumbsup:")
 			}
 		}
 	}
@@ -83,17 +81,12 @@ func SetProbeVerdict(resultDetails *types.ResultDetails, verdict, probeName, pro
 //SetProbeVerdictAfterFailure mark the verdict of all the failed/unrun probes as failed
 func SetProbeVerdictAfterFailure(resultDetails *types.ResultDetails) {
 	for index := range resultDetails.ProbeDetails {
-		if resultDetails.ProbeDetails[index].Status["PreChaos"] == "Awaited" {
-			resultDetails.ProbeDetails[index].Status["PreChaos"] = "Better Luck Next Time" + emoji.Sprint(" :thumbsdown:")
-		}
-		if resultDetails.ProbeDetails[index].Status["PostChaos"] == "Awaited" {
-			resultDetails.ProbeDetails[index].Status["PostChaos"] = "Better Luck Next Time" + emoji.Sprint(" :thumbsdown:")
-		}
-		if resultDetails.ProbeDetails[index].Status["Continuous"] == "Awaited" {
-			resultDetails.ProbeDetails[index].Status["Continuous"] = "Better Luck Next Time" + emoji.Sprint(" :thumbsdown:")
+		for _, phase := range []string{"PreChaos", "PostChaos", "Continuous", "OnChaos"} {
+			if resultDetails.ProbeDetails[index].Status[phase] == "Awaited" {
+				resultDetails.ProbeDetails[index].Status[phase] = "Better Luck Next Time" + emoji.Sprint(" :thumbsdown:")
+			}
 		}
 	}
-
 }
 
 // GetProbesFromEngine fetch the details of the probes from the chaosengines
@@ -124,7 +117,6 @@ func GetProbesFromEngine(chaosDetails *types.ChaosDetails, clients clients.Clien
 func InitializeProbesInChaosResultDetails(chaosDetails *types.ChaosDetails, clients clients.ClientSets, chaosresult *types.ResultDetails) error {
 
 	probeDetails := []types.ProbeDetails{}
-	probeDetail := types.ProbeDetails{}
 	// get the probes from the chaosengine
 	probes, err := GetProbesFromEngine(chaosDetails, clients)
 	if err != nil {
@@ -133,10 +125,11 @@ func InitializeProbesInChaosResultDetails(chaosDetails *types.ChaosDetails, clie
 
 	// set the probe details for k8s probe
 	for _, probe := range probes {
-		probeDetail.Name = probe.Name
-		probeDetail.Type = probe.Type
-		SetProbeIntialStatus(&probeDetail, probe.Mode)
-		probeDetails = append(probeDetails, probeDetail)
+		tempProbe := types.ProbeDetails{}
+		tempProbe.Name = probe.Name
+		tempProbe.Type = probe.Type
+		SetProbeInitialStatus(&tempProbe, probe.Mode)
+		probeDetails = append(probeDetails, tempProbe)
 	}
 
 	chaosresult.ProbeDetails = probeDetails
@@ -145,24 +138,29 @@ func InitializeProbesInChaosResultDetails(chaosDetails *types.ChaosDetails, clie
 	return nil
 }
 
-//SetProbeIntialStatus sets the initial status inside chaosresult
-func SetProbeIntialStatus(probeDetails *types.ProbeDetails, mode string) {
-	if mode == "Edge" {
+//SetProbeInitialStatus sets the initial status inside chaosresult
+func SetProbeInitialStatus(probeDetails *types.ProbeDetails, mode string) {
+	switch mode {
+	case "SOT":
+		probeDetails.Status = map[string]string{
+			"PreChaos": "Awaited",
+		}
+	case "EOT":
+		probeDetails.Status = map[string]string{
+			"PostChaos": "Awaited",
+		}
+	case "Edge":
 		probeDetails.Status = map[string]string{
 			"PreChaos":  "Awaited",
 			"PostChaos": "Awaited",
 		}
-	} else if mode == "SOT" {
-		probeDetails.Status = map[string]string{
-			"PreChaos": "Awaited",
-		}
-	} else if mode == "EOT" {
-		probeDetails.Status = map[string]string{
-			"PostChaos": "Awaited",
-		}
-	} else {
+	case "Continuous":
 		probeDetails.Status = map[string]string{
 			"Continuous": "Awaited",
+		}
+	case "OnChaos":
+		probeDetails.Status = map[string]string{
+			"OnChaos": "Awaited",
 		}
 	}
 }
@@ -204,9 +202,19 @@ func MarkedVerdictInEnd(err error, resultDetails *types.ResultDetails, probeName
 		SetProbeVerdictAfterFailure(resultDetails)
 		return err
 	}
+
 	// counting the passed probes count to generate the score and mark the verdict as passed
 	// for edge, probe is marked as Passed if passed in both pre/post chaos checks
-	if !((mode == "Edge" || mode == "Continuous") && phase == "PreChaos") {
+	switch mode {
+	case "Edge", "Continuous":
+		if phase != "PreChaos" {
+			resultDetails.PassedProbeCount++
+		}
+	case "OnChaos":
+		if phase != "DuringChaos" {
+			resultDetails.PassedProbeCount++
+		}
+	default:
 		resultDetails.PassedProbeCount++
 	}
 	log.InfoWithValues("[Probe]: "+probeName+" probe has been Passed "+emoji.Sprint(":smile:"), logrus.Fields{
@@ -224,20 +232,10 @@ func CheckForErrorInContinuousProbe(resultDetails *types.ResultDetails, probeNam
 
 	for index, probe := range resultDetails.ProbeDetails {
 		if probe.Name == probeName {
-			err = resultDetails.ProbeDetails[index].IsProbeFailedWithError
-			return err
+			return resultDetails.ProbeDetails[index].IsProbeFailedWithError
 		}
 	}
-
 	return nil
-}
-
-// EligibleForPrint check whether the probe detail print is required or not
-func EligibleForPrint(mode, phase string) bool {
-	if (mode == "EOT" && phase == "PreChaos") || ((mode == "SOT" || mode == "Continuous") && phase == "PostChaos") {
-		return false
-	}
-	return true
 }
 
 // ParseCommand parse the templated command and replace the templated value by actual value
@@ -250,7 +248,7 @@ func ParseCommand(templatedCommand string, resultDetails *types.ResultDetails) (
 
 	// store the parsed output in the buffer
 	var out bytes.Buffer
-	if err = t.Execute(&out, register); err != nil {
+	if err := t.Execute(&out, register); err != nil {
 		return "", err
 	}
 

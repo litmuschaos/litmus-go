@@ -60,7 +60,7 @@ func InjectChaosInSerialMode(kafkaDetails *kafkaTypes.ExperimentDetails, experim
 	for count := 0; count < experimentsDetails.Iterations; count++ {
 
 		//When broker is not defined
-		if kafkaDetails.ChaoslibDetail.TargetPod == "" {
+		if kafkaDetails.TargetPod == "" {
 			err = kafka.LaunchStreamDeriveLeader(kafkaDetails, clients)
 			if err != nil {
 				return errors.Errorf("fail to derive the leader, err: %v", err)
@@ -69,7 +69,7 @@ func InjectChaosInSerialMode(kafkaDetails *kafkaTypes.ExperimentDetails, experim
 
 		// Get the target pod details for the chaos execution
 		// if the target pod is not defined it will derive the random target pod list using pod affected percentage
-		targetPodList, err := common.GetPodList(experimentsDetails.TargetPod, experimentsDetails.PodsAffectedPerc, clients, chaosDetails)
+		targetPodList, err := common.GetPodList(experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, clients, chaosDetails)
 		if err != nil {
 			return err
 		}
@@ -137,7 +137,7 @@ func InjectChaosInParallelMode(kafkaDetails *kafkaTypes.ExperimentDetails, exper
 	for count := 0; count < experimentsDetails.Iterations; count++ {
 
 		//When broker is not defined
-		if kafkaDetails.ChaoslibDetail.TargetPod == "" {
+		if kafkaDetails.TargetPod == "" {
 			err = kafka.LaunchStreamDeriveLeader(kafkaDetails, clients)
 			if err != nil {
 				return errors.Errorf("fail to derive the leader, err: %v", err)
@@ -146,7 +146,7 @@ func InjectChaosInParallelMode(kafkaDetails *kafkaTypes.ExperimentDetails, exper
 
 		// Get the target pod details for the chaos execution
 		// if the target pod is not defined it will derive the random target pod list using pod affected percentage
-		targetPodList, err := common.GetPodList(experimentsDetails.TargetPod, experimentsDetails.PodsAffectedPerc, clients, chaosDetails)
+		targetPodList, err := common.GetPodList(experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, clients, chaosDetails)
 		if err != nil {
 			return err
 		}

@@ -74,6 +74,7 @@ type ChaosDetails struct {
 	Timeout        int
 	Delay          int
 	AppDetail      AppDetails
+	ChaosDuration  int
 }
 
 // AppDetails contains all the application related envs

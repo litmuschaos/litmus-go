@@ -24,7 +24,7 @@ type ExperimentDetails struct {
 	Iterations          int
 	Timeout             int
 	Delay               int
-	TargetPod           string
+	TargetPods          string
 	PodsAffectedPerc    int
 	Sequence            string
 }
