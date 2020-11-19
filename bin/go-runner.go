@@ -32,6 +32,7 @@ import (
 	podNetworkLatency "github.com/litmuschaos/litmus-go/experiments/generic/pod-network-latency/experiment"
 	podNetworkLoss "github.com/litmuschaos/litmus-go/experiments/generic/pod-network-loss/experiment"
 	kafkaBrokerPodFailure "github.com/litmuschaos/litmus-go/experiments/kafka/kafka-broker-pod-failure/experiment"
+	azDown "github.com/litmuschaos/litmus-go/experiments/kube-aws/az-down/experiment"
 	ebsLoss "github.com/litmuschaos/litmus-go/experiments/kube-aws/ebs-loss/experiment"
 	ec2terminate "github.com/litmuschaos/litmus-go/experiments/kube-aws/ec2-terminate/experiment"
 
@@ -109,6 +110,8 @@ func main() {
 		ebsLoss.EBSLoss(clients)
 	case "node-restart":
 		nodeRestart.NodeRestart(clients)
+	case "az-down":
+		azDown.AZDown(clients)
 	default:
 		log.Fatalf("Unsupported -name %v, please provide the correct value of -name args", *experimentName)
 	}

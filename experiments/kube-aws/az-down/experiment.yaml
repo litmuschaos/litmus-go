@@ -1,0 +1,56 @@
+apiVersion: litmuschaos.io/v1alpha1
+description:
+  message: |
+    simulating AZ to be down
+kind: ChaosExperiment
+metadata:
+  name: az-down
+  version: 0.1.0 
+spec:
+  definition:
+    scope: Cluster
+    permissions:
+      - apiGroups: 
+          - "" 
+          - "batch" 
+          - "litmuschaos.io"
+        resources: 
+          - "jobs" 
+          - "pods" 
+          - "events" 
+          - "pods/log" 
+          - "secrets" 
+          - "chaosengines" 
+          - "chaosexperiments" 
+          - "chaosresults"
+        verbs: 
+          - "create" 
+          - "list" 
+          - "get" 
+          - "update" 
+          - "patch" 
+          - "delete"
+    image: "litmuschaos/litmus-go:latest"
+    args:
+    - -c
+    - ./experiments/az-down
+    command:
+    - /bin/bash
+    env:
+    - name: ANSIBLE_STDOUT_CALLBACK
+      value: 'default'
+
+    - name: TOTAL_CHAOS_DURATION
+      value: '' 
+
+    - name: CHAOS_INTERVAL
+      value: ''
+
+    - name: LIB
+      value: ''
+
+    - name: RAMP_TIME
+      value: ''
+      
+    labels:
+      experiment: az-down 

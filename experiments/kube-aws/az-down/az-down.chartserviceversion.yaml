@@ -1,0 +1,29 @@
+apiVersion: litmuchaos.io/v1alpha1
+kind: ChartServiceVersion
+metadata:
+  name: az-down 
+  version: 0.1.0
+  annotations:
+    categories: kube-aws
+    repository: https://github.com/litmuschaos/litmus-go/tree/master/experiments/kube-aws/az-down
+    support: https://kubernetes.slack.com/messages/CNXNB0ZTN
+spec:
+  displayName: az-down 
+  categoryDescription: >
+    simulating AZ to be down 
+  keywords: 
+    - "kubernetes" 
+    - "kube-aws"
+  maturity: alpha 
+  minKubeVersion: 1.12.0 
+  provider: 
+    name: redhat
+  maintainers: 
+    - name: jhellar 
+      email: jhellar@redhat.com
+  links: 
+    - name: Documentation 
+      url: https://docs.litmuschaos.io/docs/getstarted/ 
+  icon:
+    - url: 
+      mediatype: ""
