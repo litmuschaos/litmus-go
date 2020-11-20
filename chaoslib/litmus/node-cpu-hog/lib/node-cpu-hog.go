@@ -239,7 +239,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, appN
 				{
 					Name:            experimentsDetails.ExperimentName,
 					Image:           experimentsDetails.LIBImage,
-					ImagePullPolicy: experimentDetails.LIBImagePullPolicy,
+					ImagePullPolicy: experimentsDetails.LIBImagePullPolicy,
 					Command: []string{
 						"stress-ng",
 					},
