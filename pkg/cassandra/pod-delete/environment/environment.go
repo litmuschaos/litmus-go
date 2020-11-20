@@ -54,6 +54,13 @@ func Getenv(key string, defaultValue string) string {
 
 //InitialiseChaosVariables initialise all the global variables
 func InitialiseChaosVariables(chaosDetails *types.ChaosDetails, cassandraDetails *cassandraTypes.ExperimentDetails) {
+	appDetails := types.AppDetails{}
+	appDetails.AnnotationCheck, _ = strconv.ParseBool(Getenv("ANNOTATION_CHECK", "false"))
+	appDetails.AnnotationKey = Getenv("ANNOTATION_KEY", "litmuschaos.io/chaos")
+	appDetails.AnnotationValue = "true"
+	appDetails.Kind = cassandraDetails.ChaoslibDetail.AppKind
+	appDetails.Label = cassandraDetails.ChaoslibDetail.AppLabel
+	appDetails.Namespace = cassandraDetails.ChaoslibDetail.AppNS
 
 	chaosDetails.ChaosNamespace = cassandraDetails.ChaoslibDetail.ChaosNamespace
 	chaosDetails.ChaosPodName = cassandraDetails.ChaoslibDetail.ChaosPodName
@@ -63,4 +70,5 @@ func InitialiseChaosVariables(chaosDetails *types.ChaosDetails, cassandraDetails
 	chaosDetails.InstanceID = cassandraDetails.ChaoslibDetail.InstanceID
 	chaosDetails.Timeout = cassandraDetails.ChaoslibDetail.Timeout
 	chaosDetails.Delay = cassandraDetails.ChaoslibDetail.Delay
+	chaosDetails.AppDetail = appDetails
 }

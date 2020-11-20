@@ -73,7 +73,18 @@ type ChaosDetails struct {
 	ExperimentName string
 	Timeout        int
 	Delay          int
+	AppDetail      AppDetails
 	ChaosDuration  int
+}
+
+// AppDetails contains all the application related envs
+type AppDetails struct {
+	Namespace       string
+	Label           string
+	Kind            string
+	AnnotationCheck bool
+	AnnotationKey   string
+	AnnotationValue string
 }
 
 //SetResultAttributes initialise all the chaos result ENV
