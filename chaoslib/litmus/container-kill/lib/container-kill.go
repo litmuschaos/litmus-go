@@ -215,14 +215,6 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 						},
 					},
 				},
-				{
-					Name: "cri-config",
-					VolumeSource: apiv1.VolumeSource{
-						HostPath: &apiv1.HostPathVolumeSource{
-							Path: "/etc/crictl.yaml",
-						},
-					},
-				},
 			},
 			Containers: []apiv1.Container{
 				{
@@ -241,10 +233,6 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 						{
 							Name:      "cri-socket",
 							MountPath: experimentsDetails.SocketPath,
-						},
-						{
-							Name:      "cri-config",
-							MountPath: "/etc/crictl.yaml",
 						},
 					},
 					SecurityContext: &apiv1.SecurityContext{
@@ -274,6 +262,7 @@ func GetPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, podName st
 		"CHAOS_UID":            string(experimentsDetails.ChaosUID),
 		"CHAOS_INTERVAL":       strconv.Itoa(experimentsDetails.ChaosInterval),
 		"ITERATIONS":           strconv.Itoa(experimentsDetails.Iterations),
+		"SOCKET_PATH":          experimentsDetails.SocketPath,
 	}
 	for key, value := range ENVList {
 		var perEnv apiv1.EnvVar

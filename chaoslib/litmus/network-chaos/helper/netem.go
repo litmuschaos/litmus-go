@@ -154,7 +154,8 @@ func GetPID(experimentDetails *experimentTypes.ExperimentDetails, clients client
 	log.Infof("containerid: %v", containerID)
 
 	// deriving pid from the inspect out of target container
-	out, err := exec.Command("crictl", "inspect", containerID).CombinedOutput()
+	endpoint := "unix://" + experimentDetails.SocketPath
+	out, err := exec.Command("crictl", "-i", endpoint, "-r", endpoint, "inspect", containerID).CombinedOutput()
 	if err != nil {
 		log.Error(fmt.Sprintf("[cri]: Failed to run crictl: %s", string(out)))
 		return 0, err
@@ -324,6 +325,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.ContainerRuntime = Getenv("CONTAINER_RUNTIME", "")
 	experimentDetails.NetworkInterface = Getenv("NETWORK_INTERFACE", "eth0")
 	experimentDetails.TargetIPs = Getenv("TARGET_IPs", "")
+	experimentDetails.SocketPath = Getenv("SOCKET_PATH", "")
 }
 
 // Getenv fetch the env and set the default value, if any
