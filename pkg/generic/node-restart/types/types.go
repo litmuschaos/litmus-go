@@ -21,6 +21,7 @@ type ExperimentDetails struct {
 	ChaosPodName     string
 	RunID            string
 	LIBImage         string
+	LIBImagePullPolicy string
 	AuxiliaryAppInfo string
 	Timeout          int
 	Delay            int
