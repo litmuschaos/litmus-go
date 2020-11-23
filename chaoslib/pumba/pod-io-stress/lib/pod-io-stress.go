@@ -88,6 +88,7 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		log.Info("[Status]: Checking the status of the helper pod")
 		err = status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, "app="+experimentsDetails.ExperimentName+"-helper", experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 		if err != nil {
+			common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-"+runID, "app="+experimentsDetails.ExperimentName+"-helper", chaosDetails, clients)
 			return errors.Errorf("helper pod is not in running state, err: %v", err)
 		}
 
@@ -95,6 +96,7 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		log.Infof("[Wait]: Waiting for %vs till the completion of the helper pod", strconv.Itoa(experimentsDetails.ChaosDuration+30))
 		podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, "app="+experimentsDetails.ExperimentName+"-helper", clients, experimentsDetails.ChaosDuration+30, "pumba-stress")
 		if err != nil || podStatus == "Failed" {
+			common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-"+runID, "app="+experimentsDetails.ExperimentName+"-helper", chaosDetails, clients)
 			return errors.Errorf("helper pod failed due to, err: %v", err)
 		}
 
@@ -134,6 +136,7 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 	log.Info("[Status]: Checking the status of the helper pod")
 	err = status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, "app="+experimentsDetails.ExperimentName+"-helper", experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 	if err != nil {
+		common.DeleteAllHelperPodBasedOnJobCleanupPolicy("app="+experimentsDetails.ExperimentName+"-helper", chaosDetails, clients)
 		return errors.Errorf("helper pod is not in running state, err: %v", err)
 	}
 
@@ -141,6 +144,7 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 	log.Infof("[Wait]: Waiting for %vs till the completion of the helper pod", strconv.Itoa(experimentsDetails.ChaosDuration+30))
 	podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, "app="+experimentsDetails.ExperimentName+"-helper", clients, experimentsDetails.ChaosDuration+30, "pumba-stress")
 	if err != nil || podStatus == "Failed" {
+		common.DeleteAllHelperPodBasedOnJobCleanupPolicy("app="+experimentsDetails.ExperimentName+"-helper", chaosDetails, clients)
 		return errors.Errorf("helper pod failed due to, err: %v", err)
 	}
 

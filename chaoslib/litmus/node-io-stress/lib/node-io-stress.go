@@ -89,6 +89,7 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		log.Info("[Status]: Checking the status of the helper pod")
 		err = status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, "name="+experimentsDetails.ExperimentName+"-"+experimentsDetails.RunID, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 		if err != nil {
+			common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-"+experimentsDetails.RunID, "app="+experimentsDetails.ExperimentName+"-helper", chaosDetails, clients)
 			return errors.Errorf("helper pod is not in running state, err: %v", err)
 		}
 
@@ -97,6 +98,7 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 
 		podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, "name="+experimentsDetails.ExperimentName+"-"+experimentsDetails.RunID, clients, experimentsDetails.ChaosDuration+30, experimentsDetails.ExperimentName)
 		if err != nil || podStatus == "Failed" {
+			common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-"+experimentsDetails.RunID, "app="+experimentsDetails.ExperimentName+"-helper", chaosDetails, clients)
 			return errors.Errorf("helper pod failed due to, err: %v", err)
 		}
 
@@ -104,6 +106,7 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		log.Info("[Status]: Getting the status of target nodes")
 		err = status.CheckNodeStatus(appNode, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 		if err != nil {
+			common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-"+experimentsDetails.RunID, "app="+experimentsDetails.ExperimentName+"-helper", chaosDetails, clients)
 			log.Warnf("Target nodes are not in the ready state, you may need to manually recover the node, err: %v", err)
 		}
 
@@ -154,6 +157,7 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		log.Info("[Status]: Checking the status of the helper pod")
 		err = status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, "name="+experimentsDetails.ExperimentName+"-"+experimentsDetails.RunID, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 		if err != nil {
+			common.DeleteAllHelperPodBasedOnJobCleanupPolicy("app="+experimentsDetails.ExperimentName+"-helper", chaosDetails, clients)
 			return errors.Errorf("helper pod is not in running state, err: %v", err)
 		}
 	}
@@ -163,6 +167,7 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 
 	podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, "app="+experimentsDetails.ExperimentName+"-helper", clients, experimentsDetails.ChaosDuration+30, experimentsDetails.ExperimentName)
 	if err != nil || podStatus == "Failed" {
+		common.DeleteAllHelperPodBasedOnJobCleanupPolicy("app="+experimentsDetails.ExperimentName+"-helper", chaosDetails, clients)
 		return errors.Errorf("helper pod failed due to, err: %v", err)
 	}
 
@@ -172,6 +177,7 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		log.Info("[Status]: Getting the status of application node")
 		err = status.CheckNodeStatus(appNode, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 		if err != nil {
+			common.DeleteAllHelperPodBasedOnJobCleanupPolicy("app="+experimentsDetails.ExperimentName+"-helper", chaosDetails, clients)
 			log.Warn("Application node is not in the ready state, you may need to manually recover the node")
 		}
 	}

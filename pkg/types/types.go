@@ -65,16 +65,17 @@ type EventDetails struct {
 
 // ChaosDetails is for collecting all the global variables
 type ChaosDetails struct {
-	ChaosUID       clientTypes.UID
-	ChaosNamespace string
-	ChaosPodName   string
-	EngineName     string
-	InstanceID     string
-	ExperimentName string
-	Timeout        int
-	Delay          int
-	AppDetail      AppDetails
-	ChaosDuration  int
+	ChaosUID         clientTypes.UID
+	ChaosNamespace   string
+	ChaosPodName     string
+	EngineName       string
+	InstanceID       string
+	ExperimentName   string
+	Timeout          int
+	Delay            int
+	AppDetail        AppDetails
+	ChaosDuration    int
+	JobCleanupPolicy string
 }
 
 // AppDetails contains all the application related envs
