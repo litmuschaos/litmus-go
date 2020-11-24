@@ -197,7 +197,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 							MountPath: "/var/run/docker.sock",
 						},
 					},
-					ImagePullPolicy: apiv1.PullPolicy("Always"),
+					ImagePullPolicy: apiv1.PullPolicy(experimentsDetails.LIBImagePullPolicy),
 					SecurityContext: &apiv1.SecurityContext{
 						Capabilities: &apiv1.Capabilities{
 							Add: []apiv1.Capability{

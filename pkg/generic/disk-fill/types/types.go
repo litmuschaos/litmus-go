@@ -26,6 +26,7 @@ type ExperimentDetails struct {
 	Timeout          int
 	Delay            int
 	LIBImage         string
+	LIBImagePullPolicy string
 	TargetPods       string
 	PodsAffectedPerc int
 	Annotations      map[string]string

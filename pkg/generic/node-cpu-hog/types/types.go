@@ -21,6 +21,7 @@ type ExperimentDetails struct {
 	NodeCPUcores      int
 	RunID             string
 	LIBImage          string
+	LIBImagePullPolicy string
 	AuxiliaryAppInfo  string
 	Timeout           int
 	Delay             int

@@ -27,6 +27,7 @@ type ExperimentDetails struct {
 	ChaosInjectCmd   string
 	ChaosKillCmd     string
 	LIBImage         string
+	LIBImagePullPolicy string
 	Annotations      map[string]string
 	TargetContainer  string
 	Sequence         string
