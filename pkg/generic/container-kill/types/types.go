@@ -20,6 +20,7 @@ type ExperimentDetails struct {
 	ChaosNamespace      string
 	ChaosPodName        string
 	LIBImage            string
+	LIBImagePullPolicy  string
 	TargetContainer     string
 	SocketPath          string
 	Iterations          int

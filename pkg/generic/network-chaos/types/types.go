@@ -10,6 +10,7 @@ type ExperimentDetails struct {
 	EngineName                         string
 	ChaosDuration                      int
 	LIBImage                           string
+	LIBImagePullPolicy                 string
 	RampTime                           int
 	ChaosLib                           string
 	AppNS                              string

@@ -25,4 +25,5 @@ type ExperimentDetails struct {
 	Delay            int
 	Annotations      map[string]string
 	LIBImage         string
+	LIBImagePullPolicy string
 }
