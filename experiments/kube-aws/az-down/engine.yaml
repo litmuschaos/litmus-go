@@ -1,14 +1,14 @@
 apiVersion: litmuschaos.io/v1alpha1
 kind: ChaosEngine
 metadata:
-  name: nginx-chaos
+  name: az-down-chaos
 spec:
   appinfo:
     appns: 'kafka-cluster'
     applabel: 'app.kubernetes.io/name=kafka'
     appkind: 'statefulset'
   # It can be true/false
-  annotationCheck: 'true'
+  annotationCheck: 'false'
   # It can be active/stop
   engineState: 'active'
   #ex. values: ns1:name=percona,ns2:run=nginx
@@ -29,4 +29,25 @@ spec:
             # set chaos interval (in sec) as desired
             - name: CHAOS_INTERVAL
               value: '10'
+
+            # set aws region where az is located
+            - name: AWS_REGION
+              value: ''
+
+            # set key id for IAM user to be used
+            - name: AWS_IAM_KEY_ID
+              value: '10'
+
+            # set secret for IAM user to be used
+            - name: AWS_IAM_SECRET
+              value: '10'
+
+            # number of nodes to simulate failure of
+            - name: NODE_FAILURES
+              value: ''
+
+            # number of nodes to simulate failure of
+            - name: NODE_NAMES_TO_TARGET
+              value: ''
+
               

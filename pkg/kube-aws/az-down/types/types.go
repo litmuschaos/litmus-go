@@ -8,6 +8,7 @@ import (
 // FEW MENDATORY ATTRIBUTES ARE ADDED BY DEFAULT 
 
 // ExperimentDetails is for collecting all the experiment-related details
+// TODO make sure these are all relevant
 type ExperimentDetails struct {
 	ExperimentName      string
 	EngineName          string
@@ -24,4 +25,16 @@ type ExperimentDetails struct {
 	ChaosPodName        string
 	Timeout             int
 	Delay               int
+	AwsRegion           string
+	NumberOfAZs         int
+	ClusterIdentifier   string
+	NodeIdentifiers     string
+	NumberNodesToTarget int
+}
+
+type InstanceDetails struct {
+	Name        string
+	ID          string
+	AZ          string
+	SecGroupIds []string
 }

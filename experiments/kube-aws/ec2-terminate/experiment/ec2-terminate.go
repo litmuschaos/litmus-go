@@ -62,6 +62,8 @@ func EC2Terminate(clients clients.ClientSets) {
 
 	//PRE-CHAOS APPLICATION STATUS CHECK
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (pre-chaos)")
+	// TODO - look at expanding this out to check multiple kafka clusters, not just one
+	// TODO - look at expanding this out to kafka-specific checks, or else using an external probe
 	err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 	if err != nil {
 		log.Errorf("Application status check failed, err: %v", err)
@@ -73,6 +75,7 @@ func EC2Terminate(clients clients.ClientSets) {
 	//PRE-CHAOS AUXILIARY APPLICATION STATUS CHECK
 	if experimentsDetails.AuxiliaryAppInfo != "" {
 		log.Info("[Status]: Verify that the Auxiliary Applications are running (pre-chaos)")
+		// TODO - check if there is a way to specify auxiliary applications, ie zookeepers/ kafka exporters?
 		err = status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 		if err != nil {
 			log.Errorf("Auxiliary Application status check failed, err: %v", err)
@@ -93,7 +96,7 @@ func EC2Terminate(clients clients.ClientSets) {
 
 		// run the probes in the pre-chaos check
 		if len(resultDetails.ProbeDetails) != 0 {
-
+			// TODO - check what probes these are
 			err = probe.RunProbes(&chaosDetails, clients, &resultDetails, "PreChaos", &eventsDetails)
 			if err != nil {
 				log.Errorf("Probe Failed, err: %v", err)

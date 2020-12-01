@@ -13,6 +13,8 @@ import (
 // STEPS TO GETENV OF YOUR CHOICE HERE
 // ADDED FOR FEW MANDATORY FIELD
 
+// TODO update as necessary as types change
+
 //GetENV fetches all the env variables from the runner pod
 func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.ExperimentName = Getenv("EXPERIMENT_NAME", "az-down")
