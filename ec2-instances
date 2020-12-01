@@ -1,0 +1,862 @@
+{
+    "Reservations": [
+        {
+            "Groups": [],
+            "Instances": [
+                {
+                    "AmiLaunchIndex": 0,
+                    "ImageId": "ami-060b61707685d896c",
+                    "InstanceId": "i-003020769b8d753ab",
+                    "InstanceType": "m5.xlarge",
+                    "LaunchTime": "2020-10-29T17:09:53+00:00",
+                    "Monitoring": {
+                        "State": "disabled"
+                    },
+                    "Placement": {
+                        "AvailabilityZone": "eu-west-1a",
+                        "GroupName": "",
+                        "Tenancy": "default"
+                    },
+                    "PrivateDnsName": "ip-10-0-172-107.eu-west-1.compute.internal",
+                    "PrivateIpAddress": "10.0.172.107",
+                    "ProductCodes": [],
+                    "PublicDnsName": "",
+                    "State": {
+                        "Code": 16,
+                        "Name": "running"
+                    },
+                    "StateTransitionReason": "",
+                    "SubnetId": "subnet-07b26f59781e3cb37",
+                    "VpcId": "vpc-07462a3825c1b116c",
+                    "Architecture": "x86_64",
+                    "BlockDeviceMappings": [
+                        {
+                            "DeviceName": "/dev/xvda",
+                            "Ebs": {
+                                "AttachTime": "2020-10-29T17:09:54+00:00",
+                                "DeleteOnTermination": true,
+                                "Status": "attached",
+                                "VolumeId": "vol-0d66810a6b5b4d02a"
+                            }
+                        }
+                    ],
+                    "ClientToken": "3A245EEC-6970-4AE0-B0CA-2F2D3F0B89A9",
+                    "EbsOptimized": false,
+                    "EnaSupport": true,
+                    "Hypervisor": "xen",
+                    "IamInstanceProfile": {
+                        "Arn": "arn:aws:iam::622761864308:instance-profile/pbraun-observatorium-4cnp4-master-profile",
+                        "Id": "AIPAZB7375R2FPFLRYH53"
+                    },
+                    "NetworkInterfaces": [
+                        {
+                            "Attachment": {
+                                "AttachTime": "2020-10-29T17:09:53+00:00",
+                                "AttachmentId": "eni-attach-0763b1edf5efff031",
+                                "DeleteOnTermination": false,
+                                "DeviceIndex": 0,
+                                "Status": "attached"
+                            },
+                            "Description": "",
+                            "Groups": [
+                                {
+                                    "GroupName": "terraform-20201029170931346800000003",
+                                    "GroupId": "sg-02f3a1e1a6947c5dd"
+                                }
+                            ],
+                            "Ipv6Addresses": [],
+                            "MacAddress": "0a:64:30:e5:27:45",
+                            "NetworkInterfaceId": "eni-0269164e597101773",
+                            "OwnerId": "622761864308",
+                            "PrivateDnsName": "ip-10-0-172-107.eu-west-1.compute.internal",
+                            "PrivateIpAddress": "10.0.172.107",
+                            "PrivateIpAddresses": [
+                                {
+                                    "Primary": true,
+                                    "PrivateDnsName": "ip-10-0-172-107.eu-west-1.compute.internal",
+                                    "PrivateIpAddress": "10.0.172.107"
+                                }
+                            ],
+                            "SourceDestCheck": true,
+                            "Status": "in-use",
+                            "SubnetId": "subnet-07b26f59781e3cb37",
+                            "VpcId": "vpc-07462a3825c1b116c",
+                            "InterfaceType": "interface"
+                        }
+                    ],
+                    "RootDeviceName": "/dev/xvda",
+                    "RootDeviceType": "ebs",
+                    "SecurityGroups": [
+                        {
+                            "GroupName": "terraform-20201029170931346800000003",
+                            "GroupId": "sg-02f3a1e1a6947c5dd"
+                        }
+                    ],
+                    "SourceDestCheck": true,
+                    "Tags": [
+                        {
+                            "Key": "Name",
+                            "Value": "pbraun-observatorium-4cnp4-master-1"
+                        },
+                        {
+                            "Key": "kubernetes.io/cluster/pbraun-observatorium-4cnp4",
+                            "Value": "owned"
+                        }
+                    ],
+                    "VirtualizationType": "hvm",
+                    "CpuOptions": {
+                        "CoreCount": 2,
+                        "ThreadsPerCore": 2
+                    },
+                    "CapacityReservationSpecification": {
+                        "CapacityReservationPreference": "open"
+                    },
+                    "HibernationOptions": {
+                        "Configured": false
+                    },
+                    "MetadataOptions": {
+                        "State": "applied",
+                        "HttpTokens": "optional",
+                        "HttpPutResponseHopLimit": 1,
+                        "HttpEndpoint": "enabled"
+                    }
+                }
+            ],
+            "OwnerId": "622761864308",
+            "ReservationId": "r-0ee738c1285f869ee"
+        },
+        {
+            "Groups": [],
+            "Instances": [
+                {
+                    "AmiLaunchIndex": 0,
+                    "ImageId": "ami-060b61707685d896c",
+                    "InstanceId": "i-0ab806d1bbdafe277",
+                    "InstanceType": "m5.xlarge",
+                    "LaunchTime": "2020-10-29T17:09:53+00:00",
+                    "Monitoring": {
+                        "State": "disabled"
+                    },
+                    "Placement": {
+                        "AvailabilityZone": "eu-west-1a",
+                        "GroupName": "",
+                        "Tenancy": "default"
+                    },
+                    "PrivateDnsName": "ip-10-0-207-192.eu-west-1.compute.internal",
+                    "PrivateIpAddress": "10.0.207.192",
+                    "ProductCodes": [],
+                    "PublicDnsName": "",
+                    "State": {
+                        "Code": 16,
+                        "Name": "running"
+                    },
+                    "StateTransitionReason": "",
+                    "SubnetId": "subnet-07b26f59781e3cb37",
+                    "VpcId": "vpc-07462a3825c1b116c",
+                    "Architecture": "x86_64",
+                    "BlockDeviceMappings": [
+                        {
+                            "DeviceName": "/dev/xvda",
+                            "Ebs": {
+                                "AttachTime": "2020-10-29T17:09:54+00:00",
+                                "DeleteOnTermination": true,
+                                "Status": "attached",
+                                "VolumeId": "vol-04e7a971203afa0eb"
+                            }
+                        }
+                    ],
+                    "ClientToken": "C24BBCC9-91FA-4FD6-8D02-664EDE01A37A",
+                    "EbsOptimized": false,
+                    "EnaSupport": true,
+                    "Hypervisor": "xen",
+                    "IamInstanceProfile": {
+                        "Arn": "arn:aws:iam::622761864308:instance-profile/pbraun-observatorium-4cnp4-master-profile",
+                        "Id": "AIPAZB7375R2FPFLRYH53"
+                    },
+                    "NetworkInterfaces": [
+                        {
+                            "Attachment": {
+                                "AttachTime": "2020-10-29T17:09:53+00:00",
+                                "AttachmentId": "eni-attach-0bdd2dac56b670505",
+                                "DeleteOnTermination": false,
+                                "DeviceIndex": 0,
+                                "Status": "attached"
+                            },
+                            "Description": "",
+                            "Groups": [
+                                {
+                                    "GroupName": "terraform-20201029170931346800000003",
+                                    "GroupId": "sg-02f3a1e1a6947c5dd"
+                                }
+                            ],
+                            "Ipv6Addresses": [],
+                            "MacAddress": "0a:57:f7:35:f9:f1",
+                            "NetworkInterfaceId": "eni-093d5d817b953de99",
+                            "OwnerId": "622761864308",
+                            "PrivateDnsName": "ip-10-0-207-192.eu-west-1.compute.internal",
+                            "PrivateIpAddress": "10.0.207.192",
+                            "PrivateIpAddresses": [
+                                {
+                                    "Primary": true,
+                                    "PrivateDnsName": "ip-10-0-207-192.eu-west-1.compute.internal",
+                                    "PrivateIpAddress": "10.0.207.192"
+                                }
+                            ],
+                            "SourceDestCheck": true,
+                            "Status": "in-use",
+                            "SubnetId": "subnet-07b26f59781e3cb37",
+                            "VpcId": "vpc-07462a3825c1b116c",
+                            "InterfaceType": "interface"
+                        }
+                    ],
+                    "RootDeviceName": "/dev/xvda",
+                    "RootDeviceType": "ebs",
+                    "SecurityGroups": [
+                        {
+                            "GroupName": "terraform-20201029170931346800000003",
+                            "GroupId": "sg-02f3a1e1a6947c5dd"
+                        }
+                    ],
+                    "SourceDestCheck": true,
+                    "Tags": [
+                        {
+                            "Key": "Name",
+                            "Value": "pbraun-observatorium-4cnp4-master-0"
+                        },
+                        {
+                            "Key": "kubernetes.io/cluster/pbraun-observatorium-4cnp4",
+                            "Value": "owned"
+                        }
+                    ],
+                    "VirtualizationType": "hvm",
+                    "CpuOptions": {
+                        "CoreCount": 2,
+                        "ThreadsPerCore": 2
+                    },
+                    "CapacityReservationSpecification": {
+                        "CapacityReservationPreference": "open"
+                    },
+                    "HibernationOptions": {
+                        "Configured": false
+                    },
+                    "MetadataOptions": {
+                        "State": "applied",
+                        "HttpTokens": "optional",
+                        "HttpPutResponseHopLimit": 1,
+                        "HttpEndpoint": "enabled"
+                    }
+                }
+            ],
+            "OwnerId": "622761864308",
+            "ReservationId": "r-0569b1eb8b270d282"
+        },
+        {
+            "Groups": [],
+            "Instances": [
+                {
+                    "AmiLaunchIndex": 0,
+                    "ImageId": "ami-060b61707685d896c",
+                    "InstanceId": "i-0c17df375ee86b227",
+                    "InstanceType": "m5.xlarge",
+                    "LaunchTime": "2020-10-29T17:09:53+00:00",
+                    "Monitoring": {
+                        "State": "disabled"
+                    },
+                    "Placement": {
+                        "AvailabilityZone": "eu-west-1a",
+                        "GroupName": "",
+                        "Tenancy": "default"
+                    },
+                    "PrivateDnsName": "ip-10-0-208-29.eu-west-1.compute.internal",
+                    "PrivateIpAddress": "10.0.208.29",
+                    "ProductCodes": [],
+                    "PublicDnsName": "",
+                    "State": {
+                        "Code": 16,
+                        "Name": "running"
+                    },
+                    "StateTransitionReason": "",
+                    "SubnetId": "subnet-07b26f59781e3cb37",
+                    "VpcId": "vpc-07462a3825c1b116c",
+                    "Architecture": "x86_64",
+                    "BlockDeviceMappings": [
+                        {
+                            "DeviceName": "/dev/xvda",
+                            "Ebs": {
+                                "AttachTime": "2020-10-29T17:09:54+00:00",
+                                "DeleteOnTermination": true,
+                                "Status": "attached",
+                                "VolumeId": "vol-09342496e3511934b"
+                            }
+                        }
+                    ],
+                    "ClientToken": "17E7EC13-540A-42D7-A22F-7B9B28A76E4B",
+                    "EbsOptimized": false,
+                    "EnaSupport": true,
+                    "Hypervisor": "xen",
+                    "IamInstanceProfile": {
+                        "Arn": "arn:aws:iam::622761864308:instance-profile/pbraun-observatorium-4cnp4-master-profile",
+                        "Id": "AIPAZB7375R2FPFLRYH53"
+                    },
+                    "NetworkInterfaces": [
+                        {
+                            "Attachment": {
+                                "AttachTime": "2020-10-29T17:09:53+00:00",
+                                "AttachmentId": "eni-attach-0c51b2b40c466b9f5",
+                                "DeleteOnTermination": false,
+                                "DeviceIndex": 0,
+                                "Status": "attached"
+                            },
+                            "Description": "",
+                            "Groups": [
+                                {
+                                    "GroupName": "terraform-20201029170931346800000003",
+                                    "GroupId": "sg-02f3a1e1a6947c5dd"
+                                }
+                            ],
+                            "Ipv6Addresses": [],
+                            "MacAddress": "0a:8c:cc:70:6e:c1",
+                            "NetworkInterfaceId": "eni-042d7556dc104912b",
+                            "OwnerId": "622761864308",
+                            "PrivateDnsName": "ip-10-0-208-29.eu-west-1.compute.internal",
+                            "PrivateIpAddress": "10.0.208.29",
+                            "PrivateIpAddresses": [
+                                {
+                                    "Primary": true,
+                                    "PrivateDnsName": "ip-10-0-208-29.eu-west-1.compute.internal",
+                                    "PrivateIpAddress": "10.0.208.29"
+                                }
+                            ],
+                            "SourceDestCheck": true,
+                            "Status": "in-use",
+                            "SubnetId": "subnet-07b26f59781e3cb37",
+                            "VpcId": "vpc-07462a3825c1b116c",
+                            "InterfaceType": "interface"
+                        }
+                    ],
+                    "RootDeviceName": "/dev/xvda",
+                    "RootDeviceType": "ebs",
+                    "SecurityGroups": [
+                        {
+                            "GroupName": "terraform-20201029170931346800000003",
+                            "GroupId": "sg-02f3a1e1a6947c5dd"
+                        }
+                    ],
+                    "SourceDestCheck": true,
+                    "Tags": [
+                        {
+                            "Key": "Name",
+                            "Value": "pbraun-observatorium-4cnp4-master-2"
+                        },
+                        {
+                            "Key": "kubernetes.io/cluster/pbraun-observatorium-4cnp4",
+                            "Value": "owned"
+                        }
+                    ],
+                    "VirtualizationType": "hvm",
+                    "CpuOptions": {
+                        "CoreCount": 2,
+                        "ThreadsPerCore": 2
+                    },
+                    "CapacityReservationSpecification": {
+                        "CapacityReservationPreference": "open"
+                    },
+                    "HibernationOptions": {
+                        "Configured": false
+                    },
+                    "MetadataOptions": {
+                        "State": "applied",
+                        "HttpTokens": "optional",
+                        "HttpPutResponseHopLimit": 1,
+                        "HttpEndpoint": "enabled"
+                    }
+                }
+            ],
+            "OwnerId": "622761864308",
+            "ReservationId": "r-07107c94fdf5d52c1"
+        },
+        {
+            "Groups": [],
+            "Instances": [
+                {
+                    "AmiLaunchIndex": 0,
+                    "ImageId": "ami-060b61707685d896c",
+                    "InstanceId": "i-02335f2bbec9b938d",
+                    "InstanceType": "m5.xlarge",
+                    "LaunchTime": "2020-10-29T17:23:59+00:00",
+                    "Monitoring": {
+                        "State": "disabled"
+                    },
+                    "Placement": {
+                        "AvailabilityZone": "eu-west-1a",
+                        "GroupName": "",
+                        "Tenancy": "default"
+                    },
+                    "PrivateDnsName": "ip-10-0-212-242.eu-west-1.compute.internal",
+                    "PrivateIpAddress": "10.0.212.242",
+                    "ProductCodes": [],
+                    "PublicDnsName": "",
+                    "State": {
+                        "Code": 16,
+                        "Name": "running"
+                    },
+                    "StateTransitionReason": "",
+                    "SubnetId": "subnet-07b26f59781e3cb37",
+                    "VpcId": "vpc-07462a3825c1b116c",
+                    "Architecture": "x86_64",
+                    "BlockDeviceMappings": [
+                        {
+                            "DeviceName": "/dev/xvda",
+                            "Ebs": {
+                                "AttachTime": "2020-10-29T17:24:00+00:00",
+                                "DeleteOnTermination": true,
+                                "Status": "attached",
+                                "VolumeId": "vol-0da1d03dddddc4279"
+                            }
+                        },
+                        {
+                            "DeviceName": "/dev/xvdcs",
+                            "Ebs": {
+                                "AttachTime": "2020-10-30T09:18:35+00:00",
+                                "DeleteOnTermination": false,
+                                "Status": "attached",
+                                "VolumeId": "vol-0a8f10a9f6e84ac07"
+                            }
+                        },
+                        {
+                            "DeviceName": "/dev/xvdcg",
+                            "Ebs": {
+                                "AttachTime": "2020-10-30T09:18:35+00:00",
+                                "DeleteOnTermination": false,
+                                "Status": "attached",
+                                "VolumeId": "vol-06ca00aae22d67988"
+                            }
+                        },
+                        {
+                            "DeviceName": "/dev/xvdbs",
+                            "Ebs": {
+                                "AttachTime": "2020-11-06T17:40:56+00:00",
+                                "DeleteOnTermination": false,
+                                "Status": "attached",
+                                "VolumeId": "vol-05e9463ce36a54b4f"
+                            }
+                        },
+                        {
+                            "DeviceName": "/dev/xvdbf",
+                            "Ebs": {
+                                "AttachTime": "2020-11-06T17:51:42+00:00",
+                                "DeleteOnTermination": false,
+                                "Status": "attached",
+                                "VolumeId": "vol-0a77056acc4ed584c"
+                            }
+                        }
+                    ],
+                    "ClientToken": "",
+                    "EbsOptimized": false,
+                    "EnaSupport": true,
+                    "Hypervisor": "xen",
+                    "IamInstanceProfile": {
+                        "Arn": "arn:aws:iam::622761864308:instance-profile/pbraun-observatorium-4cnp4-worker-profile",
+                        "Id": "AIPAZB7375R2BQQAMD36Y"
+                    },
+                    "NetworkInterfaces": [
+                        {
+                            "Attachment": {
+                                "AttachTime": "2020-10-29T17:23:59+00:00",
+                                "AttachmentId": "eni-attach-09029d920375d7b13",
+                                "DeleteOnTermination": true,
+                                "DeviceIndex": 0,
+                                "Status": "attached"
+                            },
+                            "Description": "",
+                            "Groups": [
+                                {
+                                    "GroupName": "terraform-20201029170931346100000002",
+                                    "GroupId": "sg-0456fb1d6d3be496a"
+                                }
+                            ],
+                            "Ipv6Addresses": [],
+                            "MacAddress": "0a:5d:0f:bf:a7:a3",
+                            "NetworkInterfaceId": "eni-0311f5e81e18ef329",
+                            "OwnerId": "622761864308",
+                            "PrivateDnsName": "ip-10-0-212-242.eu-west-1.compute.internal",
+                            "PrivateIpAddress": "10.0.212.242",
+                            "PrivateIpAddresses": [
+                                {
+                                    "Primary": true,
+                                    "PrivateDnsName": "ip-10-0-212-242.eu-west-1.compute.internal",
+                                    "PrivateIpAddress": "10.0.212.242"
+                                }
+                            ],
+                            "SourceDestCheck": true,
+                            "Status": "in-use",
+                            "SubnetId": "subnet-07b26f59781e3cb37",
+                            "VpcId": "vpc-07462a3825c1b116c",
+                            "InterfaceType": "interface"
+                        }
+                    ],
+                    "RootDeviceName": "/dev/xvda",
+                    "RootDeviceType": "ebs",
+                    "SecurityGroups": [
+                        {
+                            "GroupName": "terraform-20201029170931346100000002",
+                            "GroupId": "sg-0456fb1d6d3be496a"
+                        }
+                    ],
+                    "SourceDestCheck": true,
+                    "Tags": [
+                        {
+                            "Key": "Name",
+                            "Value": "pbraun-observatorium-4cnp4-worker-eu-west-1a-bwvcj"
+                        },
+                        {
+                            "Key": "kubernetes.io/cluster/pbraun-observatorium-4cnp4",
+                            "Value": "owned"
+                        }
+                    ],
+                    "VirtualizationType": "hvm",
+                    "CpuOptions": {
+                        "CoreCount": 2,
+                        "ThreadsPerCore": 2
+                    },
+                    "CapacityReservationSpecification": {
+                        "CapacityReservationPreference": "open"
+                    },
+                    "HibernationOptions": {
+                        "Configured": false
+                    },
+                    "MetadataOptions": {
+                        "State": "applied",
+                        "HttpTokens": "optional",
+                        "HttpPutResponseHopLimit": 1,
+                        "HttpEndpoint": "enabled"
+                    }
+                }
+            ],
+            "OwnerId": "622761864308",
+            "ReservationId": "r-02472a19998904845"
+        },
+        {
+            "Groups": [],
+            "Instances": [
+                {
+                    "AmiLaunchIndex": 0,
+                    "ImageId": "ami-060b61707685d896c",
+                    "InstanceId": "i-0a78ff91e45615718",
+                    "InstanceType": "m5.xlarge",
+                    "LaunchTime": "2020-10-29T17:24:01+00:00",
+                    "Monitoring": {
+                        "State": "disabled"
+                    },
+                    "Placement": {
+                        "AvailabilityZone": "eu-west-1a",
+                        "GroupName": "",
+                        "Tenancy": "default"
+                    },
+                    "PrivateDnsName": "ip-10-0-240-193.eu-west-1.compute.internal",
+                    "PrivateIpAddress": "10.0.240.193",
+                    "ProductCodes": [],
+                    "PublicDnsName": "",
+                    "State": {
+                        "Code": 16,
+                        "Name": "running"
+                    },
+                    "StateTransitionReason": "",
+                    "SubnetId": "subnet-07b26f59781e3cb37",
+                    "VpcId": "vpc-07462a3825c1b116c",
+                    "Architecture": "x86_64",
+                    "BlockDeviceMappings": [
+                        {
+                            "DeviceName": "/dev/xvda",
+                            "Ebs": {
+                                "AttachTime": "2020-10-29T17:24:01+00:00",
+                                "DeleteOnTermination": true,
+                                "Status": "attached",
+                                "VolumeId": "vol-0169dee4549d93b9b"
+                            }
+                        },
+                        {
+                            "DeviceName": "/dev/xvdct",
+                            "Ebs": {
+                                "AttachTime": "2020-10-30T09:18:35+00:00",
+                                "DeleteOnTermination": false,
+                                "Status": "attached",
+                                "VolumeId": "vol-0a0f55262cb62f783"
+                            }
+                        },
+                        {
+                            "DeviceName": "/dev/xvdba",
+                            "Ebs": {
+                                "AttachTime": "2020-10-30T10:27:45+00:00",
+                                "DeleteOnTermination": false,
+                                "Status": "attached",
+                                "VolumeId": "vol-032e3606125877ac3"
+                            }
+                        },
+                        {
+                            "DeviceName": "/dev/xvdca",
+                            "Ebs": {
+                                "AttachTime": "2020-11-06T17:41:51+00:00",
+                                "DeleteOnTermination": false,
+                                "Status": "attached",
+                                "VolumeId": "vol-0d896e8f13ff33822"
+                            }
+                        }
+                    ],
+                    "ClientToken": "",
+                    "EbsOptimized": false,
+                    "EnaSupport": true,
+                    "Hypervisor": "xen",
+                    "IamInstanceProfile": {
+                        "Arn": "arn:aws:iam::622761864308:instance-profile/pbraun-observatorium-4cnp4-worker-profile",
+                        "Id": "AIPAZB7375R2BQQAMD36Y"
+                    },
+                    "NetworkInterfaces": [
+                        {
+                            "Attachment": {
+                                "AttachTime": "2020-10-29T17:24:01+00:00",
+                                "AttachmentId": "eni-attach-04e5a2c6c024b999e",
+                                "DeleteOnTermination": true,
+                                "DeviceIndex": 0,
+                                "Status": "attached"
+                            },
+                            "Description": "",
+                            "Groups": [
+                                {
+                                    "GroupName": "terraform-20201029170931346100000002",
+                                    "GroupId": "sg-0456fb1d6d3be496a"
+                                }
+                            ],
+                            "Ipv6Addresses": [],
+                            "MacAddress": "0a:68:b6:92:43:ad",
+                            "NetworkInterfaceId": "eni-0b750886d755e11d3",
+                            "OwnerId": "622761864308",
+                            "PrivateDnsName": "ip-10-0-240-193.eu-west-1.compute.internal",
+                            "PrivateIpAddress": "10.0.240.193",
+                            "PrivateIpAddresses": [
+                                {
+                                    "Primary": true,
+                                    "PrivateDnsName": "ip-10-0-240-193.eu-west-1.compute.internal",
+                                    "PrivateIpAddress": "10.0.240.193"
+                                }
+                            ],
+                            "SourceDestCheck": true,
+                            "Status": "in-use",
+                            "SubnetId": "subnet-07b26f59781e3cb37",
+                            "VpcId": "vpc-07462a3825c1b116c",
+                            "InterfaceType": "interface"
+                        }
+                    ],
+                    "RootDeviceName": "/dev/xvda",
+                    "RootDeviceType": "ebs",
+                    "SecurityGroups": [
+                        {
+                            "GroupName": "terraform-20201029170931346100000002",
+                            "GroupId": "sg-0456fb1d6d3be496a"
+                        }
+                    ],
+                    "SourceDestCheck": true,
+                    "Tags": [
+                        {
+                            "Key": "kubernetes.io/cluster/pbraun-observatorium-4cnp4",
+                            "Value": "owned"
+                        },
+                        {
+                            "Key": "Name",
+                            "Value": "pbraun-observatorium-4cnp4-worker-eu-west-1a-dk8bf"
+                        }
+                    ],
+                    "VirtualizationType": "hvm",
+                    "CpuOptions": {
+                        "CoreCount": 2,
+                        "ThreadsPerCore": 2
+                    },
+                    "CapacityReservationSpecification": {
+                        "CapacityReservationPreference": "open"
+                    },
+                    "HibernationOptions": {
+                        "Configured": false
+                    },
+                    "MetadataOptions": {
+                        "State": "applied",
+                        "HttpTokens": "optional",
+                        "HttpPutResponseHopLimit": 1,
+                        "HttpEndpoint": "enabled"
+                    }
+                }
+            ],
+            "OwnerId": "622761864308",
+            "ReservationId": "r-037835368142d9029"
+        },
+        {
+            "Groups": [],
+            "Instances": [
+                {
+                    "AmiLaunchIndex": 0,
+                    "ImageId": "ami-060b61707685d896c",
+                    "InstanceId": "i-0a7a9154b652f4b65",
+                    "InstanceType": "m5.xlarge",
+                    "LaunchTime": "2020-10-29T17:24:02+00:00",
+                    "Monitoring": {
+                        "State": "disabled"
+                    },
+                    "Placement": {
+                        "AvailabilityZone": "eu-west-1a",
+                        "GroupName": "",
+                        "Tenancy": "default"
+                    },
+                    "PrivateDnsName": "ip-10-0-199-116.eu-west-1.compute.internal",
+                    "PrivateIpAddress": "10.0.199.116",
+                    "ProductCodes": [],
+                    "PublicDnsName": "",
+                    "State": {
+                        "Code": 16,
+                        "Name": "running"
+                    },
+                    "StateTransitionReason": "",
+                    "SubnetId": "subnet-07b26f59781e3cb37",
+                    "VpcId": "vpc-07462a3825c1b116c",
+                    "Architecture": "x86_64",
+                    "BlockDeviceMappings": [
+                        {
+                            "DeviceName": "/dev/xvda",
+                            "Ebs": {
+                                "AttachTime": "2020-10-29T17:24:03+00:00",
+                                "DeleteOnTermination": true,
+                                "Status": "attached",
+                                "VolumeId": "vol-02befb85f690a352f"
+                            }
+                        },
+                        {
+                            "DeviceName": "/dev/xvdci",
+                            "Ebs": {
+                                "AttachTime": "2020-10-30T09:18:12+00:00",
+                                "DeleteOnTermination": false,
+                                "Status": "attached",
+                                "VolumeId": "vol-0b304e72d161bfc8b"
+                            }
+                        },
+                        {
+                            "DeviceName": "/dev/xvdcn",
+                            "Ebs": {
+                                "AttachTime": "2020-10-30T09:18:35+00:00",
+                                "DeleteOnTermination": false,
+                                "Status": "attached",
+                                "VolumeId": "vol-0d35ca48a5e6ea9e4"
+                            }
+                        },
+                        {
+                            "DeviceName": "/dev/xvdbd",
+                            "Ebs": {
+                                "AttachTime": "2020-10-30T10:25:45+00:00",
+                                "DeleteOnTermination": false,
+                                "Status": "attached",
+                                "VolumeId": "vol-0b6b73c3e531e8534"
+                            }
+                        },
+                        {
+                            "DeviceName": "/dev/xvdba",
+                            "Ebs": {
+                                "AttachTime": "2020-11-06T17:40:06+00:00",
+                                "DeleteOnTermination": false,
+                                "Status": "attached",
+                                "VolumeId": "vol-0e4fd666b90c3718d"
+                            }
+                        },
+                        {
+                            "DeviceName": "/dev/xvdcy",
+                            "Ebs": {
+                                "AttachTime": "2020-11-06T17:49:43+00:00",
+                                "DeleteOnTermination": false,
+                                "Status": "attached",
+                                "VolumeId": "vol-03f748bb84857f3ea"
+                            }
+                        }
+                    ],
+                    "ClientToken": "",
+                    "EbsOptimized": false,
+                    "EnaSupport": true,
+                    "Hypervisor": "xen",
+                    "IamInstanceProfile": {
+                        "Arn": "arn:aws:iam::622761864308:instance-profile/pbraun-observatorium-4cnp4-worker-profile",
+                        "Id": "AIPAZB7375R2BQQAMD36Y"
+                    },
+                    "NetworkInterfaces": [
+                        {
+                            "Attachment": {
+                                "AttachTime": "2020-10-29T17:24:02+00:00",
+                                "AttachmentId": "eni-attach-06e2a73c5899145fd",
+                                "DeleteOnTermination": true,
+                                "DeviceIndex": 0,
+                                "Status": "attached"
+                            },
+                            "Description": "",
+                            "Groups": [
+                                {
+                                    "GroupName": "terraform-20201029170931346100000002",
+                                    "GroupId": "sg-0456fb1d6d3be496a"
+                                }
+                            ],
+                            "Ipv6Addresses": [],
+                            "MacAddress": "0a:24:1b:33:8a:f7",
+                            "NetworkInterfaceId": "eni-0c610f1f004d50d4d",
+                            "OwnerId": "622761864308",
+                            "PrivateDnsName": "ip-10-0-199-116.eu-west-1.compute.internal",
+                            "PrivateIpAddress": "10.0.199.116",
+                            "PrivateIpAddresses": [
+                                {
+                                    "Primary": true,
+                                    "PrivateDnsName": "ip-10-0-199-116.eu-west-1.compute.internal",
+                                    "PrivateIpAddress": "10.0.199.116"
+                                }
+                            ],
+                            "SourceDestCheck": true,
+                            "Status": "in-use",
+                            "SubnetId": "subnet-07b26f59781e3cb37",
+                            "VpcId": "vpc-07462a3825c1b116c",
+                            "InterfaceType": "interface"
+                        }
+                    ],
+                    "RootDeviceName": "/dev/xvda",
+                    "RootDeviceType": "ebs",
+                    "SecurityGroups": [
+                        {
+                            "GroupName": "terraform-20201029170931346100000002",
+                            "GroupId": "sg-0456fb1d6d3be496a"
+                        }
+                    ],
+                    "SourceDestCheck": true,
+                    "Tags": [
+                        {
+                            "Key": "kubernetes.io/cluster/pbraun-observatorium-4cnp4",
+                            "Value": "owned"
+                        },
+                        {
+                            "Key": "Name",
+                            "Value": "pbraun-observatorium-4cnp4-worker-eu-west-1a-h55nh"
+                        }
+                    ],
+                    "VirtualizationType": "hvm",
+                    "CpuOptions": {
+                        "CoreCount": 2,
+                        "ThreadsPerCore": 2
+                    },
+                    "CapacityReservationSpecification": {
+                        "CapacityReservationPreference": "open"
+                    },
+                    "HibernationOptions": {
+                        "Configured": false
+                    },
+                    "MetadataOptions": {
+                        "State": "applied",
+                        "HttpTokens": "optional",
+                        "HttpPutResponseHopLimit": 1,
+                        "HttpEndpoint": "enabled"
+                    }
+                }
+            ],
+            "OwnerId": "622761864308",
+            "ReservationId": "r-0095564e03b169e5a"
+        }
+    ]
+}
