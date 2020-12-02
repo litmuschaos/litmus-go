@@ -1,0 +1,276 @@
+{
+    "Subnets": [
+        {
+            "AvailabilityZone": "eu-west-1b",
+            "AvailabilityZoneId": "euw1-az1",
+            "AvailableIpAddressCount": 4091,
+            "CidrBlock": "172.31.0.0/20",
+            "DefaultForAz": true,
+            "MapPublicIpOnLaunch": true,
+            "MapCustomerOwnedIpOnLaunch": false,
+            "State": "available",
+            "SubnetId": "subnet-ba0e3ddc",
+            "VpcId": "vpc-ac8041d5",
+            "OwnerId": "622761864308",
+            "AssignIpv6AddressOnCreation": false,
+            "Ipv6CidrBlockAssociationSet": [],
+            "SubnetArn": "arn:aws:ec2:eu-west-1:622761864308:subnet/subnet-ba0e3ddc"
+        },
+        {
+            "AvailabilityZone": "eu-west-1a",
+            "AvailabilityZoneId": "euw1-az3",
+            "AvailableIpAddressCount": 32759,
+            "CidrBlock": "10.0.0.0/17",
+            "DefaultForAz": false,
+            "MapPublicIpOnLaunch": false,
+            "MapCustomerOwnedIpOnLaunch": false,
+            "State": "available",
+            "SubnetId": "subnet-05bec41653abc00e5",
+            "VpcId": "vpc-07462a3825c1b116c",
+            "OwnerId": "622761864308",
+            "AssignIpv6AddressOnCreation": false,
+            "Ipv6CidrBlockAssociationSet": [],
+            "Tags": [
+                {
+                    "Key": "Name",
+                    "Value": "pbraun-observatorium-4cnp4-public-eu-west-1a"
+                },
+                {
+                    "Key": "kubernetes.io/cluster/pbraun-observatorium-4cnp4",
+                    "Value": "owned"
+                }
+            ],
+            "SubnetArn": "arn:aws:ec2:eu-west-1:622761864308:subnet/subnet-05bec41653abc00e5"
+        },
+        {
+            "AvailabilityZone": "eu-west-1b",
+            "AvailabilityZoneId": "euw1-az1",
+            "AvailableIpAddressCount": 8182,
+            "CidrBlock": "10.0.32.0/19",
+            "DefaultForAz": false,
+            "MapPublicIpOnLaunch": false,
+            "MapCustomerOwnedIpOnLaunch": false,
+            "State": "available",
+            "SubnetId": "subnet-0427d0df9bf6488e5",
+            "VpcId": "vpc-0cb3748abafcc54a5",
+            "OwnerId": "622761864308",
+            "AssignIpv6AddressOnCreation": false,
+            "Ipv6CidrBlockAssociationSet": [],
+            "Tags": [
+                {
+                    "Key": "kubernetes.io/cluster/damurphy-6wndz",
+                    "Value": "owned"
+                },
+                {
+                    "Key": "Name",
+                    "Value": "damurphy-6wndz-public-eu-west-1b"
+                }
+            ],
+            "SubnetArn": "arn:aws:ec2:eu-west-1:622761864308:subnet/subnet-0427d0df9bf6488e5"
+        },
+        {
+            "AvailabilityZone": "eu-west-1a",
+            "AvailabilityZoneId": "euw1-az3",
+            "AvailableIpAddressCount": 8182,
+            "CidrBlock": "10.0.0.0/19",
+            "DefaultForAz": false,
+            "MapPublicIpOnLaunch": false,
+            "MapCustomerOwnedIpOnLaunch": false,
+            "State": "available",
+            "SubnetId": "subnet-0006edf0fa7eba4f6",
+            "VpcId": "vpc-0cb3748abafcc54a5",
+            "OwnerId": "622761864308",
+            "AssignIpv6AddressOnCreation": false,
+            "Ipv6CidrBlockAssociationSet": [],
+            "Tags": [
+                {
+                    "Key": "Name",
+                    "Value": "damurphy-6wndz-public-eu-west-1a"
+                },
+                {
+                    "Key": "kubernetes.io/cluster/damurphy-6wndz",
+                    "Value": "owned"
+                }
+            ],
+            "SubnetArn": "arn:aws:ec2:eu-west-1:622761864308:subnet/subnet-0006edf0fa7eba4f6"
+        },
+        {
+            "AvailabilityZone": "eu-west-1b",
+            "AvailabilityZoneId": "euw1-az1",
+            "AvailableIpAddressCount": 8183,
+            "CidrBlock": "10.0.160.0/19",
+            "DefaultForAz": false,
+            "MapPublicIpOnLaunch": false,
+            "MapCustomerOwnedIpOnLaunch": false,
+            "State": "available",
+            "SubnetId": "subnet-0e487870c6acf597c",
+            "VpcId": "vpc-0cb3748abafcc54a5",
+            "OwnerId": "622761864308",
+            "AssignIpv6AddressOnCreation": false,
+            "Ipv6CidrBlockAssociationSet": [],
+            "Tags": [
+                {
+                    "Key": "kubernetes.io/role/internal-elb",
+                    "Value": ""
+                },
+                {
+                    "Key": "Name",
+                    "Value": "damurphy-6wndz-private-eu-west-1b"
+                },
+                {
+                    "Key": "kubernetes.io/cluster/damurphy-6wndz",
+                    "Value": "owned"
+                }
+            ],
+            "SubnetArn": "arn:aws:ec2:eu-west-1:622761864308:subnet/subnet-0e487870c6acf597c"
+        },
+        {
+            "AvailabilityZone": "eu-west-1c",
+            "AvailabilityZoneId": "euw1-az2",
+            "AvailableIpAddressCount": 4091,
+            "CidrBlock": "172.31.16.0/20",
+            "DefaultForAz": true,
+            "MapPublicIpOnLaunch": true,
+            "MapCustomerOwnedIpOnLaunch": false,
+            "State": "available",
+            "SubnetId": "subnet-b01715f8",
+            "VpcId": "vpc-ac8041d5",
+            "OwnerId": "622761864308",
+            "AssignIpv6AddressOnCreation": false,
+            "Ipv6CidrBlockAssociationSet": [],
+            "SubnetArn": "arn:aws:ec2:eu-west-1:622761864308:subnet/subnet-b01715f8"
+        },
+        {
+            "AvailabilityZone": "eu-west-1a",
+            "AvailabilityZoneId": "euw1-az3",
+            "AvailableIpAddressCount": 8183,
+            "CidrBlock": "10.0.128.0/19",
+            "DefaultForAz": false,
+            "MapPublicIpOnLaunch": false,
+            "MapCustomerOwnedIpOnLaunch": false,
+            "State": "available",
+            "SubnetId": "subnet-09d159ec6c9e2a0c3",
+            "VpcId": "vpc-0cb3748abafcc54a5",
+            "OwnerId": "622761864308",
+            "AssignIpv6AddressOnCreation": false,
+            "Ipv6CidrBlockAssociationSet": [],
+            "Tags": [
+                {
+                    "Key": "kubernetes.io/role/internal-elb",
+                    "Value": ""
+                },
+                {
+                    "Key": "Name",
+                    "Value": "damurphy-6wndz-private-eu-west-1a"
+                },
+                {
+                    "Key": "kubernetes.io/cluster/damurphy-6wndz",
+                    "Value": "owned"
+                }
+            ],
+            "SubnetArn": "arn:aws:ec2:eu-west-1:622761864308:subnet/subnet-09d159ec6c9e2a0c3"
+        },
+        {
+            "AvailabilityZone": "eu-west-1c",
+            "AvailabilityZoneId": "euw1-az2",
+            "AvailableIpAddressCount": 8182,
+            "CidrBlock": "10.0.64.0/19",
+            "DefaultForAz": false,
+            "MapPublicIpOnLaunch": false,
+            "MapCustomerOwnedIpOnLaunch": false,
+            "State": "available",
+            "SubnetId": "subnet-0d56d85f4541b1a84",
+            "VpcId": "vpc-0cb3748abafcc54a5",
+            "OwnerId": "622761864308",
+            "AssignIpv6AddressOnCreation": false,
+            "Ipv6CidrBlockAssociationSet": [],
+            "Tags": [
+                {
+                    "Key": "Name",
+                    "Value": "damurphy-6wndz-public-eu-west-1c"
+                },
+                {
+                    "Key": "kubernetes.io/cluster/damurphy-6wndz",
+                    "Value": "owned"
+                }
+            ],
+            "SubnetArn": "arn:aws:ec2:eu-west-1:622761864308:subnet/subnet-0d56d85f4541b1a84"
+        },
+        {
+            "AvailabilityZone": "eu-west-1a",
+            "AvailabilityZoneId": "euw1-az3",
+            "AvailableIpAddressCount": 4091,
+            "CidrBlock": "172.31.32.0/20",
+            "DefaultForAz": true,
+            "MapPublicIpOnLaunch": true,
+            "MapCustomerOwnedIpOnLaunch": false,
+            "State": "available",
+            "SubnetId": "subnet-ae720ef4",
+            "VpcId": "vpc-ac8041d5",
+            "OwnerId": "622761864308",
+            "AssignIpv6AddressOnCreation": false,
+            "Ipv6CidrBlockAssociationSet": [],
+            "SubnetArn": "arn:aws:ec2:eu-west-1:622761864308:subnet/subnet-ae720ef4"
+        },
+        {
+            "AvailabilityZone": "eu-west-1a",
+            "AvailabilityZoneId": "euw1-az3",
+            "AvailableIpAddressCount": 32756,
+            "CidrBlock": "10.0.128.0/17",
+            "DefaultForAz": false,
+            "MapPublicIpOnLaunch": false,
+            "MapCustomerOwnedIpOnLaunch": false,
+            "State": "available",
+            "SubnetId": "subnet-07b26f59781e3cb37",
+            "VpcId": "vpc-07462a3825c1b116c",
+            "OwnerId": "622761864308",
+            "AssignIpv6AddressOnCreation": false,
+            "Ipv6CidrBlockAssociationSet": [],
+            "Tags": [
+                {
+                    "Key": "kubernetes.io/role/internal-elb",
+                    "Value": ""
+                },
+                {
+                    "Key": "Name",
+                    "Value": "pbraun-observatorium-4cnp4-private-eu-west-1a"
+                },
+                {
+                    "Key": "kubernetes.io/cluster/pbraun-observatorium-4cnp4",
+                    "Value": "owned"
+                }
+            ],
+            "SubnetArn": "arn:aws:ec2:eu-west-1:622761864308:subnet/subnet-07b26f59781e3cb37"
+        },
+        {
+            "AvailabilityZone": "eu-west-1c",
+            "AvailabilityZoneId": "euw1-az2",
+            "AvailableIpAddressCount": 8183,
+            "CidrBlock": "10.0.192.0/19",
+            "DefaultForAz": false,
+            "MapPublicIpOnLaunch": false,
+            "MapCustomerOwnedIpOnLaunch": false,
+            "State": "available",
+            "SubnetId": "subnet-0a41372d317d83b35",
+            "VpcId": "vpc-0cb3748abafcc54a5",
+            "OwnerId": "622761864308",
+            "AssignIpv6AddressOnCreation": false,
+            "Ipv6CidrBlockAssociationSet": [],
+            "Tags": [
+                {
+                    "Key": "kubernetes.io/cluster/damurphy-6wndz",
+                    "Value": "owned"
+                },
+                {
+                    "Key": "Name",
+                    "Value": "damurphy-6wndz-private-eu-west-1c"
+                },
+                {
+                    "Key": "kubernetes.io/role/internal-elb",
+                    "Value": ""
+                }
+            ],
+            "SubnetArn": "arn:aws:ec2:eu-west-1:622761864308:subnet/subnet-0a41372d317d83b35"
+        }
+    ]
+}

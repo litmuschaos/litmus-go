@@ -18,28 +18,15 @@ import (
 	"strings"
 )
 
-// return all instances that are in the az specified
-func getInstancesInAz(instances []*experimentTypes.InstanceDetails, az string) ([]*experimentTypes.InstanceDetails) {
-	instancesInAz := []*experimentTypes.InstanceDetails{}
-	for _, instance := range instances {
-		// for each name element to target check if in instance name string
-		// if no name elements return all instances
-		if instance.AZ == az { //TODO make sure default az value is set
-			instancesInAz = append(instancesInAz, instance)
-		}
-	}
-	return instancesInAz
-}
-
 // returns all AZ's instances are located in
-func getAllAvailableZones([]*experimentTypes.InstanceDetails) ([]string) {
+func getAzRangeOfInstances([]*experimentTypes.InstanceDetails) ([]string) {
 	// TODO check all instances and return list of zones instances are located in
 	return []string{}
 }
 
 // return random valid az to target
-func getAzToTarget(azs []string) (string) {
-	return azs[rand.Intn(len(azs))]
+func selectRandomAz(azlist []string) (string) {
+	return azlist[rand.Intn(len(azlist))]
 }
 
 // check if instance name matches what we want to target
@@ -52,36 +39,24 @@ func isTargetableInstance(instanceName string, identifiers []string) (bool) {
 	return false
 }
 
-// returns instances to target in experiment
-func getInstancesToTarget(allInstances []*experimentTypes.InstanceDetails, experimentsDetails *experimentTypes.ExperimentDetails) ([]*experimentTypes.InstanceDetails, error) {
+//
+func getAzToTarget(instances []*experimentTypes.InstanceDetails) (string) {
 
-	availableAzsToTarget := getAllAvailableZones(allInstances) // look at targeting more than 1 az if possible
+	availableAzsToTarget := getAzRangeOfInstances(instances) // look at targeting more than 1 az if possible
 
-	// az will be targeted randomly - should this be configurable?
-	azToTarget := getAzToTarget(availableAzsToTarget) // will this affect where litmus chaos is scheduled?
-	instancesInTargetAz := getInstancesInAz(allInstances, azToTarget)
+	// we want to randomly target an AZ
+	return selectRandomAz(availableAzsToTarget)
+}
 
-	// get instances that match node identifiers
-	instancesToTarget := []*experimentTypes.InstanceDetails{}
-	nodeIdentifiers := strings.Split(experimentsDetails.NodeIdentifiers, ",")
-	for _, instance := range instancesInTargetAz {
-		if isTargetableInstance(instance.Name, nodeIdentifiers) {
-			instancesToTarget = append(instancesToTarget, instance)
-		}
-	}
+//
+func getVpcOfAzInstances(instances []*experimentTypes.InstanceDetails, az string) ([]*experimentTypes.InstanceDetails, error) {
 
-	// TODO - return all instances in az if no labels match?
-	if len(instancesToTarget) == 0 {
-		instancesToTarget = instancesInTargetAz
-	}
+	azToTarget := getAzToTarget(instances)
 
-	// TODO - return number of instances specified by env var
-	numberOfNodesToTarget := experimentsDetails.NumberNodesToTarget
-	if numberOfNodesToTarget > len(instancesToTarget) {
-		return instancesToTarget, nil
-	}
+	// return vpc that corresponds to instances
+	vpcOfinstancesInTargetAz := getInstancesInAz(instances, azToTarget)
 
-	return instancesToTarget[:numberOfNodesToTarget], nil // TODO - update to return random instances
+
 }
 
 func getInstanceSecurityGroupIds(instances []*experimentTypes.InstanceDetails) ([]*string) {
@@ -132,7 +107,6 @@ func removePreChaosSecurityGroups(ec2Svc *ec2.EC2, instances []*types.InstanceDe
 
 func AZDown(clients clients.ClientSets) {
 
-	// TODO refactor this monster method into smaller methods to make more readable
 	var err error
 	experimentsDetails := experimentTypes.ExperimentDetails{}
 	resultDetails := types.ResultDetails{}
@@ -213,10 +187,7 @@ func AZDown(clients clients.ClientSets) {
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
-	// INVOKE THE CHAOSLIB OF YOUR CHOICE HERE, WHICH WILL CONTAIN
-	// THE BUSINESS LOGIC OF THE ACTUAL CHAOS
-	// IT CAN BE A NEW CHAOSLIB YOU HAVE CREATED SPECIALLY FOR THIS EXPERIMENT OR ANY EXISTING ONE
-
+	// start of experiment logic
 	// TODO create replicated topic in kafka
 
 	// Configure AWS Credentials
@@ -231,7 +202,6 @@ func AZDown(clients clients.ClientSets) {
 	ec2Svc := aws.GetNewEC2Client(&experimentsDetails)
 
 	// Get all instances in region that belong to our cluster under test
-	//Verify the aws ec2 instance is running (pre chaos)
 	clusterInstances, err := aws.GetClusterInstancesInRegion(&ec2Svc, experimentsDetails.ClusterIdentifier)
 	if err != nil {
 		log.Errorf("failed to get the ec2 instance instances in region, err: %v", err)
@@ -240,17 +210,40 @@ func AZDown(clients clients.ClientSets) {
 		return
 	}
 
-	// Get instances to target
-	instancesToTarget, err := getInstancesToTarget(clusterInstances, &experimentsDetails)
-	if (err != nil) || len(instancesToTarget) == 0 {
-		log.Errorf("failed to get the ec2 instances to target with experiment, err: %v", err)
-		failStep := "Getting the instances to target with experiment (pre-chaos)"
+	// select az to be targeted
+	azToTarget := getAzToTarget(clusterInstances)
+
+	// get subnets for target az
+	// TODO
+	subnets := ec2Svc.DescribeSubnets(ec2.DescribeSubnetsInput{Filters: ec2.Filter{ec2.AvailabilityZone{ZoneName: azToTarget}}})
+
+	// create dummy ACLs with deny all traffic policies
+	// TODO
+
+	// fetch NetworkAclId to revert change later
+
+	// fetch SubnetId to associate ACL with subnet
+	// associate dummy ACLs with target az subnets
+	// TODO
+
+	// revert change
+	// TODO
+
+	// clean up by removing dummy ACL
+	// TODO
+
+
+	// Get vpc of instances in az to target
+	vpcOfInstancesToTarget, err := getVpcOfAzInstances()
+	if (err != nil) || len(vpcOfInstancesToTarget) == 0 {
+		log.Errorf("failed to get the vpc(s) associated with the instances in az to target, err: %v", err)
+		failStep := "Getting the vpc of the instances in az being targeted with experiment (pre-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
 
 	// fetch a copy of security group definitions before alerting security groups of instances
-	preChaosSecGroups, err := GetSecurityGroupDefinitions(&ec2Svc, instancesToTarget)
+	preChaosSecGroups, err := GetSecurityGroupDefinitions(&ec2Svc, vpcOfInstancesToTarget)
 
 	// TODO create new security group with no inbound or outbound rules
 	emptySecurityGroup, err := createEmptySecurityGroup(&ec2Svc)

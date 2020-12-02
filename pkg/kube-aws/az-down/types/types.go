@@ -26,7 +26,6 @@ type ExperimentDetails struct {
 	Timeout             int
 	Delay               int
 	AwsRegion           string
-	NumberOfAZs         int
 	ClusterIdentifier   string
 }
 
