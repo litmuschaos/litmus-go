@@ -28,8 +28,6 @@ type ExperimentDetails struct {
 	AwsRegion           string
 	NumberOfAZs         int
 	ClusterIdentifier   string
-	NodeIdentifiers     string
-	NumberNodesToTarget int
 }
 
 type InstanceDetails struct {
