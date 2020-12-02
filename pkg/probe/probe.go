@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"html/template"
+	"os"
 
 	"github.com/kyokomi/emoji"
 	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
@@ -49,6 +50,12 @@ func RunProbes(chaosDetails *types.ChaosDetails, clients clients.ClientSets, res
 			case "httpProbe", "HTTPProbe":
 				// it contains steps to prepare http probe
 				err = PrepareHTTPProbe(probe, clients, chaosDetails, resultDetails, phase, eventsDetails)
+				if err != nil {
+					return err
+				}
+			case "promProbe", "PromProbe":
+				// it contains steps to prepare prom probe
+				err = PreparePromeProbe(probe, clients, chaosDetails, resultDetails, phase, eventsDetails)
 				if err != nil {
 					return err
 				}
@@ -134,6 +141,7 @@ func InitializeProbesInChaosResultDetails(chaosDetails *types.ChaosDetails, clie
 
 	chaosresult.ProbeDetails = probeDetails
 	chaosresult.ProbeArtifacts = map[string]types.ProbeArtifact{}
+	chaosresult.PromProbeImage = Getenv("LIB_IMAGE", "litmuschaos/go-runner:ci")
 
 	return nil
 }
@@ -253,5 +261,13 @@ func ParseCommand(templatedCommand string, resultDetails *types.ResultDetails) (
 	}
 
 	return out.String(), nil
+}
 
+// Getenv fetch the env and set the default value, if any
+func Getenv(key string, defaultValue string) string {
+	value := os.Getenv(key)
+	if value == "" {
+		value = defaultValue
+	}
+	return value
 }
