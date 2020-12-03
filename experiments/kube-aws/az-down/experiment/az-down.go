@@ -1,6 +1,7 @@
 package experiment
 
 import (
+	"fmt"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/az-down/lib"
 	"github.com/litmuschaos/litmus-go/pkg/clients"
@@ -215,60 +216,24 @@ func AZDown(clients clients.ClientSets) {
 
 	// get subnets for target az
 	// TODO
-	subnets := ec2Svc.DescribeSubnets(ec2.DescribeSubnetsInput{Filters: ec2.Filter{ec2.AvailabilityZone{ZoneName: azToTarget}}})
+	azName := fmt.Sprintf("ZoneName: %s", azToTarget)
+	azNameFilter := ec2.Filter{Values: []*string{&azName}}
+	filters := []*ec2.Filter{&azNameFilter}
+
+	subnets, err := ec2Svc.DescribeSubnets(&ec2.DescribeSubnetsInput{Filters: filters})
 
 	// create dummy ACLs with deny all traffic policies
 	// TODO
+	dummyAcl := ec2Svc.CreateNetworkAcl()
 
 	// fetch NetworkAclId to revert change later
+	networkAclIds := ec2Svc.DescribeNetworkAcls()
 
 	// fetch SubnetId to associate ACL with subnet
 	// associate dummy ACLs with target az subnets
 	// TODO
-
-	// revert change
-	// TODO
-
-	// clean up by removing dummy ACL
-	// TODO
-
-
-	// Get vpc of instances in az to target
-	vpcOfInstancesToTarget, err := getVpcOfAzInstances()
-	if (err != nil) || len(vpcOfInstancesToTarget) == 0 {
-		log.Errorf("failed to get the vpc(s) associated with the instances in az to target, err: %v", err)
-		failStep := "Getting the vpc of the instances in az being targeted with experiment (pre-chaos)"
-		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-		return
-	}
-
-	// fetch a copy of security group definitions before alerting security groups of instances
-	preChaosSecGroups, err := GetSecurityGroupDefinitions(&ec2Svc, vpcOfInstancesToTarget)
-
-	// TODO create new security group with no inbound or outbound rules
-	emptySecurityGroup, err := createEmptySecurityGroup(&ec2Svc)
-	if err != nil {
-		log.Errorf("failed to create new empty security group, err: %v", err)
-		failStep := "Creating an empty security group to assign to instances in az (pre-chaos)"
-		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-		return
-	}
-
-	err = assignNewSecurityGroup(&ec2Svc, instancesToTarget, emptySecurityGroup)
-	if err != nil {
-		log.Errorf("failed assign new empty security group to instances in az, err: %v", err)
-		failStep := "Failed to assign empty security group to instances in az (pre-chaos)"
-		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-		return
-	}
-
-	// TODO remove old security group
-	err = removePreChaosSecurityGroups(&ec2Svc, instancesToTarget)
-	if err != nil {
-		log.Errorf("failed to remove pre-chaos security group(s) from instances in az targeted, err: %v", err)
-		failStep := "Failed to remove pre-chaos security group(s) from instances in az targeted (pre-chaos)"
-		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-		return
+	for _, subnet := range subnets {
+		// TODO associate ACL with subnet
 	}
 
 	// Including the litmus lib
@@ -346,5 +311,9 @@ func AZDown(clients clients.ClientSets) {
 		types.SetEngineEventAttributes(&eventsDetails, types.Summary, msg, "Normal", &chaosDetails)
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
+
+	// TODO - clean up after experiment
+	// reassociate previous ACL
+	// delete dummy ACL
 }
 
