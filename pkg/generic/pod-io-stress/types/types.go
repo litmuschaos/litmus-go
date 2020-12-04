@@ -26,6 +26,7 @@ type ExperimentDetails struct {
 	NumberOfWorkers                 int
 	Annotations                     map[string]string
 	LIBImage                        string
+	LIBImagePullPolicy              string
 	PodsAffectedPerc                int
 	Sequence                        string
 	VolumeMountPath                 string

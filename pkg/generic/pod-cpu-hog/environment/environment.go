@@ -32,6 +32,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.ChaosInjectCmd = Getenv("CHAOS_INJECT_COMMAND", "md5sum /dev/zero")
 	experimentDetails.ChaosKillCmd = Getenv("CHAOS_KILL_COMMAND", "kill $(find /proc -name exe -lname '*/md5sum' 2>&1 | grep -v 'Permission denied' | awk -F/ '{print $(NF-1)}' |  head -n 1)")
 	experimentDetails.LIBImage = Getenv("LIB_IMAGE", "gaiaadm/pumba")
+	experimentDetails.LIBImagePullPolicy = Getenv("LIB_IMAGE_PULL_POLICY", "Always")
 	experimentDetails.TargetContainer = Getenv("TARGET_CONTAINER", "")
 	experimentDetails.Sequence = Getenv("SEQUENCE", "parallel")
 
@@ -48,6 +49,13 @@ func Getenv(key string, defaultValue string) string {
 
 //InitialiseChaosVariables initialise all the global variables
 func InitialiseChaosVariables(chaosDetails *types.ChaosDetails, experimentDetails *experimentTypes.ExperimentDetails) {
+	appDetails := types.AppDetails{}
+	appDetails.AnnotationCheck, _ = strconv.ParseBool(Getenv("ANNOTATION_CHECK", "false"))
+	appDetails.AnnotationKey = Getenv("ANNOTATION_KEY", "litmuschaos.io/chaos")
+	appDetails.AnnotationValue = "true"
+	appDetails.Kind = experimentDetails.AppKind
+	appDetails.Label = experimentDetails.AppLabel
+	appDetails.Namespace = experimentDetails.AppNS
 
 	chaosDetails.ChaosNamespace = experimentDetails.ChaosNamespace
 	chaosDetails.ChaosPodName = experimentDetails.ChaosPodName
@@ -57,4 +65,5 @@ func InitialiseChaosVariables(chaosDetails *types.ChaosDetails, experimentDetail
 	chaosDetails.InstanceID = experimentDetails.InstanceID
 	chaosDetails.Timeout = experimentDetails.Timeout
 	chaosDetails.Delay = experimentDetails.Delay
+	chaosDetails.AppDetail = appDetails
 }

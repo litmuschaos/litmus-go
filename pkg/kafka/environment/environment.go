@@ -65,6 +65,13 @@ func Getenv(key string, defaultValue string) string {
 
 //InitialiseChaosVariables initialise all the global variables
 func InitialiseChaosVariables(chaosDetails *types.ChaosDetails, kafkaDetails *kafkaTypes.ExperimentDetails) {
+	appDetails := types.AppDetails{}
+	appDetails.AnnotationCheck, _ = strconv.ParseBool(Getenv("ANNOTATION_CHECK", "false"))
+	appDetails.AnnotationKey = Getenv("ANNOTATION_KEY", "litmuschaos.io/chaos")
+	appDetails.AnnotationValue = "true"
+	appDetails.Kind = kafkaDetails.ChaoslibDetail.AppKind
+	appDetails.Label = kafkaDetails.ChaoslibDetail.AppLabel
+	appDetails.Namespace = kafkaDetails.ChaoslibDetail.AppNS
 
 	chaosDetails.ChaosNamespace = kafkaDetails.ChaoslibDetail.ChaosNamespace
 	chaosDetails.ChaosPodName = kafkaDetails.ChaoslibDetail.ChaosPodName
@@ -74,4 +81,5 @@ func InitialiseChaosVariables(chaosDetails *types.ChaosDetails, kafkaDetails *ka
 	chaosDetails.InstanceID = kafkaDetails.ChaoslibDetail.InstanceID
 	chaosDetails.Timeout = kafkaDetails.ChaoslibDetail.Timeout
 	chaosDetails.Delay = kafkaDetails.ChaoslibDetail.Delay
+	chaosDetails.AppDetail = appDetails
 }

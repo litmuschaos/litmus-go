@@ -3,6 +3,7 @@ package probe
 import (
 	"fmt"
 	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -148,6 +149,22 @@ func (model Model) CompareString() error {
 		}
 	case "contains", "Contains":
 		if !strings.Contains(actualOutput, expectedOutput) {
+			return fmt.Errorf("The probe output didn't match with expected criteria")
+		}
+	case "matches", "Matches":
+		re, err := regexp.Compile(expectedOutput)
+		if err != nil {
+			return fmt.Errorf("The probe regex '%s' is not a valid expression", expectedOutput)
+		}
+		if !re.MatchString(actualOutput) {
+			return fmt.Errorf("The probe output didn't match with expected criteria")
+		}
+	case "notMatches", "NotMatches":
+		re, err := regexp.Compile(expectedOutput)
+		if err != nil {
+			return fmt.Errorf("The probe regex '%s' is not a valid expression", expectedOutput)
+		}
+		if re.MatchString(actualOutput) {
 			return fmt.Errorf("The probe output didn't match with expected criteria")
 		}
 	default:
