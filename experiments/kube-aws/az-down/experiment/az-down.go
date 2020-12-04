@@ -60,6 +60,14 @@ func getVpcOfAzInstances(instances []*experimentTypes.InstanceDetails, az string
 
 }
 
+func getNetworkAclAssociationIdForSubnet(subnetId string) (string, error) {
+	return "", nil //TODO implement
+}
+
+func getNetworkAclIdForSubnet (subnetId string) (string, error) {
+	return "", nil //TODO implement
+}
+
 func getInstanceSecurityGroupIds(instances []*experimentTypes.InstanceDetails) ([]*string) {
 
 	allInstanceSecurityGroups := []string{}
@@ -215,26 +223,53 @@ func AZDown(clients clients.ClientSets) {
 	azToTarget := getAzToTarget(clusterInstances)
 
 	// get subnets for target az
-	// TODO
 	azName := fmt.Sprintf("ZoneName: %s", azToTarget)
 	azNameFilter := ec2.Filter{Values: []*string{&azName}}
 	filters := []*ec2.Filter{&azNameFilter}
 
 	subnets, err := ec2Svc.DescribeSubnets(&ec2.DescribeSubnetsInput{Filters: filters})
 
-	// create dummy ACLs with deny all traffic policies
-	// TODO
-	dummyAcl := ec2Svc.CreateNetworkAcl()
-
-	// fetch NetworkAclId to revert change later
-	networkAclIds := ec2Svc.DescribeNetworkAcls()
-
-	// fetch SubnetId to associate ACL with subnet
-	// associate dummy ACLs with target az subnets
-	// TODO
-	for _, subnet := range subnets {
-		// TODO associate ACL with subnet
+	// get vpcids for all subnets in az
+	vpcIds := []*string{}
+	for _, subnet := range subnets.Subnets {
+		vpcIds = append(vpcIds, subnet.VpcId)
 	}
+
+	// get the subnet ids
+	subnetIds := []*string{}
+	for _, subnet := range subnets.Subnets {
+		subnetIds = append(subnetIds, subnet.SubnetId)
+	}
+
+	// create and assign dummy acl to each vpc
+	dummyAclIds := []string{}
+	for _, vpcId := range vpcIds {
+		output, err := ec2Svc.CreateNetworkAcl(&ec2.CreateNetworkAclInput{VpcId: vpcId})
+		if err != nil {
+			log.Errorf("Failed to assign dummy ACM to vpc of az being targeted, err: %v", err)
+			failStep := "Failed to assign dummy ACL to vpc of az being targeted"
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+			return
+		}
+		dummyAclIds = append(dummyAclIds, fmt.Sprint(output.NetworkAcl.NetworkAclId))
+		log.Info(fmt.Sprintf("New ACL created and assigned to vpc id: %s.\n%s", vpcId, output))
+	}
+
+	// get NetworkAclAssociationId and NetworkAclId of subnets in az
+	subnetAclDetails := map[string]map[string]string{}
+	for _, subnet := range subnets.Subnets {
+		networkAclAssociationId, err := getNetworkAclAssociationIdForSubnet(*subnet.SubnetId)
+		networkAclId, err := getNetworkAclIdForSubnet(*subnet.SubnetId)
+		subnetAclDetails[*subnet.SubnetId] = map[string]string{
+			"NetworkAclAssociationId": networkAclAssociationId,
+			"NetworkAclId": networkAclId,
+		}
+	}
+
+
+	// associate dummy ACL with az subnets
+	// subnet-id
+	// network-acl-id to revert change
 
 	// Including the litmus lib
 	if experimentsDetails.ChaosLib == "litmus" {
@@ -313,6 +348,7 @@ func AZDown(clients clients.ClientSets) {
 	}
 
 	// TODO - clean up after experiment
+
 	// reassociate previous ACL
 	// delete dummy ACL
 }
