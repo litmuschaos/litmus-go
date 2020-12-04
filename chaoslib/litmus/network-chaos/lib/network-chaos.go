@@ -271,7 +271,7 @@ func GetPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, podName, a
 		"NETEM_COMMAND":        args,
 		"NETWORK_INTERFACE":    experimentsDetails.NetworkInterface,
 		"EXPERIMENT_NAME":      experimentsDetails.ExperimentName,
-		"TARGET_IPs":           GetTargetIpsArgs(experimentsDetails.TargetIPs, experimentsDetails.TargetHosts),
+		"DESTINATION_IPS":      GetTargetIpsArgs(experimentsDetails.DestinationIPs, experimentsDetails.DestinationHosts),
 	}
 	for key, value := range ENVList {
 		var perEnv apiv1.EnvVar

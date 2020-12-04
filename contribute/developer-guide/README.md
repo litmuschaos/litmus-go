@@ -33,7 +33,7 @@ scaffolded files consist of placeholders which can then be filled as desired.
 
   ```
   $ git clone https://github.com/litmuschaos/litmus-go.git
-  $ cd litmus/contribute/developer-guide
+  $ cd litmus-go/contribute/developer-guide
   ```
 
 - Populate the `attributes.yaml` with details of the chaos experiment (or chart). Use the [attributes.yaml.sample](/contribute/developer-guide/attributes.yaml.sample) as reference. 
@@ -92,12 +92,14 @@ scaffolded files consist of placeholders which can then be filled as desired.
   `pod-delete` experiment.
 
   ```
-  $ go run generate_experiment.go -attributes=attributes.yaml -generateType=experiment
+  $ ./litmus-sdk generate <generate-type> -f=attributes.yaml
   ```
 
-  **Note**: In the `-generateType` attribute, select the appropriate type of manifests to be generated, where, 
+  **Note**: Replace the `<generate-type>` placeholder with the appropriate value based on the usecase: 
   - `chart`: Just the chaos-chart metadata, i.e., chartserviceversion yaml 
   - `experiment`: Chaos experiment artifacts belonging to a an existing OR new chart. 
+
+  - provide the path of the attribute.yaml manifest in the `-f` flag. 
 
   View the generated files in `/experiments/chaos-category` folder.
 

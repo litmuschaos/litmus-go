@@ -55,7 +55,7 @@ func RunProbes(chaosDetails *types.ChaosDetails, clients clients.ClientSets, res
 				}
 			case "promProbe", "PromProbe":
 				// it contains steps to prepare prom probe
-				err = PreparePromeProbe(probe, clients, chaosDetails, resultDetails, phase, eventsDetails)
+				err = PreparePromProbe(probe, clients, chaosDetails, resultDetails, phase, eventsDetails)
 				if err != nil {
 					return err
 				}
