@@ -42,7 +42,7 @@ func PrepareCmdProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets,
 			return err
 		}
 	default:
-		return fmt.Errorf("phase '%s' not supported in the k8s probe", phase)
+		return fmt.Errorf("phase '%s' not supported in the cmd probe", phase)
 	}
 	return nil
 }
@@ -137,8 +137,7 @@ func CreateProbePod(clients clients.ClientSets, chaosDetails *types.ChaosDetails
 			},
 		},
 		Spec: apiv1.PodSpec{
-			RestartPolicy:      apiv1.RestartPolicyNever,
-			ServiceAccountName: "litmus",
+			RestartPolicy: apiv1.RestartPolicyNever,
 			Containers: []apiv1.Container{
 				{
 					Name:            chaosDetails.ExperimentName + "-probe",
@@ -406,7 +405,7 @@ func PreChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 			}
 		} else {
 
-			execCommandDetails, err := CreateHelperPod(probe, resultDetails, clients, chaosDetails)
+			execCommandDetails, err := CreateHelperPod(probe, resultDetails, clients, chaosDetails, probe.CmdProbeInputs.Source)
 			if err != nil {
 				return err
 			}
@@ -445,7 +444,7 @@ func PreChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 			go TriggerInlineContinuousCmdProbe(probe, resultDetails)
 		} else {
 
-			execCommandDetails, err := CreateHelperPod(probe, resultDetails, clients, chaosDetails)
+			execCommandDetails, err := CreateHelperPod(probe, resultDetails, clients, chaosDetails, probe.CmdProbeInputs.Source)
 			if err != nil {
 				return err
 			}
@@ -492,7 +491,7 @@ func PostChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resu
 			}
 		} else {
 
-			execCommandDetails, err := CreateHelperPod(probe, resultDetails, clients, chaosDetails)
+			execCommandDetails, err := CreateHelperPod(probe, resultDetails, clients, chaosDetails, probe.CmdProbeInputs.Source)
 			if err != nil {
 				return err
 			}
@@ -562,7 +561,7 @@ func OnChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Result
 			go TriggerInlineOnChaosCmdProbe(probe, resultDetails, chaosDetails.ChaosDuration)
 		} else {
 
-			execCommandDetails, err := CreateHelperPod(probe, resultDetails, clients, chaosDetails)
+			execCommandDetails, err := CreateHelperPod(probe, resultDetails, clients, chaosDetails, probe.CmdProbeInputs.Source)
 			if err != nil {
 				return err
 			}
@@ -577,13 +576,13 @@ func OnChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Result
 
 // CreateHelperPod create the helper pod with the source image
 // it will be created if the mode is not inline
-func CreateHelperPod(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) (litmusexec.PodDetails, error) {
+func CreateHelperPod(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, sourceImage string) (litmusexec.PodDetails, error) {
 	// Generate the run_id
 	runID := GetRunID()
 	SetRunIDForProbe(resultDetails, probe.Name, probe.Type, runID)
 
 	// create the external pod with source image for cmd probe
-	err := CreateProbePod(clients, chaosDetails, runID, probe.CmdProbeInputs.Source)
+	err := CreateProbePod(clients, chaosDetails, runID, sourceImage)
 	if err != nil {
 		return litmusexec.PodDetails{}, err
 	}

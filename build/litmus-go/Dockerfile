@@ -20,6 +20,9 @@ RUN curl -L https://github.com/kubernetes-sigs/cri-tools/releases/download/v1.16
 ENV PUMBA_VERSION="0.6.5"
 RUN curl -L https://github.com/alexei-led/pumba/releases/download/${PUMBA_VERSION}/pumba_linux_${TARGETARCH} --output /usr/local/bin/pumba && chmod +x /usr/local/bin/pumba
 
+#Installing promql cli binaries
+RUN curl -L https://github.com/litmuschaos/test-tools/raw/master/custom/promql-cli/promql-linux-${TARGETARCH} --output /usr/local/bin/promql && chmod +x /usr/local/bin/promql
+
 #Copying Necessary Files
 COPY ./build/_output/${TARGETARCH} ./litmus
 

@@ -76,12 +76,12 @@ func (model Model) CompareInt() error {
 		if !(actualOutput == expectedOutput) {
 			return fmt.Errorf("The probe output didn't match with expected criteria")
 		}
-	case "!= ":
+	case "!=":
 		if !(actualOutput != expectedOutput) {
 			return fmt.Errorf("The probe output didn't match with expected criteria")
 		}
 	default:
-		return fmt.Errorf("criteria '%s' not supported in the cmd probe", model.operator)
+		return fmt.Errorf("criteria '%s' not supported in the probe", model.operator)
 	}
 	return nil
 }
@@ -119,12 +119,12 @@ func (model Model) CompareFloat() error {
 		if !(actualOutput == expectedOutput) {
 			return fmt.Errorf("The probe output didn't match with expected criteria")
 		}
-	case "!= ":
+	case "!=":
 		if !(actualOutput != expectedOutput) {
 			return fmt.Errorf("The probe output didn't match with expected criteria")
 		}
 	default:
-		return fmt.Errorf("criteria '%s' not supported in the cmd probe", model.operator)
+		return fmt.Errorf("criteria '%s' not supported in the probe", model.operator)
 	}
 	return nil
 }
@@ -168,7 +168,7 @@ func (model Model) CompareString() error {
 			return fmt.Errorf("The probe output didn't match with expected criteria")
 		}
 	default:
-		return fmt.Errorf("criteria '%s' not supported in the cmd probe", model.operator)
+		return fmt.Errorf("criteria '%s' not supported in the probe", model.operator)
 	}
 	return nil
 }
