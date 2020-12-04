@@ -64,6 +64,8 @@ func EC2Terminate(clients clients.ClientSets) {
 
 	//PRE-CHAOS APPLICATION STATUS CHECK
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (pre-chaos)")
+	// TODO - look at expanding this out to check multiple kafka clusters, not just one
+	// TODO - look at expanding this out to kafka-specific checks, or else using an external probe
 	err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 	if err != nil {
 		log.Errorf("Application status check failed, err: %v", err)
@@ -95,7 +97,6 @@ func EC2Terminate(clients clients.ClientSets) {
 
 		// run the probes in the pre-chaos check
 		if len(resultDetails.ProbeDetails) != 0 {
-
 			err = probe.RunProbes(&chaosDetails, clients, &resultDetails, "PreChaos", &eventsDetails)
 			if err != nil {
 				log.Errorf("Probe Failed, err: %v", err)

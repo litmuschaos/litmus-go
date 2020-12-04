@@ -1,0 +1,66 @@
+apiVersion: litmuschaos.io/v1alpha1
+description:
+  message: |
+    simulating AZ to be down
+kind: ChaosExperiment
+metadata:
+  name: az-down
+  version: 0.1.0 
+spec:
+  definition:
+    scope: Cluster
+    permissions:
+      - apiGroups: 
+          - "" 
+          - "batch" 
+          - "litmuschaos.io"
+        resources: 
+          - "jobs" 
+          - "pods" 
+          - "events" 
+          - "pods/log" 
+          - "secrets" 
+          - "chaosengines" 
+          - "chaosexperiments" 
+          - "chaosresults"
+        verbs: 
+          - "create" 
+          - "list" 
+          - "get" 
+          - "update" 
+          - "patch" 
+          - "delete"
+    image: "quay.io/damurphy/go-runner:latest"
+    args:
+    - -c
+    - ./experiments/az-down
+    command:
+    - /bin/bash
+    env:
+    # should not be needed
+    - name: ANSIBLE_STDOUT_CALLBACK
+      value: 'default'
+
+    - name: TOTAL_CHAOS_DURATION
+      value: ''
+
+    - name: CHAOS_INTERVAL
+      value: ''
+
+    - name: LIB
+      value: ''
+
+    - name: RAMP_TIME
+      value: ''
+
+    # region to target
+    - name: AWS_REGION
+      value: ''
+
+    # only az's with instance names containing this substring will be targetable
+    - name: CLUSTER_IDENTIFIER
+      value: ''
+
+    # setting to true will not create or alter any ACLs/ ACL associations
+    - name: DRY_RUN
+      value: ''
