@@ -16,7 +16,6 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/sirupsen/logrus"
 	"math/rand"
-	"strings"
 )
 
 // returns all AZ's instances are located in
@@ -30,17 +29,7 @@ func selectRandomAz(azlist []string) (string) {
 	return azlist[rand.Intn(len(azlist))]
 }
 
-// check if instance name matches what we want to target
-func isTargetableInstance(instanceName string, identifiers []string) (bool) {
-	for _, identifier := range identifiers {
-		if strings.Contains(instanceName, identifier) {
-			return true
-		}
-	}
-	return false
-}
-
-//
+// chooses an az at random to target
 func getAzToTarget(instances []*experimentTypes.InstanceDetails) (string) {
 
 	availableAzsToTarget := getAzRangeOfInstances(instances) // look at targeting more than 1 az if possible
@@ -49,69 +38,12 @@ func getAzToTarget(instances []*experimentTypes.InstanceDetails) (string) {
 	return selectRandomAz(availableAzsToTarget)
 }
 
-//
-func getVpcOfAzInstances(instances []*experimentTypes.InstanceDetails, az string) ([]*experimentTypes.InstanceDetails, error) {
-
-	azToTarget := getAzToTarget(instances)
-
-	// return vpc that corresponds to instances
-	vpcOfinstancesInTargetAz := getInstancesInAz(instances, azToTarget)
-
-
-}
-
 func getNetworkAclAssociationIdForSubnet(subnetId string) (string, error) {
 	return "", nil //TODO implement
 }
 
 func getNetworkAclIdForSubnet (subnetId string) (string, error) {
 	return "", nil //TODO implement
-}
-
-func getInstanceSecurityGroupIds(instances []*experimentTypes.InstanceDetails) ([]*string) {
-
-	allInstanceSecurityGroups := []string{}
-	for _, instance := range instances {
-		allInstanceSecurityGroups = append(allInstanceSecurityGroups, instance.SecGroupIds...)
-	}
-
-	// remove duplicates
-	uniqueSecurityGroupMap := map[string]string{}
-	for _, group := range allInstanceSecurityGroups {
-		_, ok := uniqueSecurityGroupMap[group]
-		if (!ok) {
-			uniqueSecurityGroupMap[group] = "exists"
-		}
-	}
-
-	// return just security group ids
-	instanceSecurityGroupIds := make([]*string, 0, len(uniqueSecurityGroupMap))
-	for key := range uniqueSecurityGroupMap {
-		instanceSecurityGroupIds = append(instanceSecurityGroupIds, &key)
-	}
-	return instanceSecurityGroupIds
-}
-
-func GetSecurityGroupDefinitions(ec2Svc *ec2.EC2, instances []*experimentTypes.InstanceDetails) (*ec2.DescribeSecurityGroupsOutput, error) {
-	uniqueSecurityGroupNames := getInstanceSecurityGroupIds(instances)
-	securityGroupDefinitions, err := aws.GetSecurityGroupsByIds(ec2Svc, uniqueSecurityGroupNames)
-	if err != nil {
-		return nil, err
-	}
-	return securityGroupDefinitions, nil
-}
-
-func createEmptySecurityGroup(ec2Svc *ec2.EC2) (*ec2.CreateSecurityGroupOutput, error) {
-	// TODO implement
-	return nil, nil
-}
-
-func assignNewSecurityGroup(ec2Svc *ec2.EC2, instances []*types.InstanceDetails, securityGroup *ec2.CreateSecurityGroupOutput) (error) {
-	return nil // TODO implement
-}
-
-func removePreChaosSecurityGroups(ec2Svc *ec2.EC2, instances []*types.InstanceDetails) (error) {
-	return nil // TODO implement
 }
 
 func AZDown(clients clients.ClientSets) {
