@@ -82,14 +82,23 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 	// creating the helper pod to perform container kill chaos
 	for _, pod := range targetPodList.Items {
 		runID := common.GetRunID()
-		err := CreateHelperPod(experimentsDetails, clients, pod.Name, pod.Spec.NodeName, runID)
-		if err != nil {
-			return errors.Errorf("Unable to create the helper pod, err: %v", err)
+
+		switch experimentsDetails.ContainerRuntime {
+		case "docker":
+			err := CreateHelperPodForDocker(experimentsDetails, clients, pod.Name, pod.Spec.NodeName, runID)
+			if err != nil {
+				return errors.Errorf("Unable to create the helper pod, err: %v", err)
+			}
+		case "containerd", "crio":
+			err := CreateHelperPod(experimentsDetails, clients, pod.Name, pod.Spec.NodeName, runID)
+			if err != nil {
+				return errors.Errorf("Unable to create the helper pod, err: %v", err)
+			}
 		}
 
 		//checking the status of the helper pods, wait till the pod comes to running state else fail the experiment
 		log.Info("[Status]: Checking the status of the helper pods")
-		err = status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, "app="+experimentsDetails.ExperimentName+"-helper", experimentsDetails.Timeout, experimentsDetails.Delay, clients)
+		err := status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, "app="+experimentsDetails.ExperimentName+"-helper", experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 		if err != nil {
 			common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-"+runID, "app="+experimentsDetails.ExperimentName+"-helper", chaosDetails, clients)
 			return errors.Errorf("helper pods are not in running state, err: %v", err)
@@ -121,9 +130,17 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 	// creating the helper pod to perform container kill chaos
 	for _, pod := range targetPodList.Items {
 		runID := common.GetRunID()
-		err := CreateHelperPod(experimentsDetails, clients, pod.Name, pod.Spec.NodeName, runID)
-		if err != nil {
-			return errors.Errorf("Unable to create the helper pod, err: %v", err)
+		switch experimentsDetails.ContainerRuntime {
+		case "docker":
+			err := CreateHelperPodForDocker(experimentsDetails, clients, pod.Name, pod.Spec.NodeName, runID)
+			if err != nil {
+				return errors.Errorf("Unable to create the helper pod, err: %v", err)
+			}
+		case "containerd", "crio":
+			err := CreateHelperPod(experimentsDetails, clients, pod.Name, pod.Spec.NodeName, runID)
+			if err != nil {
+				return errors.Errorf("Unable to create the helper pod, err: %v", err)
+			}
 		}
 	}
 
@@ -253,6 +270,64 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 					},
 					SecurityContext: &apiv1.SecurityContext{
 						Privileged: &privilegedEnable,
+					},
+				},
+			},
+		},
+	}
+
+	_, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Create(helperPod)
+	return err
+
+}
+
+// CreateHelperPodForDocker derive the attributes for helper pod and create the helper pod
+func CreateHelperPodForDocker(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, podName, nodeName, runID string) error {
+
+	helperPod := &apiv1.Pod{
+		ObjectMeta: v1.ObjectMeta{
+			Name:      experimentsDetails.ExperimentName + "-" + runID,
+			Namespace: experimentsDetails.ChaosNamespace,
+			Labels: map[string]string{
+				"app":                       experimentsDetails.ExperimentName + "-helper",
+				"name":                      experimentsDetails.ExperimentName + "-" + runID,
+				"chaosUID":                  string(experimentsDetails.ChaosUID),
+				"app.kubernetes.io/part-of": "litmus",
+			},
+			Annotations: experimentsDetails.Annotations,
+		},
+		Spec: apiv1.PodSpec{
+			ServiceAccountName: experimentsDetails.ChaosServiceAccount,
+			RestartPolicy:      apiv1.RestartPolicyNever,
+			NodeName:           nodeName,
+			Volumes: []apiv1.Volume{
+				{
+					Name: "cri-socket",
+					VolumeSource: apiv1.VolumeSource{
+						HostPath: &apiv1.HostPathVolumeSource{
+							Path: experimentsDetails.SocketPath,
+						},
+					},
+				},
+			},
+			Containers: []apiv1.Container{
+				{
+					Name:            experimentsDetails.ExperimentName,
+					Image:           experimentsDetails.LIBImage,
+					ImagePullPolicy: apiv1.PullPolicy(experimentsDetails.LIBImagePullPolicy),
+					Command: []string{
+						"/bin/bash",
+					},
+					Args: []string{
+						"-c",
+						"./helper/container-killer-docker",
+					},
+					Env: GetPodEnv(experimentsDetails, podName),
+					VolumeMounts: []apiv1.VolumeMount{
+						{
+							Name:      "cri-socket",
+							MountPath: experimentsDetails.SocketPath,
+						},
 					},
 				},
 			},
