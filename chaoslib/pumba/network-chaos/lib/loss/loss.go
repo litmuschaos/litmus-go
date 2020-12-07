@@ -36,8 +36,8 @@ func GetContainerArguments(experimentsDetails *experimentTypes.ExperimentDetails
 	}
 
 	args := baseArgs
-	args = network_chaos.AddTargetIpsArgs(experimentsDetails.TargetIPs, args)
-	args = network_chaos.AddTargetIpsArgs(network_chaos.GetIpsForTargetHosts(experimentsDetails.TargetHosts), args)
+	args = network_chaos.AddTargetIpsArgs(experimentsDetails.DestinationIPs, args)
+	args = network_chaos.AddTargetIpsArgs(network_chaos.GetIpsForTargetHosts(experimentsDetails.DestinationHosts), args)
 	args = append(args, "loss", "--percent", strconv.Itoa(experimentsDetails.NetworkPacketLossPercentage))
 
 	return args

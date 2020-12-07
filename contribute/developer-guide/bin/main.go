@@ -24,6 +24,7 @@ func main() {
 		Short:                 "Create a new custom experiment",
 		Long:                  "Create a new custom experiment",
 		Args:                  cobra.MaximumNArgs(0),
+		Example:               "./litmus-sdk generate experiment -f=attribute.yaml",
 		DisableFlagsInUseLine: true,
 		Run: func(cmd *cobra.Command, args []string) {
 			if filePath == "" {
@@ -41,6 +42,7 @@ func main() {
 		Short:                 "Create the chart and experiment metadata",
 		Long:                  "Create the chart and experiment metadata",
 		Args:                  cobra.MaximumNArgs(0),
+		Example:               "./litmus-sdk generate chart -f=attribute.yaml",
 		DisableFlagsInUseLine: true,
 		Run: func(cmd *cobra.Command, args []string) {
 			if filePath == "" {
@@ -53,8 +55,8 @@ func main() {
 		},
 	}
 
-	experiment.Flags().StringVarP(&filePath, "file", "f", "", "file detail")
-	chart.Flags().StringVarP(&filePath, "file", "f", "", "file detail")
+	experiment.Flags().StringVarP(&filePath, "file", "f", "", "path of the attribute.yaml manifest")
+	chart.Flags().StringVarP(&filePath, "file", "f", "", "path of the attribute.yaml manifest")
 
 	var rootCmd = &cobra.Command{Use: "litmus-sdk"}
 	generate.AddCommand(experiment)

@@ -79,7 +79,7 @@ github.com/json-iterator/go
 github.com/konsorten/go-windows-terminal-sequences
 # github.com/kyokomi/emoji v2.2.4+incompatible
 github.com/kyokomi/emoji
-# github.com/litmuschaos/chaos-operator v0.0.0-20201113182537-520679f26f3d
+# github.com/litmuschaos/chaos-operator v0.0.0-20201202182158-7c71b7d70dff
 github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1
 github.com/litmuschaos/chaos-operator/pkg/client/clientset/versioned/scheme
 github.com/litmuschaos/chaos-operator/pkg/client/clientset/versioned/typed/litmuschaos/v1alpha1
@@ -216,8 +216,10 @@ k8s.io/api/storage/v1beta1
 k8s.io/apimachinery/pkg/api/errors
 k8s.io/apimachinery/pkg/api/meta
 k8s.io/apimachinery/pkg/api/resource
+k8s.io/apimachinery/pkg/apis/meta/internalversion
 k8s.io/apimachinery/pkg/apis/meta/v1
 k8s.io/apimachinery/pkg/apis/meta/v1/unstructured
+k8s.io/apimachinery/pkg/apis/meta/v1beta1
 k8s.io/apimachinery/pkg/conversion
 k8s.io/apimachinery/pkg/conversion/queryparams
 k8s.io/apimachinery/pkg/fields
@@ -330,6 +332,9 @@ k8s.io/klog
 # k8s.io/kube-openapi v0.0.0-20200121204235-bf4fb3bd569c
 k8s.io/kube-openapi/pkg/common
 k8s.io/kube-openapi/pkg/util/proto
+# k8s.io/kubernetes v1.16.2
+k8s.io/kubernetes/pkg/apis/core
+k8s.io/kubernetes/pkg/scheduler/api
 # k8s.io/utils v0.0.0-20200414100711-2df71ebbae66
 k8s.io/utils/integer
 # sigs.k8s.io/controller-runtime v0.4.0

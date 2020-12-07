@@ -355,3 +355,27 @@ func GetTargetPodsWhenTargetPodsENVNotSet(podAffPerc int, clients clients.Client
 	}
 	return realPods, nil
 }
+
+// DeleteHelperPodBasedOnJobCleanupPolicy deletes specific helper pod based on jobCleanupPolicy
+func DeleteHelperPodBasedOnJobCleanupPolicy(podName, podLabel string, chaosDetails *types.ChaosDetails, clients clients.ClientSets) {
+
+	if chaosDetails.JobCleanupPolicy == "delete" {
+		log.Infof("[Cleanup]: Deleting %v helper pod", podName)
+		err := DeletePod(podName, podLabel, chaosDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients)
+		if err != nil {
+			log.Errorf("Unable to delete the helper pod, err: %v", err)
+		}
+	}
+}
+
+// DeleteAllHelperPodBasedOnJobCleanupPolicy delete all the helper pods w/ matching label based on jobCleanupPolicy
+func DeleteAllHelperPodBasedOnJobCleanupPolicy(podLabel string, chaosDetails *types.ChaosDetails, clients clients.ClientSets) {
+
+	if chaosDetails.JobCleanupPolicy == "delete" {
+		log.Info("[Cleanup]: Deleting all the helper pods")
+		err := DeleteAllPod(podLabel, chaosDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients)
+		if err != nil {
+			log.Errorf("Unable to delete the helper pods, err: %v", err)
+		}
+	}
+}

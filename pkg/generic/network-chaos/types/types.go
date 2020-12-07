@@ -10,6 +10,7 @@ type ExperimentDetails struct {
 	EngineName                         string
 	ChaosDuration                      int
 	LIBImage                           string
+	LIBImagePullPolicy                 string
 	RampTime                           int
 	ChaosLib                           string
 	AppNS                              string
@@ -31,9 +32,9 @@ type ExperimentDetails struct {
 	Delay                              int
 	TargetPods                         string
 	PodsAffectedPerc                   int
-	TargetIPs                          string
+	DestinationIPs                     string
 	Annotations                        map[string]string
-	TargetHosts                        string
+	DestinationHosts                   string
 	ContainerRuntime                   string
 	ChaosServiceAccount                string
 	SocketPath                         string

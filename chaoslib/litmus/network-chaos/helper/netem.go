@@ -189,24 +189,17 @@ type InfoDetails struct {
 
 //parsePIDFromJSON extract the pid from the json output
 func parsePIDFromJSON(j []byte, runtime string) (int, error) {
-
 	var pid int
 
-	// in crio, pid is present inside pid attribute of inspect output
-	// in containerd, pid is present inside `info.pid` of inspect output
-	if runtime == "containerd" {
+	switch runtime {
+	case "containerd", "crio":
 		var resp InspectResponse
 		if err := json.Unmarshal(j, &resp); err != nil {
 			return 0, err
 		}
+		// pid is present inside `info.pid` of inspect output
 		pid = resp.Info.PID
-	} else if runtime == "crio" {
-		var resp InfoDetails
-		if err := json.Unmarshal(j, &resp); err != nil {
-			return 0, errors.Errorf("[cri]: Could not find pid field in json: %s", string(j))
-		}
-		pid = resp.PID
-	} else {
+	default:
 		return 0, errors.Errorf("[cri]: No supported container runtime, runtime: %v", runtime)
 	}
 
@@ -223,9 +216,9 @@ func parsePIDFromJSON(j []byte, runtime string) (int, error) {
 func InjectChaos(experimentDetails *experimentTypes.ExperimentDetails, pid int) error {
 
 	netemCommands := os.Getenv("NETEM_COMMAND")
-	targetIPs := os.Getenv("TARGET_IPs")
+	destinationIPs := os.Getenv("DESTINATION_IPS")
 
-	if targetIPs == "" {
+	if destinationIPs == "" {
 		tc := fmt.Sprintf("nsenter -t %d -n tc qdisc add dev %s root netem %v", pid, experimentDetails.NetworkInterface, netemCommands)
 		cmd := exec.Command("/bin/bash", "-c", tc)
 		out, err := cmd.CombinedOutput()
@@ -236,7 +229,7 @@ func InjectChaos(experimentDetails *experimentTypes.ExperimentDetails, pid int) 
 		}
 	} else {
 
-		ips := strings.Split(targetIPs, ",")
+		ips := strings.Split(destinationIPs, ",")
 		var uniqueIps []string
 
 		// removing duplicates ips from the list, if any
@@ -324,8 +317,8 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.ChaosPodName = Getenv("POD_NAME", "")
 	experimentDetails.ContainerRuntime = Getenv("CONTAINER_RUNTIME", "")
 	experimentDetails.NetworkInterface = Getenv("NETWORK_INTERFACE", "eth0")
-	experimentDetails.TargetIPs = Getenv("TARGET_IPs", "")
 	experimentDetails.SocketPath = Getenv("SOCKET_PATH", "")
+	experimentDetails.DestinationIPs = Getenv("DESTINATION_IPS", "")
 }
 
 // Getenv fetch the env and set the default value, if any

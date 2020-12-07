@@ -4,8 +4,6 @@ go 1.13
 
 require (
 	github.com/aws/aws-sdk-go v1.17.7
-	github.com/containerd/containerd v1.3.0
-	github.com/containerd/ttrpc v1.0.2 // indirect
 	github.com/emicklei/go-restful v2.12.0+incompatible // indirect
 	github.com/go-openapi/spec v0.19.7 // indirect
 	github.com/go-openapi/swag v0.19.9 // indirect
@@ -13,7 +11,7 @@ require (
 	github.com/imdario/mergo v0.3.9 // indirect
 	github.com/kr/pretty v0.2.0 // indirect
 	github.com/kyokomi/emoji v2.2.4+incompatible
-	github.com/litmuschaos/chaos-operator v0.0.0-20201113182537-520679f26f3d
+	github.com/litmuschaos/chaos-operator v0.0.0-20201202182158-7c71b7d70dff
 	github.com/mailru/easyjson v0.7.1 // indirect
 	github.com/openebs/maya v0.0.0-20200411140727-1c81f9e017b0
 	github.com/pkg/errors v0.9.1

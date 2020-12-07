@@ -23,6 +23,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.ChaosUID = clientTypes.UID(Getenv("CHAOS_UID", ""))
 	experimentDetails.InstanceID = Getenv("INSTANCE_ID", "")
 	experimentDetails.LIBImage = Getenv("LIB_IMAGE", "litmuschaos/go-runner:latest")
+	experimentDetails.LIBImagePullPolicy = Getenv("LIB_IMAGE_PULL_POLICY", "Always")
 	experimentDetails.ChaosPodName = Getenv("POD_NAME", "")
 	experimentDetails.NetworkPacketDuplicationPercentage, _ = strconv.Atoi(Getenv("NETWORK_PACKET_DUPLICATION_PERCENTAGE", "100"))
 	experimentDetails.NetworkLatency, _ = strconv.Atoi(Getenv("NETWORK_LATENCY", "60000"))
@@ -35,8 +36,8 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.Timeout, _ = strconv.Atoi(Getenv("STATUS_CHECK_TIMEOUT", "180"))
 	experimentDetails.TargetPods = Getenv("TARGET_PODS", "")
 	experimentDetails.PodsAffectedPerc, _ = strconv.Atoi(Getenv("PODS_AFFECTED_PERC", "0"))
-	experimentDetails.TargetIPs = Getenv("TARGET_IPS", "")
-	experimentDetails.TargetHosts = Getenv("TARGET_HOSTS", "")
+	experimentDetails.DestinationIPs = Getenv("DESTINATION_IPS", "")
+	experimentDetails.DestinationHosts = Getenv("DESTINATION_HOSTS", "")
 	experimentDetails.ContainerRuntime = Getenv("CONTAINER_RUNTIME", "docker")
 	experimentDetails.ChaosServiceAccount = Getenv("CHAOS_SERVICE_ACCOUNT", "")
 	experimentDetails.SocketPath = Getenv("SOCKET_PATH", "/run/containerd/containerd.sock")
@@ -73,4 +74,5 @@ func InitialiseChaosVariables(chaosDetails *types.ChaosDetails, experimentDetail
 	chaosDetails.Delay = experimentDetails.Delay
 	chaosDetails.ChaosDuration = experimentDetails.ChaosDuration
 	chaosDetails.AppDetail = appDetails
+	chaosDetails.JobCleanupPolicy = Getenv("JOB_CLEANUP_POLICY", "retain")
 }

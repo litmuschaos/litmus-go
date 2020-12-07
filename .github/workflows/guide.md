@@ -129,13 +129,3 @@ _Experiments Available for custom bot:_
 
 
 ***Note:*** *All the tests are performed on a KinD cluster with containerd runtime.*
-
-## Merge a Pull Request
-
-- For auto merging, we need to comment `/merge` in the PR which will add a label  `merge` in the PR and then finally merge the PR according to the ENVs provided.
-
-_Minimum Number of Approvals:_
-
-- The action will automatically check if the required number of review approvals has been reached. If the number is not reached, it will not merge the PR.
-
-- It will work according to the role of the commenter and branch protection Rule on the repository.

@@ -88,8 +88,9 @@ func InitializeChaosResult(chaosDetails *types.ChaosDetails, clients clients.Cli
 		},
 		Status: v1alpha1.ChaosResultStatus{
 			ExperimentStatus: v1alpha1.TestStatus{
-				Phase:   resultDetails.Phase,
-				Verdict: resultDetails.Verdict,
+				Phase:                  resultDetails.Phase,
+				Verdict:                resultDetails.Verdict,
+				ProbeSuccessPercentage: "Awaited",
 			},
 			ProbeStatus: probeStatus,
 		},
@@ -145,15 +146,18 @@ func PatchChaosResult(result *v1alpha1.ChaosResult, clients clients.ClientSets, 
 	result.ObjectMeta.Labels = chaosResultLabel
 	result.Status.ProbeStatus = GetProbeStatus(resultDetails)
 	if resultDetails.Phase == "Completed" {
-		if resultDetails.Verdict == "Pass" && len(resultDetails.ProbeDetails) != 0 {
+		switch resultDetails.Verdict {
+		case "Pass":
 			result.Status.ExperimentStatus.ProbeSuccessPercentage = "100"
-
-		} else if (resultDetails.Verdict == "Fail" || resultDetails.Verdict == "Stopped") && len(resultDetails.ProbeDetails) != 0 {
+		case "Fail", "Stopped":
 			probe.SetProbeVerdictAfterFailure(resultDetails)
-			result.Status.ExperimentStatus.ProbeSuccessPercentage = strconv.Itoa((resultDetails.PassedProbeCount * 100) / len(resultDetails.ProbeDetails))
+			if len(resultDetails.ProbeDetails) != 0 {
+				result.Status.ExperimentStatus.ProbeSuccessPercentage = strconv.Itoa((resultDetails.PassedProbeCount * 100) / len(resultDetails.ProbeDetails))
+			} else {
+				result.Status.ExperimentStatus.ProbeSuccessPercentage = "0"
+			}
 		}
-
-	} else if len(resultDetails.ProbeDetails) != 0 {
+	} else {
 		result.Status.ExperimentStatus.ProbeSuccessPercentage = "Awaited"
 	}
 

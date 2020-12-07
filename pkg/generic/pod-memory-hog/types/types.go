@@ -26,6 +26,7 @@ type ExperimentDetails struct {
 	TargetPods        string
 	ChaosKillCmd      string
 	LIBImage          string
+	LIBImagePullPolicy string
 	Annotations       map[string]string
 	TargetContainer   string
 	Sequence          string
