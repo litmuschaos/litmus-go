@@ -1,40 +1,15 @@
 name: Running-E2E
 on:
-  pull_request_target:
+  pull_request:
     branches: [master]
+    types: [edited, opened, synchronize, reopened]
 
 jobs:
   Tests:
-    if: "!contains(github.event.head_commit.message, '[ci skip]')"
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
     runs-on: ubuntu-latest
     steps:
       
-      - name: Trigger e2e with comment
-        uses: peter-evans/create-or-update-comment@v1
-        with:
-          issue-number: ${{ github.event.number }}
-          body: |
-            /run-e2e-all
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Find Comment to run e2e
-        uses: peter-evans/find-comment@v1
-        id: get
-        with:
-          issue-number: ${{ github.event.number }}
-          body-includes: /run-e2e-all
-
-      - name: Notification for e2e Start
-        uses: peter-evans/create-or-update-comment@v1
-        with:
-          comment-id: "${{ steps.get.outputs.comment-id }}"
-          body: |
-            **Test Status:** The e2e test has been started please wait for the results ... 
-            ****     
-            | Experiment | Result | Runtime |
-            |------------|--------|---------|
-
       #Using the last commit id of pull request
       - uses: octokit/request-action@v2.x
         id: get_PR_commits
@@ -90,10 +65,21 @@ jobs:
       - name: Setup Litmus
         uses: mayadata-io/github-chaos-actions@v0.3.0
         env:
-          INSTALL_LITMUS: true
+          INSTALL_LITMUS: true    
+
+      - name: Check the commit messgae
+        if: |
+          contains(github.event.head_commit.message, '[Pod Delete]') || contains(github.event.head_commit.message, '[Container Kill]') ||
+          contains(github.event.head_commit.message, '[Network Chaos]') || contains(github.event.head_commit.message, '[Resource Chaos]') ||
+          contains(github.event.head_commit.message, '[Scale Chaos]') || contains(github.event.head_commit.message, '[IO Chaos]') ||
+          contains(github.event.head_commit.message, '[Run CI]')
+        run: |
+          echo ::set-env name=TEST_RUN::true
+        env:
+          ACTIONS_ALLOW_UNSECURE_COMMANDS: true
 
       - name: Running Litmus pod delete chaos experiment
-        if: startsWith(steps.get.outputs.comment-body, '/run-e2e-pod-delete') || startsWith(steps.get.outputs.comment-body, '/run-e2e-all')
+        if: "contains(github.event.head_commit.message, '[Pod Delete]') || contains(github.event.head_commit.message, '[Run CI]') || env.TEST_RUN != 'true'"
         uses: mayadata-io/github-chaos-actions@v0.3.0
         env:
           EXPERIMENT_NAME: pod-delete
@@ -102,16 +88,8 @@ jobs:
           IMAGE_PULL_POLICY: IfNotPresent
           JOB_CLEANUP_POLICY: delete 
 
-      - name: Update pod delete result
-        if: startsWith(steps.get.outputs.comment-body, '/run-e2e-pod-delete') || startsWith(steps.get.outputs.comment-body, '/run-e2e-all')
-        uses: peter-evans/create-or-update-comment@v1
-        with:
-          comment-id: "${{ steps.get.outputs.comment-id }}"
-          body: |
-            | Pod Delete | Pass | containerd |
-
       - name: Running container kill chaos experiment
-        if: startsWith(steps.get.outputs.comment-body, '/run-e2e-container-kill') || startsWith(steps.get.outputs.comment-body, '/run-e2e-all')
+        if: "contains(github.event.head_commit.message, '[Container Kill]') || contains(github.event.head_commit.message, '[Run CI]') || env.TEST_RUN != 'true'"    
         uses: mayadata-io/github-chaos-actions@v0.3.0
         env:
           EXPERIMENT_NAME: container-kill
@@ -121,16 +99,8 @@ jobs:
           JOB_CLEANUP_POLICY: delete 
           CONTAINER_RUNTIME: containerd
 
-      - name: Update container-kill result
-        if: startsWith(steps.get.outputs.comment-body, '/run-e2e-container-kill') || startsWith(steps.get.outputs.comment-body, '/run-e2e-all')
-        uses: peter-evans/create-or-update-comment@v1
-        with:
-          comment-id: "${{ steps.get.outputs.comment-id }}"
-          body: |
-            | Container Kill | Pass | containerd |
-
       - name: Running node-cpu-hog chaos experiment
-        if: startsWith(steps.get.outputs.comment-body, '/run-e2e-node-cpu-hog') || startsWith(steps.get.outputs.comment-body, '/run-e2e-resource-chaos') || startsWith(steps.get.outputs.comment-body, '/run-e2e-all')
+        if: "contains(github.event.head_commit.message, '[Resource Chaos]') || contains(github.event.head_commit.message, '[Run CI]') || env.TEST_RUN != 'true'"
         uses: mayadata-io/github-chaos-actions@v0.3.0
         env:
           EXPERIMENT_NAME: node-cpu-hog
@@ -138,35 +108,20 @@ jobs:
           EXPERIMENT_IMAGE_TAG: ci
           IMAGE_PULL_POLICY: IfNotPresent
           JOB_CLEANUP_POLICY: delete 
-
-      - name: Update node-cpu-hog result
-        if: startsWith(steps.get.outputs.comment-body, '/run-e2e-node-cpu-hog') || startsWith(steps.get.outputs.comment-body, '/run-e2e-resource-chaos') || startsWith(steps.get.outputs.comment-body, '/run-e2e-all')
-        uses: peter-evans/create-or-update-comment@v1
-        with:
-          comment-id: "${{ steps.get.outputs.comment-id }}"
-          body: |
-            | Node CPU Hog | Pass | containerd |            
+          
 
       - name: Running node-memory-hog chaos experiment
-        if: startsWith(steps.get.outputs.comment-body, '/run-e2e-node-memory-hog') || startsWith(steps.get.outputs.comment-body, '/run-e2e-resource-chaos') || startsWith(steps.get.outputs.comment-body, '/run-e2e-all')
+        if: "contains(github.event.head_commit.message, '[Resource Chaos]') || contains(github.event.head_commit.message, '[Run CI]') || env.TEST_RUN != 'true'"
         uses: mayadata-io/github-chaos-actions@v0.3.0
         env:
           EXPERIMENT_NAME: node-memory-hog
           EXPERIMENT_IMAGE: litmuschaos/go-runner
           EXPERIMENT_IMAGE_TAG: ci
           IMAGE_PULL_POLICY: IfNotPresent
-          JOB_CLEANUP_POLICY: delete 
-
-      - name: Update node-memory-hog result
-        if: startsWith(steps.get.outputs.comment-body, '/run-e2e-node-memory-hog') || startsWith(steps.get.outputs.comment-body, '/run-e2e-resource-chaos') || startsWith(steps.get.outputs.comment-body, '/run-e2e-all')
-        uses: peter-evans/create-or-update-comment@v1
-        with:
-          comment-id: "${{ steps.get.outputs.comment-id }}"
-          body: |
-            | Node MEMORY Hog | Pass | containerd |            
+          JOB_CLEANUP_POLICY: delete        
           
       - name: Running pod-cpu-hog chaos experiment
-        if: startsWith(steps.get.outputs.comment-body, '/run-e2e-pod-cpu-hog') || startsWith(steps.get.outputs.comment-body, '/run-e2e-resource-chaos') || startsWith(steps.get.outputs.comment-body, '/run-e2e-all')
+        if: "contains(github.event.head_commit.message, '[Resource Chaos]') || contains(github.event.head_commit.message, '[Run CI]') || env.TEST_RUN != 'true'"
         uses: mayadata-io/github-chaos-actions@v0.3.0
         env:
           EXPERIMENT_NAME: pod-cpu-hog
@@ -178,16 +133,8 @@ jobs:
           TOTAL_CHAOS_DURATION: 60
           CPU_CORES: 1
 
-      - name: Update pod-cpu-hog result
-        if: startsWith(steps.get.outputs.comment-body, '/run-e2e-pod-cpu-hog') || startsWith(steps.get.outputs.comment-body, '/run-e2e-resource-chaos') || startsWith(steps.get.outputs.comment-body, '/run-e2e-all')
-        uses: peter-evans/create-or-update-comment@v1
-        with:
-          comment-id: "${{ steps.get.outputs.comment-id }}"
-          body: |
-            | Pod CPU Hog | Pass | containerd |           
-          
       - name: Running pod-memory-hog chaos experiment
-        if: startsWith(steps.get.outputs.comment-body, '/run-e2e-pod-memory-hog') || startsWith(steps.get.outputs.comment-body, '/run-e2e-resource-chaos') || startsWith(steps.get.outputs.comment-body, '/run-e2e-all')
+        if: "contains(github.event.head_commit.message, '[Resource Chaos]') || contains(github.event.head_commit.message, '[Run CI]') || env.TEST_RUN != 'true'"
         uses: mayadata-io/github-chaos-actions@v0.3.0
         env:
           EXPERIMENT_NAME: pod-cpu-hog
@@ -197,18 +144,10 @@ jobs:
           JOB_CLEANUP_POLICY: delete       
           TARGET_CONTAINER: nginx
           TOTAL_CHAOS_DURATION: 60
-          MEMORY_CONSUMPTION: 500
-
-      - name: Update pod-memory-hog result
-        if: startsWith(steps.get.outputs.comment-body, '/run-e2e-pod-memory-hog') || startsWith(steps.get.outputs.comment-body, '/run-e2e-resource-chaos') || startsWith(steps.get.outputs.comment-body, '/run-e2e-all')
-        uses: peter-evans/create-or-update-comment@v1
-        with:
-          comment-id: "${{ steps.get.outputs.comment-id }}"
-          body: |
-            | Pod Memory Hog | Pass | containerd |         
+          MEMORY_CONSUMPTION: 500  
           
       - name: Running pod network corruption chaos experiment
-        if: startsWith(steps.get.outputs.comment-body, '/run-e2e-pod-network-corruption') || startsWith(steps.get.outputs.comment-body, '/run-e2e-network-chaos') || startsWith(steps.get.outputs.comment-body, '/run-e2e-all')
+        if: "contains(github.event.head_commit.message, '[Network Chaos]') || contains(github.event.head_commit.message, '[Run CI]') || env.TEST_RUN != 'true'"
         uses: mayadata-io/github-chaos-actions@v0.3.0
         env:
           EXPERIMENT_NAME: pod-network-corruption
@@ -220,17 +159,9 @@ jobs:
           TOTAL_CHAOS_DURATION: 60
           NETWORK_INTERFACE: eth0
           CONTAINER_RUNTIME: containerd 
-          
-      - name: Update pod-network-corruption result
-        if: startsWith(steps.get.outputs.comment-body, '/run-e2e-pod-network-corruption') || startsWith(steps.get.outputs.comment-body, '/run-e2e-network-chaos') || startsWith(steps.get.outputs.comment-body, '/run-e2e-all')
-        uses: peter-evans/create-or-update-comment@v1
-        with:
-          comment-id: "${{ steps.get.outputs.comment-id }}"
-          body: |
-            | Pod Network Corruption | Pass | containerd | 
 
       - name: Running pod network duplication chaos experiment
-        if: startsWith(steps.get.outputs.comment-body, '/run-e2e-pod-network-duplication') || startsWith(steps.get.outputs.comment-body, '/run-e2e-network-chaos') || startsWith(steps.get.outputs.comment-body, '/run-e2e-all')
+        if: "contains(github.event.head_commit.message, '[Network Chaos]') || contains(github.event.head_commit.message, '[Run CI]') || env.TEST_RUN != 'true'"
         uses: mayadata-io/github-chaos-actions@v0.3.0
         env:
           EXPERIMENT_NAME: pod-network-duplication
@@ -241,18 +172,10 @@ jobs:
           TARGET_CONTAINER: nginx
           TOTAL_CHAOS_DURATION: 60
           NETWORK_INTERFACE: eth0
-          CONTAINER_RUNTIME: containerd  
-          
-      - name: Update pod-network-duplication result
-        if: startsWith(steps.get.outputs.comment-body, '/run-e2e-pod-network-duplication') || startsWith(steps.get.outputs.comment-body, '/run-e2e-network-chaos') || startsWith(steps.get.outputs.comment-body, '/run-e2e-all')
-        uses: peter-evans/create-or-update-comment@v1
-        with:
-          comment-id: "${{ steps.get.outputs.comment-id }}"
-          body: |
-            | Pod Network Duplication | Pass | containerd |           
+          CONTAINER_RUNTIME: containerd     
         
       - name: Running pod-network-latency chaos experiment
-        if: startsWith(steps.get.outputs.comment-body, '/run-e2e-pod-network-latency') || startsWith(steps.get.outputs.comment-body, '/run-e2e-network-chaos') || startsWith(steps.get.outputs.comment-body, '/run-e2e-all')
+        if: "contains(github.event.head_commit.message, '[Network Chaos]') || contains(github.event.head_commit.message, '[Run CI]') || env.TEST_RUN != 'true'"
         uses: mayadata-io/github-chaos-actions@v0.3.0
         env:
           EXPERIMENT_NAME: pod-network-latency
@@ -264,18 +187,10 @@ jobs:
           TOTAL_CHAOS_DURATION: 60
           NETWORK_INTERFACE: eth0
           NETWORK_LATENCY: 60000
-          CONTAINER_RUNTIME: containerd
-
-      - name: Update pod-network-latency result
-        if: startsWith(steps.get.outputs.comment-body, '/run-e2e-pod-network-latency') || startsWith(steps.get.outputs.comment-body, '/run-e2e-network-chaos') || startsWith(steps.get.outputs.comment-body, '/run-e2e-all')
-        uses: peter-evans/create-or-update-comment@v1
-        with:
-          comment-id: "${{ steps.get.outputs.comment-id }}"
-          body: |
-            | Pod Network Latency | Pass | containerd |                  
+          CONTAINER_RUNTIME: containerd              
 
       - name: Running pod-network-loss chaos experiment
-        if: startsWith(steps.get.outputs.comment-body, '/run-e2e-pod-network-loss') || startsWith(steps.get.outputs.comment-body, '/run-e2e-network-chaos') || startsWith(steps.get.outputs.comment-body, '/run-e2e-all')
+        if: "contains(github.event.head_commit.message, '[Network Chaos]') || contains(github.event.head_commit.message, '[Run CI]') || env.TEST_RUN != 'true'"
         uses: mayadata-io/github-chaos-actions@v0.3.0
         env:
           EXPERIMENT_NAME: pod-network-loss
@@ -289,16 +204,8 @@ jobs:
           NETWORK_PACKET_LOSS_PERCENTAGE: 100
           CONTAINER_RUNTIME: containerd
 
-      - name: Update pod-network-loss result
-        if: startsWith(steps.get.outputs.comment-body, '/run-e2e-pod-network-loss') || startsWith(steps.get.outputs.comment-body, '/run-e2e-network-chaos')  || startsWith(steps.get.outputs.comment-body, '/run-e2e-all')
-        uses: peter-evans/create-or-update-comment@v1
-        with:
-          comment-id: "${{ steps.get.outputs.comment-id }}"
-          body: |
-            | Pod Network Loss | Pass | containerd |      
-        
       - name: Running pod autoscaler chaos experiment
-        if: startsWith(steps.get.outputs.comment-body, '/run-e2e-pod-autoscaler') || startsWith(steps.get.outputs.comment-body, '/run-e2e-all')
+        if: "contains(github.event.head_commit.message, '[Scale Chaos]') || contains(github.event.head_commit.message, '[Run CI]') || env.TEST_RUN != 'true'"
         uses: mayadata-io/github-chaos-actions@v0.3.0
         env:
           EXPERIMENT_NAME: pod-autoscaler
@@ -306,18 +213,10 @@ jobs:
           EXPERIMENT_IMAGE_TAG: ci
           IMAGE_PULL_POLICY: IfNotPresent
           JOB_CLEANUP_POLICY: delete      
-          TOTAL_CHAOS_DURATION: 60
-
-      - name: Update pod-autoscaler result
-        if: startsWith(steps.get.outputs.comment-body, '/run-e2e-pod-autoscaler') || startsWith(steps.get.outputs.comment-body, '/run-e2e-all')
-        uses: peter-evans/create-or-update-comment@v1
-        with:
-          comment-id: "${{ steps.get.outputs.comment-id }}"
-          body: |
-            | Pod Autoscaler | Pass | containerd |            
+          TOTAL_CHAOS_DURATION: 60       
         
       - name: Running node-io-stress chaos experiment
-        if: startsWith(steps.get.outputs.comment-body, '/run-e2e-node-io-stress') || startsWith(steps.get.outputs.comment-body, '/run-e2e-io-chaos') || startsWith(steps.get.outputs.comment-body, '/run-e2e-all')
+        if: "contains(github.event.head_commit.message, '[IO Chaos]') || contains(github.event.head_commit.message, '[Run CI]') || env.TEST_RUN != 'true'"
         uses: mayadata-io/github-chaos-actions@v0.3.0
         env:
           EXPERIMENT_NAME: node-io-stress
@@ -326,58 +225,15 @@ jobs:
           IMAGE_PULL_POLICY: IfNotPresent
           JOB_CLEANUP_POLICY: delete       
           TOTAL_CHAOS_DURATION: 120
-          FILESYSTEM_UTILIZATION_PERCENTAGE: 10
-          
-      - name: Update node-io-stress result
-        if: startsWith(steps.get.outputs.comment-body, '/run-e2e-node-io-stress') || startsWith(steps.get.outputs.comment-body, '/run-e2e-io-chaos') || startsWith(steps.get.outputs.comment-body, '/run-e2e-all')
-        uses: peter-evans/create-or-update-comment@v1
-        with:
-          comment-id: "${{ steps.get.outputs.comment-id }}"
-          body: |
-            | Node IO Stress | Pass | containerd |            
-                  
-      - name: Check the test run
-        if: |
-         startsWith(steps.get.outputs.comment-body, '/run-e2e-pod-delete') || startsWith(steps.get.outputs.comment-body, '/run-e2e-container-kill') ||
-         startsWith(steps.get.outputs.comment-body, '/run-e2e-node-cpu-hog') || startsWith(steps.get.outputs.comment-body, '/run-e2e-node-memory-hog') ||
-         startsWith(steps.get.outputs.comment-body, '/run-e2e-pod-cpu-hog') || startsWith(steps.get.outputs.comment-body, '/run-e2e-pod-memory-hog') ||
-         startsWith(steps.get.outputs.comment-body, '/run-e2e-pod-network-corruption') || startsWith(steps.get.outputs.comment-body, '/run-e2e-pod-network-loss') ||
-         startsWith(steps.get.outputs.comment-body, '/run-e2e-pod-network-latency') || startsWith(steps.get.outputs.comment-body, '/run-e2e-pod-network-duplication') ||
-         startsWith(steps.get.outputs.comment-body, '/run-e2e-pod-autoscaler') || startsWith(steps.get.outputs.comment-body, '/run-e2e-node-io-stress') ||
-         startsWith(steps.get.outputs.comment-body, '/run-e2e-resource-chaos') || startsWith(steps.get.outputs.comment-body, '/run-e2e-network-chaos') ||         
-         startsWith(steps.get.outputs.comment-body, '/run-e2e-io-chaos')  || startsWith(steps.get.outputs.comment-body, '/run-e2e-all')
-        run: |
-          echo ::set-env name=TEST_RUN::true
-        env:
-          ACTIONS_ALLOW_UNSECURE_COMMANDS: true        
+          FILESYSTEM_UTILIZATION_PERCENTAGE: 10                 
 
       - name: Check for all the jobs are succeeded
         if: ${{ success() && env.TEST_RUN == 'true' }}
-        uses: peter-evans/create-or-update-comment@v1
-        with:
-          comment-id: "${{ steps.get.outputs.comment-id }}"
-          body: |  
-            ****
-            **Test Result:** All tests are passed
-            **Logs:** [${{ env.RUN_ID }}](https://github.com/litmuschaos/litmus-go/actions/runs/${{ env.RUN_ID }})
-            _If you don't want to run e2e on a pull request then use "[skip-ci]" in your commit message._                        
-          reactions: hooray         
-        env: 
-          RUN_ID: ${{ github.run_id }}       
+        run: echo "All tests Are passed"     
 
       - name: Check for any job failed
         if: ${{ failure() }}
-        uses: peter-evans/create-or-update-comment@v1
-        with:
-          comment-id: "${{ steps.get.outputs.comment-id }}"
-          body: |
-            ****
-            **Test Failed:** Some tests are failed please check
-            **Logs:** [${{ env.RUN_ID }}](https://github.com/litmuschaos/litmus-go/actions/runs/${{ env.RUN_ID }})
-            _If you don't want to run e2e on a pull request then use "[skip-ci]" in your commit message._          
-          reactions: confused
-        env: 
-          RUN_ID: ${{ github.run_id }}
+        run: echo "Some tests are failing please check..."
 
       - name: Uninstall Litmus
         uses: mayadata-io/github-chaos-actions@v0.3.0
@@ -387,17 +243,3 @@ jobs:
       - name: Deleting KinD cluster
         if: ${{ always() }}
         run: kind delete cluster
-
-      - name: Check if any test ran or not
-        if: env.TEST_RUN != 'true'
-        uses: peter-evans/create-or-update-comment@v1
-        with:
-          comment-id: "${{ steps.get.outputs.comment-id }}"
-          body: |
-            ****
-            **Test Result:** No test found
-            **Logs:** [${{ env.RUN_ID }}](https://github.com/litmuschaoslitmus-go/actions/runs/${{ env.RUN_ID }})
-            _If you don't want to run e2e while raising pull request then use "[skip-ci]" in your commit message._
-          reactions: eyes
-        env: 
-          RUN_ID: ${{ github.run_id }}
