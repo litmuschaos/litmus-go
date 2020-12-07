@@ -1,11 +1,25 @@
-FROM ubuntu:bionic
+FROM alpine:3.12
 
 LABEL maintainer="LitmusChaos"
 
 ARG TARGETARCH
 
-#Installing necessary ubuntu packages
-RUN apt-get update && apt-get install -y curl bash systemd iproute2 stress-ng openssh-client
+RUN rm -rf /var/lib/apt/lists/*
+
+# Install generally useful things
+RUN apk --update add \
+        bash\
+        make\
+        git \
+        curl\
+        iproute2\
+        stress-ng\
+        openssh-client\
+        libc6-compat \
+        sshpass
+
+# Change default shell from ash to bash
+RUN sed -i -e "s/bin\/ash/bin\/bash/" /etc/passwd     
 
 #Installing Kubectl
 ENV KUBE_LATEST_VERSION="v1.18.0"
