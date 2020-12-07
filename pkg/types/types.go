@@ -33,6 +33,7 @@ type ResultDetails struct {
 	ProbeDetails     []ProbeDetails
 	PassedProbeCount int
 	ProbeArtifacts   map[string]ProbeArtifact
+	PromProbeImage   string
 }
 
 // ProbeArtifact contains the probe artifacts

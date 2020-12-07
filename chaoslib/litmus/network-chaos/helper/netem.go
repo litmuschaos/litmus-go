@@ -222,9 +222,9 @@ func parsePIDFromJSON(j []byte, runtime string) (int, error) {
 func InjectChaos(experimentDetails *experimentTypes.ExperimentDetails, pid int) error {
 
 	netemCommands := os.Getenv("NETEM_COMMAND")
-	targetIPs := os.Getenv("TARGET_IPs")
+	destinationIPs := os.Getenv("DESTINATION_IPS")
 
-	if targetIPs == "" {
+	if destinationIPs == "" {
 		tc := fmt.Sprintf("nsenter -t %d -n tc qdisc add dev %s root netem %v", pid, experimentDetails.NetworkInterface, netemCommands)
 		cmd := exec.Command("/bin/bash", "-c", tc)
 		out, err := cmd.CombinedOutput()
@@ -235,7 +235,7 @@ func InjectChaos(experimentDetails *experimentTypes.ExperimentDetails, pid int) 
 		}
 	} else {
 
-		ips := strings.Split(targetIPs, ",")
+		ips := strings.Split(destinationIPs, ",")
 		var uniqueIps []string
 
 		// removing duplicates ips from the list, if any
@@ -323,7 +323,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.ChaosPodName = Getenv("POD_NAME", "")
 	experimentDetails.ContainerRuntime = Getenv("CONTAINER_RUNTIME", "")
 	experimentDetails.NetworkInterface = Getenv("NETWORK_INTERFACE", "eth0")
-	experimentDetails.TargetIPs = Getenv("TARGET_IPs", "")
+	experimentDetails.DestinationIPs = Getenv("DESTINATION_IPS", "")
 }
 
 // Getenv fetch the env and set the default value, if any
