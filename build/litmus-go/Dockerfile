@@ -23,6 +23,12 @@ RUN curl -L https://github.com/alexei-led/pumba/releases/download/${PUMBA_VERSIO
 #Installing promql cli binaries
 RUN curl -L https://github.com/litmuschaos/test-tools/raw/master/custom/promql-cli/promql-linux-${TARGETARCH} --output /usr/local/bin/promql && chmod +x /usr/local/bin/promql
 
+RUN if [[${TARGETARCH} == "arm64"]]; then \
+    curl -L https://get.docker.com/builds/Linux/aarch64/docker-1.13.1.tgz --output docker-cli && tar -zxvf docker-cli docker/docker && mv docker/docker /usr/local/bin/docker && chmod +x /usr/local/bin/docker; \
+  else \
+    curl -L https://get.docker.com/builds/Linux/x86_64/docker-1.13.1.tgz --output docker-cli && tar -zxvf docker-cli docker/docker && mv docker/docker /usr/local/bin/docker && chmod +x /usr/local/bin/docker; \
+  fi
+  
 #Copying Necessary Files
 COPY ./build/_output/${TARGETARCH} ./litmus
 

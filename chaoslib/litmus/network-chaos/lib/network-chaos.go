@@ -76,9 +76,17 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 	// creating the helper pod to perform network chaos
 	for _, pod := range targetPodList.Items {
 		runID := common.GetRunID()
-		err = CreateHelperPod(experimentsDetails, clients, pod.Name, pod.Spec.NodeName, runID, args)
-		if err != nil {
-			return errors.Errorf("Unable to create the helper pod, err: %v", err)
+		switch experimentsDetails.ContainerRuntime {
+		case "docker":
+			err = CreateHelperPodForDocker(experimentsDetails, clients, pod.Name, pod.Spec.NodeName, runID, args)
+			if err != nil {
+				return errors.Errorf("Unable to create the helper pod, err: %v", err)
+			}
+		case "containerd", "crio":
+			err = CreateHelperPod(experimentsDetails, clients, pod.Name, pod.Spec.NodeName, runID, args)
+			if err != nil {
+				return errors.Errorf("Unable to create the helper pod, err: %v", err)
+			}
 		}
 
 		//checking the status of the helper pods, wait till the pod comes to running state else fail the experiment
@@ -115,9 +123,17 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 	// creating the helper pod to perform network chaos
 	for _, pod := range targetPodList.Items {
 		runID := common.GetRunID()
-		err = CreateHelperPod(experimentsDetails, clients, pod.Name, pod.Spec.NodeName, runID, args)
-		if err != nil {
-			return errors.Errorf("Unable to create the helper pod, err: %v", err)
+		switch experimentsDetails.ContainerRuntime {
+		case "docker":
+			err = CreateHelperPodForDocker(experimentsDetails, clients, pod.Name, pod.Spec.NodeName, runID, args)
+			if err != nil {
+				return errors.Errorf("Unable to create the helper pod, err: %v", err)
+			}
+		case "containerd", "crio":
+			err = CreateHelperPod(experimentsDetails, clients, pod.Name, pod.Spec.NodeName, runID, args)
+			if err != nil {
+				return errors.Errorf("Unable to create the helper pod, err: %v", err)
+			}
 		}
 	}
 
@@ -238,6 +254,74 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 					},
 					SecurityContext: &apiv1.SecurityContext{
 						Privileged: &privilegedEnable,
+						Capabilities: &apiv1.Capabilities{
+							Add: []apiv1.Capability{
+								"NET_ADMIN",
+								"SYS_ADMIN",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	_, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Create(helperPod)
+	return err
+
+}
+
+// CreateHelperPodForDocker derive the attributes for helper pod and create the helper pod
+func CreateHelperPodForDocker(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, podName, nodeName, runID string, args string) error {
+
+	helperPod := &apiv1.Pod{
+		ObjectMeta: v1.ObjectMeta{
+			Name:      experimentsDetails.ExperimentName + "-" + runID,
+			Namespace: experimentsDetails.ChaosNamespace,
+			Labels: map[string]string{
+				"app":                       experimentsDetails.ExperimentName + "-helper",
+				"name":                      experimentsDetails.ExperimentName + "-" + runID,
+				"chaosUID":                  string(experimentsDetails.ChaosUID),
+				"app.kubernetes.io/part-of": "litmus",
+			},
+			Annotations: experimentsDetails.Annotations,
+		},
+		Spec: apiv1.PodSpec{
+			HostPID:            true,
+			ServiceAccountName: experimentsDetails.ChaosServiceAccount,
+			RestartPolicy:      apiv1.RestartPolicyNever,
+			NodeName:           nodeName,
+			Volumes: []apiv1.Volume{
+				{
+					Name: "cri-socket",
+					VolumeSource: apiv1.VolumeSource{
+						HostPath: &apiv1.HostPathVolumeSource{
+							Path: experimentsDetails.SocketPath,
+						},
+					},
+				},
+			},
+
+			Containers: []apiv1.Container{
+				{
+					Name:            experimentsDetails.ExperimentName,
+					Image:           experimentsDetails.LIBImage,
+					ImagePullPolicy: apiv1.PullPolicy(experimentsDetails.LIBImagePullPolicy),
+					Command: []string{
+						"/bin/bash",
+					},
+					Args: []string{
+						"-c",
+						"./helper/network-chaos-docker",
+					},
+					Env: GetPodEnv(experimentsDetails, podName, args),
+					VolumeMounts: []apiv1.VolumeMount{
+						{
+							Name:      "cri-socket",
+							MountPath: experimentsDetails.SocketPath,
+						},
+					},
+					SecurityContext: &apiv1.SecurityContext{
 						Capabilities: &apiv1.Capabilities{
 							Add: []apiv1.Capability{
 								"NET_ADMIN",
