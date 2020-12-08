@@ -2,6 +2,57 @@
 
 - When you commit code to your repository, you can continuously build and test the code to make sure that the commit doesn't introduce errors. The error could be in the form of some security issue, functional issue, or performance issue which can be tested using different custom tests, linters, or by pulling actions. This brings the need of having *Chaos Actions* which will perform a chaos test on the application over a particular commit which in-turn helps to track the performance of the application on a commit level. This can be done by commenting on the Pull Request. 
 
+The E2E action will run:
+- On Pull Request added or updated (automated)
+- Through comments on PR (user-defined)
+
+## On Pull Request added or updated
+
+We can the run e2e on a PR according to the commit message. Here are the syntax to run e2e on commit message.
+
+**Note:**_ Your commit message should contain the following Keywords to run the test. By default it will run all tests available.
+
+<table>
+  <tr>
+    <th>Keywords</th>
+    <th>Details</th>   
+  </tr>
+  <tr>
+    <th><code>[skip ci]</code></th>
+    <td>The job skip no test will run.</td> 
+  </tr>
+  <tr>
+    <th><code>'[Run CI]'</code></th>
+    <td>This will run all the test for all the experiment available</td>   
+  </tr>
+  <tr>
+    <th><code>'[Network Chaos]'</code></th>
+    <td>This will run all the test available for network experiment</td>   
+  </tr>
+  <tr>
+    <th><code>'[Resource Chaos]'</code></th>
+    <td>This will run all the test available for resource experiment</td>   
+  </tr>
+  <tr>
+    <th><code>'[IO Chaos]'</code></th>
+    <td>This will run all the test available for io experiment</td>   
+  </tr>
+  <tr>
+    <th><code>'[Scale Chaos]'</code></th>
+    <td>This will run all the test available for scale experiment</td>   
+  </tr>             
+  <tr>
+    <th><code>'[Pod Delete]'</code></th>
+    <td>This will run the pod delete test.</td>   
+  </tr>
+  <tr>
+    <th><code>'[Container Kill]'</code></th>
+    <td>This will run the container kill test.</td>   
+  </tr>  
+</table>
+
+
+
 ## Through comments on PR
 
 - We can run tests for any desired experiment or set of experiments by just commenting on the Pull Request. The format of comment will be:
