@@ -53,6 +53,11 @@ func PrepareKubeletKill(experimentsDetails *experimentTypes.ExperimentDetails, c
 		if err != nil {
 			return errors.Errorf("unable to get annotations, err: %v", err)
 		}
+		// Get Resource Requirements
+		experimentsDetails.Resources, err = common.GetChaosPodResourceRequirements(experimentsDetails.ChaosPodName, experimentsDetails.ExperimentName, experimentsDetails.ChaosNamespace, clients)
+		if err != nil {
+			return errors.Errorf("Unable to get resource requirements, err: %v", err)
+		}
 	}
 
 	// Creating the helper pod to perform node memory hog
@@ -158,6 +163,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 						"-c",
 						"sleep 10 && systemctl stop kubelet && sleep " + strconv.Itoa(experimentsDetails.ChaosDuration) + " && systemctl start kubelet",
 					},
+					Resources: experimentsDetails.Resources,
 					VolumeMounts: []apiv1.VolumeMount{
 						{
 							Name:      "bus",

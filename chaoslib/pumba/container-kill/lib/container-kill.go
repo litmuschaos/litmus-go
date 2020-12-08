@@ -47,6 +47,11 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 		if err != nil {
 			return errors.Errorf("unable to get annotations, err: %v", err)
 		}
+		// Get Resource Requirements
+		experimentsDetails.Resources, err = common.GetChaosPodResourceRequirements(experimentsDetails.ChaosPodName, experimentsDetails.ExperimentName, experimentsDetails.ChaosNamespace, clients)
+		if err != nil {
+			return errors.Errorf("Unable to get resource requirements, err: %v", err)
+		}
 	}
 
 	if experimentsDetails.EngineName != "" {
@@ -307,6 +312,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 						"SIGKILL",
 						"re2:k8s_" + experimentsDetails.TargetContainer + "_" + appName,
 					},
+					Resources: experimentsDetails.Resources,
 					VolumeMounts: []apiv1.VolumeMount{
 						{
 							Name:      "dockersocket",

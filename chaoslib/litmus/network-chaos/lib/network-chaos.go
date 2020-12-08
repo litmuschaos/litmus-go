@@ -56,6 +56,11 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 		if err != nil {
 			return errors.Errorf("unable to get annotations, err: %v", err)
 		}
+		// Get Resource Requirements
+		experimentsDetails.Resources, err = common.GetChaosPodResourceRequirements(experimentsDetails.ChaosPodName, experimentsDetails.ExperimentName, experimentsDetails.ChaosNamespace, clients)
+		if err != nil {
+			return errors.Errorf("Unable to get resource requirements, err: %v", err)
+		}
 	}
 
 	if experimentsDetails.Sequence == "serial" {
@@ -225,7 +230,8 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 						"-c",
 						"./helper/network-chaos",
 					},
-					Env: GetPodEnv(experimentsDetails, podName, args),
+					Resources: experimentsDetails.Resources,
+					Env:       GetPodEnv(experimentsDetails, podName, args),
 					VolumeMounts: []apiv1.VolumeMount{
 						{
 							Name:      "cri-socket",
