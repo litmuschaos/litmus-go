@@ -72,10 +72,12 @@ func TriggerK8sProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets,
 			switch probe.Operation {
 			case "create", "Create":
 				if err = CreateResource(probe, gvr, clients); err != nil {
+					log.Errorf("The %v k8s probe has been Failed, err: %v", probe.Name, err)
 					return err
 				}
 			case "delete", "Delete":
 				if err = DeleteResource(probe, gvr, clients); err != nil {
+					log.Errorf("The %v k8s probe has been Failed, err: %v", probe.Name, err)
 					return err
 				}
 			case "present", "Present":
@@ -84,6 +86,7 @@ func TriggerK8sProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets,
 					LabelSelector: cmd.LabelSelector,
 				})
 				if err != nil || len(resourceList.Items) == 0 {
+					log.Errorf("The %v k8s probe has been Failed, err: %v", probe.Name, err)
 					return fmt.Errorf("unable to list the resources with matching selector, err: %v", err)
 				}
 			case "absent", "Absent":
@@ -95,6 +98,7 @@ func TriggerK8sProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets,
 					return fmt.Errorf("unable to list the resources with matching selector, err: %v", err)
 				}
 				if len(resourceList.Items) != 0 {
+					log.Errorf("The %v k8s probe has been Failed, err: %v", probe.Name, err)
 					return fmt.Errorf("Resource is not deleted yet due to, err: %v", err)
 				}
 			default:
@@ -117,6 +121,7 @@ func TriggerContinuousK8sProbe(probe v1alpha1.ProbeAttributes, clients clients.C
 
 	// it trigger the k8s probe for the entire duration of chaos and it fails, if any error encounter
 	// marked the error for the probes, if any
+loop:
 	for {
 		err = TriggerK8sProbe(probe, clients, chaosresult)
 		// record the error inside the probeDetails, we are maintaining a dedicated variable for the err, inside probeDetails
@@ -124,13 +129,11 @@ func TriggerContinuousK8sProbe(probe v1alpha1.ProbeAttributes, clients clients.C
 			for index := range chaosresult.ProbeDetails {
 				if chaosresult.ProbeDetails[index].Name == probe.Name {
 					chaosresult.ProbeDetails[index].IsProbeFailedWithError = err
-					break
+					log.Errorf("The %v k8s probe has been Failed, err: %v", probe.Name, err)
+					break loop
 				}
-
 			}
-			break
 		}
-
 		// waiting for the probe polling interval
 		time.Sleep(time.Duration(probe.RunProperties.ProbePollingInterval) * time.Second)
 	}
@@ -269,7 +272,6 @@ func OnChaosK8sProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Result
 			"Phase":           "DuringChaos",
 		})
 		go TriggerOnChaosK8sProbe(probe, clients, resultDetails, chaosDetails.ChaosDuration)
-
 	}
 
 }
@@ -304,6 +306,7 @@ loop:
 				for index := range chaosresult.ProbeDetails {
 					if chaosresult.ProbeDetails[index].Name == probe.Name {
 						chaosresult.ProbeDetails[index].IsProbeFailedWithError = err
+						log.Errorf("The %v k8s probe has been Failed, err: %v", probe.Name, err)
 						break loop
 					}
 				}

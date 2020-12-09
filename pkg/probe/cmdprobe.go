@@ -74,7 +74,7 @@ func TriggerInlineCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.
 			}
 
 			if err = ValidateResult(probe.CmdProbeInputs.Comparator, strings.TrimSpace(out.String())); err != nil {
-				log.Warnf("The %v cmd probe has been Failed", probe.Name)
+				log.Errorf("The %v cmd probe has been Failed, err: %v", probe.Name, err)
 				return err
 			}
 
@@ -112,7 +112,7 @@ func TriggerSourceCmdProbe(probe v1alpha1.ProbeAttributes, execCommandDetails li
 			}
 
 			if err = ValidateResult(probe.CmdProbeInputs.Comparator, strings.TrimSpace(output)); err != nil {
-				log.Warnf("The %v cmd probe has been Failed", probe.Name)
+				log.Errorf("The %v cmd probe has been Failed, err: %v", probe.Name, err)
 				return err
 			}
 
@@ -206,6 +206,7 @@ func TriggerInlineContinuousCmdProbe(probe v1alpha1.ProbeAttributes, chaosresult
 
 	// it trigger the inline cmd probe for the entire duration of chaos and it fails, if any err encounter
 	// it marked the error for the probes, if any
+loop:
 	for {
 		err = TriggerInlineCmdProbe(probe, chaosresult)
 		// record the error inside the probeDetails, we are maintaining a dedicated variable for the err, inside probeDetails
@@ -213,17 +214,14 @@ func TriggerInlineContinuousCmdProbe(probe v1alpha1.ProbeAttributes, chaosresult
 			for index := range chaosresult.ProbeDetails {
 				if chaosresult.ProbeDetails[index].Name == probe.Name {
 					chaosresult.ProbeDetails[index].IsProbeFailedWithError = err
-					break
+					log.Errorf("The %v cmd probe has been Failed, err: %v", probe.Name, err)
+					break loop
 				}
-
 			}
-			break
 		}
-
 		// waiting for the probe polling interval
 		time.Sleep(time.Duration(probe.RunProperties.ProbePollingInterval) * time.Second)
 	}
-
 }
 
 // TriggerInlineOnChaosCmdProbe trigger the inline onchaos cmd probes
@@ -256,16 +254,15 @@ loop:
 				for index := range chaosresult.ProbeDetails {
 					if chaosresult.ProbeDetails[index].Name == probe.Name {
 						chaosresult.ProbeDetails[index].IsProbeFailedWithError = err
+						log.Errorf("The %v cmd probe has been Failed, err: %v", probe.Name, err)
 						break loop
 					}
-
 				}
 			}
 			// waiting for the probe polling interval
 			time.Sleep(time.Duration(probe.RunProperties.ProbePollingInterval) * time.Second)
 		}
 	}
-
 }
 
 // TriggerSourceOnChaosCmdProbe trigger the onchaos cmd probes having need some external source image
@@ -297,16 +294,15 @@ loop:
 				for index := range chaosresult.ProbeDetails {
 					if chaosresult.ProbeDetails[index].Name == probe.Name {
 						chaosresult.ProbeDetails[index].IsProbeFailedWithError = err
+						log.Errorf("The %v cmd probe has been Failed, err: %v", probe.Name, err)
 						break loop
 					}
-
 				}
 			}
 			// waiting for the probe polling interval
 			time.Sleep(time.Duration(probe.RunProperties.ProbePollingInterval) * time.Second)
 		}
 	}
-
 }
 
 // TriggerSourceContinuousCmdProbe trigger the continuous cmd probes having need some external source image
@@ -320,6 +316,7 @@ func TriggerSourceContinuousCmdProbe(probe v1alpha1.ProbeAttributes, execCommand
 
 	// it trigger the cmd probe for the entire duration of chaos and it fails, if any err encounter
 	// it marked the error for the probes, if any
+loop:
 	for {
 		err = TriggerSourceCmdProbe(probe, execCommandDetails, clients, chaosresult)
 		// record the error inside the probeDetails, we are maintaining a dedicated variable for the err, inside probeDetails
@@ -327,17 +324,14 @@ func TriggerSourceContinuousCmdProbe(probe v1alpha1.ProbeAttributes, execCommand
 			for index := range chaosresult.ProbeDetails {
 				if chaosresult.ProbeDetails[index].Name == probe.Name {
 					chaosresult.ProbeDetails[index].IsProbeFailedWithError = err
-					break
+					log.Errorf("The %v cmd probe has been Failed, err: %v", probe.Name, err)
+					break loop
 				}
-
 			}
-			break
 		}
-
 		// waiting for the probe polling interval
 		time.Sleep(time.Duration(probe.RunProperties.ProbePollingInterval) * time.Second)
 	}
-
 }
 
 // ValidateResult validate the probe result to specified comparison operation
