@@ -1,0 +1,245 @@
+name: Running-E2E
+on:
+  pull_request:
+    branches: [master]
+    types: [edited, opened, synchronize, reopened]
+
+jobs:
+  Tests:
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+    runs-on: ubuntu-latest
+    steps:
+      
+      #Using the last commit id of pull request
+      - uses: octokit/request-action@v2.x
+        id: get_PR_commits
+        with:
+          route: GET /repos/:repo/pulls/:pull_number/commits
+          repo: ${{ github.repository }}
+          pull_number: ${{ github.event.number }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: set commit to output
+        id: getcommit
+        run: | 
+           prsha=$(echo $response | jq '.[-1].sha'  | tr -d '"')
+           echo "::set-output name=sha::$prsha" 
+        env: 
+          response:  ${{ steps.get_PR_commits.outputs.data }}
+          
+      - uses: actions/checkout@v2  
+        with:
+          ref: ${{steps.getcommit.outputs.sha}}   
+          
+      - name: Generating Go binary and Building docker image
+        run: |
+          make build-amd64
+
+      #Install and configure a kind cluster
+      - name: Installing Prerequisites (KinD Cluster)
+        uses: engineerd/setup-kind@v0.5.0
+        with:
+            version: "v0.7.0"
+
+      - name: Configuring and testing the Installation
+        run: |
+          kubectl cluster-info --context kind-kind
+          kind get kubeconfig --internal >$HOME/.kube/config
+          kubectl get nodes            
+
+      - name: Load image on the nodes of the cluster
+        run: |
+          kind load docker-image --name=kind litmuschaos/go-runner:ci
+
+      - name: Deploy a sample application for chaos injection
+        run: |
+          kubectl apply -f https://raw.githubusercontent.com/litmuschaos/chaos-ci-lib/master/app/nginx.yml
+          sleep 30
+          
+      - name: Setting up kubeconfig ENV for Github Chaos Action
+        run: echo ::set-env name=KUBE_CONFIG_DATA::$(base64 -w 0 ~/.kube/config)
+        env:
+          ACTIONS_ALLOW_UNSECURE_COMMANDS: true
+
+      - name: Setup Litmus
+        uses: mayadata-io/github-chaos-actions@v0.3.0
+        env:
+          INSTALL_LITMUS: true    
+
+      - name: Check the commit messgae
+        if: |
+          contains(github.event.head_commit.message, '[Pod Delete]') || contains(github.event.head_commit.message, '[Container Kill]') ||
+          contains(github.event.head_commit.message, '[Network Chaos]') || contains(github.event.head_commit.message, '[Resource Chaos]') ||
+          contains(github.event.head_commit.message, '[Scale Chaos]') || contains(github.event.head_commit.message, '[IO Chaos]') ||
+          contains(github.event.head_commit.message, '[Run CI]')
+        run: |
+          echo ::set-env name=TEST_RUN::true
+        env:
+          ACTIONS_ALLOW_UNSECURE_COMMANDS: true
+
+      - name: Running Litmus pod delete chaos experiment
+        if: "contains(github.event.head_commit.message, '[Pod Delete]') || contains(github.event.head_commit.message, '[Run CI]') || env.TEST_RUN != 'true'"
+        uses: mayadata-io/github-chaos-actions@v0.3.0
+        env:
+          EXPERIMENT_NAME: pod-delete
+          EXPERIMENT_IMAGE: litmuschaos/go-runner
+          EXPERIMENT_IMAGE_TAG: ci
+          IMAGE_PULL_POLICY: IfNotPresent
+          JOB_CLEANUP_POLICY: delete 
+
+      - name: Running container kill chaos experiment
+        if: "contains(github.event.head_commit.message, '[Container Kill]') || contains(github.event.head_commit.message, '[Run CI]') || env.TEST_RUN != 'true'"    
+        uses: mayadata-io/github-chaos-actions@v0.3.0
+        env:
+          EXPERIMENT_NAME: container-kill
+          EXPERIMENT_IMAGE: litmuschaos/go-runner
+          EXPERIMENT_IMAGE_TAG: ci
+          IMAGE_PULL_POLICY: IfNotPresent
+          JOB_CLEANUP_POLICY: delete 
+          CONTAINER_RUNTIME: containerd
+
+      - name: Running node-cpu-hog chaos experiment
+        if: "contains(github.event.head_commit.message, '[Resource Chaos]') || contains(github.event.head_commit.message, '[Run CI]') || env.TEST_RUN != 'true'"
+        uses: mayadata-io/github-chaos-actions@v0.3.0
+        env:
+          EXPERIMENT_NAME: node-cpu-hog
+          EXPERIMENT_IMAGE: litmuschaos/go-runner
+          EXPERIMENT_IMAGE_TAG: ci
+          IMAGE_PULL_POLICY: IfNotPresent
+          JOB_CLEANUP_POLICY: delete 
+          
+
+      - name: Running node-memory-hog chaos experiment
+        if: "contains(github.event.head_commit.message, '[Resource Chaos]') || contains(github.event.head_commit.message, '[Run CI]') || env.TEST_RUN != 'true'"
+        uses: mayadata-io/github-chaos-actions@v0.3.0
+        env:
+          EXPERIMENT_NAME: node-memory-hog
+          EXPERIMENT_IMAGE: litmuschaos/go-runner
+          EXPERIMENT_IMAGE_TAG: ci
+          IMAGE_PULL_POLICY: IfNotPresent
+          JOB_CLEANUP_POLICY: delete        
+          
+      - name: Running pod-cpu-hog chaos experiment
+        if: "contains(github.event.head_commit.message, '[Resource Chaos]') || contains(github.event.head_commit.message, '[Run CI]') || env.TEST_RUN != 'true'"
+        uses: mayadata-io/github-chaos-actions@v0.3.0
+        env:
+          EXPERIMENT_NAME: pod-cpu-hog
+          EXPERIMENT_IMAGE: litmuschaos/go-runner
+          EXPERIMENT_IMAGE_TAG: ci
+          IMAGE_PULL_POLICY: IfNotPresent
+          JOB_CLEANUP_POLICY: delete       
+          TARGET_CONTAINER: nginx
+          TOTAL_CHAOS_DURATION: 60
+          CPU_CORES: 1
+
+      - name: Running pod-memory-hog chaos experiment
+        if: "contains(github.event.head_commit.message, '[Resource Chaos]') || contains(github.event.head_commit.message, '[Run CI]') || env.TEST_RUN != 'true'"
+        uses: mayadata-io/github-chaos-actions@v0.3.0
+        env:
+          EXPERIMENT_NAME: pod-cpu-hog
+          EXPERIMENT_IMAGE: litmuschaos/go-runner
+          EXPERIMENT_IMAGE_TAG: ci
+          IMAGE_PULL_POLICY: IfNotPresent
+          JOB_CLEANUP_POLICY: delete       
+          TARGET_CONTAINER: nginx
+          TOTAL_CHAOS_DURATION: 60
+          MEMORY_CONSUMPTION: 500  
+          
+      - name: Running pod network corruption chaos experiment
+        if: "contains(github.event.head_commit.message, '[Network Chaos]') || contains(github.event.head_commit.message, '[Run CI]') || env.TEST_RUN != 'true'"
+        uses: mayadata-io/github-chaos-actions@v0.3.0
+        env:
+          EXPERIMENT_NAME: pod-network-corruption
+          EXPERIMENT_IMAGE: litmuschaos/go-runner
+          EXPERIMENT_IMAGE_TAG: ci
+          IMAGE_PULL_POLICY: IfNotPresent
+          JOB_CLEANUP_POLICY: delete       
+          TARGET_CONTAINER: nginx
+          TOTAL_CHAOS_DURATION: 60
+          NETWORK_INTERFACE: eth0
+          CONTAINER_RUNTIME: containerd 
+
+      - name: Running pod network duplication chaos experiment
+        if: "contains(github.event.head_commit.message, '[Network Chaos]') || contains(github.event.head_commit.message, '[Run CI]') || env.TEST_RUN != 'true'"
+        uses: mayadata-io/github-chaos-actions@v0.3.0
+        env:
+          EXPERIMENT_NAME: pod-network-duplication
+          EXPERIMENT_IMAGE: litmuschaos/go-runner
+          EXPERIMENT_IMAGE_TAG: ci
+          IMAGE_PULL_POLICY: IfNotPresent
+          JOB_CLEANUP_POLICY: delete       
+          TARGET_CONTAINER: nginx
+          TOTAL_CHAOS_DURATION: 60
+          NETWORK_INTERFACE: eth0
+          CONTAINER_RUNTIME: containerd     
+        
+      - name: Running pod-network-latency chaos experiment
+        if: "contains(github.event.head_commit.message, '[Network Chaos]') || contains(github.event.head_commit.message, '[Run CI]') || env.TEST_RUN != 'true'"
+        uses: mayadata-io/github-chaos-actions@v0.3.0
+        env:
+          EXPERIMENT_NAME: pod-network-latency
+          EXPERIMENT_IMAGE: litmuschaos/go-runner
+          EXPERIMENT_IMAGE_TAG: ci
+          IMAGE_PULL_POLICY: IfNotPresent
+          JOB_CLEANUP_POLICY: delete         
+          TARGET_CONTAINER: nginx
+          TOTAL_CHAOS_DURATION: 60
+          NETWORK_INTERFACE: eth0
+          NETWORK_LATENCY: 60000
+          CONTAINER_RUNTIME: containerd              
+
+      - name: Running pod-network-loss chaos experiment
+        if: "contains(github.event.head_commit.message, '[Network Chaos]') || contains(github.event.head_commit.message, '[Run CI]') || env.TEST_RUN != 'true'"
+        uses: mayadata-io/github-chaos-actions@v0.3.0
+        env:
+          EXPERIMENT_NAME: pod-network-loss
+          EXPERIMENT_IMAGE: litmuschaos/go-runner
+          EXPERIMENT_IMAGE_TAG: ci
+          IMAGE_PULL_POLICY: IfNotPresent
+          JOB_CLEANUP_POLICY: delete       
+          TARGET_CONTAINER: nginx
+          TOTAL_CHAOS_DURATION: 60
+          NETWORK_INTERFACE: eth0
+          NETWORK_PACKET_LOSS_PERCENTAGE: 100
+          CONTAINER_RUNTIME: containerd
+
+      - name: Running pod autoscaler chaos experiment
+        if: "contains(github.event.head_commit.message, '[Scale Chaos]') || contains(github.event.head_commit.message, '[Run CI]') || env.TEST_RUN != 'true'"
+        uses: mayadata-io/github-chaos-actions@v0.3.0
+        env:
+          EXPERIMENT_NAME: pod-autoscaler
+          EXPERIMENT_IMAGE: litmuschaos/go-runner
+          EXPERIMENT_IMAGE_TAG: ci
+          IMAGE_PULL_POLICY: IfNotPresent
+          JOB_CLEANUP_POLICY: delete      
+          TOTAL_CHAOS_DURATION: 60       
+        
+      - name: Running node-io-stress chaos experiment
+        if: "contains(github.event.head_commit.message, '[IO Chaos]') || contains(github.event.head_commit.message, '[Run CI]') || env.TEST_RUN != 'true'"
+        uses: mayadata-io/github-chaos-actions@v0.3.0
+        env:
+          EXPERIMENT_NAME: node-io-stress
+          EXPERIMENT_IMAGE: litmuschaos/go-runner
+          EXPERIMENT_IMAGE_TAG: ci
+          IMAGE_PULL_POLICY: IfNotPresent
+          JOB_CLEANUP_POLICY: delete       
+          TOTAL_CHAOS_DURATION: 120
+          FILESYSTEM_UTILIZATION_PERCENTAGE: 10                 
+
+      - name: Check for all the jobs are succeeded
+        if: ${{ success() && env.TEST_RUN == 'true' }}
+        run: echo "All tests Are passed"     
+
+      - name: Check for any job failed
+        if: ${{ failure() }}
+        run: echo "Some tests are failing please check..."
+
+      - name: Uninstall Litmus
+        uses: mayadata-io/github-chaos-actions@v0.3.0
+        env:          
+          LITMUS_CLEANUP: true
+
+      - name: Deleting KinD cluster
+        if: ${{ always() }}
+        run: kind delete cluster

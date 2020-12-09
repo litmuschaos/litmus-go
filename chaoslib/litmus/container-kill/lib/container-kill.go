@@ -56,6 +56,11 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 		if err != nil {
 			return errors.Errorf("Unable to get annotations, err: %v", err)
 		}
+		// Get Resource Requirements
+		experimentsDetails.Resources, err = common.GetChaosPodResourceRequirements(experimentsDetails.ChaosPodName, experimentsDetails.ExperimentName, experimentsDetails.ChaosNamespace, clients)
+		if err != nil {
+			return errors.Errorf("Unable to get resource requirements, err: %v", err)
+		}
 	}
 
 	if experimentsDetails.Sequence == "serial" {
@@ -82,18 +87,8 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 	// creating the helper pod to perform container kill chaos
 	for _, pod := range targetPodList.Items {
 		runID := common.GetRunID()
-
-		switch experimentsDetails.ContainerRuntime {
-		case "docker":
-			err := CreateHelperPodForDocker(experimentsDetails, clients, pod.Name, pod.Spec.NodeName, runID)
-			if err != nil {
-				return errors.Errorf("Unable to create the helper pod, err: %v", err)
-			}
-		case "containerd", "crio":
-			err := CreateHelperPod(experimentsDetails, clients, pod.Name, pod.Spec.NodeName, runID)
-			if err != nil {
-				return errors.Errorf("Unable to create the helper pod, err: %v", err)
-			}
+		if err := CreateHelperPod(experimentsDetails, clients, pod.Name, pod.Spec.NodeName, runID); err != nil {
+			return errors.Errorf("Unable to create the helper pod, err: %v", err)
 		}
 
 		//checking the status of the helper pods, wait till the pod comes to running state else fail the experiment
@@ -130,17 +125,8 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 	// creating the helper pod to perform container kill chaos
 	for _, pod := range targetPodList.Items {
 		runID := common.GetRunID()
-		switch experimentsDetails.ContainerRuntime {
-		case "docker":
-			err := CreateHelperPodForDocker(experimentsDetails, clients, pod.Name, pod.Spec.NodeName, runID)
-			if err != nil {
-				return errors.Errorf("Unable to create the helper pod, err: %v", err)
-			}
-		case "containerd", "crio":
-			err := CreateHelperPod(experimentsDetails, clients, pod.Name, pod.Spec.NodeName, runID)
-			if err != nil {
-				return errors.Errorf("Unable to create the helper pod, err: %v", err)
-			}
+		if err := CreateHelperPod(experimentsDetails, clients, pod.Name, pod.Spec.NodeName, runID); err != nil {
+			return errors.Errorf("Unable to create the helper pod, err: %v", err)
 		}
 	}
 
@@ -236,14 +222,6 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 						},
 					},
 				},
-				{
-					Name: "cri-config",
-					VolumeSource: apiv1.VolumeSource{
-						HostPath: &apiv1.HostPathVolumeSource{
-							Path: "/etc/crictl.yaml",
-						},
-					},
-				},
 			},
 			Containers: []apiv1.Container{
 				{
@@ -257,77 +235,16 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 						"-c",
 						"./helper/container-killer",
 					},
-					Env: GetPodEnv(experimentsDetails, podName),
+					Resources: experimentsDetails.Resources,
+					Env:       GetPodEnv(experimentsDetails, podName),
 					VolumeMounts: []apiv1.VolumeMount{
 						{
 							Name:      "cri-socket",
 							MountPath: experimentsDetails.SocketPath,
-						},
-						{
-							Name:      "cri-config",
-							MountPath: "/etc/crictl.yaml",
 						},
 					},
 					SecurityContext: &apiv1.SecurityContext{
 						Privileged: &privilegedEnable,
-					},
-				},
-			},
-		},
-	}
-
-	_, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Create(helperPod)
-	return err
-
-}
-
-// CreateHelperPodForDocker derive the attributes for helper pod and create the helper pod
-func CreateHelperPodForDocker(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, podName, nodeName, runID string) error {
-
-	helperPod := &apiv1.Pod{
-		ObjectMeta: v1.ObjectMeta{
-			Name:      experimentsDetails.ExperimentName + "-" + runID,
-			Namespace: experimentsDetails.ChaosNamespace,
-			Labels: map[string]string{
-				"app":                       experimentsDetails.ExperimentName + "-helper",
-				"name":                      experimentsDetails.ExperimentName + "-" + runID,
-				"chaosUID":                  string(experimentsDetails.ChaosUID),
-				"app.kubernetes.io/part-of": "litmus",
-			},
-			Annotations: experimentsDetails.Annotations,
-		},
-		Spec: apiv1.PodSpec{
-			ServiceAccountName: experimentsDetails.ChaosServiceAccount,
-			RestartPolicy:      apiv1.RestartPolicyNever,
-			NodeName:           nodeName,
-			Volumes: []apiv1.Volume{
-				{
-					Name: "cri-socket",
-					VolumeSource: apiv1.VolumeSource{
-						HostPath: &apiv1.HostPathVolumeSource{
-							Path: experimentsDetails.SocketPath,
-						},
-					},
-				},
-			},
-			Containers: []apiv1.Container{
-				{
-					Name:            experimentsDetails.ExperimentName,
-					Image:           experimentsDetails.LIBImage,
-					ImagePullPolicy: apiv1.PullPolicy(experimentsDetails.LIBImagePullPolicy),
-					Command: []string{
-						"/bin/bash",
-					},
-					Args: []string{
-						"-c",
-						"./helper/container-killer-docker",
-					},
-					Env: GetPodEnv(experimentsDetails, podName),
-					VolumeMounts: []apiv1.VolumeMount{
-						{
-							Name:      "cri-socket",
-							MountPath: experimentsDetails.SocketPath,
-						},
 					},
 				},
 			},
@@ -353,6 +270,8 @@ func GetPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, podName st
 		"CHAOS_UID":            string(experimentsDetails.ChaosUID),
 		"CHAOS_INTERVAL":       strconv.Itoa(experimentsDetails.ChaosInterval),
 		"ITERATIONS":           strconv.Itoa(experimentsDetails.Iterations),
+		"SOCKET_PATH":          experimentsDetails.SocketPath,
+		"CONTAINER_RUNTIME":    experimentsDetails.ContainerRuntime,
 	}
 	for key, value := range ENVList {
 		var perEnv apiv1.EnvVar

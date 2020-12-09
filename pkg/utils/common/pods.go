@@ -76,6 +76,23 @@ func GetChaosPodAnnotation(podName, namespace string, clients clients.ClientSets
 	return pod.Annotations, nil
 }
 
+// GetChaosPodResourceRequirements will return the resource requirements on chaos pod
+func GetChaosPodResourceRequirements(podName, containerName, namespace string, clients clients.ClientSets) (core_v1.ResourceRequirements, error) {
+
+	pod, err := clients.KubeClient.CoreV1().Pods(namespace).Get(podName, v1.GetOptions{})
+	if err != nil {
+		return core_v1.ResourceRequirements{}, err
+	}
+	for _, container := range pod.Spec.Containers {
+		// The name of chaos container is always same as job name
+		// <experiment-name>-<runid>
+		if strings.Contains(container.Name, containerName) {
+			return container.Resources, nil
+		}
+	}
+	return core_v1.ResourceRequirements{}, errors.Errorf("No container found with %v name in target pod", containerName)
+}
+
 // VerifyExistanceOfPods check the availibility of list of pods
 func VerifyExistanceOfPods(namespace, pods string, clients clients.ClientSets) (bool, error) {
 
