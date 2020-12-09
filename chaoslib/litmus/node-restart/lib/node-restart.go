@@ -70,12 +70,18 @@ func PrepareNodeRestart(experimentsDetails *experimentTypes.ExperimentDetails, c
 		events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 	}
 
-	// Get Chaos Pod Annotation
-	experimentsDetails.Annotations, err = common.GetChaosPodAnnotation(experimentsDetails.ChaosPodName, experimentsDetails.ChaosNamespace, clients)
-	if err != nil {
-		return errors.Errorf("unable to get annotation, err: %v", err)
+	if experimentsDetails.EngineName != "" {
+		// Get Chaos Pod Annotation
+		experimentsDetails.Annotations, err = common.GetChaosPodAnnotation(experimentsDetails.ChaosPodName, experimentsDetails.ChaosNamespace, clients)
+		if err != nil {
+			return errors.Errorf("unable to get annotations, err: %v", err)
+		}
+		// Get Resource Requirements
+		experimentsDetails.Resources, err = common.GetChaosPodResourceRequirements(experimentsDetails.ChaosPodName, experimentsDetails.ExperimentName, experimentsDetails.ChaosNamespace, clients)
+		if err != nil {
+			return errors.Errorf("Unable to get resource requirements, err: %v", err)
+		}
 	}
-
 	// Creating the helper pod to perform node restart
 	err = CreateHelperPod(experimentsDetails, clients)
 	if err != nil {
@@ -167,7 +173,8 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 					Command: []string{
 						"/bin/sh",
 					},
-					Args: []string{"-c", fmt.Sprintf("cp %[1]s %[2]s && chmod 400 %[2]s && ssh -o \"StrictHostKeyChecking=no\" -o \"UserKnownHostsFile=/dev/null\" -i %[2]s %[3]s@%[4]s %[5]s", privateKeyPath, emptyDirPath, experimentsDetails.SSHUser, experimentsDetails.TargetNodeIP, experimentsDetails.RebootCommand)},
+					Args:      []string{"-c", fmt.Sprintf("cp %[1]s %[2]s && chmod 400 %[2]s && ssh -o \"StrictHostKeyChecking=no\" -o \"UserKnownHostsFile=/dev/null\" -i %[2]s %[3]s@%[4]s %[5]s", privateKeyPath, emptyDirPath, experimentsDetails.SSHUser, experimentsDetails.TargetNodeIP, experimentsDetails.RebootCommand)},
+					Resources: experimentsDetails.Resources,
 					VolumeMounts: []apiv1.VolumeMount{
 						{
 							Name:      privateKeySecret + experimentsDetails.RunID,

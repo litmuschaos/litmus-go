@@ -1,6 +1,7 @@
 package types
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	clientTypes "k8s.io/apimachinery/pkg/types"
 )
 
@@ -39,4 +40,5 @@ type ExperimentDetails struct {
 	ChaosServiceAccount                string
 	SocketPath                         string
 	Sequence                           string
+	Resources                          corev1.ResourceRequirements
 }
