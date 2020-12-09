@@ -173,39 +173,50 @@ func GetPID(experimentDetails *experimentTypes.ExperimentDetails, clients client
 }
 
 // InspectResponse JSON representation of crictl inspect command output
-// in crio, pid is present inside pid attribute of inspect output
-// in containerd, pid is present inside `info.pid` of inspect output
 type InspectResponse struct {
 	Info InfoDetails `json:"info"`
 }
 
-// InfoDetails JSON representation of crictl inspect command output
-// in crio, pid is present inside pid attribute of inspect output
-// in containerd, pid is present inside `info.pid` of inspect output
+// InfoDetails contains all the container details
 type InfoDetails struct {
-	PID int `json:"pid"`
+	RuntimeSpec RuntimeDetails `json:"runtimeSpec"`
+}
+
+// RuntimeDetails contains runtime details
+type RuntimeDetails struct {
+	Linux LinuxAttributes `json:"linux"`
+}
+
+// LinuxAttributes contains all the linux attributes
+type LinuxAttributes struct {
+	Namespaces []Namespace `json:"namespaces"`
+}
+
+// Namespace contains linux namespace details
+type Namespace struct {
+	Type string `json:"type"`
+	Path string `json:"path"`
 }
 
 //parsePIDFromJSON extract the pid from the json output
 func parsePIDFromJSON(j []byte, runtime string) (int, error) {
 
 	var pid int
-
-	// in crio, pid is present inside pid attribute of inspect output
-	// in containerd, pid is present inside `info.pid` of inspect output
-	if runtime == "containerd" {
+	// namespaces are present inside `info.runtimeSpec.linux.namespaces` of inspect output
+	// linux namespace of type network contains pid, in the form of `/proc/<pid>/ns/net`
+	switch runtime {
+	case "containerd", "crio":
 		var resp InspectResponse
 		if err := json.Unmarshal(j, &resp); err != nil {
 			return 0, err
 		}
-		pid = resp.Info.PID
-	} else if runtime == "crio" {
-		var resp InfoDetails
-		if err := json.Unmarshal(j, &resp); err != nil {
-			return 0, errors.Errorf("[cri]: Could not find pid field in json: %s", string(j))
+		for _, namespace := range resp.Info.RuntimeSpec.Linux.Namespaces {
+			if namespace.Type == "network" {
+				value := strings.Split(namespace.Path, "/")[2]
+				pid, _ = strconv.Atoi(value)
+			}
 		}
-		pid = resp.PID
-	} else {
+	default:
 		return 0, errors.Errorf("[cri]: No supported container runtime, runtime: %v", runtime)
 	}
 
