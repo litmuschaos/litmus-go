@@ -154,7 +154,8 @@ func GetPID(experimentDetails *experimentTypes.ExperimentDetails, clients client
 	log.Infof("containerid: %v", containerID)
 
 	// deriving pid from the inspect out of target container
-	out, err := exec.Command("crictl", "inspect", containerID).CombinedOutput()
+	endpoint := "unix://" + experimentDetails.SocketPath
+	out, err := exec.Command("crictl", "-i", endpoint, "-r", endpoint, "inspect", containerID).CombinedOutput()
 	if err != nil {
 		log.Error(fmt.Sprintf("[cri]: Failed to run crictl: %s", string(out)))
 		return 0, err
@@ -188,24 +189,17 @@ type InfoDetails struct {
 
 //parsePIDFromJSON extract the pid from the json output
 func parsePIDFromJSON(j []byte, runtime string) (int, error) {
-
 	var pid int
 
-	// in crio, pid is present inside pid attribute of inspect output
-	// in containerd, pid is present inside `info.pid` of inspect output
-	if runtime == "containerd" {
+	switch runtime {
+	case "containerd", "crio":
 		var resp InspectResponse
 		if err := json.Unmarshal(j, &resp); err != nil {
 			return 0, err
 		}
+		// pid is present inside `info.pid` of inspect output
 		pid = resp.Info.PID
-	} else if runtime == "crio" {
-		var resp InfoDetails
-		if err := json.Unmarshal(j, &resp); err != nil {
-			return 0, errors.Errorf("[cri]: Could not find pid field in json: %s", string(j))
-		}
-		pid = resp.PID
-	} else {
+	default:
 		return 0, errors.Errorf("[cri]: No supported container runtime, runtime: %v", runtime)
 	}
 
@@ -323,6 +317,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.ChaosPodName = Getenv("POD_NAME", "")
 	experimentDetails.ContainerRuntime = Getenv("CONTAINER_RUNTIME", "")
 	experimentDetails.NetworkInterface = Getenv("NETWORK_INTERFACE", "eth0")
+	experimentDetails.SocketPath = Getenv("SOCKET_PATH", "")
 	experimentDetails.DestinationIPs = Getenv("DESTINATION_IPS", "")
 }
 

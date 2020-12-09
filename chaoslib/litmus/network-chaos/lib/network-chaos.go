@@ -208,14 +208,6 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 						},
 					},
 				},
-				{
-					Name: "cri-config",
-					VolumeSource: apiv1.VolumeSource{
-						HostPath: &apiv1.HostPathVolumeSource{
-							Path: "/etc/crictl.yaml",
-						},
-					},
-				},
 			},
 
 			Containers: []apiv1.Container{
@@ -236,10 +228,6 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 						{
 							Name:      "cri-socket",
 							MountPath: experimentsDetails.SocketPath,
-						},
-						{
-							Name:      "cri-config",
-							MountPath: "/etc/crictl.yaml",
 						},
 					},
 					SecurityContext: &apiv1.SecurityContext{
@@ -277,6 +265,7 @@ func GetPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, podName, a
 		"NETEM_COMMAND":        args,
 		"NETWORK_INTERFACE":    experimentsDetails.NetworkInterface,
 		"EXPERIMENT_NAME":      experimentsDetails.ExperimentName,
+		"SOCKET_PATH":          experimentsDetails.SocketPath,
 		"DESTINATION_IPS":      GetTargetIpsArgs(experimentsDetails.DestinationIPs, experimentsDetails.DestinationHosts),
 	}
 	for key, value := range ENVList {
