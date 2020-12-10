@@ -65,12 +65,13 @@ func TriggerInlineCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.
 		Timeout(int64(probe.RunProperties.ProbeTimeout)).
 		Wait(time.Duration(probe.RunProperties.Interval) * time.Second).
 		TryWithTimeout(func(attempt uint) error {
-			var out bytes.Buffer
+			var out, errOut bytes.Buffer
 			// run the inline command probe
 			cmd := exec.Command("/bin/sh", "-c", probe.CmdProbeInputs.Command)
 			cmd.Stdout = &out
+			cmd.Stderr = &errOut
 			if err := cmd.Run(); err != nil {
-				return fmt.Errorf("Unable to run command, err: %v", err)
+				return fmt.Errorf("Unable to run command, err: %v; error output: %v", err, errOut.String())
 			}
 
 			if err = ValidateResult(probe.CmdProbeInputs.Comparator, strings.TrimSpace(out.String())); err != nil {
