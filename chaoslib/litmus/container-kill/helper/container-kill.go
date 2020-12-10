@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	"bytes"
 	"os"
 	"os/exec"
 	"strconv"
@@ -85,9 +85,13 @@ func KillContainer(experimentsDetails *experimentTypes.ExperimentDetails, client
 
 		switch experimentsDetails.ContainerRuntime {
 		case "docker":
-			StopDockerContainer(containerID)
+			if err := StopDockerContainer(containerID); err != nil {
+				return err
+			}
 		case "containerd", "crio":
-			StopContainerdContainer(containerID, experimentsDetails.SocketPath)
+			if err := StopContainerdContainer(containerID, experimentsDetails.SocketPath); err != nil {
+				return err
+			}
 		default:
 			return errors.Errorf("%v container runtime not supported", experimentsDetails.ContainerRuntime)
 		}
@@ -149,19 +153,26 @@ func GetContainerID(experimentsDetails *experimentTypes.ExperimentDetails, clien
 }
 
 //StopContainerdContainer kill the application container
-func StopContainerdContainer(containerID, socketPath string) {
-
+func StopContainerdContainer(containerID, socketPath string) error {
+	var errOut bytes.Buffer
 	endpoint := "unix://" + socketPath
 	cmd := exec.Command("crictl", "-i", endpoint, "-r", endpoint, "stop", string(containerID))
-	stdout, _ := cmd.Output()
-	fmt.Print(string(stdout))
+	cmd.Stderr = &errOut
+	if err := cmd.Run(); err != nil {
+		return errors.Errorf("Unable to run command, err: %v; error output: %v", err, errOut.String())
+	}
+	return nil
 }
 
 //StopDockerContainer kill the application container
-func StopDockerContainer(containerID string) {
+func StopDockerContainer(containerID string) error {
+	var errOut bytes.Buffer
 	cmd := exec.Command("docker", "kill", string(containerID))
-	stdout, _ := cmd.Output()
-	fmt.Print(string(stdout))
+	cmd.Stderr = &errOut
+	if err := cmd.Run(); err != nil {
+		return errors.Errorf("Unable to run command, err: %v; error output: %v", err, errOut.String())
+	}
+	return nil
 }
 
 // CheckContainerStatus checks the status of the application container
