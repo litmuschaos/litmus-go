@@ -11,7 +11,7 @@ require (
 	github.com/imdario/mergo v0.3.9 // indirect
 	github.com/kr/pretty v0.2.0 // indirect
 	github.com/kyokomi/emoji v2.2.4+incompatible
-	github.com/litmuschaos/chaos-operator v0.0.0-20201202182158-7c71b7d70dff
+	github.com/litmuschaos/chaos-operator v0.0.0-20201210172142-57fddee6734e
 	github.com/mailru/easyjson v0.7.1 // indirect
 	github.com/openebs/maya v0.0.0-20200411140727-1c81f9e017b0
 	github.com/pkg/errors v0.9.1
@@ -19,7 +19,6 @@ require (
 	github.com/sirupsen/logrus v1.6.0
 	github.com/spf13/cobra v1.0.0
 	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d // indirect
-	golang.org/x/sys v0.0.0-20200509044756-6aff5f38e54f // indirect
 	golang.org/x/time v0.0.0-20200416051211-89c76fbcd5d1 // indirect
 	google.golang.org/appengine v1.6.6 // indirect
 	google.golang.org/protobuf v1.24.0 // indirect

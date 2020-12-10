@@ -149,6 +149,8 @@ type RunnerInfo struct {
 	Secrets []Secret `json:"secrets,omitempty"`
 	// Tolerations for runner pod
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+	// Resource requirements for the runner pod
+	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 
 // ExperimentList defines information about chaos experiments defined in the chaos engine
@@ -240,6 +242,8 @@ type PromProbeInputs struct {
 	Endpoint string `json:"endpoint,omitempty"`
 	// Query to get promethus metrices
 	Query string `json:"query,omitempty"`
+	// QueryPath contains filePath, which contains prometheus query
+	QueryPath string `json:"queryPath,omitempty"`
 	// Comparator check for the correctness of the probe output
 	Comparator ComparatorInfo `json:"comparator,omitempty"`
 }
@@ -282,7 +286,7 @@ type RunProperty struct {
 
 // ExperimentComponents contains ENV, Configmaps and Secrets
 type ExperimentComponents struct {
-	ENV                        []ExperimentENV               `json:"env,omitempty"`
+	ENV                        []corev1.EnvVar               `json:"env,omitempty"`
 	ConfigMaps                 []ConfigMap                   `json:"configMaps,omitempty"`
 	Secrets                    []Secret                      `json:"secrets,omitempty"`
 	ExperimentAnnotations      map[string]string             `json:"experimentannotation,omitempty"`
@@ -298,12 +302,6 @@ type ExperimentComponents struct {
 type StatusCheckTimeout struct {
 	Delay   int `json:"delay,omitempty"`
 	Timeout int `json:"timeout,omitempty"`
-}
-
-// ExperimentENV varibles to override the default values in chaosexperiment
-type ExperimentENV struct {
-	Name  string `json:"name"`
-	Value string `json:"value"`
 }
 
 // ExperimentStatuses defines information about status of individual experiments
