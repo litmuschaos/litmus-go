@@ -146,7 +146,7 @@ func GetContainerID(experimentDetails *experimentTypes.ExperimentDetails, client
 		cmd := "docker ps | grep k8s_POD_" + experimentDetails.TargetPods + "_" + experimentDetails.AppNS + " | awk '{print $1}'"
 		out, err := exec.Command("/bin/sh", "-c", cmd).CombinedOutput()
 		if err != nil {
-			log.Error(fmt.Sprintf("[cri]: Failed to run docker ps command: %s", string(out)))
+			log.Error(fmt.Sprintf("[docker]: Failed to run docker ps command: %s", string(out)))
 			return "", err
 		}
 		containerID = strings.TrimSpace(string(out))
@@ -180,13 +180,13 @@ func GetPID(experimentDetails *experimentTypes.ExperimentDetails, containerID st
 		// deriving pid from the inspect out of target container
 		out, err := exec.Command("docker", "inspect", containerID).CombinedOutput()
 		if err != nil {
-			log.Error(fmt.Sprintf("[cri]: Failed to run docker inspect: %s", string(out)))
+			log.Error(fmt.Sprintf("[docker]: Failed to run docker inspect: %s", string(out)))
 			return 0, err
 		}
 		// parsing data from the json output of inspect command
 		PID, err = parsePIDFromJSON(out, experimentDetails.ContainerRuntime)
 		if err != nil {
-			log.Error(fmt.Sprintf("[cri]: Failed to parse json from docker inspect output: %s", string(out)))
+			log.Error(fmt.Sprintf("[docker]: Failed to parse json from docker inspect output: %s", string(out)))
 			return 0, err
 		}
 	case "containerd", "crio":
