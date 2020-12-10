@@ -90,7 +90,7 @@ func KillContainer(experimentsDetails *experimentTypes.ExperimentDetails, client
 		}
 
 		// killing the application container
-		StopContainer(containerID)
+		StopContainer(containerID, experimentsDetails.SocketPath)
 
 		//Waiting for the chaos interval after chaos injection
 		if experimentsDetails.ChaosInterval != 0 {
@@ -128,12 +128,16 @@ func KillContainer(experimentsDetails *experimentTypes.ExperimentDetails, client
 //GetPodID derive the pod-id of the application pod
 func GetPodID(experimentsDetails *experimentTypes.ExperimentDetails) (string, error) {
 
-	cmd := exec.Command("crictl", "pods")
+	endpoint := "unix://" + experimentsDetails.SocketPath
+	cmd := exec.Command("crictl", "-i", endpoint, "-r", endpoint, "pods")
 	stdout, _ := cmd.Output()
 
 	pods := RemoveExtraSpaces(stdout)
+
 	for i := 0; i < len(pods)-1; i++ {
+		log.Infof("pod child: %v", pods[i])
 		attributes := strings.Split(pods[i], " ")
+		log.Infof("attributes: %v", attributes)
 		if attributes[3] == experimentsDetails.TargetPods {
 			return attributes[0], nil
 		}
@@ -146,7 +150,8 @@ func GetPodID(experimentsDetails *experimentTypes.ExperimentDetails) (string, er
 //GetContainerID  derive the container id of the application container
 func GetContainerID(experimentsDetails *experimentTypes.ExperimentDetails, podID string) (string, error) {
 
-	cmd := exec.Command("crictl", "ps")
+	endpoint := "unix://" + experimentsDetails.SocketPath
+	cmd := exec.Command("crictl", "-i", endpoint, "-r", endpoint, "ps")
 	stdout, _ := cmd.Output()
 	containers := RemoveExtraSpaces(stdout)
 
@@ -163,9 +168,10 @@ func GetContainerID(experimentsDetails *experimentTypes.ExperimentDetails, podID
 }
 
 //StopContainer kill the application container
-func StopContainer(containerID string) {
+func StopContainer(containerID, socketPath string) {
 
-	cmd := exec.Command("crictl", "stop", string(containerID))
+	endpoint := "unix://" + socketPath
+	cmd := exec.Command("crictl", "-i", endpoint, "-r", endpoint, "stop", string(containerID))
 	stdout, _ := cmd.Output()
 	fmt.Print(string(stdout))
 }
@@ -286,6 +292,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, name string) {
 	experimentDetails.AppLabel = Getenv("APP_LABEL", "")
 	experimentDetails.ChaosUID = clientTypes.UID(Getenv("CHAOS_UID", ""))
 	experimentDetails.ChaosPodName = Getenv("POD_NAME", "")
+	experimentDetails.SocketPath = Getenv("SOCKET_PATH", "")
 }
 
 // Getenv fetch the env and set the default value, if any
