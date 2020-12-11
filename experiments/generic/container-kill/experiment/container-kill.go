@@ -106,14 +106,14 @@ func ContainerKill(clients clients.ClientSets) {
 	}
 
 	// Including the litmus lib for container-kill
-	if experimentsDetails.ChaosLib == "litmus" && (experimentsDetails.ContainerRuntime == "containerd" || experimentsDetails.ContainerRuntime == "crio") {
+	if experimentsDetails.ChaosLib == "litmus" {
 		err = litmusLIB.PrepareContainerKill(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
 		if err != nil {
 			failStep := "failed in chaos injection phase"
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			log.Fatalf("Chaos injection failed, err: %v", err)
 		}
-	} else if experimentsDetails.ChaosLib == "litmus" && experimentsDetails.ContainerRuntime == "docker" {
+	} else if experimentsDetails.ChaosLib == "pumba" && experimentsDetails.ContainerRuntime == "docker" {
 		err = pumbaLIB.PrepareContainerKill(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
 		if err != nil {
 			failStep := "failed in chaos injection phase"

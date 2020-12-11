@@ -6,15 +6,15 @@ import (
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	apiv1 "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 //CreateEvents create the events in the desired resource
-func CreateEvents(eventsDetails *types.EventDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, kind string) error {
-
+func CreateEvents(eventsDetails *types.EventDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, kind, eventName string) error {
 	events := &apiv1.Event{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      eventsDetails.Reason + chaosDetails.ExperimentName + string(chaosDetails.ChaosUID),
+			Name:      eventName,
 			Namespace: chaosDetails.ChaosNamespace,
 		},
 		Source: apiv1.EventSource{
@@ -44,28 +44,31 @@ func CreateEvents(eventsDetails *types.EventDetails, clients clients.ClientSets,
 // else it will create a new event
 func GenerateEvents(eventsDetails *types.EventDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, kind string) error {
 
-	var err error
-	event, _ := clients.KubeClient.CoreV1().Events(chaosDetails.ChaosNamespace).Get(eventsDetails.Reason+string(eventsDetails.ResourceUID), metav1.GetOptions{})
-
-	if event.Name != eventsDetails.Reason+chaosDetails.ExperimentName+string(chaosDetails.ChaosUID) {
-
-		err = CreateEvents(eventsDetails, clients, chaosDetails, kind)
-
-	} else {
-
-		event.LastTimestamp = metav1.Time{Time: time.Now()}
-
-		if kind == "ChaosResult" {
-			event.Message = eventsDetails.Message
-			event.CreationTimestamp = metav1.Time{Time: time.Now()}
-			event.FirstTimestamp = metav1.Time{Time: time.Now()}
-			event.Source.Component = chaosDetails.ChaosPodName
-			event.Type = eventsDetails.Type
-		} else {
-			event.Count = event.Count + 1
+	switch kind {
+	case "ChaosResult":
+		eventName := eventsDetails.Reason + chaosDetails.ChaosPodName
+		if err := CreateEvents(eventsDetails, clients, chaosDetails, kind, eventName); err != nil {
+			return err
 		}
-
-		_, err = clients.KubeClient.CoreV1().Events(chaosDetails.ChaosNamespace).Update(event)
+	case "ChaosEngine":
+		eventName := eventsDetails.Reason + chaosDetails.ExperimentName + string(chaosDetails.ChaosUID)
+		event, err := clients.KubeClient.CoreV1().Events(chaosDetails.ChaosNamespace).Get(eventName, metav1.GetOptions{})
+		if err != nil {
+			if k8serrors.IsNotFound(err) {
+				if err := CreateEvents(eventsDetails, clients, chaosDetails, kind, eventName); err != nil {
+					return err
+				}
+			} else {
+				return err
+			}
+		} else {
+			event.LastTimestamp = metav1.Time{Time: time.Now()}
+			event.Count = event.Count + 1
+			_, err = clients.KubeClient.CoreV1().Events(chaosDetails.ChaosNamespace).Update(event)
+			if err != nil {
+				return err
+			}
+		}
 	}
-	return err
+	return nil
 }
