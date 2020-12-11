@@ -173,12 +173,15 @@ func TriggerPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 		Wait(time.Duration(probe.RunProperties.Interval) * time.Second).
 		TryWithTimeout(func(attempt uint) error {
 			var command string
+			// It will use query or queryPath to get the prometheus metrics
+			// if both are provided, it will use query
 			if probe.PromProbeInputs.Query != "" {
 				command = "promql --host " + probe.PromProbeInputs.Endpoint + " \"" + probe.PromProbeInputs.Query + "\"" + " --output csv"
-			} else {
+			} else if probe.PromProbeInputs.QueryPath != "" {
 				command = "promql --host " + probe.PromProbeInputs.Endpoint + " \"$(cat " + probe.PromProbeInputs.QueryPath + ")\"" + " --output csv"
+			} else {
+				return errors.Errorf("[Probe]: Any one of query or queryPath is required")
 			}
-			log.Infof("command: %v", command)
 
 			var out, errOut bytes.Buffer
 			// run the inline command probe
@@ -200,6 +203,7 @@ func TriggerPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 				SecondValue(value).
 				Criteria(probe.PromProbeInputs.Comparator.Criteria).
 				CompareFloat(); err != nil {
+				log.Errorf("The %v prom probe has been Failed, err: %v", probe.Name, err)
 				return err
 			}
 			return nil
@@ -218,6 +222,7 @@ func TriggerContinuousPromProbe(probe v1alpha1.ProbeAttributes, chaosresult *typ
 
 	// it trigger the prom probe for the entire duration of chaos and it fails, if any err encounter
 	// it marked the error for the probes, if any
+loop:
 	for {
 		err = TriggerPromProbe(probe, chaosresult)
 		// record the error inside the probeDetails, we are maintaining a dedicated variable for the err, inside probeDetails
@@ -225,16 +230,14 @@ func TriggerContinuousPromProbe(probe v1alpha1.ProbeAttributes, chaosresult *typ
 			for index := range chaosresult.ProbeDetails {
 				if chaosresult.ProbeDetails[index].Name == probe.Name {
 					chaosresult.ProbeDetails[index].IsProbeFailedWithError = err
-					break
+					log.Errorf("The %v prom probe has been Failed, err: %v", probe.Name, err)
+					break loop
 				}
-
 			}
-			break
 		}
 		// waiting for the probe polling interval
 		time.Sleep(time.Duration(probe.RunProperties.ProbePollingInterval) * time.Second)
 	}
-
 }
 
 // TriggerOnChaosPromProbe trigger the onchaos prom probe
@@ -266,9 +269,9 @@ loop:
 				for index := range chaosresult.ProbeDetails {
 					if chaosresult.ProbeDetails[index].Name == probe.Name {
 						chaosresult.ProbeDetails[index].IsProbeFailedWithError = err
+						log.Errorf("The %v prom probe has been Failed, err: %v", probe.Name, err)
 						break loop
 					}
-
 				}
 			}
 			// waiting for the probe polling interval
