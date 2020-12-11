@@ -47,8 +47,8 @@ func CheckAuxiliaryApplicationStatus(AuxiliaryAppDetails string, timeout, delay 
 	return nil
 }
 
-// CheckPodStatus checks the running status of the application pod
-func CheckPodStatus(appNs, appLabel string, timeout, delay int, clients clients.ClientSets) error {
+// CheckPodStatusPhase checks the status of the application pod
+func CheckPodStatusPhase(appNs, appLabel string, timeout, delay int, clients clients.ClientSets, states ...string) error {
 	err := retry.
 		Times(uint(timeout / delay)).
 		Wait(time.Duration(delay) * time.Second).
@@ -58,10 +58,17 @@ func CheckPodStatus(appNs, appLabel string, timeout, delay int, clients clients.
 				return errors.Errorf("Unable to find the pods with matching labels, err: %v", err)
 			}
 			for _, pod := range podSpec.Items {
-				if string(pod.Status.Phase) != "Running" {
-					return errors.Errorf("Pod is not yet in running state")
+				isInState := false
+				for _, state := range states {
+					if string(pod.Status.Phase) == state {
+						isInState = true
+						break
+					}
 				}
-				log.InfoWithValues("[Status]: The running status of Pods are as follows", logrus.Fields{
+				if !isInState {
+					return errors.Errorf("Pod is not yet in targeted state")
+				}
+				log.InfoWithValues("[Status]: The status of Pods are as follows", logrus.Fields{
 					"Pod": pod.Name, "Status": pod.Status.Phase})
 			}
 			return nil
@@ -70,6 +77,11 @@ func CheckPodStatus(appNs, appLabel string, timeout, delay int, clients clients.
 		return err
 	}
 	return nil
+}
+
+// CheckPodStatus checks the running status of the application pod
+func CheckPodStatus(appNs, appLabel string, timeout, delay int, clients clients.ClientSets) error {
+	return CheckPodStatusPhase(appNs, appLabel, timeout, delay, clients, "Running")
 }
 
 // CheckContainerStatus checks the status of the application container
