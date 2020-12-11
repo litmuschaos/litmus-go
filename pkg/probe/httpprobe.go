@@ -62,9 +62,9 @@ func TriggerHTTPProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 			code, _ := strconv.Atoi(probe.HTTPProbeInputs.ExpectedResponseCode)
 			// matching the status code w/ expected code
 			if resp.StatusCode != code {
+				log.Errorf("The %v http probe has been Failed, err: %v", probe.Name, err)
 				return errors.Errorf("The response status code doesn't match with expected status code, code: %v", resp.StatusCode)
 			}
-
 			return nil
 		})
 	return err
@@ -81,6 +81,7 @@ func TriggerContinuousHTTPProbe(probe v1alpha1.ProbeAttributes, chaosresult *typ
 
 	// it trigger the http probe for the entire duration of chaos and it fails, if any error encounter
 	// it marked the error for the probes, if any
+loop:
 	for {
 		err = TriggerHTTPProbe(probe, chaosresult)
 		// record the error inside the probeDetails, we are maintaining a dedicated variable for the err, inside probeDetails
@@ -88,17 +89,14 @@ func TriggerContinuousHTTPProbe(probe v1alpha1.ProbeAttributes, chaosresult *typ
 			for index := range chaosresult.ProbeDetails {
 				if chaosresult.ProbeDetails[index].Name == probe.Name {
 					chaosresult.ProbeDetails[index].IsProbeFailedWithError = err
-					break
+					log.Errorf("The %v http probe has been Failed, err: %v", probe.Name, err)
+					break loop
 				}
-
 			}
-			break
 		}
-
 		// waiting for the probe polling interval
 		time.Sleep(time.Duration(probe.RunProperties.ProbePollingInterval) * time.Second)
 	}
-
 }
 
 //PreChaosHTTPProbe trigger the http probe for prechaos phase
