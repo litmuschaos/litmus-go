@@ -124,6 +124,7 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		if err != nil {
 			return errors.Errorf("Unable to create the helper pod, err: %v", err)
 		}
+
 	}
 
 	//checking the status of the helper pods, wait till the pod comes to running state else fail the experiment

@@ -62,8 +62,12 @@ func main() {
 //PreparePodNetworkChaos contains the prepration steps before chaos injection
 func PreparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails) error {
 
+	containerID, err := GetContainerID(experimentsDetails, clients)
+	if err != nil {
+		return err
+	}
 	// extract out the pid of the target container
-	targetPID, err := GetPID(experimentsDetails, clients)
+	targetPID, err := GetPID(experimentsDetails, containerID)
 	if err != nil {
 		return err
 	}
@@ -132,55 +136,93 @@ loop:
 	return nil
 }
 
-//GetPID extract out the pid of target container
-func GetPID(experimentDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) (int, error) {
-
-	pod, err := clients.KubeClient.CoreV1().Pods(experimentDetails.AppNS).Get(experimentDetails.TargetPods, v1.GetOptions{})
-	if err != nil {
-		return 0, err
-	}
+//GetContainerID extract out the container id of the target container
+func GetContainerID(experimentDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) (string, error) {
 
 	var containerID string
-
-	// filtering out the container id from the details of containers inside containerStatuses of the given pod
-	// container id is present in the form of <runtime>://<container-id>
-	for _, container := range pod.Status.ContainerStatuses {
-		if container.Name == experimentDetails.TargetContainer {
-			containerID = strings.Split(container.ContainerID, "//")[1]
-			break
+	switch experimentDetails.ContainerRuntime {
+	case "docker":
+		// deriving the container id of the pause container
+		cmd := "docker ps | grep k8s_POD_" + experimentDetails.TargetPods + "_" + experimentDetails.AppNS + " | awk '{print $1}'"
+		out, err := exec.Command("/bin/sh", "-c", cmd).CombinedOutput()
+		if err != nil {
+			log.Error(fmt.Sprintf("[docker]: Failed to run docker ps command: %s", string(out)))
+			return "", err
 		}
+		containerID = strings.TrimSpace(string(out))
+	case "containerd", "crio":
+		pod, err := clients.KubeClient.CoreV1().Pods(experimentDetails.AppNS).Get(experimentDetails.TargetPods, v1.GetOptions{})
+		if err != nil {
+			return "", err
+		}
+		// filtering out the container id from the details of containers inside containerStatuses of the given pod
+		// container id is present in the form of <runtime>://<container-id>
+		for _, container := range pod.Status.ContainerStatuses {
+			if container.Name == experimentDetails.TargetContainer {
+				containerID = strings.Split(container.ContainerID, "//")[1]
+				break
+			}
+		}
+	default:
+		return "", errors.Errorf("%v container runtime not suported", experimentDetails.ContainerRuntime)
 	}
-
 	log.Infof("containerid: %v", containerID)
 
-	// deriving pid from the inspect out of target container
-	endpoint := "unix://" + experimentDetails.SocketPath
-	out, err := exec.Command("crictl", "-i", endpoint, "-r", endpoint, "inspect", containerID).CombinedOutput()
-	if err != nil {
-		log.Error(fmt.Sprintf("[cri]: Failed to run crictl: %s", string(out)))
-		return 0, err
-	}
-	// parsing data from the json output of inspect command
-	PID, err := parsePIDFromJSON(out, experimentDetails.ContainerRuntime)
-	if err != nil {
-		log.Error(fmt.Sprintf("[cri]: Failed to parse json from crictl output: %s", string(out)))
-		return 0, err
+	return containerID, nil
+}
+
+//GetPID extract out the PID of the target container
+func GetPID(experimentDetails *experimentTypes.ExperimentDetails, containerID string) (int, error) {
+	var PID int
+
+	switch experimentDetails.ContainerRuntime {
+	case "docker":
+		// deriving pid from the inspect out of target container
+		out, err := exec.Command("docker", "inspect", containerID).CombinedOutput()
+		if err != nil {
+			log.Error(fmt.Sprintf("[docker]: Failed to run docker inspect: %s", string(out)))
+			return 0, err
+		}
+		// parsing data from the json output of inspect command
+		PID, err = parsePIDFromJSON(out, experimentDetails.ContainerRuntime)
+		if err != nil {
+			log.Error(fmt.Sprintf("[docker]: Failed to parse json from docker inspect output: %s", string(out)))
+			return 0, err
+		}
+	case "containerd", "crio":
+		// deriving pid from the inspect out of target container
+		endpoint := "unix://" + experimentDetails.SocketPath
+		out, err := exec.Command("crictl", "-i", endpoint, "-r", endpoint, "inspect", containerID).CombinedOutput()
+		if err != nil {
+			log.Error(fmt.Sprintf("[cri]: Failed to run crictl: %s", string(out)))
+			return 0, err
+		}
+		// parsing data from the json output of inspect command
+		PID, err = parsePIDFromJSON(out, experimentDetails.ContainerRuntime)
+		if err != nil {
+			log.Errorf(fmt.Sprintf("[cri]: Failed to parse json from crictl output: %s", string(out)))
+			return 0, err
+		}
+	default:
+		return 0, errors.Errorf("%v container runtime not suported", experimentDetails.ContainerRuntime)
 	}
 
 	log.Info(fmt.Sprintf("[cri]: Container ID=%s has process PID=%d", containerID, PID))
 
 	return PID, nil
-
 }
 
-// InspectResponse JSON representation of crictl inspect command output
-type InspectResponse struct {
+// CrictlInspectResponse JSON representation of crictl inspect command output
+// in crio, pid is present inside pid attribute of inspect output
+// in containerd, pid is present inside `info.pid` of inspect output
+type CrictlInspectResponse struct {
 	Info InfoDetails `json:"info"`
 }
 
-// InfoDetails contains all the container details
+// InfoDetails JSON representation of crictl inspect command output
 type InfoDetails struct {
 	RuntimeSpec RuntimeDetails `json:"runtimeSpec"`
+	PID         int            `json:"pid"`
 }
 
 // RuntimeDetails contains runtime details
@@ -199,14 +241,31 @@ type Namespace struct {
 	Path string `json:"path"`
 }
 
+// DockerInspectResponse JSON representation of docker inspect command output
+type DockerInspectResponse struct {
+	State StateDetails `json:"state"`
+}
+
+// StateDetails JSON representation of docker inspect command output
+type StateDetails struct {
+	PID int `json:"pid"`
+}
+
 //parsePIDFromJSON extract the pid from the json output
 func parsePIDFromJSON(j []byte, runtime string) (int, error) {
 	var pid int
 	// namespaces are present inside `info.runtimeSpec.linux.namespaces` of inspect output
 	// linux namespace of type network contains pid, in the form of `/proc/<pid>/ns/net`
 	switch runtime {
-	case "containerd", "crio":
-		var resp InspectResponse
+	case "docker":
+		// in docker, pid is present inside state.pid attribute of inspect output
+		var resp []DockerInspectResponse
+		if err := json.Unmarshal(j, &resp); err != nil {
+			return 0, err
+		}
+		pid = resp[0].State.PID
+	case "containerd":
+		var resp CrictlInspectResponse
 		if err := json.Unmarshal(j, &resp); err != nil {
 			return 0, err
 		}
@@ -216,10 +275,22 @@ func parsePIDFromJSON(j []byte, runtime string) (int, error) {
 				pid, _ = strconv.Atoi(value)
 			}
 		}
+	case "crio":
+		var info InfoDetails
+		if err := json.Unmarshal(j, &info); err != nil {
+			return 0, err
+		}
+		pid = info.PID
+		if pid == 0 {
+			var resp CrictlInspectResponse
+			if err := json.Unmarshal(j, &resp); err != nil {
+				return 0, err
+			}
+			pid = resp.Info.PID
+		}
 	default:
 		return 0, errors.Errorf("[cri]: No supported container runtime, runtime: %v", runtime)
 	}
-
 	if pid == 0 {
 		return 0, errors.Errorf("[cri]: No running target container found, pid: %v", string(pid))
 	}
