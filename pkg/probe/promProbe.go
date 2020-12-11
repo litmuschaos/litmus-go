@@ -232,6 +232,7 @@ func TriggerPromProbe(probe v1alpha1.ProbeAttributes, execCommandDetails litmuse
 				SecondValue(value).
 				Criteria(probe.PromProbeInputs.Comparator.Criteria).
 				CompareFloat(); err != nil {
+				log.Errorf("The %v prom probe has been Failed, err: %v", probe.Name, err)
 				return err
 			}
 
@@ -251,6 +252,7 @@ func TriggerContinuousPromProbe(probe v1alpha1.ProbeAttributes, execCommandDetai
 
 	// it trigger the prom probe for the entire duration of chaos and it fails, if any err encounter
 	// it marked the error for the probes, if any
+loop:
 	for {
 		err = TriggerPromProbe(probe, execCommandDetails, clients, chaosresult)
 		// record the error inside the probeDetails, we are maintaining a dedicated variable for the err, inside probeDetails
@@ -258,17 +260,14 @@ func TriggerContinuousPromProbe(probe v1alpha1.ProbeAttributes, execCommandDetai
 			for index := range chaosresult.ProbeDetails {
 				if chaosresult.ProbeDetails[index].Name == probe.Name {
 					chaosresult.ProbeDetails[index].IsProbeFailedWithError = err
-					break
+					log.Errorf("The %v prom probe has been Failed, err: %v", probe.Name, err)
+					break loop
 				}
-
 			}
-			break
 		}
-
 		// waiting for the probe polling interval
 		time.Sleep(time.Duration(probe.RunProperties.ProbePollingInterval) * time.Second)
 	}
-
 }
 
 // TriggerOnChaosPromProbe trigger the onchaos prom probe
@@ -300,16 +299,15 @@ loop:
 				for index := range chaosresult.ProbeDetails {
 					if chaosresult.ProbeDetails[index].Name == probe.Name {
 						chaosresult.ProbeDetails[index].IsProbeFailedWithError = err
+						log.Errorf("The %v prom probe has been Failed, err: %v", probe.Name, err)
 						break loop
 					}
-
 				}
 			}
 			// waiting for the probe polling interval
 			time.Sleep(time.Duration(probe.RunProperties.ProbePollingInterval) * time.Second)
 		}
 	}
-
 }
 
 // ExtractValueFromMetrics extract the value field from the prometheus metrix
