@@ -148,7 +148,7 @@ func GetContainerID(experimentsDetails *experimentTypes.ExperimentDetails, clien
 		}
 	}
 
-	log.Infof("containerid: %v", containerID)
+	log.Infof("container ID of app container under test: %v", containerID)
 	return containerID, nil
 }
 
