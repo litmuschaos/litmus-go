@@ -1,7 +1,9 @@
 package probe
 
 import (
+	"bytes"
 	"fmt"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -10,7 +12,6 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/math"
 	"github.com/litmuschaos/litmus-go/pkg/types"
-	litmusexec "github.com/litmuschaos/litmus-go/pkg/utils/exec"
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -62,25 +63,12 @@ func PreChaosPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resu
 			time.Sleep(time.Duration(probe.RunProperties.InitialDelaySeconds) * time.Second)
 		}
 
-		execCommandDetails, err := CreateHelperPod(probe, resultDetails, clients, chaosDetails, resultDetails.PromProbeImage)
-		if err != nil {
-			return err
-		}
-
 		// triggering the prom probe and storing the output into the out buffer
-		err = TriggerPromProbe(probe, execCommandDetails, clients, resultDetails)
+		err = TriggerPromProbe(probe, resultDetails)
 
 		// failing the probe, if the success condition doesn't met after the retry & timeout combinations
 		// it will update the status of all the unrun probes as well
 		if err = MarkedVerdictInEnd(err, resultDetails, probe.Name, probe.Mode, probe.Type, "PreChaos"); err != nil {
-			return err
-		}
-
-		// get runId
-		runID := GetRunIDFromProbe(resultDetails, probe.Name, probe.Type)
-
-		// deleting the external pod which was created for prom probe
-		if err = DeleteProbePod(chaosDetails, clients, runID); err != nil {
 			return err
 		}
 
@@ -97,13 +85,8 @@ func PreChaosPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resu
 			"Phase":          "PreChaos",
 		})
 
-		execCommandDetails, err := CreateHelperPod(probe, resultDetails, clients, chaosDetails, resultDetails.PromProbeImage)
-		if err != nil {
-			return err
-		}
-
 		// trigger the continuous cmd probe
-		go TriggerContinuousPromProbe(probe, execCommandDetails, clients, resultDetails)
+		go TriggerContinuousPromProbe(probe, resultDetails)
 	}
 
 	return nil
@@ -132,25 +115,12 @@ func PostChaosPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Res
 			time.Sleep(time.Duration(probe.RunProperties.InitialDelaySeconds) * time.Second)
 		}
 
-		execCommandDetails, err := CreateHelperPod(probe, resultDetails, clients, chaosDetails, resultDetails.PromProbeImage)
-		if err != nil {
-			return err
-		}
-
 		// triggering the prom probe and storing the output into the out buffer
-		err = TriggerPromProbe(probe, execCommandDetails, clients, resultDetails)
+		err = TriggerPromProbe(probe, resultDetails)
 
 		// failing the probe, if the success condition doesn't met after the retry & timeout combinations
 		// it will update the status of all the unrun probes as well
 		if err = MarkedVerdictInEnd(err, resultDetails, probe.Name, probe.Mode, probe.Type, "PostChaos"); err != nil {
-			return err
-		}
-
-		// get runId
-		runID := GetRunIDFromProbe(resultDetails, probe.Name, probe.Type)
-
-		// deleting the external pod which was created for prom probe
-		if err = DeleteProbePod(chaosDetails, clients, runID); err != nil {
 			return err
 		}
 
@@ -163,14 +133,8 @@ func PostChaosPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Res
 		if err = MarkedVerdictInEnd(err, resultDetails, probe.Name, probe.Mode, probe.Type, "PostChaos"); err != nil {
 			return err
 		}
-		// get runId
-		runID := GetRunIDFromProbe(resultDetails, probe.Name, probe.Type)
-		// deleting the external pod, which was created for prom probe
-		if err = DeleteProbePod(chaosDetails, clients, runID); err != nil {
-			return err
-		}
-	}
 
+	}
 	return nil
 }
 
@@ -191,20 +155,14 @@ func OnChaosPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 			"Phase":          "DuringChaos",
 		})
 
-		execCommandDetails, err := CreateHelperPod(probe, resultDetails, clients, chaosDetails, resultDetails.PromProbeImage)
-		if err != nil {
-			return err
-		}
-
 		// trigger the continuous prom probe
-		go TriggerOnChaosPromProbe(probe, execCommandDetails, clients, resultDetails, chaosDetails.ChaosDuration)
-
+		go TriggerOnChaosPromProbe(probe, resultDetails, chaosDetails.ChaosDuration)
 	}
 	return nil
 }
 
 // TriggerPromProbe trigger the prometheus probe inside the external pod
-func TriggerPromProbe(probe v1alpha1.ProbeAttributes, execCommandDetails litmusexec.PodDetails, clients clients.ClientSets, resultDetails *types.ResultDetails) error {
+func TriggerPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails) error {
 
 	// running the prom probe command and matching the output
 	// it will retry for some retry count, in each iterations of try it contains following things
@@ -214,15 +172,28 @@ func TriggerPromProbe(probe v1alpha1.ProbeAttributes, execCommandDetails litmuse
 		Timeout(int64(probe.RunProperties.ProbeTimeout)).
 		Wait(time.Duration(probe.RunProperties.Interval) * time.Second).
 		TryWithTimeout(func(attempt uint) error {
-			command := []string{"/bin/sh", "-c", "promql --host " + probe.PromProbeInputs.Endpoint + " \"" + probe.PromProbeInputs.Query + "\"" + " --output csv"}
-			// exec inside the external pod to get the o/p of given command
-			output, err := litmusexec.Exec(&execCommandDetails, clients, command)
-			if err != nil {
-				return errors.Errorf("Unable to get output of cmd command, err: %v", err)
+			var command string
+			// It will use query or queryPath to get the prometheus metrics
+			// if both are provided, it will use query
+			if probe.PromProbeInputs.Query != "" {
+				command = "promql --host " + probe.PromProbeInputs.Endpoint + " \"" + probe.PromProbeInputs.Query + "\"" + " --output csv"
+			} else if probe.PromProbeInputs.QueryPath != "" {
+				command = "promql --host " + probe.PromProbeInputs.Endpoint + " \"$(cat " + probe.PromProbeInputs.QueryPath + ")\"" + " --output csv"
+			} else {
+				return errors.Errorf("[Probe]: Any one of query or queryPath is required")
+			}
+
+			var out, errOut bytes.Buffer
+			// run the inline command probe
+			cmd := exec.Command("/bin/sh", "-c", command)
+			cmd.Stdout = &out
+			cmd.Stderr = &errOut
+			if err := cmd.Run(); err != nil {
+				return fmt.Errorf("Unable to run command, err: %v; error output: %v", err, errOut.String())
 			}
 
 			// extract the values from the metrics
-			value, err := ExtractValueFromMetrics(strings.TrimSpace(output))
+			value, err := ExtractValueFromMetrics(strings.TrimSpace(out.String()))
 			if err != nil {
 				return err
 			}
@@ -235,14 +206,13 @@ func TriggerPromProbe(probe v1alpha1.ProbeAttributes, execCommandDetails litmuse
 				log.Errorf("The %v prom probe has been Failed, err: %v", probe.Name, err)
 				return err
 			}
-
 			return nil
 		})
 	return err
 }
 
 // TriggerContinuousPromProbe trigger the continuous prometheus probe
-func TriggerContinuousPromProbe(probe v1alpha1.ProbeAttributes, execCommandDetails litmusexec.PodDetails, clients clients.ClientSets, chaosresult *types.ResultDetails) {
+func TriggerContinuousPromProbe(probe v1alpha1.ProbeAttributes, chaosresult *types.ResultDetails) {
 
 	// waiting for initial delay
 	if probe.RunProperties.InitialDelaySeconds != 0 {
@@ -254,7 +224,7 @@ func TriggerContinuousPromProbe(probe v1alpha1.ProbeAttributes, execCommandDetai
 	// it marked the error for the probes, if any
 loop:
 	for {
-		err = TriggerPromProbe(probe, execCommandDetails, clients, chaosresult)
+		err = TriggerPromProbe(probe, chaosresult)
 		// record the error inside the probeDetails, we are maintaining a dedicated variable for the err, inside probeDetails
 		if err != nil {
 			for index := range chaosresult.ProbeDetails {
@@ -271,7 +241,7 @@ loop:
 }
 
 // TriggerOnChaosPromProbe trigger the onchaos prom probe
-func TriggerOnChaosPromProbe(probe v1alpha1.ProbeAttributes, execCommandDetails litmusexec.PodDetails, clients clients.ClientSets, chaosresult *types.ResultDetails, duration int) {
+func TriggerOnChaosPromProbe(probe v1alpha1.ProbeAttributes, chaosresult *types.ResultDetails, duration int) {
 
 	// waiting for initial delay
 	if probe.RunProperties.InitialDelaySeconds != 0 {
@@ -295,7 +265,7 @@ loop:
 			break loop
 		default:
 			// record the error inside the probeDetails, we are maintaining a dedicated variable for the err, inside probeDetails
-			if err = TriggerPromProbe(probe, execCommandDetails, clients, chaosresult); err != nil {
+			if err = TriggerPromProbe(probe, chaosresult); err != nil {
 				for index := range chaosresult.ProbeDetails {
 					if chaosresult.ProbeDetails[index].Name == probe.Name {
 						chaosresult.ProbeDetails[index].IsProbeFailedWithError = err
@@ -342,6 +312,5 @@ func ExtractValueFromMetrics(metrics string) (string, error) {
 	if values[indexForValueColumn] == "" {
 		return "", errors.Errorf("error while parsing value from derived matrics")
 	}
-
 	return values[indexForValueColumn], nil
 }

@@ -141,8 +141,6 @@ func InitializeProbesInChaosResultDetails(chaosDetails *types.ChaosDetails, clie
 
 	chaosresult.ProbeDetails = probeDetails
 	chaosresult.ProbeArtifacts = map[string]types.ProbeArtifact{}
-	chaosresult.PromProbeImage = Getenv("LIB_IMAGE", "litmuschaos/go-runner:ci")
-
 	return nil
 }
 

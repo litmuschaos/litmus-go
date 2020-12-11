@@ -127,7 +127,6 @@ func TriggerSourceCmdProbe(probe v1alpha1.ProbeAttributes, execCommandDetails li
 
 // CreateProbePod creates an external pod with source image for the cmd probe
 func CreateProbePod(clients clients.ClientSets, chaosDetails *types.ChaosDetails, runID, source string) error {
-
 	cmdProbe := &apiv1.Pod{
 		ObjectMeta: v1.ObjectMeta{
 			Name:      chaosDetails.ExperimentName + "-probe-" + runID,
