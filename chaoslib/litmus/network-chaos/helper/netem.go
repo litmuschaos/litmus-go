@@ -221,7 +221,24 @@ type CrictlInspectResponse struct {
 
 // InfoDetails JSON representation of crictl inspect command output
 type InfoDetails struct {
-	PID int `json:"pid"`
+	RuntimeSpec RuntimeDetails `json:"runtimeSpec"`
+	PID         int            `json:"pid"`
+}
+
+// RuntimeDetails contains runtime details
+type RuntimeDetails struct {
+	Linux LinuxAttributes `json:"linux"`
+}
+
+// LinuxAttributes contains all the linux attributes
+type LinuxAttributes struct {
+	Namespaces []Namespace `json:"namespaces"`
+}
+
+// Namespace contains linux namespace details
+type Namespace struct {
+	Type string `json:"type"`
+	Path string `json:"path"`
 }
 
 // DockerInspectResponse JSON representation of docker inspect command output
@@ -237,7 +254,8 @@ type StateDetails struct {
 //parsePIDFromJSON extract the pid from the json output
 func parsePIDFromJSON(j []byte, runtime string) (int, error) {
 	var pid int
-
+	// namespaces are present inside `info.runtimeSpec.linux.namespaces` of inspect output
+	// linux namespace of type network contains pid, in the form of `/proc/<pid>/ns/net`
 	switch runtime {
 	case "docker":
 		// in docker, pid is present inside state.pid attribute of inspect output
@@ -246,17 +264,33 @@ func parsePIDFromJSON(j []byte, runtime string) (int, error) {
 			return 0, err
 		}
 		pid = resp[0].State.PID
-	case "containerd", "crio":
+	case "containerd":
 		var resp CrictlInspectResponse
 		if err := json.Unmarshal(j, &resp); err != nil {
 			return 0, err
 		}
-		// pid is present inside `info.pid` of inspect output
-		pid = resp.Info.PID
+		for _, namespace := range resp.Info.RuntimeSpec.Linux.Namespaces {
+			if namespace.Type == "network" {
+				value := strings.Split(namespace.Path, "/")[2]
+				pid, _ = strconv.Atoi(value)
+			}
+		}
+	case "crio":
+		var info InfoDetails
+		if err := json.Unmarshal(j, &info); err != nil {
+			return 0, err
+		}
+		pid = info.PID
+		if pid == 0 {
+			var resp CrictlInspectResponse
+			if err := json.Unmarshal(j, &resp); err != nil {
+				return 0, err
+			}
+			pid = resp.Info.PID
+		}
 	default:
 		return 0, errors.Errorf("[cri]: No supported container runtime, runtime: %v", runtime)
 	}
-
 	if pid == 0 {
 		return 0, errors.Errorf("[cri]: No running target container found, pid: %v", string(pid))
 	}
