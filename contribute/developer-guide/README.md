@@ -143,7 +143,7 @@ scaffolded files consist of placeholders which can then be filled as desired.
   - entry & exit criteria checks for the experiment 
   - helper utils in either [pkg](/pkg/) or new [base chaos libraries](/chaoslib) 
 
-- Update the `chaoslib/litmus/pod-delete/pod-delete.go` chaoslib to achieve the desired effect or reuse the existing chaoslib.
+- Update the `chaoslib/litmus/pod-delete/lib/pod-delete.go` chaoslib to achieve the desired effect or reuse the existing chaoslib.
 
 - Create an experiment README explaining, briefly, the *what*, *why* & *how* of the experiment to aid users of this experiment. 
 
