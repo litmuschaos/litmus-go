@@ -36,9 +36,11 @@ func PodNetworkLatency(clients clients.ClientSets) {
 	// Intialise Chaos Result Parameters
 	types.SetResultAttributes(&resultDetails, chaosDetails)
 
-	// Intialise the probe details. Bail out upon error, as we haven't entered exp business logic yet
-	if err = probe.InitializeProbesInChaosResultDetails(&chaosDetails, clients, &resultDetails); err != nil {
-		log.Fatalf("Unable to initialize the probes, err: %v", err)
+	if experimentsDetails.EngineName != "" {
+		// Intialise the probe details. Bail out upon error, as we haven't entered exp business logic yet
+		if err = probe.InitializeProbesInChaosResultDetails(&chaosDetails, clients, &resultDetails); err != nil {
+			log.Fatalf("Unable to initialize the probes, err: %v", err)
+		}
 	}
 
 	//Updating the chaos result in the beginning of experiment
@@ -101,7 +103,7 @@ func PodNetworkLatency(clients clients.ClientSets) {
 	}
 
 	// Including the pumba lib for pod-network-latency
-	if experimentsDetails.ChaosLib == "litmus" && experimentsDetails.ContainerRuntime == "docker" {
+	if experimentsDetails.ChaosLib == "pumba" && experimentsDetails.ContainerRuntime == "docker" {
 		// Calling AbortWatcher go routine, it will continuously watch for the abort signal for the entire chaos duration and generate the required events and result
 		// It is being invoked here, as opposed to within the chaoslib, as these experiments do not need additional recovery/chaos revert steps like in case of network experiments
 		go common.AbortWatcher(experimentsDetails.ExperimentName, clients, &resultDetails, &chaosDetails, &eventsDetails)
@@ -114,7 +116,7 @@ func PodNetworkLatency(clients clients.ClientSets) {
 		}
 		log.Info("[Confirmation]: The pod network latency chaos has been applied")
 		resultDetails.Verdict = "Pass"
-	} else if experimentsDetails.ChaosLib == "litmus" && (experimentsDetails.ContainerRuntime == "containerd" || experimentsDetails.ContainerRuntime == "crio") {
+	} else if experimentsDetails.ChaosLib == "litmus" {
 		err = litmusLIB.PodNetworkLatencyChaos(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
 		if err != nil {
 			log.Errorf("Chaos injection failed, err: %v", err)

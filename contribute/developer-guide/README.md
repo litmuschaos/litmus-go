@@ -204,7 +204,7 @@ Follow the steps provided below to setup okteto & test the experiment execution.
 - Execute the experiment against the sample app chosen & verify the steps via logs printed on the console.
 
   ```
-  go run experiments/<chaos-category>/<experiment-name>/<experiment-name>.go
+  go run bin/go-runner.go -name <experiment-name>
   ``` 
 
 - In parallel, observe the experiment execution via the changes to the pod/node state

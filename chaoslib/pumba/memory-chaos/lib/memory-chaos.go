@@ -44,6 +44,11 @@ func PreparePodMemoryHog(experimentsDetails *experimentTypes.ExperimentDetails, 
 		if err != nil {
 			return errors.Errorf("unable to get annotations, err: %v", err)
 		}
+		// Get Resource Requirements
+		experimentsDetails.Resources, err = common.GetChaosPodResourceRequirements(experimentsDetails.ChaosPodName, experimentsDetails.ExperimentName, experimentsDetails.ChaosNamespace, clients)
+		if err != nil {
+			return errors.Errorf("Unable to get resource requirements, err: %v", err)
+		}
 	}
 
 	if experimentsDetails.Sequence == "serial" {
@@ -192,9 +197,10 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 			},
 			Containers: []apiv1.Container{
 				{
-					Name:  "pumba-stress",
-					Image: experimentsDetails.LIBImage,
-					Args:  GetContainerArguments(experimentsDetails, appName),
+					Name:      "pumba-stress",
+					Image:     experimentsDetails.LIBImage,
+					Args:      GetContainerArguments(experimentsDetails, appName),
+					Resources: experimentsDetails.Resources,
 					VolumeMounts: []apiv1.VolumeMount{
 						{
 							Name:      "dockersocket",

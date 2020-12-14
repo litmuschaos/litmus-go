@@ -34,6 +34,19 @@ func PrepareNodeCPUHog(experimentsDetails *experimentTypes.ExperimentDetails, cl
 	}
 	log.Infof("Number of targeted nodes, %v", len(targetNodeList))
 
+	if experimentsDetails.EngineName != "" {
+		// Get Chaos Pod Annotation
+		experimentsDetails.Annotations, err = common.GetChaosPodAnnotation(experimentsDetails.ChaosPodName, experimentsDetails.ChaosNamespace, clients)
+		if err != nil {
+			return errors.Errorf("unable to get annotations, err: %v", err)
+		}
+		// Get Resource Requirements
+		experimentsDetails.Resources, err = common.GetChaosPodResourceRequirements(experimentsDetails.ChaosPodName, experimentsDetails.ExperimentName, experimentsDetails.ChaosNamespace, clients)
+		if err != nil {
+			return errors.Errorf("Unable to get resource requirements, err: %v", err)
+		}
+	}
+
 	if experimentsDetails.Sequence == "serial" {
 		if err = InjectChaosInSerialMode(experimentsDetails, targetNodeList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
 			return err
@@ -79,14 +92,6 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		})
 
 		experimentsDetails.RunID = common.GetRunID()
-
-		if experimentsDetails.EngineName != "" {
-			// Get Chaos Pod Annotation
-			experimentsDetails.Annotations, err = common.GetChaosPodAnnotation(experimentsDetails.ChaosPodName, experimentsDetails.ChaosNamespace, clients)
-			if err != nil {
-				return errors.Errorf("unable to get annotations, err: %v", err)
-			}
-		}
 
 		// Creating the helper pod to perform node cpu hog
 		err = CreateHelperPod(experimentsDetails, appNode, clients)
@@ -155,14 +160,6 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		})
 
 		experimentsDetails.RunID = common.GetRunID()
-
-		if experimentsDetails.EngineName != "" {
-			// Get Chaos Pod Annotation
-			experimentsDetails.Annotations, err = common.GetChaosPodAnnotation(experimentsDetails.ChaosPodName, experimentsDetails.ChaosNamespace, clients)
-			if err != nil {
-				return errors.Errorf("unable to get annotations, err: %v", err)
-			}
-		}
 
 		// Creating the helper pod to perform node cpu hog
 		err = CreateHelperPod(experimentsDetails, appNode, clients)
@@ -255,6 +252,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, appN
 						"--timeout",
 						strconv.Itoa(experimentsDetails.ChaosDuration),
 					},
+					Resources: experimentsDetails.Resources,
 				},
 			},
 		},

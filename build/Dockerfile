@@ -37,6 +37,8 @@ RUN curl -L https://github.com/alexei-led/pumba/releases/download/${PUMBA_VERSIO
 #Installing promql cli binaries
 RUN curl -L https://github.com/litmuschaos/test-tools/raw/master/custom/promql-cli/promql-linux-${TARGETARCH} --output /usr/local/bin/promql && chmod +x /usr/local/bin/promql
 
+COPY --from=docker:19.03 /usr/local/bin/docker /usr/local/bin/
+
 #Copying Necessary Files
 COPY ./build/_output/${TARGETARCH} ./litmus
 

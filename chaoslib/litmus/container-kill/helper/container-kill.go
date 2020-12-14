@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	"bytes"
 	"os"
 	"os/exec"
 	"strconv"
@@ -57,12 +57,6 @@ func KillContainer(experimentsDetails *experimentTypes.ExperimentDetails, client
 
 	for iteration := 0; iteration < experimentsDetails.Iterations; iteration++ {
 
-		//Obtain the pod ID of the application pod
-		podID, err := GetPodID(experimentsDetails)
-		if err != nil {
-			return errors.Errorf("Unable to get the pod id, %v", err)
-		}
-
 		//GetRestartCount return the restart count of target container
 		restartCountBefore, err := GetRestartCount(experimentsDetails, experimentsDetails.TargetPods, clients)
 		if err != nil {
@@ -70,8 +64,8 @@ func KillContainer(experimentsDetails *experimentTypes.ExperimentDetails, client
 		}
 
 		//Obtain the container ID through Pod
-		// this id will be used to select the container for kill
-		containerID, err := GetContainerID(experimentsDetails, podID)
+		// this id will be used to select the container for the kill
+		containerID, err := GetContainerID(experimentsDetails, clients)
 		if err != nil {
 			return errors.Errorf("Unable to get the container id, %v", err)
 		}
@@ -89,8 +83,18 @@ func KillContainer(experimentsDetails *experimentTypes.ExperimentDetails, client
 			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngne")
 		}
 
-		// killing the application container
-		StopContainer(containerID)
+		switch experimentsDetails.ContainerRuntime {
+		case "docker":
+			if err := StopDockerContainer(containerID); err != nil {
+				return err
+			}
+		case "containerd", "crio":
+			if err := StopContainerdContainer(containerID, experimentsDetails.SocketPath); err != nil {
+				return err
+			}
+		default:
+			return errors.Errorf("%v container runtime not supported", experimentsDetails.ContainerRuntime)
+		}
 
 		//Waiting for the chaos interval after chaos injection
 		if experimentsDetails.ChaosInterval != 0 {
@@ -125,49 +129,50 @@ func KillContainer(experimentsDetails *experimentTypes.ExperimentDetails, client
 
 }
 
-//GetPodID derive the pod-id of the application pod
-func GetPodID(experimentsDetails *experimentTypes.ExperimentDetails) (string, error) {
-
-	cmd := exec.Command("crictl", "pods")
-	stdout, _ := cmd.Output()
-
-	pods := RemoveExtraSpaces(stdout)
-	for i := 0; i < len(pods)-1; i++ {
-		attributes := strings.Split(pods[i], " ")
-		if attributes[3] == experimentsDetails.TargetPods {
-			return attributes[0], nil
-		}
-
-	}
-
-	return "", fmt.Errorf("%v pod is unavailable", experimentsDetails.TargetPods)
-}
-
 //GetContainerID  derive the container id of the application container
-func GetContainerID(experimentsDetails *experimentTypes.ExperimentDetails, podID string) (string, error) {
+func GetContainerID(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) (string, error) {
 
-	cmd := exec.Command("crictl", "ps")
-	stdout, _ := cmd.Output()
-	containers := RemoveExtraSpaces(stdout)
-
-	for i := 0; i < len(containers)-1; i++ {
-		attributes := strings.Split(containers[i], " ")
-		if attributes[4] == experimentsDetails.TargetContainer && attributes[6] == podID {
-			return attributes[0], nil
-		}
-
+	pod, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Get(experimentsDetails.TargetPods, v1.GetOptions{})
+	if err != nil {
+		return "", err
 	}
 
-	return "", fmt.Errorf("%v container is unavailable", experimentsDetails.TargetContainer)
+	var containerID string
 
+	// filtering out the container id from the details of containers inside containerStatuses of the given pod
+	// container id is present in the form of <runtime>://<container-id>
+	for _, container := range pod.Status.ContainerStatuses {
+		if container.Name == experimentsDetails.TargetContainer {
+			containerID = strings.Split(container.ContainerID, "//")[1]
+			break
+		}
+	}
+
+	log.Infof("container ID of app container under test: %v", containerID)
+	return containerID, nil
 }
 
-//StopContainer kill the application container
-func StopContainer(containerID string) {
+//StopContainerdContainer kill the application container
+func StopContainerdContainer(containerID, socketPath string) error {
+	var errOut bytes.Buffer
+	endpoint := "unix://" + socketPath
+	cmd := exec.Command("crictl", "-i", endpoint, "-r", endpoint, "stop", string(containerID))
+	cmd.Stderr = &errOut
+	if err := cmd.Run(); err != nil {
+		return errors.Errorf("Unable to run command, err: %v; error output: %v", err, errOut.String())
+	}
+	return nil
+}
 
-	cmd := exec.Command("crictl", "stop", string(containerID))
-	stdout, _ := cmd.Output()
-	fmt.Print(string(stdout))
+//StopDockerContainer kill the application container
+func StopDockerContainer(containerID string) error {
+	var errOut bytes.Buffer
+	cmd := exec.Command("docker", "kill", string(containerID))
+	cmd.Stderr = &errOut
+	if err := cmd.Run(); err != nil {
+		return errors.Errorf("Unable to run command, err: %v; error output: %v", err, errOut.String())
+	}
+	return nil
 }
 
 // CheckContainerStatus checks the status of the application container
@@ -194,31 +199,6 @@ func CheckContainerStatus(experimentsDetails *experimentTypes.ExperimentDetails,
 		return err
 	}
 	return nil
-}
-
-// RemoveExtraSpaces remove all the extra spaces present in output of crictl commands
-func RemoveExtraSpaces(arr []byte) []string {
-	bytesSlice := make([]byte, len(arr))
-	index := 0
-	count := 0
-	for i := 0; i < len(arr); i++ {
-		count = 0
-		for arr[i] == 32 {
-			count++
-			i++
-			if i >= len(arr) {
-				break
-			}
-		}
-		if count > 1 {
-			bytesSlice[index] = 32
-			index++
-		}
-		bytesSlice[index] = arr[i]
-		index++
-
-	}
-	return strings.Split(string(bytesSlice), "\n")
 }
 
 //waitForChaosInterval waits for the given ramp time duration (in seconds)
@@ -286,6 +266,8 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, name string) {
 	experimentDetails.AppLabel = Getenv("APP_LABEL", "")
 	experimentDetails.ChaosUID = clientTypes.UID(Getenv("CHAOS_UID", ""))
 	experimentDetails.ChaosPodName = Getenv("POD_NAME", "")
+	experimentDetails.SocketPath = Getenv("SOCKET_PATH", "")
+	experimentDetails.ContainerRuntime = Getenv("CONTAINER_RUNTIME", "")
 }
 
 // Getenv fetch the env and set the default value, if any

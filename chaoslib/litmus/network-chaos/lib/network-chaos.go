@@ -56,6 +56,11 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 		if err != nil {
 			return errors.Errorf("unable to get annotations, err: %v", err)
 		}
+		// Get Resource Requirements
+		experimentsDetails.Resources, err = common.GetChaosPodResourceRequirements(experimentsDetails.ChaosPodName, experimentsDetails.ExperimentName, experimentsDetails.ChaosNamespace, clients)
+		if err != nil {
+			return errors.Errorf("Unable to get resource requirements, err: %v", err)
+		}
 	}
 
 	if experimentsDetails.Sequence == "serial" {
@@ -119,6 +124,7 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		if err != nil {
 			return errors.Errorf("Unable to create the helper pod, err: %v", err)
 		}
+
 	}
 
 	//checking the status of the helper pods, wait till the pod comes to running state else fail the experiment
@@ -172,10 +178,7 @@ func GetTargetContainer(experimentsDetails *experimentTypes.ExperimentDetails, a
 // CreateHelperPod derive the attributes for helper pod and create the helper pod
 func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, podName, nodeName, runID string, args string) error {
 
-	privilegedEnable := false
-	if experimentsDetails.ContainerRuntime == "crio" {
-		privilegedEnable = true
-	}
+	privilegedEnable := true
 
 	helperPod := &apiv1.Pod{
 		ObjectMeta: v1.ObjectMeta{
@@ -203,14 +206,6 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 						},
 					},
 				},
-				{
-					Name: "cri-config",
-					VolumeSource: apiv1.VolumeSource{
-						HostPath: &apiv1.HostPathVolumeSource{
-							Path: "/etc/crictl.yaml",
-						},
-					},
-				},
 			},
 
 			Containers: []apiv1.Container{
@@ -225,15 +220,12 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 						"-c",
 						"./helper/network-chaos",
 					},
-					Env: GetPodEnv(experimentsDetails, podName, args),
+					Resources: experimentsDetails.Resources,
+					Env:       GetPodEnv(experimentsDetails, podName, args),
 					VolumeMounts: []apiv1.VolumeMount{
 						{
 							Name:      "cri-socket",
 							MountPath: experimentsDetails.SocketPath,
-						},
-						{
-							Name:      "cri-config",
-							MountPath: "/etc/crictl.yaml",
 						},
 					},
 					SecurityContext: &apiv1.SecurityContext{
@@ -271,6 +263,7 @@ func GetPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, podName, a
 		"NETEM_COMMAND":        args,
 		"NETWORK_INTERFACE":    experimentsDetails.NetworkInterface,
 		"EXPERIMENT_NAME":      experimentsDetails.ExperimentName,
+		"SOCKET_PATH":          experimentsDetails.SocketPath,
 		"DESTINATION_IPS":      GetTargetIpsArgs(experimentsDetails.DestinationIPs, experimentsDetails.DestinationHosts),
 	}
 	for key, value := range ENVList {
