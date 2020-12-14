@@ -40,7 +40,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.DestinationHosts = Getenv("DESTINATION_HOSTS", "")
 	experimentDetails.ContainerRuntime = Getenv("CONTAINER_RUNTIME", "docker")
 	experimentDetails.ChaosServiceAccount = Getenv("CHAOS_SERVICE_ACCOUNT", "")
-	experimentDetails.SocketPath = Getenv("SOCKET_PATH", "/run/containerd/containerd.sock")
+	experimentDetails.SocketPath = Getenv("SOCKET_PATH", "/var/run/docker.sock")
 	experimentDetails.Sequence = Getenv("SEQUENCE", "parallel")
 
 }
