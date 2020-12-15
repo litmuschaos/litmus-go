@@ -9,7 +9,7 @@
 # Docker info
 DOCKER_REPO ?= litmuschaos
 DOCKER_IMAGE ?= go-runner
-DOCKER_TAG ?= ci
+DOCKER_TAG ?= 1.11.0-nonroot
 
 IS_DOCKER_INSTALLED = $(shell which docker >> /dev/null 2>&1; echo $$?)
 PACKAGES = $(shell go list ./... | grep -v '/vendor/')
@@ -81,7 +81,7 @@ build:
 	@echo "-------------------------"
 	@echo "--> Build go-runner image" 
 	@echo "-------------------------"
-	@sudo docker buildx build --file build/Dockerfile --progress plane --platform linux/arm64,linux/amd64 --no-cache --tag $(DOCKER_REPO)/$(DOCKER_IMAGE):$(DOCKER_TAG) .
+	@sudo docker buildx build --push --file build/Dockerfile --progress plane --platform linux/arm64,linux/amd64 --no-cache --tag $(DOCKER_REPO)/$(DOCKER_IMAGE):$(DOCKER_TAG) .
 
 .PHONY: build-amd64
 build-amd64:

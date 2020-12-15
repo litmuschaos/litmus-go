@@ -3,11 +3,13 @@ FROM alpine:3.12
 LABEL maintainer="LitmusChaos"
 
 ARG TARGETARCH
+ARG USER=litmus
 
 RUN rm -rf /var/lib/apt/lists/*
 
 # Install generally useful things
 RUN apk --update add \
+        sudo \
         bash\
         make\
         git \
@@ -41,5 +43,12 @@ COPY --from=docker:19.03 /usr/local/bin/docker /usr/local/bin/
 
 #Copying Necessary Files
 COPY ./build/_output/${TARGETARCH} ./litmus
+
+#add new user
+RUN adduser -D -S $USER \
+        && echo "$USER ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/$USER \
+        && chmod 0440 /etc/sudoers.d/$USER
+
+USER $USER
 
 WORKDIR /litmus

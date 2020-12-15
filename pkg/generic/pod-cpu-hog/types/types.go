@@ -33,4 +33,5 @@ type ExperimentDetails struct {
 	TargetContainer    string
 	Sequence           string
 	Resources          corev1.ResourceRequirements
+	SocketPath         string
 }

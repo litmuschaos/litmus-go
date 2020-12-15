@@ -192,7 +192,25 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 					Name: "dockersocket",
 					VolumeSource: apiv1.VolumeSource{
 						HostPath: &apiv1.HostPathVolumeSource{
-							Path: "/var/run/docker.sock",
+							Path: experimentsDetails.SocketPath,
+						},
+					},
+				},
+			},
+			InitContainers: []apiv1.Container{
+				{
+					Name:            "setup-pumba-stress",
+					Image:           experimentsDetails.LIBImage,
+					ImagePullPolicy: apiv1.PullPolicy(experimentsDetails.LIBImagePullPolicy),
+					Command: []string{
+						"/bin/bash",
+						"-c",
+						"sudo chmod 777 " + experimentsDetails.SocketPath,
+					},
+					VolumeMounts: []apiv1.VolumeMount{
+						{
+							Name:      "dockersocket",
+							MountPath: experimentsDetails.SocketPath,
 						},
 					},
 				},
@@ -206,7 +224,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 					VolumeMounts: []apiv1.VolumeMount{
 						{
 							Name:      "dockersocket",
-							MountPath: "/var/run/docker.sock",
+							MountPath: experimentsDetails.SocketPath,
 						},
 					},
 					ImagePullPolicy: apiv1.PullPolicy(experimentsDetails.LIBImagePullPolicy),

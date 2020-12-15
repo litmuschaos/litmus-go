@@ -29,7 +29,7 @@ func CreateDelayQdisc(PID int, latency float64, jitter float64) error {
 
 	log.Info(fmt.Sprintf("[tc] CreateDelayQdisc: PID=%d interface=%s latency=%fs jitter=%fs", PID, iface, latency, jitter))
 
-	tc := fmt.Sprintf("nsenter -t %d -n tc qdisc add dev %s root handle 1: prio", PID, iface)
+	tc := fmt.Sprintf("sudo nsenter -t %d -n tc qdisc add dev %s root handle 1: prio", PID, iface)
 	cmd := exec.Command("/bin/bash", "-c", tc)
 	out, err := cmd.CombinedOutput()
 	log.Info(cmd.String())
@@ -40,9 +40,9 @@ func CreateDelayQdisc(PID int, latency float64, jitter float64) error {
 
 	if almostZero(jitter) {
 		// no jitter
-		tc = fmt.Sprintf("nsenter -t %d -n tc qdisc add dev %s parent 1:3 netem delay %fs", PID, iface, latency)
+		tc = fmt.Sprintf("sudo nsenter -t %d -n tc qdisc add dev %s parent 1:3 netem delay %fs", PID, iface, latency)
 	} else {
-		tc = fmt.Sprintf("nsenter -t %d -n tc qdisc add dev %s parent 1:3 netem delay %fs %fs", PID, iface, latency, jitter)
+		tc = fmt.Sprintf("sudo nsenter -t %d -n tc qdisc add dev %s parent 1:3 netem delay %fs %fs", PID, iface, latency, jitter)
 	}
 	cmd = exec.Command("/bin/bash", "-c", tc)
 	out, err = cmd.CombinedOutput()
@@ -68,7 +68,7 @@ func AddIPFilter(PID int, IP net.IP, port int) error {
 
 	log.Info(fmt.Sprintf("[tc] AddIPFilter: Target PID=%d, destination IP=%s, destination Port=%d", PID, IP, port))
 
-	tc := fmt.Sprintf("nsenter -t %d -n tc filter add dev eth0 protocol ip parent 1:0 prio 3 u32 match ip dst %s match ip dport %d 0xffff flowid 1:3", PID, IP, port)
+	tc := fmt.Sprintf("sudo nsenter -t %d -n tc filter add dev eth0 protocol ip parent 1:0 prio 3 u32 match ip dst %s match ip dport %d 0xffff flowid 1:3", PID, IP, port)
 	cmd := exec.Command("/bin/bash", "-c", tc)
 
 	out, err := cmd.CombinedOutput()
@@ -87,7 +87,7 @@ func Killnetem(PID int) error {
 		return errors.New("Target PID cannot be zero")
 	}
 
-	tc := fmt.Sprintf("nsenter -t %d -n tc qdisc delete dev eth0 root", PID)
+	tc := fmt.Sprintf("sudo nsenter -t %d -n tc qdisc delete dev eth0 root", PID)
 	cmd := exec.Command("/bin/bash", "-c", tc)
 	out, err := cmd.CombinedOutput()
 	log.Info(cmd.String())
