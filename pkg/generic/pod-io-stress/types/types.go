@@ -32,4 +32,5 @@ type ExperimentDetails struct {
 	Sequence                        string
 	VolumeMountPath                 string
 	Resources                       corev1.ResourceRequirements
+	SocketPath                      string
 }

@@ -1,11 +1,27 @@
-FROM ubuntu:bionic
+FROM alpine:3.12
 
 LABEL maintainer="LitmusChaos"
 
 ARG TARGETARCH
+ARG USER=litmus
 
-#Installing necessary ubuntu packages
-RUN apt-get update && apt-get install -y curl bash systemd iproute2 stress-ng openssh-client
+RUN rm -rf /var/lib/apt/lists/*
+
+# Install generally useful things
+RUN apk --update add \
+        sudo \
+        bash\
+        make\
+        git \
+        curl\
+        iproute2\
+        stress-ng\
+        openssh-client\
+        libc6-compat \
+        sshpass
+
+# Change default shell from ash to bash
+RUN sed -i -e "s/bin\/ash/bin\/bash/" /etc/passwd     
 
 #Installing Kubectl
 ENV KUBE_LATEST_VERSION="v1.18.0"
@@ -27,5 +43,12 @@ COPY --from=docker:19.03 /usr/local/bin/docker /usr/local/bin/
 
 #Copying Necessary Files
 COPY ./build/_output/${TARGETARCH} ./litmus
+
+#add new user
+RUN adduser -D -S $USER \
+        && echo "$USER ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/$USER \
+        && chmod 0440 /etc/sudoers.d/$USER
+
+USER $USER
 
 WORKDIR /litmus
