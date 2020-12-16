@@ -40,8 +40,8 @@ script:
   - make gotasks
   # Build
   - make build
-  # Running trivy check
-  - make trivy-check  
+  # # Running trivy check
+  # - make trivy-check
 
 after_success:
   - make push
