@@ -32,5 +32,6 @@ type ExperimentDetails struct {
 	Annotations        map[string]string
 	TargetContainer    string
 	Sequence           string
+	SocketPath         string
 	Resources          corev1.ResourceRequirements
 }

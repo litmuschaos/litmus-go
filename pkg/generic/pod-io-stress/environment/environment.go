@@ -34,6 +34,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.PodsAffectedPerc, _ = strconv.Atoi(Getenv("PODS_AFFECTED_PERC", "0"))
 	experimentDetails.Sequence = Getenv("SEQUENCE", "parallel")
 	experimentDetails.VolumeMountPath = Getenv("VOLUME_MOUNT_PATH", "")
+	experimentDetails.SocketPath = Getenv("SOCKET_PATH", "/var/run/docker.sock")
 
 }
 
