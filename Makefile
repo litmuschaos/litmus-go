@@ -7,6 +7,11 @@
 #
 IS_DOCKER_INSTALLED = $(shell which docker >> /dev/null 2>&1; echo $$?)
 
+# Docker info
+DOCKER_REPO ?= litmuschaos
+DOCKER_IMAGE ?= go-runner
+DOCKER_TAG ?= ci
+
 PACKAGES = $(shell go list ./... | grep -v '/vendor/')
 
 .PHONY: all
@@ -75,7 +80,7 @@ build:
 	@echo "-------------------------"
 	@echo "--> Build go-runner image" 
 	@echo "-------------------------"
-	@sudo docker buildx build --file build/litmus-go/Dockerfile --progress plane --platform linux/arm64,linux/amd64 --no-cache --tag litmuschaos/go-runner:ci .
+	@sudo docker buildx build --file build/litmus-go/Dockerfile --progress plane --platform linux/arm64,linux/amd64 --no-cache --tag $(DOCKER_REPO)/$(DOCKER_IMAGE):$(DOCKER_TAG) .
 
 .PHONY: build-amd64
 build-amd64:
@@ -87,7 +92,7 @@ build-amd64:
 	@echo "-------------------------"
 	@echo "--> Build go-runner image" 
 	@echo "-------------------------"
-	@sudo docker build --file build/litmus-go/Dockerfile --tag litmuschaos/go-runner:ci . --build-arg TARGETARCH=amd64
+	@sudo docker build --file build/litmus-go/Dockerfile --tag $(DOCKER_REPO)/$(DOCKER_IMAGE):$(DOCKER_TAG) . --build-arg TARGETARCH=amd64
 
 .PHONY: push-amd64
 push-amd64:
@@ -95,7 +100,7 @@ push-amd64:
 	@echo "------------------------------"
 	@echo "--> Pushing image" 
 	@echo "------------------------------"
-	@sudo docker push litmuschaos/go-runner:ci
+	@sudo docker push $(DOCKER_REPO)/$(DOCKER_IMAGE):$(DOCKER_TAG)
 	
 .PHONY: push
 push: litmus-go-push
@@ -104,7 +109,7 @@ litmus-go-push:
 	@echo "-------------------"
 	@echo "--> go-runner image" 
 	@echo "-------------------"
-	REPONAME="litmuschaos" IMGNAME="go-runner" IMGTAG="ci" ./build/push
+	REPONAME="$(DOCKER_REPO)" IMGNAME="$(DOCKER_IMAGE)" IMGTAG="$(DOCKER_TAG)" ./build/push
 	
 .PHONY: trivy-check
 trivy-check:
@@ -112,6 +117,6 @@ trivy-check:
 	@echo "------------------------"
 	@echo "---> Running Trivy Check"
 	@echo "------------------------"
-	@./trivy --exit-code 0 --severity HIGH --no-progress litmuschaos/go-runner:ci
-	@./trivy --exit-code 0 --severity CRITICAL --no-progress litmuschaos/go-runner:ci
+	@./trivy --exit-code 0 --severity HIGH --no-progress $(DOCKER_REPO)/$(DOCKER_IMAGE):$(DOCKER_TAG)
+	@./trivy --exit-code 0 --severity CRITICAL --no-progress $(DOCKER_REPO)/$(DOCKER_IMAGE):$(DOCKER_TAG)
 
