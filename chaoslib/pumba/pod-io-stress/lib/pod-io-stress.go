@@ -192,7 +192,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 					Name: "dockersocket",
 					VolumeSource: apiv1.VolumeSource{
 						HostPath: &apiv1.HostPathVolumeSource{
-							Path: "/var/run/docker.sock",
+							Path: experimentsDetails.SocketPath,
 						},
 					},
 				},
@@ -206,7 +206,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 					VolumeMounts: []apiv1.VolumeMount{
 						{
 							Name:      "dockersocket",
-							MountPath: "/var/run/docker.sock",
+							MountPath: experimentsDetails.SocketPath,
 						},
 					},
 					ImagePullPolicy: apiv1.PullPolicy(experimentsDetails.LIBImagePullPolicy),
