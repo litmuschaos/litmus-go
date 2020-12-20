@@ -12,6 +12,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-autoscaler/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
+	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
@@ -239,10 +240,17 @@ func DeploymentStatusCheck(experimentsDetails *experimentTypes.ExperimentDetails
 			return errors.Errorf("Unable to perform autoscaling, err: %v", err)
 		}
 		return errors.Errorf("Failed to scale the application")
-	} else if err != nil {
+	}
+	if err != nil {
 		return err
 	}
 
+	// run the probes during chaos
+	if len(resultDetails.ProbeDetails) != 0 {
+		if err = probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+			return err
+		}
+	}
 	//ChaosCurrentTimeStamp contains the current timestamp
 	ChaosCurrentTimeStamp := time.Now().Unix()
 	if int(ChaosCurrentTimeStamp-ChaosStartTimeStamp) <= experimentsDetails.ChaosDuration {
@@ -285,8 +293,16 @@ func StatefulsetStatusCheck(experimentsDetails *experimentTypes.ExperimentDetail
 			return errors.Errorf("Unable to perform autoscaling, err: %v", err)
 		}
 		return errors.Errorf("Failed to scale the application")
-	} else if err != nil {
+	}
+	if err != nil {
 		return err
+	}
+
+	// run the probes during chaos
+	if len(resultDetails.ProbeDetails) != 0 {
+		if err = probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+			return err
+		}
 	}
 
 	//ChaosCurrentTimeStamp contains the current timestamp
