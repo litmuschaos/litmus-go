@@ -71,12 +71,17 @@ unused-package-check:
 	fi
 
 .PHONY: build
-build:
+build: experiment-build image-build
 
+.PHONY: experiment-build
+experiment-build:
 	@echo "------------------------------"
 	@echo "--> Build experiment go binary" 
 	@echo "------------------------------"
 	@./build/go-multiarch-build.sh build/generate_go_binary
+
+.PHONY: image-build
+image-build:	
 	@echo "-------------------------"
 	@echo "--> Build go-runner image" 
 	@echo "-------------------------"
@@ -119,4 +124,3 @@ trivy-check:
 	@echo "------------------------"
 	@./trivy --exit-code 0 --severity HIGH --no-progress $(DOCKER_REPO)/$(DOCKER_IMAGE):$(DOCKER_TAG)
 	@./trivy --exit-code 0 --severity CRITICAL --no-progress $(DOCKER_REPO)/$(DOCKER_IMAGE):$(DOCKER_TAG)
-
