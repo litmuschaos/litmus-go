@@ -72,12 +72,12 @@ func TriggerK8sProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets,
 			switch probe.Operation {
 			case "create", "Create":
 				if err = CreateResource(probe, gvr, clients); err != nil {
-					log.Errorf("The %v k8s probe has been Failed, err: %v", probe.Name, err)
+					log.Errorf("The %v k8s probe has Failed, err: %v", probe.Name, err)
 					return err
 				}
 			case "delete", "Delete":
 				if err = DeleteResource(probe, gvr, clients); err != nil {
-					log.Errorf("The %v k8s probe has been Failed, err: %v", probe.Name, err)
+					log.Errorf("The %v k8s probe has Failed, err: %v", probe.Name, err)
 					return err
 				}
 			case "present", "Present":
@@ -86,7 +86,7 @@ func TriggerK8sProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets,
 					LabelSelector: cmd.LabelSelector,
 				})
 				if err != nil || len(resourceList.Items) == 0 {
-					log.Errorf("The %v k8s probe has been Failed, err: %v", probe.Name, err)
+					log.Errorf("The %v k8s probe has Failed, err: %v", probe.Name, err)
 					return fmt.Errorf("unable to list the resources with matching selector, err: %v", err)
 				}
 			case "absent", "Absent":
@@ -98,7 +98,7 @@ func TriggerK8sProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets,
 					return fmt.Errorf("unable to list the resources with matching selector, err: %v", err)
 				}
 				if len(resourceList.Items) != 0 {
-					log.Errorf("The %v k8s probe has been Failed, err: %v", probe.Name, err)
+					log.Errorf("The %v k8s probe has Failed, err: %v", probe.Name, err)
 					return fmt.Errorf("Resource is not deleted yet due to, err: %v", err)
 				}
 			default:
@@ -148,7 +148,6 @@ func CreateResource(probe v1alpha1.ProbeAttributes, gvr schema.GroupVersionResou
 	if err != nil {
 		return err
 	}
-
 	_, err := clients.DynamicClient.Resource(gvr).Namespace(probe.K8sProbeInputs.Command.Namespace).Create(data, v1.CreateOptions{})
 
 	return err
