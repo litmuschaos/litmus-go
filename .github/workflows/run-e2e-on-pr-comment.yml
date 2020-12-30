@@ -72,13 +72,13 @@ jobs:
           ACTIONS_ALLOW_UNSECURE_COMMANDS: true
 
       - name: Setup Litmus
-        uses: mayadata-io/github-chaos-actions@v0.3.0
+        uses: mayadata-io/github-chaos-actions@v0.3.1
         env:
           INSTALL_LITMUS: true
 
       - name: Running Litmus pod delete chaos experiment
         if: startsWith(github.event.comment.body, '/run-e2e-pod-delete') || startsWith(github.event.comment.body, '/run-e2e-all')
-        uses: mayadata-io/github-chaos-actions@v0.3.0
+        uses: mayadata-io/github-chaos-actions@v0.3.1
         env:
           EXPERIMENT_NAME: pod-delete
           EXPERIMENT_IMAGE: litmuschaos/go-runner
@@ -96,7 +96,7 @@ jobs:
 
       - name: Running container kill chaos experiment
         if: startsWith(github.event.comment.body, '/run-e2e-container-kill') || startsWith(github.event.comment.body, '/run-e2e-all')
-        uses: mayadata-io/github-chaos-actions@v0.3.0
+        uses: mayadata-io/github-chaos-actions@v0.3.1
         env:
           EXPERIMENT_NAME: container-kill
           EXPERIMENT_IMAGE: litmuschaos/go-runner
@@ -115,7 +115,7 @@ jobs:
 
       - name: Running node-cpu-hog chaos experiment
         if: startsWith(github.event.comment.body, '/run-e2e-node-cpu-hog') || startsWith(github.event.comment.body, '/run-e2e-resource-chaos') || startsWith(github.event.comment.body, '/run-e2e-all')
-        uses: mayadata-io/github-chaos-actions@v0.3.0
+        uses: mayadata-io/github-chaos-actions@v0.3.1
         env:
           EXPERIMENT_NAME: node-cpu-hog
           EXPERIMENT_IMAGE: litmuschaos/go-runner
@@ -133,7 +133,7 @@ jobs:
 
       - name: Running node-memory-hog chaos experiment
         if: startsWith(github.event.comment.body, '/run-e2e-node-memory-hog') || startsWith(github.event.comment.body, '/run-e2e-resource-chaos') || startsWith(github.event.comment.body, '/run-e2e-all')
-        uses: mayadata-io/github-chaos-actions@v0.3.0
+        uses: mayadata-io/github-chaos-actions@v0.3.1
         env:
           EXPERIMENT_NAME: node-memory-hog
           EXPERIMENT_IMAGE: litmuschaos/go-runner
@@ -151,7 +151,7 @@ jobs:
           
       - name: Running pod-cpu-hog chaos experiment
         if: startsWith(github.event.comment.body, '/run-e2e-pod-cpu-hog') || startsWith(github.event.comment.body, '/run-e2e-resource-chaos') || startsWith(github.event.comment.body, '/run-e2e-all')
-        uses: mayadata-io/github-chaos-actions@v0.3.0
+        uses: mayadata-io/github-chaos-actions@v0.3.1
         env:
           EXPERIMENT_NAME: pod-cpu-hog
           EXPERIMENT_IMAGE: litmuschaos/go-runner
@@ -172,7 +172,7 @@ jobs:
           
       - name: Running pod-memory-hog chaos experiment
         if: startsWith(github.event.comment.body, '/run-e2e-pod-memory-hog') || startsWith(github.event.comment.body, '/run-e2e-resource-chaos') || startsWith(github.event.comment.body, '/run-e2e-all')
-        uses: mayadata-io/github-chaos-actions@v0.3.0
+        uses: mayadata-io/github-chaos-actions@v0.3.1
         env:
           EXPERIMENT_NAME: pod-cpu-hog
           EXPERIMENT_IMAGE: litmuschaos/go-runner
@@ -193,7 +193,7 @@ jobs:
           
       - name: Running pod network corruption chaos experiment
         if: startsWith(github.event.comment.body, '/run-e2e-pod-network-corruption') || startsWith(github.event.comment.body, '/run-e2e-network-chaos') || startsWith(github.event.comment.body, '/run-e2e-all')
-        uses: mayadata-io/github-chaos-actions@v0.3.0
+        uses: mayadata-io/github-chaos-actions@v0.3.1
         env:
           EXPERIMENT_NAME: pod-network-corruption
           EXPERIMENT_IMAGE: litmuschaos/go-runner
@@ -215,7 +215,7 @@ jobs:
 
       - name: Running pod network duplication chaos experiment
         if: startsWith(github.event.comment.body, '/run-e2e-pod-network-duplication') || startsWith(github.event.comment.body, '/run-e2e-network-chaos') || startsWith(github.event.comment.body, '/run-e2e-all')
-        uses: mayadata-io/github-chaos-actions@v0.3.0
+        uses: mayadata-io/github-chaos-actions@v0.3.1
         env:
           EXPERIMENT_NAME: pod-network-duplication
           EXPERIMENT_IMAGE: litmuschaos/go-runner
@@ -237,7 +237,7 @@ jobs:
         
       - name: Running pod-network-latency chaos experiment
         if: startsWith(github.event.comment.body, '/run-e2e-pod-network-latency') || startsWith(github.event.comment.body, '/run-e2e-network-chaos') || startsWith(github.event.comment.body, '/run-e2e-all')
-        uses: mayadata-io/github-chaos-actions@v0.3.0
+        uses: mayadata-io/github-chaos-actions@v0.3.1
         env:
           EXPERIMENT_NAME: pod-network-latency
           EXPERIMENT_IMAGE: litmuschaos/go-runner
@@ -260,7 +260,7 @@ jobs:
 
       - name: Running pod-network-loss chaos experiment
         if: startsWith(github.event.comment.body, '/run-e2e-pod-network-loss') || startsWith(github.event.comment.body, '/run-e2e-network-chaos') || startsWith(github.event.comment.body, '/run-e2e-all')
-        uses: mayadata-io/github-chaos-actions@v0.3.0
+        uses: mayadata-io/github-chaos-actions@v0.3.1
         env:
           EXPERIMENT_NAME: pod-network-loss
           EXPERIMENT_IMAGE: litmuschaos/go-runner
@@ -283,7 +283,7 @@ jobs:
         
       - name: Running pod autoscaler chaos experiment
         if: startsWith(github.event.comment.body, '/run-e2e-pod-autoscaler') || startsWith(github.event.comment.body, '/run-e2e-all')
-        uses: mayadata-io/github-chaos-actions@v0.3.0
+        uses: mayadata-io/github-chaos-actions@v0.3.1
         env:
           EXPERIMENT_NAME: pod-autoscaler
           EXPERIMENT_IMAGE: litmuschaos/go-runner
@@ -302,7 +302,7 @@ jobs:
         
       - name: Running node-io-stress chaos experiment
         if: startsWith(github.event.comment.body, '/run-e2e-node-io-stress') || startsWith(github.event.comment.body, '/run-e2e-io-chaos') || startsWith(github.event.comment.body, '/run-e2e-all')
-        uses: mayadata-io/github-chaos-actions@v0.3.0
+        uses: mayadata-io/github-chaos-actions@v0.3.1
         env:
           EXPERIMENT_NAME: node-io-stress
           EXPERIMENT_IMAGE: litmuschaos/go-runner
@@ -362,7 +362,7 @@ jobs:
           RUN_ID: ${{ github.run_id }}
 
       - name: Uninstall Litmus
-        uses: mayadata-io/github-chaos-actions@v0.3.0
+        uses: mayadata-io/github-chaos-actions@v0.3.1
         env:          
           LITMUS_CLEANUP: true
 
