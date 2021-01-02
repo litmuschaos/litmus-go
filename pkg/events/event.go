@@ -64,6 +64,8 @@ func GenerateEvents(eventsDetails *types.EventDetails, clients clients.ClientSet
 		} else {
 			event.LastTimestamp = metav1.Time{Time: time.Now()}
 			event.Count = event.Count + 1
+			event.Source.Component = chaosDetails.ChaosPodName
+			event.Message = eventsDetails.Message
 			_, err = clients.KubeClient.CoreV1().Events(chaosDetails.ChaosNamespace).Update(event)
 			if err != nil {
 				return err
