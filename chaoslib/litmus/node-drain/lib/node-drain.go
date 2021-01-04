@@ -147,7 +147,7 @@ func DrainNode(experimentsDetails *experimentTypes.ExperimentDetails, clients cl
 		return fmt.Errorf("Unable to drain the %v node, err: %v", experimentsDetails.TargetNode, err)
 	}
 
-	err = retry.
+	return retry.
 		Times(90).
 		Wait(1 * time.Second).
 		Try(func(attempt uint) error {
@@ -160,8 +160,6 @@ func DrainNode(experimentsDetails *experimentTypes.ExperimentDetails, clients cl
 			}
 			return nil
 		})
-
-	return nil
 }
 
 // UncordonNode uncordon the application node
@@ -178,7 +176,7 @@ func UncordonNode(experimentsDetails *experimentTypes.ExperimentDetails, clients
 		return fmt.Errorf("Unable to uncordon the %v node, err: %v", experimentsDetails.TargetNode, err)
 	}
 
-	err = retry.
+	return retry.
 		Times(90).
 		Wait(1 * time.Second).
 		Try(func(attempt uint) error {
@@ -191,6 +189,4 @@ func UncordonNode(experimentsDetails *experimentTypes.ExperimentDetails, clients
 			}
 			return nil
 		})
-
-	return nil
 }
