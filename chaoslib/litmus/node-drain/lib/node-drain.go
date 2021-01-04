@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -137,7 +138,7 @@ func DrainNode(experimentsDetails *experimentTypes.ExperimentDetails, clients cl
 
 	log.Infof("[Inject]: Draining the %v node", experimentsDetails.TargetNode)
 
-	command := exec.Command("kubectl", "drain", experimentsDetails.TargetNode, "--ignore-daemonsets", "--delete-local-data", "--force")
+	command := exec.Command("kubectl", "drain", experimentsDetails.TargetNode, "--ignore-daemonsets", "--delete-local-data", "--force", "--timeout", strconv.Itoa(experimentsDetails.ChaosDuration)+"s")
 	var out, stderr bytes.Buffer
 	command.Stdout = &out
 	command.Stderr = &stderr
