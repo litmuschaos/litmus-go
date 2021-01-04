@@ -142,7 +142,7 @@ func CreateProbePod(clients clients.ClientSets, chaosDetails *types.ChaosDetails
 				{
 					Name:            chaosDetails.ExperimentName + "-probe",
 					Image:           source,
-					ImagePullPolicy: apiv1.PullAlways,
+					ImagePullPolicy: apiv1.PullPolicy(chaosDetails.ProbeImagePullPolicy),
 					Command: []string{
 						"/bin/sh",
 					},
