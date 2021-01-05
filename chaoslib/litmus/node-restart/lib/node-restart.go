@@ -90,7 +90,7 @@ func PrepareNodeRestart(experimentsDetails *experimentTypes.ExperimentDetails, c
 
 	//Checking the status of helper pod
 	log.Info("[Status]: Checking the status of the helper pod")
-	err = status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, appLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
+	err = CheckApplicationStatus(experimentsDetails.ChaosNamespace, appLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 	if err != nil {
 		common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-"+experimentsDetails.RunID, appLabel, chaosDetails, clients)
 		return errors.Errorf("helper pod is not in running state, err: %v", err)
@@ -222,4 +222,23 @@ func GetNode(experimentsDetails *experimentTypes.ExperimentDetails, clients clie
 	podForNodeCandidate := podList.Items[randomIndex]
 
 	return &podForNodeCandidate, nil
+}
+
+// CheckApplicationStatus checks the status of the AUT
+func CheckApplicationStatus(appNs, appLabel string, timeout, delay int, clients clients.ClientSets) error {
+
+	// Checking whether application containers are in ready state
+	log.Info("[Status]: Checking whether application containers are in ready state")
+	err := status.CheckContainerStatus(appNs, appLabel, timeout, delay, clients)
+	if err != nil {
+		return err
+	}
+	// Checking whether application pods are in running or completed state
+	log.Info("[Status]: Checking whether application pods are in running or completed state")
+	err = status.CheckPodStatusPhase(appNs, appLabel, timeout, delay, clients, "Running", "Completed")
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

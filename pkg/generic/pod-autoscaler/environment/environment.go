@@ -20,6 +20,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.AppNS = Getenv("APP_NAMESPACE", "")
 	experimentDetails.AppLabel = Getenv("APP_LABEL", "")
 	experimentDetails.AppKind = Getenv("APP_KIND", "")
+	experimentDetails.AppAffectPercentage, _ = strconv.Atoi(Getenv("APP_AFFECT_PERC", "100"))
 	experimentDetails.Replicas, _ = strconv.Atoi(Getenv("REPLICA_COUNT", ""))
 	experimentDetails.ChaosUID = clientTypes.UID(Getenv("CHAOS_UID", ""))
 	experimentDetails.InstanceID = Getenv("INSTANCE_ID", "")

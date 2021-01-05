@@ -69,7 +69,7 @@ func parsePIDFromJSON(j []byte, runtime string) (int, error) {
 	}
 
 	if pid == 0 {
-		return 0, errors.Errorf("[cri] no running target container found, pid: %v", string(pid))
+		return 0, errors.Errorf("[cri] no running target container found, pid: %d", pid)
 	}
 
 	return pid, nil
