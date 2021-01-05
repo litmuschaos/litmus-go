@@ -3,7 +3,7 @@ name: Release
 on:
   create:
     tags:
-      - 'v*'
+      - '**'
 
 jobs:
   lint:
@@ -55,7 +55,7 @@ jobs:
 
       - name: Set Tag
         run: |
-          TAG="${GITHUB_REF#refs/*/v}"
+          TAG="${GITHUB_REF#refs/*/}"
           echo "TAG=${TAG}" >> $GITHUB_ENV
           echo "RELEASE_TAG=${TAG}" >> $GITHUB_ENV
 
