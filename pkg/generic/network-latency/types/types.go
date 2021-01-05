@@ -7,26 +7,27 @@ import (
 
 // ExperimentDetails is for collecting all the experiment-related details
 type ExperimentDetails struct {
-	ExperimentName      string
-	EngineName          string
-	ChaosDuration       int
-	ChaosInterval       int
-	RampTime            int
-	ChaosLib            string
-	ChaosServiceAccount string
-	AppNS               string
-	AppLabel            string
-	AppKind             string
-	ChaosUID            clientTypes.UID
-	AuxiliaryAppInfo    string
-	InstanceID          string
-	ChaosNamespace      string
-	ChaosPodName        string
-	Latency             float64
-	Jitter              float64
-	ChaosNode           string
-	Timeout             int
-	Delay               int
+	ExperimentName        string
+	EngineName            string
+	ChaosDuration         int
+	ChaosInterval         int
+	RampTime              int
+	ChaosLib              string
+	ChaosServiceAccount   string
+	AppNS                 string
+	AppLabel              string
+	AppKind               string
+	ChaosUID              clientTypes.UID
+	AuxiliaryAppInfo      string
+	InstanceID            string
+	ChaosNamespace        string
+	ChaosPodName          string
+	Latency               float64
+	Jitter                float64
+	ChaosNode             string
+	Timeout               int
+	Delay                 int
+	LIBImagePullPolicy    string
 }
 
 // Definition is the chaos experiment definition coming from a user input file.
