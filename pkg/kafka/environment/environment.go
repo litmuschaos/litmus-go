@@ -82,4 +82,5 @@ func InitialiseChaosVariables(chaosDetails *types.ChaosDetails, kafkaDetails *ka
 	chaosDetails.Timeout = kafkaDetails.ChaoslibDetail.Timeout
 	chaosDetails.Delay = kafkaDetails.ChaoslibDetail.Delay
 	chaosDetails.AppDetail = appDetails
+	chaosDetails.ProbeImagePullPolicy = experimentDetails.LIBImagePullPolicy
 }
