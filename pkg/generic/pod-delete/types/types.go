@@ -27,4 +27,5 @@ type ExperimentDetails struct {
 	TargetPods          string
 	PodsAffectedPerc    int
 	Sequence            string
+	LIBImagePullPolicy  string
 }
