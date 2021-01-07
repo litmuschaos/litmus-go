@@ -61,6 +61,7 @@ func ChaosResult(chaosDetails *types.ChaosDetails, clients clients.ClientSets, r
 		// the chaos-result is already present with matching labels
 		// it will patch the new parameters in the same chaos-result
 		if state == "SOT" {
+			result.Spec.RollbackStatus = "N/A"
 			return PatchChaosResult(&result, clients, chaosDetails, resultDetails, experimentLabel)
 		}
 
@@ -85,6 +86,7 @@ func InitializeChaosResult(chaosDetails *types.ChaosDetails, clients clients.Cli
 			EngineName:     chaosDetails.EngineName,
 			ExperimentName: chaosDetails.ExperimentName,
 			InstanceID:     chaosDetails.InstanceID,
+			RollbackStatus: "N/A",
 		},
 		Status: v1alpha1.ChaosResultStatus{
 			ExperimentStatus: v1alpha1.TestStatus{

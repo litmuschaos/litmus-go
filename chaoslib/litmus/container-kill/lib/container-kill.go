@@ -64,11 +64,11 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 	}
 
 	if experimentsDetails.Sequence == "serial" {
-		if err = InjectChaosInSerialMode(experimentsDetails, targetPodList, clients, chaosDetails); err != nil {
+		if err = InjectChaosInSerialMode(experimentsDetails, targetPodList, clients, chaosDetails, resultDetails); err != nil {
 			return err
 		}
 	} else {
-		if err = InjectChaosInParallelMode(experimentsDetails, targetPodList, clients, chaosDetails); err != nil {
+		if err = InjectChaosInParallelMode(experimentsDetails, targetPodList, clients, chaosDetails, resultDetails); err != nil {
 			return err
 		}
 	}
@@ -82,12 +82,12 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 }
 
 // InjectChaosInSerialMode kill the container of all target application serially (one by one)
-func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
+func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails) error {
 
 	// creating the helper pod to perform container kill chaos
 	for _, pod := range targetPodList.Items {
 		runID := common.GetRunID()
-		if err := CreateHelperPod(experimentsDetails, clients, pod.Name, pod.Spec.NodeName, runID); err != nil {
+		if err := CreateHelperPod(experimentsDetails, clients, pod.Name, pod.Spec.NodeName, runID, resultDetails); err != nil {
 			return errors.Errorf("Unable to create the helper pod, err: %v", err)
 		}
 
@@ -120,12 +120,12 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 }
 
 // InjectChaosInParallelMode kill the container of all target application in parallel mode (all at once)
-func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
+func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails) error {
 
 	// creating the helper pod to perform container kill chaos
 	for _, pod := range targetPodList.Items {
 		runID := common.GetRunID()
-		if err := CreateHelperPod(experimentsDetails, clients, pod.Name, pod.Spec.NodeName, runID); err != nil {
+		if err := CreateHelperPod(experimentsDetails, clients, pod.Name, pod.Spec.NodeName, runID, resultDetails); err != nil {
 			return errors.Errorf("Unable to create the helper pod, err: %v", err)
 		}
 	}
@@ -190,7 +190,7 @@ func GetTargetContainer(experimentsDetails *experimentTypes.ExperimentDetails, a
 }
 
 // CreateHelperPod derive the attributes for helper pod and create the helper pod
-func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, podName, nodeName, runID string) error {
+func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, podName, nodeName, runID string, resultDetails *types.ResultDetails) error {
 
 	privilegedEnable := false
 	if experimentsDetails.ContainerRuntime == "crio" {
@@ -236,7 +236,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 						"./helper/container-killer",
 					},
 					Resources: experimentsDetails.Resources,
-					Env:       GetPodEnv(experimentsDetails, podName),
+					Env:       GetPodEnv(experimentsDetails, podName, resultDetails),
 					VolumeMounts: []apiv1.VolumeMount{
 						{
 							Name:      "cri-socket",
@@ -257,7 +257,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 }
 
 // GetPodEnv derive all the env required for the helper pod
-func GetPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, podName string) []apiv1.EnvVar {
+func GetPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, podName string, resultDetails *types.ResultDetails) []apiv1.EnvVar {
 
 	var envVar []apiv1.EnvVar
 	ENVList := map[string]string{
@@ -272,6 +272,7 @@ func GetPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, podName st
 		"ITERATIONS":           strconv.Itoa(experimentsDetails.Iterations),
 		"SOCKET_PATH":          experimentsDetails.SocketPath,
 		"CONTAINER_RUNTIME":    experimentsDetails.ContainerRuntime,
+		"RESULT_NAME":          resultDetails.Name,
 	}
 	for key, value := range ENVList {
 		var perEnv apiv1.EnvVar
