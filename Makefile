@@ -5,15 +5,14 @@
 # Internal variables or constants.
 # NOTE - These will be executed when any make target is invoked.
 #
+IS_DOCKER_INSTALLED = $(shell which docker >> /dev/null 2>&1; echo $$?)
 
 # Docker info
 DOCKER_REPO ?= litmuschaos
 DOCKER_IMAGE ?= go-runner
-DOCKER_TAG ?= 1.11.0-nonroot
+DOCKER_TAG ?= 1.11.2-nonroot
 
-IS_DOCKER_INSTALLED = $(shell which docker >> /dev/null 2>&1; echo $$?)
 PACKAGES = $(shell go list ./... | grep -v '/vendor/')
-
 
 .PHONY: all
 all: deps gotasks build push trivy-check build-amd64 push-amd64
@@ -72,12 +71,17 @@ unused-package-check:
 	fi
 
 .PHONY: build
-build:
+build: experiment-build image-build
 
+.PHONY: experiment-build
+experiment-build:
 	@echo "------------------------------"
 	@echo "--> Build experiment go binary" 
 	@echo "------------------------------"
 	@./build/go-multiarch-build.sh build/generate_go_binary
+
+.PHONY: image-build
+image-build:	
 	@echo "-------------------------"
 	@echo "--> Build go-runner image" 
 	@echo "-------------------------"
@@ -120,4 +124,3 @@ trivy-check:
 	@echo "------------------------"
 	@./trivy --exit-code 0 --severity HIGH --no-progress $(DOCKER_REPO)/$(DOCKER_IMAGE):$(DOCKER_TAG)
 	@./trivy --exit-code 0 --severity CRITICAL --no-progress $(DOCKER_REPO)/$(DOCKER_IMAGE):$(DOCKER_TAG)
-

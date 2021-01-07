@@ -31,6 +31,6 @@ type ExperimentDetails struct {
 	PodsAffectedPerc                int
 	Sequence                        string
 	VolumeMountPath                 string
-	Resources                       corev1.ResourceRequirements
 	SocketPath                      string
+	Resources                       corev1.ResourceRequirements
 }
