@@ -24,15 +24,16 @@ import (
 // StressCPU Uses the REST API to exec into the target container of the target pod
 // The function will be constantly increasing the CPU utilisation until it reaches the maximum available or allowed number.
 // Using the TOTAL_CHAOS_DURATION we will need to specify for how long this experiment will last
-func StressCPU(containerName, podName, namespace, cpuHogCmd string, clients clients.ClientSets) error {
+func StressCPU(experimentsDetails *experimentTypes.ExperimentDetails, podName string, clients clients.ClientSets) error {
 	// It will contains all the pod & container details required for exec command
 	execCommandDetails := litmusexec.PodDetails{}
-	command := []string{"/bin/sh", "-c", cpuHogCmd}
-	litmusexec.SetExecCommandAttributes(&execCommandDetails, podName, containerName, namespace)
+	command := []string{"/bin/sh", "-c", experimentsDetails.ChaosInjectCmd}
+	litmusexec.SetExecCommandAttributes(&execCommandDetails, podName, experimentsDetails.TargetContainer, experimentsDetails.AppNS)
 	_, err := litmusexec.Exec(&execCommandDetails, clients, command)
 	if err != nil {
 		return errors.Errorf("Unable to run stress command inside target container, err: %v", err)
 	}
+
 	return nil
 }
 
@@ -85,7 +86,9 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 			"Pod":       pod.Name,
 			"CPU CORE":  experimentsDetails.CPUcores,
 		})
-		go StressCPU(experimentsDetails.TargetContainer, pod.Name, experimentsDetails.AppNS, experimentsDetails.ChaosInjectCmd, clients)
+		for i := 0; i < experimentsDetails.CPUcores; i++ {
+			go StressCPU(experimentsDetails, pod.Name, clients)
+		}
 
 		log.Infof("[Chaos]:Waiting for: %vs", experimentsDetails.ChaosDuration)
 
@@ -99,7 +102,7 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 			select {
 			case <-signChan:
 				log.Info("[Chaos]: Killing process started because of terminated signal received")
-				err := KillStressCPUSerial(experimentsDetails.TargetContainer, pod.Name, experimentsDetails.AppNS, experimentsDetails.ChaosKillCmd, clients)
+				err := KillStressCPUSerial(experimentsDetails, pod.Name, clients)
 				if err != nil {
 					klog.V(0).Infof("Error in Kill stress after abortion")
 					return err
@@ -124,7 +127,7 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 				break loop
 			}
 		}
-		if err := KillStressCPUSerial(experimentsDetails.TargetContainer, pod.Name, experimentsDetails.AppNS, experimentsDetails.ChaosKillCmd, clients); err != nil {
+		if err := KillStressCPUSerial(experimentsDetails, pod.Name, clients); err != nil {
 			return err
 		}
 	}
@@ -150,7 +153,9 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 			"CPU CORE":  experimentsDetails.CPUcores,
 		})
 
-		go StressCPU(experimentsDetails.TargetContainer, pod.Name, experimentsDetails.AppNS, experimentsDetails.ChaosInjectCmd, clients)
+		for i := 0; i < experimentsDetails.CPUcores; i++ {
+			go StressCPU(experimentsDetails, pod.Name, clients)
+		}
 	}
 
 	log.Infof("[Chaos]:Waiting for: %vs", experimentsDetails.ChaosDuration)
@@ -165,7 +170,7 @@ loop:
 		select {
 		case <-signChan:
 			log.Info("[Chaos]: Killing process started because of terminated signal received")
-			err := KillStressCPUParallel(experimentsDetails.TargetContainer, targetPodList, experimentsDetails.AppNS, experimentsDetails.ChaosKillCmd, clients)
+			err := KillStressCPUParallel(experimentsDetails, targetPodList, clients)
 			if err != nil {
 				klog.V(0).Infof("Error in Kill stress after abortion")
 				return err
@@ -190,7 +195,7 @@ loop:
 			break loop
 		}
 	}
-	if err := KillStressCPUParallel(experimentsDetails.TargetContainer, targetPodList, experimentsDetails.AppNS, experimentsDetails.ChaosKillCmd, clients); err != nil {
+	if err := KillStressCPUParallel(experimentsDetails, targetPodList, clients); err != nil {
 		return err
 	}
 
@@ -231,13 +236,13 @@ func GetTargetContainer(experimentsDetails *experimentTypes.ExperimentDetails, a
 
 // KillStressCPUSerial function to kill a stress process running inside target container
 //  Triggered by either timeout of chaos duration or termination of the experiment
-func KillStressCPUSerial(containerName, podName, namespace, cpuFreeCmd string, clients clients.ClientSets) error {
+func KillStressCPUSerial(experimentsDetails *experimentTypes.ExperimentDetails, podName string, clients clients.ClientSets) error {
 	// It will contains all the pod & container details required for exec command
 	execCommandDetails := litmusexec.PodDetails{}
 
-	command := []string{"/bin/sh", "-c", cpuFreeCmd}
+	command := []string{"/bin/sh", "-c", experimentsDetails.ChaosKillCmd}
 
-	litmusexec.SetExecCommandAttributes(&execCommandDetails, podName, containerName, namespace)
+	litmusexec.SetExecCommandAttributes(&execCommandDetails, podName, experimentsDetails.TargetContainer, experimentsDetails.AppNS)
 	_, err := litmusexec.Exec(&execCommandDetails, clients, command)
 	if err != nil {
 		return errors.Errorf("Unable to kill the stress process in %v pod, err: %v", podName, err)
@@ -248,11 +253,11 @@ func KillStressCPUSerial(containerName, podName, namespace, cpuFreeCmd string, c
 
 // KillStressCPUParallel function to kill all the stress process running inside target container
 // Triggered by either timeout of chaos duration or termination of the experiment
-func KillStressCPUParallel(containerName string, targetPodList corev1.PodList, namespace, cpuFreeCmd string, clients clients.ClientSets) error {
+func KillStressCPUParallel(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList corev1.PodList, clients clients.ClientSets) error {
 
 	for _, pod := range targetPodList.Items {
 
-		if err := KillStressCPUSerial(containerName, pod.Name, namespace, cpuFreeCmd, clients); err != nil {
+		if err := KillStressCPUSerial(experimentsDetails, pod.Name, clients); err != nil {
 			return err
 		}
 	}
