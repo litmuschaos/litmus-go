@@ -68,7 +68,6 @@ func TriggerHTTPProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 			}
 
 			// getting the response from the given url
-			//resp, err := http.Get(probe.HTTPProbeInputs.URL)
 			resp, err := client.Get(probe.HTTPProbeInputs.URL)
 			if err != nil {
 				return err
