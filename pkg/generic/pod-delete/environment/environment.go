@@ -62,4 +62,5 @@ func InitialiseChaosVariables(chaosDetails *types.ChaosDetails, experimentDetail
 	chaosDetails.Timeout = experimentDetails.Timeout
 	chaosDetails.Delay = experimentDetails.Delay
 	chaosDetails.AppDetail = appDetails
+	chaosDetails.ProbeImagePullPolicy = experimentDetails.LIBImagePullPolicy
 }
