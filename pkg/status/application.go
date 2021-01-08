@@ -53,11 +53,11 @@ func CheckPodStatusPhase(appNs, appLabel string, timeout, delay int, clients cli
 		Times(uint(timeout / delay)).
 		Wait(time.Duration(delay) * time.Second).
 		Try(func(attempt uint) error {
-			podSpec, err := clients.KubeClient.CoreV1().Pods(appNs).List(metav1.ListOptions{LabelSelector: appLabel})
-			if err != nil || len(podSpec.Items) == 0 {
+			podList, err := clients.KubeClient.CoreV1().Pods(appNs).List(metav1.ListOptions{LabelSelector: appLabel})
+			if err != nil || len(podList.Items) == 0 {
 				return errors.Errorf("Unable to find the pods with matching labels, err: %v", err)
 			}
-			for _, pod := range podSpec.Items {
+			for _, pod := range podList.Items {
 				isInState := false
 				for _, state := range states {
 					if string(pod.Status.Phase) == state {
@@ -66,7 +66,7 @@ func CheckPodStatusPhase(appNs, appLabel string, timeout, delay int, clients cli
 					}
 				}
 				if !isInState {
-					return errors.Errorf("Pod is not yet in targeted state")
+					return errors.Errorf("Pod is not yet in %v state(s)", states)
 				}
 				log.InfoWithValues("[Status]: The status of Pods are as follows", logrus.Fields{
 					"Pod": pod.Name, "Status": pod.Status.Phase})
@@ -91,11 +91,11 @@ func CheckContainerStatus(appNs, appLabel string, timeout, delay int, clients cl
 		Times(uint(timeout / delay)).
 		Wait(time.Duration(delay) * time.Second).
 		Try(func(attempt uint) error {
-			podSpec, err := clients.KubeClient.CoreV1().Pods(appNs).List(metav1.ListOptions{LabelSelector: appLabel})
-			if err != nil || len(podSpec.Items) == 0 {
+			podList, err := clients.KubeClient.CoreV1().Pods(appNs).List(metav1.ListOptions{LabelSelector: appLabel})
+			if err != nil || len(podList.Items) == 0 {
 				return errors.Errorf("Unable to find the pods with matching labels, err: %v", err)
 			}
-			for _, pod := range podSpec.Items {
+			for _, pod := range podList.Items {
 				for _, container := range pod.Status.ContainerStatuses {
 					if container.State.Terminated != nil {
 						return errors.Errorf("container is in terminated state")
@@ -124,15 +124,15 @@ func WaitForCompletion(appNs, appLabel string, clients clients.ClientSets, durat
 		Times(uint(duration)).
 		Wait(1 * time.Second).
 		Try(func(attempt uint) error {
-			podSpec, err := clients.KubeClient.CoreV1().Pods(appNs).List(metav1.ListOptions{LabelSelector: appLabel})
-			if err != nil || len(podSpec.Items) == 0 {
+			podList, err := clients.KubeClient.CoreV1().Pods(appNs).List(metav1.ListOptions{LabelSelector: appLabel})
+			if err != nil || len(podList.Items) == 0 {
 				return errors.Errorf("Unable to find the pods with matching labels, err: %v", err)
 			}
 			// it will check for the status of helper pod, if it is Succeeded and target container is completed then it will marked it as completed and return
 			// if it is still running then it will check for the target container, as we can have multiple container inside helper pod (istio)
 			// if the target container is in completed state(ready flag is false), then we will marked the helper pod as completed
 			// we will retry till it met the timeout(chaos duration)
-			for _, pod := range podSpec.Items {
+			for _, pod := range podList.Items {
 				podStatus = string(pod.Status.Phase)
 				log.Infof("helper pod status: %v", podStatus)
 				if podStatus != "Succeeded" && podStatus != "Failed" {
