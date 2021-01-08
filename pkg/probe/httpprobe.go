@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"net/http"
+	"crypto/tls"
 
 	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
 	"github.com/litmuschaos/litmus-go/pkg/clients"
@@ -54,11 +55,25 @@ func TriggerHTTPProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 		Timeout(int64(probe.RunProperties.ProbeTimeout)).
 		Wait(time.Duration(probe.RunProperties.Interval) * time.Second).
 		TryWithTimeout(func(attempt uint) error {
+
+			// initialize simple http client with default attributes
+			client := &http.Client{}
+
+			// impose properties to http client with cert check disabled
+			if probe.HTTPProbeInputs.InsecureSkipVerify {
+				transCfg := &http.Transport{
+					TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+				}
+				client = &http.Client{Transport: transCfg}
+			}
+
 			// getting the response from the given url
-			resp, err := http.Get(probe.HTTPProbeInputs.URL)
+			//resp, err := http.Get(probe.HTTPProbeInputs.URL)
+			resp, err := client.Get(probe.HTTPProbeInputs.URL)
 			if err != nil {
 				return err
 			}
+
 			code, _ := strconv.Atoi(probe.HTTPProbeInputs.ExpectedResponseCode)
 			// matching the status code w/ expected code
 			if resp.StatusCode != code {
