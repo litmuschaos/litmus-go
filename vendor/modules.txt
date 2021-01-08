@@ -75,11 +75,9 @@ github.com/inconshreveable/mousetrap
 github.com/jmespath/go-jmespath
 # github.com/json-iterator/go v1.1.9
 github.com/json-iterator/go
-# github.com/konsorten/go-windows-terminal-sequences v1.0.3
-github.com/konsorten/go-windows-terminal-sequences
 # github.com/kyokomi/emoji v2.2.4+incompatible
 github.com/kyokomi/emoji
-# github.com/litmuschaos/chaos-operator v0.0.0-20201210172142-57fddee6734e
+# github.com/litmuschaos/chaos-operator v0.0.0-20210108143008-188ee98457c8
 github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1
 github.com/litmuschaos/chaos-operator/pkg/client/clientset/versioned/scheme
 github.com/litmuschaos/chaos-operator/pkg/client/clientset/versioned/typed/litmuschaos/v1alpha1
@@ -100,7 +98,7 @@ github.com/rs/zerolog
 github.com/rs/zerolog/internal/cbor
 github.com/rs/zerolog/internal/json
 github.com/rs/zerolog/log
-# github.com/sirupsen/logrus v1.6.0
+# github.com/sirupsen/logrus v1.7.0
 github.com/sirupsen/logrus
 # github.com/spf13/cobra v1.0.0
 github.com/spf13/cobra
