@@ -51,7 +51,7 @@ func GetEC2InstanceStatus(experimentsDetails *experimentTypes.ExperimentDetails)
 
 }
 
-// GetRandomInstance will give a random instance from a specific region
+// GetRandomInstance will give a random running instance from a specific region
 func GetRandomInstance(region string, session *session.Session) (string, error) {
 
 	// Create new EC2 client
@@ -78,7 +78,7 @@ func GetRandomInstance(region string, session *session.Session) (string, error) 
 		}
 	}
 	if len(instanceList) == 0 {
-		return "", errors.Errorf("No instance found in the given region")
+		return "", errors.Errorf("No running instance found in the given region")
 	}
 	randomIndex := rand.Intn(len(instanceList))
 	return instanceList[randomIndex], nil
