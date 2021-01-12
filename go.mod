@@ -12,7 +12,7 @@ require (
 	github.com/imdario/mergo v0.3.9 // indirect
 	github.com/kr/pretty v0.2.0 // indirect
 	github.com/kyokomi/emoji v2.2.4+incompatible
-	github.com/litmuschaos/chaos-operator v0.0.0-20210108143008-188ee98457c8
+	github.com/litmuschaos/chaos-operator v0.0.0-20210112070251-865ad815a2b9
 	github.com/mailru/easyjson v0.7.1 // indirect
 	github.com/openebs/maya v0.0.0-20200411140727-1c81f9e017b0
 	github.com/pkg/errors v0.9.1

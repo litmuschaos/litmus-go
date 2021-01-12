@@ -1,6 +1,7 @@
 package result
 
 import (
+	"reflect"
 	"strconv"
 	"time"
 
@@ -61,6 +62,7 @@ func ChaosResult(chaosDetails *types.ChaosDetails, clients clients.ClientSets, r
 		// the chaos-result is already present with matching labels
 		// it will patch the new parameters in the same chaos-result
 		if state == "SOT" {
+			updateHistory(&result)
 			return PatchChaosResult(&result, clients, chaosDetails, resultDetails, experimentLabel)
 		}
 
@@ -93,6 +95,11 @@ func InitializeChaosResult(chaosDetails *types.ChaosDetails, clients clients.Cli
 				ProbeSuccessPercentage: "Awaited",
 			},
 			ProbeStatus: probeStatus,
+			History: v1alpha1.HistoryDetails{
+				PassedRuns:  0,
+				FailedRuns:  0,
+				StoppedRuns: 0,
+			},
 		},
 	}
 
@@ -149,7 +156,17 @@ func PatchChaosResult(result *v1alpha1.ChaosResult, clients clients.ClientSets, 
 		switch resultDetails.Verdict {
 		case "Pass":
 			result.Status.ExperimentStatus.ProbeSuccessPercentage = "100"
-		case "Fail", "Stopped":
+			result.Status.History.PassedRuns++
+		case "Fail":
+			result.Status.History.FailedRuns++
+			probe.SetProbeVerdictAfterFailure(resultDetails)
+			if len(resultDetails.ProbeDetails) != 0 {
+				result.Status.ExperimentStatus.ProbeSuccessPercentage = strconv.Itoa((resultDetails.PassedProbeCount * 100) / len(resultDetails.ProbeDetails))
+			} else {
+				result.Status.ExperimentStatus.ProbeSuccessPercentage = "0"
+			}
+		case "Stopped":
+			result.Status.History.StoppedRuns++
 			probe.SetProbeVerdictAfterFailure(resultDetails)
 			if len(resultDetails.ProbeDetails) != 0 {
 				result.Status.ExperimentStatus.ProbeSuccessPercentage = strconv.Itoa((resultDetails.PassedProbeCount * 100) / len(resultDetails.ProbeDetails))
@@ -209,4 +226,16 @@ func RecordAfterFailure(chaosDetails *types.ChaosDetails, resultDetails *types.R
 		events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 	}
 
+}
+
+// updateHistory initialise the history for the older results
+func updateHistory(result *v1alpha1.ChaosResult) {
+	if reflect.DeepEqual(result.Status.History, v1alpha1.HistoryDetails{}) {
+		history := v1alpha1.HistoryDetails{
+			PassedRuns:  0,
+			FailedRuns:  0,
+			StoppedRuns: 0,
+		}
+		result.Status.History = history
+	}
 }
