@@ -2,6 +2,7 @@ package experiment
 
 import (
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
+    litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/{{ .Name }}/lib"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	experimentEnv "github.com/litmuschaos/litmus-go/pkg/{{ .Category }}/{{ .Name }}/environment"
@@ -13,13 +14,12 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func {{ .Name }}(clients clients.ClientSets)
+func {{ .Name }}(clients clients.ClientSets){
 
 	var err error
 	experimentsDetails := experimentTypes.ExperimentDetails{}
 	resultDetails := types.ResultDetails{}
 	eventsDetails := types.EventDetails{}
-	clients := clients.ClientSets{}
 	chaosDetails := types.ChaosDetails{}
 	
 	//Fetching all the ENV passed from the runner pod
@@ -30,7 +30,7 @@ func {{ .Name }}(clients clients.ClientSets)
 	experimentEnv.InitialiseChaosVariables(&chaosDetails, &experimentsDetails)
 	
 	// Intialise Chaos Result Parameters
-	types.SetResultAttributes(&resultDetails, experimentsDetails.EngineName, experimentsDetails.ExperimentName)
+	types.SetResultAttributes(&resultDetails, chaosDetails)
 
 	if experimentsDetails.EngineName != "" {
 		// Intialise the probe details. Bail out upon error, as we haven't entered exp business logic yet
@@ -69,7 +69,7 @@ func {{ .Name }}(clients clients.ClientSets)
     
 	//PRE-CHAOS APPLICATION STATUS CHECK
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (pre-chaos)")
-	err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, clients)
+	err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 	if err != nil {
 		log.Errorf("Application status check failed, err: %v", err)
 		failStep := "Verify that the AUT (Application Under Test) is running (pre-chaos)"
@@ -80,7 +80,7 @@ func {{ .Name }}(clients clients.ClientSets)
 	//PRE-CHAOS AUXILIARY APPLICATION STATUS CHECK
 	if experimentsDetails.AuxiliaryAppInfo != "" {
 	log.Info("[Status]: Verify that the Auxiliary Applications are running (pre-chaos)")
-	err = status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, clients)
+	err = status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 	if err != nil {
 		log.Errorf("Auxiliary Application status check failed, err: %v", err)
 		failStep := "Verify that the Auxiliary Applications are running (pre-chaos)"
@@ -120,7 +120,7 @@ func {{ .Name }}(clients clients.ClientSets)
    
 	// Including the litmus lib
 	if experimentsDetails.ChaosLib == "litmus" {
-		err = {{ .Name }}.{{ .Name }}()
+		err = litmusLIB.PrepareChaos(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
 		if err != nil {
 			log.Errorf("Chaos injection failed, err: %v", err)
 			failStep := "failed in chaos injection phase"
@@ -141,7 +141,7 @@ func {{ .Name }}(clients clients.ClientSets)
 
 	//POST-CHAOS APPLICATION STATUS CHECK
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (post-chaos)")
-	err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, clients)
+	err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 	if err != nil {
 		log.Errorf("Application status check failed, err: %v", err)
 		failStep := "Verify that the AUT (Application Under Test) is running (post-chaos)"
@@ -152,7 +152,7 @@ func {{ .Name }}(clients clients.ClientSets)
 	//POST-CHAOS AUXILIARY APPLICATION STATUS CHECK
 	if experimentsDetails.AuxiliaryAppInfo != "" {
 	log.Info("[Status]: Verify that the Auxiliary Applications are running (post-chaos)")
-	err = status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, clients)
+	err = status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 	if err != nil {
 		log.Errorf("Auxiliary Application status check failed, err: %v", err)
 		failStep := "Verify that the Auxiliary Applications are running (post-chaos)"

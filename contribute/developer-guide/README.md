@@ -44,7 +44,7 @@ scaffolded files consist of placeholders which can then be filled as desired.
   $ cat attributes.yaml 
   
   ---
-  name: "pod-delete"
+  name: "sample-pod-delete"
   version: "0.1.0"
   category: "sample-category"
   repository: "https://github.com/litmuschaos/litmus-go/tree/master/sample-category/pod-delete"
@@ -89,7 +89,7 @@ scaffolded files consist of placeholders which can then be filled as desired.
   ```
 
 - Run the following command to generate the necessary artifacts for submitting the `sample-category` chaos chart with 
-  `pod-delete` experiment.
+  `sample-pod-delete` experiment.
 
   ```
   $ ./litmus-sdk generate <generate-type> -f=attributes.yaml
@@ -118,32 +118,32 @@ scaffolded files consist of placeholders which can then be filled as desired.
   total 12
   -rw-r--r-- 1 shubham shubham   41 May 15 13:26 sample-category.package.yaml
   -rw-r--r-- 1 shubham shubham  734 May 15 13:26 sample-category.chartserviceversion.yaml
-  drwxr-xr-x 2 shubham shubham 4096 May 15 13:26 pod-delete/
+  drwxr-xr-x 2 shubham shubham 4096 May 15 13:26 sample-pod-delete/
 
   $ ls -ltr sample-category/pod-delete
 
   total 28
   -rw-r--r-- 1 shubham shubham  791 May 15 13:26 rbac.yaml
-  -rw-r--r-- 1 shubham shubham  734 May 15 13:26 pod-delete.chartserviceversion.yaml
+  -rw-r--r-- 1 shubham shubham  734 May 15 13:26 sample-pod-delete.chartserviceversion.yaml
   -rw-r--r-- 1 shubham shubham  792 May 15 13:26 experiment.yaml
   drwxr-xr-x 2 shubham shubham 4096 May 15 13:26 test
-  -rw-r--r-- 1 shubham shubham 4533 May 15 13:26 pod-delete.go
+  -rw-r--r-- 1 shubham shubham 4533 May 15 13:26 sample-pod-delete.go
   -rw-r--r-- 1 shubham shubham  813 May 15 13:26 engine.yaml
   
-  $ ls -ltr sample-category/pod-delete/test
+  $ ls -ltr sample-category/sample-pod-delete/test
 
   total 4
   -rw-r--r-- 1 shubham shubham  1039 May 15 13:26 test.yaml
   ```
  
-- Proceed with construction of business logic inside the `pod-delete.go` file, by making
+- Proceed with construction of business logic inside the `sample-pod-delete.go` file, by making
   the appropriate modifications listed below to achieve the desired effect: 
 
   - variables 
   - entry & exit criteria checks for the experiment 
   - helper utils in either [pkg](/pkg/) or new [base chaos libraries](/chaoslib) 
 
-- Update the `chaoslib/litmus/pod-delete/lib/pod-delete.go` chaoslib to achieve the desired effect or reuse the existing chaoslib.
+- Update the `chaoslib/litmus/sample-pod-delete/lib/sample-pod-delete.go` chaoslib to achieve the desired effect or reuse the existing chaoslib.
 
 - Create an experiment README explaining, briefly, the *what*, *why* & *how* of the experiment to aid users of this experiment. 
 
