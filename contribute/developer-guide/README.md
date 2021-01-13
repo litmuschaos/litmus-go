@@ -143,7 +143,8 @@ scaffolded files consist of placeholders which can then be filled as desired.
   - entry & exit criteria checks for the experiment 
   - helper utils in either [pkg](/pkg/) or new [base chaos libraries](/chaoslib) 
 
-- Update the `chaoslib/litmus/sample-pod-delete/lib/sample-pod-delete.go` chaoslib to achieve the desired effect or reuse the existing chaoslib.
+
+- The chaoslib is created at `chaoslib/litmus/sample-pod-delete/lib/sample-pod-delete.go` path. It contains some pre-defined steps which runs `ChaosInject` command(explicitly provided as an anv inside the experiment CR). Which will induce chaos in the target application. It will Wait for the given chaos duration and finally run the `ChaosKill` command for the cleanup purpose. Update this chaoslib to achieve the desired effect based on the usecase or reuse the existing chaoslib.
 
 - Create an experiment README explaining, briefly, the *what*, *why* & *how* of the experiment to aid users of this experiment. 
 

@@ -14,6 +14,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	apiv1 "k8s.io/api/core/v1"
 	k8stypes "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -47,6 +48,11 @@ func PrepareNodeRestart(experimentsDetails *experimentTypes.ExperimentDetails, c
 		experimentsDetails.TargetNode = targetNode.Spec.NodeName
 		experimentsDetails.TargetNodeIP = targetNode.Status.HostIP
 	}
+
+	log.InfoWithValues("[Info]: Details of application under chaos injection", logrus.Fields{
+		"Target Node":    experimentsDetails.TargetNode,
+		"Target Node IP": experimentsDetails.TargetNodeIP,
+	})
 
 	// Checking the status of target node
 	log.Info("[Status]: Getting the status of target node")

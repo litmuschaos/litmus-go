@@ -63,6 +63,12 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 			return err
 		}
 
+		podNames := []string{}
+		for _, pod := range targetPodList.Items {
+			podNames = append(podNames, pod.Name)
+		}
+		log.Infof("Target pods list, %v", podNames)
+
 		if experimentsDetails.EngineName != "" {
 			msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on application pod"
 			types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
@@ -131,6 +137,12 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		if err != nil {
 			return err
 		}
+
+		podNames := []string{}
+		for _, pod := range targetPodList.Items {
+			podNames = append(podNames, pod.Name)
+		}
+		log.Infof("Target pods list for chaos, %v", podNames)
 
 		if experimentsDetails.EngineName != "" {
 			msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on application pod"
