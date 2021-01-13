@@ -32,7 +32,10 @@ func PrepareNodeIOStress(experimentsDetails *experimentTypes.ExperimentDetails, 
 	if err != nil {
 		return err
 	}
-	log.Infof("Number of targeted nodes, %v", len(targetNodeList))
+	log.InfoWithValues("[Info]: Details of Nodes under chaos injection", logrus.Fields{
+		"No. Of Nodes": len(targetNodeList),
+		"Node Names":   targetNodeList,
+	})
 
 	if experimentsDetails.EngineName != "" {
 		// Get Chaos Pod Annotation
