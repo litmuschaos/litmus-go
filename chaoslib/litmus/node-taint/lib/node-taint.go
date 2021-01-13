@@ -38,7 +38,6 @@ func PrepareNodeTaint(experimentsDetails *experimentTypes.ExperimentDetails, cli
 		if err != nil {
 			return err
 		}
-
 	}
 
 	if experimentsDetails.EngineName != "" {
@@ -137,6 +136,8 @@ func TaintNode(experimentsDetails *experimentTypes.ExperimentDetails, clients cl
 
 	// get the taint labels & effect
 	TaintKey, TaintValue, TaintEffect := GetTaintDetails(experimentsDetails)
+
+	log.Infof("Add %v taints to the %v node", TaintKey+"="+TaintValue+":"+TaintEffect, experimentsDetails.TargetNode)
 
 	// get the node details
 	node, err := clients.KubeClient.CoreV1().Nodes().Get(experimentsDetails.TargetNode, v1.GetOptions{})
