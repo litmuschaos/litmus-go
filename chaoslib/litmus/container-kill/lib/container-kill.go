@@ -11,6 +11,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	apiv1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -24,6 +25,12 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 	if err != nil {
 		return err
 	}
+
+	podNames := []string{}
+	for _, pod := range targetPodList.Items {
+		podNames = append(podNames, pod.Name)
+	}
+	log.Infof("Target pods list for chaos, %v", podNames)
 
 	//Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
@@ -86,6 +93,12 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 
 	// creating the helper pod to perform container kill chaos
 	for _, pod := range targetPodList.Items {
+
+		log.InfoWithValues("[Info]: Details of application under chaos injection", logrus.Fields{
+			"PodName":       pod.Name,
+			"NodeName":      pod.Spec.NodeName,
+			"ContainerName": experimentsDetails.TargetContainer,
+		})
 		runID := common.GetRunID()
 		if err := CreateHelperPod(experimentsDetails, clients, pod.Name, pod.Spec.NodeName, runID); err != nil {
 			return errors.Errorf("Unable to create the helper pod, err: %v", err)
@@ -124,6 +137,12 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 
 	// creating the helper pod to perform container kill chaos
 	for _, pod := range targetPodList.Items {
+
+		log.InfoWithValues("[Info]: Details of application under chaos injection", logrus.Fields{
+			"PodName":       pod.Name,
+			"NodeName":      pod.Spec.NodeName,
+			"ContainerName": experimentsDetails.TargetContainer,
+		})
 		runID := common.GetRunID()
 		if err := CreateHelperPod(experimentsDetails, clients, pod.Name, pod.Spec.NodeName, runID); err != nil {
 			return errors.Errorf("Unable to create the helper pod, err: %v", err)

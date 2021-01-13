@@ -56,6 +56,12 @@ func ExperimentMemory(experimentsDetails *experimentTypes.ExperimentDetails, cli
 		return err
 	}
 
+	podNames := []string{}
+	for _, pod := range targetPodList.Items {
+		podNames = append(podNames, pod.Name)
+	}
+	log.Infof("Target pods list for chaos, %v", podNames)
+
 	//Get the target container name of the application pod
 	if experimentsDetails.TargetContainer == "" {
 		experimentsDetails.TargetContainer, err = GetTargetContainer(experimentsDetails, targetPodList.Items[0].Name, clients)
@@ -94,11 +100,10 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		}
 
 		log.InfoWithValues("[Chaos]: The Target application details", logrus.Fields{
-			"container":              experimentsDetails.TargetContainer,
-			"Pod":                    pod.Name,
+			"Target Container":       experimentsDetails.TargetContainer,
+			"Target Pod":             pod.Name,
 			"Memory Consumption(MB)": experimentsDetails.MemoryConsumption,
 		})
-
 		go StressMemory(strconv.Itoa(experimentsDetails.MemoryConsumption), experimentsDetails.TargetContainer, pod.Name, experimentsDetails.AppNS, clients, stressErr)
 
 		log.Infof("[Chaos]:Waiting for: %vs", experimentsDetails.ChaosDuration)
@@ -173,8 +178,8 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		}
 
 		log.InfoWithValues("[Chaos]: The Target application details", logrus.Fields{
-			"container":              experimentsDetails.TargetContainer,
-			"Pod":                    pod.Name,
+			"Target Container":       experimentsDetails.TargetContainer,
+			"Target Pod":             pod.Name,
 			"Memory Consumption(MB)": experimentsDetails.MemoryConsumption,
 		})
 

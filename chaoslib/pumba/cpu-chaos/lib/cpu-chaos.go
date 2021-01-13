@@ -26,6 +26,12 @@ func PreparePodCPUHog(experimentsDetails *experimentTypes.ExperimentDetails, cli
 		return err
 	}
 
+	podNames := []string{}
+	for _, pod := range targetPodList.Items {
+		podNames = append(podNames, pod.Name)
+	}
+	log.Infof("Target pods list for chaos, %v", podNames)
+
 	//Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
 		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", experimentsDetails.RampTime)
@@ -78,9 +84,9 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		runID := common.GetRunID()
 
 		log.InfoWithValues("[Info]: Details of application under chaos injection", logrus.Fields{
-			"PodName":  pod.Name,
-			"NodeName": pod.Spec.NodeName,
-			"CPUcores": experimentsDetails.CPUcores,
+			"Target Pod": pod.Name,
+			"NodeName":   pod.Spec.NodeName,
+			"CPUcores":   experimentsDetails.CPUcores,
 		})
 
 		err = CreateHelperPod(experimentsDetails, clients, pod.Name, pod.Spec.NodeName, runID)
@@ -124,9 +130,9 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		runID := common.GetRunID()
 
 		log.InfoWithValues("[Info]: Details of application under chaos injection", logrus.Fields{
-			"PodName":  pod.Name,
-			"NodeName": pod.Spec.NodeName,
-			"CPUcores": experimentsDetails.CPUcores,
+			"Target Pod": pod.Name,
+			"NodeName":   pod.Spec.NodeName,
+			"CPUcores":   experimentsDetails.CPUcores,
 		})
 
 		err = CreateHelperPod(experimentsDetails, clients, pod.Name, pod.Spec.NodeName, runID)

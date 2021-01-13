@@ -85,7 +85,7 @@ func KillContainer(experimentsDetails *experimentTypes.ExperimentDetails, client
 
 		switch experimentsDetails.ContainerRuntime {
 		case "docker":
-			if err := StopDockerContainer(containerID); err != nil {
+			if err := StopDockerContainer(containerID, experimentsDetails.SocketPath); err != nil {
 				return err
 			}
 		case "containerd", "crio":
@@ -147,7 +147,6 @@ func GetContainerID(experimentsDetails *experimentTypes.ExperimentDetails, clien
 			break
 		}
 	}
-
 	log.Infof("container ID of app container under test: %v", containerID)
 	return containerID, nil
 }
@@ -165,9 +164,10 @@ func StopContainerdContainer(containerID, socketPath string) error {
 }
 
 //StopDockerContainer kill the application container
-func StopDockerContainer(containerID string) error {
+func StopDockerContainer(containerID, socketPath string) error {
 	var errOut bytes.Buffer
-	cmd := exec.Command("docker", "kill", string(containerID))
+	host := "unix://" + socketPath
+	cmd := exec.Command("docker", "--host", host, "kill", string(containerID))
 	cmd.Stderr = &errOut
 	if err := cmd.Run(); err != nil {
 		return errors.Errorf("Unable to run command, err: %v; error output: %v", err, errOut.String())

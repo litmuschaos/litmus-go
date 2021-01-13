@@ -142,8 +142,9 @@ func GetContainerID(experimentDetails *experimentTypes.ExperimentDetails, client
 	var containerID string
 	switch experimentDetails.ContainerRuntime {
 	case "docker":
+		host := "unix://" + experimentDetails.SocketPath
 		// deriving the container id of the pause container
-		cmd := "docker ps | grep k8s_POD_" + experimentDetails.TargetPods + "_" + experimentDetails.AppNS + " | awk '{print $1}'"
+		cmd := "docker --host " + host + " ps | grep k8s_POD_" + experimentDetails.TargetPods + "_" + experimentDetails.AppNS + " | awk '{print $1}'"
 		out, err := exec.Command("/bin/sh", "-c", cmd).CombinedOutput()
 		if err != nil {
 			log.Error(fmt.Sprintf("[docker]: Failed to run docker ps command: %s", string(out)))
@@ -177,8 +178,9 @@ func GetPID(experimentDetails *experimentTypes.ExperimentDetails, containerID st
 
 	switch experimentDetails.ContainerRuntime {
 	case "docker":
+		host := "unix://" + experimentDetails.SocketPath
 		// deriving pid from the inspect out of target container
-		out, err := exec.Command("docker", "inspect", containerID).CombinedOutput()
+		out, err := exec.Command("docker", "--host", host, "inspect", containerID).CombinedOutput()
 		if err != nil {
 			log.Error(fmt.Sprintf("[docker]: Failed to run docker inspect: %s", string(out)))
 			return 0, err
