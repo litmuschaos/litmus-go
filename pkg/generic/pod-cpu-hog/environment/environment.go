@@ -31,7 +31,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.TargetPods = Getenv("TARGET_PODS", "")
 	experimentDetails.ChaosInjectCmd = Getenv("CHAOS_INJECT_COMMAND", "md5sum /dev/zero")
 	experimentDetails.ChaosKillCmd = Getenv("CHAOS_KILL_COMMAND", "kill $(find /proc -name exe -lname '*/md5sum' 2>&1 | grep -v 'Permission denied' | awk -F/ '{print $(NF-1)}')")
-	experimentDetails.LIBImage = Getenv("LIB_IMAGE", "gaiaadm/pumba")
+	experimentDetails.LIBImage = Getenv("LIB_IMAGE", "litmuschaos/go-runner:latest")
 	experimentDetails.LIBImagePullPolicy = Getenv("LIB_IMAGE_PULL_POLICY", "Always")
 	experimentDetails.TargetContainer = Getenv("TARGET_CONTAINER", "")
 	experimentDetails.Sequence = Getenv("SEQUENCE", "parallel")

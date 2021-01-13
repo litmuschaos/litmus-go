@@ -47,6 +47,12 @@ func ExperimentCPU(experimentsDetails *experimentTypes.ExperimentDetails, client
 		return err
 	}
 
+	podNames := []string{}
+	for _, pod := range targetPodList.Items {
+		podNames = append(podNames, pod.Name)
+	}
+	log.Infof("Target pods list for chaos, %v", podNames)
+
 	//Get the target container name of the application pod
 	if experimentsDetails.TargetContainer == "" {
 		experimentsDetails.TargetContainer, err = GetTargetContainer(experimentsDetails, targetPodList.Items[0].Name, clients)
@@ -82,9 +88,9 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		}
 
 		log.InfoWithValues("[Chaos]: The Target application details", logrus.Fields{
-			"container": experimentsDetails.TargetContainer,
-			"Pod":       pod.Name,
-			"CPU CORE":  experimentsDetails.CPUcores,
+			"Target Container": experimentsDetails.TargetContainer,
+			"Target Pod":       pod.Name,
+			"CPU CORE":         experimentsDetails.CPUcores,
 		})
 		for i := 0; i < experimentsDetails.CPUcores; i++ {
 			go StressCPU(experimentsDetails, pod.Name, clients)
@@ -148,11 +154,10 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		}
 
 		log.InfoWithValues("[Chaos]: The Target application details", logrus.Fields{
-			"container": experimentsDetails.TargetContainer,
-			"Pod":       pod.Name,
-			"CPU CORE":  experimentsDetails.CPUcores,
+			"Target Container": experimentsDetails.TargetContainer,
+			"Target Pod":       pod.Name,
+			"CPU CORE":         experimentsDetails.CPUcores,
 		})
-
 		for i := 0; i < experimentsDetails.CPUcores; i++ {
 			go StressCPU(experimentsDetails, pod.Name, clients)
 		}
