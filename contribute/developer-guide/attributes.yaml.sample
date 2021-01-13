@@ -1,5 +1,5 @@
 ---
-name: "pod-delete"
+name: "sample-pod-delete"
 version: "0.1.0"
 category: "sample-category"
 repository: "https://github.com/litmuschaos/litmus-go/tree/master/sample-category/pod-delete"
