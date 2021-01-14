@@ -13,7 +13,7 @@ import (
 // process (container). It returns an error if case none, or more than one,
 // interface is present.
 func InterfaceName(PID int) (string, error) {
-	ip := fmt.Sprintf("nsenter -t %d -n ip -json link list", PID)
+	ip := fmt.Sprintf("sudo nsenter -t %d -n ip -json link list", PID)
 	cmd := exec.Command("/bin/bash", "-c", ip)
 	out, err := cmd.CombinedOutput()
 	log.Info(fmt.Sprintf("[ip] %s", cmd))
