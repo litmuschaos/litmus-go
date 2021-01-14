@@ -11,6 +11,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	apiv1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -24,6 +25,12 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 	if err != nil {
 		return err
 	}
+
+	podNames := []string{}
+	for _, pod := range targetPodList.Items {
+		podNames = append(podNames, pod.Name)
+	}
+	log.Infof("Target pods list for chaos, %v", podNames)
 
 	//Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
@@ -64,11 +71,11 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 	}
 
 	if experimentsDetails.Sequence == "serial" {
-		if err = InjectChaosInSerialMode(experimentsDetails, targetPodList, clients, chaosDetails, resultDetails); err != nil {
+		if err = InjectChaosInSerialMode(experimentsDetails, targetPodList, clients, chaosDetails); err != nil {
 			return err
 		}
 	} else {
-		if err = InjectChaosInParallelMode(experimentsDetails, targetPodList, clients, chaosDetails, resultDetails); err != nil {
+		if err = InjectChaosInParallelMode(experimentsDetails, targetPodList, clients, chaosDetails); err != nil {
 			return err
 		}
 	}
@@ -82,12 +89,18 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 }
 
 // InjectChaosInSerialMode kill the container of all target application serially (one by one)
-func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails) error {
+func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
 
 	// creating the helper pod to perform container kill chaos
 	for _, pod := range targetPodList.Items {
+
+		log.InfoWithValues("[Info]: Details of application under chaos injection", logrus.Fields{
+			"PodName":       pod.Name,
+			"NodeName":      pod.Spec.NodeName,
+			"ContainerName": experimentsDetails.TargetContainer,
+		})
 		runID := common.GetRunID()
-		if err := CreateHelperPod(experimentsDetails, clients, pod.Name, pod.Spec.NodeName, runID, resultDetails); err != nil {
+		if err := CreateHelperPod(experimentsDetails, clients, pod.Name, pod.Spec.NodeName, runID); err != nil {
 			return errors.Errorf("Unable to create the helper pod, err: %v", err)
 		}
 
@@ -120,12 +133,18 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 }
 
 // InjectChaosInParallelMode kill the container of all target application in parallel mode (all at once)
-func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails) error {
+func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
 
 	// creating the helper pod to perform container kill chaos
 	for _, pod := range targetPodList.Items {
+
+		log.InfoWithValues("[Info]: Details of application under chaos injection", logrus.Fields{
+			"PodName":       pod.Name,
+			"NodeName":      pod.Spec.NodeName,
+			"ContainerName": experimentsDetails.TargetContainer,
+		})
 		runID := common.GetRunID()
-		if err := CreateHelperPod(experimentsDetails, clients, pod.Name, pod.Spec.NodeName, runID, resultDetails); err != nil {
+		if err := CreateHelperPod(experimentsDetails, clients, pod.Name, pod.Spec.NodeName, runID); err != nil {
 			return errors.Errorf("Unable to create the helper pod, err: %v", err)
 		}
 	}
@@ -190,7 +209,7 @@ func GetTargetContainer(experimentsDetails *experimentTypes.ExperimentDetails, a
 }
 
 // CreateHelperPod derive the attributes for helper pod and create the helper pod
-func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, podName, nodeName, runID string, resultDetails *types.ResultDetails) error {
+func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, podName, nodeName, runID string) error {
 
 	privilegedEnable := false
 	if experimentsDetails.ContainerRuntime == "crio" {
@@ -236,7 +255,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 						"./helper/container-killer",
 					},
 					Resources: experimentsDetails.Resources,
-					Env:       GetPodEnv(experimentsDetails, podName, resultDetails),
+					Env:       GetPodEnv(experimentsDetails, podName),
 					VolumeMounts: []apiv1.VolumeMount{
 						{
 							Name:      "cri-socket",
@@ -257,7 +276,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 }
 
 // GetPodEnv derive all the env required for the helper pod
-func GetPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, podName string, resultDetails *types.ResultDetails) []apiv1.EnvVar {
+func GetPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, podName string) []apiv1.EnvVar {
 
 	var envVar []apiv1.EnvVar
 	ENVList := map[string]string{
@@ -272,7 +291,6 @@ func GetPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, podName st
 		"ITERATIONS":           strconv.Itoa(experimentsDetails.Iterations),
 		"SOCKET_PATH":          experimentsDetails.SocketPath,
 		"CONTAINER_RUNTIME":    experimentsDetails.ContainerRuntime,
-		"RESULT_NAME":          resultDetails.Name,
 	}
 	for key, value := range ENVList {
 		var perEnv apiv1.EnvVar

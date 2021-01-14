@@ -17,6 +17,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
+	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	retries "k8s.io/client-go/util/retry"
@@ -51,6 +52,15 @@ func PreparePodAutoscaler(experimentsDetails *experimentTypes.ExperimentDetails,
 			return errors.Errorf("Unable to get the name & replicaCount of the deployment, err: %v", err)
 		}
 
+		deploymentList := []string{}
+		for _, deployment := range appsUnderTest {
+			deploymentList = append(deploymentList, deployment.AppName)
+		}
+		log.InfoWithValues("[Info]: Details of Deployments under chaos injection", logrus.Fields{
+			"No. Of Deployments": len(deploymentList),
+			"Target Deployments": deploymentList,
+		})
+
 		//calling go routine which will continuously watch for the abort signal
 		go AbortPodAutoScalerChaos(appsUnderTest, experimentsDetails, clients, resultDetails, eventsDetails, chaosDetails)
 
@@ -70,6 +80,15 @@ func PreparePodAutoscaler(experimentsDetails *experimentTypes.ExperimentDetails,
 		if err != nil {
 			return errors.Errorf("Unable to get the name & replicaCount of the statefulset, err: %v", err)
 		}
+
+		stsList := []string{}
+		for _, sts := range appsUnderTest {
+			stsList = append(stsList, sts.AppName)
+		}
+		log.InfoWithValues("[Info]: Details of Statefulsets under chaos injection", logrus.Fields{
+			"No. Of Statefulsets": len(stsList),
+			"Target Statefulsets": stsList,
+		})
 
 		//calling go routine which will continuously watch for the abort signal
 		go AbortPodAutoScalerChaos(appsUnderTest, experimentsDetails, clients, resultDetails, eventsDetails, chaosDetails)

@@ -24,6 +24,10 @@ import (
 	clientTypes "k8s.io/apimachinery/pkg/types"
 )
 
+const (
+	qdiscNotFound = "Cannot delete qdisc with handle of zero."
+)
+
 var err error
 
 func main() {
@@ -52,11 +56,47 @@ func main() {
 	// Set the chaos result uid
 	result.SetResultUID(&resultDetails, clients, &chaosDetails)
 
-	err := PreparePodNetworkChaos(&experimentsDetails, clients, &eventsDetails, &chaosDetails, &resultDetails)
+	chaosType := Getenv("CHAOS_TYPE", "inject")
+
+	switch strings.ToLower(chaosType) {
+	case "inject":
+		err := PreparePodNetworkChaos(&experimentsDetails, clients, &eventsDetails, &chaosDetails, &resultDetails)
+		if err != nil {
+			log.Fatalf("helper pod failed, err: %v", err)
+		}
+	case "recover":
+		err := PreparePodNetworkRecovery(&experimentsDetails, clients, &eventsDetails, &chaosDetails, &resultDetails)
+		if err != nil {
+			log.Fatalf("helper pod failed, err: %v", err)
+		}
+	}
+}
+
+//PreparePodNetworkRecovery perform the chaos recovery steps
+func PreparePodNetworkRecovery(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails) error {
+
+	containerID, err := GetContainerID(experimentsDetails, clients)
 	if err != nil {
-		log.Fatalf("helper pod failed, err: %v", err)
+		return err
+	}
+	// extract out the pid of the target container
+	targetPID, err := GetPID(experimentsDetails, containerID)
+	if err != nil {
+		return err
 	}
 
+	log.Info("[Chaos]: Killing the chaos")
+
+	// cleaning the netem process after chaos injection
+	if err = tc.Killnetem(targetPID); err != nil {
+		return err
+	}
+
+	if err = updateStatus(resultDetails.Name, chaosDetails.ChaosNamespace, "Recovered", experimentsDetails.TargetPods, clients); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 //PreparePodNetworkChaos contains the prepration steps before chaos injection
@@ -84,6 +124,10 @@ func PreparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetail
 
 	// injecting network chaos inside target container
 	if err = InjectChaos(experimentsDetails, targetPID); err != nil {
+		return err
+	}
+
+	if err = updateStatus(resultDetails.Name, chaosDetails.ChaosNamespace, "Injected", experimentsDetails.TargetPods, clients); err != nil {
 		return err
 	}
 
@@ -116,8 +160,12 @@ loop:
 
 			if err = tc.Killnetem(targetPID); err != nil {
 				log.Errorf("unable to kill netem process, err :%v", err)
-
 			}
+
+			if err = updateStatus(resultDetails.Name, chaosDetails.ChaosNamespace, "Recovered", experimentsDetails.TargetPods, clients); err != nil {
+				return err
+			}
+
 			os.Exit(1)
 		case <-endTime:
 			log.Infof("[Chaos]: Time is up for experiment: %v", experimentsDetails.ExperimentName)
@@ -133,6 +181,10 @@ loop:
 		return err
 	}
 
+	if err = updateStatus(resultDetails.Name, chaosDetails.ChaosNamespace, "Recovered", experimentsDetails.TargetPods, clients); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -142,8 +194,9 @@ func GetContainerID(experimentDetails *experimentTypes.ExperimentDetails, client
 	var containerID string
 	switch experimentDetails.ContainerRuntime {
 	case "docker":
+		host := "unix://" + experimentDetails.SocketPath
 		// deriving the container id of the pause container
-		cmd := "docker ps | grep k8s_POD_" + experimentDetails.TargetPods + "_" + experimentDetails.AppNS + " | awk '{print $1}'"
+		cmd := "docker --host " + host + " ps | grep k8s_POD_" + experimentDetails.TargetPods + "_" + experimentDetails.AppNS + " | awk '{print $1}'"
 		out, err := exec.Command("/bin/sh", "-c", cmd).CombinedOutput()
 		if err != nil {
 			log.Error(fmt.Sprintf("[docker]: Failed to run docker ps command: %s", string(out)))
@@ -177,8 +230,9 @@ func GetPID(experimentDetails *experimentTypes.ExperimentDetails, containerID st
 
 	switch experimentDetails.ContainerRuntime {
 	case "docker":
+		host := "unix://" + experimentDetails.SocketPath
 		// deriving pid from the inspect out of target container
-		out, err := exec.Command("docker", "inspect", containerID).CombinedOutput()
+		out, err := exec.Command("docker", "--host", host, "inspect", containerID).CombinedOutput()
 		if err != nil {
 			log.Error(fmt.Sprintf("[docker]: Failed to run docker inspect: %s", string(out)))
 			return 0, err
@@ -385,9 +439,11 @@ func Killnetem(PID int) error {
 
 	if err != nil {
 		log.Error(string(out))
+		if strings.Contains(string(out), qdiscNotFound) {
+			return nil
+		}
 		return err
 	}
-
 	return nil
 }
 
@@ -416,4 +472,22 @@ func Getenv(key string, defaultValue string) string {
 		value = defaultValue
 	}
 	return value
+}
+
+// updateStatus update the chaosResult for the chaos status
+func updateStatus(resultName, namespace, status, podName string, clients clients.ClientSets) error {
+
+	result, err := clients.LitmusClient.ChaosResults(namespace).Get(resultName, v1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	chaosStatusDetails := result.Status.History.ChaosStatus
+	for index := range chaosStatusDetails {
+		if chaosStatusDetails[index].TargetPodName == podName {
+			chaosStatusDetails[index].ChaosStatus = status
+		}
+	}
+	result.Status.History.ChaosStatus = chaosStatusDetails
+	_, err = clients.LitmusClient.ChaosResults(namespace).Update(result)
+	return err
 }

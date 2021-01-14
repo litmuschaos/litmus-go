@@ -71,4 +71,5 @@ func InitialiseChaosVariables(chaosDetails *types.ChaosDetails, cassandraDetails
 	chaosDetails.Timeout = cassandraDetails.ChaoslibDetail.Timeout
 	chaosDetails.Delay = cassandraDetails.ChaoslibDetail.Delay
 	chaosDetails.AppDetail = appDetails
+	chaosDetails.ProbeImagePullPolicy = cassandraDetails.ChaoslibDetail.LIBImagePullPolicy
 }

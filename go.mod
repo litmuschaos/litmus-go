@@ -5,14 +5,14 @@ go 1.13
 require (
 	github.com/aws/aws-sdk-go v1.17.7
 	github.com/emicklei/go-restful v2.12.0+incompatible // indirect
+	github.com/fsouza/go-dockerclient v1.7.0 // indirect
 	github.com/go-openapi/spec v0.19.7 // indirect
 	github.com/go-openapi/swag v0.19.9 // indirect
-	github.com/google/go-cmp v0.5.2 // indirect
 	github.com/google/gofuzz v1.1.0 // indirect
 	github.com/imdario/mergo v0.3.9 // indirect
 	github.com/kr/pretty v0.2.0 // indirect
 	github.com/kyokomi/emoji v2.2.4+incompatible
-	github.com/litmuschaos/chaos-operator v0.0.0-20201210172142-57fddee6734e
+	github.com/litmuschaos/chaos-operator v0.0.0-20210112070251-865ad815a2b9
 	github.com/mailru/easyjson v0.7.1 // indirect
 	github.com/openebs/maya v0.0.0-20200411140727-1c81f9e017b0
 	github.com/pkg/errors v0.9.1

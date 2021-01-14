@@ -30,6 +30,11 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.ChaosPodName = Getenv("POD_NAME", "")
 	experimentDetails.Delay, _ = strconv.Atoi(Getenv("STATUS_CHECK_DELAY", "2"))
 	experimentDetails.Timeout, _ = strconv.Atoi(Getenv("STATUS_CHECK_TIMEOUT", "180"))
+	experimentDetails.ChaosInjectCmd = Getenv("CHAOS_INJECT_COMMAND", "")
+	experimentDetails.ChaosKillCmd = Getenv("CHAOS_KILL_COMMAND", "")
+	experimentDetails.TargetContainer = Getenv("TARGET_CONTAINER", "")
+	experimentDetails.TargetPods = Getenv("TARGET_PODS", "")
+	experimentDetails.PodsAffectedPerc, _ = strconv.Atoi(Getenv("PODS_AFFECTED_PERC", "0"))
 }
 
 // Getenv fetch the env and set the default value, if any

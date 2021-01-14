@@ -37,12 +37,10 @@ func main() {
 	log.Info("[PreReq]: Getting the ENV variables")
 	GetENV(&experimentsDetails, "container-kill")
 
-	resultName := Getenv("RESULT_NAME", experimentsDetails.EngineName+"-"+experimentsDetails.ExperimentName)
-
 	// Intialise the chaos attributes
 	experimentEnv.InitialiseChaosVariables(&chaosDetails, &experimentsDetails)
 
-	err := KillContainer(&experimentsDetails, clients, &eventsDetails, &chaosDetails, resultName)
+	err := KillContainer(&experimentsDetails, clients, &eventsDetails, &chaosDetails)
 	if err != nil {
 		log.Fatalf("helper pod failed, err: %v", err)
 	}
@@ -52,7 +50,7 @@ func main() {
 // KillContainer kill the random application container
 // it will kill the container till the chaos duration
 // the execution will stop after timestamp passes the given chaos duration
-func KillContainer(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, resultName string) error {
+func KillContainer(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	// getting the current timestamp, it will help to kepp track the total chaos duration
 	ChaosStartTimeStamp := time.Now().Unix()
@@ -87,7 +85,7 @@ func KillContainer(experimentsDetails *experimentTypes.ExperimentDetails, client
 
 		switch experimentsDetails.ContainerRuntime {
 		case "docker":
-			if err := StopDockerContainer(containerID); err != nil {
+			if err := StopDockerContainer(containerID, experimentsDetails.SocketPath); err != nil {
 				return err
 			}
 		case "containerd", "crio":
@@ -96,10 +94,6 @@ func KillContainer(experimentsDetails *experimentTypes.ExperimentDetails, client
 			}
 		default:
 			return errors.Errorf("%v container runtime not supported", experimentsDetails.ContainerRuntime)
-		}
-
-		if err = updateStatus(resultName, chaosDetails.ChaosNamespace, "UnSuccessful", clients); err != nil {
-			return err
 		}
 
 		//Waiting for the chaos interval after chaos injection
@@ -120,10 +114,6 @@ func KillContainer(experimentsDetails *experimentTypes.ExperimentDetails, client
 			return err
 		}
 
-		if err := updateStatus(resultName, chaosDetails.ChaosNamespace, "Successful", clients); err != nil {
-			return err
-		}
-
 		// generating the total duration of the experiment run
 		ChaosCurrentTimeStamp := time.Now().Unix()
 		chaosDiffTimeStamp := ChaosCurrentTimeStamp - ChaosStartTimeStamp
@@ -134,7 +124,6 @@ func KillContainer(experimentsDetails *experimentTypes.ExperimentDetails, client
 		}
 
 	}
-
 	log.Infof("[Completion]: %v chaos has been completed", experimentsDetails.ExperimentName)
 	return nil
 
@@ -158,7 +147,6 @@ func GetContainerID(experimentsDetails *experimentTypes.ExperimentDetails, clien
 			break
 		}
 	}
-
 	log.Infof("container ID of app container under test: %v", containerID)
 	return containerID, nil
 }
@@ -176,9 +164,10 @@ func StopContainerdContainer(containerID, socketPath string) error {
 }
 
 //StopDockerContainer kill the application container
-func StopDockerContainer(containerID string) error {
+func StopDockerContainer(containerID, socketPath string) error {
 	var errOut bytes.Buffer
-	cmd := exec.Command("docker", "kill", string(containerID))
+	host := "unix://" + socketPath
+	cmd := exec.Command("docker", "--host", host, "kill", string(containerID))
 	cmd.Stderr = &errOut
 	if err := cmd.Run(); err != nil {
 		return errors.Errorf("Unable to run command, err: %v; error output: %v", err, errOut.String())
@@ -288,16 +277,4 @@ func Getenv(key string, defaultValue string) string {
 		value = defaultValue
 	}
 	return value
-}
-
-// updateStatus update the chaosResult for the rollback status
-func updateStatus(resultName, namespace, status string, clients clients.ClientSets) error {
-
-	result, err := clients.LitmusClient.ChaosResults(namespace).Get(resultName, v1.GetOptions{})
-	if err != nil {
-		return err
-	}
-	result.Spec.RollbackStatus = status
-	_, err = clients.LitmusClient.ChaosResults(namespace).Update(result)
-	return err
 }
