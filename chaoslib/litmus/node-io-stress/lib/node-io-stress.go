@@ -257,6 +257,8 @@ func GetContainerArguments(experimentsDetails *experimentTypes.ExperimentDetails
 		hddbytes,
 		"--timeout",
 		strconv.Itoa(experimentsDetails.ChaosDuration) + "s",
+		"--temp-path",
+		"/tmp",
 	}
 	return stressArgs
 }

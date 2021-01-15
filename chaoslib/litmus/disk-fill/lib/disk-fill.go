@@ -143,7 +143,7 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 
 		// Derive the used ephemeral storage size from the target container
 		// It will exec inside disk-fill helper pod & derive the used ephemeral storage space
-		command := "du /diskfill/" + containerID
+		command := "sudo du /diskfill/" + containerID
 		exec.SetExecCommandAttributes(&execCommandDetails, podName, "disk-fill", experimentsDetails.ChaosNamespace)
 		ephemeralStorageDetails, err := exec.Exec(&execCommandDetails, clients, strings.Fields(command))
 		if err != nil {
