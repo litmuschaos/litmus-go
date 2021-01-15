@@ -361,7 +361,7 @@ func InjectChaos(experimentDetails *experimentTypes.ExperimentDetails, pid int) 
 	destinationIPs := os.Getenv("DESTINATION_IPS")
 
 	if destinationIPs == "" {
-		tc := fmt.Sprintf("nsenter -t %d -n tc qdisc add dev %s root netem %v", pid, experimentDetails.NetworkInterface, netemCommands)
+		tc := fmt.Sprintf("sudo nsenter -t %d -n tc qdisc add dev %s root netem %v", pid, experimentDetails.NetworkInterface, netemCommands)
 		cmd := exec.Command("/bin/bash", "-c", tc)
 		out, err := cmd.CombinedOutput()
 		log.Info(cmd.String())
@@ -390,7 +390,7 @@ func InjectChaos(experimentDetails *experimentTypes.ExperimentDetails, pid int) 
 
 		// Create a priority-based queue
 		// This instantly creates classes 1:1, 1:2, 1:3
-		priority := fmt.Sprintf("nsenter -t %v -n tc qdisc add dev %v root handle 1: prio", pid, experimentDetails.NetworkInterface)
+		priority := fmt.Sprintf("sudo nsenter -t %v -n tc qdisc add dev %v root handle 1: prio", pid, experimentDetails.NetworkInterface)
 		cmd := exec.Command("/bin/bash", "-c", priority)
 		out, err := cmd.CombinedOutput()
 		log.Info(cmd.String())
@@ -401,7 +401,7 @@ func InjectChaos(experimentDetails *experimentTypes.ExperimentDetails, pid int) 
 
 		// Add queueing discipline for 1:3 class.
 		// No traffic is going through 1:3 yet
-		traffic := fmt.Sprintf("nsenter -t %v -n tc qdisc add dev %v parent 1:3 netem %v", pid, experimentDetails.NetworkInterface, netemCommands)
+		traffic := fmt.Sprintf("sudo nsenter -t %v -n tc qdisc add dev %v parent 1:3 netem %v", pid, experimentDetails.NetworkInterface, netemCommands)
 		cmd = exec.Command("/bin/bash", "-c", traffic)
 		out, err = cmd.CombinedOutput()
 		log.Info(cmd.String())
@@ -415,7 +415,7 @@ func InjectChaos(experimentDetails *experimentTypes.ExperimentDetails, pid int) 
 			// redirect traffic to specific IP through band 3
 			// It allows ipv4 addresses only
 			if !strings.Contains(ip, ":") {
-				tc := fmt.Sprintf("nsenter -t %v -n tc filter add dev %v protocol ip parent 1:0 prio 3 u32 match ip dst %v flowid 1:3", pid, experimentDetails.NetworkInterface, ip)
+				tc := fmt.Sprintf("sudo nsenter -t %v -n tc filter add dev %v protocol ip parent 1:0 prio 3 u32 match ip dst %v flowid 1:3", pid, experimentDetails.NetworkInterface, ip)
 				cmd = exec.Command("/bin/bash", "-c", tc)
 				out, err = cmd.CombinedOutput()
 				log.Info(cmd.String())
@@ -432,7 +432,7 @@ func InjectChaos(experimentDetails *experimentTypes.ExperimentDetails, pid int) 
 // Killnetem kill the netem process for all the target containers
 func Killnetem(PID int) error {
 
-	tc := fmt.Sprintf("nsenter -t %d -n tc qdisc delete dev eth0 root", PID)
+	tc := fmt.Sprintf("sudo nsenter -t %d -n tc qdisc delete dev eth0 root", PID)
 	cmd := exec.Command("/bin/bash", "-c", tc)
 	out, err := cmd.CombinedOutput()
 	log.Info(cmd.String())
@@ -440,6 +440,7 @@ func Killnetem(PID int) error {
 	if err != nil {
 		log.Error(string(out))
 		if strings.Contains(string(out), qdiscNotFound) {
+			log.Warn("The network chaos process has already been removed")
 			return nil
 		}
 		return err

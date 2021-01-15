@@ -63,7 +63,7 @@ lint:
 .PHONY: unused-package-check
 unused-package-check:
 	@echo "------------------"
-	@echo "--> Check unused packages for the chaos-operator"
+	@echo "--> Check unused packages for the litmus-go"
 	@echo "------------------"
 	@tidy=$$(go mod tidy); \
 	if [ -n "$${tidy}" ]; then \
@@ -85,7 +85,7 @@ image-build:
 	@echo "-------------------------"
 	@echo "--> Build go-runner image" 
 	@echo "-------------------------"
-	@sudo docker buildx build --file build/litmus-go/Dockerfile --progress plane --platform linux/arm64,linux/amd64 --no-cache --tag $(DOCKER_REPO)/$(DOCKER_IMAGE):$(DOCKER_TAG) .
+	@sudo docker buildx build --file build/Dockerfile --progress plane --platform linux/arm64,linux/amd64 --no-cache --tag $(DOCKER_REPO)/$(DOCKER_IMAGE):$(DOCKER_TAG) .
 
 .PHONY: build-amd64
 build-amd64:
@@ -97,7 +97,7 @@ build-amd64:
 	@echo "-------------------------"
 	@echo "--> Build go-runner image" 
 	@echo "-------------------------"
-	@sudo docker build --file build/litmus-go/Dockerfile --tag $(DOCKER_REPO)/$(DOCKER_IMAGE):$(DOCKER_TAG) . --build-arg TARGETARCH=amd64
+	@sudo docker build --file build/Dockerfile --tag $(DOCKER_REPO)/$(DOCKER_IMAGE):$(DOCKER_TAG) . --build-arg TARGETARCH=amd64
 
 .PHONY: push-amd64
 push-amd64:

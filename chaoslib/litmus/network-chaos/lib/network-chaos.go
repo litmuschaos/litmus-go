@@ -238,6 +238,24 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 					},
 				},
 			},
+			InitContainers: []apiv1.Container{
+				{
+					Name:            "setup-" + experimentsDetails.ExperimentName,
+					Image:           experimentsDetails.LIBImage,
+					ImagePullPolicy: apiv1.PullPolicy(experimentsDetails.LIBImagePullPolicy),
+					Command: []string{
+						"/bin/bash",
+						"-c",
+						"sudo chmod 777 " + experimentsDetails.SocketPath,
+					},
+					VolumeMounts: []apiv1.VolumeMount{
+						{
+							Name:      "cri-socket",
+							MountPath: experimentsDetails.SocketPath,
+						},
+					},
+				},
+			},
 
 			Containers: []apiv1.Container{
 				{
@@ -401,6 +419,7 @@ func ChaosRecovery(resultDetails *types.ResultDetails, chaosDetails *types.Chaos
 				return err
 			}
 			if len(targetPods) == 0 {
+				log.Info("No target pod found for recovery!")
 				return nil
 			}
 			for _, pod := range targetPods {
