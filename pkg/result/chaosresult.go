@@ -62,6 +62,7 @@ func ChaosResult(chaosDetails *types.ChaosDetails, clients clients.ClientSets, r
 		// the chaos-result is already present with matching labels
 		// it will patch the new parameters in the same chaos-result
 		if state == "SOT" {
+			result.Status.History.ChaosStatus = []v1alpha1.ChaosStatusDetails{}
 			updateHistory(&result)
 			return PatchChaosResult(&result, clients, chaosDetails, resultDetails, experimentLabel)
 		}
@@ -99,6 +100,7 @@ func InitializeChaosResult(chaosDetails *types.ChaosDetails, clients clients.Cli
 				PassedRuns:  0,
 				FailedRuns:  0,
 				StoppedRuns: 0,
+				ChaosStatus: []v1alpha1.ChaosStatusDetails{},
 			},
 		},
 	}
