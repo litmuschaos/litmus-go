@@ -166,7 +166,7 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 
 		if sizeTobeFilled > 0 {
 			// Creating files to fill the required ephemeral storage size of block size of 4K
-			command := "dd if=/dev/urandom of=/diskfill/" + containerID + "/diskfill bs=4K count=" + strconv.Itoa(sizeTobeFilled/4)
+			command := "sudo dd if=/dev/urandom of=/diskfill/" + containerID + "/diskfill bs=4K count=" + strconv.Itoa(sizeTobeFilled/4)
 			_, err = exec.Exec(&execCommandDetails, clients, strings.Fields(command))
 			if err != nil {
 				common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-"+runID, "app="+experimentsDetails.ExperimentName+"-helper", chaosDetails, clients)
@@ -264,7 +264,7 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 
 		// Derive the used ephemeral storage size from the target container
 		// It will exec inside disk-fill helper pod & derive the used ephemeral storage space
-		command := "du /diskfill/" + containerID
+		command := "sudo du /diskfill/" + containerID
 		exec.SetExecCommandAttributes(&execCommandDetails, podName, "disk-fill", experimentsDetails.ChaosNamespace)
 		ephemeralStorageDetails, err := exec.Exec(&execCommandDetails, clients, strings.Fields(command))
 		if err != nil {
@@ -287,7 +287,7 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 
 		if sizeTobeFilled > 0 {
 			// Creating files to fill the required ephemeral storage size of block size of 4K
-			command := "dd if=/dev/urandom of=/diskfill/" + containerID + "/diskfill bs=4K count=" + strconv.Itoa(sizeTobeFilled/4)
+			command := "sudo dd if=/dev/urandom of=/diskfill/" + containerID + "/diskfill bs=4K count=" + strconv.Itoa(sizeTobeFilled/4)
 			_, err = exec.Exec(&execCommandDetails, clients, strings.Fields(command))
 			if err != nil {
 				common.DeleteAllHelperPodBasedOnJobCleanupPolicy("app="+experimentsDetails.ExperimentName+"-helper", chaosDetails, clients)
@@ -498,7 +498,7 @@ func Remedy(experimentsDetails *experimentTypes.ExperimentDetails, clients clien
 	} else {
 
 		// deleting the files after chaos execution
-		command := "rm -rf /diskfill/" + containerID + "/diskfill"
+		command := "sudo rm -rf /diskfill/" + containerID + "/diskfill"
 		_, err = exec.Exec(execCommandDetails, clients, strings.Fields(command))
 		if err != nil {
 			return errors.Errorf("Unable to delete files to reset ephemeral storage usage due to err: %v", err)
