@@ -1,7 +1,7 @@
 name: Running-E2E
 on:
   pull_request:
-    branches: [master]
+    branches: [dev]
     types: [edited, opened, synchronize, reopened]
 
 jobs:

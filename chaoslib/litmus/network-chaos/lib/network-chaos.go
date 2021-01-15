@@ -126,7 +126,6 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 			if err := ChaosRecovery(resultDetails, chaosDetails, experimentsDetails, clients, args); err != nil {
 				return err
 			}
-			return errors.Errorf("helper pod failed due to, err: %v", err)
 		}
 
 		//Deleting all the helper pod for container-kill chaos

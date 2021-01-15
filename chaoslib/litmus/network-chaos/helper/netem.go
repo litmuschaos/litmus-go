@@ -11,7 +11,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/litmuschaos/litmus-go/chaoslib/litmus/network_latency/tc"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/network-chaos/environment"
@@ -25,7 +24,8 @@ import (
 )
 
 const (
-	qdiscNotFound = "Cannot delete qdisc with handle of zero."
+	qdiscNotFound    = "Cannot delete qdisc with handle of zero."
+	qdiscNoFileFound = "RTNETLINK answers: No such file or directory"
 )
 
 var err error
@@ -88,7 +88,7 @@ func PreparePodNetworkRecovery(experimentsDetails *experimentTypes.ExperimentDet
 	log.Info("[Chaos]: Killing the chaos")
 
 	// cleaning the netem process after chaos injection
-	if err = tc.Killnetem(targetPID); err != nil {
+	if err = Killnetem(targetPID); err != nil {
 		return err
 	}
 
@@ -158,7 +158,7 @@ loop:
 			types.SetResultEventAttributes(eventsDetails, types.StoppedVerdict, msg, "Warning", resultDetails)
 			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosResult")
 
-			if err = tc.Killnetem(targetPID); err != nil {
+			if err = Killnetem(targetPID); err != nil {
 				log.Errorf("unable to kill netem process, err :%v", err)
 			}
 
@@ -177,7 +177,7 @@ loop:
 	log.Info("[Chaos]: Stopping the experiment")
 
 	// cleaning the netem process after chaos injection
-	if err = tc.Killnetem(targetPID); err != nil {
+	if err = Killnetem(targetPID); err != nil {
 		return err
 	}
 
@@ -439,7 +439,7 @@ func Killnetem(PID int) error {
 
 	if err != nil {
 		log.Error(string(out))
-		if strings.Contains(string(out), qdiscNotFound) {
+		if strings.Contains(string(out), qdiscNotFound) || strings.Contains(string(out), qdiscNoFileFound) {
 			log.Warn("The network chaos process has already been removed")
 			return nil
 		}
