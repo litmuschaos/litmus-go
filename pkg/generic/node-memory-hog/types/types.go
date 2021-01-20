@@ -19,7 +19,7 @@ type ExperimentDetails struct {
 	InstanceID         string
 	ChaosNamespace     string
 	ChaosPodName       string
-	MemoryPercentage   int
+	MemoryConsumption  string
 	RunID              string
 	LIBImage           string
 	LIBImagePullPolicy string

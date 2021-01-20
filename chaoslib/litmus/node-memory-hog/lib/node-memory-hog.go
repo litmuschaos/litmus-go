@@ -2,6 +2,7 @@ package lib
 
 import (
 	"strconv"
+	"strings"
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
@@ -78,8 +79,8 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		}
 
 		log.InfoWithValues("[Info]: Details of Node under chaos injection", logrus.Fields{
-			"NodeName":             appNode,
-			"MemoryHog Percentage": experimentsDetails.MemoryPercentage,
+			"NodeName":           appNode,
+			"Memory Consumption": experimentsDetails.MemoryConsumption,
 		})
 
 		experimentsDetails.RunID = common.GetRunID()
@@ -90,8 +91,28 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 			return errors.Errorf("Unable to get the node memory details, err: %v", err)
 		}
 
-		// Get the total memory percentage wrt allocatable memory
-		experimentsDetails.MemoryPercentage = CalculateMemoryPercentage(experimentsDetails, clients, memoryCapacity, memoryAllocatable)
+		unit := experimentsDetails.MemoryConsumption[len(experimentsDetails.MemoryConsumption)-1:]
+		switch string(unit[0]) {
+		case "%":
+			// Get the total memory percentage wrt allocatable memory
+			MemoryConsumption, err := CalculateMemoryConsumption(experimentsDetails, clients, memoryCapacity, memoryAllocatable, "%")
+			if err != nil {
+				return errors.Errorf("percentage memory calculation failed, err: %v", err)
+			}
+			experimentsDetails.MemoryConsumption = strconv.Itoa(MemoryConsumption) + "%"
+		case "G":
+			_, err := CalculateMemoryConsumption(experimentsDetails, clients, memoryCapacity, memoryAllocatable, "G")
+			if err != nil {
+				return errors.Errorf("Gibibyte memory calculation failed, err: %v", err)
+			}
+		case "M":
+			_, err := CalculateMemoryConsumption(experimentsDetails, clients, memoryCapacity, memoryAllocatable, "M")
+			if err != nil {
+				return errors.Errorf("Mebibyte memory calculation failed, err: %v", err)
+			}
+		default:
+			return errors.Errorf("unit in %v is not supported for hogging memory, Please provide the input in G(for Gibibyte),M(for Mebibyte) or in percentage format", experimentsDetails.MemoryConsumption)
+		}
 
 		// Creating the helper pod to perform node memory hog
 		err = CreateHelperPod(experimentsDetails, appNode, clients)
@@ -111,9 +132,11 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		log.Infof("[Wait]: Waiting for %vs till the completion of the helper pod", experimentsDetails.ChaosDuration+30)
 
 		podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, "name="+experimentsDetails.ExperimentName+"-"+experimentsDetails.RunID, clients, experimentsDetails.ChaosDuration+30, experimentsDetails.ExperimentName)
-		if err != nil || podStatus == "Failed" {
+		if err != nil {
 			common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-"+experimentsDetails.RunID, "app="+experimentsDetails.ExperimentName+"-helper", chaosDetails, clients)
 			return errors.Errorf("helper pod failed due to, err: %v", err)
+		} else if podStatus == "Failed" {
+			return errors.Errorf("helper pod status is %v", podStatus)
 		}
 
 		// Checking the status of target nodes
@@ -146,8 +169,8 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		}
 
 		log.InfoWithValues("[Info]: Details of Node under chaos injection", logrus.Fields{
-			"NodeName":             appNode,
-			"MemoryHog Percentage": experimentsDetails.MemoryPercentage,
+			"NodeName":           appNode,
+			"Memory Consumption": experimentsDetails.MemoryConsumption,
 		})
 
 		experimentsDetails.RunID = common.GetRunID()
@@ -158,8 +181,28 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 			return errors.Errorf("Unable to get the node memory details, err: %v", err)
 		}
 
-		// Get the total memory percentage wrt allocatable memory
-		experimentsDetails.MemoryPercentage = CalculateMemoryPercentage(experimentsDetails, clients, memoryCapacity, memoryAllocatable)
+		unit := experimentsDetails.MemoryConsumption[len(experimentsDetails.MemoryConsumption)-1:]
+		switch string(unit[0]) {
+		case "%":
+			// Get the total memory percentage wrt allocatable memory
+			MemoryConsumption, err := CalculateMemoryConsumption(experimentsDetails, clients, memoryCapacity, memoryAllocatable, "%")
+			if err != nil {
+				return errors.Errorf("percentage memory calculation failed, err: %v", err)
+			}
+			experimentsDetails.MemoryConsumption = strconv.Itoa(MemoryConsumption) + "%"
+		case "G":
+			_, err := CalculateMemoryConsumption(experimentsDetails, clients, memoryCapacity, memoryAllocatable, "G")
+			if err != nil {
+				return errors.Errorf("Gibibyte memory calculation failed, err: %v", err)
+			}
+		case "M":
+			_, err := CalculateMemoryConsumption(experimentsDetails, clients, memoryCapacity, memoryAllocatable, "M")
+			if err != nil {
+				return errors.Errorf("Mebibyte memory calculation failed, err: %v", err)
+			}
+		default:
+			return errors.Errorf("unit in %v is not supported for hogging memory, Please provide the input in G(for Gibibyte),M(for Mebibyte) or in percentage format", experimentsDetails.MemoryConsumption)
+		}
 
 		// Creating the helper pod to perform node memory hog
 		err = CreateHelperPod(experimentsDetails, appNode, clients)
@@ -180,9 +223,11 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 	log.Infof("[Wait]: Waiting for %vs till the completion of the helper pod", experimentsDetails.ChaosDuration+30)
 
 	podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, "app="+experimentsDetails.ExperimentName+"-helper", clients, experimentsDetails.ChaosDuration+30, experimentsDetails.ExperimentName)
-	if err != nil || podStatus == "Failed" {
+	if err != nil {
 		common.DeleteAllHelperPodBasedOnJobCleanupPolicy("app="+experimentsDetails.ExperimentName+"-helper", chaosDetails, clients)
 		return errors.Errorf("helper pod failed due to, err: %v", err)
+	} else if podStatus == "Failed" {
+		return errors.Errorf("helper pod status is %v", podStatus)
 	}
 
 	for _, appNode := range targetNodeList {
@@ -225,20 +270,49 @@ func GetNodeMemoryDetails(appNodeName string, clients clients.ClientSets) (int, 
 
 }
 
-// CalculateMemoryPercentage will calculate the memory percentage under chaos wrt allocatable memory
-func CalculateMemoryPercentage(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, memoryCapacity, memoryAllocatable int) int {
+// CalculateMemoryConsumption will calculate the memory consumption is the given unit to be consumed
+func CalculateMemoryConsumption(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, memoryCapacity, memoryAllocatable int, selector string) (int, error) {
 
-	var totalMemoryPercentage int
+	var totalMemoryConsumption int
+	switch string(selector) {
+	case "%":
+		MemoryConsumption, _ := strconv.Atoi(strings.Split(experimentsDetails.MemoryConsumption, "%")[0])
+		//Getting the total memory under chaos
+		memoryForChaos := ((float64(MemoryConsumption) / 100) * float64(memoryCapacity))
 
-	//Getting the total memory under chaos
-	memoryForChaos := ((float64(experimentsDetails.MemoryPercentage) / 100) * float64(memoryCapacity))
+		//Get the percentage of memory under chaos wrt allocatable memory
+		totalMemoryConsumption = int((float64(memoryForChaos) / float64(memoryAllocatable)) * 100)
+		log.Infof("[Info]: PercentageOfMemoryCapacityToBeUsed To Be Used: %v percent, which is %d percent of Allocatable Memory", MemoryConsumption, totalMemoryConsumption)
+		return totalMemoryConsumption, nil
 
-	//Get the percentage of memory under chaos wrt allocatable memory
-	totalMemoryPercentage = int((float64(memoryForChaos) / float64(memoryAllocatable)) * 100)
+	case "G":
+		MemoryConsumption := strings.Split(experimentsDetails.MemoryConsumption, "G")[0]
+		TotalMemoryConsumption, _ := strconv.ParseFloat(MemoryConsumption, 64)
+		// since 1Gi = 1044921.875Ki
+		TotalMemoryConsumption = TotalMemoryConsumption * 1044921.875
 
-	log.Infof("[Info]: PercentageOfMemoryCapacityToBeUsed: %d, which is %d percent of Allocatable Memory", experimentsDetails.MemoryPercentage, totalMemoryPercentage)
+		if float64(memoryAllocatable) < TotalMemoryConsumption {
+			experimentsDetails.MemoryConsumption = strconv.Itoa(memoryAllocatable) + "k"
+			log.Infof("The memory consumption %vKi is more than the memory available that is %vKi, so it will hog only the available memory", TotalMemoryConsumption, memoryAllocatable)
+		} else {
+			experimentsDetails.MemoryConsumption = MemoryConsumption + "g"
+		}
+		return 0, nil
+	case "M":
+		MemoryConsumption := strings.Split(experimentsDetails.MemoryConsumption, "M")[0]
+		TotalMemoryConsumption, _ := strconv.ParseFloat(MemoryConsumption, 64)
+		// since 1Mi = 1025.390625Ki
+		TotalMemoryConsumption = TotalMemoryConsumption * 1025.390625
 
-	return totalMemoryPercentage
+		if float64(memoryAllocatable) < TotalMemoryConsumption {
+			experimentsDetails.MemoryConsumption = strconv.Itoa(memoryAllocatable) + "k"
+			log.Infof("The memory consumption %vKi is more than the memory available that is %vKi, so it will hog only the available memory", TotalMemoryConsumption, memoryAllocatable)
+		} else {
+			experimentsDetails.MemoryConsumption = MemoryConsumption + "m"
+		}
+		return 0, nil
+	}
+	return 0, errors.Errorf("fail to calculate the memory consumption, invalid unit provided")
 }
 
 // CreateHelperPod derive the attributes for helper pod and create the helper pod
@@ -271,7 +345,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, appN
 						"--vm",
 						"1",
 						"--vm-bytes",
-						strconv.Itoa(experimentsDetails.MemoryPercentage) + "%",
+						experimentsDetails.MemoryConsumption,
 						"--timeout",
 						strconv.Itoa(experimentsDetails.ChaosDuration) + "s",
 					},
