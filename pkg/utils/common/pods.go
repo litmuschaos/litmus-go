@@ -185,12 +185,12 @@ func IsPodParentAnnotated(clients clients.ClientSets, targetPod core_v1.Pod, cha
 						ownerRef := rs.OwnerReferences
 						for _, own := range ownerRef {
 							if own.Kind == "Deployment" && own.Name == deploy.Name {
+								log.Infof("[Info]: chaos candidate of kind: %v, name: %v, namespace: %v", chaosDetails.AppDetail.Kind, deploy.Name, deploy.Namespace)
 								return true, nil
 							}
 						}
 					}
 				}
-
 			}
 		}
 		return false, nil
@@ -204,6 +204,7 @@ func IsPodParentAnnotated(clients clients.ClientSets, targetPod core_v1.Pod, cha
 				ownerRef := targetPod.OwnerReferences
 				for _, own := range ownerRef {
 					if own.Kind == "StatefulSet" && own.Name == sts.Name {
+						log.Infof("[Info]: chaos candidate of kind: %v, name: %v, namespace: %v", chaosDetails.AppDetail.Kind, sts.Name, sts.Namespace)
 						return true, nil
 					}
 				}
@@ -219,6 +220,7 @@ func IsPodParentAnnotated(clients clients.ClientSets, targetPod core_v1.Pod, cha
 				ownerRef := targetPod.OwnerReferences
 				for _, own := range ownerRef {
 					if own.Kind == "DaemonSet" && own.Name == ds.Name {
+						log.Infof("[Info]: chaos candidate of kind: %v, name: %v, namespace: %v", chaosDetails.AppDetail.Kind, ds.Name, ds.Namespace)
 						return true, nil
 					}
 				}
@@ -247,6 +249,7 @@ func IsPodParentAnnotated(clients clients.ClientSets, targetPod core_v1.Pod, cha
 						ownerRef := rc.OwnerReferences
 						for _, own := range ownerRef {
 							if own.Kind == "DeploymentConfig" && own.Name == dc.GetName() {
+								log.Infof("[Info]: chaos candidate of kind: %v, name: %v, namespace: %v", chaosDetails.AppDetail.Kind, dc.GetName(), dc.GetNamespace())
 								return true, nil
 							}
 						}
@@ -277,12 +280,12 @@ func IsPodParentAnnotated(clients clients.ClientSets, targetPod core_v1.Pod, cha
 						ownerRef := rs.OwnerReferences
 						for _, own := range ownerRef {
 							if own.Kind == "Rollout" && own.Name == ro.GetName() {
+								log.Infof("[Info]: chaos candidate of kind: %v, name: %v, namespace: %v", chaosDetails.AppDetail.Kind, ro.GetName(), ro.GetNamespace())
 								return true, nil
 							}
 						}
 					}
 				}
-
 			}
 		}
 	default:
