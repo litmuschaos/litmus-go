@@ -46,7 +46,6 @@ func DeletePod(podName, podLabel, namespace string, timeout, delay int, clients 
 func DeleteAllPod(podLabel, namespace string, timeout, delay int, clients clients.ClientSets) error {
 
 	err := clients.KubeClient.CoreV1().Pods(namespace).DeleteCollection(&v1.DeleteOptions{}, v1.ListOptions{LabelSelector: podLabel})
-
 	if err != nil {
 		return err
 	}
