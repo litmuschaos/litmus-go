@@ -508,6 +508,8 @@ github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de/go.mod h1:zAbeS9
 github.com/lithammer/dedent v1.1.0/go.mod h1:jrXYCQtgg0nJiN+StA2KgR7w6CiQNv9Fd/Z9BP0jIOc=
 github.com/litmuschaos/chaos-operator v0.0.0-20210112160123-c2ea9ad59dcd h1:v/UCMcXgC4HWpsyvNJ9pzC2zlTHVVxGXVz36F/b3AJg=
 github.com/litmuschaos/chaos-operator v0.0.0-20210112160123-c2ea9ad59dcd/go.mod h1:Z2GpYjqXwFd8bx+kv58YEQFxynx1v9PMGCGTQFRVnFQ=
+github.com/litmuschaos/chaos-operator v0.0.0-20210125072350-102befb1d701 h1:GLKrBT+yofmDbAa5X1wSqOy1t11v4BXWD9zcnC9Cs+E=
+github.com/litmuschaos/chaos-operator v0.0.0-20210125072350-102befb1d701/go.mod h1:Z2GpYjqXwFd8bx+kv58YEQFxynx1v9PMGCGTQFRVnFQ=
 github.com/litmuschaos/elves v0.0.0-20201107015738-552d74669e3c/go.mod h1:DsbHGNUq/78NZozWVVI9Q6eBei4I+JjlkkD5aibJ3MQ=
 github.com/lpabon/godbc v0.1.1/go.mod h1:Jo9QV0cf3U6jZABgiJ2skINAXb9j8m51r07g4KI92ZA=
 github.com/lucas-clemente/aes12 v0.0.0-20171027163421-cd47fb39b79f h1:sSeNEkJrs+0F9TUau0CgWTTNEwF23HST3Eq0A+QIx+A=

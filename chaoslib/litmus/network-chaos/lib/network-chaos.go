@@ -2,8 +2,11 @@ package lib
 
 import (
 	"net"
+	"os"
+	"os/signal"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
@@ -32,16 +35,10 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 		return err
 	}
 
-	chaosStatusList := []v1alpha1.ChaosStatusDetails{}
 	podNames := []string{}
 	for _, pod := range targetPodList.Items {
 		podNames = append(podNames, pod.Name)
-		chaosStatusList = append(chaosStatusList, v1alpha1.ChaosStatusDetails{
-			TargetPodName: pod.Name,
-			ChaosStatus:   "N/A",
-		})
 	}
-	updateChaosResult(resultDetails.Name, chaosDetails.ChaosNamespace, clients, chaosStatusList)
 
 	log.Infof("Target pods list for chaos, %v", podNames)
 
@@ -80,12 +77,14 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 		}
 	}
 
+	go abortWatcher(resultDetails, chaosDetails, clients)
+
 	if experimentsDetails.Sequence == "serial" {
 		if err = InjectChaosInSerialMode(experimentsDetails, targetPodList, clients, chaosDetails, args, resultDetails); err != nil {
 			return err
 		}
 	} else {
-		if err = InjectChaosInParallelMode(experimentsDetails, targetPodList, clients, chaosDetails, args); err != nil {
+		if err = InjectChaosInParallelMode(experimentsDetails, targetPodList, clients, chaosDetails, args, resultDetails); err != nil {
 			return err
 		}
 	}
@@ -95,6 +94,7 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 // InjectChaosInSerialMode inject the network chaos in all target application serially (one by one)
 func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, args string, resultDetails *types.ResultDetails) error {
 
+	labelSuffix := common.GetRunID()
 	// creating the helper pod to perform network chaos
 	for _, pod := range targetPodList.Items {
 
@@ -104,33 +104,46 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 			"ContainerName": experimentsDetails.TargetContainer,
 		})
 		runID := common.GetRunID()
-		err = CreateHelperPod(experimentsDetails, clients, pod.Name, pod.Spec.NodeName, runID, args, "inject")
+		err = CreateHelperPod(experimentsDetails, clients, pod.Name, pod.Spec.NodeName, runID, args, "inject", labelSuffix)
 		if err != nil {
 			return errors.Errorf("Unable to create the helper pod, err: %v", err)
 		}
 
+		appLabel := "name=" + experimentsDetails.ExperimentName + "-" + runID
+
 		//checking the status of the helper pods, wait till the pod comes to running state else fail the experiment
 		log.Info("[Status]: Checking the status of the helper pods")
-		err = status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, "app="+experimentsDetails.ExperimentName+"-helper", experimentsDetails.Timeout, experimentsDetails.Delay, clients)
+		err = status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, appLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 		if err != nil {
-			common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-"+runID, "app="+experimentsDetails.ExperimentName+"-helper", chaosDetails, clients)
+			common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-"+runID, appLabel, chaosDetails, clients)
 			return errors.Errorf("helper pods are not in running state, err: %v", err)
 		}
 
 		// Wait till the completion of the helper pod
 		// set an upper limit for the waiting time
 		log.Info("[Wait]: waiting till the completion of the helper pod")
-		podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, "app="+experimentsDetails.ExperimentName+"-helper", clients, experimentsDetails.ChaosDuration+60, experimentsDetails.ExperimentName)
+		podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, appLabel, clients, experimentsDetails.ChaosDuration+60, experimentsDetails.ExperimentName)
+		if updateErr := updateChaosStatus(resultDetails, chaosDetails, clients); err != nil {
+			return updateErr
+		}
 		if err != nil || podStatus == "Failed" {
-			common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-"+runID, "app="+experimentsDetails.ExperimentName+"-helper", chaosDetails, clients)
-			if err := ChaosRecovery(resultDetails, chaosDetails, experimentsDetails, clients, args); err != nil {
-				return err
+			common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-"+runID, appLabel, chaosDetails, clients)
+			recoveryErr := ChaosRecovery(resultDetails, chaosDetails, experimentsDetails, clients, args)
+			if updateErr := updateChaosStatus(resultDetails, chaosDetails, clients); err != nil {
+				return updateErr
+			}
+			if recoveryErr != nil {
+				return recoveryErr
+			}
+		} else {
+			if updateErr := updateChaosStatus(resultDetails, chaosDetails, clients); err != nil {
+				return updateErr
 			}
 		}
 
 		//Deleting all the helper pod for container-kill chaos
 		log.Info("[Cleanup]: Deleting the the helper pod")
-		err = common.DeletePod(experimentsDetails.ExperimentName+"-"+runID, "app="+experimentsDetails.ExperimentName+"-helper", experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients)
+		err = common.DeletePod(experimentsDetails.ExperimentName+"-"+runID, appLabel, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients)
 		if err != nil {
 			return errors.Errorf("Unable to delete the helper pods, err: %v", err)
 		}
@@ -140,8 +153,9 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 }
 
 // InjectChaosInParallelMode inject the network chaos in all target application in parallel mode (all at once)
-func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, args string) error {
+func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, args string, resultDetails *types.ResultDetails) error {
 
+	labelSuffix := common.GetRunID()
 	// creating the helper pod to perform network chaos
 	for _, pod := range targetPodList.Items {
 
@@ -151,32 +165,44 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 			"ContainerName": experimentsDetails.TargetContainer,
 		})
 		runID := common.GetRunID()
-		err = CreateHelperPod(experimentsDetails, clients, pod.Name, pod.Spec.NodeName, runID, args, "inject")
+		err = CreateHelperPod(experimentsDetails, clients, pod.Name, pod.Spec.NodeName, runID, args, "inject", labelSuffix)
 		if err != nil {
 			return errors.Errorf("Unable to create the helper pod, err: %v", err)
 		}
 	}
 
+	appLabel := "app=" + experimentsDetails.ExperimentName + "-helper-" + labelSuffix
+
 	//checking the status of the helper pods, wait till the pod comes to running state else fail the experiment
 	log.Info("[Status]: Checking the status of the helper pods")
-	err = status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, "app="+experimentsDetails.ExperimentName+"-helper", experimentsDetails.Timeout, experimentsDetails.Delay, clients)
+	err = status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, appLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 	if err != nil {
-		common.DeleteAllHelperPodBasedOnJobCleanupPolicy("app="+experimentsDetails.ExperimentName+"-helper", chaosDetails, clients)
+		common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
 		return errors.Errorf("helper pods are not in running state, err: %v", err)
 	}
 
 	// Wait till the completion of the helper pod
 	// set an upper limit for the waiting time
 	log.Info("[Wait]: waiting till the completion of the helper pod")
-	podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, "app="+experimentsDetails.ExperimentName+"-helper", clients, experimentsDetails.ChaosDuration+60, experimentsDetails.ExperimentName)
+	podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, appLabel, clients, experimentsDetails.ChaosDuration+60, experimentsDetails.ExperimentName)
 	if err != nil || podStatus == "Failed" {
-		common.DeleteAllHelperPodBasedOnJobCleanupPolicy("app="+experimentsDetails.ExperimentName+"-helper", chaosDetails, clients)
-		return errors.Errorf("helper pod failed due to, err: %v", err)
+		common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
+		recoveryErr := ChaosRecovery(resultDetails, chaosDetails, experimentsDetails, clients, args)
+		if updateErr := updateChaosStatus(resultDetails, chaosDetails, clients); err != nil {
+			return updateErr
+		}
+		if recoveryErr != nil {
+			return recoveryErr
+		}
+	} else {
+		if updateErr := updateChaosStatus(resultDetails, chaosDetails, clients); err != nil {
+			return updateErr
+		}
 	}
 
 	//Deleting all the helper pod for container-kill chaos
 	log.Info("[Cleanup]: Deleting all the helper pod")
-	err = common.DeleteAllPod("app="+experimentsDetails.ExperimentName+"-helper", experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients)
+	err = common.DeleteAllPod(appLabel, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients)
 	if err != nil {
 		return errors.Errorf("Unable to delete the helper pods, err: %v", err)
 	}
@@ -206,7 +232,7 @@ func GetTargetContainer(experimentsDetails *experimentTypes.ExperimentDetails, a
 }
 
 // CreateHelperPod derive the attributes for helper pod and create the helper pod
-func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, podName, nodeName, runID, args, chaosType string) error {
+func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, podName, nodeName, runID, args, chaosType, labelSuffix string) error {
 
 	privilegedEnable := true
 
@@ -215,7 +241,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 			Name:      experimentsDetails.ExperimentName + "-" + runID,
 			Namespace: experimentsDetails.ChaosNamespace,
 			Labels: map[string]string{
-				"app":                       experimentsDetails.ExperimentName + "-helper",
+				"app":                       experimentsDetails.ExperimentName + "-helper-" + labelSuffix,
 				"name":                      experimentsDetails.ExperimentName + "-" + runID,
 				"chaosUID":                  string(experimentsDetails.ChaosUID),
 				"app.kubernetes.io/part-of": "litmus",
@@ -377,15 +403,31 @@ func GetIpsForTargetHosts(targetHosts string) string {
 	return strings.Join(commaSeparatedIPs, ",")
 }
 
-// updateStatus update the chaosResult with chaosStatus
-func updateChaosResult(resultName, namespace string, clients clients.ClientSets, chaosStatus []v1alpha1.ChaosStatusDetails) error {
+// updateChaosStatus update the chaos status based on annotations in chaosresult
+func updateChaosStatus(resultDetails *types.ResultDetails, chaosDetails *types.ChaosDetails, clients clients.ClientSets) error {
 
-	result, err := clients.LitmusClient.ChaosResults(namespace).Get(resultName, v1.GetOptions{})
+	result, err := clients.LitmusClient.ChaosResults(chaosDetails.ChaosNamespace).Get(resultDetails.Name, v1.GetOptions{})
 	if err != nil {
 		return err
 	}
-	result.Status.History.ChaosStatus = chaosStatus
-	_, err = clients.LitmusClient.ChaosResults(namespace).Update(result)
+	annotations := result.ObjectMeta.Annotations
+	chaosStatusList := []v1alpha1.ChaosStatusDetails{}
+	for k, v := range annotations {
+		switch strings.ToLower(v) {
+		case "injected", "recovered":
+			podName := strings.TrimSpace(strings.Split(k, "/")[1])
+			chaosStatus := v1alpha1.ChaosStatusDetails{
+				TargetPodName: podName,
+				ChaosStatus:   v,
+			}
+			chaosStatusList = append(chaosStatusList, chaosStatus)
+			delete(annotations, k)
+		}
+	}
+
+	result.Status.History.ChaosStatus = chaosStatusList
+	result.ObjectMeta.Annotations = annotations
+	_, err = clients.LitmusClient.ChaosResults(chaosDetails.ChaosNamespace).Update(result)
 	return err
 }
 
@@ -396,17 +438,30 @@ func getTargetPodsForRecovery(resultName, namespace string, clients clients.Clie
 	if err != nil {
 		return nil, err
 	}
-	chaosStatusList := result.Status.History.ChaosStatus
+	targetPodCount := 0
+	chaosStatusList := result.ObjectMeta.Annotations
 	targetPodForRecovery := []string{}
-	for _, chaosStatus := range chaosStatusList {
-		if strings.ToLower(chaosStatus.ChaosStatus) == "injected" {
-			targetPodForRecovery = append(targetPodForRecovery, chaosStatus.TargetPodName)
+
+	for k, v := range chaosStatusList {
+		if strings.ToLower(v) == "injected" {
+			podName := strings.TrimSpace(strings.Split(k, "/")[1])
+			if podName == "" {
+				return nil, errors.Errorf("Wrong formated annotations found inside %v chaosresult", result.Name)
+			}
+			targetPodForRecovery = append(targetPodForRecovery, podName)
 		}
+		if strings.ToLower(v) == "injected" || strings.ToLower(v) == "recovered" {
+			targetPodCount++
+		}
+	}
+	if targetPodCount == 0 {
+		return nil, errors.Errorf("Helper pod failed before chaos injection")
 	}
 	return targetPodForRecovery, nil
 }
 
 // ChaosRecovery contains steps for the chaos recovery
+// it launches helper pod for recovery
 func ChaosRecovery(resultDetails *types.ResultDetails, chaosDetails *types.ChaosDetails, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, args string) error {
 
 	return retry.
@@ -421,22 +476,32 @@ func ChaosRecovery(resultDetails *types.ResultDetails, chaosDetails *types.Chaos
 				log.Info("No target pod found for recovery!")
 				return nil
 			}
+			log.Info("Starting the chaos revert...")
+			labelSuffix := common.GetRunID()
 			for _, pod := range targetPods {
 				nodeName, err := getNodeName(pod, experimentsDetails.AppNS, clients)
 				if err != nil {
 					return err
 				}
 				runID := common.GetRunID()
-				if err := CreateHelperPod(experimentsDetails, clients, pod, nodeName, runID, args, "recover"); err != nil {
+				if err := CreateHelperPod(experimentsDetails, clients, pod, nodeName, runID, args, "recover", labelSuffix); err != nil {
 					return err
 				}
+				appLabel := "name=" + experimentsDetails.ExperimentName + "-" + runID
+
 				// Wait till the completion of the helper pod
 				// set an upper limit for the waiting time
 				log.Info("[Wait]: waiting till the completion of the helper pod")
-				podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, "app="+experimentsDetails.ExperimentName+"-helper", clients, 60, experimentsDetails.ExperimentName)
+				podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, appLabel, clients, 60, experimentsDetails.ExperimentName)
 				if err != nil || podStatus == "Failed" {
-					common.DeleteAllHelperPodBasedOnJobCleanupPolicy("app="+experimentsDetails.ExperimentName+"-helper", chaosDetails, clients)
+					common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-"+runID, appLabel, chaosDetails, clients)
 					return errors.Errorf("helper pod failed due to, err: %v", err)
+				}
+				//Deleting all the helper pod for container-kill chaos
+				log.Info("[Cleanup]: Deleting the the helper pod")
+				err = common.DeletePod(experimentsDetails.ExperimentName+"-"+runID, appLabel, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients)
+				if err != nil {
+					return errors.Errorf("Unable to delete the helper pods, err: %v", err)
 				}
 			}
 			return nil
@@ -450,4 +515,25 @@ func getNodeName(podName, namespace string, clients clients.ClientSets) (string,
 		return "", err
 	}
 	return pod.Spec.NodeName, nil
+}
+
+// abortWatcher continuosly watch for the abort signals
+// it will update the chaosresult
+func abortWatcher(resultDetails *types.ResultDetails, chaosDetails *types.ChaosDetails, clients clients.ClientSets) {
+
+	// signChan channel is used to transmit signal notifications.
+	signChan := make(chan os.Signal, 1)
+	// Catch and relay certain signal(s) to signChan channel.
+	signal.Notify(signChan, os.Interrupt, syscall.SIGTERM, syscall.SIGKILL)
+
+	for {
+		select {
+		case <-signChan:
+			log.Info("termination signal recieved, updating chaos status")
+			if err := updateChaosStatus(resultDetails, chaosDetails, clients); err != nil {
+				log.Errorf("err: %v", err)
+			}
+			os.Exit(1)
+		}
+	}
 }
