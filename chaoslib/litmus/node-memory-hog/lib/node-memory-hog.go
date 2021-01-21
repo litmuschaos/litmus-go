@@ -238,7 +238,7 @@ func CalculateMemoryConsumption(experimentsDetails *experimentTypes.ExperimentDe
 	var totalMemoryConsumption int
 
 	unit := experimentsDetails.MemoryConsumption[len(experimentsDetails.MemoryConsumption)-1:]
-	switch string(unit[0]) {
+	switch unit[0] {
 	case "%":
 		// Get the total memory percentage wrt allocatable memory
 		MemoryConsumption, err := strconv.Atoi(strings.Split(experimentsDetails.MemoryConsumption, "%")[0])
