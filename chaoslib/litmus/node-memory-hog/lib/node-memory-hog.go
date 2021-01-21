@@ -238,8 +238,10 @@ func CalculateMemoryConsumption(experimentsDetails *experimentTypes.ExperimentDe
 	var totalMemoryConsumption int
 
 	unit := experimentsDetails.MemoryConsumption[len(experimentsDetails.MemoryConsumption)-1:]
-	switch unit[0] {
+	switch string(unit[0]) {
+
 	case "%":
+
 		// Get the total memory percentage wrt allocatable memory
 		MemoryConsumption, err := strconv.Atoi(strings.Split(experimentsDetails.MemoryConsumption, "%")[0])
 		if err != nil {
@@ -250,37 +252,47 @@ func CalculateMemoryConsumption(experimentsDetails *experimentTypes.ExperimentDe
 
 		//Get the percentage of memory under chaos wrt allocatable memory
 		totalMemoryConsumption = int((float64(memoryForChaos) / float64(memoryAllocatable)) * 100)
-		log.Infof("[Info]: PercentageOfMemoryCapacityToBeUsed To Be Used: %v percent, which is %d percent of Allocatable Memory", MemoryConsumption, totalMemoryConsumption)
+		log.Infof("[Info]: PercentageOfMemoryCapacity To Be Used: %v percent, which is %d percent of Allocatable Memory", MemoryConsumption, totalMemoryConsumption)
 		experimentsDetails.MemoryConsumption = strconv.Itoa(totalMemoryConsumption) + "%"
 		return nil
+
 	case "G":
+
 		MemoryConsumption := strings.Split(experimentsDetails.MemoryConsumption, "G")[0]
 		TotalMemoryConsumption, err := strconv.ParseFloat(MemoryConsumption, 64)
 		if err != nil {
 			return errors.Errorf("fail to parse memory consumption into float, err: %v", err)
 		}
+		// Bringing all the values in Ki unit to compare
 		// since 1Gi = 1044921.875Ki
 		TotalMemoryConsumption = TotalMemoryConsumption * 1044921.875
+		// since 1Ki = 1024 bytes
+		memoryAllocatable := memoryAllocatable / 1024
 
-		if float64(memoryAllocatable) < TotalMemoryConsumption {
+		if memoryAllocatable < int(TotalMemoryConsumption) {
 			experimentsDetails.MemoryConsumption = strconv.Itoa(memoryAllocatable) + "k"
-			log.Infof("The memory consumption %vKi is more than the memory available that is %vKi, so it will hog only the available memory", TotalMemoryConsumption, memoryAllocatable)
+			log.Infof("The memory for consumption %vKi is more than the available memory %vKi, so the experiment will hog the memory until %vKi", int(TotalMemoryConsumption), memoryAllocatable, memoryAllocatable)
 		} else {
 			experimentsDetails.MemoryConsumption = MemoryConsumption + "g"
 		}
 		return nil
+
 	case "M":
+
 		MemoryConsumption := strings.Split(experimentsDetails.MemoryConsumption, "M")[0]
 		TotalMemoryConsumption, err := strconv.ParseFloat(MemoryConsumption, 64)
 		if err != nil {
 			return errors.Errorf("fail to parse memory consumption into float, err: %v", err)
 		}
+		// Bringing all the values in Ki unit to compare
 		// since 1Mi = 1025.390625Ki
 		TotalMemoryConsumption = TotalMemoryConsumption * 1025.390625
+		// since 1Ki = 1024 bytes
+		memoryAllocatable := memoryAllocatable / 1024
 
-		if float64(memoryAllocatable) < TotalMemoryConsumption {
+		if memoryAllocatable < int(TotalMemoryConsumption) {
 			experimentsDetails.MemoryConsumption = strconv.Itoa(memoryAllocatable) + "k"
-			log.Infof("The memory consumption %vKi is more than the memory available that is %vKi, so it will hog only the available memory", TotalMemoryConsumption, memoryAllocatable)
+			log.Infof("The memory for consumption %vKi is more than the available memory %vKi, so the experiment will hog the memory until %vKi", int(TotalMemoryConsumption), memoryAllocatable, memoryAllocatable)
 		} else {
 			experimentsDetails.MemoryConsumption = MemoryConsumption + "m"
 		}
