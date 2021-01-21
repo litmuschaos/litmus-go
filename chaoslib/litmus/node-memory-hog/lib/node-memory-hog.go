@@ -91,27 +91,8 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 			return errors.Errorf("Unable to get the node memory details, err: %v", err)
 		}
 
-		unit := experimentsDetails.MemoryConsumption[len(experimentsDetails.MemoryConsumption)-1:]
-		switch string(unit[0]) {
-		case "%":
-			// Get the total memory percentage wrt allocatable memory
-			MemoryConsumption, err := CalculateMemoryConsumption(experimentsDetails, clients, memoryCapacity, memoryAllocatable, "%")
-			if err != nil {
-				return errors.Errorf("percentage memory calculation failed, err: %v", err)
-			}
-			experimentsDetails.MemoryConsumption = strconv.Itoa(MemoryConsumption) + "%"
-		case "G":
-			_, err := CalculateMemoryConsumption(experimentsDetails, clients, memoryCapacity, memoryAllocatable, "G")
-			if err != nil {
-				return errors.Errorf("Gibibyte memory calculation failed, err: %v", err)
-			}
-		case "M":
-			_, err := CalculateMemoryConsumption(experimentsDetails, clients, memoryCapacity, memoryAllocatable, "M")
-			if err != nil {
-				return errors.Errorf("Mebibyte memory calculation failed, err: %v", err)
-			}
-		default:
-			return errors.Errorf("unit in %v is not supported for hogging memory, Please provide the input in G(for Gibibyte),M(for Mebibyte) or in percentage format", experimentsDetails.MemoryConsumption)
+		if err = CalculateMemoryConsumption(experimentsDetails, clients, memoryCapacity, memoryAllocatable); err != nil {
+			return errors.Errorf("memory calculation failed, err: %v", err)
 		}
 
 		// Creating the helper pod to perform node memory hog
@@ -181,27 +162,8 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 			return errors.Errorf("Unable to get the node memory details, err: %v", err)
 		}
 
-		unit := experimentsDetails.MemoryConsumption[len(experimentsDetails.MemoryConsumption)-1:]
-		switch string(unit[0]) {
-		case "%":
-			// Get the total memory percentage wrt allocatable memory
-			MemoryConsumption, err := CalculateMemoryConsumption(experimentsDetails, clients, memoryCapacity, memoryAllocatable, "%")
-			if err != nil {
-				return errors.Errorf("percentage memory calculation failed, err: %v", err)
-			}
-			experimentsDetails.MemoryConsumption = strconv.Itoa(MemoryConsumption) + "%"
-		case "G":
-			_, err := CalculateMemoryConsumption(experimentsDetails, clients, memoryCapacity, memoryAllocatable, "G")
-			if err != nil {
-				return errors.Errorf("Gibibyte memory calculation failed, err: %v", err)
-			}
-		case "M":
-			_, err := CalculateMemoryConsumption(experimentsDetails, clients, memoryCapacity, memoryAllocatable, "M")
-			if err != nil {
-				return errors.Errorf("Mebibyte memory calculation failed, err: %v", err)
-			}
-		default:
-			return errors.Errorf("unit in %v is not supported for hogging memory, Please provide the input in G(for Gibibyte),M(for Mebibyte) or in percentage format", experimentsDetails.MemoryConsumption)
+		if err = CalculateMemoryConsumption(experimentsDetails, clients, memoryCapacity, memoryAllocatable); err != nil {
+			return errors.Errorf("memory calculation failed, err: %v", err)
 		}
 
 		// Creating the helper pod to perform node memory hog
@@ -270,24 +232,33 @@ func GetNodeMemoryDetails(appNodeName string, clients clients.ClientSets) (int, 
 
 }
 
-// CalculateMemoryConsumption will calculate the memory consumption is the given unit to be consumed
-func CalculateMemoryConsumption(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, memoryCapacity, memoryAllocatable int, selector string) (int, error) {
+// CalculateMemoryConsumption will calculate the amount of memory to be consumed for a given unit.
+func CalculateMemoryConsumption(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, memoryCapacity, memoryAllocatable int) error {
 
 	var totalMemoryConsumption int
-	switch string(selector) {
+
+	unit := experimentsDetails.MemoryConsumption[len(experimentsDetails.MemoryConsumption)-1:]
+	switch string(unit[0]) {
 	case "%":
-		MemoryConsumption, _ := strconv.Atoi(strings.Split(experimentsDetails.MemoryConsumption, "%")[0])
+		// Get the total memory percentage wrt allocatable memory
+		MemoryConsumption, err := strconv.Atoi(strings.Split(experimentsDetails.MemoryConsumption, "%")[0])
+		if err != nil {
+			return errors.Errorf("unable to filter the unit, err: %v", err)
+		}
 		//Getting the total memory under chaos
 		memoryForChaos := ((float64(MemoryConsumption) / 100) * float64(memoryCapacity))
 
 		//Get the percentage of memory under chaos wrt allocatable memory
 		totalMemoryConsumption = int((float64(memoryForChaos) / float64(memoryAllocatable)) * 100)
 		log.Infof("[Info]: PercentageOfMemoryCapacityToBeUsed To Be Used: %v percent, which is %d percent of Allocatable Memory", MemoryConsumption, totalMemoryConsumption)
-		return totalMemoryConsumption, nil
-
+		experimentsDetails.MemoryConsumption = strconv.Itoa(totalMemoryConsumption) + "%"
+		return nil
 	case "G":
 		MemoryConsumption := strings.Split(experimentsDetails.MemoryConsumption, "G")[0]
-		TotalMemoryConsumption, _ := strconv.ParseFloat(MemoryConsumption, 64)
+		TotalMemoryConsumption, err := strconv.ParseFloat(MemoryConsumption, 64)
+		if err != nil {
+			return errors.Errorf("fail to parse memory consumption into float, err: %v", err)
+		}
 		// since 1Gi = 1044921.875Ki
 		TotalMemoryConsumption = TotalMemoryConsumption * 1044921.875
 
@@ -297,10 +268,13 @@ func CalculateMemoryConsumption(experimentsDetails *experimentTypes.ExperimentDe
 		} else {
 			experimentsDetails.MemoryConsumption = MemoryConsumption + "g"
 		}
-		return 0, nil
+		return nil
 	case "M":
 		MemoryConsumption := strings.Split(experimentsDetails.MemoryConsumption, "M")[0]
-		TotalMemoryConsumption, _ := strconv.ParseFloat(MemoryConsumption, 64)
+		TotalMemoryConsumption, err := strconv.ParseFloat(MemoryConsumption, 64)
+		if err != nil {
+			return errors.Errorf("fail to parse memory consumption into float, err: %v", err)
+		}
 		// since 1Mi = 1025.390625Ki
 		TotalMemoryConsumption = TotalMemoryConsumption * 1025.390625
 
@@ -310,9 +284,10 @@ func CalculateMemoryConsumption(experimentsDetails *experimentTypes.ExperimentDe
 		} else {
 			experimentsDetails.MemoryConsumption = MemoryConsumption + "m"
 		}
-		return 0, nil
+		return nil
+	default:
+		return errors.Errorf("unit in %v is not supported for hogging memory, Please provide the input in G(for Gibibyte),M(for Mebibyte) or in percentage format", experimentsDetails.MemoryConsumption)
 	}
-	return 0, errors.Errorf("fail to calculate the memory consumption, invalid unit provided")
 }
 
 // CreateHelperPod derive the attributes for helper pod and create the helper pod
