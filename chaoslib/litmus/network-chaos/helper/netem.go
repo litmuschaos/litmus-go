@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -92,7 +93,7 @@ func PreparePodNetworkRecovery(experimentsDetails *experimentTypes.ExperimentDet
 		return err
 	}
 
-	if err = updateStatus(resultDetails.Name, chaosDetails.ChaosNamespace, "Recovered", experimentsDetails.TargetPods, clients); err != nil {
+	if err = annotateChaosResult(resultDetails.Name, chaosDetails.ChaosNamespace, "Recovered", experimentsDetails.TargetPods); err != nil {
 		return err
 	}
 
@@ -127,7 +128,7 @@ func PreparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetail
 		return err
 	}
 
-	if err = updateStatus(resultDetails.Name, chaosDetails.ChaosNamespace, "Injected", experimentsDetails.TargetPods, clients); err != nil {
+	if err = annotateChaosResult(resultDetails.Name, chaosDetails.ChaosNamespace, "Injected", experimentsDetails.TargetPods); err != nil {
 		return err
 	}
 
@@ -162,7 +163,7 @@ loop:
 				log.Errorf("unable to kill netem process, err :%v", err)
 			}
 
-			if err = updateStatus(resultDetails.Name, chaosDetails.ChaosNamespace, "Recovered", experimentsDetails.TargetPods, clients); err != nil {
+			if err = annotateChaosResult(resultDetails.Name, chaosDetails.ChaosNamespace, "Recovered", experimentsDetails.TargetPods); err != nil {
 				return err
 			}
 
@@ -181,7 +182,7 @@ loop:
 		return err
 	}
 
-	if err = updateStatus(resultDetails.Name, chaosDetails.ChaosNamespace, "Recovered", experimentsDetails.TargetPods, clients); err != nil {
+	if err = annotateChaosResult(resultDetails.Name, chaosDetails.ChaosNamespace, "Recovered", experimentsDetails.TargetPods); err != nil {
 		return err
 	}
 
@@ -475,20 +476,15 @@ func Getenv(key string, defaultValue string) string {
 	return value
 }
 
-// updateStatus update the chaosResult for the chaos status
-func updateStatus(resultName, namespace, status, podName string, clients clients.ClientSets) error {
-
-	result, err := clients.LitmusClient.ChaosResults(namespace).Get(resultName, v1.GetOptions{})
-	if err != nil {
-		return err
+// annotateChaosResult annotate the chaosResult for the chaos status
+func annotateChaosResult(resultName, namespace, status, podName string) error {
+	command := exec.Command("kubectl", "annotate", "chaosresult", resultName, "-n", namespace, "litmuschaos.io/"+podName+"="+status, "--overwrite")
+	var out, stderr bytes.Buffer
+	command.Stdout = &out
+	command.Stderr = &stderr
+	if err := command.Run(); err != nil {
+		log.Infof("Error String: %v", stderr.String())
+		return fmt.Errorf("Unable to annotate the %v chaosresult, err: %v", resultName, err)
 	}
-	chaosStatusDetails := result.Status.History.ChaosStatus
-	for index := range chaosStatusDetails {
-		if chaosStatusDetails[index].TargetPodName == podName {
-			chaosStatusDetails[index].ChaosStatus = status
-		}
-	}
-	result.Status.History.ChaosStatus = chaosStatusDetails
-	_, err = clients.LitmusClient.ChaosResults(namespace).Update(result)
-	return err
+	return nil
 }

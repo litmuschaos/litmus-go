@@ -32,16 +32,10 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 		return err
 	}
 
-	chaosStatusList := []v1alpha1.ChaosStatusDetails{}
 	podNames := []string{}
 	for _, pod := range targetPodList.Items {
 		podNames = append(podNames, pod.Name)
-		chaosStatusList = append(chaosStatusList, v1alpha1.ChaosStatusDetails{
-			TargetPodName: pod.Name,
-			ChaosStatus:   "N/A",
-		})
 	}
-	updateChaosResult(resultDetails.Name, chaosDetails.ChaosNamespace, clients, chaosStatusList)
 
 	log.Infof("Target pods list for chaos, %v", podNames)
 
@@ -85,7 +79,7 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 			return err
 		}
 	} else {
-		if err = InjectChaosInParallelMode(experimentsDetails, targetPodList, clients, chaosDetails, args); err != nil {
+		if err = InjectChaosInParallelMode(experimentsDetails, targetPodList, clients, chaosDetails, args, resultDetails); err != nil {
 			return err
 		}
 	}
@@ -123,8 +117,12 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, "app="+experimentsDetails.ExperimentName+"-helper", clients, experimentsDetails.ChaosDuration+60, experimentsDetails.ExperimentName)
 		if err != nil || podStatus == "Failed" {
 			common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-"+runID, "app="+experimentsDetails.ExperimentName+"-helper", chaosDetails, clients)
-			if err := ChaosRecovery(resultDetails, chaosDetails, experimentsDetails, clients, args); err != nil {
-				return err
+			recoveryErr := ChaosRecovery(resultDetails, chaosDetails, experimentsDetails, clients, args)
+			if updateErr := updateChaosStatus(resultDetails, chaosDetails, clients); err != nil {
+				return updateErr
+			}
+			if recoveryErr != nil {
+				return recoveryErr
 			}
 			return errors.Errorf("helper pod failed due to, err: %v", err)
 		}
@@ -141,7 +139,7 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 }
 
 // InjectChaosInParallelMode inject the network chaos in all target application in parallel mode (all at once)
-func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, args string) error {
+func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, args string, resultDetails *types.ResultDetails) error {
 
 	// creating the helper pod to perform network chaos
 	for _, pod := range targetPodList.Items {
@@ -172,6 +170,13 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 	podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, "app="+experimentsDetails.ExperimentName+"-helper", clients, experimentsDetails.ChaosDuration+60, experimentsDetails.ExperimentName)
 	if err != nil || podStatus == "Failed" {
 		common.DeleteAllHelperPodBasedOnJobCleanupPolicy("app="+experimentsDetails.ExperimentName+"-helper", chaosDetails, clients)
+		recoveryErr := ChaosRecovery(resultDetails, chaosDetails, experimentsDetails, clients, args)
+		if updateErr := updateChaosStatus(resultDetails, chaosDetails, clients); err != nil {
+			return updateErr
+		}
+		if recoveryErr != nil {
+			return recoveryErr
+		}
 		return errors.Errorf("helper pod failed due to, err: %v", err)
 	}
 
@@ -378,15 +383,28 @@ func GetIpsForTargetHosts(targetHosts string) string {
 	return strings.Join(commaSeparatedIPs, ",")
 }
 
-// updateStatus update the chaosResult with chaosStatus
-func updateChaosResult(resultName, namespace string, clients clients.ClientSets, chaosStatus []v1alpha1.ChaosStatusDetails) error {
+// updateChaosStatus ...
+func updateChaosStatus(resultDetails *types.ResultDetails, chaosDetails *types.ChaosDetails, clients clients.ClientSets) error {
 
-	result, err := clients.LitmusClient.ChaosResults(namespace).Get(resultName, v1.GetOptions{})
+	result, err := clients.LitmusClient.ChaosResults(chaosDetails.ChaosNamespace).Get(resultDetails.Name, v1.GetOptions{})
 	if err != nil {
 		return err
 	}
-	result.Status.History.ChaosStatus = chaosStatus
-	_, err = clients.LitmusClient.ChaosResults(namespace).Update(result)
+	annotations := result.ObjectMeta.Annotations
+	chaosStatusList := []v1alpha1.ChaosStatusDetails{}
+	for k, v := range annotations {
+		podName := strings.TrimSpace(strings.Split(k, "/")[1])
+		chaosStatus := v1alpha1.ChaosStatusDetails{
+			TargetPodName: podName,
+			ChaosStatus:   v,
+		}
+		chaosStatusList = append(chaosStatusList, chaosStatus)
+		delete(annotations, k)
+	}
+
+	result.Status.History.ChaosStatus = chaosStatusList
+	result.ObjectMeta.Annotations = annotations
+	_, err = clients.LitmusClient.ChaosResults(chaosDetails.ChaosNamespace).Update(result)
 	return err
 }
 
@@ -397,11 +415,15 @@ func getTargetPodsForRecovery(resultName, namespace string, clients clients.Clie
 	if err != nil {
 		return nil, err
 	}
-	chaosStatusList := result.Status.History.ChaosStatus
+	chaosStatusList := result.ObjectMeta.Annotations
 	targetPodForRecovery := []string{}
-	for _, chaosStatus := range chaosStatusList {
-		if strings.ToLower(chaosStatus.ChaosStatus) == "injected" {
-			targetPodForRecovery = append(targetPodForRecovery, chaosStatus.TargetPodName)
+	for k, v := range chaosStatusList {
+		if strings.ToLower(v) == "injected" {
+			podName := strings.TrimSpace(strings.Split(k, "/")[1])
+			if podName == "" {
+				return nil, errors.Errorf("Wrong formated annotations found inside %v chaosresult", result.Name)
+			}
+			targetPodForRecovery = append(targetPodForRecovery, podName)
 		}
 	}
 	return targetPodForRecovery, nil
