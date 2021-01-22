@@ -252,8 +252,13 @@ func CalculateMemoryConsumption(experimentsDetails *experimentTypes.ExperimentDe
 
 		//Get the percentage of memory under chaos wrt allocatable memory
 		totalMemoryConsumption = int((float64(memoryForChaos) / float64(memoryAllocatable)) * 100)
-		log.Infof("[Info]: PercentageOfMemoryCapacity To Be Used: %v percent, which is %d percent of Allocatable Memory", MemoryConsumption, totalMemoryConsumption)
-		experimentsDetails.MemoryConsumption = strconv.Itoa(totalMemoryConsumption) + "%"
+		if totalMemoryConsumption > 100 {
+			log.Infof("PercentageOfMemoryCapacity To Be Used: %v percent, which is more than 100 percent (%d percent) of Allocatable Memory, so the experiment will only consume upto 100 percent of Allocatable Memory", MemoryConsumption, totalMemoryConsumption)
+			experimentsDetails.MemoryConsumption = "100%"
+		} else {
+			log.Infof("[Info]: PercentageOfMemoryCapacity To Be Used: %v percent, which is %d percent of Allocatable Memory", MemoryConsumption, totalMemoryConsumption)
+			experimentsDetails.MemoryConsumption = strconv.Itoa(totalMemoryConsumption) + "%"
+		}
 		return nil
 
 	case "G":
@@ -271,7 +276,7 @@ func CalculateMemoryConsumption(experimentsDetails *experimentTypes.ExperimentDe
 
 		if memoryAllocatable < int(TotalMemoryConsumption) {
 			experimentsDetails.MemoryConsumption = strconv.Itoa(memoryAllocatable) + "k"
-			log.Infof("The memory for consumption %vKi is more than the available memory %vKi, so the experiment will hog the memory until %vKi", int(TotalMemoryConsumption), memoryAllocatable, memoryAllocatable)
+			log.Infof("The memory for consumption %vKi is more than the available memory %vKi, so the experiment will hog the memory upto %vKi", int(TotalMemoryConsumption), memoryAllocatable, memoryAllocatable)
 		} else {
 			experimentsDetails.MemoryConsumption = MemoryConsumption + "g"
 		}
@@ -292,7 +297,7 @@ func CalculateMemoryConsumption(experimentsDetails *experimentTypes.ExperimentDe
 
 		if memoryAllocatable < int(TotalMemoryConsumption) {
 			experimentsDetails.MemoryConsumption = strconv.Itoa(memoryAllocatable) + "k"
-			log.Infof("The memory for consumption %vKi is more than the available memory %vKi, so the experiment will hog the memory until %vKi", int(TotalMemoryConsumption), memoryAllocatable, memoryAllocatable)
+			log.Infof("The memory for consumption %vKi is more than the available memory %vKi, so the experiment will hog the memory upto %vKi", int(TotalMemoryConsumption), memoryAllocatable, memoryAllocatable)
 		} else {
 			experimentsDetails.MemoryConsumption = MemoryConsumption + "m"
 		}
