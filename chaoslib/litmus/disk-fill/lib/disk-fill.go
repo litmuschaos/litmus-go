@@ -86,19 +86,22 @@ func PrepareDiskFill(experimentsDetails *experimentTypes.ExperimentDetails, clie
 // InjectChaosInSerialMode fill the ephemeral storage of all target application serially (one by one)
 func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, execCommandDetails exec.PodDetails) error {
 
+	labelSuffix := common.GetRunID()
 	// creating the helper pod to perform disk-fill chaos
 	for _, pod := range targetPodList.Items {
 		runID := common.GetRunID()
-		err := CreateHelperPod(experimentsDetails, clients, pod.Name, pod.Spec.NodeName, runID)
+		err := CreateHelperPod(experimentsDetails, clients, pod.Name, pod.Spec.NodeName, runID, labelSuffix)
 		if err != nil {
 			return errors.Errorf("Unable to create the helper pod, err: %v", err)
 		}
 
+		appLabel := "name=" + experimentsDetails.ExperimentName + "-" + runID
+
 		//checking the status of the helper pods, wait till the pod comes to running state else fail the experiment
 		log.Info("[Status]: Checking the status of the helper pods")
-		err = status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, "app="+experimentsDetails.ExperimentName+"-helper", experimentsDetails.Timeout, experimentsDetails.Delay, clients)
+		err = status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, appLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 		if err != nil {
-			common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-"+runID, "app="+experimentsDetails.ExperimentName+"-helper", chaosDetails, clients)
+			common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-"+runID, appLabel, chaosDetails, clients)
 			return errors.Errorf("helper pods are not in running state, err: %v", err)
 		}
 
@@ -106,7 +109,7 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		if experimentsDetails.TargetContainer == "" {
 			experimentsDetails.TargetContainer, err = GetTargetContainer(experimentsDetails, pod.Name, clients)
 			if err != nil {
-				common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-"+runID, "app="+experimentsDetails.ExperimentName+"-helper", chaosDetails, clients)
+				common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-"+runID, appLabel, chaosDetails, clients)
 				return errors.Errorf("Unable to get the target container name, err: %v", err)
 			}
 		}
@@ -114,14 +117,14 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		// GetEphemeralStorageAttributes derive the ephemeral storage attributes from the target container
 		ephemeralStorageLimit, ephemeralStorageRequest, err := GetEphemeralStorageAttributes(experimentsDetails, clients, pod.Name)
 		if err != nil {
-			common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-"+runID, "app="+experimentsDetails.ExperimentName+"-helper", chaosDetails, clients)
+			common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-"+runID, appLabel, chaosDetails, clients)
 			return err
 		}
 
 		// Derive the container id of the target container
 		containerID, err := GetContainerID(experimentsDetails, clients, pod.Name)
 		if err != nil {
-			common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-"+runID, "app="+experimentsDetails.ExperimentName+"-helper", chaosDetails, clients)
+			common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-"+runID, appLabel, chaosDetails, clients)
 			return err
 		}
 
@@ -135,9 +138,9 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		})
 
 		// getting the helper pod name, scheduled on the target node
-		podName, err := GetHelperPodName(pod, clients, experimentsDetails.ChaosNamespace, "app="+experimentsDetails.ExperimentName+"-helper")
+		podName, err := GetHelperPodName(pod, clients, experimentsDetails.ChaosNamespace, appLabel)
 		if err != nil {
-			common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-"+runID, "app="+experimentsDetails.ExperimentName+"-helper", chaosDetails, clients)
+			common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-"+runID, appLabel, chaosDetails, clients)
 			return err
 		}
 
@@ -147,14 +150,14 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		exec.SetExecCommandAttributes(&execCommandDetails, podName, "disk-fill", experimentsDetails.ChaosNamespace)
 		ephemeralStorageDetails, err := exec.Exec(&execCommandDetails, clients, strings.Fields(command))
 		if err != nil {
-			common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-"+runID, "app="+experimentsDetails.ExperimentName+"-helper", chaosDetails, clients)
+			common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-"+runID, appLabel, chaosDetails, clients)
 			return errors.Errorf("Unable to get ephemeral storage details, err: %v", err)
 		}
 
 		// filtering out the used ephemeral storage from the output of du command
 		usedEphemeralStorageSize, err := FilterUsedEphemeralStorage(ephemeralStorageDetails)
 		if err != nil {
-			common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-"+runID, "app="+experimentsDetails.ExperimentName+"-helper", chaosDetails, clients)
+			common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-"+runID, appLabel, chaosDetails, clients)
 			return errors.Errorf("Unable to filter used ephemeral storage size, err: %v", err)
 		}
 		log.Infof("used ephemeral storage space: %v", strconv.Itoa(usedEphemeralStorageSize))
@@ -169,7 +172,7 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 			command := "sudo dd if=/dev/urandom of=/diskfill/" + containerID + "/diskfill bs=4K count=" + strconv.Itoa(sizeTobeFilled/4)
 			_, err = exec.Exec(&execCommandDetails, clients, strings.Fields(command))
 			if err != nil {
-				common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-"+runID, "app="+experimentsDetails.ExperimentName+"-helper", chaosDetails, clients)
+				common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-"+runID, appLabel, chaosDetails, clients)
 				return errors.Errorf("Unable to fill the ephemeral storage, err: %v", err)
 			}
 		} else {
@@ -185,13 +188,13 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		exec.SetExecCommandAttributes(&execCommandDetails, podName, "disk-fill", experimentsDetails.ChaosNamespace)
 		err = Remedy(experimentsDetails, clients, containerID, pod.Name, &execCommandDetails)
 		if err != nil {
-			common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-"+runID, "app="+experimentsDetails.ExperimentName+"-helper", chaosDetails, clients)
+			common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-"+runID, appLabel, chaosDetails, clients)
 			return errors.Errorf("Unable to perform remedy operation due to %v", err)
 		}
 
 		//Deleting all the helper pod for disk-fill chaos
 		log.Info("[Cleanup]: Deleting the helper pod")
-		err = common.DeletePod(experimentsDetails.ExperimentName+"-"+runID, "app="+experimentsDetails.ExperimentName+"-helper", experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients)
+		err = common.DeletePod(experimentsDetails.ExperimentName+"-"+runID, appLabel, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients)
 		if err != nil {
 			return errors.Errorf("Unable to delete the helper pod, %v", err)
 		}
@@ -204,20 +207,23 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 // InjectChaosInParallelMode fill the ephemeral storage of of all target application in parallel mode (all at once)
 func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, execCommandDetails exec.PodDetails) error {
 
+	labelSuffix := common.GetRunID()
 	// creating the helper pod to perform disk-fill chaos
 	for _, pod := range targetPodList.Items {
 		runID := common.GetRunID()
-		err := CreateHelperPod(experimentsDetails, clients, pod.Name, pod.Spec.NodeName, runID)
+		err := CreateHelperPod(experimentsDetails, clients, pod.Name, pod.Spec.NodeName, runID, labelSuffix)
 		if err != nil {
 			return errors.Errorf("Unable to create the helper pod, err: %v", err)
 		}
 	}
 
+	appLabel := "app=" + experimentsDetails.ExperimentName + "-helper-" + labelSuffix
+
 	//checking the status of the helper pods, wait till the pod comes to running state else fail the experiment
 	log.Info("[Status]: Checking the status of the helper pods")
-	err := status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, "app="+experimentsDetails.ExperimentName+"-helper", experimentsDetails.Timeout, experimentsDetails.Delay, clients)
+	err := status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, appLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 	if err != nil {
-		common.DeleteAllHelperPodBasedOnJobCleanupPolicy("app="+experimentsDetails.ExperimentName+"-helper", chaosDetails, clients)
+		common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
 		return errors.Errorf("helper pods are not in running state, err: %v", err)
 	}
 
@@ -227,7 +233,7 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		if experimentsDetails.TargetContainer == "" {
 			experimentsDetails.TargetContainer, err = GetTargetContainer(experimentsDetails, pod.Name, clients)
 			if err != nil {
-				common.DeleteAllHelperPodBasedOnJobCleanupPolicy("app="+experimentsDetails.ExperimentName+"-helper", chaosDetails, clients)
+				common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
 				return errors.Errorf("Unable to get the target container name, err: %v", err)
 			}
 		}
@@ -235,14 +241,14 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		// GetEphemeralStorageAttributes derive the ephemeral storage attributes from the target container
 		ephemeralStorageLimit, ephemeralStorageRequest, err := GetEphemeralStorageAttributes(experimentsDetails, clients, pod.Name)
 		if err != nil {
-			common.DeleteAllHelperPodBasedOnJobCleanupPolicy("app="+experimentsDetails.ExperimentName+"-helper", chaosDetails, clients)
+			common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
 			return err
 		}
 
 		// Derive the container id of the target container
 		containerID, err := GetContainerID(experimentsDetails, clients, pod.Name)
 		if err != nil {
-			common.DeleteAllHelperPodBasedOnJobCleanupPolicy("app="+experimentsDetails.ExperimentName+"-helper", chaosDetails, clients)
+			common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
 			return err
 		}
 
@@ -256,9 +262,9 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		})
 
 		// getting the helper pod name, scheduled on the target node
-		podName, err := GetHelperPodName(pod, clients, experimentsDetails.ChaosNamespace, "app="+experimentsDetails.ExperimentName+"-helper")
+		podName, err := GetHelperPodName(pod, clients, experimentsDetails.ChaosNamespace, appLabel)
 		if err != nil {
-			common.DeleteAllHelperPodBasedOnJobCleanupPolicy("app="+experimentsDetails.ExperimentName+"-helper", chaosDetails, clients)
+			common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
 			return err
 		}
 
@@ -268,14 +274,14 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		exec.SetExecCommandAttributes(&execCommandDetails, podName, "disk-fill", experimentsDetails.ChaosNamespace)
 		ephemeralStorageDetails, err := exec.Exec(&execCommandDetails, clients, strings.Fields(command))
 		if err != nil {
-			common.DeleteAllHelperPodBasedOnJobCleanupPolicy("app="+experimentsDetails.ExperimentName+"-helper", chaosDetails, clients)
+			common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
 			return errors.Errorf("Unable to get ephemeral storage details, err: %v", err)
 		}
 
 		// filtering out the used ephemeral storage from the output of du command
 		usedEphemeralStorageSize, err := FilterUsedEphemeralStorage(ephemeralStorageDetails)
 		if err != nil {
-			common.DeleteAllHelperPodBasedOnJobCleanupPolicy("app="+experimentsDetails.ExperimentName+"-helper", chaosDetails, clients)
+			common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
 			return errors.Errorf("Unable to filter used ephemeral storage size, err: %v", err)
 		}
 		log.Infof("used ephemeral storage space: %v", strconv.Itoa(usedEphemeralStorageSize))
@@ -290,7 +296,7 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 			command := "sudo dd if=/dev/urandom of=/diskfill/" + containerID + "/diskfill bs=4K count=" + strconv.Itoa(sizeTobeFilled/4)
 			_, err = exec.Exec(&execCommandDetails, clients, strings.Fields(command))
 			if err != nil {
-				common.DeleteAllHelperPodBasedOnJobCleanupPolicy("app="+experimentsDetails.ExperimentName+"-helper", chaosDetails, clients)
+				common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
 				return errors.Errorf("Unable to fill the ephemeral storage, err: %v", err)
 			}
 		} else {
@@ -307,14 +313,14 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		// Derive the container id of the target container
 		containerID, err := GetContainerID(experimentsDetails, clients, pod.Name)
 		if err != nil {
-			common.DeleteAllHelperPodBasedOnJobCleanupPolicy("app="+experimentsDetails.ExperimentName+"-helper", chaosDetails, clients)
+			common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
 			return err
 		}
 
 		// getting the helper pod name, scheduled on the target node
-		podName, err := GetHelperPodName(pod, clients, experimentsDetails.ChaosNamespace, "app="+experimentsDetails.ExperimentName+"-helper")
+		podName, err := GetHelperPodName(pod, clients, experimentsDetails.ChaosNamespace, appLabel)
 		if err != nil {
-			common.DeleteAllHelperPodBasedOnJobCleanupPolicy("app="+experimentsDetails.ExperimentName+"-helper", chaosDetails, clients)
+			common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
 			return err
 		}
 
@@ -323,14 +329,14 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		exec.SetExecCommandAttributes(&execCommandDetails, podName, "disk-fill", experimentsDetails.ChaosNamespace)
 		err = Remedy(experimentsDetails, clients, containerID, pod.Name, &execCommandDetails)
 		if err != nil {
-			common.DeleteAllHelperPodBasedOnJobCleanupPolicy("app="+experimentsDetails.ExperimentName+"-helper", chaosDetails, clients)
+			common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
 			return errors.Errorf("Unable to perform remedy operation due to %v", err)
 		}
 	}
 
 	//Deleting all the helper pod for disk-fill chaos
 	log.Info("[Cleanup]: Deleting all the helper pod")
-	err = common.DeleteAllPod("app="+experimentsDetails.ExperimentName+"-helper", experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients)
+	err = common.DeleteAllPod(appLabel, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients)
 	if err != nil {
 		return errors.Errorf("Unable to delete the helper pod, %v", err)
 	}
@@ -351,7 +357,7 @@ func GetTargetContainer(experimentsDetails *experimentTypes.ExperimentDetails, a
 }
 
 // CreateHelperPod derive the attributes for helper pod and create the helper pod
-func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, appName, appNodeName, runID string) error {
+func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, appName, appNodeName, runID, labelSuffix string) error {
 
 	mountPropagationMode := apiv1.MountPropagationHostToContainer
 
@@ -360,7 +366,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 			Name:      experimentsDetails.ExperimentName + "-" + runID,
 			Namespace: experimentsDetails.ChaosNamespace,
 			Labels: map[string]string{
-				"app":                       experimentsDetails.ExperimentName + "-helper",
+				"app":                       experimentsDetails.ExperimentName + "-helper-" + labelSuffix,
 				"name":                      experimentsDetails.ExperimentName + "-" + runID,
 				"chaosUID":                  string(experimentsDetails.ChaosUID),
 				"app.kubernetes.io/part-of": "litmus",
