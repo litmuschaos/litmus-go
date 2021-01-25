@@ -68,7 +68,7 @@ func NodeMemoryHog(clients clients.ClientSets) {
 		"Target Nodes":                  experimentsDetails.TargetNodes,
 		"Ramp Time":                     experimentsDetails.RampTime,
 		"Memory Consumption Percentage": experimentsDetails.MemoryConsumptionPercentage,
-		"Memory Consumption Megibytes":  experimentsDetails.MemoryConsumptionMegibytes,
+		"Memory Consumption Mebibytes":  experimentsDetails.MemoryConsumptionMebibytes,
 	})
 
 	// Calling AbortWatcher go routine, it will continuously watch for the abort signal for the entire chaos duration and generate the required events and result

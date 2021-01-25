@@ -81,7 +81,7 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		log.InfoWithValues("[Info]: Details of Node under chaos injection", logrus.Fields{
 			"NodeName":                      appNode,
 			"Memory Consumption Percentage": experimentsDetails.MemoryConsumptionPercentage,
-			"Memory Consumption Megibytes":  experimentsDetails.MemoryConsumptionMegibytes,
+			"Memory Consumption Mebibytes":  experimentsDetails.MemoryConsumptionMebibytes,
 		})
 
 		experimentsDetails.RunID = common.GetRunID()
@@ -158,7 +158,7 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		log.InfoWithValues("[Info]: Details of Node under chaos injection", logrus.Fields{
 			"NodeName":                      appNode,
 			"Memory Consumption Percentage": experimentsDetails.MemoryConsumptionPercentage,
-			"Memory Consumption Megibytes":  experimentsDetails.MemoryConsumptionMegibytes,
+			"Memory Consumption Mebibytes":  experimentsDetails.MemoryConsumptionMebibytes,
 		})
 
 		experimentsDetails.RunID = common.GetRunID()
@@ -249,10 +249,19 @@ func CalculateMemoryConsumption(experimentsDetails *experimentTypes.ExperimentDe
 	var MemoryConsumption string
 	var selector string
 
-	if experimentsDetails.MemoryConsumptionPercentage != 0 {
+	if experimentsDetails.MemoryConsumptionMebibytes == 0 {
+		if experimentsDetails.MemoryConsumptionPercentage == 0 {
+			log.Info("Neither of MemoryConsumptionPercentage or MemoryConsumptionMebibytes provided, proceeding with a default MemoryConsumptionPercentage value of 30%")
+			return "30%", nil
+		}
 		selector = "percentage"
-	} else if experimentsDetails.MemoryConsumptionMegibytes != 0 {
-		selector = "megibytes"
+	} else {
+		if experimentsDetails.MemoryConsumptionPercentage == 0 {
+			selector = "mebibytes"
+		} else {
+			log.Warn("Both MemoryConsumptionPercentage & MemoryConsumptionMebibytes provided as inputs, using the MemoryConsumptionPercentage value to proceed with the experiment")
+			selector = "percentage"
+		}
 	}
 
 	switch selector {
@@ -273,11 +282,11 @@ func CalculateMemoryConsumption(experimentsDetails *experimentTypes.ExperimentDe
 		}
 		return MemoryConsumption, nil
 
-	case "megibytes":
+	case "mebibytes":
 
 		// Bringing all the values in Ki unit to compare
 		// since 1Mi = 1025.390625Ki
-		TotalMemoryConsumption := float64(experimentsDetails.MemoryConsumptionMegibytes) * 1025.390625
+		TotalMemoryConsumption := float64(experimentsDetails.MemoryConsumptionMebibytes) * 1025.390625
 		// since 1Ki = 1024 bytes
 		memoryAllocatable := memoryAllocatable / 1024
 
@@ -285,11 +294,11 @@ func CalculateMemoryConsumption(experimentsDetails *experimentTypes.ExperimentDe
 			MemoryConsumption = strconv.Itoa(memoryAllocatable) + "k"
 			log.Infof("[Info]: The memory for consumption %vKi is more than the available memory %vKi, so the experiment will hog the memory upto %vKi", int(TotalMemoryConsumption), memoryAllocatable, memoryAllocatable)
 		} else {
-			MemoryConsumption = strconv.Itoa(experimentsDetails.MemoryConsumptionMegibytes) + "m"
+			MemoryConsumption = strconv.Itoa(experimentsDetails.MemoryConsumptionMebibytes) + "m"
 		}
 		return MemoryConsumption, nil
 	}
-	return "", errors.Errorf("please specify the memory consumption value either in percentage or megibytes in a non-decimal format using respective envs")
+	return "", errors.Errorf("please specify the memory consumption value either in percentage or mebibytes in a non-decimal format using respective envs")
 }
 
 // CreateHelperPod derive the attributes for helper pod and create the helper pod
