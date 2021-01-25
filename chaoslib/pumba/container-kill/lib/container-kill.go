@@ -87,6 +87,7 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 // InjectChaosInSerialMode kill the container of all target application serially (one by one)
 func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
 
+	labelSuffix := common.GetRunID()
 	// creating the helper pod to perform container kill chaos
 	for _, pod := range targetPodList.Items {
 
@@ -102,16 +103,18 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 			"Target Container": experimentsDetails.TargetContainer,
 		})
 
-		err := CreateHelperPod(experimentsDetails, clients, pod.Name, pod.Spec.NodeName, runID)
+		err := CreateHelperPod(experimentsDetails, clients, pod.Name, pod.Spec.NodeName, runID, labelSuffix)
 		if err != nil {
 			return errors.Errorf("Unable to create the helper pod, err: %v", err)
 		}
 
+		appLabel := "name=" + experimentsDetails.ExperimentName + "-" + runID
+
 		//checking the status of the helper pod, wait till the pod comes to running state else fail the experiment
 		log.Info("[Status]: Checking the status of the helper pod")
-		err = status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, "app="+experimentsDetails.ExperimentName+"-helper", experimentsDetails.Timeout, experimentsDetails.Delay, clients)
+		err = status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, appLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 		if err != nil {
-			common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-"+runID, "app="+experimentsDetails.ExperimentName+"-helper", chaosDetails, clients)
+			common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-"+runID, appLabel, chaosDetails, clients)
 			return errors.Errorf("helper pod is not in running state, err: %v", err)
 		}
 
@@ -121,13 +124,13 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		// It will verify that the restart count of container should increase after chaos injection
 		err = VerifyRestartCount(experimentsDetails, pod, clients, restartCountBefore)
 		if err != nil {
-			common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-"+runID, "app="+experimentsDetails.ExperimentName+"-helper", chaosDetails, clients)
+			common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-"+runID, appLabel, chaosDetails, clients)
 			return errors.Errorf("Target container is not restarted, err: %v", err)
 		}
 
 		//Deleting the helper pod
 		log.Info("[Cleanup]: Deleting the helper pod")
-		err = common.DeletePod(experimentsDetails.ExperimentName+"-"+runID, "app="+experimentsDetails.ExperimentName+"-helper", experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients)
+		err = common.DeletePod(experimentsDetails.ExperimentName+"-"+runID, appLabel, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients)
 		if err != nil {
 			return errors.Errorf("Unable to delete the helper pod, err: %v", err)
 		}
@@ -143,6 +146,7 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 	restartCountBefore := GetRestartCountAll(targetPodList, experimentsDetails.TargetContainer)
 	log.Infof("restartCount of target containers before chaos injection: %v", restartCountBefore)
 
+	labelSuffix := common.GetRunID()
 	// creating the helper pod to perform container kill chaos
 	for _, pod := range targetPodList.Items {
 
@@ -154,17 +158,19 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 			"Target Container": experimentsDetails.TargetContainer,
 		})
 
-		err := CreateHelperPod(experimentsDetails, clients, pod.Name, pod.Spec.NodeName, runID)
+		err := CreateHelperPod(experimentsDetails, clients, pod.Name, pod.Spec.NodeName, runID, labelSuffix)
 		if err != nil {
 			return errors.Errorf("Unable to create the helper pod, err: %v", err)
 		}
 	}
 
+	appLabel := "app=" + experimentsDetails.ExperimentName + "-helper-" + labelSuffix
+
 	//checking the status of the helper pod, wait till the pod comes to running state else fail the experiment
 	log.Info("[Status]: Checking the status of the helper pod")
-	err := status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, "app="+experimentsDetails.ExperimentName+"-helper", experimentsDetails.Timeout, experimentsDetails.Delay, clients)
+	err := status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, appLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 	if err != nil {
-		common.DeleteAllHelperPodBasedOnJobCleanupPolicy("app="+experimentsDetails.ExperimentName+"-helper", chaosDetails, clients)
+		common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
 		return errors.Errorf("helper pod is not in running state, err: %v", err)
 	}
 
@@ -174,13 +180,13 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 	// It will verify that the restart count of container should increase after chaos injection
 	err = VerifyRestartCountAll(experimentsDetails, targetPodList, clients, restartCountBefore)
 	if err != nil {
-		common.DeleteAllHelperPodBasedOnJobCleanupPolicy("app="+experimentsDetails.ExperimentName+"-helper", chaosDetails, clients)
+		common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
 		return errors.Errorf("Target container is not restarted , err: %v", err)
 	}
 
 	//Deleting the helper pod
 	log.Info("[Cleanup]: Deleting the helper pod")
-	err = common.DeleteAllPod("app="+experimentsDetails.ExperimentName+"-helper", experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients)
+	err = common.DeleteAllPod(appLabel, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients)
 	if err != nil {
 		return errors.Errorf("Unable to delete the helper pod, err: %v", err)
 	}
@@ -274,14 +280,14 @@ func VerifyRestartCountAll(experimentsDetails *experimentTypes.ExperimentDetails
 }
 
 // CreateHelperPod derive the attributes for helper pod and create the helper pod
-func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, appName, appNodeName, runID string) error {
+func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, appName, appNodeName, runID, labelSuffix string) error {
 
 	helperPod := &apiv1.Pod{
 		ObjectMeta: v1.ObjectMeta{
 			Name:      experimentsDetails.ExperimentName + "-" + runID,
 			Namespace: experimentsDetails.ChaosNamespace,
 			Labels: map[string]string{
-				"app":                       experimentsDetails.ExperimentName + "-helper",
+				"app":                       experimentsDetails.ExperimentName + "-helper-" + labelSuffix,
 				"name":                      experimentsDetails.ExperimentName + "-" + runID,
 				"chaosUID":                  string(experimentsDetails.ChaosUID),
 				"app.kubernetes.io/part-of": "litmus",
