@@ -62,12 +62,14 @@ func NodeMemoryHog(clients clients.ClientSets) {
 
 	//DISPLAY THE APP INFORMATION
 	log.InfoWithValues("The application information is as follows", logrus.Fields{
-		"Namespace":          experimentsDetails.AppNS,
-		"Label":              experimentsDetails.AppLabel,
-		"Chaos Duration":     experimentsDetails.ChaosDuration,
-		"Target Nodes":       experimentsDetails.TargetNodes,
-		"Ramp Time":          experimentsDetails.RampTime,
-		"Memory Consumption": experimentsDetails.MemoryConsumption,
+		"Namespace":                     experimentsDetails.AppNS,
+		"Label":                         experimentsDetails.AppLabel,
+		"Chaos Duration":                experimentsDetails.ChaosDuration,
+		"Target Nodes":                  experimentsDetails.TargetNodes,
+		"Ramp Time":                     experimentsDetails.RampTime,
+		"Memory Consumption Percentage": experimentsDetails.MemoryConsumptionPercentage,
+		"Memory Consumption Gibibytes":  experimentsDetails.MemoryConsumptionGibibytes,
+		"Memory Consumption Megibytes":  experimentsDetails.MemoryConsumptionMegibytes,
 	})
 
 	// Calling AbortWatcher go routine, it will continuously watch for the abort signal for the entire chaos duration and generate the required events and result
