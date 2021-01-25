@@ -10,6 +10,7 @@ RUN rm -rf /var/lib/apt/lists/*
 # Install generally useful things
 RUN apk --update add \
         sudo \
+	htop\
         bash\
         make\
         git \
