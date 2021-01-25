@@ -59,7 +59,7 @@ jobs:
 
       - name: Load image on the nodes of the cluster
         run: |
-          kind load docker-image --name=kind litmuschaos/go-runner:ci
+          kind load docker-image --name=kind litmuschaos/go-runner:1.12.0-revert
 
       - name: Deploy a sample application for chaos injection
         run: |
