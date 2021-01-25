@@ -24,7 +24,6 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.InstanceID = Getenv("INSTANCE_ID", "")
 	experimentDetails.ChaosPodName = Getenv("POD_NAME", "")
 	experimentDetails.MemoryConsumptionPercentage, _ = strconv.Atoi(Getenv("MEMORY_CONSUMPTION_PERCENTAGE", ""))
-	experimentDetails.MemoryConsumptionGibibytes, _ = strconv.Atoi(Getenv("MEMORY_CONSUMPTION_GIBIBYTES", ""))
 	experimentDetails.MemoryConsumptionMegibytes, _ = strconv.Atoi(Getenv("MEMORY_CONSUMPTION_MEGIBYTES", ""))
 	experimentDetails.LIBImage = Getenv("LIB_IMAGE", "litmuschaos/go-runner:latest")
 	experimentDetails.LIBImagePullPolicy = Getenv("LIB_IMAGE_PULL_POLICY", "Always")

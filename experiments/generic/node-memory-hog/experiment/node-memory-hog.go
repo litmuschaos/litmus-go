@@ -68,7 +68,6 @@ func NodeMemoryHog(clients clients.ClientSets) {
 		"Target Nodes":                  experimentsDetails.TargetNodes,
 		"Ramp Time":                     experimentsDetails.RampTime,
 		"Memory Consumption Percentage": experimentsDetails.MemoryConsumptionPercentage,
-		"Memory Consumption Gibibytes":  experimentsDetails.MemoryConsumptionGibibytes,
 		"Memory Consumption Megibytes":  experimentsDetails.MemoryConsumptionMegibytes,
 	})
 

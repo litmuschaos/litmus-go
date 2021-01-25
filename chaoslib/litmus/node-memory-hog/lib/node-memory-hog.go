@@ -81,7 +81,6 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		log.InfoWithValues("[Info]: Details of Node under chaos injection", logrus.Fields{
 			"NodeName":                      appNode,
 			"Memory Consumption Percentage": experimentsDetails.MemoryConsumptionPercentage,
-			"Memory Consumption Gibibytes":  experimentsDetails.MemoryConsumptionGibibytes,
 			"Memory Consumption Megibytes":  experimentsDetails.MemoryConsumptionMegibytes,
 		})
 
@@ -159,7 +158,6 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		log.InfoWithValues("[Info]: Details of Node under chaos injection", logrus.Fields{
 			"NodeName":                      appNode,
 			"Memory Consumption Percentage": experimentsDetails.MemoryConsumptionPercentage,
-			"Memory Consumption Gibibytes":  experimentsDetails.MemoryConsumptionGibibytes,
 			"Memory Consumption Megibytes":  experimentsDetails.MemoryConsumptionMegibytes,
 		})
 
@@ -253,8 +251,6 @@ func CalculateMemoryConsumption(experimentsDetails *experimentTypes.ExperimentDe
 
 	if experimentsDetails.MemoryConsumptionPercentage != 0 {
 		selector = "percentage"
-	} else if experimentsDetails.MemoryConsumptionGibibytes != 0 {
-		selector = "gibibytes"
 	} else if experimentsDetails.MemoryConsumptionMegibytes != 0 {
 		selector = "megibytes"
 	}
@@ -277,22 +273,6 @@ func CalculateMemoryConsumption(experimentsDetails *experimentTypes.ExperimentDe
 		}
 		return MemoryConsumption, nil
 
-	case "gibibytes":
-
-		// Bringing all the values in Ki unit to compare
-		// since 1Gi = 1044921.875Ki
-		TotalMemoryConsumption := float64(experimentsDetails.MemoryConsumptionGibibytes) * 1044921.875
-		// since 1Ki = 1024 bytes
-		memoryAllocatable := memoryAllocatable / 1024
-
-		if memoryAllocatable < int(TotalMemoryConsumption) {
-			MemoryConsumption = strconv.Itoa(memoryAllocatable) + "k"
-			log.Infof("[Info]: The memory for consumption %vKi is more than the available memory %vKi, so the experiment will hog the memory upto %vKi", int(TotalMemoryConsumption), memoryAllocatable, memoryAllocatable)
-		} else {
-			MemoryConsumption = strconv.Itoa(experimentsDetails.MemoryConsumptionGibibytes) + "g"
-		}
-		return MemoryConsumption, nil
-
 	case "megibytes":
 
 		// Bringing all the values in Ki unit to compare
@@ -309,7 +289,7 @@ func CalculateMemoryConsumption(experimentsDetails *experimentTypes.ExperimentDe
 		}
 		return MemoryConsumption, nil
 	}
-	return "", errors.Errorf("please specify the memory consumption value in either percentage or gibibytes or megibytes in non-decimal format using respective envs")
+	return "", errors.Errorf("please specify the memory consumption value either in percentage or megibytes in a non-decimal format using respective envs")
 }
 
 // CreateHelperPod derive the attributes for helper pod and create the helper pod
