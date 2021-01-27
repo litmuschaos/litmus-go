@@ -137,14 +137,15 @@ jobs:
         if: "contains(github.event.head_commit.message, '[Resource Chaos]') || contains(github.event.head_commit.message, '[Run CI]') || env.TEST_RUN != 'true'"
         uses: mayadata-io/github-chaos-actions@v0.3.1
         env:
-          EXPERIMENT_NAME: pod-cpu-hog
+          EXPERIMENT_NAME: pod-memory-hog
           EXPERIMENT_IMAGE: litmuschaos/go-runner
           EXPERIMENT_IMAGE_TAG: ci
           IMAGE_PULL_POLICY: IfNotPresent
           JOB_CLEANUP_POLICY: delete       
           TARGET_CONTAINER: nginx
           TOTAL_CHAOS_DURATION: 60
-          MEMORY_CONSUMPTION: 500  
+          MEMORY_CONSUMPTION: 500 
+          CHAOS_KILL_COMMAND: "kill -9 $(ps afx | grep \"[dd] if /dev/zero\" | awk '{print$1}' | tr '\\n' ' ')"
           
       - name: Running pod network corruption chaos experiment
         if: "contains(github.event.head_commit.message, '[Network Chaos]') || contains(github.event.head_commit.message, '[Run CI]') || env.TEST_RUN != 'true'"
