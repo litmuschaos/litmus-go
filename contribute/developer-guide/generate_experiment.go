@@ -39,7 +39,7 @@ func GenerateExperiment(attributeFile *string, generationType string) error {
 
 	if generationType == "chart" {
 		csvFilePath := chartDIR + "/" + experimentDetails.Category + ".chartserviceversion.yaml"
-		if err = GenerateFile(experimentDetails, csvFilePath, "./templates/chartserviceversion.tmpl"); err != nil {
+		if err = GenerateFile(experimentDetails, csvFilePath, "./templates/category_chartserviceversion.tmpl"); err != nil {
 			return err
 		}
 		packageFilePath := chartDIR + "/" + experimentDetails.Category + ".package.yaml"
@@ -84,7 +84,7 @@ func GenerateExperiment(attributeFile *string, generationType string) error {
 
 		// generating the csv file
 		csvFilePath := experimentRootDIR + "/" + experimentDetails.Name + ".chartserviceversion.yaml"
-		if err = GenerateFile(experimentDetails, csvFilePath, "./templates/chartserviceversion.tmpl"); err != nil {
+		if err = GenerateFile(experimentDetails, csvFilePath, "./templates/experiment_chartserviceversion.tmpl"); err != nil {
 			return err
 		}
 

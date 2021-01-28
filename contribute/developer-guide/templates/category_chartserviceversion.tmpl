@@ -1,0 +1,33 @@
+apiVersion: litmuchaos.io/v1alpha1
+kind: ChartServiceVersion
+metadata:
+  name: {{ .Category }} 
+  version: {{ .Version }}
+  annotations:
+    categories: {{ .Category }}
+spec:
+  displayName: {{ .Category }} chaos
+  categoryDescription: >
+    {{ .Description }} 
+  experiments:
+  - {{ .Name }}
+  keywords: 
+  {{- range .Keywords }} 
+    - "{{ . }}"
+  {{- end}}
+  minKubeVersion: {{ .MinKubernetesVersion }} 
+  provider: 
+    name: {{ .Provider.Name }}
+  maintainers: 
+  {{- range .Maintainers }} 
+    - name: {{ .Name }} 
+      email: {{ .Email }}
+  {{- end }}
+  links:
+  {{- range .References }} 
+    - name: {{ .Name }} 
+      url: {{ .URL }}
+  {{- end }} 
+  icon:
+    - url: 
+      mediatype: ""
