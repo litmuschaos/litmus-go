@@ -1,11 +1,16 @@
 package probe
 
 import (
+	"bytes"
+	"fmt"
+	"os/exec"
+	"reflect"
 	"strconv"
+	"strings"
 	"time"
 
-	"net/http"
 	"crypto/tls"
+	"net/http"
 
 	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
 	"github.com/litmuschaos/litmus-go/pkg/clients"
@@ -48,24 +53,64 @@ func TriggerHTTPProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 		return err
 	}
 
+	// it fetch the http method type
+	method := getHTTPMethodType(probe.HTTPProbeInputs.Method)
+
+	// initialize simple http client with default attributes
+	client := &http.Client{}
+
+	// impose properties to http client with cert check disabled
+	if probe.HTTPProbeInputs.InsecureSkipVerify {
+		transCfg := &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		}
+		client = &http.Client{Transport: transCfg}
+	}
+
+	switch method {
+	case "Get":
+		log.InfoWithValues("[Probe]: HTTP get method informations", logrus.Fields{
+			"Name":         probe.Name,
+			"URL":          probe.HTTPProbeInputs.URL,
+			"Criteria":     probe.HTTPProbeInputs.Method.Get.Criteria,
+			"ResponseCode": probe.HTTPProbeInputs.Method.Get.ResponseCode,
+		})
+		if err := httpGet(probe, client); err != nil {
+			return err
+		}
+	case "Post":
+		log.InfoWithValues("[Probe]: HTTP Post method informations", logrus.Fields{
+			"Name":        probe.Name,
+			"URL":         probe.HTTPProbeInputs.URL,
+			"Body":        probe.HTTPProbeInputs.Method.Post.Body,
+			"BodyPath":    probe.HTTPProbeInputs.Method.Post.BodyPath,
+			"ContentType": probe.HTTPProbeInputs.Method.Post.ContentType,
+		})
+		if err := httpPost(probe, client); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// it fetch the http method type
+// it supports Get and Post methods
+func getHTTPMethodType(httpMethod v1alpha1.HTTPMethod) string {
+	if !reflect.DeepEqual(httpMethod.Get, v1alpha1.GetMethod{}) {
+		return "Get"
+	}
+	return "Post"
+}
+
+// httpGet send the http Get request to the given URL and verify the response code to follow the specified criteria
+func httpGet(probe v1alpha1.ProbeAttributes, client *http.Client) error {
 	// it will retry for some retry count, in each iterations of try it contains following things
 	// it contains a timeout per iteration of retry. if the timeout expires without success then it will go to next try
 	// for a timeout, it will run the command, if it fails wait for the iterval and again execute the command until timeout expires
-	err = retry.Times(uint(probe.RunProperties.Retry)).
+	return retry.Times(uint(probe.RunProperties.Retry)).
 		Timeout(int64(probe.RunProperties.ProbeTimeout)).
 		Wait(time.Duration(probe.RunProperties.Interval) * time.Second).
 		TryWithTimeout(func(attempt uint) error {
-
-			// initialize simple http client with default attributes
-			client := &http.Client{}
-
-			// impose properties to http client with cert check disabled
-			if probe.HTTPProbeInputs.InsecureSkipVerify {
-				transCfg := &http.Transport{
-					TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-				}
-				client = &http.Client{Transport: transCfg}
-			}
 
 			// getting the response from the given url
 			resp, err := client.Get(probe.HTTPProbeInputs.URL)
@@ -73,15 +118,77 @@ func TriggerHTTPProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 				return err
 			}
 
-			code, _ := strconv.Atoi(probe.HTTPProbeInputs.ExpectedResponseCode)
-			// matching the status code w/ expected code
-			if resp.StatusCode != code {
+			code := strconv.Itoa(resp.StatusCode)
+
+			// comparing the response code with the expected criteria
+			if err = FirstValue(probe.HTTPProbeInputs.Method.Get.ResponseCode).
+				SecondValue(code).
+				Criteria(probe.HTTPProbeInputs.Method.Get.Criteria).
+				CompareInt(); err != nil {
 				log.Errorf("The %v http probe has been Failed, err: %v", probe.Name, err)
-				return errors.Errorf("The response status code doesn't match with expected status code, code: %v", resp.StatusCode)
+				return err
 			}
 			return nil
 		})
-	return err
+}
+
+// httpPost send the http post request to the given URL
+func httpPost(probe v1alpha1.ProbeAttributes, client *http.Client) error {
+	body, err := getHTTPBody(probe.HTTPProbeInputs.Method.Post)
+	if err != nil {
+		return err
+	}
+	// it will retry for some retry count, in each iterations of try it contains following things
+	// it contains a timeout per iteration of retry. if the timeout expires without success then it will go to next try
+	// for a timeout, it will run the command, if it fails wait for the iterval and again execute the command until timeout expires
+	return retry.Times(uint(probe.RunProperties.Retry)).
+		Timeout(int64(probe.RunProperties.ProbeTimeout)).
+		Wait(time.Duration(probe.RunProperties.Interval) * time.Second).
+		TryWithTimeout(func(attempt uint) error {
+			resp, err := client.Post(probe.HTTPProbeInputs.URL, probe.HTTPProbeInputs.Method.Post.ContentType, strings.NewReader(body))
+			if err != nil {
+				return err
+			}
+			code := strconv.Itoa(resp.StatusCode)
+
+			// comparing the response code with the expected criteria
+			if err = FirstValue(probe.HTTPProbeInputs.Method.Post.ResponseCode).
+				SecondValue(code).
+				Criteria(probe.HTTPProbeInputs.Method.Post.Criteria).
+				CompareInt(); err != nil {
+				log.Errorf("The %v http probe has been Failed, err: %v", probe.Name, err)
+				return err
+			}
+			return nil
+		})
+}
+
+// getHTTPBody fetch the http body for the post request
+// It will use body or bodyPath attributes to get the http request body
+// if both are provided, it will use body field
+func getHTTPBody(httpBody v1alpha1.PostMethod) (string, error) {
+
+	if httpBody.Body != "" {
+		return httpBody.Body, nil
+	}
+
+	var command string
+
+	if httpBody.BodyPath != "" {
+		command = "cat " + httpBody.BodyPath
+	} else {
+		return "", errors.Errorf("[Probe]: Any one of body or bodyPath is required")
+	}
+
+	var out, errOut bytes.Buffer
+	// run the inline command probe
+	cmd := exec.Command("/bin/sh", "-c", command)
+	cmd.Stdout = &out
+	cmd.Stderr = &errOut
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("Unable to run command, err: %v; error output: %v", err, errOut.String())
+	}
+	return out.String(), nil
 }
 
 // TriggerContinuousHTTPProbe trigger the continuous http probes
@@ -121,12 +228,11 @@ func PreChaosHTTPProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resu
 
 		//DISPLAY THE HTTP PROBE INFO
 		log.InfoWithValues("[Probe]: The http probe information is as follows", logrus.Fields{
-			"Name":                     probe.Name,
-			"URL":                      probe.HTTPProbeInputs.URL,
-			"Expecected Response Code": probe.HTTPProbeInputs.ExpectedResponseCode,
-			"Run Properties":           probe.RunProperties,
-			"Mode":                     probe.Mode,
-			"Phase":                    "PreChaos",
+			"Name":           probe.Name,
+			"URL":            probe.HTTPProbeInputs.URL,
+			"Run Properties": probe.RunProperties,
+			"Mode":           probe.Mode,
+			"Phase":          "PreChaos",
 		})
 
 		// waiting for initial delay
@@ -146,12 +252,11 @@ func PreChaosHTTPProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resu
 
 		//DISPLAY THE HTTP PROBE INFO
 		log.InfoWithValues("[Probe]: The http probe information is as follows", logrus.Fields{
-			"Name":                     probe.Name,
-			"URL":                      probe.HTTPProbeInputs.URL,
-			"Expecected Response Code": probe.HTTPProbeInputs.ExpectedResponseCode,
-			"Run Properties":           probe.RunProperties,
-			"Mode":                     probe.Mode,
-			"Phase":                    "PreChaos",
+			"Name":           probe.Name,
+			"URL":            probe.HTTPProbeInputs.URL,
+			"Run Properties": probe.RunProperties,
+			"Mode":           probe.Mode,
+			"Phase":          "PreChaos",
 		})
 		go TriggerContinuousHTTPProbe(probe, resultDetails)
 	}
@@ -166,12 +271,11 @@ func PostChaosHTTPProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Res
 
 		//DISPLAY THE HTTP PROBE INFO
 		log.InfoWithValues("[Probe]: The http probe information is as follows", logrus.Fields{
-			"Name":                     probe.Name,
-			"URL":                      probe.HTTPProbeInputs.URL,
-			"Expecected Response Code": probe.HTTPProbeInputs.ExpectedResponseCode,
-			"Run Properties":           probe.RunProperties,
-			"Mode":                     probe.Mode,
-			"Phase":                    "PostChaos",
+			"Name":           probe.Name,
+			"URL":            probe.HTTPProbeInputs.URL,
+			"Run Properties": probe.RunProperties,
+			"Mode":           probe.Mode,
+			"Phase":          "PostChaos",
 		})
 
 		// waiting for initial delay
@@ -250,12 +354,11 @@ func OnChaosHTTPProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 
 		//DISPLAY THE HTTP PROBE INFO
 		log.InfoWithValues("[Probe]: The http probe information is as follows", logrus.Fields{
-			"Name":                     probe.Name,
-			"URL":                      probe.HTTPProbeInputs.URL,
-			"Expecected Response Code": probe.HTTPProbeInputs.ExpectedResponseCode,
-			"Run Properties":           probe.RunProperties,
-			"Mode":                     probe.Mode,
-			"Phase":                    "DuringChaos",
+			"Name":           probe.Name,
+			"URL":            probe.HTTPProbeInputs.URL,
+			"Run Properties": probe.RunProperties,
+			"Mode":           probe.Mode,
+			"Phase":          "DuringChaos",
 		})
 		go TriggerOnChaosHTTPProbe(probe, resultDetails, chaosDetails.ChaosDuration)
 
