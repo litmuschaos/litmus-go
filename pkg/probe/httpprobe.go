@@ -4,8 +4,8 @@ import (
 	"strconv"
 	"time"
 
-	"net/http"
 	"crypto/tls"
+	"net/http"
 
 	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
 	"github.com/litmuschaos/litmus-go/pkg/clients"
@@ -51,7 +51,7 @@ func TriggerHTTPProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 	// it will retry for some retry count, in each iterations of try it contains following things
 	// it contains a timeout per iteration of retry. if the timeout expires without success then it will go to next try
 	// for a timeout, it will run the command, if it fails wait for the iterval and again execute the command until timeout expires
-	err = retry.Times(uint(probe.RunProperties.Retry)).
+	return retry.Times(uint(probe.RunProperties.Retry)).
 		Timeout(int64(probe.RunProperties.ProbeTimeout)).
 		Wait(time.Duration(probe.RunProperties.Interval) * time.Second).
 		TryWithTimeout(func(attempt uint) error {
@@ -81,7 +81,6 @@ func TriggerHTTPProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 			}
 			return nil
 		})
-	return err
 }
 
 // TriggerContinuousHTTPProbe trigger the continuous http probes
@@ -231,7 +230,6 @@ loop:
 						chaosresult.ProbeDetails[index].IsProbeFailedWithError = err
 						break loop
 					}
-
 				}
 			}
 
@@ -239,7 +237,6 @@ loop:
 			time.Sleep(time.Duration(probe.RunProperties.ProbePollingInterval) * time.Second)
 		}
 	}
-
 }
 
 //OnChaosHTTPProbe trigger the http probe for DuringChaos phase
@@ -258,6 +255,5 @@ func OnChaosHTTPProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 			"Phase":                    "DuringChaos",
 		})
 		go TriggerOnChaosHTTPProbe(probe, resultDetails, chaosDetails.ChaosDuration)
-
 	}
 }

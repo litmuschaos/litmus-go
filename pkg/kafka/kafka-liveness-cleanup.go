@@ -17,7 +17,7 @@ func LivenessCleanup(experimentsDetails *experimentTypes.ExperimentDetails, clie
 		return errors.Errorf("Fail to delete liveness deployment, err: %v", err)
 	}
 
-	err := retry.
+	return retry.
 		Times(uint(experimentsDetails.ChaoslibDetail.Timeout / experimentsDetails.ChaoslibDetail.Delay)).
 		Wait(time.Duration(experimentsDetails.ChaoslibDetail.Delay) * time.Second).
 		Try(func(attempt uint) error {
@@ -27,6 +27,4 @@ func LivenessCleanup(experimentsDetails *experimentTypes.ExperimentDetails, clie
 			}
 			return nil
 		})
-
-	return err
 }

@@ -43,8 +43,7 @@ func LivenessCheck(experimentsDetails *experimentTypes.ExperimentDetails, client
 	// Checking the status of liveness deployment pod
 	log.Info("[Status]: Checking the status of the cassandra liveness pod")
 	// Record cassandra liveness pod resource version
-	err = status.CheckApplicationStatus(experimentsDetails.ChaoslibDetail.AppNS, "name=cassandra-liveness-deploy-"+experimentsDetails.RunID, experimentsDetails.ChaoslibDetail.Timeout, experimentsDetails.ChaoslibDetail.Delay, clients)
-	if err != nil {
+	if err = status.CheckApplicationStatus(experimentsDetails.ChaoslibDetail.AppNS, "name=cassandra-liveness-deploy-"+experimentsDetails.RunID, experimentsDetails.ChaoslibDetail.Timeout, experimentsDetails.ChaoslibDetail.Delay, clients); err != nil {
 		return "", errors.Errorf("Liveness pod is not in running state, err: %v", err)
 	}
 
@@ -61,8 +60,6 @@ func LivenessCheck(experimentsDetails *experimentTypes.ExperimentDetails, client
 // At last it removes/cleanup the liveness deploy and svc
 func LivenessCleanup(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, ResourceVersionBefore string) error {
 
-	var err error
-
 	// Getting ClusterIP
 	log.Info("[CleanUP]: Getting ClusterIP of liveness service")
 	ClusterIP, err := GetServiceClusterIP(experimentsDetails, clients)
@@ -76,25 +73,21 @@ func LivenessCleanup(experimentsDetails *experimentTypes.ExperimentDetails, clie
 		return errors.Errorf("Failed to get the pod resource version, err: %v", err)
 	}
 
-	err = ResourceVersionCheck(ResourceVersionBefore, ResourceVersionAfter)
-	if err != nil {
+	if err = ResourceVersionCheck(ResourceVersionBefore, ResourceVersionAfter); err != nil {
 		return err
 	}
 
-	err = WaitTillCycleComplete(experimentsDetails, ClusterIP)
-	if err != nil {
+	if err = WaitTillCycleComplete(experimentsDetails, ClusterIP); err != nil {
 		return errors.Errorf("cycle complete test failed, err: %v", err)
 	}
 
-	err = DeleteLivenessDeployment(experimentsDetails, clients)
-	if err != nil {
+	if err = DeleteLivenessDeployment(experimentsDetails, clients); err != nil {
 		return errors.Errorf("Liveness deployment deletion failed, err: %v", err)
 	}
 
 	log.Info("[Cleanup]: Cassandra liveness deployment has been deleted successfully")
 
-	err = DeleteLivenessService(experimentsDetails, clients)
-	if err != nil {
+	if err = DeleteLivenessService(experimentsDetails, clients); err != nil {
 		return errors.Errorf("Liveness service deletion failed, err: %v", err)
 	}
 
@@ -134,7 +127,7 @@ func WaitTillCycleComplete(experimentsDetails *experimentTypes.ExperimentDetails
 	URL := "http://" + ClusterIP + ":" + port
 	log.Infof("The URL to check the status of liveness pod cycle, url: %v", URL)
 
-	err := retry.
+	return retry.
 		Times(uint(experimentsDetails.ChaoslibDetail.Timeout / experimentsDetails.ChaoslibDetail.Delay)).
 		Wait(time.Duration(experimentsDetails.ChaoslibDetail.Delay) * time.Second).
 		Try(func(attempt uint) error {
@@ -150,8 +143,6 @@ func WaitTillCycleComplete(experimentsDetails *experimentTypes.ExperimentDetails
 			log.Info("Liveness pod comes to CycleComplete state")
 			return nil
 		})
-
-	return err
 }
 
 // ResourceVersionCheck compare the resource version for target pods before and after chaos
@@ -174,7 +165,7 @@ func DeleteLivenessDeployment(experimentsDetails *experimentTypes.ExperimentDeta
 	}); err != nil {
 		return err
 	}
-	err := retry.
+	return retry.
 		Times(uint(experimentsDetails.ChaoslibDetail.Timeout / experimentsDetails.ChaoslibDetail.Delay)).
 		Wait(time.Duration(experimentsDetails.ChaoslibDetail.Delay) * time.Second).
 		Try(func(attempt uint) error {
@@ -184,7 +175,6 @@ func DeleteLivenessDeployment(experimentsDetails *experimentTypes.ExperimentDeta
 			}
 			return nil
 		})
-	return err
 }
 
 // DeleteLivenessService deletes the liveness service and wait for its termination
@@ -196,17 +186,16 @@ func DeleteLivenessService(experimentsDetails *experimentTypes.ExperimentDetails
 	}); err != nil {
 		return errors.Errorf("Fail to delete liveness service, err: %v", err)
 	}
-	err := retry.
+	return retry.
 		Times(uint(experimentsDetails.ChaoslibDetail.Timeout / experimentsDetails.ChaoslibDetail.Delay)).
 		Wait(time.Duration(experimentsDetails.ChaoslibDetail.Delay) * time.Second).
 		Try(func(attempt uint) error {
-			podSpec, err := clients.KubeClient.AppsV1().Deployments(experimentsDetails.ChaoslibDetail.AppNS).List(metav1.ListOptions{LabelSelector: "name=cassandra-liveness-service-" + experimentsDetails.RunID})
+			podSpec, err := clients.KubeClient.CoreV1().Services(experimentsDetails.ChaoslibDetail.AppNS).List(metav1.ListOptions{LabelSelector: "name=cassandra-liveness-service-" + experimentsDetails.RunID})
 			if err != nil || len(podSpec.Items) != 0 {
 				return errors.Errorf("Liveness deployment is not deleted yet, err: %v", err)
 			}
 			return nil
 		})
-	return err
 }
 
 // CreateLivenessPod will create a cassandra liveness deployment
@@ -342,7 +331,6 @@ func CreateLivenessPod(experimentsDetails *experimentTypes.ExperimentDetails, cl
 	}
 	log.Info("Liveness Deployment Created successfully!")
 	return nil
-
 }
 
 // CreateLivenessService will create Cassandra liveness service

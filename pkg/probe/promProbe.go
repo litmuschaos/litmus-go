@@ -11,6 +11,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/math"
+	cmp "github.com/litmuschaos/litmus-go/pkg/probe/comparator"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
 	"github.com/pkg/errors"
@@ -168,7 +169,7 @@ func TriggerPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 	// it will retry for some retry count, in each iterations of try it contains following things
 	// it contains a timeout per iteration of retry. if the timeout expires without success then it will go to next try
 	// for a timeout, it will run the command, if it fails wait for the iterval and again execute the command until timeout expires
-	err = retry.Times(uint(probe.RunProperties.Retry)).
+	return retry.Times(uint(probe.RunProperties.Retry)).
 		Timeout(int64(probe.RunProperties.ProbeTimeout)).
 		Wait(time.Duration(probe.RunProperties.Interval) * time.Second).
 		TryWithTimeout(func(attempt uint) error {
@@ -199,8 +200,8 @@ func TriggerPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 			}
 
 			// comparing the metrics output with the expected criteria
-			if err = FirstValue(probe.PromProbeInputs.Comparator.Value).
-				SecondValue(value).
+			if err = cmp.FirstValue(value).
+				SecondValue(probe.PromProbeInputs.Comparator.Value).
 				Criteria(probe.PromProbeInputs.Comparator.Criteria).
 				CompareFloat(); err != nil {
 				log.Errorf("The %v prom probe has been Failed, err: %v", probe.Name, err)
@@ -208,7 +209,6 @@ func TriggerPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 			}
 			return nil
 		})
-	return err
 }
 
 // TriggerContinuousPromProbe trigger the continuous prometheus probe
