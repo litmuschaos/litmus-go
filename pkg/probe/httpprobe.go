@@ -106,7 +106,7 @@ func getHTTPMethodType(httpMethod v1alpha1.HTTPMethod) string {
 func httpGet(probe v1alpha1.ProbeAttributes, client *http.Client) error {
 	// it will retry for some retry count, in each iterations of try it contains following things
 	// it contains a timeout per iteration of retry. if the timeout expires without success then it will go to next try
-	// for a timeout, it will run the command, if it fails wait for the iterval and again execute the command until timeout expires
+	// for a timeout, it will run the command, if it fails wait for the interval and again execute the command until timeout expires
 	return retry.Times(uint(probe.RunProperties.Retry)).
 		Timeout(int64(probe.RunProperties.ProbeTimeout)).
 		Wait(time.Duration(probe.RunProperties.Interval) * time.Second).
@@ -125,7 +125,7 @@ func httpGet(probe v1alpha1.ProbeAttributes, client *http.Client) error {
 				SecondValue(code).
 				Criteria(probe.HTTPProbeInputs.Method.Get.Criteria).
 				CompareInt(); err != nil {
-				log.Errorf("The %v http probe has been Failed, err: %v", probe.Name, err)
+				log.Errorf("The %v http probe get method has Failed, err: %v", probe.Name, err)
 				return err
 			}
 			return nil
@@ -140,7 +140,7 @@ func httpPost(probe v1alpha1.ProbeAttributes, client *http.Client) error {
 	}
 	// it will retry for some retry count, in each iterations of try it contains following things
 	// it contains a timeout per iteration of retry. if the timeout expires without success then it will go to next try
-	// for a timeout, it will run the command, if it fails wait for the iterval and again execute the command until timeout expires
+	// for a timeout, it will run the command, if it fails wait for the interval and again execute the command until timeout expires
 	return retry.Times(uint(probe.RunProperties.Retry)).
 		Timeout(int64(probe.RunProperties.ProbeTimeout)).
 		Wait(time.Duration(probe.RunProperties.Interval) * time.Second).
@@ -156,7 +156,7 @@ func httpPost(probe v1alpha1.ProbeAttributes, client *http.Client) error {
 				SecondValue(code).
 				Criteria(probe.HTTPProbeInputs.Method.Post.Criteria).
 				CompareInt(); err != nil {
-				log.Errorf("The %v http probe has been Failed, err: %v", probe.Name, err)
+				log.Errorf("The %v http probe post method has Failed, err: %v", probe.Name, err)
 				return err
 			}
 			return nil

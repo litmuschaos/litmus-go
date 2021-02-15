@@ -44,10 +44,12 @@ func (model *Model) Criteria(criteria string) *Model {
 	return model
 }
 
+// typeCastToInt type cast the interface argument to integer value
 func typeCastToInt(a interface{}) (int, error) {
 	return strconv.Atoi(reflect.ValueOf(a).String())
 }
 
+// typeCastToFloat type cast the interface argument to float64 value
 func typeCastToFloat(a interface{}) (float64, error) {
 	return strconv.ParseFloat(reflect.ValueOf(a).String(), 64)
 }
@@ -56,6 +58,7 @@ func typeCastToFloat(a interface{}) (float64, error) {
 // it check for the >=, >, <=, <, ==, != operators
 func (model Model) CompareInt() error {
 
+	// typecasting actual value to the integer type
 	actualOutput, err := typeCastToInt(model.b)
 	if err != nil {
 		return err
@@ -65,6 +68,7 @@ func (model Model) CompareInt() error {
 	case "oneof":
 		expectedValues := reflect.ValueOf(model.a).String()
 		expectedValueList := strings.Split(strings.TrimSpace(expectedValues), ",")
+		// matches that the actual value should be present inside the given expected list
 		for i := range expectedValueList {
 			value, _ := strconv.Atoi(expectedValueList[i])
 			if value == actualOutput {
@@ -74,6 +78,7 @@ func (model Model) CompareInt() error {
 		return errors.Errorf("Actual value: {%v} doesn't matched with any of the expected values: {%v}", actualOutput, expectedValueList)
 	}
 
+	// typecasting expected value to be integer type
 	expectedOutput, err := typeCastToInt(model.a)
 	if err != nil {
 		return err
@@ -114,6 +119,7 @@ func (model Model) CompareInt() error {
 // it check for the >=, >, <=, <, ==, != operators
 func (model Model) CompareFloat() error {
 
+	// typecasting actual value to the floating type
 	actualOutput, err := typeCastToFloat(model.b)
 	if err != nil {
 		return err
@@ -123,6 +129,7 @@ func (model Model) CompareFloat() error {
 	case "oneof":
 		expectedValues := reflect.ValueOf(model.a).String()
 		expectedValueList := strings.Split(strings.TrimSpace(expectedValues), ",")
+		// matches that the actual value should be present inside the given expected list
 		for i := range expectedValueList {
 			value, _ := strconv.ParseFloat(expectedValueList[i], 64)
 			if value == actualOutput {
@@ -132,6 +139,7 @@ func (model Model) CompareFloat() error {
 		return errors.Errorf("Actual value: {%v} doesn't matched with any of the expected values: {%v}", actualOutput, expectedValueList)
 	}
 
+	// typecasting expected value to the floating type
 	expectedOutput, err := typeCastToFloat(model.a)
 	if err != nil {
 		return err
