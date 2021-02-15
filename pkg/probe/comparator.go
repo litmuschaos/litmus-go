@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/pkg/errors"
+
 	"github.com/litmuschaos/litmus-go/pkg/log"
 )
 
@@ -42,15 +44,42 @@ func (model *Model) Criteria(criteria string) *Model {
 	return model
 }
 
+// typeCastToInt type cast the interface argument to integer value
+func typeCastToInt(a interface{}) (int, error) {
+	return strconv.Atoi(reflect.ValueOf(a).String())
+}
+
+// typeCastToFloat type cast the interface argument to float64 value
+func typeCastToFloat(a interface{}) (float64, error) {
+	return strconv.ParseFloat(reflect.ValueOf(a).String(), 64)
+}
+
 // CompareInt compares integer numbers for specific operation
 // it check for the >=, >, <=, <, ==, != operators
 func (model Model) CompareInt() error {
 
-	expectedOutput, err := strconv.Atoi(reflect.ValueOf(model.a).String())
+	// typecasting actual value to the integer type
+	actualOutput, err := typeCastToInt(model.b)
 	if err != nil {
 		return err
 	}
-	actualOutput, err := strconv.Atoi(reflect.ValueOf(model.b).String())
+
+	switch strings.ToLower(model.operator) {
+	case "oneof":
+		expectedValues := reflect.ValueOf(model.a).String()
+		expectedValueList := strings.Split(strings.TrimSpace(expectedValues), ",")
+		// matches that the actual value should be present inside the given expected list
+		for i := range expectedValueList {
+			value, _ := strconv.Atoi(expectedValueList[i])
+			if value == actualOutput {
+				return nil
+			}
+		}
+		return errors.Errorf("Actual value: {%v} doesn't matched with any of the expected values: {%v}", actualOutput, expectedValueList)
+	}
+
+	// typecasting expected value to be integer type
+	expectedOutput, err := typeCastToInt(model.a)
 	if err != nil {
 		return err
 	}
@@ -90,14 +119,32 @@ func (model Model) CompareInt() error {
 // it check for the >=, >, <=, <, ==, != operators
 func (model Model) CompareFloat() error {
 
-	expectedOutput, err := strconv.ParseFloat(reflect.ValueOf(model.a).String(), 64)
+	// typecasting actual value to the floating type
+	actualOutput, err := typeCastToFloat(model.b)
 	if err != nil {
 		return err
 	}
-	actualOutput, err := strconv.ParseFloat(reflect.ValueOf(model.b).String(), 64)
+
+	switch strings.ToLower(model.operator) {
+	case "oneof":
+		expectedValues := reflect.ValueOf(model.a).String()
+		expectedValueList := strings.Split(strings.TrimSpace(expectedValues), ",")
+		// matches that the actual value should be present inside the given expected list
+		for i := range expectedValueList {
+			value, _ := strconv.ParseFloat(expectedValueList[i], 64)
+			if value == actualOutput {
+				return nil
+			}
+		}
+		return errors.Errorf("Actual value: {%v} doesn't matched with any of the expected values: {%v}", actualOutput, expectedValueList)
+	}
+
+	// typecasting expected value to the floating type
+	expectedOutput, err := typeCastToFloat(model.a)
 	if err != nil {
 		return err
 	}
+
 	switch model.operator {
 	case ">=":
 		if !(actualOutput >= expectedOutput) {
@@ -138,20 +185,20 @@ func (model Model) CompareString() error {
 
 	log.Infof("actual: %v, expected: %v, operator: %v", actualOutput, expectedOutput, model.operator)
 
-	switch model.operator {
-	case "equal", "Equal":
+	switch strings.ToLower(model.operator) {
+	case "equal":
 		if !(actualOutput == expectedOutput) {
 			return fmt.Errorf("The probe output didn't match with expected criteria")
 		}
-	case "notEqual", "NotEqual":
+	case "notequal":
 		if !(actualOutput != expectedOutput) {
 			return fmt.Errorf("The probe output didn't match with expected criteria")
 		}
-	case "contains", "Contains":
+	case "contains":
 		if !strings.Contains(actualOutput, expectedOutput) {
 			return fmt.Errorf("The probe output didn't match with expected criteria")
 		}
-	case "matches", "Matches":
+	case "matches":
 		re, err := regexp.Compile(expectedOutput)
 		if err != nil {
 			return fmt.Errorf("The probe regex '%s' is not a valid expression", expectedOutput)
@@ -159,7 +206,7 @@ func (model Model) CompareString() error {
 		if !re.MatchString(actualOutput) {
 			return fmt.Errorf("The probe output didn't match with expected criteria")
 		}
-	case "notMatches", "NotMatches":
+	case "notmatches":
 		re, err := regexp.Compile(expectedOutput)
 		if err != nil {
 			return fmt.Errorf("The probe regex '%s' is not a valid expression", expectedOutput)
@@ -167,6 +214,14 @@ func (model Model) CompareString() error {
 		if re.MatchString(actualOutput) {
 			return fmt.Errorf("The probe output didn't match with expected criteria")
 		}
+	case "oneof":
+		expectedValueList := strings.Split(strings.TrimSpace(expectedOutput), ",")
+		for i := range expectedValueList {
+			if expectedValueList[i] == actualOutput {
+				return nil
+			}
+		}
+		return errors.Errorf("Actual value: {%v} doesn't matched with any of the expected values: {%v}", actualOutput, expectedValueList)
 	default:
 		return fmt.Errorf("criteria '%s' not supported in the probe", model.operator)
 	}
