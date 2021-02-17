@@ -7,6 +7,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/node-io-stress/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
+	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
@@ -72,6 +73,14 @@ func PrepareNodeIOStress(experimentsDetails *experimentTypes.ExperimentDetails, 
 func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, targetNodeList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	labelSuffix := common.GetRunID()
+
+	// run the probes during chaos
+	if len(resultDetails.ProbeDetails) != 0 {
+		if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+			return err
+		}
+	}
+
 	for _, appNode := range targetNodeList {
 
 		if experimentsDetails.EngineName != "" {
@@ -135,6 +144,14 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, targetNodeList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	labelSuffix := common.GetRunID()
+
+	// run the probes during chaos
+	if len(resultDetails.ProbeDetails) != 0 {
+		if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+			return err
+		}
+	}
+
 	for _, appNode := range targetNodeList {
 
 		if experimentsDetails.EngineName != "" {

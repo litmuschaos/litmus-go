@@ -8,6 +8,7 @@ import (
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/network-chaos/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
+	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
@@ -71,11 +72,11 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 	}
 
 	if experimentsDetails.Sequence == "serial" {
-		if err = InjectChaosInSerialMode(experimentsDetails, targetPodList, clients, chaosDetails, args); err != nil {
+		if err = InjectChaosInSerialMode(experimentsDetails, targetPodList, clients, chaosDetails, args, resultDetails, eventsDetails); err != nil {
 			return err
 		}
 	} else {
-		if err = InjectChaosInParallelMode(experimentsDetails, targetPodList, clients, chaosDetails, args); err != nil {
+		if err = InjectChaosInParallelMode(experimentsDetails, targetPodList, clients, chaosDetails, args, resultDetails, eventsDetails); err != nil {
 			return err
 		}
 	}
@@ -83,9 +84,17 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 }
 
 // InjectChaosInSerialMode inject the network chaos in all target application serially (one by one)
-func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, args string) error {
+func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, args string, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
 
 	labelSuffix := common.GetRunID()
+
+	// run the probes during chaos
+	if len(resultDetails.ProbeDetails) != 0 {
+		if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+			return err
+		}
+	}
+
 	// creating the helper pod to perform network chaos
 	for _, pod := range targetPodList.Items {
 
@@ -131,9 +140,17 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 }
 
 // InjectChaosInParallelMode inject the network chaos in all target application in parallel mode (all at once)
-func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, args string) error {
+func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, args string, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
 
 	labelSuffix := common.GetRunID()
+
+	// run the probes during chaos
+	if len(resultDetails.ProbeDetails) != 0 {
+		if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+			return err
+		}
+	}
+
 	// creating the helper pod to perform network chaos
 	for _, pod := range targetPodList.Items {
 

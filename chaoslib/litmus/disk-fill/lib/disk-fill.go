@@ -6,6 +6,7 @@ import (
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/disk-fill/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
+	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
@@ -70,11 +71,11 @@ func PrepareDiskFill(experimentsDetails *experimentTypes.ExperimentDetails, clie
 	}
 
 	if experimentsDetails.Sequence == "serial" {
-		if err = InjectChaosInSerialMode(experimentsDetails, targetPodList, clients, chaosDetails, execCommandDetails); err != nil {
+		if err = InjectChaosInSerialMode(experimentsDetails, targetPodList, clients, chaosDetails, execCommandDetails, resultDetails, eventsDetails); err != nil {
 			return err
 		}
 	} else {
-		if err = InjectChaosInParallelMode(experimentsDetails, targetPodList, clients, chaosDetails, execCommandDetails); err != nil {
+		if err = InjectChaosInParallelMode(experimentsDetails, targetPodList, clients, chaosDetails, execCommandDetails, resultDetails, eventsDetails); err != nil {
 			return err
 		}
 	}
@@ -88,9 +89,17 @@ func PrepareDiskFill(experimentsDetails *experimentTypes.ExperimentDetails, clie
 }
 
 // InjectChaosInSerialMode fill the ephemeral storage of all target application serially (one by one)
-func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, execCommandDetails exec.PodDetails) error {
+func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, execCommandDetails exec.PodDetails, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
 
 	labelSuffix := common.GetRunID()
+
+	// run the probes during chaos
+	if len(resultDetails.ProbeDetails) != 0 {
+		if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+			return err
+		}
+	}
+
 	// creating the helper pod to perform disk-fill chaos
 	for _, pod := range targetPodList.Items {
 		runID := common.GetRunID()
@@ -131,9 +140,17 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 }
 
 // InjectChaosInParallelMode fill the ephemeral storage of of all target application in parallel mode (all at once)
-func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, execCommandDetails exec.PodDetails) error {
+func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, execCommandDetails exec.PodDetails, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
 
 	labelSuffix := common.GetRunID()
+
+	// run the probes during chaos
+	if len(resultDetails.ProbeDetails) != 0 {
+		if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+			return err
+		}
+	}
+
 	// creating the helper pod to perform disk-fill chaos
 	for _, pod := range targetPodList.Items {
 		runID := common.GetRunID()
