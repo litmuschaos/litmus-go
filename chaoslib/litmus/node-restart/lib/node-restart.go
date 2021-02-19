@@ -87,6 +87,11 @@ func PrepareNodeRestart(experimentsDetails *experimentTypes.ExperimentDetails, c
 		if err != nil {
 			return errors.Errorf("Unable to get resource requirements, err: %v", err)
 		}
+		// Get ImagePullSecrets
+		experimentsDetails.ImagePullSecrets, err = common.GetImagePullSecrets(experimentsDetails.ChaosPodName, experimentsDetails.ChaosNamespace, clients)
+		if err != nil {
+			return errors.Errorf("Unable to get imagePullSecrets, err: %v", err)
+		}
 	}
 	// Creating the helper pod to perform node restart
 	err = CreateHelperPod(experimentsDetails, clients)
@@ -153,7 +158,8 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 			Annotations: experimentsDetails.Annotations,
 		},
 		Spec: apiv1.PodSpec{
-			RestartPolicy: apiv1.RestartPolicyNever,
+			RestartPolicy:    apiv1.RestartPolicyNever,
+			ImagePullSecrets: experimentsDetails.ImagePullSecrets,
 			Affinity: &k8stypes.Affinity{
 				NodeAffinity: &k8stypes.NodeAffinity{
 					RequiredDuringSchedulingIgnoredDuringExecution: &k8stypes.NodeSelector{

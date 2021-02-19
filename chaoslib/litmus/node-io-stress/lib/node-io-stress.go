@@ -48,6 +48,11 @@ func PrepareNodeIOStress(experimentsDetails *experimentTypes.ExperimentDetails, 
 		if err != nil {
 			return errors.Errorf("Unable to get resource requirements, err: %v", err)
 		}
+		// Get ImagePullSecrets
+		experimentsDetails.ImagePullSecrets, err = common.GetImagePullSecrets(experimentsDetails.ChaosPodName, experimentsDetails.ChaosNamespace, clients)
+		if err != nil {
+			return errors.Errorf("Unable to get imagePullSecrets, err: %v", err)
+		}
 	}
 
 	if experimentsDetails.Sequence == "serial" {
@@ -213,8 +218,9 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, appN
 			Annotations: experimentsDetails.Annotations,
 		},
 		Spec: apiv1.PodSpec{
-			RestartPolicy: apiv1.RestartPolicyNever,
-			NodeName:      appNode,
+			RestartPolicy:    apiv1.RestartPolicyNever,
+			ImagePullSecrets: experimentsDetails.ImagePullSecrets,
+			NodeName:         appNode,
 			Containers: []apiv1.Container{
 				{
 					Name:            experimentsDetails.ExperimentName,

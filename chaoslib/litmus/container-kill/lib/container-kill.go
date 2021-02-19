@@ -68,6 +68,12 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 		if err != nil {
 			return errors.Errorf("Unable to get resource requirements, err: %v", err)
 		}
+		// Get ImagePullSecrets
+		experimentsDetails.ImagePullSecrets, err = common.GetImagePullSecrets(experimentsDetails.ChaosPodName, experimentsDetails.ChaosNamespace, clients)
+		if err != nil {
+			return errors.Errorf("Unable to get imagePullSecrets, err: %v", err)
+		}
+
 	}
 
 	if experimentsDetails.Sequence == "serial" {
@@ -236,6 +242,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 		},
 		Spec: apiv1.PodSpec{
 			ServiceAccountName: experimentsDetails.ChaosServiceAccount,
+			ImagePullSecrets:   experimentsDetails.ImagePullSecrets,
 			RestartPolicy:      apiv1.RestartPolicyNever,
 			NodeName:           nodeName,
 			Volumes: []apiv1.Volume{

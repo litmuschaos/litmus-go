@@ -34,4 +34,5 @@ type ExperimentDetails struct {
 	Sequence            string
 	Resources           corev1.ResourceRequirements
 	ChaosServiceAccount string
+	ImagePullSecrets    []corev1.LocalObjectReference
 }

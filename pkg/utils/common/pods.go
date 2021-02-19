@@ -75,6 +75,16 @@ func GetChaosPodAnnotation(podName, namespace string, clients clients.ClientSets
 	return pod.Annotations, nil
 }
 
+// GetImagePullSecrets return the imagePullSecrets from the experiment pod
+func GetImagePullSecrets(podName, namespace string, clients clients.ClientSets) ([]core_v1.LocalObjectReference, error) {
+
+	pod, err := clients.KubeClient.CoreV1().Pods(namespace).Get(podName, v1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+	return pod.Spec.ImagePullSecrets, nil
+}
+
 // GetChaosPodResourceRequirements will return the resource requirements on chaos pod
 func GetChaosPodResourceRequirements(podName, containerName, namespace string, clients clients.ClientSets) (core_v1.ResourceRequirements, error) {
 

@@ -32,4 +32,5 @@ type ExperimentDetails struct {
 	NodesAffectedPerc           int
 	Sequence                    string
 	Resources                   corev1.ResourceRequirements
+	ImagePullSecrets            []corev1.LocalObjectReference
 }
