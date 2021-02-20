@@ -55,6 +55,11 @@ func PreparePodIOStress(experimentsDetails *experimentTypes.ExperimentDetails, c
 		if err != nil {
 			return errors.Errorf("Unable to get resource requirements, err: %v", err)
 		}
+		// Get ImagePullSecrets
+		experimentsDetails.ImagePullSecrets, err = common.GetImagePullSecrets(experimentsDetails.ChaosPodName, experimentsDetails.ChaosNamespace, clients)
+		if err != nil {
+			return errors.Errorf("Unable to get imagePullSecrets, err: %v", err)
+		}
 	}
 
 	if experimentsDetails.Sequence == "serial" {
@@ -197,8 +202,9 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 			Annotations: experimentsDetails.Annotations,
 		},
 		Spec: apiv1.PodSpec{
-			RestartPolicy: apiv1.RestartPolicyNever,
-			NodeName:      appNodeName,
+			RestartPolicy:    apiv1.RestartPolicyNever,
+			ImagePullSecrets: experimentsDetails.ImagePullSecrets,
+			NodeName:         appNodeName,
 			Volumes: []apiv1.Volume{
 				{
 					Name: "dockersocket",
