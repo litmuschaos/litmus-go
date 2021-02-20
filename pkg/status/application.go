@@ -35,6 +35,16 @@ func AUTStatusCheck(appNs, appLabel string, timeout, delay int, clients clients.
 						return err
 					}
 					if isPodAnnotated {
+						for _, container := range pod.Status.ContainerStatuses {
+							if container.State.Terminated != nil {
+								return errors.Errorf("container is in terminated state")
+							}
+							if container.Ready != true {
+								return errors.Errorf("containers are not yet in running state")
+							}
+							log.InfoWithValues("[Status]: The Container status are as follows", logrus.Fields{
+								"container": container.Name, "Pod": pod.Name, "Readiness": container.Ready})
+						}
 						if pod.Status.Phase != "Running" {
 							return errors.Errorf("%v pod is not yet in running state", pod.Name)
 						}

@@ -39,7 +39,6 @@ func IsPodParentAnnotated(clients clients.ClientSets, targetPod core_v1.Pod, cha
 				}
 			}
 		}
-		return false, nil
 	case "statefulset", "statefulsets":
 		stsList, err := clients.KubeClient.AppsV1().StatefulSets(chaosDetails.AppDetail.Namespace).List(v1.ListOptions{LabelSelector: chaosDetails.AppDetail.Label})
 		if err != nil || len(stsList.Items) == 0 {
@@ -80,7 +79,7 @@ func IsPodParentAnnotated(clients clients.ClientSets, targetPod core_v1.Pod, cha
 		}
 		deploymentConfigList, err := clients.DynamicClient.Resource(gvrdc).Namespace(chaosDetails.AppDetail.Namespace).List(v1.ListOptions{LabelSelector: chaosDetails.AppDetail.Label})
 		if err != nil || len(deploymentConfigList.Items) == 0 {
-			return false, errors.Errorf("No delploymentconfig found with matching labels, err: %v", err)
+			return false, errors.Errorf("No deploymentconfig found with matching labels, err: %v", err)
 		}
 		for _, dc := range deploymentConfigList.Items {
 			annotations := dc.GetAnnotations()
