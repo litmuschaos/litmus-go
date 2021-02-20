@@ -67,7 +67,6 @@ func SetupSubsciptionID(experimentsDetails *experimentTypes.ExperimentDetails) e
 
 	if id, contains := details["subscriptionId"]; contains {
 		experimentsDetails.SubscriptionID = id
-		log.Infof("The Subscription id is:[%v]", experimentsDetails.SubscriptionID)
 	} else {
 		return errors.Errorf("The auth file does not have a subscriptionId field")
 	}

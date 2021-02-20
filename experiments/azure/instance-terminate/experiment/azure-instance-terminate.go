@@ -15,7 +15,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// InstanceTerminate inject the ec2 instance termination on eks instance
+// InstanceTerminate inject the azure instance termination chaos
 func InstanceTerminate(clients clients.ClientSets) {
 
 	var err error
@@ -46,7 +46,7 @@ func InstanceTerminate(clients clients.ClientSets) {
 	err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT")
 	if err != nil {
 		log.Errorf("Unable to Create the Chaos Result, err: %v", err)
-		failStep := "Updating the chaos result of ec2 terminate experiment (SOT)"
+		failStep := "Updating the chaos result of azure instance terminate experiment (SOT)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -86,6 +86,9 @@ func InstanceTerminate(clients clients.ClientSets) {
 
 	if err = azureStatus.SetupSubsciptionID(&experimentsDetails); err != nil {
 		log.Errorf("fail to get the subscription id, err: %v", err)
+		failStep := "Getting the subscription ID for authentication"
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+		return
 	}
 
 	// generating the event in chaosresult to marked the verdict as awaited
@@ -151,7 +154,7 @@ func InstanceTerminate(clients clients.ClientSets) {
 		return
 	}
 
-	//Verify the aws ec2 instance is running (post chaos)
+	//Verify the azure instance is running (post chaos)
 	instanceState, err = azureStatus.GetAzureInstanceStatus(&experimentsDetails)
 	if err != nil {
 		log.Errorf("failed to get the azure instance status, err: %v", err)
