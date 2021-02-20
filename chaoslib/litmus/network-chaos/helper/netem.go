@@ -100,6 +100,9 @@ loop:
 		select {
 		case <-signChan:
 			log.Info("[Chaos]: Killing process started because of terminated signal received")
+			if err = tc.Killnetem(targetPID); err != nil {
+				log.Errorf("unable to kill netem process, err :%v", err)
+			}
 			// updating the chaosresult after stopped
 			failStep := "Network Chaos injection stopped!"
 			types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep)
@@ -114,10 +117,6 @@ loop:
 			types.SetResultEventAttributes(eventsDetails, types.StoppedVerdict, msg, "Warning", resultDetails)
 			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosResult")
 
-			if err = tc.Killnetem(targetPID); err != nil {
-				log.Errorf("unable to kill netem process, err :%v", err)
-
-			}
 			os.Exit(1)
 		case <-endTime:
 			log.Infof("[Chaos]: Time is up for experiment: %v", experimentsDetails.ExperimentName)
