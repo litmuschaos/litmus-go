@@ -203,6 +203,7 @@ func GetTargetContainer(experimentsDetails *experimentTypes.ExperimentDetails, a
 func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, podName, nodeName, runID, args, labelSuffix string) error {
 
 	privilegedEnable := true
+	terminationGracePeriodSeconds := int64(60)
 
 	helperPod := &apiv1.Pod{
 		ObjectMeta: v1.ObjectMeta{
@@ -217,10 +218,11 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 			Annotations: experimentsDetails.Annotations,
 		},
 		Spec: apiv1.PodSpec{
-			HostPID:            true,
-			ServiceAccountName: experimentsDetails.ChaosServiceAccount,
-			RestartPolicy:      apiv1.RestartPolicyNever,
-			NodeName:           nodeName,
+			HostPID:                       true,
+			TerminationGracePeriodSeconds: &terminationGracePeriodSeconds,
+			ServiceAccountName:            experimentsDetails.ChaosServiceAccount,
+			RestartPolicy:                 apiv1.RestartPolicyNever,
+			NodeName:                      nodeName,
 			Volumes: []apiv1.Volume{
 				{
 					Name: "cri-socket",

@@ -12,11 +12,11 @@ then
   exit 1
 fi
 
-IMAGEID=$( sudo docker images -q ${REPONAME}/${IMGNAME}:${IMGTAG} )
+IMAGEID=$( docker images -q ${REPONAME}/${IMGNAME}:${IMGTAG} )
 
 if [ ! -z "${DNAME}" ] && [ ! -z "${DPASS}" ]; 
 then 
-  sudo docker login -u "${DNAME}" -p "${DPASS}";
+  docker login -u "${DNAME}" -p "${DPASS}";
   # Push image to docker hub
   echo "Pushing ${REPONAME}/${IMGNAME}:${IMGTAG} ..."; 
   docker buildx build --file build/Dockerfile --push --progress plane --platform linux/arm64,linux/amd64 --no-cache --tag ${REPONAME}/${IMGNAME}:${IMGTAG} .
