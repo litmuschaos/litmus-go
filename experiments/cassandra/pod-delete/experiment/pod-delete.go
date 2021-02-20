@@ -48,8 +48,7 @@ func CasssandraPodDelete(clients clients.ClientSets) {
 	if err != nil {
 		log.Errorf("Unable to Create the Chaos Result, err: %v", err)
 		failStep := "Updating the chaos result of pod-delete experiment (SOT)"
-		types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
-		err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
 
@@ -77,8 +76,7 @@ func CasssandraPodDelete(clients clients.ClientSets) {
 	if err != nil {
 		log.Errorf("Application status check failed, err: %v", err)
 		failStep := "Verify that the AUT (Application Under Test) is running (pre-chaos)"
-		types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
-		result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
 
@@ -112,8 +110,8 @@ func CasssandraPodDelete(clients clients.ClientSets) {
 	if err != nil {
 		log.Errorf("[Status]: Chaos node tool status check failed, err: %v", err)
 		failStep := "Checking for load distribution on the ring(pre-chaos)"
-		types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
-		result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+		return
 	}
 
 	// Cassandra liveness check
@@ -122,8 +120,8 @@ func CasssandraPodDelete(clients clients.ClientSets) {
 		if err != nil {
 			log.Errorf("[Liveness]: Cassandra liveness check failed, err: %v", err)
 			failStep := "failed while creating liveness pod"
-			types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
-			result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+			return
 		}
 		log.Info("[Confirmation]: The cassandra application liveness pod created successfully")
 	} else {
@@ -136,8 +134,7 @@ func CasssandraPodDelete(clients clients.ClientSets) {
 		if err != nil {
 			log.Errorf("Chaos injection failed, err: %v", err)
 			failStep := "failed in chaos injection phase"
-			types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
-			result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}
 		log.Info("[Confirmation]: The application pod has been deleted successfully")
@@ -145,8 +142,7 @@ func CasssandraPodDelete(clients clients.ClientSets) {
 	} else {
 		log.Error("[Invalid]: Please Provide the correct LIB")
 		failStep := "no match found for specified lib"
-		types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
-		result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
 
@@ -156,8 +152,7 @@ func CasssandraPodDelete(clients clients.ClientSets) {
 	if err != nil {
 		log.Errorf("Application status check failed, err: %v", err)
 		failStep := "Verify that the AUT (Application Under Test) is running (post-chaos)"
-		types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
-		result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
 	if experimentsDetails.ChaoslibDetail.EngineName != "" {
@@ -190,8 +185,8 @@ func CasssandraPodDelete(clients clients.ClientSets) {
 	if err != nil {
 		log.Errorf("[Status]: Chaos node tool status check is failed, err: %v", err)
 		failStep := "Checking for load distribution on the ring(post-chaos)"
-		types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
-		result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+		return
 	}
 
 	// Cassandra statefulset liveness check (post-chaos)
@@ -202,15 +197,15 @@ func CasssandraPodDelete(clients clients.ClientSets) {
 		if err != nil {
 			log.Errorf("Liveness status check failed, err: %v", err)
 			failStep := "failed while checking the status of liveness pod"
-			types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
-			result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+			return
 		}
 		err = cassandra.LivenessCleanup(&experimentsDetails, clients, ResourceVersionBefore)
 		if err != nil {
 			log.Errorf("Liveness cleanup failed, err: %v", err)
 			failStep := "failed while deleting liveness pod"
-			types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
-			result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+			return
 		}
 	}
 	//Updating the chaosResult in the end of experiment

@@ -29,7 +29,7 @@ func CreateDelayQdisc(PID int, latency float64, jitter float64) error {
 
 	log.Info(fmt.Sprintf("[tc] CreateDelayQdisc: PID=%d interface=%s latency=%fs jitter=%fs", PID, iface, latency, jitter))
 
-	tc := fmt.Sprintf("sudo nsenter -t %d -n tc qdisc add dev %s root handle 1: prio", PID, iface)
+	tc := fmt.Sprintf("sudo nsenter -t %d -n tc qdisc replace dev %s root handle 1: prio", PID, iface)
 	cmd := exec.Command("/bin/bash", "-c", tc)
 	out, err := cmd.CombinedOutput()
 	log.Info(cmd.String())
@@ -40,9 +40,9 @@ func CreateDelayQdisc(PID int, latency float64, jitter float64) error {
 
 	if almostZero(jitter) {
 		// no jitter
-		tc = fmt.Sprintf("sudo nsenter -t %d -n tc qdisc add dev %s parent 1:3 netem delay %fs", PID, iface, latency)
+		tc = fmt.Sprintf("sudo nsenter -t %d -n tc qdisc replace dev %s parent 1:3 netem delay %fs", PID, iface, latency)
 	} else {
-		tc = fmt.Sprintf("sudo nsenter -t %d -n tc qdisc add dev %s parent 1:3 netem delay %fs %fs", PID, iface, latency, jitter)
+		tc = fmt.Sprintf("sudo nsenter -t %d -n tc qdisc replace dev %s parent 1:3 netem delay %fs %fs", PID, iface, latency, jitter)
 	}
 	cmd = exec.Command("/bin/bash", "-c", tc)
 	out, err = cmd.CombinedOutput()

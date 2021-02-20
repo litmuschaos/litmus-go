@@ -100,6 +100,9 @@ loop:
 		select {
 		case <-signChan:
 			log.Info("[Chaos]: Killing process started because of terminated signal received")
+			if err = tc.Killnetem(targetPID); err != nil {
+				log.Errorf("unable to kill netem process, err :%v", err)
+			}
 			// updating the chaosresult after stopped
 			failStep := "Network Chaos injection stopped!"
 			types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep)
@@ -114,10 +117,6 @@ loop:
 			types.SetResultEventAttributes(eventsDetails, types.StoppedVerdict, msg, "Warning", resultDetails)
 			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosResult")
 
-			if err = tc.Killnetem(targetPID); err != nil {
-				log.Errorf("unable to kill netem process, err :%v", err)
-
-			}
 			os.Exit(1)
 		case <-endTime:
 			log.Infof("[Chaos]: Time is up for experiment: %v", experimentsDetails.ExperimentName)
@@ -309,7 +308,7 @@ func InjectChaos(experimentDetails *experimentTypes.ExperimentDetails, pid int) 
 	destinationIPs := os.Getenv("DESTINATION_IPS")
 
 	if destinationIPs == "" {
-		tc := fmt.Sprintf("sudo nsenter -t %d -n tc qdisc add dev %s root netem %v", pid, experimentDetails.NetworkInterface, netemCommands)
+		tc := fmt.Sprintf("sudo nsenter -t %d -n tc qdisc replace dev %s root netem %v", pid, experimentDetails.NetworkInterface, netemCommands)
 		cmd := exec.Command("/bin/bash", "-c", tc)
 		out, err := cmd.CombinedOutput()
 		log.Info(cmd.String())
@@ -338,7 +337,7 @@ func InjectChaos(experimentDetails *experimentTypes.ExperimentDetails, pid int) 
 
 		// Create a priority-based queue
 		// This instantly creates classes 1:1, 1:2, 1:3
-		priority := fmt.Sprintf("sudo nsenter -t %v -n tc qdisc add dev %v root handle 1: prio", pid, experimentDetails.NetworkInterface)
+		priority := fmt.Sprintf("sudo nsenter -t %v -n tc qdisc replace dev %v root handle 1: prio", pid, experimentDetails.NetworkInterface)
 		cmd := exec.Command("/bin/bash", "-c", priority)
 		out, err := cmd.CombinedOutput()
 		log.Info(cmd.String())
@@ -349,7 +348,7 @@ func InjectChaos(experimentDetails *experimentTypes.ExperimentDetails, pid int) 
 
 		// Add queueing discipline for 1:3 class.
 		// No traffic is going through 1:3 yet
-		traffic := fmt.Sprintf("sudo nsenter -t %v -n tc qdisc add dev %v parent 1:3 netem %v", pid, experimentDetails.NetworkInterface, netemCommands)
+		traffic := fmt.Sprintf("sudo nsenter -t %v -n tc qdisc replace dev %v parent 1:3 netem %v", pid, experimentDetails.NetworkInterface, netemCommands)
 		cmd = exec.Command("/bin/bash", "-c", traffic)
 		out, err = cmd.CombinedOutput()
 		log.Info(cmd.String())

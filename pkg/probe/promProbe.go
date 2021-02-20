@@ -168,7 +168,7 @@ func TriggerPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 	// running the prom probe command and matching the output
 	// it will retry for some retry count, in each iterations of try it contains following things
 	// it contains a timeout per iteration of retry. if the timeout expires without success then it will go to next try
-	// for a timeout, it will run the command, if it fails wait for the iterval and again execute the command until timeout expires
+	// for a timeout, it will run the command, if it fails wait for the interval and again execute the command until timeout expires
 	return retry.Times(uint(probe.RunProperties.Retry)).
 		Timeout(int64(probe.RunProperties.ProbeTimeout)).
 		Wait(time.Duration(probe.RunProperties.Interval) * time.Second).

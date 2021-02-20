@@ -1,11 +1,11 @@
-name: Running-E2E
+name: E2E
 on:
   pull_request:
     branches: [master]
     types: [edited, opened, synchronize, reopened]
 
 jobs:
-  Tests:
+  Generic_Tests:
     if: "!contains(github.event.head_commit.message, '[skip ci]')"
     runs-on: ubuntu-latest
     steps:
@@ -244,3 +244,153 @@ jobs:
       - name: Deleting KinD cluster
         if: ${{ always() }}
         run: kind delete cluster
+
+
+  Pod_Level_In_Series_Mode:
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+    runs-on: ubuntu-latest
+    steps:
+      
+      #Using the last commit id of pull request
+      - uses: octokit/request-action@v2.x
+        id: get_PR_commits
+        with:
+          route: GET /repos/:repo/pulls/:pull_number/commits
+          repo: ${{ github.repository }}
+          pull_number: ${{ github.event.number }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: set commit to output
+        id: getcommit
+        run: | 
+           prsha=$(echo $response | jq '.[-1].sha'  | tr -d '"')
+           echo "::set-output name=sha::$prsha" 
+        env: 
+          response:  ${{ steps.get_PR_commits.outputs.data }}
+          
+      # Checkout to the latest commit
+      # On specific directory/path
+      - uses: actions/checkout@v2
+        with:
+          ref: ${{steps.getcommit.outputs.sha}}
+          path: go/src/github.com/${{github.repository}}             
+
+      # Install golang
+      - uses: actions/setup-go@v2
+        with:
+          go-version: '^1.13.1'
+
+      # Setup gopath
+      - name: Setting up GOPATH 
+        run: |
+          echo "GOPATH=${GITHUB_WORKSPACE}/go" >> $GITHUB_ENV
+
+      - name: Generating Go binary and Building docker image
+        run: |
+          cd ${GOPATH}/src/github.com/${{github.repository}}
+          make build-amd64
+
+      #Install and configure a kind cluster
+      - name: Installing Prerequisites (K3S Cluster)
+        env: 
+          KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+        run: |
+          curl -sfL https://get.k3s.io | sh -s - --docker --write-kubeconfig-mode 664
+          sleep 30
+          kubectl get nodes
+
+      - name: Cloning Litmus E2E Repo
+        run: |
+          cd ${GOPATH}/src/github.com/${{github.repository}}
+          git clone https://github.com/litmuschaos/litmus-e2e.git -b generic         
+
+      - name: Running Pod level experiment with affected percentage 100 and in series mode
+        env:
+          GO_EXPERIMENT_IMAGE: litmuschaos/go-runner:ci
+          EXPERIMENT_IMAGE_PULL_POLICY: IfNotPresent
+          KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+        run: |
+          cd ${GOPATH}/src/github.com/${{github.repository}}/litmus-e2e
+          make build-litmus
+          make app-deploy
+          make pod-affected-perc-ton-series
+          kubectl describe chaosexperiment -n litmus
+
+      - name: Deleting K3S cluster
+        if: ${{ always() }}
+        run: /usr/local/bin/k3s-uninstall.sh        
+
+  Pod_Level_In_Parallel_Mode:
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+    runs-on: ubuntu-latest
+    steps:
+      
+      #Using the last commit id of pull request
+      - uses: octokit/request-action@v2.x
+        id: get_PR_commits
+        with:
+          route: GET /repos/:repo/pulls/:pull_number/commits
+          repo: ${{ github.repository }}
+          pull_number: ${{ github.event.number }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: set commit to output
+        id: getcommit
+        run: | 
+           prsha=$(echo $response | jq '.[-1].sha'  | tr -d '"')
+           echo "::set-output name=sha::$prsha" 
+        env: 
+          response:  ${{ steps.get_PR_commits.outputs.data }}
+          
+      # Checkout to the latest commit
+      # On specific directory/path
+      - uses: actions/checkout@v2
+        with:
+          ref: ${{steps.getcommit.outputs.sha}}
+          path: go/src/github.com/${{github.repository}}             
+
+      # Install golang
+      - uses: actions/setup-go@v2
+        with:
+          go-version: '^1.13.1'
+
+      # Setup gopath
+      - name: Setting up GOPATH 
+        run: |
+          echo "GOPATH=${GITHUB_WORKSPACE}/go" >> $GITHUB_ENV
+
+      - name: Generating Go binary and Building docker image
+        run: |
+          cd ${GOPATH}/src/github.com/${{github.repository}}
+          make build-amd64
+
+      #Install and configure a kind cluster
+      - name: Installing Prerequisites (K3S Cluster)
+        env: 
+          KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+        run: |
+          curl -sfL https://get.k3s.io | sh -s - --docker --write-kubeconfig-mode 664
+          sleep 30
+          kubectl get nodes
+
+      - name: Cloning Litmus E2E Repo
+        run: |
+          cd ${GOPATH}/src/github.com/${{github.repository}}
+          git clone https://github.com/litmuschaos/litmus-e2e.git -b generic         
+
+      - name: Running Pod level experiment with affected percentage 100 and in parallel mode
+        env:
+          GO_EXPERIMENT_IMAGE: litmuschaos/go-runner:ci
+          EXPERIMENT_IMAGE_PULL_POLICY: IfNotPresent
+          KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+        run: |
+          cd ${GOPATH}/src/github.com/${{github.repository}}/litmus-e2e
+          make build-litmus
+          make app-deploy
+          make pod-affected-perc-ton-parallel
+
+      - name: Deleting K3S cluster
+        if: ${{ always() }}
+        run: /usr/local/bin/k3s-uninstall.sh        
