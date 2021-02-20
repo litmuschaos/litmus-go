@@ -19,16 +19,16 @@ then
   sudo docker login -u "${DNAME}" -p "${DPASS}";
   # Push image to docker hub
   echo "Pushing ${REPONAME}/${IMGNAME}:${IMGTAG} ..."; 
-  sudo docker buildx build --file build/Dockerfile --push --progress plane --platform linux/arm64,linux/amd64 --no-cache --tag ${REPONAME}/${IMGNAME}:${IMGTAG} .
+  docker buildx build --file build/Dockerfile --push --progress plane --platform linux/arm64,linux/amd64 --no-cache --tag ${REPONAME}/${IMGNAME}:${IMGTAG} .
   if [ ! -z "${RELEASE_TAG}" ] ; 
   then
     # Push with different tags if tagged as a release
     # When github is tagged with a release, then Travis will 
     # set the release tag in env RELEASE_TAG
     echo "Pushing ${REPONAME}/${IMGNAME}:${RELEASE_TAG} ..."; 
-    sudo docker buildx build --file build/Dockerfile --push --progress plane --platform linux/arm64,linux/amd64 --no-cache --tag ${REPONAME}/${IMGNAME}:${RELEASE_TAG} .
+    docker buildx build --file build/Dockerfile --push --progress plane --platform linux/arm64,linux/amd64 --no-cache --tag ${REPONAME}/${IMGNAME}:${RELEASE_TAG} .
     echo "Pushing ${REPONAME}/${IMGNAME}:latest ..."; 
-    sudo docker buildx build --file build/Dockerfile --push --progress plane --platform linux/arm64,linux/amd64 --no-cache --tag ${REPONAME}/${IMGNAME}:latest .
+    docker buildx build --file build/Dockerfile --push --progress plane --platform linux/arm64,linux/amd64 --no-cache --tag ${REPONAME}/${IMGNAME}:latest .
   fi;
 else
   echo "No docker credentials provided. Skip uploading ${REPONAME}/${IMGNAME}:${IMGTAG} to docker hub"; 
