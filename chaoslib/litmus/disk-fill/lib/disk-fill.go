@@ -67,6 +67,11 @@ func PrepareDiskFill(experimentsDetails *experimentTypes.ExperimentDetails, clie
 		if err != nil {
 			return errors.Errorf("Unable to get resource requirements, err: %v", err)
 		}
+		// Get ImagePullSecrets
+		experimentsDetails.ImagePullSecrets, err = common.GetImagePullSecrets(experimentsDetails.ChaosPodName, experimentsDetails.ChaosNamespace, clients)
+		if err != nil {
+			return errors.Errorf("Unable to get imagePullSecrets, err: %v", err)
+		}
 	}
 
 	if experimentsDetails.Sequence == "serial" {
@@ -213,6 +218,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 		},
 		Spec: apiv1.PodSpec{
 			RestartPolicy:      apiv1.RestartPolicyNever,
+			ImagePullSecrets:   experimentsDetails.ImagePullSecrets,
 			NodeName:           appNodeName,
 			ServiceAccountName: experimentsDetails.ChaosServiceAccount,
 			Volumes: []apiv1.Volume{
