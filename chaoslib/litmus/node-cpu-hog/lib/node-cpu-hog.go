@@ -7,6 +7,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/node-cpu-hog/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
+	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
@@ -79,6 +80,13 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 	nodeCPUCores := experimentsDetails.NodeCPUcores
 	labelSuffix := common.GetRunID()
 
+	// run the probes during chaos
+	if len(resultDetails.ProbeDetails) != 0 {
+		if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+			return err
+		}
+	}
+
 	for _, appNode := range targetNodeList {
 
 		if experimentsDetails.EngineName != "" {
@@ -150,6 +158,14 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 	nodeCPUCores := experimentsDetails.NodeCPUcores
 
 	labelSuffix := common.GetRunID()
+
+	// run the probes during chaos
+	if len(resultDetails.ProbeDetails) != 0 {
+		if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+			return err
+		}
+	}
+
 	for _, appNode := range targetNodeList {
 
 		if experimentsDetails.EngineName != "" {
