@@ -10,6 +10,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/kafka"
 	kafkaTypes "github.com/litmuschaos/litmus-go/pkg/kafka/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
+	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
@@ -33,11 +34,11 @@ func PreparePodDelete(kafkaDetails *kafkaTypes.ExperimentDetails, experimentsDet
 	}
 
 	if experimentsDetails.Sequence == "serial" {
-		if err = InjectChaosInSerialMode(kafkaDetails, experimentsDetails, clients, chaosDetails, eventsDetails); err != nil {
+		if err = InjectChaosInSerialMode(kafkaDetails, experimentsDetails, clients, chaosDetails, eventsDetails, resultDetails); err != nil {
 			return err
 		}
 	} else {
-		if err = InjectChaosInParallelMode(kafkaDetails, experimentsDetails, clients, chaosDetails, eventsDetails); err != nil {
+		if err = InjectChaosInParallelMode(kafkaDetails, experimentsDetails, clients, chaosDetails, eventsDetails, resultDetails); err != nil {
 			return err
 		}
 	}
@@ -51,7 +52,14 @@ func PreparePodDelete(kafkaDetails *kafkaTypes.ExperimentDetails, experimentsDet
 }
 
 // InjectChaosInSerialMode delete the kafka broker pods in serial mode(one by one)
-func InjectChaosInSerialMode(kafkaDetails *kafkaTypes.ExperimentDetails, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, eventsDetails *types.EventDetails) error {
+func InjectChaosInSerialMode(kafkaDetails *kafkaTypes.ExperimentDetails, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, eventsDetails *types.EventDetails, resultDetails *types.ResultDetails) error {
+
+	// run the probes during chaos
+	if len(resultDetails.ProbeDetails) != 0 {
+		if err = probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+			return err
+		}
+	}
 
 	GracePeriod := int64(0)
 	//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
@@ -128,7 +136,14 @@ func InjectChaosInSerialMode(kafkaDetails *kafkaTypes.ExperimentDetails, experim
 }
 
 // InjectChaosInParallelMode delete the kafka broker pods in parallel mode (all at once)
-func InjectChaosInParallelMode(kafkaDetails *kafkaTypes.ExperimentDetails, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, eventsDetails *types.EventDetails) error {
+func InjectChaosInParallelMode(kafkaDetails *kafkaTypes.ExperimentDetails, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, eventsDetails *types.EventDetails, resultDetails *types.ResultDetails) error {
+
+	// run the probes during chaos
+	if len(resultDetails.ProbeDetails) != 0 {
+		if err = probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+			return err
+		}
+	}
 
 	GracePeriod := int64(0)
 	//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
