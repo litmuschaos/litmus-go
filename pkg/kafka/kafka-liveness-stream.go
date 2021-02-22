@@ -17,7 +17,6 @@ import (
 
 // LivenessStream will generate kafka liveness deployment on the basic of given condition
 func LivenessStream(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) (string, error) {
-
 	var ordinality string
 
 	// Generate a random string as suffix to topic name
@@ -40,7 +39,6 @@ func LivenessStream(experimentsDetails *experimentTypes.ExperimentDetails, clien
 	if experimentsDetails.KafkaInstanceName == "" {
 
 		execCommandDetails := litmusexec.PodDetails{}
-
 		command := append([]string{"/bin/sh", "-c"}, "kafka-topics --topic topic-"+experimentsDetails.RunID+" --describe --zookeeper "+experimentsDetails.ZookeeperService+":"+experimentsDetails.ZookeeperPort+" | grep -o 'Leader: [^[:space:]]*' | awk '{print $2}'")
 		litmusexec.SetExecCommandAttributes(&execCommandDetails, "kafka-liveness-"+experimentsDetails.RunID, "kafka-consumer", experimentsDetails.KafkaNamespace)
 		ordinality, err = litmusexec.Exec(&execCommandDetails, clients, command)
@@ -188,5 +186,4 @@ func CreateLivenessPod(experimentsDetails *experimentTypes.ExperimentDetails, Ka
 		return errors.Errorf("Unable to create Liveness pod, err: %v", err)
 	}
 	return nil
-
 }

@@ -14,19 +14,16 @@ import (
 
 // ClusterHealthCheck will do a health check over a kafka cluster
 func ClusterHealthCheck(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) error {
-	var err error
 
 	// Checking Kafka pods status
 	log.Info("[Status]: Verify that all kafka pods are running")
-	err = status.CheckApplicationStatus(experimentsDetails.KafkaNamespace, experimentsDetails.KafkaLabel, experimentsDetails.ChaoslibDetail.Timeout, experimentsDetails.ChaoslibDetail.Delay, clients)
-	if err != nil {
+	if err := status.CheckApplicationStatus(experimentsDetails.KafkaNamespace, experimentsDetails.KafkaLabel, experimentsDetails.ChaoslibDetail.Timeout, experimentsDetails.ChaoslibDetail.Delay, clients); err != nil {
 		log.Errorf("Kafka pod status check failed, err: %v", err)
 		return err
 	}
 
 	log.Info("[Status]: Verify that all zookeeper pods are running")
-	err = status.CheckApplicationStatus(experimentsDetails.ZookeeperNamespace, experimentsDetails.ZookeeperLabel, experimentsDetails.ChaoslibDetail.Timeout, experimentsDetails.ChaoslibDetail.Delay, clients)
-	if err != nil {
+	if err := status.CheckApplicationStatus(experimentsDetails.ZookeeperNamespace, experimentsDetails.ZookeeperLabel, experimentsDetails.ChaoslibDetail.Timeout, experimentsDetails.ChaoslibDetail.Delay, clients); err != nil {
 		log.Errorf("Zookeeper status check failed, err: %v", err)
 		return err
 	}

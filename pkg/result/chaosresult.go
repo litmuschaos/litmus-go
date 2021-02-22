@@ -3,9 +3,11 @@ package result
 import (
 	"reflect"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
+
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
@@ -152,12 +154,14 @@ func PatchChaosResult(result *v1alpha1.ChaosResult, clients clients.ClientSets, 
 	// for existing chaos result resource it will patch the label
 	result.ObjectMeta.Labels = chaosResultLabel
 	result.Status.ProbeStatus = GetProbeStatus(resultDetails)
-	if resultDetails.Phase == "Completed" {
-		switch resultDetails.Verdict {
-		case "Pass":
+
+	switch strings.ToLower(resultDetails.Phase) {
+	case "completed":
+		switch strings.ToLower(resultDetails.Verdict) {
+		case "pass":
 			result.Status.ExperimentStatus.ProbeSuccessPercentage = "100"
 			result.Status.History.PassedRuns++
-		case "Fail":
+		case "fail":
 			result.Status.History.FailedRuns++
 			probe.SetProbeVerdictAfterFailure(resultDetails)
 			if len(resultDetails.ProbeDetails) != 0 {
@@ -165,7 +169,7 @@ func PatchChaosResult(result *v1alpha1.ChaosResult, clients clients.ClientSets, 
 			} else {
 				result.Status.ExperimentStatus.ProbeSuccessPercentage = "0"
 			}
-		case "Stopped":
+		case "stopped":
 			result.Status.History.StoppedRuns++
 			probe.SetProbeVerdictAfterFailure(resultDetails)
 			if len(resultDetails.ProbeDetails) != 0 {
@@ -174,13 +178,13 @@ func PatchChaosResult(result *v1alpha1.ChaosResult, clients clients.ClientSets, 
 				result.Status.ExperimentStatus.ProbeSuccessPercentage = "0"
 			}
 		}
-	} else {
+	default:
 		result.Status.ExperimentStatus.ProbeSuccessPercentage = "Awaited"
 	}
 
 	// It will update the existing chaos-result CR with new values
 	// it will retries until it will able to update successfully or met the timeout(3 mins)
-	err := retry.
+	return retry.
 		Times(90).
 		Wait(2 * time.Second).
 		Try(func(attempt uint) error {
@@ -190,8 +194,6 @@ func PatchChaosResult(result *v1alpha1.ChaosResult, clients clients.ClientSets, 
 			}
 			return nil
 		})
-
-	return err
 }
 
 // SetResultUID sets the ResultUID into the ResultDetails structure
@@ -205,7 +207,6 @@ func SetResultUID(resultDetails *types.ResultDetails, clients clients.ClientSets
 
 	resultDetails.ResultUID = result.UID
 	return nil
-
 }
 
 //RecordAfterFailure update the chaosresult and create the summary events
