@@ -16,6 +16,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/math"
+	cmp "github.com/litmuschaos/litmus-go/pkg/probe/comparator"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
 	"github.com/pkg/errors"
@@ -121,8 +122,8 @@ func httpGet(probe v1alpha1.ProbeAttributes, client *http.Client) error {
 			code := strconv.Itoa(resp.StatusCode)
 
 			// comparing the response code with the expected criteria
-			if err = FirstValue(probe.HTTPProbeInputs.Method.Get.ResponseCode).
-				SecondValue(code).
+			if err = cmp.FirstValue(code).
+				SecondValue(probe.HTTPProbeInputs.Method.Get.ResponseCode).
 				Criteria(probe.HTTPProbeInputs.Method.Get.Criteria).
 				CompareInt(); err != nil {
 				log.Errorf("The %v http probe get method has Failed, err: %v", probe.Name, err)
@@ -152,8 +153,8 @@ func httpPost(probe v1alpha1.ProbeAttributes, client *http.Client) error {
 			code := strconv.Itoa(resp.StatusCode)
 
 			// comparing the response code with the expected criteria
-			if err = FirstValue(probe.HTTPProbeInputs.Method.Post.ResponseCode).
-				SecondValue(code).
+			if err = cmp.FirstValue(code).
+				SecondValue(probe.HTTPProbeInputs.Method.Post.ResponseCode).
 				Criteria(probe.HTTPProbeInputs.Method.Post.Criteria).
 				CompareInt(); err != nil {
 				log.Errorf("The %v http probe post method has Failed, err: %v", probe.Name, err)
@@ -335,7 +336,6 @@ loop:
 						chaosresult.ProbeDetails[index].IsProbeFailedWithError = err
 						break loop
 					}
-
 				}
 			}
 
@@ -343,7 +343,6 @@ loop:
 			time.Sleep(time.Duration(probe.RunProperties.ProbePollingInterval) * time.Second)
 		}
 	}
-
 }
 
 //OnChaosHTTPProbe trigger the http probe for DuringChaos phase
@@ -361,6 +360,5 @@ func OnChaosHTTPProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 			"Phase":          "DuringChaos",
 		})
 		go TriggerOnChaosHTTPProbe(probe, resultDetails, chaosDetails.ChaosDuration)
-
 	}
 }

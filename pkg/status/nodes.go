@@ -17,7 +17,7 @@ import (
 func CheckNodeStatus(nodes string, timeout, delay int, clients clients.ClientSets) error {
 
 	nodeList := apiv1.NodeList{}
-	err := retry.
+	return retry.
 		Times(uint(timeout / delay)).
 		Wait(time.Duration(delay) * time.Second).
 		Try(func(attempt uint) error {
@@ -41,7 +41,6 @@ func CheckNodeStatus(nodes string, timeout, delay int, clients clients.ClientSet
 				conditions := node.Status.Conditions
 				isReady := false
 				for _, condition := range conditions {
-
 					if condition.Type == apiv1.NodeReady && condition.Status == apiv1.ConditionTrue {
 						isReady = true
 						break
@@ -55,15 +54,11 @@ func CheckNodeStatus(nodes string, timeout, delay int, clients clients.ClientSet
 			}
 			return nil
 		})
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
 // CheckNodeNotReadyState check for node to be in not ready state
 func CheckNodeNotReadyState(nodeName string, timeout, delay int, clients clients.ClientSets) error {
-	err := retry.
+	return retry.
 		Times(uint(timeout / delay)).
 		Wait(time.Duration(delay) * time.Second).
 		Try(func(attempt uint) error {
@@ -74,7 +69,6 @@ func CheckNodeNotReadyState(nodeName string, timeout, delay int, clients clients
 			conditions := node.Status.Conditions
 			isReady := false
 			for _, condition := range conditions {
-
 				if condition.Type == apiv1.NodeReady && condition.Status == apiv1.ConditionTrue {
 					isReady = true
 					break
@@ -89,8 +83,4 @@ func CheckNodeNotReadyState(nodeName string, timeout, delay int, clients clients
 
 			return nil
 		})
-	if err != nil {
-		return err
-	}
-	return nil
 }
