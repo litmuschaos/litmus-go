@@ -6,11 +6,58 @@ import (
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/log"
+	"github.com/litmuschaos/litmus-go/pkg/types"
+	"github.com/litmuschaos/litmus-go/pkg/utils/annotation"
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
 	"github.com/pkg/errors"
 	logrus "github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+// AUTStatusCheck checks the status of application under test
+// if annotationCheck is true, it will check the status of the annotated pod only
+// else it will check status of all pods with matching label
+func AUTStatusCheck(appNs, appLabel string, timeout, delay int, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
+
+	switch chaosDetails.AppDetail.AnnotationCheck {
+	case true:
+		return retry.
+			Times(uint(timeout / delay)).
+			Wait(time.Duration(delay) * time.Second).
+			Try(func(attempt uint) error {
+				podList, err := clients.KubeClient.CoreV1().Pods(appNs).List(metav1.ListOptions{LabelSelector: appLabel})
+				if err != nil || len(podList.Items) == 0 {
+					return errors.Errorf("Unable to find the pods with matching labels, err: %v", err)
+				}
+				for _, pod := range podList.Items {
+					isPodAnnotated, err := annotation.IsPodParentAnnotated(clients, pod, chaosDetails)
+					if err != nil {
+						return err
+					}
+					if isPodAnnotated {
+						for _, container := range pod.Status.ContainerStatuses {
+							if container.State.Terminated != nil {
+								return errors.Errorf("container is in terminated state")
+							}
+							if container.Ready != true {
+								return errors.Errorf("containers are not yet in running state")
+							}
+							log.InfoWithValues("[Status]: The Container status are as follows", logrus.Fields{
+								"container": container.Name, "Pod": pod.Name, "Readiness": container.Ready})
+						}
+						if pod.Status.Phase != "Running" {
+							return errors.Errorf("%v pod is not yet in running state", pod.Name)
+						}
+						log.InfoWithValues("[Status]: The status of Pods are as follows", logrus.Fields{
+							"Pod": pod.Name, "Status": pod.Status.Phase})
+					}
+				}
+				return nil
+			})
+	default:
+		return CheckApplicationStatus(appNs, appLabel, timeout, delay, clients)
+	}
+}
 
 // CheckApplicationStatus checks the status of the AUT
 func CheckApplicationStatus(appNs, appLabel string, timeout, delay int, clients clients.ClientSets) error {
