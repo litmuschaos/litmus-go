@@ -36,12 +36,6 @@ func InjectEC2Terminate(experimentsDetails *experimentTypes.ExperimentDetails, c
 		return errors.Errorf("ec2 instance failed to stop, err: %v", err)
 	}
 
-	//Wait for ec2 instance to completely stop
-	log.Info("[Wait]: Wait for EC2 instance to come in stopped state")
-	if err = WaitForEC2Down(experimentsDetails); err != nil {
-		return errors.Errorf("unable to stop the ec2 instance, err: %v", err)
-	}
-
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
 		if err = probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
@@ -54,16 +48,12 @@ func InjectEC2Terminate(experimentsDetails *experimentTypes.ExperimentDetails, c
 	time.Sleep(time.Duration(experimentsDetails.ChaosDuration) * time.Second)
 
 	//Starting the EC2 instance
-	log.Info("[Chaos]: Starting back the EC2 instance")
-	err = EC2Start(experimentsDetails)
-	if err != nil {
-		return errors.Errorf("ec2 instance failed to start, err: %v", err)
-	}
-
-	//Wait for ec2 instance to come in running state
-	log.Info("[Wait]: Wait for EC2 instance to get in running state")
-	if err = WaitForEC2Up(experimentsDetails); err != nil {
-		return errors.Errorf("unable to start the ec2 instance, err: %v", err)
+	if experimentsDetails.ManagedNodegroup != "enable" {
+		log.Info("[Chaos]: Starting back the EC2 instance")
+		err = EC2Start(experimentsDetails)
+		if err != nil {
+			return errors.Errorf("ec2 instance failed to start, err: %v", err)
+		}
 	}
 
 	//Waiting for the ramp time after chaos injection
@@ -109,6 +99,12 @@ func EC2Stop(experimentsDetails *experimentTypes.ExperimentDetails) error {
 		"InstanceId":    *result.StoppingInstances[0].InstanceId,
 	})
 
+	//Wait for ec2 instance to completely stop
+	log.Info("[Wait]: Wait for EC2 instance to come in stopped state")
+	if err = WaitForEC2Down(experimentsDetails); err != nil {
+		return errors.Errorf("unable to stop the ec2 instance, err: %v", err)
+	}
+
 	return nil
 }
 
@@ -148,6 +144,12 @@ func EC2Start(experimentsDetails *experimentTypes.ExperimentDetails) error {
 		"InstanceId":    *result.StartingInstances[0].InstanceId,
 	})
 
+	//Wait for ec2 instance to come in running state
+	log.Info("[Wait]: Wait for EC2 instance to get in running state")
+	if err = WaitForEC2Up(experimentsDetails); err != nil {
+		return errors.Errorf("unable to start the ec2 instance, err: %v", err)
+	}
+
 	return nil
 }
 
@@ -164,7 +166,7 @@ func WaitForEC2Down(experimentsDetails *experimentTypes.ExperimentDetails) error
 			if err != nil {
 				return errors.Errorf("failed to get the instance status")
 			}
-			if instanceState != "stopped" {
+			if instanceState != "stopped" || (experimentsDetails.ManagedNodegroup == "enable" && instanceState == "terminated") {
 				log.Infof("The instance state is %v", instanceState)
 				return errors.Errorf("instance is not yet in stopped state")
 			}
