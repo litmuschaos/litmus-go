@@ -510,6 +510,8 @@ github.com/litmuschaos/chaos-operator v0.0.0-20210112160123-c2ea9ad59dcd h1:v/UC
 github.com/litmuschaos/chaos-operator v0.0.0-20210112160123-c2ea9ad59dcd/go.mod h1:Z2GpYjqXwFd8bx+kv58YEQFxynx1v9PMGCGTQFRVnFQ=
 github.com/litmuschaos/chaos-operator v0.0.0-20210125072350-102befb1d701 h1:GLKrBT+yofmDbAa5X1wSqOy1t11v4BXWD9zcnC9Cs+E=
 github.com/litmuschaos/chaos-operator v0.0.0-20210125072350-102befb1d701/go.mod h1:Z2GpYjqXwFd8bx+kv58YEQFxynx1v9PMGCGTQFRVnFQ=
+github.com/litmuschaos/chaos-operator v0.0.0-20210223100622-83c023984c2c h1:OUlHvM6M49Ejk9+RmtTfA9zH/jgxSEJgXZx2QDc5jQk=
+github.com/litmuschaos/chaos-operator v0.0.0-20210223100622-83c023984c2c/go.mod h1:Z2GpYjqXwFd8bx+kv58YEQFxynx1v9PMGCGTQFRVnFQ=
 github.com/litmuschaos/elves v0.0.0-20201107015738-552d74669e3c/go.mod h1:DsbHGNUq/78NZozWVVI9Q6eBei4I+JjlkkD5aibJ3MQ=
 github.com/lpabon/godbc v0.1.1/go.mod h1:Jo9QV0cf3U6jZABgiJ2skINAXb9j8m51r07g4KI92ZA=
 github.com/lucas-clemente/aes12 v0.0.0-20171027163421-cd47fb39b79f h1:sSeNEkJrs+0F9TUau0CgWTTNEwF23HST3Eq0A+QIx+A=

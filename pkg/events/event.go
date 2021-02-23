@@ -37,7 +37,6 @@ func CreateEvents(eventsDetails *types.EventDetails, clients clients.ClientSets,
 
 	_, err := clients.KubeClient.CoreV1().Events(chaosDetails.ChaosNamespace).Create(events)
 	return err
-
 }
 
 //GenerateEvents update the events and increase the count by 1, if already present

@@ -31,4 +31,5 @@ type ExperimentDetails struct {
 	TargetNode         string
 	TargetNodeIP       string
 	Resources          corev1.ResourceRequirements
+	ImagePullSecrets   []corev1.LocalObjectReference
 }

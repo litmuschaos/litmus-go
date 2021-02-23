@@ -11,6 +11,7 @@ import (
 	awslib "github.com/litmuschaos/litmus-go/pkg/cloud/aws"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/kube-aws/ec2-terminate/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
+	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
@@ -39,6 +40,13 @@ func InjectEC2Terminate(experimentsDetails *experimentTypes.ExperimentDetails, c
 	log.Info("[Wait]: Wait for EC2 instance to come in stopped state")
 	if err = WaitForEC2Down(experimentsDetails); err != nil {
 		return errors.Errorf("unable to stop the ec2 instance, err: %v", err)
+	}
+
+	// run the probes during chaos
+	if len(resultDetails.ProbeDetails) != 0 {
+		if err = probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+			return err
+		}
 	}
 
 	//Wait for chaos duration

@@ -10,7 +10,7 @@ IS_DOCKER_INSTALLED = $(shell which docker >> /dev/null 2>&1; echo $$?)
 # Docker info
 DOCKER_REPO ?= litmuschaos
 DOCKER_IMAGE ?= go-runner
-DOCKER_TAG ?= 1.12.0-revert
+DOCKER_TAG ?= 1.13.1-revert
 
 PACKAGES = $(shell go list ./... | grep -v '/vendor/')
 
@@ -71,7 +71,7 @@ unused-package-check:
 	fi
 
 .PHONY: build
-build: experiment-build image-build
+build: experiment-build docker.buildx image-build
 
 .PHONY: experiment-build
 experiment-build:
@@ -80,12 +80,23 @@ experiment-build:
 	@echo "------------------------------"
 	@./build/go-multiarch-build.sh build/generate_go_binary
 
+.PHONY: docker.buildx
+docker.buildx:
+	@echo "------------------------------"
+	@echo "--> Setting up Builder        " 
+	@echo "------------------------------"
+	@if ! docker buildx ls | grep -q multibuilder; then\
+		docker buildx create --name multibuilder;\
+		docker buildx inspect multibuilder --bootstrap;\
+		docker buildx use multibuilder;\
+	fi
+
 .PHONY: image-build
 image-build:	
 	@echo "-------------------------"
 	@echo "--> Build go-runner image" 
 	@echo "-------------------------"
-	@sudo docker buildx build --file build/Dockerfile --progress plane --platform linux/arm64,linux/amd64 --no-cache --tag $(DOCKER_REPO)/$(DOCKER_IMAGE):$(DOCKER_TAG) .
+	@docker buildx build --file build/Dockerfile --progress plane --platform linux/arm64,linux/amd64 --no-cache --tag $(DOCKER_REPO)/$(DOCKER_IMAGE):$(DOCKER_TAG) .
 
 .PHONY: build-amd64
 build-amd64:
@@ -108,7 +119,7 @@ push-amd64:
 	@sudo docker push $(DOCKER_REPO)/$(DOCKER_IMAGE):$(DOCKER_TAG)
 	
 .PHONY: push
-push: litmus-go-push
+push: docker.buildx litmus-go-push
 
 litmus-go-push:
 	@echo "-------------------"

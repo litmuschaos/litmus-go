@@ -11,8 +11,11 @@ import (
 
 	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
+	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/network-chaos/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
+	"github.com/litmuschaos/litmus-go/pkg/probe"
+	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
@@ -77,14 +80,14 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 		}
 	}
 
-	go abortWatcher(resultDetails, chaosDetails, clients)
+	go abortWatcher(resultDetails, chaosDetails, clients, eventsDetails, experimentsDetails)
 
 	if experimentsDetails.Sequence == "serial" {
-		if err = InjectChaosInSerialMode(experimentsDetails, targetPodList, clients, chaosDetails, args, resultDetails); err != nil {
+		if err = InjectChaosInSerialMode(experimentsDetails, targetPodList, clients, chaosDetails, args, resultDetails, eventsDetails); err != nil {
 			return err
 		}
 	} else {
-		if err = InjectChaosInParallelMode(experimentsDetails, targetPodList, clients, chaosDetails, args, resultDetails); err != nil {
+		if err = InjectChaosInParallelMode(experimentsDetails, targetPodList, clients, chaosDetails, args, resultDetails, eventsDetails); err != nil {
 			return err
 		}
 	}
@@ -92,9 +95,17 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 }
 
 // InjectChaosInSerialMode inject the network chaos in all target application serially (one by one)
-func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, args string, resultDetails *types.ResultDetails) error {
+func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, args string, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
 
 	labelSuffix := common.GetRunID()
+
+	// run the probes during chaos
+	if len(resultDetails.ProbeDetails) != 0 {
+		if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+			return err
+		}
+	}
+
 	// creating the helper pod to perform network chaos
 	for _, pod := range targetPodList.Items {
 
@@ -153,9 +164,17 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 }
 
 // InjectChaosInParallelMode inject the network chaos in all target application in parallel mode (all at once)
-func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, args string, resultDetails *types.ResultDetails) error {
+func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, args string, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
 
 	labelSuffix := common.GetRunID()
+
+	// run the probes during chaos
+	if len(resultDetails.ProbeDetails) != 0 {
+		if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+			return err
+		}
+	}
+
 	// creating the helper pod to perform network chaos
 	for _, pod := range targetPodList.Items {
 
@@ -519,7 +538,7 @@ func getNodeName(podName, namespace string, clients clients.ClientSets) (string,
 
 // abortWatcher continuosly watch for the abort signals
 // it will update the chaosresult
-func abortWatcher(resultDetails *types.ResultDetails, chaosDetails *types.ChaosDetails, clients clients.ClientSets) {
+func abortWatcher(resultDetails *types.ResultDetails, chaosDetails *types.ChaosDetails, clients clients.ClientSets, eventsDetails *types.EventDetails, experimentsDetails *experimentTypes.ExperimentDetails) {
 
 	// signChan channel is used to transmit signal notifications.
 	signChan := make(chan os.Signal, 1)
@@ -530,9 +549,19 @@ func abortWatcher(resultDetails *types.ResultDetails, chaosDetails *types.ChaosD
 		select {
 		case <-signChan:
 			log.Info("termination signal recieved, updating chaos status")
-			if err := updateChaosStatus(resultDetails, chaosDetails, clients); err != nil {
-				log.Errorf("err: %v", err)
-			}
+			// updating the chaosresult after stopped
+			failStep := "Network Chaos injection stopped!"
+			types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep)
+			result.ChaosResult(chaosDetails, clients, resultDetails, "EOT")
+
+			// generating summary event in chaosengine
+			msg := experimentsDetails.ExperimentName + " experiment has been aborted"
+			types.SetEngineEventAttributes(eventsDetails, types.Summary, msg, "Warning", chaosDetails)
+			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
+
+			// generating summary event in chaosresult
+			types.SetResultEventAttributes(eventsDetails, types.StoppedVerdict, msg, "Warning", resultDetails)
+			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosResult")
 			os.Exit(1)
 		}
 	}

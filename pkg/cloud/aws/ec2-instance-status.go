@@ -82,5 +82,4 @@ func GetRandomInstance(region string, session *session.Session) (string, error) 
 	}
 	randomIndex := rand.Intn(len(instanceList))
 	return instanceList[randomIndex], nil
-
 }
