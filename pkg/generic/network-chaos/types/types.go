@@ -41,4 +41,5 @@ type ExperimentDetails struct {
 	SocketPath                         string
 	Sequence                           string
 	Resources                          corev1.ResourceRequirements
+	ImagePullSecrets                   []corev1.LocalObjectReference
 }

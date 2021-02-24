@@ -11,6 +11,7 @@ import (
 	ebs "github.com/litmuschaos/litmus-go/pkg/cloud/aws"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/kube-aws/ebs-loss/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
+	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
@@ -39,6 +40,13 @@ func InjectEBSLoss(experimentsDetails *experimentTypes.ExperimentDetails, client
 	log.Info("[Wait]: Wait for EBS volume detachment")
 	if err = WaitForVolumeDetachment(experimentsDetails); err != nil {
 		return errors.Errorf("unable to detach the ebs volume to the ec2 instance, err: %v", err)
+	}
+
+	// run the probes during chaos
+	if len(resultDetails.ProbeDetails) != 0 {
+		if err = probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+			return err
+		}
 	}
 
 	//Wait for chaos duration

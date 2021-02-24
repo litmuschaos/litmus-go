@@ -12,6 +12,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/math"
+	cmp "github.com/litmuschaos/litmus-go/pkg/probe/comparator"
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	litmusexec "github.com/litmuschaos/litmus-go/pkg/utils/exec"
@@ -61,7 +62,7 @@ func TriggerInlineCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.
 	// it will retry for some retry count, in each iterations of try it contains following things
 	// it contains a timeout per iteration of retry. if the timeout expires without success then it will go to next try
 	// for a timeout, it will run the command, if it fails wait for the iterval and again execute the command until timeout expires
-	err = retry.Times(uint(probe.RunProperties.Retry)).
+	return retry.Times(uint(probe.RunProperties.Retry)).
 		Timeout(int64(probe.RunProperties.ProbeTimeout)).
 		Wait(time.Duration(probe.RunProperties.Interval) * time.Second).
 		TryWithTimeout(func(attempt uint) error {
@@ -84,7 +85,6 @@ func TriggerInlineCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.
 			resultDetails.ProbeArtifacts[probe.Name] = probes
 			return nil
 		})
-	return err
 }
 
 // TriggerSourceCmdProbe trigger the cmd probe inside the external pod
@@ -101,7 +101,7 @@ func TriggerSourceCmdProbe(probe v1alpha1.ProbeAttributes, execCommandDetails li
 	// it will retry for some retry count, in each iterations of try it contains following things
 	// it contains a timeout per iteration of retry. if the timeout expires without success then it will go to next try
 	// for a timeout, it will run the command, if it fails wait for the iterval and again execute the command until timeout expires
-	err = retry.Times(uint(probe.RunProperties.Retry)).
+	return retry.Times(uint(probe.RunProperties.Retry)).
 		Timeout(int64(probe.RunProperties.ProbeTimeout)).
 		Wait(time.Duration(probe.RunProperties.Interval) * time.Second).
 		TryWithTimeout(func(attempt uint) error {
@@ -122,7 +122,6 @@ func TriggerSourceCmdProbe(probe v1alpha1.ProbeAttributes, execCommandDetails li
 			resultDetails.ProbeArtifacts[probe.Name] = probes
 			return nil
 		})
-	return err
 }
 
 // CreateProbePod creates an external pod with source image for the cmd probe
@@ -163,14 +162,12 @@ func CreateProbePod(clients clients.ClientSets, chaosDetails *types.ChaosDetails
 //DeleteProbePod deletes the probe pod and wait until it got terminated
 func DeleteProbePod(chaosDetails *types.ChaosDetails, clients clients.ClientSets, runID string) error {
 
-	err := clients.KubeClient.CoreV1().Pods(chaosDetails.ChaosNamespace).Delete(chaosDetails.ExperimentName+"-probe-"+runID, &v1.DeleteOptions{})
-
-	if err != nil {
+	if err := clients.KubeClient.CoreV1().Pods(chaosDetails.ChaosNamespace).Delete(chaosDetails.ExperimentName+"-probe-"+runID, &v1.DeleteOptions{}); err != nil {
 		return err
 	}
 
 	// waiting till the termination of the pod
-	err = retry.
+	return retry.
 		Times(uint(chaosDetails.Timeout / chaosDetails.Delay)).
 		Wait(time.Duration(chaosDetails.Delay) * time.Second).
 		Try(func(attempt uint) error {
@@ -180,8 +177,6 @@ func DeleteProbePod(chaosDetails *types.ChaosDetails, clients clients.ClientSets
 			}
 			return nil
 		})
-
-	return err
 }
 
 // GetRunID generate a random string
@@ -337,24 +332,24 @@ loop:
 // ValidateResult validate the probe result to specified comparison operation
 // it supports int, float, string operands
 func ValidateResult(comparator v1alpha1.ComparatorInfo, cmdOutput string) error {
-	switch comparator.Type {
-	case "int", "Int":
-		if err = FirstValue(comparator.Value).
-			SecondValue(cmdOutput).
+	switch strings.ToLower(comparator.Type) {
+	case "int":
+		if err = cmp.FirstValue(cmdOutput).
+			SecondValue(comparator.Value).
 			Criteria(comparator.Criteria).
 			CompareInt(); err != nil {
 			return err
 		}
-	case "float", "Float":
-		if err = FirstValue(comparator.Value).
-			SecondValue(cmdOutput).
+	case "float":
+		if err = cmp.FirstValue(cmdOutput).
+			SecondValue(comparator.Value).
 			Criteria(comparator.Criteria).
 			CompareFloat(); err != nil {
 			return err
 		}
-	case "string", "String":
-		if err = FirstValue(comparator.Value).
-			SecondValue(cmdOutput).
+	case "string":
+		if err = cmp.FirstValue(cmdOutput).
+			SecondValue(comparator.Value).
 			Criteria(comparator.Criteria).
 			CompareString(); err != nil {
 			return err

@@ -53,6 +53,11 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 		if err != nil {
 			return errors.Errorf("Unable to get resource requirements, err: %v", err)
 		}
+		// Get ImagePullSecrets
+		experimentsDetails.ImagePullSecrets, err = common.GetImagePullSecrets(experimentsDetails.ChaosPodName, experimentsDetails.ChaosNamespace, clients)
+		if err != nil {
+			return errors.Errorf("Unable to get imagePullSecrets, err: %v", err)
+		}
 	}
 
 	if experimentsDetails.EngineName != "" {
@@ -83,6 +88,14 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, args []string, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
 
 	labelSuffix := common.GetRunID()
+
+	// run the probes during chaos
+	if len(resultDetails.ProbeDetails) != 0 {
+		if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+			return err
+		}
+	}
+
 	// creating the helper pod to perform network chaos
 	for _, pod := range targetPodList.Items {
 
@@ -112,14 +125,6 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 			return errors.Errorf("helper pod is not in running state, err: %v", err)
 		}
 
-		// run the probes during chaos
-		if len(resultDetails.ProbeDetails) != 0 {
-			if err = probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
-				common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-"+runID, appLabel, chaosDetails, clients)
-				return err
-			}
-		}
-
 		// Wait till the completion of helper pod
 		log.Infof("[Wait]: Waiting for %vs till the completion of the helper pod", experimentsDetails.ChaosDuration)
 		podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, appLabel, clients, experimentsDetails.ChaosDuration+30, chaosDetails.ExperimentName)
@@ -143,6 +148,14 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, args []string, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
 
 	labelSuffix := common.GetRunID()
+
+	// run the probes during chaos
+	if len(resultDetails.ProbeDetails) != 0 {
+		if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+			return err
+		}
+	}
+
 	// creating the helper pod to perform network chaos
 	for _, pod := range targetPodList.Items {
 
@@ -171,14 +184,6 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 	if err != nil {
 		common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
 		return errors.Errorf("helper pod is not in running state, err: %v", err)
-	}
-
-	// run the probes during chaos
-	if len(resultDetails.ProbeDetails) != 0 {
-		if err = probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
-			common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
-			return err
-		}
 	}
 
 	// Wait till the completion of helper pod
@@ -215,8 +220,9 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 			Annotations: experimentsDetails.Annotations,
 		},
 		Spec: apiv1.PodSpec{
-			RestartPolicy: apiv1.RestartPolicyNever,
-			NodeName:      appNodeName,
+			RestartPolicy:    apiv1.RestartPolicyNever,
+			ImagePullSecrets: experimentsDetails.ImagePullSecrets,
+			NodeName:         appNodeName,
 			Volumes: []apiv1.Volume{
 				{
 					Name: "dockersocket",
