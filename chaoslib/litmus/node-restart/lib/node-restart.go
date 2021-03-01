@@ -250,7 +250,7 @@ func CheckApplicationStatus(appNs, appLabel string, timeout, delay int, clients 
 
 	// Checking whether application containers are in ready state
 	log.Info("[Status]: Checking whether application containers are in ready state")
-	err := status.CheckContainerStatus(appNs, appLabel, timeout, delay, clients)
+	err := status.CheckContainerStatus(appNs, appLabel, "", timeout, delay, clients)
 	if err != nil {
 		return err
 	}
