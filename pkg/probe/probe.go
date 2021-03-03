@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"html/template"
 	"os"
+	"strings"
 
 	"github.com/kyokomi/emoji"
 	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
@@ -32,36 +33,30 @@ func RunProbes(chaosDetails *types.ChaosDetails, clients clients.ClientSets, res
 
 		for _, probe := range probes {
 
-			switch probe.Type {
+			switch strings.ToLower(probe.Type) {
 
-			case "k8sProbe", "K8sProbe":
+			case "k8sprobe":
 				// it contains steps to prepare the k8s probe
-				err = PrepareK8sProbe(probe, resultDetails, clients, phase, eventsDetails, chaosDetails)
-				if err != nil {
+				if err = PrepareK8sProbe(probe, resultDetails, clients, phase, eventsDetails, chaosDetails); err != nil {
 					return err
 				}
-
-			case "cmdProbe", "CmdProbe":
+			case "cmdprobe":
 				// it contains steps to prepare cmd probe
-				err = PrepareCmdProbe(probe, clients, chaosDetails, resultDetails, phase, eventsDetails)
-				if err != nil {
+				if err = PrepareCmdProbe(probe, clients, chaosDetails, resultDetails, phase, eventsDetails); err != nil {
 					return err
 				}
-			case "httpProbe", "HTTPProbe":
+			case "httpprobe":
 				// it contains steps to prepare http probe
-				err = PrepareHTTPProbe(probe, clients, chaosDetails, resultDetails, phase, eventsDetails)
-				if err != nil {
+				if err = PrepareHTTPProbe(probe, clients, chaosDetails, resultDetails, phase, eventsDetails); err != nil {
 					return err
 				}
-			case "promProbe", "PromProbe":
+			case "promprobe":
 				// it contains steps to prepare prom probe
-				err = PreparePromProbe(probe, clients, chaosDetails, resultDetails, phase, eventsDetails)
-				if err != nil {
+				if err = PreparePromProbe(probe, clients, chaosDetails, resultDetails, phase, eventsDetails); err != nil {
 					return err
 				}
 			default:
 				return errors.Errorf("No supported probe type found, type: %v", probe.Type)
-
 			}
 		}
 	}

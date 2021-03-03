@@ -112,14 +112,6 @@ func EBSLoss(clients clients.ClientSets) {
 		}
 	}
 
-	//Configure AWS Credentials
-	if err = aws.ConfigureAWS(); err != nil {
-		log.Errorf("AWS authentication failed, err: %v", err)
-		failStep := "Configure AWS configuration (pre-chaos)"
-		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-		return
-	}
-
 	//Verify the aws ec2 instance is attached to ebs volume
 	EBSStatus, err := aws.GetEBSStatus(&experimentsDetails)
 	if err != nil || EBSStatus != "attached" {

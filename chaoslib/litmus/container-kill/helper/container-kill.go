@@ -85,7 +85,7 @@ func KillContainer(experimentsDetails *experimentTypes.ExperimentDetails, client
 
 		switch experimentsDetails.ContainerRuntime {
 		case "docker":
-			if err := StopDockerContainer(containerID, experimentsDetails.SocketPath); err != nil {
+			if err := StopDockerContainer(containerID, experimentsDetails.SocketPath, experimentsDetails.Signal); err != nil {
 				return err
 			}
 		case "containerd", "crio":
@@ -164,10 +164,10 @@ func StopContainerdContainer(containerID, socketPath string) error {
 }
 
 //StopDockerContainer kill the application container
-func StopDockerContainer(containerID, socketPath string) error {
+func StopDockerContainer(containerID, socketPath, signal string) error {
 	var errOut bytes.Buffer
 	host := "unix://" + socketPath
-	cmd := exec.Command("docker", "--host", host, "kill", string(containerID))
+	cmd := exec.Command("docker", "--host", host, "kill", string(containerID), "--signal", signal)
 	cmd.Stderr = &errOut
 	if err := cmd.Run(); err != nil {
 		return errors.Errorf("Unable to run command, err: %v; error output: %v", err, errOut.String())
@@ -268,6 +268,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, name string) {
 	experimentDetails.ChaosPodName = Getenv("POD_NAME", "")
 	experimentDetails.SocketPath = Getenv("SOCKET_PATH", "")
 	experimentDetails.ContainerRuntime = Getenv("CONTAINER_RUNTIME", "")
+	experimentDetails.Signal = Getenv("SIGNAL", "SIGKILL")
 }
 
 // Getenv fetch the env and set the default value, if any

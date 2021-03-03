@@ -35,4 +35,6 @@ type ExperimentDetails struct {
 	Annotations         map[string]string
 	Sequence            string
 	Resources           corev1.ResourceRequirements
+	Signal              string
+	ImagePullSecrets    []corev1.LocalObjectReference
 }

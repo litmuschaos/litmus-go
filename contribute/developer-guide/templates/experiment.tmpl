@@ -14,7 +14,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func {{ .Name }}(clients clients.ClientSets){
+// Experiment contains steps to inject chaos
+func Experiment(clients clients.ClientSets){
 
 	var err error
 	experimentsDetails := experimentTypes.ExperimentDetails{}

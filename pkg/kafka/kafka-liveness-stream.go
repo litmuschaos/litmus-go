@@ -17,40 +17,28 @@ import (
 
 // LivenessStream will generate kafka liveness deployment on the basic of given condition
 func LivenessStream(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) (string, error) {
-	var err error
-	var LivenessTopicLeader string
-	var KafkaTopicName string
 	var ordinality string
 
-	podList, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.KafkaNamespace).List(metav1.ListOptions{LabelSelector: "name=kafka-liveness"})
+	// Generate a random string as suffix to topic name
+	log.Info("[Liveness]: Set the kafka topic name")
+	experimentsDetails.RunID = common.GetRunID()
+	KafkaTopicName := "topic-" + experimentsDetails.RunID
+
+	log.Info("[Liveness]: Generate the kafka liveness spec from template")
+	err := CreateLivenessPod(experimentsDetails, KafkaTopicName, clients)
 	if err != nil {
-		return "", errors.Errorf("unable to find the liveness pod with matching labels, err: %v", err)
+		return "", err
 	}
-	if len(podList.Items) == 0 {
 
-		// Generate a random string as suffix to topic name
-		log.Info("[Liveness]: Set the kafka topic name")
-		experimentsDetails.RunID = common.GetRunID()
-		KafkaTopicName = "topic-" + experimentsDetails.RunID
-
-		log.Info("[Liveness]: Generate the kafka liveness spec from template")
-		err = CreateLivenessPod(experimentsDetails, KafkaTopicName, clients)
-		if err != nil {
-			return "", err
-		}
-
-		log.Info("[Liveness]: Confirm that the kafka liveness pod is running")
-		err = status.CheckApplicationStatus(experimentsDetails.KafkaNamespace, "name=kafka-liveness", experimentsDetails.ChaoslibDetail.Timeout, experimentsDetails.ChaoslibDetail.Delay, clients)
-		if err != nil {
-			return "", errors.Errorf("Liveness pod status check failed, err: %v", err)
-		}
+	log.Info("[Liveness]: Confirm that the kafka liveness pod is running")
+	if err := status.CheckApplicationStatus(experimentsDetails.KafkaNamespace, "name=kafka-liveness-"+experimentsDetails.RunID, experimentsDetails.ChaoslibDetail.Timeout, experimentsDetails.ChaoslibDetail.Delay, clients); err != nil {
+		return "", errors.Errorf("Liveness pod status check failed, err: %v", err)
 	}
 
 	log.Info("[Liveness]: Obtain the leader broker ordinality for the topic (partition) created by kafka-liveness")
 	if experimentsDetails.KafkaInstanceName == "" {
 
 		execCommandDetails := litmusexec.PodDetails{}
-
 		command := append([]string{"/bin/sh", "-c"}, "kafka-topics --topic topic-"+experimentsDetails.RunID+" --describe --zookeeper "+experimentsDetails.ZookeeperService+":"+experimentsDetails.ZookeeperPort+" | grep -o 'Leader: [^[:space:]]*' | awk '{print $2}'")
 		litmusexec.SetExecCommandAttributes(&execCommandDetails, "kafka-liveness-"+experimentsDetails.RunID, "kafka-consumer", experimentsDetails.KafkaNamespace)
 		ordinality, err = litmusexec.Exec(&execCommandDetails, clients, command)
@@ -70,19 +58,18 @@ func LivenessStream(experimentsDetails *experimentTypes.ExperimentDetails, clien
 	}
 
 	log.Info("[Liveness]: Determine the leader broker pod name")
-	podList, err = clients.KubeClient.CoreV1().Pods(experimentsDetails.KafkaNamespace).List(metav1.ListOptions{LabelSelector: experimentsDetails.KafkaLabel})
+	podList, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.KafkaNamespace).List(metav1.ListOptions{LabelSelector: experimentsDetails.KafkaLabel})
 	if err != nil {
 		return "", errors.Errorf("unable to find the pods with matching labels, err: %v", err)
 	}
 
 	for _, pod := range podList.Items {
 		if strings.ContainsAny(pod.Name, ordinality) {
-			LivenessTopicLeader = pod.Name
-			break
+			return pod.Name, nil
 		}
 	}
 
-	return LivenessTopicLeader, nil
+	return "", errors.Errorf("No kafka pod found with %v ordinality", ordinality)
 }
 
 // CreateLivenessPod will create a liveness pod when kafka saslAuth in not enabled
@@ -96,7 +83,8 @@ func CreateLivenessPod(experimentsDetails *experimentTypes.ExperimentDetails, Ka
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "kafka-liveness-" + experimentsDetails.RunID,
 			Labels: map[string]string{
-				"name":                      "kafka-liveness",
+				"app":                       "kafka-liveness",
+				"name":                      "kafka-liveness-" + experimentsDetails.RunID,
 				"app.kubernetes.io/part-of": "litmus",
 			},
 		},
@@ -198,5 +186,4 @@ func CreateLivenessPod(experimentsDetails *experimentTypes.ExperimentDetails, Ka
 		return errors.Errorf("Unable to create Liveness pod, err: %v", err)
 	}
 	return nil
-
 }

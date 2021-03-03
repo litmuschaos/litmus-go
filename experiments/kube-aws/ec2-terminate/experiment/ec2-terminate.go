@@ -113,14 +113,6 @@ func EC2Terminate(clients clients.ClientSets) {
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
-	//Configure AWS Credentials
-	if err = aws.ConfigureAWS(); err != nil {
-		log.Errorf("AWS authentication failed, err: %v", err)
-		failStep := "Configure AWS configuration (pre-chaos)"
-		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-		return
-	}
-
 	//Verify the aws ec2 instance is running (pre chaos)
 	instanceState, err := aws.GetEC2InstanceStatus(&experimentsDetails)
 	if err != nil {
