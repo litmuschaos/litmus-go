@@ -430,21 +430,21 @@ func updateChaosStatus(resultDetails *types.ResultDetails, chaosDetails *types.C
 		return err
 	}
 	annotations := result.ObjectMeta.Annotations
-	chaosStatusList := []v1alpha1.ChaosStatusDetails{}
+	targetList := []v1alpha1.Target{}
 	for k, v := range annotations {
 		switch strings.ToLower(v) {
 		case "injected", "recovered":
 			podName := strings.TrimSpace(strings.Split(k, "/")[1])
-			chaosStatus := v1alpha1.ChaosStatusDetails{
-				TargetPodName: podName,
-				ChaosStatus:   v,
+			target := v1alpha1.Target{
+				PodName:     podName,
+				ChaosStatus: v,
 			}
-			chaosStatusList = append(chaosStatusList, chaosStatus)
+			targetList = append(targetList, target)
 			delete(annotations, k)
 		}
 	}
 
-	result.Status.History.ChaosStatus = chaosStatusList
+	result.Status.History.Targets = targetList
 	result.ObjectMeta.Annotations = annotations
 	_, err = clients.LitmusClient.ChaosResults(chaosDetails.ChaosNamespace).Update(result)
 	return err
