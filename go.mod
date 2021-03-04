@@ -3,35 +3,20 @@ module github.com/litmuschaos/litmus-go
 go 1.13
 
 require (
-	github.com/aws/aws-sdk-go v1.17.7
-	github.com/emicklei/go-restful v2.12.0+incompatible // indirect
-	github.com/fsouza/go-dockerclient v1.7.0 // indirect
-	github.com/go-openapi/spec v0.19.7 // indirect
-	github.com/go-openapi/swag v0.19.9 // indirect
-	github.com/google/gofuzz v1.1.0 // indirect
-	github.com/imdario/mergo v0.3.9 // indirect
-	github.com/kr/pretty v0.2.0 // indirect
+	github.com/aws/aws-sdk-go v1.36.27
 	github.com/kyokomi/emoji v2.2.4+incompatible
-	github.com/litmuschaos/chaos-operator v0.0.0-20210223100622-83c023984c2c
-	github.com/mailru/easyjson v0.7.1 // indirect
+	github.com/litmuschaos/chaos-operator v0.0.0-20210304075822-6f3ede86edaa
 	github.com/openebs/maya v0.0.0-20200411140727-1c81f9e017b0
 	github.com/pkg/errors v0.9.1
 	github.com/rs/zerolog v1.19.0
 	github.com/sirupsen/logrus v1.7.0
 	github.com/spf13/cobra v1.0.0
-	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d // indirect
-	golang.org/x/time v0.0.0-20200416051211-89c76fbcd5d1 // indirect
-	google.golang.org/appengine v1.6.6 // indirect
-	google.golang.org/protobuf v1.24.0 // indirect
 	gopkg.in/yaml.v2 v2.2.8
 	k8s.io/api v0.17.3
 	k8s.io/apimachinery v0.17.3
 	k8s.io/client-go v12.0.0+incompatible
 	k8s.io/klog v1.0.0
-	k8s.io/kube-openapi v0.0.0-20200121204235-bf4fb3bd569c // indirect
 	k8s.io/kubernetes v1.16.2
-	k8s.io/utils v0.0.0-20200414100711-2df71ebbae66 // indirect
-	sigs.k8s.io/yaml v1.2.0 // indirect
 )
 
 // Pinned to kubernetes-1.16.2
