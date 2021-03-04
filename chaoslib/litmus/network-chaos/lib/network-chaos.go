@@ -400,7 +400,7 @@ func GetIpsForTargetHosts(targetHosts string) (string, error) {
 	for i := range hosts {
 		ips, err := net.LookupIP(hosts[i])
 		if err != nil {
-			log.Warnf("Unknown host: {%v}", hosts[i])
+			log.Warnf("Unknown host: {%v}, it won't be included in the scope of chaos", hosts[i])
 		} else {
 			for j := range ips {
 				log.Infof("Host: {%v}, IP address: {%v}", hosts[i], ips[j])
