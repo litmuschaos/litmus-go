@@ -85,7 +85,7 @@ image-build:
 	@echo "-------------------------"
 	@echo "--> Build go-runner image" 
 	@echo "-------------------------"
-	@sudo docker buildx build --file build/Dockerfile --progress plane --platform linux/arm64,linux/amd64 --no-cache --tag $(DOCKER_REPO)/$(DOCKER_IMAGE):$(DOCKER_TAG) .
+	@docker buildx build --file build/Dockerfile --progress plane --platform linux/arm64,linux/amd64 --no-cache --tag $(DOCKER_REPO)/$(DOCKER_IMAGE):$(DOCKER_TAG) .
 
 .PHONY: build-amd64
 build-amd64:
