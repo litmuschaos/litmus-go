@@ -23,4 +23,5 @@ type ExperimentDetails struct {
 	Timeout            int
 	Delay              int
 	LIBImagePullPolicy string
+	TargetContainer    string
 }
