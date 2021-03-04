@@ -2,7 +2,6 @@ package aws
 
 import (
 	"math/rand"
-	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -94,23 +93,24 @@ func GetRandomInstance(region string, session *session.Session) (string, error) 
 // PreChaosNodeStatusCheck fetch the target node name from instance id and checks its status also fetch the total active nodes in the cluster
 func PreChaosNodeStatusCheck(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) error {
 
-	var targetNodeName string
-	var err error
-	targetNodeName, experimentsDetails.ActiveNodes, err = getTargetNodeAndTotalNodeCount(experimentsDetails.Ec2InstanceID, clients)
+	nodeList, err := clients.KubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
 	if err != nil {
-		return errors.Errorf("fail to get the target nodes from instance id, err: %v", err)
+		return errors.Errorf("fail to get the nodes, err: %v", err)
 	}
-	// Checking the status of target nodes
-	log.Info("[Status]: Getting the status of target node")
-	err = status.CheckNodeStatus(targetNodeName, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
+	for _, node := range nodeList.Items {
+		if err = status.CheckNodeStatus(node.Name, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
+			log.Infof("[Info]: The cluster is unhealthy this might not work, due to %v", err)
+		}
+	}
+	experimentsDetails.ActiveNodes, err = getActiveNodeCount(experimentsDetails.Ec2InstanceID, clients)
 	if err != nil {
-		return errors.Errorf("Target node is not in the ready state, err: %v", err)
+		return errors.Errorf("fail to get the total active node count pre chaos, err: %v", err)
 	}
 
 	return nil
 }
 
-// PostChaosActiveNodeCountCheck checks the number of active nodes post chaos
+// PostChaosActiveNodeCountCheck checks the number of active nodes post chaos and validate the number of healthy node count post chaos.
 func PostChaosActiveNodeCountCheck(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) error {
 
 	err := retry.
@@ -118,33 +118,29 @@ func PostChaosActiveNodeCountCheck(experimentsDetails *experimentTypes.Experimen
 		Wait(time.Duration(experimentsDetails.Delay) * time.Second).
 		Try(func(attempt uint) error {
 
-			_, activeNodes, err := getTargetNodeAndTotalNodeCount(experimentsDetails.Ec2InstanceID, clients)
+			activeNodes, err := getActiveNodeCount(experimentsDetails.Ec2InstanceID, clients)
 			if err != nil {
 				return errors.Errorf("fail to get the total active nodes, err: %v", err)
 			}
 			if experimentsDetails.ActiveNodes != activeNodes {
 				return errors.Errorf("fail to get equal active node post chaos")
 			}
-			log.Infof("[Info]: The active node count is: %v", activeNodes)
 			return nil
 		})
 	return err
 }
 
-// getTargetNodeAndTotalNodeCount fetch the target node and total node count from the cluster
-func getTargetNodeAndTotalNodeCount(ec2InstanceID string, clients clients.ClientSets) (string, int, error) {
+// getActiveNodeCount fetch the target node and total node count from the cluster
+func getActiveNodeCount(ec2InstanceID string, clients clients.ClientSets) (int, error) {
 
-	var targetNodeName string
 	nodeList, err := clients.KubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
 	if err != nil {
-		panic(err.Error())
+		return 0, errors.Errorf("fail to get the nodes, err: %v", err)
 	}
 
 	nodeCount := 0
 	for _, node := range nodeList.Items {
-		if targetNodeName == "" && strings.Contains(node.Spec.ProviderID, ec2InstanceID) {
-			targetNodeName = node.Name
-		}
+
 		conditions := node.Status.Conditions
 		for _, condition := range conditions {
 			if condition.Type == apiv1.NodeReady && condition.Status == apiv1.ConditionTrue {
@@ -154,5 +150,5 @@ func getTargetNodeAndTotalNodeCount(ec2InstanceID string, clients clients.Client
 	}
 	log.Infof("[Info]: Total number active nodes are: %v", nodeCount)
 
-	return targetNodeName, nodeCount, nil
+	return nodeCount, nil
 }
