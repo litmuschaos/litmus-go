@@ -3,7 +3,7 @@ name: Push
 on:
   push:
     branches:
-      - dev
+      - v1.12.x
     tags-ignore:
       - '**'
 
