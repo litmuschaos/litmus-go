@@ -1,9 +1,9 @@
 package lib
 
 import (
-	"net"
 	"strings"
 
+	network_chaos "github.com/litmuschaos/litmus-go/chaoslib/litmus/network-chaos/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/network-chaos/types"
@@ -277,34 +277,19 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 }
 
 // AddTargetIpsArgs inserts a comma-separated list of targetIPs (if provided by the user) into the pumba command/args
-func AddTargetIpsArgs(targetIPs string, args []string) []string {
+func AddTargetIpsArgs(targetIPs, targetHosts string, args []string) ([]string, error) {
+
+	targetIPs, err := network_chaos.GetTargetIps(targetIPs, targetHosts)
+	if err != nil {
+		return nil, err
+	}
+
 	if targetIPs == "" {
-		return args
+		return args, nil
 	}
 	ips := strings.Split(targetIPs, ",")
 	for i := range ips {
 		args = append(args, "--target", strings.TrimSpace(ips[i]))
 	}
-	return args
-}
-
-// GetIpsForTargetHosts resolves IP addresses for comma-separated list of target hosts and returns comma-separated ips
-func GetIpsForTargetHosts(targetHosts string) string {
-	if targetHosts == "" {
-		return ""
-	}
-	hosts := strings.Split(targetHosts, ",")
-	var commaSeparatedIPs []string
-	for i := range hosts {
-		ips, err := net.LookupIP(hosts[i])
-		if err != nil {
-			log.Infof("Unknown host")
-		} else {
-			for j := range ips {
-				log.Infof("IP address: %v", ips[j])
-				commaSeparatedIPs = append(commaSeparatedIPs, ips[j].String())
-			}
-		}
-	}
-	return strings.Join(commaSeparatedIPs, ",")
+	return args, nil
 }
