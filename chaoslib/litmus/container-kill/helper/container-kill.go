@@ -85,11 +85,11 @@ func KillContainer(experimentsDetails *experimentTypes.ExperimentDetails, client
 
 		switch experimentsDetails.ContainerRuntime {
 		case "docker":
-			if err := StopDockerContainer(containerID); err != nil {
+			if err := StopDockerContainer(containerID, experimentsDetails.SocketPath, experimentsDetails.Signal); err != nil {
 				return err
 			}
 		case "containerd", "crio":
-			if err := StopContainerdContainer(containerID, experimentsDetails.SocketPath); err != nil {
+			if err := StopContainerdContainer(containerID, experimentsDetails.SocketPath, experimentsDetails.Signal); err != nil {
 				return err
 			}
 		default:
@@ -153,10 +153,18 @@ func GetContainerID(experimentsDetails *experimentTypes.ExperimentDetails, clien
 }
 
 //StopContainerdContainer kill the application container
-func StopContainerdContainer(containerID, socketPath string) error {
+func StopContainerdContainer(containerID, socketPath, signal string) error {
 	var errOut bytes.Buffer
+	var cmd *exec.Cmd
 	endpoint := "unix://" + socketPath
-	cmd := exec.Command("crictl", "-i", endpoint, "-r", endpoint, "stop", string(containerID))
+	switch signal {
+	case "SIGKILL":
+		cmd = exec.Command("crictl", "-i", endpoint, "-r", endpoint, "stop", "--timeout=0", string(containerID))
+	case "SIGTERM":
+		cmd = exec.Command("crictl", "-i", endpoint, "-r", endpoint, "stop", string(containerID))
+	default:
+		return errors.Errorf("{%v} signal not supported, use either SIGTERM or SIGKILL", signal)
+	}
 	cmd.Stderr = &errOut
 	if err := cmd.Run(); err != nil {
 		return errors.Errorf("Unable to run command, err: %v; error output: %v", err, errOut.String())
@@ -165,9 +173,10 @@ func StopContainerdContainer(containerID, socketPath string) error {
 }
 
 //StopDockerContainer kill the application container
-func StopDockerContainer(containerID string) error {
+func StopDockerContainer(containerID, socketPath, signal string) error {
 	var errOut bytes.Buffer
-	cmd := exec.Command("docker", "kill", string(containerID))
+	host := "unix://" + socketPath
+	cmd := exec.Command("docker", "--host", host, "kill", string(containerID), "--signal", signal)
 	cmd.Stderr = &errOut
 	if err := cmd.Run(); err != nil {
 		return errors.Errorf("Unable to run command, err: %v; error output: %v", err, errOut.String())
@@ -268,6 +277,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, name string) {
 	experimentDetails.ChaosPodName = Getenv("POD_NAME", "")
 	experimentDetails.SocketPath = Getenv("SOCKET_PATH", "")
 	experimentDetails.ContainerRuntime = Getenv("CONTAINER_RUNTIME", "")
+	experimentDetails.Signal = Getenv("SIGNAL", "SIGKILL")
 }
 
 // Getenv fetch the env and set the default value, if any

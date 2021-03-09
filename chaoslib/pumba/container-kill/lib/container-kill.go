@@ -309,7 +309,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 						strconv.Itoa(experimentsDetails.ChaosInterval) + "s",
 						"kill",
 						"--signal",
-						"SIGKILL",
+						experimentsDetails.Signal,
 						"re2:k8s_" + experimentsDetails.TargetContainer + "_" + appName,
 					},
 					Resources: experimentsDetails.Resources,

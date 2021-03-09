@@ -272,6 +272,7 @@ func GetPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, podName st
 		"ITERATIONS":           strconv.Itoa(experimentsDetails.Iterations),
 		"SOCKET_PATH":          experimentsDetails.SocketPath,
 		"CONTAINER_RUNTIME":    experimentsDetails.ContainerRuntime,
+		"SIGNAL":               experimentsDetails.Signal,
 	}
 	for key, value := range ENVList {
 		var perEnv apiv1.EnvVar
