@@ -3,7 +3,7 @@ name: Push
 on:
   push:
     branches:
-      - master
+      - v1.11.x
     tags-ignore:
       - '**'
 
@@ -70,7 +70,7 @@ jobs:
         env:
           DOCKER_REPO: litmuschaos
           DOCKER_IMAGE: go-runner
-          DOCKER_TAG: ci
+          DOCKER_TAG: 1.11.x-ci
         run: |
           cd go/src/github.com/${{github.repository}}
           make experiment-build
@@ -79,7 +79,7 @@ jobs:
         env:
           DOCKER_REPO: litmuschaos
           DOCKER_IMAGE: go-runner
-          DOCKER_TAG: ci
+          DOCKER_TAG: 1.11.x-ci
           DNAME: ${{ secrets.DNAME }}
           DPASS: ${{ secrets.DPASS }}
         run: |
