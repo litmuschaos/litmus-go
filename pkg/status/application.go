@@ -11,68 +11,22 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
 	"github.com/pkg/errors"
 	logrus "github.com/sirupsen/logrus"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // AUTStatusCheck checks the status of application under test
 // if annotationCheck is true, it will check the status of the annotated pod only
 // else it will check status of all pods with matching label
-func AUTStatusCheck(appNs, appLabel string, timeout, delay int, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
+func AUTStatusCheck(appNs, appLabel, containerName string, timeout, delay int, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
 
 	switch chaosDetails.AppDetail.AnnotationCheck {
 	case true:
-		return retry.
-			Times(uint(timeout / delay)).
-			Wait(time.Duration(delay) * time.Second).
-			Try(func(attempt uint) error {
-				podList, err := clients.KubeClient.CoreV1().Pods(appNs).List(metav1.ListOptions{LabelSelector: appLabel})
-				if err != nil || len(podList.Items) == 0 {
-					return errors.Errorf("Unable to find the pods with matching labels, err: %v", err)
-				}
-				for _, pod := range podList.Items {
-					isPodAnnotated, err := annotation.IsPodParentAnnotated(clients, pod, chaosDetails)
-					if err != nil {
-						return err
-					}
-					if isPodAnnotated {
-						for _, container := range pod.Status.ContainerStatuses {
-							if container.State.Terminated != nil {
-								return errors.Errorf("container is in terminated state")
-							}
-							if container.Ready != true {
-								return errors.Errorf("containers are not yet in running state")
-							}
-							log.InfoWithValues("[Status]: The Container status are as follows", logrus.Fields{
-								"container": container.Name, "Pod": pod.Name, "Readiness": container.Ready})
-						}
-						if pod.Status.Phase != "Running" {
-							return errors.Errorf("%v pod is not yet in running state", pod.Name)
-						}
-						log.InfoWithValues("[Status]: The status of Pods are as follows", logrus.Fields{
-							"Pod": pod.Name, "Status": pod.Status.Phase})
-					}
-				}
-				return nil
-			})
-	default:
-		return CheckApplicationStatus(appNs, appLabel, timeout, delay, clients)
-	}
-}
-
-// CheckApplicationStatus checks the status of the AUT
-func CheckApplicationStatus(appNs, appLabel string, timeout, delay int, clients clients.ClientSets) error {
-
-	switch appLabel {
-	case "":
-		// Checking whether applications are healthy
-		log.Info("[Status]: Checking whether applications are in healthy state")
-		if err := CheckPodAndContainerStatusInAppNs(appNs, timeout, delay, clients); err != nil {
-			return err
-		}
+		return AnnotatedApplicationsStatusCheck(appNs, appLabel, containerName, timeout, delay, clients, chaosDetails)
 	default:
 		// Checking whether application containers are in ready state
 		log.Info("[Status]: Checking whether application containers are in ready state")
-		if err := CheckContainerStatus(appNs, appLabel, timeout, delay, clients); err != nil {
+		if err := CheckContainerStatus(appNs, appLabel, containerName, timeout, delay, clients); err != nil {
 			return err
 		}
 		// Checking whether application pods are in running state
@@ -84,38 +38,80 @@ func CheckApplicationStatus(appNs, appLabel string, timeout, delay int, clients 
 	return nil
 }
 
-// CheckPodAndContainerStatusInAppNs check status of pods and containers present in appns
-func CheckPodAndContainerStatusInAppNs(appNs string, timeout, delay int, clients clients.ClientSets) error {
+// AnnotatedApplicationsStatusCheck checks the status of all the annotated applications with matching label
+func AnnotatedApplicationsStatusCheck(appNs, appLabel, containerName string, timeout, delay int, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
+
 	return retry.
 		Times(uint(timeout / delay)).
 		Wait(time.Duration(delay) * time.Second).
 		Try(func(attempt uint) error {
-			podList, err := clients.KubeClient.CoreV1().Pods(appNs).List(metav1.ListOptions{})
+			podList, err := clients.KubeClient.CoreV1().Pods(appNs).List(metav1.ListOptions{LabelSelector: appLabel})
 			if err != nil || len(podList.Items) == 0 {
-				return errors.Errorf("Unable to find any pod in %v namespace, err: %v", appNs, err)
+				return errors.Errorf("Unable to find the pods with matching labels, err: %v", err)
 			}
 			for _, pod := range podList.Items {
-				if isChaosPod(pod.Labels) {
-					continue
+				isPodAnnotated, err := annotation.IsPodParentAnnotated(clients, pod, chaosDetails)
+				if err != nil {
+					return err
 				}
-				for _, container := range pod.Status.ContainerStatuses {
-					if container.State.Terminated != nil {
-						return errors.Errorf("container is in terminated state")
+				if isPodAnnotated {
+					switch containerName {
+					case "":
+						for _, container := range pod.Status.ContainerStatuses {
+							if container.State.Terminated != nil {
+								return errors.Errorf("container is in terminated state")
+							}
+							if container.Ready != true {
+								return errors.Errorf("containers are not yet in running state")
+							}
+							log.InfoWithValues("[Status]: The Container status are as follows", logrus.Fields{
+								"container": container.Name, "Pod": pod.Name, "Readiness": container.Ready})
+						}
+					default:
+						for _, container := range pod.Status.ContainerStatuses {
+							if containerName == container.Name {
+								if container.State.Terminated != nil {
+									return errors.Errorf("container is in terminated state")
+								}
+								if container.Ready != true {
+									return errors.Errorf("containers are not yet in running state")
+								}
+								log.InfoWithValues("[Status]: The Container status are as follows", logrus.Fields{
+									"container": container.Name, "Pod": pod.Name, "Readiness": container.Ready})
+							}
+						}
 					}
-					if container.Ready != true {
-						return errors.Errorf("containers are not yet in running state")
+					if pod.Status.Phase != "Running" {
+						return errors.Errorf("%v pod is not yet in running state", pod.Name)
 					}
-					log.InfoWithValues("[Status]: The Container status are as follows", logrus.Fields{
-						"container": container.Name, "Pod": pod.Name, "Readiness": container.Ready})
+					log.InfoWithValues("[Status]: The status of Pods are as follows", logrus.Fields{
+						"Pod": pod.Name, "Status": pod.Status.Phase})
 				}
-				if pod.Status.Phase != "Running" {
-					return errors.Errorf("pods are not yet in running state")
-				}
-				log.InfoWithValues("[Status]: The Pod status are as follows", logrus.Fields{
-					"Pod": pod.Name, "Phase": pod.Status.Phase})
 			}
 			return nil
 		})
+}
+
+// CheckApplicationStatus checks the status of the AUT
+func CheckApplicationStatus(appNs, appLabel string, timeout, delay int, clients clients.ClientSets) error {
+
+	switch appLabel {
+	case "":
+		// Checking whether applications are healthy
+		log.Info("[Status]: No appLabels provided, skipping the application status checks")
+	default:
+		// Checking whether application containers are in ready state
+		log.Info("[Status]: Checking whether application containers are in ready state")
+		if err := CheckContainerStatus(appNs, appLabel, "", timeout, delay, clients); err != nil {
+			return err
+		}
+		// Checking whether application pods are in running state
+		log.Info("[Status]: Checking whether application pods are in running state")
+		if err := CheckPodStatus(appNs, appLabel, timeout, delay, clients); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // CheckAuxiliaryApplicationStatus checks the status of the Auxiliary applications
@@ -143,13 +139,7 @@ func CheckPodStatusPhase(appNs, appLabel string, timeout, delay int, clients cli
 				return errors.Errorf("Unable to find the pods with matching labels, err: %v", err)
 			}
 			for _, pod := range podList.Items {
-				isInState := false
-				for _, state := range states {
-					if string(pod.Status.Phase) == state {
-						isInState = true
-						break
-					}
-				}
+				isInState := isOneOfState(string(pod.Status.Phase), states)
 				if !isInState {
 					return errors.Errorf("Pod is not yet in %v state(s)", states)
 				}
@@ -160,13 +150,23 @@ func CheckPodStatusPhase(appNs, appLabel string, timeout, delay int, clients cli
 		})
 }
 
+// isOneOfState check for the string should be present inside given list
+func isOneOfState(podState string, states []string) bool {
+	for i := range states {
+		if podState == states[i] {
+			return true
+		}
+	}
+	return false
+}
+
 // CheckPodStatus checks the running status of the application pod
 func CheckPodStatus(appNs, appLabel string, timeout, delay int, clients clients.ClientSets) error {
 	return CheckPodStatusPhase(appNs, appLabel, timeout, delay, clients, "Running")
 }
 
 // CheckContainerStatus checks the status of the application container
-func CheckContainerStatus(appNs, appLabel string, timeout, delay int, clients clients.ClientSets) error {
+func CheckContainerStatus(appNs, appLabel, containerName string, timeout, delay int, clients clients.ClientSets) error {
 
 	return retry.
 		Times(uint(timeout / delay)).
@@ -177,19 +177,46 @@ func CheckContainerStatus(appNs, appLabel string, timeout, delay int, clients cl
 				return errors.Errorf("Unable to find the pods with matching labels, err: %v", err)
 			}
 			for _, pod := range podList.Items {
-				for _, container := range pod.Status.ContainerStatuses {
-					if container.State.Terminated != nil {
-						return errors.Errorf("container is in terminated state")
+				switch containerName {
+				case "":
+					if err := validateAllContainerStatus(pod.Name, pod.Status.ContainerStatuses); err != nil {
+						return err
 					}
-					if container.Ready != true {
-						return errors.Errorf("containers are not yet in running state")
+				default:
+					if err := validateContainerStatus(containerName, pod.Name, pod.Status.ContainerStatuses); err != nil {
+						return err
 					}
-					log.InfoWithValues("[Status]: The Container status are as follows", logrus.Fields{
-						"container": container.Name, "Pod": pod.Name, "Readiness": container.Ready})
 				}
 			}
 			return nil
 		})
+}
+
+// validateContainerStatus verify that the provided container should be in ready state
+func validateContainerStatus(containerName, podName string, ContainerStatuses []v1.ContainerStatus) error {
+	for _, container := range ContainerStatuses {
+		if container.Name == containerName {
+			if container.State.Terminated != nil {
+				return errors.Errorf("container is in terminated state")
+			}
+			if container.Ready != true {
+				return errors.Errorf("containers are not yet in running state")
+			}
+			log.InfoWithValues("[Status]: The Container status are as follows", logrus.Fields{
+				"container": container.Name, "Pod": podName, "Readiness": container.Ready})
+		}
+	}
+	return nil
+}
+
+// validateAllContainerStatus verify that the all the containers should be in ready state
+func validateAllContainerStatus(podName string, ContainerStatuses []v1.ContainerStatus) error {
+	for _, container := range ContainerStatuses {
+		if err := validateContainerStatus(container.Name, podName, ContainerStatuses); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // WaitForCompletion wait until the completion of pod

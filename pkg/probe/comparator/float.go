@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/pkg/errors"
 )
 
@@ -15,6 +16,8 @@ func (model Model) CompareFloat() error {
 
 	obj := Float{}
 	obj.setValues(reflect.ValueOf(model.a).String(), reflect.ValueOf(model.b).String())
+
+	log.Infof("[Probe]: {Actual value: %v}, {Expected value: %v}, {Operator: %v}", obj.a, obj.b, model.operator)
 
 	switch model.operator {
 	case ">=":

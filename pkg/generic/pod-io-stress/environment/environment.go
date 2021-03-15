@@ -35,7 +35,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.Sequence = Getenv("SEQUENCE", "parallel")
 	experimentDetails.VolumeMountPath = Getenv("VOLUME_MOUNT_PATH", "")
 	experimentDetails.SocketPath = Getenv("SOCKET_PATH", "/var/run/docker.sock")
-
+	experimentDetails.TargetContainer = Getenv("TARGET_CONTAINER", "")
 }
 
 // Getenv fetch the env and set the default value, if any

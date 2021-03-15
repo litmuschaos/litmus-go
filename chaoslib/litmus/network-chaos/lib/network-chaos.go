@@ -63,6 +63,11 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 		}
 	}
 
+	experimentsDetails.DestinationIPs, err = GetTargetIps(experimentsDetails.DestinationIPs, experimentsDetails.DestinationHosts)
+	if err != nil {
+		return err
+	}
+
 	if experimentsDetails.EngineName != "" {
 		// Get Chaos Pod Annotation
 		experimentsDetails.Annotations, err = common.GetChaosPodAnnotation(experimentsDetails.ChaosPodName, experimentsDetails.ChaosNamespace, clients)
@@ -263,24 +268,6 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 					},
 				},
 			},
-			InitContainers: []apiv1.Container{
-				{
-					Name:            "setup-" + experimentsDetails.ExperimentName,
-					Image:           experimentsDetails.LIBImage,
-					ImagePullPolicy: apiv1.PullPolicy(experimentsDetails.LIBImagePullPolicy),
-					Command: []string{
-						"/bin/bash",
-						"-c",
-						"sudo chmod 777 " + experimentsDetails.SocketPath,
-					},
-					VolumeMounts: []apiv1.VolumeMount{
-						{
-							Name:      "cri-socket",
-							MountPath: experimentsDetails.SocketPath,
-						},
-					},
-				},
-			},
 
 			Containers: []apiv1.Container{
 				{
@@ -338,7 +325,7 @@ func GetPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, podName, a
 		"NETWORK_INTERFACE":    experimentsDetails.NetworkInterface,
 		"EXPERIMENT_NAME":      experimentsDetails.ExperimentName,
 		"SOCKET_PATH":          experimentsDetails.SocketPath,
-		"DESTINATION_IPS":      GetTargetIpsArgs(experimentsDetails.DestinationIPs, experimentsDetails.DestinationHosts),
+		"DESTINATION_IPS":      experimentsDetails.DestinationIPs,
 	}
 	for key, value := range ENVList {
 		var perEnv apiv1.EnvVar
@@ -367,39 +354,52 @@ func GetValueFromDownwardAPI(apiVersion string, fieldPath string) apiv1.EnvVarSo
 	return downwardENV
 }
 
-// GetTargetIpsArgs return the comma separated target ips
+// GetTargetIps return the comma separated target ips
 // It fetch the ips from the target ips (if defined by users)
 // it append the ips from the host, if target host is provided
-func GetTargetIpsArgs(targetIPs, targetHosts string) string {
+func GetTargetIps(targetIPs, targetHosts string) (string, error) {
 
-	ipsFromHost := GetIpsForTargetHosts(targetHosts)
+	ipsFromHost, err := GetIpsForTargetHosts(targetHosts)
+	if err != nil {
+		return "", err
+	}
 	if targetIPs == "" {
 		targetIPs = ipsFromHost
 	} else if ipsFromHost != "" {
 		targetIPs = targetIPs + "," + ipsFromHost
 	}
-	return targetIPs
+	return targetIPs, nil
 }
 
 // GetIpsForTargetHosts resolves IP addresses for comma-separated list of target hosts and returns comma-separated ips
-func GetIpsForTargetHosts(targetHosts string) string {
+func GetIpsForTargetHosts(targetHosts string) (string, error) {
 	if targetHosts == "" {
-		return ""
+		return "", nil
 	}
 	hosts := strings.Split(targetHosts, ",")
+	finalHosts := ""
 	var commaSeparatedIPs []string
 	for i := range hosts {
 		ips, err := net.LookupIP(hosts[i])
 		if err != nil {
-			log.Infof("Unknown host")
+			log.Warnf("Unknown host: {%v}, it won't be included in the scope of chaos", hosts[i])
 		} else {
 			for j := range ips {
-				log.Infof("IP address: %v", ips[j])
+				log.Infof("Host: {%v}, IP address: {%v}", hosts[i], ips[j])
 				commaSeparatedIPs = append(commaSeparatedIPs, ips[j].String())
+			}
+			if finalHosts == "" {
+				finalHosts = hosts[i]
+			} else {
+				finalHosts = finalHosts + "," + hosts[i]
 			}
 		}
 	}
-	return strings.Join(commaSeparatedIPs, ",")
+	if len(commaSeparatedIPs) == 0 {
+		return "", errors.Errorf("Provided hosts: {%v} are invalid, unable to resolve", targetHosts)
+	}
+	log.Infof("Injecting chaos on {%v} hosts", finalHosts)
+	return strings.Join(commaSeparatedIPs, ","), nil
 }
 
 // abortWatcher continuosly watch for the abort signals

@@ -15,7 +15,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// LivenessStream will generate kafka liveness deployment on the basic of given condition
+// LivenessStream generates kafka liveness pod, which continuously validate the liveness of kafka brokers
+// and derive the kafka topic leader(candidate for the deletion)
 func LivenessStream(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) (string, error) {
 	var ordinality string
 
@@ -24,7 +25,7 @@ func LivenessStream(experimentsDetails *experimentTypes.ExperimentDetails, clien
 	experimentsDetails.RunID = common.GetRunID()
 	KafkaTopicName := "topic-" + experimentsDetails.RunID
 
-	log.Info("[Liveness]: Generate the kafka liveness spec from template")
+	log.Info("[Liveness]: Creating the kafka liveness pod")
 	err := CreateLivenessPod(experimentsDetails, KafkaTopicName, clients)
 	if err != nil {
 		return "", err
@@ -72,7 +73,7 @@ func LivenessStream(experimentsDetails *experimentTypes.ExperimentDetails, clien
 	return "", errors.Errorf("No kafka pod found with %v ordinality", ordinality)
 }
 
-// CreateLivenessPod will create a liveness pod when kafka saslAuth in not enabled
+// CreateLivenessPod creates the kafka liveness pod
 func CreateLivenessPod(experimentsDetails *experimentTypes.ExperimentDetails, KafkaTopicName string, clients clients.ClientSets) error {
 
 	LivenessPod := &corev1.Pod{

@@ -10,7 +10,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// LivenessCleanup will delete the kafka liveness deployment
+// LivenessCleanup deletes the kafka liveness pod
 func LivenessCleanup(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) error {
 
 	if err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaoslibDetail.AppNS).Delete("kafka-liveness-"+experimentsDetails.RunID, &metav1.DeleteOptions{}); err != nil {
