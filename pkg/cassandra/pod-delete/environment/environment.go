@@ -29,6 +29,7 @@ func GetENV(cassandraDetails *cassandraTypes.ExperimentDetails) {
 	ChaoslibDetail.ChaosUID = clientTypes.UID(Getenv("CHAOS_UID", ""))
 	ChaoslibDetail.InstanceID = Getenv("INSTANCE_ID", "")
 	ChaoslibDetail.ChaosPodName = Getenv("POD_NAME", "")
+	ChaoslibDetail.TargetContainer = Getenv("TARGET_CONTAINER", "")
 	ChaoslibDetail.Force, _ = strconv.ParseBool(Getenv("FORCE", "false"))
 	ChaoslibDetail.Delay, _ = strconv.Atoi(Getenv("STATUS_CHECK_DELAY", "2"))
 	ChaoslibDetail.Timeout, _ = strconv.Atoi(Getenv("STATUS_CHECK_TIMEOUT", "180"))
