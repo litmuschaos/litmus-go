@@ -125,7 +125,7 @@ func GetContainerID(experimentDetails *experimentTypes.ExperimentDetails, client
 	case "docker":
 		host := "unix://" + experimentDetails.SocketPath
 		// deriving the container id of the pause container
-		cmd := "docker --host " + host + " ps | grep k8s_POD_" + experimentDetails.TargetPods + "_" + experimentDetails.AppNS + " | awk '{print $1}'"
+		cmd := "sudo docker --host " + host + " ps | grep k8s_POD_" + experimentDetails.TargetPods + "_" + experimentDetails.AppNS + " | awk '{print $1}'"
 		out, err := exec.Command("/bin/sh", "-c", cmd).CombinedOutput()
 		if err != nil {
 			log.Error(fmt.Sprintf("[docker]: Failed to run docker ps command: %s", string(out)))
@@ -161,7 +161,7 @@ func GetPID(experimentDetails *experimentTypes.ExperimentDetails, containerID st
 	case "docker":
 		host := "unix://" + experimentDetails.SocketPath
 		// deriving pid from the inspect out of target container
-		out, err := exec.Command("docker", "--host", host, "inspect", containerID).CombinedOutput()
+		out, err := exec.Command("sudo", "docker", "--host", host, "inspect", containerID).CombinedOutput()
 		if err != nil {
 			log.Error(fmt.Sprintf("[docker]: Failed to run docker inspect: %s", string(out)))
 			return 0, err
@@ -175,7 +175,7 @@ func GetPID(experimentDetails *experimentTypes.ExperimentDetails, containerID st
 	case "containerd", "crio":
 		// deriving pid from the inspect out of target container
 		endpoint := "unix://" + experimentDetails.SocketPath
-		out, err := exec.Command("crictl", "-i", endpoint, "-r", endpoint, "inspect", containerID).CombinedOutput()
+		out, err := exec.Command("sudo", "crictl", "-i", endpoint, "-r", endpoint, "inspect", containerID).CombinedOutput()
 		if err != nil {
 			log.Error(fmt.Sprintf("[cri]: Failed to run crictl: %s", string(out)))
 			return 0, err

@@ -283,15 +283,16 @@ func GetPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, podName st
 
 	var envVar []apiv1.EnvVar
 	ENVList := map[string]string{
-		"APP_NS":               experimentsDetails.AppNS,
-		"APP_POD":              podName,
-		"APP_CONTAINER":        experimentsDetails.TargetContainer,
-		"TOTAL_CHAOS_DURATION": strconv.Itoa(experimentsDetails.ChaosDuration),
-		"CHAOS_NAMESPACE":      experimentsDetails.ChaosNamespace,
-		"CHAOS_ENGINE":         experimentsDetails.EngineName,
-		"CHAOS_UID":            string(experimentsDetails.ChaosUID),
-		"EXPERIMENT_NAME":      experimentsDetails.ExperimentName,
-		"FILL_PERCENTAGE":      strconv.Itoa(experimentsDetails.FillPercentage),
+		"APP_NS":                      experimentsDetails.AppNS,
+		"APP_POD":                     podName,
+		"APP_CONTAINER":               experimentsDetails.TargetContainer,
+		"TOTAL_CHAOS_DURATION":        strconv.Itoa(experimentsDetails.ChaosDuration),
+		"CHAOS_NAMESPACE":             experimentsDetails.ChaosNamespace,
+		"CHAOS_ENGINE":                experimentsDetails.EngineName,
+		"CHAOS_UID":                   string(experimentsDetails.ChaosUID),
+		"EXPERIMENT_NAME":             experimentsDetails.ExperimentName,
+		"FILL_PERCENTAGE":             strconv.Itoa(experimentsDetails.FillPercentage),
+		"EPHEMERAL_STORAGE_MEBIBYTES": strconv.Itoa(experimentsDetails.EphemeralStorageMebibytes),
 	}
 	for key, value := range ENVList {
 		var perEnv apiv1.EnvVar
