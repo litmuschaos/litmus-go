@@ -26,4 +26,5 @@ type ExperimentDetails struct {
 	ManagedNodegroup   string
 	ActiveNodes        int
 	LIBImagePullPolicy string
+	TargetContainer    string
 }

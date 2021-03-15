@@ -30,6 +30,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.Ec2InstanceID = Getenv("EC2_INSTANCE_ID", "")
 	experimentDetails.Region = Getenv("REGION", "")
 	experimentDetails.ManagedNodegroup = Getenv("MANAGED_NODEGROUP", "disable")
+	experimentDetails.TargetContainer = Getenv("TARGET_CONTAINER", "")
 }
 
 // Getenv fetch the env and set the default value, if any

@@ -25,6 +25,7 @@ func GetENV(kafkaDetails *kafkaTypes.ExperimentDetails) {
 	ChaoslibDetail.ChaosServiceAccount = Getenv("CHAOS_SERVICE_ACCOUNT", "")
 	ChaoslibDetail.AppNS = Getenv("APP_NAMESPACE", "")
 	ChaoslibDetail.AppLabel = Getenv("APP_LABEL", "")
+	ChaoslibDetail.TargetContainer = Getenv("TARGET_CONTAINER", "")
 	ChaoslibDetail.AppKind = Getenv("APP_KIND", "")
 	ChaoslibDetail.ChaosUID = clientTypes.UID(Getenv("CHAOS_UID", ""))
 	ChaoslibDetail.InstanceID = Getenv("INSTANCE_ID", "")

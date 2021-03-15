@@ -59,25 +59,12 @@ func main() {
 
 //DiskFill contains steps to inject disk-fill chaos
 func DiskFill(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails) error {
-	// GetEphemeralStorageAttributes derive the ephemeral storage attributes from the target container
-	ephemeralStorageLimit, ephemeralStorageRequest, err := GetEphemeralStorageAttributes(experimentsDetails, clients)
-	if err != nil {
-		return err
-	}
 
 	// Derive the container id of the target container
 	containerID, err := GetContainerID(experimentsDetails, clients)
 	if err != nil {
 		return err
 	}
-
-	log.InfoWithValues("[Info]: Details of application under chaos injection", logrus.Fields{
-		"PodName":                 experimentsDetails.TargetPods,
-		"ContainerName":           experimentsDetails.TargetContainer,
-		"ephemeralStorageLimit":   ephemeralStorageLimit,
-		"ephemeralStorageRequest": ephemeralStorageRequest,
-		"ContainerID":             containerID,
-	})
 
 	// derive the used ephemeral storage size from the target container
 	du := fmt.Sprintf("sudo du /diskfill/%v", containerID)
@@ -94,12 +81,29 @@ func DiskFill(experimentsDetails *experimentTypes.ExperimentDetails, clients cli
 	if err != nil {
 		return errors.Errorf("Unable to filter used ephemeral storage size, err: %v", err)
 	}
-	log.Infof("used ephemeral storage space: %v", strconv.Itoa(usedEphemeralStorageSize))
+	log.Infof("used ephemeral storage space: %vKB", strconv.Itoa(usedEphemeralStorageSize))
+
+	// GetEphemeralStorageAttributes derive the ephemeral storage attributes from the target container
+	ephemeralStorageLimit, err := GetEphemeralStorageAttributes(experimentsDetails, clients)
+	if err != nil {
+		return err
+	}
+
+	if ephemeralStorageLimit == 0 && experimentsDetails.EphemeralStorageMebibytes == 0 {
+		return errors.Errorf("Either provide ephemeral storage limit inside target container or define EPHEMERAL_STORAGE_MEBIBYTES ENV")
+	}
 
 	// deriving the ephemeral storage size to be filled
 	sizeTobeFilled := GetSizeToBeFilled(experimentsDetails, usedEphemeralStorageSize, int(ephemeralStorageLimit))
 
-	log.Infof("ephemeral storage size to be filled: %v", strconv.Itoa(sizeTobeFilled))
+	log.InfoWithValues("[Info]: Details of application under chaos injection", logrus.Fields{
+		"PodName":               experimentsDetails.TargetPods,
+		"ContainerName":         experimentsDetails.TargetContainer,
+		"ephemeralStorageLimit(KB)": ephemeralStorageLimit,
+		"ContainerID":           containerID,
+	})
+
+	log.Infof("ephemeral storage size to be filled: %vKB", strconv.Itoa(sizeTobeFilled))
 
 	// record the event inside chaosengine
 	if experimentsDetails.EngineName != "" {
@@ -174,15 +178,15 @@ func DiskFill(experimentsDetails *experimentTypes.ExperimentDetails, clients cli
 }
 
 // GetEphemeralStorageAttributes derive the ephemeral storage attributes from the target pod
-func GetEphemeralStorageAttributes(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) (int64, int64, error) {
+func GetEphemeralStorageAttributes(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) (int64, error) {
 
 	pod, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Get(experimentsDetails.TargetPods, v1.GetOptions{})
 
 	if err != nil {
-		return 0, 0, err
+		return 0, err
 	}
 
-	var ephemeralStorageLimit, ephemeralStorageRequest int64
+	var ephemeralStorageLimit int64
 	containers := pod.Spec.Containers
 
 	// Extracting ephemeral storage limit & requested value from the target container
@@ -190,16 +194,11 @@ func GetEphemeralStorageAttributes(experimentsDetails *experimentTypes.Experimen
 	for _, container := range containers {
 		if container.Name == experimentsDetails.TargetContainer {
 			ephemeralStorageLimit = container.Resources.Limits.StorageEphemeral().ToDec().ScaledValue(resource.Kilo)
-			ephemeralStorageRequest = container.Resources.Requests.StorageEphemeral().ToDec().ScaledValue(resource.Kilo)
 			break
 		}
 	}
 
-	if ephemeralStorageRequest == 0 || ephemeralStorageLimit == 0 {
-		return 0, 0, fmt.Errorf("No Ephemeral storage details found inside %v container", experimentsDetails.TargetContainer)
-	}
-
-	return ephemeralStorageLimit, ephemeralStorageRequest, nil
+	return ephemeralStorageLimit, nil
 }
 
 // GetContainerID derive the container id of the target container
@@ -242,9 +241,16 @@ func FilterUsedEphemeralStorage(ephemeralStorageDetails string) (int, error) {
 
 // GetSizeToBeFilled generate the ephemeral storage size need to be filled
 func GetSizeToBeFilled(experimentsDetails *experimentTypes.ExperimentDetails, usedEphemeralStorageSize int, ephemeralStorageLimit int) int {
+	var requirementToBeFill int
 
-	// deriving size need to be filled from the used size & requirement size to fill
-	requirementToBeFill := (ephemeralStorageLimit * experimentsDetails.FillPercentage) / 100
+	switch ephemeralStorageLimit {
+	case 0:
+		requirementToBeFill = experimentsDetails.EphemeralStorageMebibytes * 1024
+	default:
+		// deriving size need to be filled from the used size & requirement size to fill
+		requirementToBeFill = (ephemeralStorageLimit * experimentsDetails.FillPercentage) / 100
+	}
+
 	needToBeFilled := requirementToBeFill - usedEphemeralStorageSize
 	return needToBeFilled
 }
@@ -288,6 +294,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, name string) {
 	experimentDetails.ChaosUID = clientTypes.UID(Getenv("CHAOS_UID", ""))
 	experimentDetails.ChaosPodName = Getenv("POD_NAME", "")
 	experimentDetails.FillPercentage, _ = strconv.Atoi(Getenv("FILL_PERCENTAGE", ""))
+	experimentDetails.EphemeralStorageMebibytes, _ = strconv.Atoi(Getenv("EPHEMERAL_STORAGE_MEBIBYTES", ""))
 }
 
 // Getenv fetch the env and set the default value, if any

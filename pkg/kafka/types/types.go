@@ -25,5 +25,4 @@ type ExperimentDetails struct {
 	ZookeeperPort         string
 	Lib                   string
 	RunID                 string
-	TargetPod             string
 }
