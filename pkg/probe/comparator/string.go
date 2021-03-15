@@ -17,7 +17,7 @@ func (model Model) CompareString() error {
 	obj := String{}
 	obj.setValues(reflect.ValueOf(model.a).String(), reflect.ValueOf(model.b).String())
 
-	log.Infof("actual: %v, expected: %v, operator: %v", obj.a, obj.b, model.operator)
+	log.Infof("[Probe]: {Actual value: %v}, {Expected value: %v}, {Operator: %v}", obj.a, obj.b, model.operator)
 
 	switch model.operator {
 	case "equal", "Equal":
