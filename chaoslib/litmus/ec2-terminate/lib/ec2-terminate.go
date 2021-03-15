@@ -166,7 +166,7 @@ func WaitForEC2Down(experimentsDetails *experimentTypes.ExperimentDetails) error
 			if err != nil {
 				return errors.Errorf("failed to get the instance status")
 			}
-			if (experimentsDetails.ManagedNodegroup != "enable" && instanceState != "stopped") || (experimentsDetails.ManagedNodegroup == "enable" && instanceState == "terminated") {
+			if (experimentsDetails.ManagedNodegroup != "enable" && instanceState != "stopped") || (experimentsDetails.ManagedNodegroup == "enable" && instanceState != "terminated") {
 				log.Infof("The instance state is %v", instanceState)
 				return errors.Errorf("instance is not yet in stopped state")
 			}
