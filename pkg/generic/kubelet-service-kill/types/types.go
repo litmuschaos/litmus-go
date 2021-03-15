@@ -29,4 +29,5 @@ type ExperimentDetails struct {
 	LIBImagePullPolicy string
 	Resources          corev1.ResourceRequirements
 	ImagePullSecrets   []corev1.LocalObjectReference
+	TargetContainer    string
 }

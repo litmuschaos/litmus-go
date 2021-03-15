@@ -32,6 +32,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.RebootCommand = Getenv("REBOOT_COMMAND", "sudo systemctl reboot")
 	experimentDetails.TargetNode = Getenv("TARGET_NODE", "")
 	experimentDetails.TargetNodeIP = Getenv("TARGET_NODE_IP", "")
+	experimentDetails.TargetContainer = Getenv("TARGET_CONTAINER", "")
 }
 
 // Getenv fetch the env and set the default value, if any
