@@ -40,16 +40,16 @@ func PrepareK8sProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Result
 // TriggerK8sProbe run the k8s probe command
 func TriggerK8sProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets, resultDetails *types.ResultDetails) error {
 
-	cmd := probe.K8sProbeInputs.Command
+	inputs := probe.K8sProbeInputs
 
 	// It parse the templated command and return normal string
 	// if command doesn't have template, it will return the same command
-	cmd.FieldSelector, err = ParseCommand(cmd.FieldSelector, resultDetails)
+	inputs.FieldSelector, err = ParseCommand(inputs.FieldSelector, resultDetails)
 	if err != nil {
 		return err
 	}
 
-	cmd.LabelSelector, err = ParseCommand(cmd.LabelSelector, resultDetails)
+	inputs.LabelSelector, err = ParseCommand(inputs.LabelSelector, resultDetails)
 	if err != nil {
 		return err
 	}
@@ -64,12 +64,12 @@ func TriggerK8sProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets,
 
 			//defining the gvr for the requested resource
 			gvr := schema.GroupVersionResource{
-				Group:    cmd.Group,
-				Version:  cmd.Version,
-				Resource: cmd.Resource,
+				Group:    inputs.Group,
+				Version:  inputs.Version,
+				Resource: inputs.Resource,
 			}
 
-			switch probe.Operation {
+			switch inputs.Operation {
 			case "create", "Create":
 				if err = CreateResource(probe, gvr, clients); err != nil {
 					log.Errorf("The %v k8s probe has Failed, err: %v", probe.Name, err)
@@ -81,18 +81,18 @@ func TriggerK8sProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets,
 					return err
 				}
 			case "present", "Present":
-				resourceList, err := clients.DynamicClient.Resource(gvr).Namespace(cmd.Namespace).List(v1.ListOptions{
-					FieldSelector: cmd.FieldSelector,
-					LabelSelector: cmd.LabelSelector,
+				resourceList, err := clients.DynamicClient.Resource(gvr).Namespace(inputs.Namespace).List(v1.ListOptions{
+					FieldSelector: inputs.FieldSelector,
+					LabelSelector: inputs.LabelSelector,
 				})
 				if err != nil || len(resourceList.Items) == 0 {
 					log.Errorf("The %v k8s probe has Failed, err: %v", probe.Name, err)
 					return fmt.Errorf("unable to list the resources with matching selector, err: %v", err)
 				}
 			case "absent", "Absent":
-				resourceList, err := clients.DynamicClient.Resource(gvr).Namespace(cmd.Namespace).List(v1.ListOptions{
-					FieldSelector: cmd.FieldSelector,
-					LabelSelector: cmd.LabelSelector,
+				resourceList, err := clients.DynamicClient.Resource(gvr).Namespace(inputs.Namespace).List(v1.ListOptions{
+					FieldSelector: inputs.FieldSelector,
+					LabelSelector: inputs.LabelSelector,
 				})
 				if err != nil {
 					return fmt.Errorf("unable to list the resources with matching selector, err: %v", err)
@@ -102,7 +102,7 @@ func TriggerK8sProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets,
 					return fmt.Errorf("Resource is not deleted yet due to, err: %v", err)
 				}
 			default:
-				return fmt.Errorf("operation type '%s' not supported in the k8s probe", probe.Operation)
+				return fmt.Errorf("operation type '%s' not supported in the k8s probe", inputs.Operation)
 			}
 
 			return nil
@@ -147,23 +147,23 @@ func CreateResource(probe v1alpha1.ProbeAttributes, gvr schema.GroupVersionResou
 	if err != nil {
 		return err
 	}
-	_, err := clients.DynamicClient.Resource(gvr).Namespace(probe.K8sProbeInputs.Command.Namespace).Create(data, v1.CreateOptions{})
+	_, err := clients.DynamicClient.Resource(gvr).Namespace(probe.K8sProbeInputs.Namespace).Create(data, v1.CreateOptions{})
 
 	return err
 }
 
 // DeleteResource deletes the resource with matching label & field selector
 func DeleteResource(probe v1alpha1.ProbeAttributes, gvr schema.GroupVersionResource, clients clients.ClientSets) error {
-	resourceList, err := clients.DynamicClient.Resource(gvr).Namespace(probe.K8sProbeInputs.Command.Namespace).List(v1.ListOptions{
-		FieldSelector: probe.K8sProbeInputs.Command.FieldSelector,
-		LabelSelector: probe.K8sProbeInputs.Command.LabelSelector,
+	resourceList, err := clients.DynamicClient.Resource(gvr).Namespace(probe.K8sProbeInputs.Namespace).List(v1.ListOptions{
+		FieldSelector: probe.K8sProbeInputs.FieldSelector,
+		LabelSelector: probe.K8sProbeInputs.LabelSelector,
 	})
 	if err != nil || len(resourceList.Items) == 0 {
 		return fmt.Errorf("unable to list the resources with matching selector, err: %v", err)
 	}
 
 	for index := range resourceList.Items {
-		if err = clients.DynamicClient.Resource(gvr).Namespace(probe.K8sProbeInputs.Command.Namespace).Delete(resourceList.Items[index].GetName(), &v1.DeleteOptions{}); err != nil {
+		if err = clients.DynamicClient.Resource(gvr).Namespace(probe.K8sProbeInputs.Namespace).Delete(resourceList.Items[index].GetName(), &v1.DeleteOptions{}); err != nil {
 			return err
 		}
 
@@ -179,12 +179,11 @@ func PreChaosK8sProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 
 		//DISPLAY THE K8S PROBE INFO
 		log.InfoWithValues("[Probe]: The k8s probe information is as follows", logrus.Fields{
-			"Name":            probe.Name,
-			"Command":         probe.K8sProbeInputs.Command,
-			"Expected Result": probe.K8sProbeInputs.ExpectedResult,
-			"Run Properties":  probe.RunProperties,
-			"Mode":            probe.Mode,
-			"Phase":           "PreChaos",
+			"Name":           probe.Name,
+			"Inputs":         probe.K8sProbeInputs,
+			"Run Properties": probe.RunProperties,
+			"Mode":           probe.Mode,
+			"Phase":          "PreChaos",
 		})
 		// waiting for initial delay
 		if probe.RunProperties.InitialDelaySeconds != 0 {
@@ -203,12 +202,11 @@ func PreChaosK8sProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 
 		//DISPLAY THE K8S PROBE INFO
 		log.InfoWithValues("[Probe]: The k8s probe information is as follows", logrus.Fields{
-			"Name":            probe.Name,
-			"Command":         probe.K8sProbeInputs.Command,
-			"Expected Result": probe.K8sProbeInputs.ExpectedResult,
-			"Run Properties":  probe.RunProperties,
-			"Mode":            probe.Mode,
-			"Phase":           "PreChaos",
+			"Name":           probe.Name,
+			"Inputs":         probe.K8sProbeInputs,
+			"Run Properties": probe.RunProperties,
+			"Mode":           probe.Mode,
+			"Phase":          "PreChaos",
 		})
 		go TriggerContinuousK8sProbe(probe, clients, resultDetails)
 	}
@@ -223,12 +221,11 @@ func PostChaosK8sProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resu
 
 		//DISPLAY THE K8S PROBE INFO
 		log.InfoWithValues("[Probe]: The k8s probe information is as follows", logrus.Fields{
-			"Name":            probe.Name,
-			"Command":         probe.K8sProbeInputs.Command,
-			"Expected Result": probe.K8sProbeInputs.ExpectedResult,
-			"Run Properties":  probe.RunProperties,
-			"Mode":            probe.Mode,
-			"Phase":           "PostChaos",
+			"Name":           probe.Name,
+			"Inputs":         probe.K8sProbeInputs,
+			"Run Properties": probe.RunProperties,
+			"Mode":           probe.Mode,
+			"Phase":          "PostChaos",
 		})
 		// waiting for initial delay
 		if probe.RunProperties.InitialDelaySeconds != 0 {
@@ -262,12 +259,11 @@ func OnChaosK8sProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Result
 
 		//DISPLAY THE K8S PROBE INFO
 		log.InfoWithValues("[Probe]: The k8s probe information is as follows", logrus.Fields{
-			"Name":            probe.Name,
-			"Command":         probe.K8sProbeInputs.Command,
-			"Expected Result": probe.K8sProbeInputs.ExpectedResult,
-			"Run Properties":  probe.RunProperties,
-			"Mode":            probe.Mode,
-			"Phase":           "DuringChaos",
+			"Name":           probe.Name,
+			"Inputs":         probe.K8sProbeInputs,
+			"Run Properties": probe.RunProperties,
+			"Mode":           probe.Mode,
+			"Phase":          "DuringChaos",
 		})
 		go TriggerOnChaosK8sProbe(probe, clients, resultDetails, chaosDetails.ChaosDuration)
 	}
