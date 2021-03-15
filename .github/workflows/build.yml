@@ -2,7 +2,7 @@
 name: Build
 on:
   pull_request:
-    branches: [master]
+    branches: [azure]
     types: [opened, synchronize, reopened]
 
 jobs:
@@ -68,7 +68,7 @@ jobs:
         env:
           DOCKER_REPO: litmuschaos
           DOCKER_IMAGE: go-runner
-          DOCKER_TAG: ci
+          DOCKER_TAG: azure
         run: |
           cd go/src/github.com/${{github.repository}}
           make build

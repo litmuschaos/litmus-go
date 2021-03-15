@@ -12,6 +12,7 @@ import (
 	// _ "k8s.io/client-go/plugin/pkg/client/auth/oidc"
 	// _ "k8s.io/client-go/plugin/pkg/client/auth/openstack"
 
+	azureInstanceTerminate "github.com/litmuschaos/litmus-go/experiments/azure/instance-terminate/experiment"
 	cassandraPodDelete "github.com/litmuschaos/litmus-go/experiments/cassandra/pod-delete/experiment"
 	containerKill "github.com/litmuschaos/litmus-go/experiments/generic/container-kill/experiment"
 	diskFill "github.com/litmuschaos/litmus-go/experiments/generic/disk-fill/experiment"
@@ -109,6 +110,8 @@ func main() {
 		ebsLoss.EBSLoss(clients)
 	case "node-restart":
 		nodeRestart.NodeRestart(clients)
+	case "azure-instance-terminate":
+		azureInstanceTerminate.InstanceTerminate(clients)
 	default:
 		log.Fatalf("Unsupported -name %v, please provide the correct value of -name args", *experimentName)
 	}
