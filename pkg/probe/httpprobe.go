@@ -58,34 +58,36 @@ func TriggerHTTPProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 	method := getHTTPMethodType(probe.HTTPProbeInputs.Method)
 
 	// initialize simple http client with default attributes
-	client := &http.Client{}
-
+	timeout := time.Duration(probe.HTTPProbeInputs.ResponseTimeout) * time.Millisecond
+	client := &http.Client{Timeout: timeout}
 	// impose properties to http client with cert check disabled
 	if probe.HTTPProbeInputs.InsecureSkipVerify {
 		transCfg := &http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		}
-		client = &http.Client{Transport: transCfg}
+		client = &http.Client{Transport: transCfg, Timeout: timeout}
 	}
 
 	switch method {
 	case "Get":
 		log.InfoWithValues("[Probe]: HTTP get method informations", logrus.Fields{
-			"Name":         probe.Name,
-			"URL":          probe.HTTPProbeInputs.URL,
-			"Criteria":     probe.HTTPProbeInputs.Method.Get.Criteria,
-			"ResponseCode": probe.HTTPProbeInputs.Method.Get.ResponseCode,
+			"Name":            probe.Name,
+			"URL":             probe.HTTPProbeInputs.URL,
+			"Criteria":        probe.HTTPProbeInputs.Method.Get.Criteria,
+			"ResponseCode":    probe.HTTPProbeInputs.Method.Get.ResponseCode,
+			"ResponseTimeout": probe.HTTPProbeInputs.ResponseTimeout,
 		})
 		if err := httpGet(probe, client); err != nil {
 			return err
 		}
 	case "Post":
 		log.InfoWithValues("[Probe]: HTTP Post method informations", logrus.Fields{
-			"Name":        probe.Name,
-			"URL":         probe.HTTPProbeInputs.URL,
-			"Body":        probe.HTTPProbeInputs.Method.Post.Body,
-			"BodyPath":    probe.HTTPProbeInputs.Method.Post.BodyPath,
-			"ContentType": probe.HTTPProbeInputs.Method.Post.ContentType,
+			"Name":            probe.Name,
+			"URL":             probe.HTTPProbeInputs.URL,
+			"Body":            probe.HTTPProbeInputs.Method.Post.Body,
+			"BodyPath":        probe.HTTPProbeInputs.Method.Post.BodyPath,
+			"ContentType":     probe.HTTPProbeInputs.Method.Post.ContentType,
+			"ResponseTimeout": probe.HTTPProbeInputs.ResponseTimeout,
 		})
 		if err := httpPost(probe, client); err != nil {
 			return err
