@@ -62,6 +62,17 @@ func EC2Terminate(clients clients.ClientSets) {
 		"Ramp Time":      experimentsDetails.RampTime,
 	})
 
+	//PRE-CHAOS NODE STATUS CHECK
+	if experimentsDetails.ManagedNodegroup == "enable" {
+		err = aws.PreChaosNodeStatusCheck(&experimentsDetails, clients)
+		if err != nil {
+			log.Errorf("Pre chaos node status check failed, err: %v", err)
+			failStep := "Verify that the NUT (Node Under Test) is running (pre-chaos)"
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+			return
+		}
+	}
+
 	//PRE-CHAOS APPLICATION STATUS CHECK
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (pre-chaos)")
 	if err = status.AUTStatusCheck(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.TargetContainer, experimentsDetails.Timeout, experimentsDetails.Delay, clients, &chaosDetails); err != nil {
@@ -146,21 +157,34 @@ func EC2Terminate(clients clients.ClientSets) {
 		return
 	}
 
+	// POST-CHAOS ACTIVE NODE COUNT TEST
+	if experimentsDetails.ManagedNodegroup == "enable" {
+		err = aws.PostChaosActiveNodeCountCheck(&experimentsDetails, clients)
+		if err != nil {
+			log.Errorf("Post chaos active node count check failed, err: %v", err)
+			failStep := "Verify active number of nodes post chaos"
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+			return
+		}
+	}
+
 	//Verify the aws ec2 instance is running (post chaos)
-	instanceState, err = aws.GetEC2InstanceStatus(&experimentsDetails)
-	if err != nil {
-		log.Errorf("failed to get the ec2 instance status, err: %v", err)
-		failStep := "Verify the AWS ec2 instance status (post-chaos)"
-		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-		return
+	if experimentsDetails.ManagedNodegroup != "enable" {
+		instanceState, err = aws.GetEC2InstanceStatus(&experimentsDetails)
+		if err != nil {
+			log.Errorf("failed to get the ec2 instance status, err: %v", err)
+			failStep := "Verify the AWS ec2 instance status (post-chaos)"
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+			return
+		}
+		if instanceState != "running" {
+			log.Errorf("failed to get the ec2 instance status as running")
+			failStep := "Verify the AWS ec2 instance status (post-chaos)"
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+			return
+		}
+		log.Info("[Status]: EC2 instance is in running state (post chaos)")
 	}
-	if instanceState != "running" {
-		log.Errorf("failed to get the ec2 instance status as running")
-		failStep := "Verify the AWS ec2 instance status (post-chaos)"
-		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-		return
-	}
-	log.Info("[Status]: EC2 instance is in running state (post chaos)")
 
 	//POST-CHAOS APPLICATION STATUS CHECK
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (post-chaos)")

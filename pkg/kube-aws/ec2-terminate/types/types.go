@@ -23,6 +23,8 @@ type ExperimentDetails struct {
 	Delay              int
 	Ec2InstanceID      string
 	Region             string
+	ManagedNodegroup   string
+	ActiveNodes        int
 	LIBImagePullPolicy string
 	TargetContainer    string
 }
