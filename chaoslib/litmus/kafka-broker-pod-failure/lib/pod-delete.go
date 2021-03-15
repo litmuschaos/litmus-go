@@ -6,75 +6,70 @@ import (
 	pod_delete "github.com/litmuschaos/litmus-go/chaoslib/litmus/pod-delete/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-delete/types"
-	"github.com/litmuschaos/litmus-go/pkg/kafka"
-	kafkaTypes "github.com/litmuschaos/litmus-go/pkg/kafka/types"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/kafka/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
+	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-var err error
-
 //PreparePodDelete contains the prepration steps before chaos injection
-func PreparePodDelete(kafkaDetails *kafkaTypes.ExperimentDetails, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+func PreparePodDelete(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	//Getting the iteration count for the pod deletion
-	pod_delete.GetIterations(experimentsDetails)
+	pod_delete.GetIterations(experimentsDetails.ChaoslibDetail)
 
 	//Waiting for the ramp time before chaos injection
-	if experimentsDetails.RampTime != 0 {
-		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", experimentsDetails.RampTime)
-		common.WaitForDuration(experimentsDetails.RampTime)
+	if experimentsDetails.ChaoslibDetail.RampTime != 0 {
+		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", experimentsDetails.ChaoslibDetail.RampTime)
+		common.WaitForDuration(experimentsDetails.ChaoslibDetail.RampTime)
 	}
 
-	if experimentsDetails.Sequence == "serial" {
-		if err = InjectChaosInSerialMode(kafkaDetails, experimentsDetails, clients, chaosDetails, eventsDetails); err != nil {
+	if experimentsDetails.ChaoslibDetail.Sequence == "serial" {
+		if err := InjectChaosInSerialMode(experimentsDetails, clients, chaosDetails, eventsDetails, resultDetails); err != nil {
 			return err
 		}
 	} else {
-		if err = InjectChaosInParallelMode(kafkaDetails, experimentsDetails, clients, chaosDetails, eventsDetails); err != nil {
+		if err := InjectChaosInParallelMode(experimentsDetails, clients, chaosDetails, eventsDetails, resultDetails); err != nil {
 			return err
 		}
 	}
 
 	//Waiting for the ramp time after chaos injection
-	if experimentsDetails.RampTime != 0 {
-		log.Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", experimentsDetails.RampTime)
-		common.WaitForDuration(experimentsDetails.RampTime)
+	if experimentsDetails.ChaoslibDetail.RampTime != 0 {
+		log.Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", experimentsDetails.ChaoslibDetail.RampTime)
+		common.WaitForDuration(experimentsDetails.ChaoslibDetail.RampTime)
 	}
 	return nil
 }
 
 // InjectChaosInSerialMode delete the kafka broker pods in serial mode(one by one)
-func InjectChaosInSerialMode(kafkaDetails *kafkaTypes.ExperimentDetails, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, eventsDetails *types.EventDetails) error {
+func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, eventsDetails *types.EventDetails, resultDetails *types.ResultDetails) error {
+
+	// run the probes during chaos
+	if len(resultDetails.ProbeDetails) != 0 {
+		if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+			return err
+		}
+	}
 
 	GracePeriod := int64(0)
 	//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
 	ChaosStartTimeStamp := time.Now().Unix()
 
-	for count := 0; count < experimentsDetails.Iterations; count++ {
-
-		//When broker is not defined
-		if kafkaDetails.TargetPod == "" {
-			err = kafka.LaunchStreamDeriveLeader(kafkaDetails, clients)
-			if err != nil {
-				return errors.Errorf("fail to derive the leader, err: %v", err)
-			}
-		}
+	for count := 0; count < experimentsDetails.ChaoslibDetail.Iterations; count++ {
 
 		// Get the target pod details for the chaos execution
 		// if the target pod is not defined it will derive the random target pod list using pod affected percentage
-		targetPodList, err := common.GetPodList(experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, clients, chaosDetails)
+		targetPodList, err := common.GetPodList(experimentsDetails.KafkaBroker, experimentsDetails.ChaoslibDetail.PodsAffectedPerc, clients, chaosDetails)
 		if err != nil {
 			return err
 		}
 
-		if experimentsDetails.EngineName != "" {
+		if experimentsDetails.ChaoslibDetail.EngineName != "" {
 			msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on application pod"
 			types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
 			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
@@ -86,24 +81,24 @@ func InjectChaosInSerialMode(kafkaDetails *kafkaTypes.ExperimentDetails, experim
 			log.InfoWithValues("[Info]: Killing the following pods", logrus.Fields{
 				"PodName": pod.Name})
 
-			if experimentsDetails.Force == true {
-				err = clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Delete(pod.Name, &v1.DeleteOptions{GracePeriodSeconds: &GracePeriod})
+			if experimentsDetails.ChaoslibDetail.Force == true {
+				err = clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaoslibDetail.AppNS).Delete(pod.Name, &v1.DeleteOptions{GracePeriodSeconds: &GracePeriod})
 			} else {
-				err = clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Delete(pod.Name, &v1.DeleteOptions{})
+				err = clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaoslibDetail.AppNS).Delete(pod.Name, &v1.DeleteOptions{})
 			}
 			if err != nil {
 				return err
 			}
 
 			//Waiting for the chaos interval after chaos injection
-			if experimentsDetails.ChaosInterval != 0 {
-				log.Infof("[Wait]: Wait for the chaos interval %vs", experimentsDetails.ChaosInterval)
-				common.WaitForDuration(experimentsDetails.ChaosInterval)
+			if experimentsDetails.ChaoslibDetail.ChaosInterval != 0 {
+				log.Infof("[Wait]: Wait for the chaos interval %vs", experimentsDetails.ChaoslibDetail.ChaosInterval)
+				common.WaitForDuration(experimentsDetails.ChaoslibDetail.ChaosInterval)
 			}
 
 			//Verify the status of pod after the chaos injection
 			log.Info("[Status]: Verification for the recreation of application pod")
-			if err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
+			if err = status.CheckApplicationStatus(experimentsDetails.ChaoslibDetail.AppNS, experimentsDetails.ChaoslibDetail.AppLabel, experimentsDetails.ChaoslibDetail.Timeout, experimentsDetails.ChaoslibDetail.Delay, clients); err != nil {
 				return err
 			}
 
@@ -114,7 +109,7 @@ func InjectChaosInSerialMode(kafkaDetails *kafkaTypes.ExperimentDetails, experim
 			//It will helpful to track the total chaos duration
 			chaosDiffTimeStamp := ChaosCurrentTimeStamp - ChaosStartTimeStamp
 
-			if int(chaosDiffTimeStamp) >= experimentsDetails.ChaosDuration {
+			if int(chaosDiffTimeStamp) >= experimentsDetails.ChaoslibDetail.ChaosDuration {
 				log.Infof("[Chaos]: Time is up for experiment: %v", experimentsDetails.ExperimentName)
 				break
 			}
@@ -128,30 +123,29 @@ func InjectChaosInSerialMode(kafkaDetails *kafkaTypes.ExperimentDetails, experim
 }
 
 // InjectChaosInParallelMode delete the kafka broker pods in parallel mode (all at once)
-func InjectChaosInParallelMode(kafkaDetails *kafkaTypes.ExperimentDetails, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, eventsDetails *types.EventDetails) error {
+func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, eventsDetails *types.EventDetails, resultDetails *types.ResultDetails) error {
+
+	// run the probes during chaos
+	if len(resultDetails.ProbeDetails) != 0 {
+		if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+			return err
+		}
+	}
 
 	GracePeriod := int64(0)
 	//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
 	ChaosStartTimeStamp := time.Now().Unix()
 
-	for count := 0; count < experimentsDetails.Iterations; count++ {
-
-		//When broker is not defined
-		if kafkaDetails.TargetPod == "" {
-			err = kafka.LaunchStreamDeriveLeader(kafkaDetails, clients)
-			if err != nil {
-				return errors.Errorf("fail to derive the leader, err: %v", err)
-			}
-		}
+	for count := 0; count < experimentsDetails.ChaoslibDetail.Iterations; count++ {
 
 		// Get the target pod details for the chaos execution
 		// if the target pod is not defined it will derive the random target pod list using pod affected percentage
-		targetPodList, err := common.GetPodList(experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, clients, chaosDetails)
+		targetPodList, err := common.GetPodList(experimentsDetails.KafkaBroker, experimentsDetails.ChaoslibDetail.PodsAffectedPerc, clients, chaosDetails)
 		if err != nil {
 			return err
 		}
 
-		if experimentsDetails.EngineName != "" {
+		if experimentsDetails.ChaoslibDetail.EngineName != "" {
 			msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on application pod"
 			types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
 			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
@@ -163,10 +157,10 @@ func InjectChaosInParallelMode(kafkaDetails *kafkaTypes.ExperimentDetails, exper
 			log.InfoWithValues("[Info]: Killing the following pods", logrus.Fields{
 				"PodName": pod.Name})
 
-			if experimentsDetails.Force == true {
-				err = clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Delete(pod.Name, &v1.DeleteOptions{GracePeriodSeconds: &GracePeriod})
+			if experimentsDetails.ChaoslibDetail.Force == true {
+				err = clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaoslibDetail.AppNS).Delete(pod.Name, &v1.DeleteOptions{GracePeriodSeconds: &GracePeriod})
 			} else {
-				err = clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Delete(pod.Name, &v1.DeleteOptions{})
+				err = clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaoslibDetail.AppNS).Delete(pod.Name, &v1.DeleteOptions{})
 			}
 			if err != nil {
 				return err
@@ -174,14 +168,14 @@ func InjectChaosInParallelMode(kafkaDetails *kafkaTypes.ExperimentDetails, exper
 		}
 
 		//Waiting for the chaos interval after chaos injection
-		if experimentsDetails.ChaosInterval != 0 {
-			log.Infof("[Wait]: Wait for the chaos interval %vs", experimentsDetails.ChaosInterval)
-			common.WaitForDuration(experimentsDetails.ChaosInterval)
+		if experimentsDetails.ChaoslibDetail.ChaosInterval != 0 {
+			log.Infof("[Wait]: Wait for the chaos interval %vs", experimentsDetails.ChaoslibDetail.ChaosInterval)
+			common.WaitForDuration(experimentsDetails.ChaoslibDetail.ChaosInterval)
 		}
 
 		//Verify the status of pod after the chaos injection
 		log.Info("[Status]: Verification for the recreation of application pod")
-		if err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
+		if err = status.CheckApplicationStatus(experimentsDetails.ChaoslibDetail.AppNS, experimentsDetails.ChaoslibDetail.AppLabel, experimentsDetails.ChaoslibDetail.Timeout, experimentsDetails.ChaoslibDetail.Delay, clients); err != nil {
 			return err
 		}
 
@@ -192,7 +186,7 @@ func InjectChaosInParallelMode(kafkaDetails *kafkaTypes.ExperimentDetails, exper
 		//It will helpful to track the total chaos duration
 		chaosDiffTimeStamp := ChaosCurrentTimeStamp - ChaosStartTimeStamp
 
-		if int(chaosDiffTimeStamp) >= experimentsDetails.ChaosDuration {
+		if int(chaosDiffTimeStamp) >= experimentsDetails.ChaoslibDetail.ChaosDuration {
 			log.Infof("[Chaos]: Time is up for experiment: %v", experimentsDetails.ExperimentName)
 			break
 		}

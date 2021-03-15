@@ -36,4 +36,5 @@ type ExperimentDetails struct {
 	Sequence            string
 	Resources           corev1.ResourceRequirements
 	Signal              string
+	ImagePullSecrets    []corev1.LocalObjectReference
 }

@@ -11,7 +11,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/litmuschaos/litmus-go/chaoslib/litmus/network_latency/tc"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/network-chaos/environment"
@@ -19,12 +18,19 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/types"
+	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/pkg/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientTypes "k8s.io/apimachinery/pkg/types"
 )
 
+const (
+	qdiscNotFound    = "Cannot delete qdisc with handle of zero"
+	qdiscNoFileFound = "RTNETLINK answers: No such file or directory"
+)
+
 var err error
+var inject, abort chan os.Signal
 
 func main() {
 
@@ -33,6 +39,16 @@ func main() {
 	eventsDetails := types.EventDetails{}
 	chaosDetails := types.ChaosDetails{}
 	resultDetails := types.ResultDetails{}
+
+	// inject channel is used to transmit signal notifications.
+	inject = make(chan os.Signal, 1)
+	// Catch and relay certain signal(s) to inject channel.
+	signal.Notify(inject, os.Interrupt, syscall.SIGTERM, syscall.SIGKILL)
+
+	// abort channel is used to transmit signal notifications.
+	abort = make(chan os.Signal, 1)
+	// Catch and relay certain signal(s) to abort channel.
+	signal.Notify(abort, os.Interrupt, syscall.SIGTERM, syscall.SIGKILL)
 
 	//Getting kubeConfig and Generate ClientSets
 	if err := clients.GenerateClientSetFromKubeConfig(); err != nil {
@@ -79,8 +95,8 @@ func PreparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetail
 		events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 	}
 
-	var endTime <-chan time.Time
-	timeDelay := time.Duration(experimentsDetails.ChaosDuration) * time.Second
+	// watching for the abort signal and revert the chaos
+	go abortWatcher(targetPID)
 
 	// injecting network chaos inside target container
 	if err = InjectChaos(experimentsDetails, targetPID); err != nil {
@@ -89,46 +105,12 @@ func PreparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetail
 
 	log.Infof("[Chaos]: Waiting for %vs", experimentsDetails.ChaosDuration)
 
-	// signChan channel is used to transmit signal notifications.
-	signChan := make(chan os.Signal, 1)
-	// Catch and relay certain signal(s) to signChan channel.
-	signal.Notify(signChan, os.Interrupt, syscall.SIGTERM, syscall.SIGKILL)
-
-loop:
-	for {
-		endTime = time.After(timeDelay)
-		select {
-		case <-signChan:
-			log.Info("[Chaos]: Killing process started because of terminated signal received")
-			if err = tc.Killnetem(targetPID); err != nil {
-				log.Errorf("unable to kill netem process, err :%v", err)
-			}
-			// updating the chaosresult after stopped
-			failStep := "Network Chaos injection stopped!"
-			types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep)
-			result.ChaosResult(chaosDetails, clients, resultDetails, "EOT")
-
-			// generating summary event in chaosengine
-			msg := experimentsDetails.ExperimentName + " experiment has been aborted"
-			types.SetEngineEventAttributes(eventsDetails, types.Summary, msg, "Warning", chaosDetails)
-			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
-
-			// generating summary event in chaosresult
-			types.SetResultEventAttributes(eventsDetails, types.StoppedVerdict, msg, "Warning", resultDetails)
-			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosResult")
-
-			os.Exit(1)
-		case <-endTime:
-			log.Infof("[Chaos]: Time is up for experiment: %v", experimentsDetails.ExperimentName)
-			endTime = nil
-			break loop
-		}
-	}
+	common.WaitForDuration(experimentsDetails.ChaosDuration)
 
 	log.Info("[Chaos]: Stopping the experiment")
 
 	// cleaning the netem process after chaos injection
-	if err = tc.Killnetem(targetPID); err != nil {
+	if err = Killnetem(targetPID); err != nil {
 		return err
 	}
 
@@ -143,7 +125,7 @@ func GetContainerID(experimentDetails *experimentTypes.ExperimentDetails, client
 	case "docker":
 		host := "unix://" + experimentDetails.SocketPath
 		// deriving the container id of the pause container
-		cmd := "docker --host " + host + " ps | grep k8s_POD_" + experimentDetails.TargetPods + "_" + experimentDetails.AppNS + " | awk '{print $1}'"
+		cmd := "sudo docker --host " + host + " ps | grep k8s_POD_" + experimentDetails.TargetPods + "_" + experimentDetails.AppNS + " | awk '{print $1}'"
 		out, err := exec.Command("/bin/sh", "-c", cmd).CombinedOutput()
 		if err != nil {
 			log.Error(fmt.Sprintf("[docker]: Failed to run docker ps command: %s", string(out)))
@@ -179,7 +161,7 @@ func GetPID(experimentDetails *experimentTypes.ExperimentDetails, containerID st
 	case "docker":
 		host := "unix://" + experimentDetails.SocketPath
 		// deriving pid from the inspect out of target container
-		out, err := exec.Command("docker", "--host", host, "inspect", containerID).CombinedOutput()
+		out, err := exec.Command("sudo", "docker", "--host", host, "inspect", containerID).CombinedOutput()
 		if err != nil {
 			log.Error(fmt.Sprintf("[docker]: Failed to run docker inspect: %s", string(out)))
 			return 0, err
@@ -193,7 +175,7 @@ func GetPID(experimentDetails *experimentTypes.ExperimentDetails, containerID st
 	case "containerd", "crio":
 		// deriving pid from the inspect out of target container
 		endpoint := "unix://" + experimentDetails.SocketPath
-		out, err := exec.Command("crictl", "-i", endpoint, "-r", endpoint, "inspect", containerID).CombinedOutput()
+		out, err := exec.Command("sudo", "crictl", "-i", endpoint, "-r", endpoint, "inspect", containerID).CombinedOutput()
 		if err != nil {
 			log.Error(fmt.Sprintf("[cri]: Failed to run crictl: %s", string(out)))
 			return 0, err
@@ -307,68 +289,74 @@ func InjectChaos(experimentDetails *experimentTypes.ExperimentDetails, pid int) 
 	netemCommands := os.Getenv("NETEM_COMMAND")
 	destinationIPs := os.Getenv("DESTINATION_IPS")
 
-	if destinationIPs == "" {
-		tc := fmt.Sprintf("sudo nsenter -t %d -n tc qdisc replace dev %s root netem %v", pid, experimentDetails.NetworkInterface, netemCommands)
-		cmd := exec.Command("/bin/bash", "-c", tc)
-		out, err := cmd.CombinedOutput()
-		log.Info(cmd.String())
-		if err != nil {
-			log.Error(string(out))
-			return err
-		}
-	} else {
+	select {
+	case <-inject:
+		// stopping the chaos execution, if abort signal recieved
+		os.Exit(1)
+	default:
+		if destinationIPs == "" {
+			tc := fmt.Sprintf("sudo nsenter -t %d -n tc qdisc replace dev %s root netem %v", pid, experimentDetails.NetworkInterface, netemCommands)
+			cmd := exec.Command("/bin/bash", "-c", tc)
+			out, err := cmd.CombinedOutput()
+			log.Info(cmd.String())
+			if err != nil {
+				log.Error(string(out))
+				return err
+			}
+		} else {
 
-		ips := strings.Split(destinationIPs, ",")
-		var uniqueIps []string
+			ips := strings.Split(destinationIPs, ",")
+			var uniqueIps []string
 
-		// removing duplicates ips from the list, if any
-		for i := range ips {
-			isPresent := false
-			for j := range uniqueIps {
-				if ips[i] == uniqueIps[j] {
-					isPresent = true
+			// removing duplicates ips from the list, if any
+			for i := range ips {
+				isPresent := false
+				for j := range uniqueIps {
+					if ips[i] == uniqueIps[j] {
+						isPresent = true
+					}
 				}
+				if !isPresent {
+					uniqueIps = append(uniqueIps, ips[i])
+				}
+
 			}
-			if !isPresent {
-				uniqueIps = append(uniqueIps, ips[i])
+
+			// Create a priority-based queue
+			// This instantly creates classes 1:1, 1:2, 1:3
+			priority := fmt.Sprintf("sudo nsenter -t %v -n tc qdisc replace dev %v root handle 1: prio", pid, experimentDetails.NetworkInterface)
+			cmd := exec.Command("/bin/bash", "-c", priority)
+			out, err := cmd.CombinedOutput()
+			log.Info(cmd.String())
+			if err != nil {
+				log.Error(string(out))
+				return err
 			}
 
-		}
+			// Add queueing discipline for 1:3 class.
+			// No traffic is going through 1:3 yet
+			traffic := fmt.Sprintf("sudo nsenter -t %v -n tc qdisc replace dev %v parent 1:3 netem %v", pid, experimentDetails.NetworkInterface, netemCommands)
+			cmd = exec.Command("/bin/bash", "-c", traffic)
+			out, err = cmd.CombinedOutput()
+			log.Info(cmd.String())
+			if err != nil {
+				log.Error(string(out))
+				return err
+			}
 
-		// Create a priority-based queue
-		// This instantly creates classes 1:1, 1:2, 1:3
-		priority := fmt.Sprintf("sudo nsenter -t %v -n tc qdisc replace dev %v root handle 1: prio", pid, experimentDetails.NetworkInterface)
-		cmd := exec.Command("/bin/bash", "-c", priority)
-		out, err := cmd.CombinedOutput()
-		log.Info(cmd.String())
-		if err != nil {
-			log.Error(string(out))
-			return err
-		}
+			for _, ip := range uniqueIps {
 
-		// Add queueing discipline for 1:3 class.
-		// No traffic is going through 1:3 yet
-		traffic := fmt.Sprintf("sudo nsenter -t %v -n tc qdisc replace dev %v parent 1:3 netem %v", pid, experimentDetails.NetworkInterface, netemCommands)
-		cmd = exec.Command("/bin/bash", "-c", traffic)
-		out, err = cmd.CombinedOutput()
-		log.Info(cmd.String())
-		if err != nil {
-			log.Error(string(out))
-			return err
-		}
-
-		for _, ip := range uniqueIps {
-
-			// redirect traffic to specific IP through band 3
-			// It allows ipv4 addresses only
-			if !strings.Contains(ip, ":") {
-				tc := fmt.Sprintf("sudo nsenter -t %v -n tc filter add dev %v protocol ip parent 1:0 prio 3 u32 match ip dst %v flowid 1:3", pid, experimentDetails.NetworkInterface, ip)
-				cmd = exec.Command("/bin/bash", "-c", tc)
-				out, err = cmd.CombinedOutput()
-				log.Info(cmd.String())
-				if err != nil {
-					log.Error(string(out))
-					return err
+				// redirect traffic to specific IP through band 3
+				// It allows ipv4 addresses only
+				if !strings.Contains(ip, ":") {
+					tc := fmt.Sprintf("sudo nsenter -t %v -n tc filter add dev %v protocol ip parent 1:0 prio 3 u32 match ip dst %v flowid 1:3", pid, experimentDetails.NetworkInterface, ip)
+					cmd = exec.Command("/bin/bash", "-c", tc)
+					out, err = cmd.CombinedOutput()
+					log.Info(cmd.String())
+					if err != nil {
+						log.Error(string(out))
+						return err
+					}
 				}
 			}
 		}
@@ -386,6 +374,11 @@ func Killnetem(PID int) error {
 
 	if err != nil {
 		log.Error(string(out))
+		// ignoring err if qdisc process doesn't exist inside the target container
+		if strings.Contains(string(out), qdiscNotFound) || strings.Contains(string(out), qdiscNoFileFound) {
+			log.Warn("The network chaos process has already been removed")
+			return nil
+		}
 		return err
 	}
 
@@ -417,4 +410,27 @@ func Getenv(key string, defaultValue string) string {
 		value = defaultValue
 	}
 	return value
+}
+
+// abortWatcher continuosly watch for the abort signals
+func abortWatcher(targetPID int) {
+
+	for {
+		select {
+		case <-abort:
+			log.Info("[Chaos]: Killing process started because of terminated signal received")
+			log.Info("Chaos Revert Started")
+			// retry thrice for the chaos revert
+			retry := 3
+			for retry > 0 {
+				if err = Killnetem(targetPID); err != nil {
+					log.Errorf("unable to kill netem process, err :%v", err)
+				}
+				retry--
+				time.Sleep(1 * time.Second)
+			}
+			log.Info("Chaos Revert Completed")
+			os.Exit(1)
+		}
+	}
 }

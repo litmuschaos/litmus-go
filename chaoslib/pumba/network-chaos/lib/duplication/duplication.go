@@ -14,17 +14,15 @@ var err error
 //PodNetworkDuplicationChaos contains the steps to prepare and inject chaos
 func PodNetworkDuplicationChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
-	args := GetContainerArguments(experimentsDetails)
-	err = network_chaos.PrepareAndInjectChaos(experimentsDetails, clients, resultDetails, eventsDetails, chaosDetails, args)
+	args, err := GetContainerArguments(experimentsDetails)
 	if err != nil {
 		return err
 	}
-
-	return nil
+	return network_chaos.PrepareAndInjectChaos(experimentsDetails, clients, resultDetails, eventsDetails, chaosDetails, args)
 }
 
 // GetContainerArguments derives the args for the pumba pod
-func GetContainerArguments(experimentsDetails *experimentTypes.ExperimentDetails) []string {
+func GetContainerArguments(experimentsDetails *experimentTypes.ExperimentDetails) ([]string, error) {
 	baseArgs := []string{
 		"netem",
 		"--tc-image",
@@ -36,9 +34,11 @@ func GetContainerArguments(experimentsDetails *experimentTypes.ExperimentDetails
 	}
 
 	args := baseArgs
-	args = network_chaos.AddTargetIpsArgs(experimentsDetails.DestinationIPs, args)
-	args = network_chaos.AddTargetIpsArgs(network_chaos.GetIpsForTargetHosts(experimentsDetails.DestinationHosts), args)
+	args, err := network_chaos.AddTargetIpsArgs(experimentsDetails.DestinationIPs, experimentsDetails.DestinationHosts, args)
+	if err != nil {
+		return args, err
+	}
 	args = append(args, "duplicate", "--percent", strconv.Itoa(experimentsDetails.NetworkPacketDuplicationPercentage))
 
-	return args
+	return args, nil
 }

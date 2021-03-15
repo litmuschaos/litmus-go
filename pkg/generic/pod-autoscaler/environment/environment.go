@@ -28,6 +28,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.AuxiliaryAppInfo = Getenv("AUXILIARY_APPINFO", "")
 	experimentDetails.Delay, _ = strconv.Atoi(Getenv("STATUS_CHECK_DELAY", "2"))
 	experimentDetails.Timeout, _ = strconv.Atoi(Getenv("STATUS_CHECK_TIMEOUT", "180"))
+	experimentDetails.TargetContainer = Getenv("TARGET_CONTAINER", "")
 }
 
 // Getenv fetch the env and set the default value, if any
@@ -41,6 +42,13 @@ func Getenv(key string, defaultValue string) string {
 
 //InitialiseChaosVariables initialise all the global variables
 func InitialiseChaosVariables(chaosDetails *types.ChaosDetails, experimentDetails *experimentTypes.ExperimentDetails) {
+	appDetails := types.AppDetails{}
+	appDetails.AnnotationCheck, _ = strconv.ParseBool(Getenv("ANNOTATION_CHECK", "false"))
+	appDetails.AnnotationKey = Getenv("ANNOTATION_KEY", "litmuschaos.io/chaos")
+	appDetails.AnnotationValue = "true"
+	appDetails.Kind = experimentDetails.AppKind
+	appDetails.Label = experimentDetails.AppLabel
+	appDetails.Namespace = experimentDetails.AppNS
 
 	chaosDetails.ChaosNamespace = experimentDetails.ChaosNamespace
 	chaosDetails.ChaosPodName = experimentDetails.ChaosPodName
@@ -49,5 +57,5 @@ func InitialiseChaosVariables(chaosDetails *types.ChaosDetails, experimentDetail
 	chaosDetails.ExperimentName = experimentDetails.ExperimentName
 	chaosDetails.InstanceID = experimentDetails.InstanceID
 	chaosDetails.ProbeImagePullPolicy = experimentDetails.LIBImagePullPolicy
-
+	chaosDetails.AppDetail = appDetails
 }

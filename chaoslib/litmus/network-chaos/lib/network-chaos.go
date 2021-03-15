@@ -2,12 +2,18 @@ package lib
 
 import (
 	"net"
+	"os"
+	"os/signal"
 	"strconv"
 	"strings"
+	"syscall"
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
+	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/network-chaos/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
+	"github.com/litmuschaos/litmus-go/pkg/probe"
+	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
@@ -57,6 +63,11 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 		}
 	}
 
+	experimentsDetails.DestinationIPs, err = GetTargetIps(experimentsDetails.DestinationIPs, experimentsDetails.DestinationHosts)
+	if err != nil {
+		return err
+	}
+
 	if experimentsDetails.EngineName != "" {
 		// Get Chaos Pod Annotation
 		experimentsDetails.Annotations, err = common.GetChaosPodAnnotation(experimentsDetails.ChaosPodName, experimentsDetails.ChaosNamespace, clients)
@@ -68,14 +79,21 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 		if err != nil {
 			return errors.Errorf("Unable to get resource requirements, err: %v", err)
 		}
+		// Get ImagePullSecrets
+		experimentsDetails.ImagePullSecrets, err = common.GetImagePullSecrets(experimentsDetails.ChaosPodName, experimentsDetails.ChaosNamespace, clients)
+		if err != nil {
+			return errors.Errorf("Unable to get imagePullSecrets, err: %v", err)
+		}
 	}
 
+	go abortWatcher(resultDetails, chaosDetails, clients, eventsDetails, experimentsDetails)
+
 	if experimentsDetails.Sequence == "serial" {
-		if err = InjectChaosInSerialMode(experimentsDetails, targetPodList, clients, chaosDetails, args); err != nil {
+		if err = InjectChaosInSerialMode(experimentsDetails, targetPodList, clients, chaosDetails, args, resultDetails, eventsDetails); err != nil {
 			return err
 		}
 	} else {
-		if err = InjectChaosInParallelMode(experimentsDetails, targetPodList, clients, chaosDetails, args); err != nil {
+		if err = InjectChaosInParallelMode(experimentsDetails, targetPodList, clients, chaosDetails, args, resultDetails, eventsDetails); err != nil {
 			return err
 		}
 	}
@@ -83,9 +101,17 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 }
 
 // InjectChaosInSerialMode inject the network chaos in all target application serially (one by one)
-func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, args string) error {
+func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, args string, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
 
 	labelSuffix := common.GetRunID()
+
+	// run the probes during chaos
+	if len(resultDetails.ProbeDetails) != 0 {
+		if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+			return err
+		}
+	}
+
 	// creating the helper pod to perform network chaos
 	for _, pod := range targetPodList.Items {
 
@@ -131,9 +157,17 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 }
 
 // InjectChaosInParallelMode inject the network chaos in all target application in parallel mode (all at once)
-func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, args string) error {
+func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, args string, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
 
 	labelSuffix := common.GetRunID()
+
+	// run the probes during chaos
+	if len(resultDetails.ProbeDetails) != 0 {
+		if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+			return err
+		}
+	}
+
 	// creating the helper pod to perform network chaos
 	for _, pod := range targetPodList.Items {
 
@@ -220,6 +254,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 		Spec: apiv1.PodSpec{
 			HostPID:                       true,
 			TerminationGracePeriodSeconds: &terminationGracePeriodSeconds,
+			ImagePullSecrets:              experimentsDetails.ImagePullSecrets,
 			ServiceAccountName:            experimentsDetails.ChaosServiceAccount,
 			RestartPolicy:                 apiv1.RestartPolicyNever,
 			NodeName:                      nodeName,
@@ -229,24 +264,6 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 					VolumeSource: apiv1.VolumeSource{
 						HostPath: &apiv1.HostPathVolumeSource{
 							Path: experimentsDetails.SocketPath,
-						},
-					},
-				},
-			},
-			InitContainers: []apiv1.Container{
-				{
-					Name:            "setup-" + experimentsDetails.ExperimentName,
-					Image:           experimentsDetails.LIBImage,
-					ImagePullPolicy: apiv1.PullPolicy(experimentsDetails.LIBImagePullPolicy),
-					Command: []string{
-						"/bin/bash",
-						"-c",
-						"sudo chmod 777 " + experimentsDetails.SocketPath,
-					},
-					VolumeMounts: []apiv1.VolumeMount{
-						{
-							Name:      "cri-socket",
-							MountPath: experimentsDetails.SocketPath,
 						},
 					},
 				},
@@ -308,7 +325,7 @@ func GetPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, podName, a
 		"NETWORK_INTERFACE":    experimentsDetails.NetworkInterface,
 		"EXPERIMENT_NAME":      experimentsDetails.ExperimentName,
 		"SOCKET_PATH":          experimentsDetails.SocketPath,
-		"DESTINATION_IPS":      GetTargetIpsArgs(experimentsDetails.DestinationIPs, experimentsDetails.DestinationHosts),
+		"DESTINATION_IPS":      experimentsDetails.DestinationIPs,
 	}
 	for key, value := range ENVList {
 		var perEnv apiv1.EnvVar
@@ -337,37 +354,81 @@ func GetValueFromDownwardAPI(apiVersion string, fieldPath string) apiv1.EnvVarSo
 	return downwardENV
 }
 
-// GetTargetIpsArgs return the comma separated target ips
+// GetTargetIps return the comma separated target ips
 // It fetch the ips from the target ips (if defined by users)
 // it append the ips from the host, if target host is provided
-func GetTargetIpsArgs(targetIPs, targetHosts string) string {
+func GetTargetIps(targetIPs, targetHosts string) (string, error) {
 
-	ipsFromHost := GetIpsForTargetHosts(targetHosts)
+	ipsFromHost, err := GetIpsForTargetHosts(targetHosts)
+	if err != nil {
+		return "", err
+	}
 	if targetIPs == "" {
 		targetIPs = ipsFromHost
 	} else if ipsFromHost != "" {
 		targetIPs = targetIPs + "," + ipsFromHost
 	}
-	return targetIPs
+	return targetIPs, nil
 }
 
 // GetIpsForTargetHosts resolves IP addresses for comma-separated list of target hosts and returns comma-separated ips
-func GetIpsForTargetHosts(targetHosts string) string {
+func GetIpsForTargetHosts(targetHosts string) (string, error) {
 	if targetHosts == "" {
-		return ""
+		return "", nil
 	}
 	hosts := strings.Split(targetHosts, ",")
+	finalHosts := ""
 	var commaSeparatedIPs []string
 	for i := range hosts {
 		ips, err := net.LookupIP(hosts[i])
 		if err != nil {
-			log.Infof("Unknown host")
+			log.Warnf("Unknown host: {%v}, it won't be included in the scope of chaos", hosts[i])
 		} else {
 			for j := range ips {
-				log.Infof("IP address: %v", ips[j])
+				log.Infof("Host: {%v}, IP address: {%v}", hosts[i], ips[j])
 				commaSeparatedIPs = append(commaSeparatedIPs, ips[j].String())
+			}
+			if finalHosts == "" {
+				finalHosts = hosts[i]
+			} else {
+				finalHosts = finalHosts + "," + hosts[i]
 			}
 		}
 	}
-	return strings.Join(commaSeparatedIPs, ",")
+	if len(commaSeparatedIPs) == 0 {
+		return "", errors.Errorf("Provided hosts: {%v} are invalid, unable to resolve", targetHosts)
+	}
+	log.Infof("Injecting chaos on {%v} hosts", finalHosts)
+	return strings.Join(commaSeparatedIPs, ","), nil
+}
+
+// abortWatcher continuosly watch for the abort signals
+// it will update the chaosresult
+func abortWatcher(resultDetails *types.ResultDetails, chaosDetails *types.ChaosDetails, clients clients.ClientSets, eventsDetails *types.EventDetails, experimentsDetails *experimentTypes.ExperimentDetails) {
+
+	// signChan channel is used to transmit signal notifications.
+	signChan := make(chan os.Signal, 1)
+	// Catch and relay certain signal(s) to signChan channel.
+	signal.Notify(signChan, os.Interrupt, syscall.SIGTERM, syscall.SIGKILL)
+
+	for {
+		select {
+		case <-signChan:
+			log.Info("termination signal recieved, updating chaos status")
+			// updating the chaosresult after stopped
+			failStep := "Network Chaos injection stopped!"
+			types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep)
+			result.ChaosResult(chaosDetails, clients, resultDetails, "EOT")
+
+			// generating summary event in chaosengine
+			msg := experimentsDetails.ExperimentName + " experiment has been aborted"
+			types.SetEngineEventAttributes(eventsDetails, types.Summary, msg, "Warning", chaosDetails)
+			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
+
+			// generating summary event in chaosresult
+			types.SetResultEventAttributes(eventsDetails, types.StoppedVerdict, msg, "Warning", resultDetails)
+			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosResult")
+			os.Exit(1)
+		}
+	}
 }

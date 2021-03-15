@@ -31,6 +31,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.EBSVolumeID = Getenv("EBS_VOL_ID", "")
 	experimentDetails.DeviceName = Getenv("DEVICE_NAME", "")
 	experimentDetails.Region = Getenv("REGION", "")
+	experimentDetails.TargetContainer = Getenv("TARGET_CONTAINER", "")
 }
 
 // Getenv fetch the env and set the default value, if any
