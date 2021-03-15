@@ -1,7 +1,9 @@
 package experiment
 
 import (
-	kafka_broker_pod_failure "github.com/litmuschaos/litmus-go/chaoslib/litmus/kafka-broker-pod-failure/lib"
+	"strings"
+
+	kafkaPodDelete "github.com/litmuschaos/litmus-go/chaoslib/litmus/kafka-broker-pod-failure/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	"github.com/litmuschaos/litmus-go/pkg/kafka"
@@ -15,7 +17,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// KafkaBrokerPodFailure inject the kafka-broker-pod-failure chaos
+// KafkaBrokerPodFailure derive and kill the kafka broker leader
 func KafkaBrokerPodFailure(clients clients.ClientSets) {
 
 	var err error
@@ -71,8 +73,8 @@ func KafkaBrokerPodFailure(clients clients.ClientSets) {
 	log.Info("[Status]: Verify that the Kafka cluster is healthy(pre-chaos)")
 	err = kafka.ClusterHealthCheck(&experimentsDetails, clients)
 	if err != nil {
-		log.Errorf("Cluster status check failed, err: %v", err)
-		failStep := "Verify that the AUT (Application Under Test) is running (pre-chaos)"
+		log.Errorf("Cluster health check failed, err: %v", err)
+		failStep := "Verify that the Kafka cluster is healthy(pre-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -101,47 +103,28 @@ func KafkaBrokerPodFailure(clients clients.ClientSets) {
 	}
 
 	// PRE-CHAOS KAFKA APPLICATION LIVENESS CHECK
-	// when the kafka broker is provided
-	if experimentsDetails.KafkaBroker != "" {
-		if experimentsDetails.KafkaLivenessStream == "enabled" {
-			_, err := kafka.LivenessStream(&experimentsDetails, clients)
-			if err != nil {
-				log.Errorf("Liveness check failed, err: %v", err)
-				failStep := "Verify liveness check (pre-chaos)"
-				result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-				return
-			}
-			log.Info("The Liveness pod gets established")
+	switch strings.ToLower(experimentsDetails.KafkaLivenessStream) {
+	case "enabled":
+		livenessTopicLeader, err := kafka.LivenessStream(&experimentsDetails, clients)
+		if err != nil {
+			log.Errorf("Liveness check failed, err: %v", err)
+			failStep := "Verify liveness check (pre-chaos)"
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+			return
+		}
+		log.Info("The Liveness pod gets established")
+		log.Infof("[Info]: Kafka partition leader is %v", livenessTopicLeader)
 
-		} else if experimentsDetails.KafkaLivenessStream == "" || experimentsDetails.KafkaLivenessStream == "disabled" {
-			kafka.DisplayKafkaBroker(&experimentsDetails)
+		if experimentsDetails.KafkaBroker == "" {
+			experimentsDetails.KafkaBroker = livenessTopicLeader
 		}
 	}
 
-	// when the kafka broker is not provided
-	if experimentsDetails.KafkaBroker == "" {
-		if experimentsDetails.KafkaLivenessStream == "enabled" {
-			err = kafka.LaunchStreamDeriveLeader(&experimentsDetails, clients)
-			if err != nil {
-				log.Errorf("Error: %v", err)
-				failStep := "Launch the stream derive leader"
-				result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-				return
-			}
-		} else if experimentsDetails.KafkaLivenessStream == "" || experimentsDetails.KafkaLivenessStream == "disabled" {
-			_, err := kafka.SelectBroker(&experimentsDetails, "", clients)
-			if err != nil {
-				log.Errorf("Error: %v", err)
-				failStep := "Selecting broker when liveness is disabled"
-				result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-				return
-			}
-		}
-	}
+	kafka.DisplayKafkaBroker(&experimentsDetails)
 
 	// Including the litmus lib for kafka-broker-pod-failure
 	if experimentsDetails.ChaoslibDetail.ChaosLib == "litmus" {
-		err = kafka_broker_pod_failure.PreparePodDelete(&experimentsDetails, experimentsDetails.ChaoslibDetail, clients, &resultDetails, &eventsDetails, &chaosDetails)
+		err = kafkaPodDelete.PreparePodDelete(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
 		if err != nil {
 			log.Errorf("Chaos injection failed, err: %v", err)
 			failStep := "Including the litmus lib for kafka-broker-pod-failure"
@@ -161,8 +144,8 @@ func KafkaBrokerPodFailure(clients clients.ClientSets) {
 	log.Info("[Status]: Verify that the Kafka cluster is healthy(post-chaos)")
 	err = kafka.ClusterHealthCheck(&experimentsDetails, clients)
 	if err != nil {
-		log.Errorf("Cluster status check failed, err: %v", err)
-		failStep := "Verify that the AUT (Application Under Test) is running (pre-chaos)"
+		log.Errorf("Cluster health check failed, err: %v", err)
+		failStep := "Verify that the Kafka cluster is healthy(post-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -191,22 +174,23 @@ func KafkaBrokerPodFailure(clients clients.ClientSets) {
 	}
 
 	// Liveness Status Check (post-chaos) and cleanup
-	if experimentsDetails.KafkaLivenessStream != "" {
-		err = status.CheckApplicationStatus(experimentsDetails.ChaoslibDetail.AppNS, "name=kafka-liveness-"+experimentsDetails.RunID, experimentsDetails.ChaoslibDetail.Timeout, experimentsDetails.ChaoslibDetail.Delay, clients)
-		if err != nil {
-			log.Errorf("Application liveness check failed, err: %v", err)
-			failStep := "Verify that the AUT (Application Under Test) is running (post-chaos)"
+	switch strings.ToLower(experimentsDetails.KafkaLivenessStream) {
+	case "enabled":
+		log.Info("[Status]: Verify that the Kafka liveness pod is running(post-chaos)")
+		if err = status.CheckApplicationStatus(experimentsDetails.ChaoslibDetail.AppNS, "name=kafka-liveness-"+experimentsDetails.RunID, experimentsDetails.ChaoslibDetail.Timeout, experimentsDetails.ChaoslibDetail.Delay, clients); err != nil {
+			log.Errorf("Application liveness status check failed, err: %v", err)
+			failStep := "Verify that the liveness pod is running (post-chaos)"
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}
 
+		log.Info("[CleanUp]: Deleting the kafka liveness pod(post-chaos)")
 		if err := kafka.LivenessCleanup(&experimentsDetails, clients); err != nil {
 			log.Errorf("liveness cleanup failed, err: %v", err)
-			failStep := "Performing cleanup post chaos"
+			failStep := "Performing liveness pod cleanup (post-chaos)"
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}
-
 	}
 
 	//Updating the chaosResult in the end of experiment
