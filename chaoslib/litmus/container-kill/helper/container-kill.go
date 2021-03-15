@@ -158,9 +158,9 @@ func StopContainerdContainer(containerID, socketPath, signal string) error {
 	endpoint := "unix://" + socketPath
 	switch signal {
 	case "SIGKILL":
-		cmd = exec.Command("crictl", "-i", endpoint, "-r", endpoint, "stop", "--timeout=0", string(containerID))
+		cmd = exec.Command("sudo", "crictl", "-i", endpoint, "-r", endpoint, "stop", "--timeout=0", string(containerID))
 	case "SIGTERM":
-		cmd = exec.Command("crictl", "-i", endpoint, "-r", endpoint, "stop", string(containerID))
+		cmd = exec.Command("sudo", "crictl", "-i", endpoint, "-r", endpoint, "stop", string(containerID))
 	default:
 		return errors.Errorf("{%v} signal not supported, use either SIGTERM or SIGKILL", signal)
 	}
@@ -175,7 +175,7 @@ func StopContainerdContainer(containerID, socketPath, signal string) error {
 func StopDockerContainer(containerID, socketPath, signal string) error {
 	var errOut bytes.Buffer
 	host := "unix://" + socketPath
-	cmd := exec.Command("docker", "--host", host, "kill", string(containerID), "--signal", signal)
+	cmd := exec.Command("sudo", "docker", "--host", host, "kill", string(containerID), "--signal", signal)
 	cmd.Stderr = &errOut
 	if err := cmd.Run(); err != nil {
 		return errors.Errorf("Unable to run command, err: %v; error output: %v", err, errOut.String())
