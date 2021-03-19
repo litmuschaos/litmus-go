@@ -244,7 +244,7 @@ func DeploymentStatusCheck(experimentsDetails *experimentTypes.ExperimentDetails
 					return errors.Errorf("Unable to find the deployment with name %v, err: %v", app.AppName, err)
 				}
 				log.Infof("Deployment's Available Replica Count is %v", deployment.Status.AvailableReplicas)
-				if int(deployment.Status.AvailableReplicas) != app.ReplicaCount {
+				if int(deployment.Status.AvailableReplicas) != experimentsDetails.Replicas {
 					isFailed = true
 					return errors.Errorf("Application %s is not scaled yet, err: %v", app.AppName, err)
 				}
@@ -440,7 +440,7 @@ func AutoscalerRecoveryInStatefulset(experimentsDetails *experimentTypes.Experim
 func int32Ptr(i int32) *int32 { return &i }
 
 //AbortPodAutoScalerChaos go routine will continuously watch for the abort signal for the entire chaos duration and generate the required events and result
-func AbortPodAutoScalerChaos(appsUnderTest []experimentTypes.ApplicationUnderTest, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+func AbortPodAutoScalerChaos(appsUnderTest []experimentTypes.ApplicationUnderTest, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) {
 
 	// signChan channel is used to transmit signal notifications.
 	signChan := make(chan os.Signal, 1)
@@ -485,7 +485,7 @@ func AbortPodAutoScalerChaos(appsUnderTest []experimentTypes.ApplicationUnderTes
 				}
 
 			default:
-				return errors.Errorf("application type '%s' is not supported for the chaos", experimentsDetails.AppKind)
+				log.Errorf("application type '%s' is not supported for the chaos", experimentsDetails.AppKind)
 			}
 
 			os.Exit(1)
