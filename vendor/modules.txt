@@ -83,7 +83,7 @@ github.com/jmespath/go-jmespath
 github.com/json-iterator/go
 # github.com/kyokomi/emoji v2.2.4+incompatible
 github.com/kyokomi/emoji
-# github.com/litmuschaos/chaos-operator v0.0.0-20210312154932-c2d4b2ff7b19
+# github.com/litmuschaos/chaos-operator v0.0.0-20210325093226-50a357ad2256
 github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1
 github.com/litmuschaos/chaos-operator/pkg/client/clientset/versioned/scheme
 github.com/litmuschaos/chaos-operator/pkg/client/clientset/versioned/typed/litmuschaos/v1alpha1

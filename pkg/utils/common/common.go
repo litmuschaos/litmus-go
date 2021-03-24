@@ -33,12 +33,19 @@ func GetRunID() string {
 // AbortWatcher continuosly watch for the abort signals
 // it will update chaosresult w/ failed step and create an abort event, if it recieved abort signal during chaos
 func AbortWatcher(expname string, clients clients.ClientSets, resultDetails *types.ResultDetails, chaosDetails *types.ChaosDetails, eventsDetails *types.EventDetails) {
+	AbortWatcherWithoutExit(expname, clients, resultDetails, chaosDetails, eventsDetails)
+	os.Exit(1)
+}
+
+// AbortWatcherWithoutExit continuosly watch for the abort signals
+func AbortWatcherWithoutExit(expname string, clients clients.ClientSets, resultDetails *types.ResultDetails, chaosDetails *types.ChaosDetails, eventsDetails *types.EventDetails) {
 
 	// signChan channel is used to transmit signal notifications.
 	signChan := make(chan os.Signal, 1)
 	// Catch and relay certain signal(s) to signChan channel.
-	signal.Notify(signChan, os.Interrupt, syscall.SIGTERM, syscall.SIGKILL)
+	signal.Notify(signChan, os.Interrupt, syscall.SIGTERM)
 
+loop:
 	for {
 		select {
 		case <-signChan:
@@ -56,7 +63,7 @@ func AbortWatcher(expname string, clients clients.ClientSets, resultDetails *typ
 			// generating summary event in chaosresult
 			types.SetResultEventAttributes(eventsDetails, types.StoppedVerdict, msg, "Warning", resultDetails)
 			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosResult")
-			os.Exit(1)
+			break loop
 		}
 	}
 }
