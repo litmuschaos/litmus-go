@@ -77,6 +77,7 @@ type ChaosDetails struct {
 	ChaosDuration        int
 	JobCleanupPolicy     string
 	ProbeImagePullPolicy string
+	Randomness           bool
 }
 
 // AppDetails contains all the application related envs
