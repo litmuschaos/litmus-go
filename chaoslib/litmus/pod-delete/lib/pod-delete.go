@@ -12,6 +12,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -63,6 +64,9 @@ loop:
 	for {
 		// Get the target pod details for the chaos execution
 		// if the target pod is not defined it will derive the random target pod list using pod affected percentage
+		if experimentsDetails.TargetPods == "" && chaosDetails.AppDetail.Label == "" {
+			return errors.Errorf("Please provide one of the appLabel or TARGET_PODS")
+		}
 		targetPodList, err := common.GetPodList(experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, clients, chaosDetails)
 		if err != nil {
 			return err
@@ -153,6 +157,9 @@ loop:
 	for {
 		// Get the target pod details for the chaos execution
 		// if the target pod is not defined it will derive the random target pod list using pod affected percentage
+		if experimentsDetails.TargetPods == "" && chaosDetails.AppDetail.Label == "" {
+			return errors.Errorf("Please provide one of the appLabel or TARGET_PODS")
+		}
 		targetPodList, err := common.GetPodList(experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, clients, chaosDetails)
 		if err != nil {
 			return err

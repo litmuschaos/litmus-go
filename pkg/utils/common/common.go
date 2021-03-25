@@ -22,6 +22,7 @@ func WaitForDuration(duration int) {
 	time.Sleep(time.Duration(duration) * time.Second)
 }
 
+// RandomInterval wait for the random interval lies between lower & upper bounds
 func RandomInterval(interval string) error {
 	intervals := strings.Split(interval, "-")
 	var lowerBound, upperBound int
