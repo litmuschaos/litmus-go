@@ -58,10 +58,10 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 
 	GracePeriod := int64(0)
 	//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
-	ChaosStartTimeStamp := time.Now().Unix()
+	ChaosStartTimeStamp := time.Now()
+	duration := int(time.Since(ChaosStartTimeStamp).Seconds())
 
-loop:
-	for {
+	for duration < experimentsDetails.ChaosDuration {
 		// Get the target pod details for the chaos execution
 		// if the target pod is not defined it will derive the random target pod list using pod affected percentage
 		if experimentsDetails.TargetPods == "" && chaosDetails.AppDetail.Label == "" {
@@ -119,17 +119,7 @@ loop:
 				return err
 			}
 
-			//ChaosCurrentTimeStamp contains the current timestamp
-			ChaosCurrentTimeStamp := time.Now().Unix()
-
-			//ChaosDiffTimeStamp contains the difference of current timestamp and start timestamp
-			//It will helpful to track the total chaos duration
-			chaosDiffTimeStamp := ChaosCurrentTimeStamp - ChaosStartTimeStamp
-
-			if int(chaosDiffTimeStamp) >= experimentsDetails.ChaosDuration {
-				log.Infof("[Chaos]: Time is up for experiment: %v", experimentsDetails.ExperimentName)
-				break loop
-			}
+			duration = int(time.Since(ChaosStartTimeStamp).Seconds())
 		}
 
 	}
@@ -151,10 +141,10 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 
 	GracePeriod := int64(0)
 	//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
-	ChaosStartTimeStamp := time.Now().Unix()
+	ChaosStartTimeStamp := time.Now()
+	duration := int(time.Since(ChaosStartTimeStamp).Seconds())
 
-loop:
-	for {
+	for duration < experimentsDetails.ChaosDuration {
 		// Get the target pod details for the chaos execution
 		// if the target pod is not defined it will derive the random target pod list using pod affected percentage
 		if experimentsDetails.TargetPods == "" && chaosDetails.AppDetail.Label == "" {
@@ -213,17 +203,7 @@ loop:
 			return err
 		}
 
-		//ChaosCurrentTimeStamp contains the current timestamp
-		ChaosCurrentTimeStamp := time.Now().Unix()
-
-		//ChaosDiffTimeStamp contains the difference of current timestamp and start timestamp
-		//It will helpful to track the total chaos duration
-		chaosDiffTimeStamp := ChaosCurrentTimeStamp - ChaosStartTimeStamp
-
-		if int(chaosDiffTimeStamp) >= experimentsDetails.ChaosDuration {
-			log.Infof("[Chaos]: Time is up for experiment: %v", experimentsDetails.ExperimentName)
-			break loop
-		}
+		duration = int(time.Since(ChaosStartTimeStamp).Seconds())
 	}
 
 	log.Infof("[Completion]: %v chaos is done", experimentsDetails.ExperimentName)

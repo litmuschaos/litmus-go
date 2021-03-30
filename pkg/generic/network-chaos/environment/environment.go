@@ -14,7 +14,6 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.ExperimentName = Getenv("EXPERIMENT_NAME", "")
 	experimentDetails.ChaosNamespace = Getenv("CHAOS_NAMESPACE", "litmus")
 	experimentDetails.EngineName = Getenv("CHAOSENGINE", "")
-	experimentDetails.ChaosDuration, _ = strconv.Atoi(Getenv("TOTAL_CHAOS_DURATION", "60"))
 	experimentDetails.RampTime, _ = strconv.Atoi(Getenv("RAMP_TIME", "0"))
 	experimentDetails.ChaosLib = Getenv("LIB", "litmus")
 	experimentDetails.AppNS = Getenv("APP_NAMESPACE", "")
@@ -42,7 +41,9 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.ChaosServiceAccount = Getenv("CHAOS_SERVICE_ACCOUNT", "")
 	experimentDetails.SocketPath = Getenv("SOCKET_PATH", "/var/run/docker.sock")
 	experimentDetails.Sequence = Getenv("SEQUENCE", "parallel")
-
+	experimentDetails.ChaosInterval = Getenv("CHAOS_INTERVAL", "")
+	experimentDetails.NetworkChaosDuration, _ = strconv.Atoi(Getenv("NETWORK_CHAOS_DURATION", "60"))
+	experimentDetails.ChaosDuration, _ = strconv.Atoi(Getenv("TOTAL_CHAOS_DURATION", strconv.Itoa(experimentDetails.NetworkChaosDuration)))
 }
 
 // Getenv fetch the env and set the default value, if any
@@ -76,4 +77,5 @@ func InitialiseChaosVariables(chaosDetails *types.ChaosDetails, experimentDetail
 	chaosDetails.AppDetail = appDetails
 	chaosDetails.JobCleanupPolicy = Getenv("JOB_CLEANUP_POLICY", "retain")
 	chaosDetails.ProbeImagePullPolicy = experimentDetails.LIBImagePullPolicy
+	chaosDetails.Randomness, _ = strconv.ParseBool(Getenv("RANDOMNESS", "false"))
 }

@@ -9,8 +9,6 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/types"
 )
 
-var err error
-
 //PodNetworkCorruptionChaos contains the steps to prepare and inject chaos
 func PodNetworkCorruptionChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
@@ -30,7 +28,7 @@ func GetContainerArguments(experimentsDetails *experimentTypes.ExperimentDetails
 		"--interface",
 		experimentsDetails.NetworkInterface,
 		"--duration",
-		strconv.Itoa(experimentsDetails.ChaosDuration) + "s",
+		strconv.Itoa(experimentsDetails.NetworkChaosDuration) + "s",
 	}
 
 	args := baseArgs

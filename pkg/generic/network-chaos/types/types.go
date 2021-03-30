@@ -42,4 +42,6 @@ type ExperimentDetails struct {
 	Sequence                           string
 	Resources                          corev1.ResourceRequirements
 	ImagePullSecrets                   []corev1.LocalObjectReference
+	ChaosInterval                      string
+	NetworkChaosDuration               int
 }
