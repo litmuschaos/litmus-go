@@ -19,7 +19,7 @@ func GetENV(kafkaDetails *kafkaTypes.ExperimentDetails) {
 	ChaoslibDetail.ChaosNamespace = Getenv("CHAOS_NAMESPACE", "litmus")
 	ChaoslibDetail.EngineName = Getenv("CHAOSENGINE", "")
 	ChaoslibDetail.ChaosDuration, _ = strconv.Atoi(Getenv("TOTAL_CHAOS_DURATION", "60"))
-	ChaoslibDetail.ChaosInterval, _ = strconv.Atoi(Getenv("CHAOS_INTERVAL", "10"))
+	ChaoslibDetail.ChaosInterval = Getenv("CHAOS_INTERVAL", "10")
 	ChaoslibDetail.RampTime, _ = strconv.Atoi(Getenv("RAMP_TIME", "0"))
 	ChaoslibDetail.ChaosLib = Getenv("LIB", "litmus")
 	ChaoslibDetail.ChaosServiceAccount = Getenv("CHAOS_SERVICE_ACCOUNT", "")
@@ -84,4 +84,5 @@ func InitialiseChaosVariables(chaosDetails *types.ChaosDetails, kafkaDetails *ka
 	chaosDetails.Delay = kafkaDetails.ChaoslibDetail.Delay
 	chaosDetails.AppDetail = appDetails
 	chaosDetails.ProbeImagePullPolicy = kafkaDetails.ChaoslibDetail.LIBImagePullPolicy
+	chaosDetails.Randomness, _ = strconv.ParseBool(Getenv("RANDOMNESS", "false"))
 }

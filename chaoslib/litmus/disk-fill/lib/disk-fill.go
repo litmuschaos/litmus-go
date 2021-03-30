@@ -24,6 +24,9 @@ func PrepareDiskFill(experimentsDetails *experimentTypes.ExperimentDetails, clie
 
 	// Get the target pod details for the chaos execution
 	// if the target pod is not defined it will derive the random target pod list using pod affected percentage
+	if experimentsDetails.TargetPods == "" && chaosDetails.AppDetail.Label == ""{
+		return errors.Errorf("Please provide one of the appLabel or TARGET_PODS")
+	}
 	targetPodList, err := common.GetPodList(experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, clients, chaosDetails)
 	if err != nil {
 		return err
