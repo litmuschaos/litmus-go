@@ -278,6 +278,10 @@ func GetContainerArguments(experimentsDetails *experimentTypes.ExperimentDetails
 	}
 
 	stressArgs := []string{
+		"--cpu",
+		strconv.Itoa(experimentsDetails.Cpu),
+		"--vm",
+		strconv.Itoa(experimentsDetails.VmWorkers),
 		"--io",
 		strconv.Itoa(experimentsDetails.NumberOfWorkers),
 		"--hdd",
