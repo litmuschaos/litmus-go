@@ -16,7 +16,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.ChaosNamespace = Getenv("CHAOS_NAMESPACE", "litmus")
 	experimentDetails.EngineName = Getenv("CHAOSENGINE", "")
 	experimentDetails.ChaosDuration, _ = strconv.Atoi(Getenv("TOTAL_CHAOS_DURATION", "30"))
-	experimentDetails.ChaosInterval, _ = strconv.Atoi(Getenv("CHAOS_INTERVAL", "10"))
+	experimentDetails.ChaosInterval = Getenv("CHAOS_INTERVAL", "10")
 	experimentDetails.RampTime, _ = strconv.Atoi(Getenv("RAMP_TIME", "0"))
 	experimentDetails.ChaosLib = Getenv("LIB", "litmus")
 	experimentDetails.ChaosServiceAccount = Getenv("CHAOS_SERVICE_ACCOUNT", "")
@@ -64,4 +64,5 @@ func InitialiseChaosVariables(chaosDetails *types.ChaosDetails, experimentDetail
 	chaosDetails.Delay = experimentDetails.Delay
 	chaosDetails.AppDetail = appDetails
 	chaosDetails.ProbeImagePullPolicy = experimentDetails.LIBImagePullPolicy
+	chaosDetails.Randomness, _ = strconv.ParseBool(Getenv("RANDOMNESS", "false"))
 }
