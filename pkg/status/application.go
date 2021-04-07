@@ -222,6 +222,7 @@ func validateAllContainerStatus(podName string, ContainerStatuses []v1.Container
 // WaitForCompletion wait until the completion of pod
 func WaitForCompletion(appNs, appLabel string, clients clients.ClientSets, duration int, containerName string) (string, error) {
 	var podStatus string
+	failedPods := 0
 	// It will wait till the completion of target container
 	// it will retries until the target container completed or met the timeout(chaos duration)
 	err := retry.
@@ -236,6 +237,7 @@ func WaitForCompletion(appNs, appLabel string, clients clients.ClientSets, durat
 			// if it is still running then it will check for the target container, as we can have multiple container inside helper pod (istio)
 			// if the target container is in completed state(ready flag is false), then we will marked the helper pod as completed
 			// we will retry till it met the timeout(chaos duration)
+			failedPods = 0
 			for _, pod := range podList.Items {
 				podStatus = string(pod.Status.Phase)
 				log.Infof("helper pod status: %v", podStatus)
@@ -247,15 +249,21 @@ func WaitForCompletion(appNs, appLabel string, clients clients.ClientSets, durat
 						}
 					}
 				}
+				if podStatus == "Pending" {
+					return errors.Errorf("pod is in pending state")
+				}
 				log.InfoWithValues("[Status]: The running status of Pods are as follows", logrus.Fields{
 					"Pod": pod.Name, "Status": podStatus})
+				if podStatus == "Failed" {
+					failedPods++
+				}
 			}
 			return nil
 		})
-	if err != nil {
-		return "", err
+	if failedPods > 0 {
+		return "Failed", err
 	}
-	return podStatus, nil
+	return podStatus, err
 }
 
 // IsChaosPod check wheather the given pod is chaos pod or not
