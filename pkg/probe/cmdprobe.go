@@ -72,10 +72,11 @@ func TriggerInlineCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.
 			cmd.Stdout = &out
 			cmd.Stderr = &errOut
 			if err := cmd.Run(); err != nil {
-				return fmt.Errorf("Unable to run command, err: %v; error output: %v", err, errOut.String())
+				return errors.Errorf("unable to run command, err: %v; error output: %v", err, errOut.String())
 			}
 
-			if err = ValidateResult(probe.CmdProbeInputs.Comparator, strings.TrimSpace(out.String())); err != nil {
+			rc := getAndIncrementRunCount(resultDetails, probe.Name)
+			if err = ValidateResult(probe.CmdProbeInputs.Comparator, strings.TrimSpace(out.String()), rc); err != nil {
 				log.Errorf("The %v cmd probe has been Failed, err: %v", probe.Name, err)
 				return err
 			}
@@ -112,7 +113,8 @@ func TriggerSourceCmdProbe(probe v1alpha1.ProbeAttributes, execCommandDetails li
 				return errors.Errorf("Unable to get output of cmd command, err: %v", err)
 			}
 
-			if err = ValidateResult(probe.CmdProbeInputs.Comparator, strings.TrimSpace(output)); err != nil {
+			rc := getAndIncrementRunCount(resultDetails, probe.Name)
+			if err = ValidateResult(probe.CmdProbeInputs.Comparator, strings.TrimSpace(output), rc); err != nil {
 				log.Errorf("The %v cmd probe has been Failed, err: %v", probe.Name, err)
 				return err
 			}
@@ -331,27 +333,24 @@ loop:
 
 // ValidateResult validate the probe result to specified comparison operation
 // it supports int, float, string operands
-func ValidateResult(comparator v1alpha1.ComparatorInfo, cmdOutput string) error {
+func ValidateResult(comparator v1alpha1.ComparatorInfo, cmdOutput string, rc int) error {
+
+	compare := cmp.RunCount(rc).
+		FirstValue(cmdOutput).
+		SecondValue(comparator.Value).
+		Criteria(comparator.Criteria)
+
 	switch strings.ToLower(comparator.Type) {
 	case "int":
-		if err = cmp.FirstValue(cmdOutput).
-			SecondValue(comparator.Value).
-			Criteria(comparator.Criteria).
-			CompareInt(); err != nil {
+		if err = compare.CompareInt(); err != nil {
 			return err
 		}
 	case "float":
-		if err = cmp.FirstValue(cmdOutput).
-			SecondValue(comparator.Value).
-			Criteria(comparator.Criteria).
-			CompareFloat(); err != nil {
+		if err = compare.CompareFloat(); err != nil {
 			return err
 		}
 	case "string":
-		if err = cmp.FirstValue(cmdOutput).
-			SecondValue(comparator.Value).
-			Criteria(comparator.Criteria).
-			CompareString(); err != nil {
+		if err = compare.CompareString(); err != nil {
 			return err
 		}
 	default:

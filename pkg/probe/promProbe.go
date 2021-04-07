@@ -190,7 +190,7 @@ func TriggerPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 			cmd.Stdout = &out
 			cmd.Stderr = &errOut
 			if err := cmd.Run(); err != nil {
-				return fmt.Errorf("Unable to run command, err: %v; error output: %v", err, errOut.String())
+				return fmt.Errorf("unable to run command, err: %v; error output: %v", err, errOut.String())
 			}
 
 			// extract the values from the metrics
@@ -199,8 +199,10 @@ func TriggerPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 				return err
 			}
 
+			rc := getAndIncrementRunCount(resultDetails, probe.Name)
 			// comparing the metrics output with the expected criteria
-			if err = cmp.FirstValue(value).
+			if err = cmp.RunCount(rc).
+				FirstValue(value).
 				SecondValue(probe.PromProbeInputs.Comparator.Value).
 				Criteria(probe.PromProbeInputs.Comparator.Criteria).
 				CompareFloat(); err != nil {
