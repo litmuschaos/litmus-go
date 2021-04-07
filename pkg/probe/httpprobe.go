@@ -77,7 +77,7 @@ func TriggerHTTPProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 			"ResponseCode":    probe.HTTPProbeInputs.Method.Get.ResponseCode,
 			"ResponseTimeout": probe.HTTPProbeInputs.ResponseTimeout,
 		})
-		if err := httpGet(probe, client); err != nil {
+		if err := httpGet(probe, client, resultDetails); err != nil {
 			return err
 		}
 	case "Post":
@@ -89,7 +89,7 @@ func TriggerHTTPProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 			"ContentType":     probe.HTTPProbeInputs.Method.Post.ContentType,
 			"ResponseTimeout": probe.HTTPProbeInputs.ResponseTimeout,
 		})
-		if err := httpPost(probe, client); err != nil {
+		if err := httpPost(probe, client, resultDetails); err != nil {
 			return err
 		}
 	}
@@ -106,7 +106,7 @@ func getHTTPMethodType(httpMethod v1alpha1.HTTPMethod) string {
 }
 
 // httpGet send the http Get request to the given URL and verify the response code to follow the specified criteria
-func httpGet(probe v1alpha1.ProbeAttributes, client *http.Client) error {
+func httpGet(probe v1alpha1.ProbeAttributes, client *http.Client, resultDetails *types.ResultDetails) error {
 	// it will retry for some retry count, in each iterations of try it contains following things
 	// it contains a timeout per iteration of retry. if the timeout expires without success then it will go to next try
 	// for a timeout, it will run the command, if it fails wait for the interval and again execute the command until timeout expires
@@ -114,7 +114,6 @@ func httpGet(probe v1alpha1.ProbeAttributes, client *http.Client) error {
 		Timeout(int64(probe.RunProperties.ProbeTimeout)).
 		Wait(time.Duration(probe.RunProperties.Interval) * time.Second).
 		TryWithTimeout(func(attempt uint) error {
-
 			// getting the response from the given url
 			resp, err := client.Get(probe.HTTPProbeInputs.URL)
 			if err != nil {
@@ -122,9 +121,11 @@ func httpGet(probe v1alpha1.ProbeAttributes, client *http.Client) error {
 			}
 
 			code := strconv.Itoa(resp.StatusCode)
+			rc := getAndIncrementRunCount(resultDetails, probe.Name)
 
 			// comparing the response code with the expected criteria
-			if err = cmp.FirstValue(code).
+			if err = cmp.RunCount(rc).
+				FirstValue(code).
 				SecondValue(probe.HTTPProbeInputs.Method.Get.ResponseCode).
 				Criteria(probe.HTTPProbeInputs.Method.Get.Criteria).
 				CompareInt(); err != nil {
@@ -136,7 +137,7 @@ func httpGet(probe v1alpha1.ProbeAttributes, client *http.Client) error {
 }
 
 // httpPost send the http post request to the given URL
-func httpPost(probe v1alpha1.ProbeAttributes, client *http.Client) error {
+func httpPost(probe v1alpha1.ProbeAttributes, client *http.Client, resultDetails *types.ResultDetails) error {
 	body, err := getHTTPBody(probe.HTTPProbeInputs.Method.Post)
 	if err != nil {
 		return err
@@ -153,9 +154,11 @@ func httpPost(probe v1alpha1.ProbeAttributes, client *http.Client) error {
 				return err
 			}
 			code := strconv.Itoa(resp.StatusCode)
+			rc := getAndIncrementRunCount(resultDetails, probe.Name)
 
 			// comparing the response code with the expected criteria
-			if err = cmp.FirstValue(code).
+			if err = cmp.RunCount(rc).
+				FirstValue(code).
 				SecondValue(probe.HTTPProbeInputs.Method.Post.ResponseCode).
 				Criteria(probe.HTTPProbeInputs.Method.Post.Criteria).
 				CompareInt(); err != nil {
@@ -189,7 +192,7 @@ func getHTTPBody(httpBody v1alpha1.PostMethod) (string, error) {
 	cmd.Stdout = &out
 	cmd.Stderr = &errOut
 	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("Unable to run command, err: %v; error output: %v", err, errOut.String())
+		return "", fmt.Errorf("unable to run command, err: %v; error output: %v", err, errOut.String())
 	}
 	return out.String(), nil
 }
