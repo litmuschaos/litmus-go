@@ -61,7 +61,6 @@ func TriggerK8sProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets,
 		Timeout(int64(probe.RunProperties.ProbeTimeout)).
 		Wait(time.Duration(probe.RunProperties.Interval) * time.Second).
 		TryWithTimeout(func(attempt uint) error {
-
 			//defining the gvr for the requested resource
 			gvr := schema.GroupVersionResource{
 				Group:    inputs.Group,
@@ -99,7 +98,7 @@ func TriggerK8sProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets,
 				}
 				if len(resourceList.Items) != 0 {
 					log.Errorf("The %v k8s probe has Failed, err: %v", probe.Name, err)
-					return fmt.Errorf("Resource is not deleted yet due to, err: %v", err)
+					return fmt.Errorf("resource is not deleted yet due to, err: %v", err)
 				}
 			default:
 				return fmt.Errorf("operation type '%s' not supported in the k8s probe", inputs.Operation)
