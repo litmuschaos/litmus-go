@@ -20,6 +20,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.AppKind = Getenv("APP_KIND", "")
 	experimentDetails.AuxiliaryAppInfo = Getenv("AUXILIARY_APPINFO", "")
 	experimentDetails.ChaosDuration, _ = strconv.Atoi(Getenv("TOTAL_CHAOS_DURATION", "60"))
+	experimentDetails.ChaosInterval, _ = strconv.Atoi(Getenv("CHAOS_INTERVAL", "30"))
 	experimentDetails.RampTime, _ = strconv.Atoi(Getenv("RAMP_TIME", "0"))
 	experimentDetails.ChaosLib = Getenv("LIB", "litmus")
 	experimentDetails.ChaosUID = clientTypes.UID(Getenv("CHAOS_UID", ""))
@@ -30,6 +31,9 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.Ec2InstanceID = Getenv("EC2_INSTANCE_ID", "")
 	experimentDetails.Region = Getenv("REGION", "")
 	experimentDetails.ManagedNodegroup = Getenv("MANAGED_NODEGROUP", "disable")
+	experimentDetails.InstanceTag = Getenv("INSTANCE_TAG", "")
+	experimentDetails.InstanceAffectedPerc, _ = strconv.Atoi(Getenv("INSTANCE_AFFECTED_PERC", "0"))
+	experimentDetails.Sequence = Getenv("SEQUENCE", "parallel")
 	experimentDetails.TargetContainer = Getenv("TARGET_CONTAINER", "")
 }
 

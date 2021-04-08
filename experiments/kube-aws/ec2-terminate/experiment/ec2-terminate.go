@@ -124,15 +124,9 @@ func EC2Terminate(clients clients.ClientSets) {
 	}
 
 	//Verify the aws ec2 instance is running (pre chaos)
-	instanceState, err := aws.GetEC2InstanceStatus(&experimentsDetails)
+	err = litmusLIB.InstanceStatusCheck(&experimentsDetails)
 	if err != nil {
 		log.Errorf("failed to get the ec2 instance status, err: %v", err)
-		failStep := "Verify the AWS ec2 instance status (pre-chaos)"
-		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-		return
-	}
-	if instanceState != "running" {
-		log.Errorf("failed to get the ec2 instance status as running")
 		failStep := "Verify the AWS ec2 instance status (pre-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
@@ -141,7 +135,7 @@ func EC2Terminate(clients clients.ClientSets) {
 
 	// Including the litmus lib for ec2-terminate
 	if experimentsDetails.ChaosLib == "litmus" {
-		err = litmusLIB.InjectEC2Terminate(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
+		err = litmusLIB.PrepareEC2Terminate(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
 		if err != nil {
 			log.Errorf("Chaos injection failed, err: %v", err)
 			failStep := "failed in chaos injection phase"
@@ -170,15 +164,9 @@ func EC2Terminate(clients clients.ClientSets) {
 
 	//Verify the aws ec2 instance is running (post chaos)
 	if experimentsDetails.ManagedNodegroup != "enable" {
-		instanceState, err = aws.GetEC2InstanceStatus(&experimentsDetails)
+		err = litmusLIB.InstanceStatusCheck(&experimentsDetails)
 		if err != nil {
 			log.Errorf("failed to get the ec2 instance status, err: %v", err)
-			failStep := "Verify the AWS ec2 instance status (post-chaos)"
-			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-			return
-		}
-		if instanceState != "running" {
-			log.Errorf("failed to get the ec2 instance status as running")
 			failStep := "Verify the AWS ec2 instance status (post-chaos)"
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
