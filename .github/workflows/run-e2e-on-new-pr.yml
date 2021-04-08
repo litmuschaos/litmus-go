@@ -63,7 +63,7 @@ jobs:
           ACTIONS_ALLOW_UNSECURE_COMMANDS: true
 
       - name: Setup Litmus
-        uses: mayadata-io/github-chaos-actions@v0.3.1
+        uses: litmuschaos/github-chaos-actions@v0.3.1
         env:
           INSTALL_LITMUS: true    
 
@@ -80,7 +80,7 @@ jobs:
 
       - name: Running Litmus pod delete chaos experiment
         if: "contains(github.event.head_commit.message, '[Pod Delete]') || contains(github.event.head_commit.message, '[Run CI]') || env.TEST_RUN != 'true'"
-        uses: mayadata-io/github-chaos-actions@v0.3.1
+        uses: litmuschaos/github-chaos-actions@v0.3.1
         env:
           EXPERIMENT_NAME: pod-delete
           EXPERIMENT_IMAGE: litmuschaos/go-runner
@@ -90,7 +90,7 @@ jobs:
 
       - name: Running container kill chaos experiment
         if: "contains(github.event.head_commit.message, '[Container Kill]') || contains(github.event.head_commit.message, '[Run CI]') || env.TEST_RUN != 'true'"    
-        uses: mayadata-io/github-chaos-actions@v0.3.1
+        uses: litmuschaos/github-chaos-actions@v0.3.1
         env:
           EXPERIMENT_NAME: container-kill
           EXPERIMENT_IMAGE: litmuschaos/go-runner
@@ -101,7 +101,7 @@ jobs:
 
       - name: Running node-cpu-hog chaos experiment
         if: "contains(github.event.head_commit.message, '[Resource Chaos]') || contains(github.event.head_commit.message, '[Run CI]') || env.TEST_RUN != 'true'"
-        uses: mayadata-io/github-chaos-actions@v0.3.1
+        uses: litmuschaos/github-chaos-actions@v0.3.1
         env:
           EXPERIMENT_NAME: node-cpu-hog
           EXPERIMENT_IMAGE: litmuschaos/go-runner
@@ -112,7 +112,7 @@ jobs:
 
       - name: Running node-memory-hog chaos experiment
         if: "contains(github.event.head_commit.message, '[Resource Chaos]') || contains(github.event.head_commit.message, '[Run CI]') || env.TEST_RUN != 'true'"
-        uses: mayadata-io/github-chaos-actions@v0.3.1
+        uses: litmuschaos/github-chaos-actions@v0.3.1
         env:
           EXPERIMENT_NAME: node-memory-hog
           EXPERIMENT_IMAGE: litmuschaos/go-runner
@@ -122,7 +122,7 @@ jobs:
           
       - name: Running pod-cpu-hog chaos experiment
         if: "contains(github.event.head_commit.message, '[Resource Chaos]') || contains(github.event.head_commit.message, '[Run CI]') || env.TEST_RUN != 'true'"
-        uses: mayadata-io/github-chaos-actions@v0.3.1
+        uses: litmuschaos/github-chaos-actions@v0.3.1
         env:
           EXPERIMENT_NAME: pod-cpu-hog
           EXPERIMENT_IMAGE: litmuschaos/go-runner
@@ -135,7 +135,7 @@ jobs:
 
       - name: Running pod-memory-hog chaos experiment
         if: "contains(github.event.head_commit.message, '[Resource Chaos]') || contains(github.event.head_commit.message, '[Run CI]') || env.TEST_RUN != 'true'"
-        uses: mayadata-io/github-chaos-actions@v0.3.1
+        uses: litmuschaos/github-chaos-actions@v0.3.1
         env:
           EXPERIMENT_NAME: pod-memory-hog
           EXPERIMENT_IMAGE: litmuschaos/go-runner
@@ -149,7 +149,7 @@ jobs:
           
       - name: Running pod network corruption chaos experiment
         if: "contains(github.event.head_commit.message, '[Network Chaos]') || contains(github.event.head_commit.message, '[Run CI]') || env.TEST_RUN != 'true'"
-        uses: mayadata-io/github-chaos-actions@v0.3.1
+        uses: litmuschaos/github-chaos-actions@v0.3.1
         env:
           EXPERIMENT_NAME: pod-network-corruption
           EXPERIMENT_IMAGE: litmuschaos/go-runner
@@ -163,7 +163,7 @@ jobs:
 
       - name: Running pod network duplication chaos experiment
         if: "contains(github.event.head_commit.message, '[Network Chaos]') || contains(github.event.head_commit.message, '[Run CI]') || env.TEST_RUN != 'true'"
-        uses: mayadata-io/github-chaos-actions@v0.3.1
+        uses: litmuschaos/github-chaos-actions@v0.3.1
         env:
           EXPERIMENT_NAME: pod-network-duplication
           EXPERIMENT_IMAGE: litmuschaos/go-runner
@@ -177,7 +177,7 @@ jobs:
         
       - name: Running pod-network-latency chaos experiment
         if: "contains(github.event.head_commit.message, '[Network Chaos]') || contains(github.event.head_commit.message, '[Run CI]') || env.TEST_RUN != 'true'"
-        uses: mayadata-io/github-chaos-actions@v0.3.1
+        uses: litmuschaos/github-chaos-actions@v0.3.1
         env:
           EXPERIMENT_NAME: pod-network-latency
           EXPERIMENT_IMAGE: litmuschaos/go-runner
@@ -192,7 +192,7 @@ jobs:
 
       - name: Running pod-network-loss chaos experiment
         if: "contains(github.event.head_commit.message, '[Network Chaos]') || contains(github.event.head_commit.message, '[Run CI]') || env.TEST_RUN != 'true'"
-        uses: mayadata-io/github-chaos-actions@v0.3.1
+        uses: litmuschaos/github-chaos-actions@v0.3.1
         env:
           EXPERIMENT_NAME: pod-network-loss
           EXPERIMENT_IMAGE: litmuschaos/go-runner
@@ -207,7 +207,7 @@ jobs:
 
       - name: Running pod autoscaler chaos experiment
         if: "contains(github.event.head_commit.message, '[Scale Chaos]') || contains(github.event.head_commit.message, '[Run CI]') || env.TEST_RUN != 'true'"
-        uses: mayadata-io/github-chaos-actions@v0.3.1
+        uses: litmuschaos/github-chaos-actions@v0.3.1
         env:
           EXPERIMENT_NAME: pod-autoscaler
           EXPERIMENT_IMAGE: litmuschaos/go-runner
@@ -218,7 +218,7 @@ jobs:
         
       - name: Running node-io-stress chaos experiment
         if: "contains(github.event.head_commit.message, '[IO Chaos]') || contains(github.event.head_commit.message, '[Run CI]') || env.TEST_RUN != 'true'"
-        uses: mayadata-io/github-chaos-actions@v0.3.1
+        uses: litmuschaos/github-chaos-actions@v0.3.1
         env:
           EXPERIMENT_NAME: node-io-stress
           EXPERIMENT_IMAGE: litmuschaos/go-runner
@@ -237,7 +237,7 @@ jobs:
         run: echo "Some tests are failing please check..."
 
       - name: Uninstall Litmus
-        uses: mayadata-io/github-chaos-actions@v0.3.1
+        uses: litmuschaos/github-chaos-actions@v0.3.1
         env:          
           LITMUS_CLEANUP: true
 

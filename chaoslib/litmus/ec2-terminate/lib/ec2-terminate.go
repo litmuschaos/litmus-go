@@ -35,9 +35,6 @@ func PrepareEC2Terminate(experimentsDetails *experimentTypes.ExperimentDetails, 
 
 	if experimentsDetails.Ec2InstanceID == "" && experimentsDetails.InstanceTag == "" {
 		return errors.Errorf("Please provide one of the Instance ID or Instance Tag")
-	} else if experimentsDetails.Ec2InstanceID != "" && experimentsDetails.InstanceTag != "" {
-		log.Info("[Info]: Both instance id and instance tag are provided so the preferance will be given to the instance id")
-		experimentsDetails.InstanceTag = ""
 	}
 	instanceIDList, err := GetInstanceList(experimentsDetails.Ec2InstanceID, experimentsDetails.InstanceTag, experimentsDetails.Region)
 	if err != nil {
@@ -235,6 +232,10 @@ loop:
 func GetInstanceList(instanceID, instanceTag, region string) ([]string, error) {
 
 	var instanceList []string
+	if instanceID != "" && instanceTag != "" {
+		log.Info("[Info]: Both instance id and instance tag are provided so the preferance will be given to the instance id")
+		instanceTag = ""
+	}
 	switch instanceTag {
 	case "":
 		//get the instance id or list of instance ids
