@@ -29,35 +29,39 @@ func RunProbes(chaosDetails *types.ChaosDetails, clients clients.ClientSets, res
 		return err
 	}
 
+	var probeError []error
+
 	if probes != nil {
 
 		for _, probe := range probes {
 
 			switch strings.ToLower(probe.Type) {
-
 			case "k8sprobe":
 				// it contains steps to prepare the k8s probe
 				if err = PrepareK8sProbe(probe, resultDetails, clients, phase, eventsDetails, chaosDetails); err != nil {
-					return err
+					probeError = append(probeError, err)
 				}
 			case "cmdprobe":
 				// it contains steps to prepare cmd probe
 				if err = PrepareCmdProbe(probe, clients, chaosDetails, resultDetails, phase, eventsDetails); err != nil {
-					return err
+					probeError = append(probeError, err)
 				}
 			case "httpprobe":
 				// it contains steps to prepare http probe
 				if err = PrepareHTTPProbe(probe, clients, chaosDetails, resultDetails, phase, eventsDetails); err != nil {
-					return err
+					probeError = append(probeError, err)
 				}
 			case "promprobe":
 				// it contains steps to prepare prom probe
 				if err = PreparePromProbe(probe, clients, chaosDetails, resultDetails, phase, eventsDetails); err != nil {
-					return err
+					probeError = append(probeError, err)
 				}
 			default:
 				return errors.Errorf("No supported probe type found, type: %v", probe.Type)
 			}
+		}
+		if len(probeError) != 0 {
+			return errors.Errorf("probes failed, err: %v", probeError)
 		}
 	}
 
@@ -98,7 +102,7 @@ func GetProbesFromEngine(chaosDetails *types.ChaosDetails, clients clients.Clien
 
 	engine, err := clients.LitmusClient.ChaosEngines(chaosDetails.ChaosNamespace).Get(chaosDetails.EngineName, v1.GetOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("Unable to Get the chaosengine, err: %v", err)
+		return nil, fmt.Errorf("unable to Get the chaosengine, err: %v", err)
 	}
 
 	// get all the probes defined inside chaosengine for the corresponding experiment
@@ -130,6 +134,7 @@ func InitializeProbesInChaosResultDetails(chaosDetails *types.ChaosDetails, clie
 		tempProbe := types.ProbeDetails{}
 		tempProbe.Name = probe.Name
 		tempProbe.Type = probe.Type
+		tempProbe.RunCount = 0
 		SetProbeInitialStatus(&tempProbe, probe.Mode)
 		probeDetails = append(probeDetails, tempProbe)
 	}
@@ -137,6 +142,17 @@ func InitializeProbesInChaosResultDetails(chaosDetails *types.ChaosDetails, clie
 	chaosresult.ProbeDetails = probeDetails
 	chaosresult.ProbeArtifacts = map[string]types.ProbeArtifact{}
 	return nil
+}
+
+//getAndIncrementRunCount return the run count for the specified probe
+func getAndIncrementRunCount(resultDetails *types.ResultDetails, probeName string) int {
+	for index, probe := range resultDetails.ProbeDetails {
+		if probeName == probe.Name {
+			resultDetails.ProbeDetails[index].RunCount++
+			return resultDetails.ProbeDetails[index].RunCount
+		}
+	}
+	return 0
 }
 
 //SetProbeInitialStatus sets the initial status inside chaosresult
@@ -200,7 +216,6 @@ func MarkedVerdictInEnd(err error, resultDetails *types.ResultDetails, probeName
 			"ProbeInstance": phase,
 			"ProbeStatus":   "Failed",
 		})
-		SetProbeVerdictAfterFailure(resultDetails)
 		return err
 	}
 
