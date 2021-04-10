@@ -352,7 +352,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, appN
 					},
 					Args: []string{
 						"--vm",
-						"1",
+						strconv.Itoa(experimentsDetails.NumberOfWorkers),
 						"--vm-bytes",
 						MemoryConsumption,
 						"--timeout",

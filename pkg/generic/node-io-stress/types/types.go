@@ -29,7 +29,9 @@ type ExperimentDetails struct {
 	TargetNodes                     string
 	FilesystemUtilizationPercentage int
 	FilesystemUtilizationBytes      int
+	CPU                             int
 	NumberOfWorkers                 int
+	VMWorkers                       int
 	NodesAffectedPerc               int
 	Sequence                        string
 	Resources                       corev1.ResourceRequirements
