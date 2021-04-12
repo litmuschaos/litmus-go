@@ -24,15 +24,21 @@ func AUTStatusCheck(appNs, appLabel, containerName string, timeout, delay int, c
 	case true:
 		return AnnotatedApplicationsStatusCheck(appNs, appLabel, containerName, timeout, delay, clients, chaosDetails)
 	default:
-		// Checking whether application containers are in ready state
-		log.Info("[Status]: Checking whether application containers are in ready state")
-		if err := CheckContainerStatus(appNs, appLabel, containerName, timeout, delay, clients); err != nil {
-			return err
-		}
-		// Checking whether application pods are in running state
-		log.Info("[Status]: Checking whether application pods are in running state")
-		if err := CheckPodStatus(appNs, appLabel, timeout, delay, clients); err != nil {
-			return err
+		switch appLabel {
+			case "":
+				// Checking whether applications are healthy
+				log.Info("[Status]: No appLabels provided, skipping the application status checks")
+			default:
+			// Checking whether application containers are in ready state
+			log.Info("[Status]: Checking whether application containers are in ready state")
+			if err := CheckContainerStatus(appNs, appLabel, containerName, timeout, delay, clients); err != nil {
+				return err
+			}
+			// Checking whether application pods are in running state
+			log.Info("[Status]: Checking whether application pods are in running state")
+			if err := CheckPodStatus(appNs, appLabel, timeout, delay, clients); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -61,7 +67,7 @@ func AnnotatedApplicationsStatusCheck(appNs, appLabel, containerName string, tim
 							if container.State.Terminated != nil {
 								return errors.Errorf("container is in terminated state")
 							}
-							if container.Ready != true {
+							if !container.Ready   {
 								return errors.Errorf("containers are not yet in running state")
 							}
 							log.InfoWithValues("[Status]: The Container status are as follows", logrus.Fields{
@@ -73,7 +79,7 @@ func AnnotatedApplicationsStatusCheck(appNs, appLabel, containerName string, tim
 								if container.State.Terminated != nil {
 									return errors.Errorf("container is in terminated state")
 								}
-								if container.Ready != true {
+								if !container.Ready{
 									return errors.Errorf("containers are not yet in running state")
 								}
 								log.InfoWithValues("[Status]: The Container status are as follows", logrus.Fields{
@@ -199,7 +205,7 @@ func validateContainerStatus(containerName, podName string, ContainerStatuses []
 			if container.State.Terminated != nil {
 				return errors.Errorf("container is in terminated state")
 			}
-			if container.Ready != true {
+			if !container.Ready{
 				return errors.Errorf("containers are not yet in running state")
 			}
 			log.InfoWithValues("[Status]: The Container status are as follows", logrus.Fields{
@@ -264,13 +270,4 @@ func WaitForCompletion(appNs, appLabel string, clients clients.ClientSets, durat
 		return "Failed", err
 	}
 	return podStatus, err
-}
-
-// IsChaosPod check wheather the given pod is chaos pod or not
-// based on labels present inside pod
-func isChaosPod(labels map[string]string) bool {
-	if labels["chaosUID"] != "" || labels["name"] == "chaos-operator" {
-		return true
-	}
-	return false
 }
