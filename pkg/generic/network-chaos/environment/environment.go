@@ -42,7 +42,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.ChaosServiceAccount = Getenv("CHAOS_SERVICE_ACCOUNT", "")
 	experimentDetails.SocketPath = Getenv("SOCKET_PATH", "/var/run/docker.sock")
 	experimentDetails.Sequence = Getenv("SEQUENCE", "parallel")
-
+	experimentDetails.TerminationGracePeriodSeconds, _ = strconv.Atoi(Getenv("TERMINATION_GRACE_PERIOD_SECONDS", ""))
 }
 
 // Getenv fetch the env and set the default value, if any
