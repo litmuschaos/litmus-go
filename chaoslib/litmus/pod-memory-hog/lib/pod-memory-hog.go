@@ -14,7 +14,6 @@ import (
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-memory-hog/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
-	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	litmusexec "github.com/litmuschaos/litmus-go/pkg/utils/exec"
@@ -22,7 +21,6 @@ import (
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/klog"
 )
 
 var err error
@@ -44,7 +42,6 @@ func StressMemory(MemoryConsumption, containerName, podName, namespace string, c
 	_, err := litmusexec.Exec(&execCommandDetails, clients, command)
 
 	stressErr <- err
-
 }
 
 //ExperimentMemory function orchestrates the experiment by calling the StressMemory function, of every container, of every pod that is targeted
@@ -139,25 +136,11 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 					return err
 				}
 			case <-signChan:
-				log.Info("[Chaos]: Killing process started because of terminated signal received")
-				err = KillStressMemorySerial(experimentsDetails.TargetContainer, pod.Name, experimentsDetails.AppNS, experimentsDetails.ChaosKillCmd, clients)
-				if err != nil {
-					klog.V(0).Infof("Error in Kill stress after abortion")
-					return err
+				log.Info("[Chaos]: Revert Started")
+				if err = KillStressMemorySerial(experimentsDetails.TargetContainer, pod.Name, experimentsDetails.AppNS, experimentsDetails.ChaosKillCmd, clients); err != nil {
+					log.Errorf("Error in Kill stress after abortion, err: %v", err)
 				}
-				// updating the chaosresult after stopped
-				failStep := "Memory hog Chaos injection stopped!"
-				types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep)
-				result.ChaosResult(chaosDetails, clients, resultDetails, "EOT")
-
-				// generating summary event in chaosengine
-				msg := experimentsDetails.ExperimentName + " experiment has been aborted"
-				types.SetEngineEventAttributes(eventsDetails, types.StoppedVerdict, msg, "Warning", chaosDetails)
-				events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
-
-				// generating summary event in chaosresult
-				types.SetResultEventAttributes(eventsDetails, types.Summary, msg, "Warning", resultDetails)
-				events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosResult")
+				log.Info("[Chaos]: Revert Completed")
 				os.Exit(1)
 			case <-endTime:
 				log.Infof("[Chaos]: Time is up for experiment: %v", experimentsDetails.ExperimentName)
@@ -225,25 +208,11 @@ loop:
 				return err
 			}
 		case <-signChan:
-			log.Info("[Chaos]: Killing process started because of terminated signal received")
-			err = KillStressMemoryParallel(experimentsDetails.TargetContainer, targetPodList, experimentsDetails.AppNS, experimentsDetails.ChaosKillCmd, clients)
-			if err != nil {
-				klog.V(0).Infof("Error in Kill stress after abortion")
-				return err
+			log.Info("[Chaos]: Revert Started")
+			if err = KillStressMemoryParallel(experimentsDetails.TargetContainer, targetPodList, experimentsDetails.AppNS, experimentsDetails.ChaosKillCmd, clients); err != nil {
+				log.Errorf("Error in Kill stress after abortion, err: %v", err)
 			}
-			// updating the chaosresult after stopped
-			failStep := "Memory hog Chaos injection stopped!"
-			types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep)
-			result.ChaosResult(chaosDetails, clients, resultDetails, "EOT")
-
-			// generating summary event in chaosengine
-			msg := experimentsDetails.ExperimentName + " experiment has been aborted"
-			types.SetEngineEventAttributes(eventsDetails, types.StoppedVerdict, msg, "Warning", chaosDetails)
-			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
-
-			// generating summary event in chaosresult
-			types.SetResultEventAttributes(eventsDetails, types.Summary, msg, "Warning", resultDetails)
-			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosResult")
+			log.Info("[Chaos]: Revert Completed")
 			os.Exit(1)
 		case <-endTime:
 			log.Infof("[Chaos]: Time is up for experiment: %v", experimentsDetails.ExperimentName)
