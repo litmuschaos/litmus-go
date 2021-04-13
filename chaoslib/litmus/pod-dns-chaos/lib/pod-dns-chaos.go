@@ -1,26 +1,30 @@
 package lib
 
 import (
+	"os"
+	"os/signal"
 	"strconv"
+	"syscall"
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/disk-fill/types"
+	"github.com/litmuschaos/litmus-go/pkg/events"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-dns-chaos/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
+	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
-	"github.com/litmuschaos/litmus-go/pkg/utils/exec"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	apiv1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-//PrepareDiskFill contains the prepration steps before chaos injection
-func PrepareDiskFill(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+var err error
 
-	// It will contains all the pod & container details required for exec command
-	execCommandDetails := exec.PodDetails{}
+//PrepareAndInjectChaos contains the preparation & injection steps
+func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	// Get the target pod details for the chaos execution
 	// if the target pod is not defined it will derive the random target pod list using pod affected percentage
@@ -44,19 +48,19 @@ func PrepareDiskFill(experimentsDetails *experimentTypes.ExperimentDetails, clie
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 
-	//Get the target container name of the application pod
-	if experimentsDetails.TargetContainer == "" {
-		experimentsDetails.TargetContainer, err = GetTargetContainer(experimentsDetails, targetPodList.Items[0].Name, clients)
-		if err != nil {
-			return errors.Errorf("Unable to get the target container name, err: %v", err)
-		}
-	}
-
 	// Getting the serviceAccountName, need permission inside helper pod to create the events
 	if experimentsDetails.ChaosServiceAccount == "" {
 		err = GetServiceAccount(experimentsDetails, clients)
 		if err != nil {
 			return errors.Errorf("Unable to get the serviceAccountName, err: %v", err)
+		}
+	}
+
+	//Get the target container name of the application pod
+	if experimentsDetails.TargetContainer == "" {
+		experimentsDetails.TargetContainer, err = GetTargetContainer(experimentsDetails, targetPodList.Items[0].Name, clients)
+		if err != nil {
+			return errors.Errorf("Unable to get the target container name, err: %v", err)
 		}
 	}
 
@@ -78,26 +82,22 @@ func PrepareDiskFill(experimentsDetails *experimentTypes.ExperimentDetails, clie
 		}
 	}
 
+	go abortWatcher(resultDetails, chaosDetails, clients, eventsDetails, experimentsDetails)
+
 	if experimentsDetails.Sequence == "serial" {
-		if err = InjectChaosInSerialMode(experimentsDetails, targetPodList, clients, chaosDetails, execCommandDetails, resultDetails, eventsDetails); err != nil {
+		if err = InjectChaosInSerialMode(experimentsDetails, targetPodList, clients, chaosDetails, resultDetails, eventsDetails); err != nil {
 			return err
 		}
 	} else {
-		if err = InjectChaosInParallelMode(experimentsDetails, targetPodList, clients, chaosDetails, execCommandDetails, resultDetails, eventsDetails); err != nil {
+		if err = InjectChaosInParallelMode(experimentsDetails, targetPodList, clients, chaosDetails, resultDetails, eventsDetails); err != nil {
 			return err
 		}
-	}
-
-	//Waiting for the ramp time after chaos injection
-	if experimentsDetails.RampTime != 0 {
-		log.Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", experimentsDetails.RampTime)
-		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 	return nil
 }
 
-// InjectChaosInSerialMode fill the ephemeral storage of all target application serially (one by one)
-func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, execCommandDetails exec.PodDetails, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
+// InjectChaosInSerialMode inject the DNS Chaos in all target application serially (one by one)
+func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
 
 	labelSuffix := common.GetRunID()
 
@@ -108,10 +108,16 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		}
 	}
 
-	// creating the helper pod to perform disk-fill chaos
+	// creating the helper pod to perform DNS Chaos
 	for _, pod := range targetPodList.Items {
+
+		log.InfoWithValues("[Info]: Details of application under chaos injection", logrus.Fields{
+			"PodName":       pod.Name,
+			"NodeName":      pod.Spec.NodeName,
+			"ContainerName": experimentsDetails.TargetContainer,
+		})
 		runID := common.GetRunID()
-		err := CreateHelperPod(experimentsDetails, clients, pod.Name, pod.Spec.NodeName, runID, labelSuffix)
+		err = CreateHelperPod(experimentsDetails, clients, pod.Name, pod.Spec.NodeName, runID, labelSuffix)
 		if err != nil {
 			return errors.Errorf("Unable to create the helper pod, err: %v", err)
 		}
@@ -135,20 +141,19 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 			return errors.Errorf("helper pod failed due to, err: %v", err)
 		}
 
-		//Deleting all the helper pod for disk-fill chaos
-		log.Info("[Cleanup]: Deleting the helper pod")
+		//Deleting all the helper pod for container-kill chaos
+		log.Info("[Cleanup]: Deleting the the helper pod")
 		err = common.DeletePod(experimentsDetails.ExperimentName+"-"+runID, appLabel, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients)
 		if err != nil {
-			return errors.Errorf("Unable to delete the helper pod, %v", err)
+			return errors.Errorf("Unable to delete the helper pods, err: %v", err)
 		}
 	}
 
 	return nil
-
 }
 
-// InjectChaosInParallelMode fill the ephemeral storage of of all target application in parallel mode (all at once)
-func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, execCommandDetails exec.PodDetails, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
+// InjectChaosInParallelMode inject the DNS Chaos in all target application in parallel mode (all at once)
+func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
 
 	labelSuffix := common.GetRunID()
 
@@ -159,10 +164,16 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		}
 	}
 
-	// creating the helper pod to perform disk-fill chaos
+	// creating the helper pod to perform DNS Chaos
 	for _, pod := range targetPodList.Items {
+
+		log.InfoWithValues("[Info]: Details of application under chaos injection", logrus.Fields{
+			"PodName":       pod.Name,
+			"NodeName":      pod.Spec.NodeName,
+			"ContainerName": experimentsDetails.TargetContainer,
+		})
 		runID := common.GetRunID()
-		err := CreateHelperPod(experimentsDetails, clients, pod.Name, pod.Spec.NodeName, runID, labelSuffix)
+		err = CreateHelperPod(experimentsDetails, clients, pod.Name, pod.Spec.NodeName, runID, labelSuffix)
 		if err != nil {
 			return errors.Errorf("Unable to create the helper pod, err: %v", err)
 		}
@@ -172,7 +183,7 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 
 	//checking the status of the helper pods, wait till the pod comes to running state else fail the experiment
 	log.Info("[Status]: Checking the status of the helper pods")
-	err := status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, appLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
+	err = status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, appLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 	if err != nil {
 		common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
 		return errors.Errorf("helper pods are not in running state, err: %v", err)
@@ -187,15 +198,14 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		return errors.Errorf("helper pod failed due to, err: %v", err)
 	}
 
-	//Deleting all the helper pod for disk-fill chaos
+	//Deleting all the helper pod for container-kill chaos
 	log.Info("[Cleanup]: Deleting all the helper pod")
 	err = common.DeleteAllPod(appLabel, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients)
 	if err != nil {
-		return errors.Errorf("Unable to delete the helper pod, %v", err)
+		return errors.Errorf("Unable to delete the helper pods, err: %v", err)
 	}
 
 	return nil
-
 }
 
 // GetServiceAccount find the serviceAccountName for the helper pod
@@ -209,7 +219,7 @@ func GetServiceAccount(experimentsDetails *experimentTypes.ExperimentDetails, cl
 }
 
 //GetTargetContainer will fetch the container name from application pod
-// It will return the first container name from the application pod
+//This container will be used as target container
 func GetTargetContainer(experimentsDetails *experimentTypes.ExperimentDetails, appName string, clients clients.ClientSets) (string, error) {
 	pod, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Get(appName, v1.GetOptions{})
 	if err != nil {
@@ -220,9 +230,10 @@ func GetTargetContainer(experimentsDetails *experimentTypes.ExperimentDetails, a
 }
 
 // CreateHelperPod derive the attributes for helper pod and create the helper pod
-func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, appName, appNodeName, runID, labelSuffix string) error {
+func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, podName, nodeName, runID, labelSuffix string) error {
 
-	mountPropagationMode := apiv1.MountPropagationHostToContainer
+	privilegedEnable := true
+	terminationGracePeriodSeconds := int64(60)
 
 	helperPod := &apiv1.Pod{
 		ObjectMeta: v1.ObjectMeta{
@@ -237,20 +248,23 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 			Annotations: experimentsDetails.Annotations,
 		},
 		Spec: apiv1.PodSpec{
-			RestartPolicy:      apiv1.RestartPolicyNever,
-			ImagePullSecrets:   experimentsDetails.ImagePullSecrets,
-			NodeName:           appNodeName,
-			ServiceAccountName: experimentsDetails.ChaosServiceAccount,
+			HostPID:                       true,
+			TerminationGracePeriodSeconds: &terminationGracePeriodSeconds,
+			ImagePullSecrets:              experimentsDetails.ImagePullSecrets,
+			ServiceAccountName:            experimentsDetails.ChaosServiceAccount,
+			RestartPolicy:                 apiv1.RestartPolicyNever,
+			NodeName:                      nodeName,
 			Volumes: []apiv1.Volume{
 				{
-					Name: "udev",
+					Name: "cri-socket",
 					VolumeSource: apiv1.VolumeSource{
 						HostPath: &apiv1.HostPathVolumeSource{
-							Path: experimentsDetails.ContainerPath,
+							Path: experimentsDetails.SocketPath,
 						},
 					},
 				},
 			},
+
 			Containers: []apiv1.Container{
 				{
 					Name:            experimentsDetails.ExperimentName,
@@ -261,16 +275,18 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 					},
 					Args: []string{
 						"-c",
-						"./helper/disk-fill",
+						"./helper/dns-chaos",
 					},
 					Resources: experimentsDetails.Resources,
-					Env:       GetPodEnv(experimentsDetails, appName),
+					Env:       GetPodEnv(experimentsDetails, podName),
 					VolumeMounts: []apiv1.VolumeMount{
 						{
-							Name:             "udev",
-							MountPath:        "/diskfill",
-							MountPropagation: &mountPropagationMode,
+							Name:      "cri-socket",
+							MountPath: experimentsDetails.SocketPath,
 						},
+					},
+					SecurityContext: &apiv1.SecurityContext{
+						Privileged: &privilegedEnable,
 					},
 				},
 			},
@@ -279,6 +295,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 
 	_, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Create(helperPod)
 	return err
+
 }
 
 // GetPodEnv derive all the env required for the helper pod
@@ -286,16 +303,19 @@ func GetPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, podName st
 
 	var envVar []apiv1.EnvVar
 	ENVList := map[string]string{
-		"APP_NS":                      experimentsDetails.AppNS,
-		"APP_POD":                     podName,
-		"APP_CONTAINER":               experimentsDetails.TargetContainer,
-		"TOTAL_CHAOS_DURATION":        strconv.Itoa(experimentsDetails.ChaosDuration),
-		"CHAOS_NAMESPACE":             experimentsDetails.ChaosNamespace,
-		"CHAOS_ENGINE":                experimentsDetails.EngineName,
-		"CHAOS_UID":                   string(experimentsDetails.ChaosUID),
-		"EXPERIMENT_NAME":             experimentsDetails.ExperimentName,
-		"FILL_PERCENTAGE":             strconv.Itoa(experimentsDetails.FillPercentage),
-		"EPHEMERAL_STORAGE_MEBIBYTES": strconv.Itoa(experimentsDetails.EphemeralStorageMebibytes),
+		"APP_NS":            experimentsDetails.AppNS,
+		"APP_POD":           podName,
+		"APP_CONTAINER":     experimentsDetails.TargetContainer,
+		"CHAOS_DURATION":    strconv.Itoa(experimentsDetails.ChaosDuration),
+		"CHAOS_NAMESPACE":   experimentsDetails.ChaosNamespace,
+		"CHAOS_ENGINE":      experimentsDetails.EngineName,
+		"CHAOS_UID":         string(experimentsDetails.ChaosUID),
+		"CONTAINER_RUNTIME": experimentsDetails.ContainerRuntime,
+		"EXPERIMENT_NAME":   experimentsDetails.ExperimentName,
+		"SOCKET_PATH":       experimentsDetails.SocketPath,
+		"TARGET_HOSTNAMES":  experimentsDetails.TargetHostNames,
+		"MATCH_SCHEME":      experimentsDetails.MatchScheme,
+		"CHAOS_TYPE":        experimentsDetails.ChaosType,
 	}
 	for key, value := range ENVList {
 		var perEnv apiv1.EnvVar
@@ -322,4 +342,35 @@ func GetValueFromDownwardAPI(apiVersion string, fieldPath string) apiv1.EnvVarSo
 		},
 	}
 	return downwardENV
+}
+
+// abortWatcher continuosly watch for the abort signals
+// it will update the chaosresult
+func abortWatcher(resultDetails *types.ResultDetails, chaosDetails *types.ChaosDetails, clients clients.ClientSets, eventsDetails *types.EventDetails, experimentsDetails *experimentTypes.ExperimentDetails) {
+
+	// signChan channel is used to transmit signal notifications.
+	signChan := make(chan os.Signal, 1)
+	// Catch and relay certain signal(s) to signChan channel.
+	signal.Notify(signChan, os.Interrupt, syscall.SIGTERM, syscall.SIGKILL)
+
+	for {
+		select {
+		case <-signChan:
+			log.Info("termination signal recieved, updating chaos status")
+			// updating the chaosresult after stopped
+			failStep := "DNS Chaos injection stopped!"
+			types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep)
+			result.ChaosResult(chaosDetails, clients, resultDetails, "EOT")
+
+			// generating summary event in chaosengine
+			msg := experimentsDetails.ExperimentName + " experiment has been aborted"
+			types.SetEngineEventAttributes(eventsDetails, types.Summary, msg, "Warning", chaosDetails)
+			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
+
+			// generating summary event in chaosresult
+			types.SetResultEventAttributes(eventsDetails, types.StoppedVerdict, msg, "Warning", resultDetails)
+			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosResult")
+			os.Exit(1)
+		}
+	}
 }

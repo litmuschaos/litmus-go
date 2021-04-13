@@ -97,10 +97,10 @@ func DiskFill(experimentsDetails *experimentTypes.ExperimentDetails, clients cli
 	sizeTobeFilled := GetSizeToBeFilled(experimentsDetails, usedEphemeralStorageSize, int(ephemeralStorageLimit))
 
 	log.InfoWithValues("[Info]: Details of application under chaos injection", logrus.Fields{
-		"PodName":               experimentsDetails.TargetPods,
-		"ContainerName":         experimentsDetails.TargetContainer,
+		"PodName":                   experimentsDetails.TargetPods,
+		"ContainerName":             experimentsDetails.TargetContainer,
 		"ephemeralStorageLimit(KB)": ephemeralStorageLimit,
-		"ContainerID":           containerID,
+		"ContainerID":               containerID,
 	})
 
 	log.Infof("ephemeral storage size to be filled: %vKB", strconv.Itoa(sizeTobeFilled))
