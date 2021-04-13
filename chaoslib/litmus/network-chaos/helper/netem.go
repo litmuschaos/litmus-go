@@ -32,7 +32,6 @@ const (
 var err error
 var inject, abort chan os.Signal
 
-
 func main() {
 
 	experimentsDetails := experimentTypes.ExperimentDetails{}

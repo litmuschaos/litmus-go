@@ -70,9 +70,8 @@ func PodIOStress(clients clients.ClientSets) {
 		"NumberOfWorkers":                 experimentsDetails.NumberOfWorkers,
 	})
 
-    // Calling AbortWatcher go routine, it will continuously watch for the abort signal and generate the required events and result
-    go common.AbortWatcher(experimentsDetails.ExperimentName, clients, &resultDetails, &chaosDetails, &eventsDetails)
-
+	// Calling AbortWatcher go routine, it will continuously watch for the abort signal and generate the required events and result
+	go common.AbortWatcher(experimentsDetails.ExperimentName, clients, &resultDetails, &chaosDetails, &eventsDetails)
 
 	//PRE-CHAOS APPLICATION STATUS CHECK
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (pre-chaos)")

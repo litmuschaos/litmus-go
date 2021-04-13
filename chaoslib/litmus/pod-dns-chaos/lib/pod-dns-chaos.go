@@ -233,7 +233,7 @@ func GetTargetContainer(experimentsDetails *experimentTypes.ExperimentDetails, a
 func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, podName, nodeName, runID, labelSuffix string) error {
 
 	privilegedEnable := true
-	terminationGracePeriodSeconds := int64(60)
+	terminationGracePeriodSeconds := int64(experimentsDetails.TerminationGracePeriodSeconds)
 
 	helperPod := &apiv1.Pod{
 		ObjectMeta: v1.ObjectMeta{

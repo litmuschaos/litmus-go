@@ -16,8 +16,8 @@ import (
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/disk-fill/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/result"
-	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/litmuschaos/litmus-go/pkg/types"
+	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -129,7 +129,7 @@ func DiskFill(experimentsDetails *experimentTypes.ExperimentDetails, clients cli
 
 	if sizeTobeFilled > 0 {
 
-        if err := fillDisk(containerID, sizeTobeFilled); err != nil{
+		if err := fillDisk(containerID, sizeTobeFilled); err != nil {
 			log.Error(string(out))
 			return err
 		}
@@ -139,7 +139,7 @@ func DiskFill(experimentsDetails *experimentTypes.ExperimentDetails, clients cli
 		common.WaitForDuration(experimentsDetails.ChaosDuration)
 
 		log.Info("[Chaos]: Stopping the experiment")
-	
+
 		// It will delete the target pod if target pod is evicted
 		// if target pod is still running then it will delete all the files, which was created earlier during chaos execution
 		err = Remedy(experimentsDetails, clients, containerID)
@@ -153,7 +153,7 @@ func DiskFill(experimentsDetails *experimentTypes.ExperimentDetails, clients cli
 }
 
 // fillDisk fill the ephemeral disk by creating files
-func fillDisk(containerID string, sizeTobeFilled int) error{
+func fillDisk(containerID string, sizeTobeFilled int) error {
 
 	select {
 	case <-inject:
@@ -300,7 +300,6 @@ func Getenv(key string, defaultValue string) string {
 	return value
 }
 
-
 // abortWatcher continuosly watch for the abort signals
 func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, containerID string) {
 
@@ -313,7 +312,7 @@ func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, clients
 			retry := 3
 			for retry > 0 {
 				if err := Remedy(experimentsDetails, clients, containerID); err != nil {
-			        log.Errorf("Unable to perform remedy operation, err: %v", err)
+					log.Errorf("Unable to perform remedy operation, err: %v", err)
 				}
 				retry--
 				time.Sleep(1 * time.Second)
@@ -323,4 +322,3 @@ func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, clients
 		}
 	}
 }
-
