@@ -313,7 +313,6 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.AppNS = Getenv("APP_NS", "")
 	experimentDetails.TargetContainer = Getenv("APP_CONTAINER", "")
 	experimentDetails.TargetPods = Getenv("APP_POD", "")
-	experimentDetails.AppLabel = Getenv("APP_LABEL", "")
 	experimentDetails.ChaosDuration, _ = strconv.Atoi(Getenv("CHAOS_DURATION", "30"))
 	experimentDetails.ChaosNamespace = Getenv("CHAOS_NAMESPACE", "litmus")
 	experimentDetails.EngineName = Getenv("CHAOS_ENGINE", "")

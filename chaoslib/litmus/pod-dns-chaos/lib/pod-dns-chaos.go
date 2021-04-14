@@ -133,7 +133,7 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 			return errors.Errorf("helper pod failed due to, err: %v", err)
 		}
 
-		//Deleting all the helper pod for container-kill chaos
+		//Deleting all the helper pod for pod-dns chaos
 		log.Info("[Cleanup]: Deleting the the helper pod")
 		err = common.DeletePod(experimentsDetails.ExperimentName+"-"+runID, appLabel, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients)
 		if err != nil {
@@ -190,7 +190,7 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		return errors.Errorf("helper pod failed due to, err: %v", err)
 	}
 
-	//Deleting all the helper pod for container-kill chaos
+	//Deleting all the helper pod for pod-dns chaos
 	log.Info("[Cleanup]: Deleting all the helper pod")
 	err = common.DeleteAllPod(appLabel, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients)
 	if err != nil {
