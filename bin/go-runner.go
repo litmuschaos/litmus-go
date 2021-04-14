@@ -33,7 +33,8 @@ import (
 	podNetworkLoss "github.com/litmuschaos/litmus-go/experiments/generic/pod-network-loss/experiment"
 	kafkaBrokerPodFailure "github.com/litmuschaos/litmus-go/experiments/kafka/kafka-broker-pod-failure/experiment"
 	ebsLoss "github.com/litmuschaos/litmus-go/experiments/kube-aws/ebs-loss/experiment"
-	ec2terminate "github.com/litmuschaos/litmus-go/experiments/kube-aws/ec2-terminate/experiment"
+	ec2TerminateByID "github.com/litmuschaos/litmus-go/experiments/kube-aws/ec2-terminate-by-id/experiment"
+	ec2TerminateByTag "github.com/litmuschaos/litmus-go/experiments/kube-aws/ec2-terminate-by-tag/experiment"
 
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/log"
@@ -103,8 +104,10 @@ func main() {
 		podNetworkLoss.PodNetworkLoss(clients)
 	case "cassandra-pod-delete":
 		cassandraPodDelete.CasssandraPodDelete(clients)
-	case "ec2-terminate":
-		ec2terminate.EC2Terminate(clients)
+	case "ec2-terminate-by-id":
+		ec2TerminateByID.EC2TerminateByID(clients)
+	case "ec2-terminate-by-tag":
+		ec2TerminateByTag.EC2TerminateByTag(clients)
 	case "ebs-loss":
 		ebsLoss.EBSLoss(clients)
 	case "node-restart":
