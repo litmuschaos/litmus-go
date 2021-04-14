@@ -44,6 +44,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.ChaosInterval = Getenv("CHAOS_INTERVAL", "")
 	experimentDetails.NetworkChaosDuration, _ = strconv.Atoi(Getenv("NETWORK_CHAOS_DURATION", "60"))
 	experimentDetails.ChaosDuration, _ = strconv.Atoi(Getenv("TOTAL_CHAOS_DURATION", strconv.Itoa(experimentDetails.NetworkChaosDuration)))
+	experimentDetails.TerminationGracePeriodSeconds, _ = strconv.Atoi(Getenv("TERMINATION_GRACE_PERIOD_SECONDS", ""))
 }
 
 // Getenv fetch the env and set the default value, if any

@@ -44,4 +44,5 @@ type ExperimentDetails struct {
 	ImagePullSecrets                   []corev1.LocalObjectReference
 	ChaosInterval                      string
 	NetworkChaosDuration               int
+	TerminationGracePeriodSeconds      int
 }
