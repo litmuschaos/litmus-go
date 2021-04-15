@@ -142,7 +142,7 @@ func TaintNode(experimentsDetails *experimentTypes.ExperimentDetails, clients cl
 	select {
 	case <-inject:
 		// stopping the chaos execution, if abort signal recieved
-		os.Exit(1)
+		os.Exit(0)
 	default:
 		if !tainted {
 			node.Spec.Taints = append(node.Spec.Taints, apiv1.Taint{
