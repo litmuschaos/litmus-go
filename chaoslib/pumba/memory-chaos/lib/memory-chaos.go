@@ -296,6 +296,8 @@ func GetContainerArguments(experimentsDetails *experimentTypes.ExperimentDetails
 		"stress",
 		"--duration",
 		strconv.Itoa(experimentsDetails.ChaosDuration) + "s",
+		"--stress-image",
+		experimentsDetails.StressImage,
 		"--stressors",
 		"--cpu 1 --vm 1 --vm-bytes " + strconv.Itoa(experimentsDetails.MemoryConsumption) + "M --timeout " + strconv.Itoa(experimentsDetails.ChaosDuration) + "s",
 	}
