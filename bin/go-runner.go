@@ -60,7 +60,8 @@ func main() {
 
 	//Getting kubeConfig and Generate ClientSets
 	if err := clients.GenerateClientSetFromKubeConfig(); err != nil {
-		log.Fatalf("Unable to Get the kubeconfig, err: %v", err)
+		log.Errorf("Unable to Get the kubeconfig, err: %v", err)
+		return
 	}
 
 	log.Infof("Experiment Name: %v", *experimentName)
@@ -116,6 +117,7 @@ func main() {
 	case "pod-dns-chaos":
 		podDNSChaos.PodDNSExperiment(clients)
 	default:
-		log.Fatalf("Unsupported -name %v, please provide the correct value of -name args", *experimentName)
+		log.Errorf("Unsupported -name %v, please provide the correct value of -name args", *experimentName)
+		return
 	}
 }
