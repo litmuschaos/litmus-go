@@ -17,7 +17,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-//PrepareEC2Terminate contains the prepration and injection steps for the experiment
+//PrepareEC2TerminateByTag contains the prepration and injection steps for the experiment
 func PrepareEC2TerminateByTag(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	var err error
@@ -214,10 +214,10 @@ loop:
 }
 
 //CalculateInstanceAffPerc will calculate the target instance ids according to the instance affected percentage provided.
-func CalculateInstanceAffPerc(podAffPerc int, instanceList []string) []string {
+func CalculateInstanceAffPerc(InstanceAffPerc int, instanceList []string) []string {
 
 	var newIDList []string
-	newInstanceListLength := math.Maximum(1, math.Adjustment(podAffPerc, len(instanceList)))
+	newInstanceListLength := math.Maximum(1, math.Adjustment(InstanceAffPerc, len(instanceList)))
 	rand.Seed(time.Now().UnixNano())
 
 	// it will generate the random instanceList
