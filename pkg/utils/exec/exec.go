@@ -67,7 +67,7 @@ func Exec(commandDetails *PodDetails, clients clients.ClientSets, command []stri
 
 	if err != nil {
 		errorCode := strings.Contains(err.Error(), "143")
-		if errorCode != true {
+		if !errorCode {
 			if strings.Contains(err.Error(), "137") {
 				log.Warn("Chaos process OOM killed as the provided value exceeds resource limits")
 			} else {

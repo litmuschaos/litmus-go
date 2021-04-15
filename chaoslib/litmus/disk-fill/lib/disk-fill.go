@@ -24,6 +24,9 @@ func PrepareDiskFill(experimentsDetails *experimentTypes.ExperimentDetails, clie
 
 	// Get the target pod details for the chaos execution
 	// if the target pod is not defined it will derive the random target pod list using pod affected percentage
+	if experimentsDetails.TargetPods == "" && chaosDetails.AppDetail.Label == "" {
+		return errors.Errorf("Please provide one of the appLabel or TARGET_PODS")
+	}
 	targetPodList, err := common.GetPodList(experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, clients, chaosDetails)
 	if err != nil {
 		return err
@@ -220,6 +223,7 @@ func GetTargetContainer(experimentsDetails *experimentTypes.ExperimentDetails, a
 func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, appName, appNodeName, runID, labelSuffix string) error {
 
 	mountPropagationMode := apiv1.MountPropagationHostToContainer
+	terminationGracePeriodSeconds := int64(experimentsDetails.TerminationGracePeriodSeconds)
 
 	helperPod := &apiv1.Pod{
 		ObjectMeta: v1.ObjectMeta{
@@ -234,10 +238,11 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 			Annotations: experimentsDetails.Annotations,
 		},
 		Spec: apiv1.PodSpec{
-			RestartPolicy:      apiv1.RestartPolicyNever,
-			ImagePullSecrets:   experimentsDetails.ImagePullSecrets,
-			NodeName:           appNodeName,
-			ServiceAccountName: experimentsDetails.ChaosServiceAccount,
+			RestartPolicy:                 apiv1.RestartPolicyNever,
+			ImagePullSecrets:              experimentsDetails.ImagePullSecrets,
+			NodeName:                      appNodeName,
+			ServiceAccountName:            experimentsDetails.ChaosServiceAccount,
+			TerminationGracePeriodSeconds: &terminationGracePeriodSeconds,
 			Volumes: []apiv1.Volume{
 				{
 					Name: "udev",

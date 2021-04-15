@@ -24,15 +24,21 @@ func AUTStatusCheck(appNs, appLabel, containerName string, timeout, delay int, c
 	case true:
 		return AnnotatedApplicationsStatusCheck(appNs, appLabel, containerName, timeout, delay, clients, chaosDetails)
 	default:
-		// Checking whether application containers are in ready state
-		log.Info("[Status]: Checking whether application containers are in ready state")
-		if err := CheckContainerStatus(appNs, appLabel, containerName, timeout, delay, clients); err != nil {
-			return err
-		}
-		// Checking whether application pods are in running state
-		log.Info("[Status]: Checking whether application pods are in running state")
-		if err := CheckPodStatus(appNs, appLabel, timeout, delay, clients); err != nil {
-			return err
+		switch appLabel {
+		case "":
+			// Checking whether applications are healthy
+			log.Info("[Status]: No appLabels provided, skipping the application status checks")
+		default:
+			// Checking whether application containers are in ready state
+			log.Info("[Status]: Checking whether application containers are in ready state")
+			if err := CheckContainerStatus(appNs, appLabel, containerName, timeout, delay, clients); err != nil {
+				return err
+			}
+			// Checking whether application pods are in running state
+			log.Info("[Status]: Checking whether application pods are in running state")
+			if err := CheckPodStatus(appNs, appLabel, timeout, delay, clients); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -61,7 +67,7 @@ func AnnotatedApplicationsStatusCheck(appNs, appLabel, containerName string, tim
 							if container.State.Terminated != nil {
 								return errors.Errorf("container is in terminated state")
 							}
-							if container.Ready != true {
+							if !container.Ready {
 								return errors.Errorf("containers are not yet in running state")
 							}
 							log.InfoWithValues("[Status]: The Container status are as follows", logrus.Fields{
@@ -73,7 +79,7 @@ func AnnotatedApplicationsStatusCheck(appNs, appLabel, containerName string, tim
 								if container.State.Terminated != nil {
 									return errors.Errorf("container is in terminated state")
 								}
-								if container.Ready != true {
+								if !container.Ready {
 									return errors.Errorf("containers are not yet in running state")
 								}
 								log.InfoWithValues("[Status]: The Container status are as follows", logrus.Fields{
@@ -199,7 +205,7 @@ func validateContainerStatus(containerName, podName string, ContainerStatuses []
 			if container.State.Terminated != nil {
 				return errors.Errorf("container is in terminated state")
 			}
-			if container.Ready != true {
+			if !container.Ready {
 				return errors.Errorf("containers are not yet in running state")
 			}
 			log.InfoWithValues("[Status]: The Container status are as follows", logrus.Fields{
@@ -222,6 +228,7 @@ func validateAllContainerStatus(podName string, ContainerStatuses []v1.Container
 // WaitForCompletion wait until the completion of pod
 func WaitForCompletion(appNs, appLabel string, clients clients.ClientSets, duration int, containerName string) (string, error) {
 	var podStatus string
+	failedPods := 0
 	// It will wait till the completion of target container
 	// it will retries until the target container completed or met the timeout(chaos duration)
 	err := retry.
@@ -236,6 +243,7 @@ func WaitForCompletion(appNs, appLabel string, clients clients.ClientSets, durat
 			// if it is still running then it will check for the target container, as we can have multiple container inside helper pod (istio)
 			// if the target container is in completed state(ready flag is false), then we will marked the helper pod as completed
 			// we will retry till it met the timeout(chaos duration)
+			failedPods = 0
 			for _, pod := range podList.Items {
 				podStatus = string(pod.Status.Phase)
 				log.Infof("helper pod status: %v", podStatus)
@@ -247,22 +255,19 @@ func WaitForCompletion(appNs, appLabel string, clients clients.ClientSets, durat
 						}
 					}
 				}
+				if podStatus == "Pending" {
+					return errors.Errorf("pod is in pending state")
+				}
 				log.InfoWithValues("[Status]: The running status of Pods are as follows", logrus.Fields{
 					"Pod": pod.Name, "Status": podStatus})
+				if podStatus == "Failed" {
+					failedPods++
+				}
 			}
 			return nil
 		})
-	if err != nil {
-		return "", err
+	if failedPods > 0 {
+		return "Failed", err
 	}
-	return podStatus, nil
-}
-
-// IsChaosPod check wheather the given pod is chaos pod or not
-// based on labels present inside pod
-func isChaosPod(labels map[string]string) bool {
-	if labels["chaosUID"] != "" || labels["name"] == "chaos-operator" {
-		return true
-	}
-	return false
+	return podStatus, err
 }

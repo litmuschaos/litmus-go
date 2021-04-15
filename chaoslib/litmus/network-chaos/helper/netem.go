@@ -43,12 +43,12 @@ func main() {
 	// inject channel is used to transmit signal notifications.
 	inject = make(chan os.Signal, 1)
 	// Catch and relay certain signal(s) to inject channel.
-	signal.Notify(inject, os.Interrupt, syscall.SIGTERM, syscall.SIGKILL)
+	signal.Notify(inject, os.Interrupt, syscall.SIGTERM)
 
 	// abort channel is used to transmit signal notifications.
 	abort = make(chan os.Signal, 1)
 	// Catch and relay certain signal(s) to abort channel.
-	signal.Notify(abort, os.Interrupt, syscall.SIGTERM, syscall.SIGKILL)
+	signal.Notify(abort, os.Interrupt, syscall.SIGTERM)
 
 	//Getting kubeConfig and Generate ClientSets
 	if err := clients.GenerateClientSetFromKubeConfig(); err != nil {

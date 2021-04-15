@@ -38,7 +38,8 @@ func ContainerKill(clients clients.ClientSets) {
 	if experimentsDetails.EngineName != "" {
 		// Intialise the probe details. Bail out upon error, as we haven't entered exp business logic yet
 		if err = probe.InitializeProbesInChaosResultDetails(&chaosDetails, clients, &resultDetails); err != nil {
-			log.Fatalf("Unable to initialize the probes, err: %v", err)
+			log.Errorf("Unable to initialize the probes, err: %v", err)
+			return
 		}
 	}
 
@@ -67,8 +68,7 @@ func ContainerKill(clients clients.ClientSets) {
 		"Ramp Time": experimentsDetails.RampTime,
 	})
 
-	// Calling AbortWatcher go routine, it will continuously watch for the abort signal for the entire chaos duration and generate the required events and result
-	// It is being invoked here, as opposed to within the chaoslib, as these experiments do not need additional recovery/chaos revert steps like in case of network experiments
+	// Calling AbortWatcher go routine, it will continuously watch for the abort signal and generate the required events and result
 	go common.AbortWatcher(experimentsDetails.ExperimentName, clients, &resultDetails, &chaosDetails, &eventsDetails)
 
 	//PRE-CHAOS APPLICATION STATUS CHECK
@@ -110,19 +110,22 @@ func ContainerKill(clients clients.ClientSets) {
 		if err != nil {
 			failStep := "failed in chaos injection phase"
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-			log.Fatalf("Chaos injection failed, err: %v", err)
+			log.Errorf("Chaos injection failed, err: %v", err)
+			return
 		}
 	} else if experimentsDetails.ChaosLib == "pumba" && experimentsDetails.ContainerRuntime == "docker" {
 		err = pumbaLIB.PrepareContainerKill(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
 		if err != nil {
 			failStep := "failed in chaos injection phase"
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-			log.Fatalf("Chaos injection failed, err: %v", err)
+			log.Errorf("Chaos injection failed, err: %v", err)
+			return
 		}
 	} else {
 		failStep := "lib and container-runtime combination not supported!"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-		log.Fatal("lib and container-runtime combination not supported, provide the correct value of lib & container-runtime")
+		log.Error("lib and container-runtime combination not supported, provide the correct value of lib & container-runtime")
+		return
 	}
 
 	log.Infof("[Confirmation]: %v chaos has been injected successfully", experimentsDetails.ExperimentName)
@@ -165,7 +168,8 @@ func ContainerKill(clients clients.ClientSets) {
 	log.Infof("[The End]: Updating the chaos result of %v experiment (EOT)", experimentsDetails.ExperimentName)
 	err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 	if err != nil {
-		log.Fatalf("Unable to Update the Chaos Result, err: %v", err)
+		log.Errorf("Unable to Update the Chaos Result, err: %v", err)
+		return
 	}
 
 	// generating the event in chaosresult to marked the verdict as pass/fail

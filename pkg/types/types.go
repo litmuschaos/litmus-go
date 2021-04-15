@@ -52,6 +52,7 @@ type ProbeDetails struct {
 	Status                 map[string]string
 	IsProbeFailedWithError error
 	RunID                  string
+	RunCount               int
 }
 
 // EventDetails is for collecting all the events-related details
@@ -77,6 +78,7 @@ type ChaosDetails struct {
 	ChaosDuration        int
 	JobCleanupPolicy     string
 	ProbeImagePullPolicy string
+	Randomness           bool
 }
 
 // AppDetails contains all the application related envs
