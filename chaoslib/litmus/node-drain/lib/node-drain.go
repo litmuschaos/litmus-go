@@ -14,8 +14,8 @@ import (
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/node-drain/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
-	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/result"
+	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
@@ -28,7 +28,7 @@ var inject, abort chan os.Signal
 
 //PrepareNodeDrain contains the prepration steps before chaos injection
 func PrepareNodeDrain(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	
+
 	// inject channel is used to transmit signal notifications.
 	inject = make(chan os.Signal, 1)
 	// Catch and relay certain signal(s) to inject channel.
@@ -98,7 +98,7 @@ func PrepareNodeDrain(experimentsDetails *experimentTypes.ExperimentDetails, cli
 	log.Info("[Chaos]: Stopping the experiment")
 
 	// Uncordon the application node
-	if err := UncordonNode(experimentsDetails, clients);err != nil {
+	if err := UncordonNode(experimentsDetails, clients); err != nil {
 		return err
 	}
 
@@ -125,30 +125,30 @@ func DrainNode(experimentsDetails *experimentTypes.ExperimentDetails, clients cl
 		// stopping the chaos execution, if abort signal recieved
 		os.Exit(1)
 	default:
-	log.Infof("[Inject]: Draining the %v node", experimentsDetails.TargetNode)
+		log.Infof("[Inject]: Draining the %v node", experimentsDetails.TargetNode)
 
-	command := exec.Command("kubectl", "drain", experimentsDetails.TargetNode, "--ignore-daemonsets", "--delete-local-data", "--force", "--timeout", strconv.Itoa(experimentsDetails.ChaosDuration)+"s")
-	var out, stderr bytes.Buffer
-	command.Stdout = &out
-	command.Stderr = &stderr
-	if err := command.Run(); err != nil {
-		log.Infof("Error String: %v", stderr.String())
-		return errors.Errorf("Unable to drain the %v node, err: %v", experimentsDetails.TargetNode, err)
-	}
+		command := exec.Command("kubectl", "drain", experimentsDetails.TargetNode, "--ignore-daemonsets", "--delete-local-data", "--force", "--timeout", strconv.Itoa(experimentsDetails.ChaosDuration)+"s")
+		var out, stderr bytes.Buffer
+		command.Stdout = &out
+		command.Stderr = &stderr
+		if err := command.Run(); err != nil {
+			log.Infof("Error String: %v", stderr.String())
+			return errors.Errorf("Unable to drain the %v node, err: %v", experimentsDetails.TargetNode, err)
+		}
 
-	return retry.
-		Times(90).
-		Wait(1 * time.Second).
-		Try(func(attempt uint) error {
-			nodeSpec, err := clients.KubeClient.CoreV1().Nodes().Get(experimentsDetails.TargetNode, v1.GetOptions{})
-			if err != nil {
-				return err
-			}
-			if !nodeSpec.Spec.Unschedulable {
-				return errors.Errorf("%v node is not in unschedulable state", experimentsDetails.TargetNode)
-			}
-			return nil
-		})
+		return retry.
+			Times(90).
+			Wait(1 * time.Second).
+			Try(func(attempt uint) error {
+				nodeSpec, err := clients.KubeClient.CoreV1().Nodes().Get(experimentsDetails.TargetNode, v1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				if !nodeSpec.Spec.Unschedulable {
+					return errors.Errorf("%v node is not in unschedulable state", experimentsDetails.TargetNode)
+				}
+				return nil
+			})
 	}
 	return nil
 }
@@ -193,8 +193,8 @@ func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, clients
 			// retry thrice for the chaos revert
 			retry := 3
 			for retry > 0 {
-				if err := UncordonNode(experimentsDetails, clients);err != nil {
-					log.Errorf("Unable to uncordon the node, err: %v",err)
+				if err := UncordonNode(experimentsDetails, clients); err != nil {
+					log.Errorf("Unable to uncordon the node, err: %v", err)
 				}
 				retry--
 				time.Sleep(1 * time.Second)

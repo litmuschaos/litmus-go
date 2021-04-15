@@ -1,11 +1,11 @@
 package experiment
 
 import (
-	pumbaLIB "github.com/litmuschaos/litmus-go/chaoslib/pumba/pod-io-stress/lib"
-	clients "github.com/litmuschaos/litmus-go/pkg/clients"
+	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/pod-dns-chaos/lib"
+	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
-	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/pod-io-stress/environment"
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-io-stress/types"
+	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/pod-dns-chaos/environment"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-dns-chaos/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/result"
@@ -13,11 +13,10 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/sirupsen/logrus"
-	"k8s.io/klog"
 )
 
-// PodIOStress inject the pod-io-stress chaos
-func PodIOStress(clients clients.ClientSets) {
+// PodDNSExperiment contains steps to inject chaos
+func PodDNSExperiment(clients clients.ClientSets) {
 
 	var err error
 	experimentsDetails := experimentTypes.ExperimentDetails{}
@@ -29,14 +28,14 @@ func PodIOStress(clients clients.ClientSets) {
 	log.Infof("[PreReq]: Getting the ENV for the %v experiment", experimentsDetails.ExperimentName)
 	experimentEnv.GetENV(&experimentsDetails)
 
-	// Intialise the chaos attributes
+	// Initialise the chaos attributes
 	experimentEnv.InitialiseChaosVariables(&chaosDetails, &experimentsDetails)
 
-	// Intialise Chaos Result Parameters
+	// Initialise Chaos Result Parameters
 	types.SetResultAttributes(&resultDetails, chaosDetails)
 
 	if experimentsDetails.EngineName != "" {
-		// Intialise the probe details. Bail out upon error, as we haven't entered exp business logic yet
+		// Initialise the probe details. Bail out upon error, as we haven't entered exp business logic yet
 		if err = probe.InitializeProbesInChaosResultDetails(&chaosDetails, clients, &resultDetails); err != nil {
 			log.Fatalf("Unable to initialize the probes, err: %v", err)
 		}
@@ -47,7 +46,7 @@ func PodIOStress(clients clients.ClientSets) {
 	err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT")
 	if err != nil {
 		log.Errorf("Unable to Create the Chaos Result, err: %v", err)
-		failStep := "Updating the chaos result of " + experimentsDetails.ExperimentName + " experiment (SOT)"
+		failStep := "Updating the chaos result of pod-delete experiment (SOT)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -61,13 +60,10 @@ func PodIOStress(clients clients.ClientSets) {
 	events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosResult")
 
 	//DISPLAY THE APP INFORMATION
-	log.InfoWithValues("The application information is as follows", logrus.Fields{
-		"Namespace":                       experimentsDetails.AppNS,
-		"Label":                           experimentsDetails.AppLabel,
-		"Chaos Duration":                  experimentsDetails.ChaosDuration,
-		"Ramp Time":                       experimentsDetails.RampTime,
-		"FilesystemUtilizationPercentage": experimentsDetails.FilesystemUtilizationPercentage,
-		"NumberOfWorkers":                 experimentsDetails.NumberOfWorkers,
+	log.InfoWithValues("[Info]: The application information is as follows", logrus.Fields{
+		"Namespace": experimentsDetails.AppNS,
+		"Label":     experimentsDetails.AppLabel,
+		"Ramp Time": experimentsDetails.RampTime,
 	})
 
 	// Calling AbortWatcher go routine, it will continuously watch for the abort signal and generate the required events and result
@@ -75,7 +71,8 @@ func PodIOStress(clients clients.ClientSets) {
 
 	//PRE-CHAOS APPLICATION STATUS CHECK
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (pre-chaos)")
-	if err = status.AUTStatusCheck(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.TargetContainer, experimentsDetails.Timeout, experimentsDetails.Delay, clients, &chaosDetails); err != nil {
+	err = status.AUTStatusCheck(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.TargetContainer, experimentsDetails.Timeout, experimentsDetails.Delay, clients, &chaosDetails)
+	if err != nil {
 		log.Errorf("Application status check failed, err: %v", err)
 		failStep := "Verify that the AUT (Application Under Test) is running (pre-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
@@ -106,16 +103,16 @@ func PodIOStress(clients clients.ClientSets) {
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
-	// Including the litmus lib for pod-io-stress
-	if experimentsDetails.ChaosLib == "pumba" {
-		err = pumbaLIB.PreparePodIOStress(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
+	// Including the litmus lib
+	if experimentsDetails.ChaosLib == "litmus" {
+		err = litmusLIB.PrepareAndInjectChaos(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
 		if err != nil {
-			log.Errorf("[Error]: pod io stress chaos failed, err: %v", err)
+			log.Errorf("Chaos injection failed, err: %v", err)
 			failStep := "failed in chaos injection phase"
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}
-		log.Info("[Confirmation]: Disk of the application pod has been stressed successfully")
+		log.Info("[Confirmation]: chaos has been injected successfully")
 		resultDetails.Verdict = "Pass"
 	} else {
 		log.Error("[Invalid]: Please Provide the correct LIB")
@@ -126,8 +123,9 @@ func PodIOStress(clients clients.ClientSets) {
 
 	//POST-CHAOS APPLICATION STATUS CHECK
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (post-chaos)")
-	if err = status.AUTStatusCheck(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.TargetContainer, experimentsDetails.Timeout, experimentsDetails.Delay, clients, &chaosDetails); err != nil {
-		klog.V(0).Infof("Application status check failed, err: %v", err)
+	err = status.AUTStatusCheck(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.TargetContainer, experimentsDetails.Timeout, experimentsDetails.Delay, clients, &chaosDetails)
+	if err != nil {
+		log.Errorf("Application status check failed, err: %v", err)
 		failStep := "Verify that the AUT (Application Under Test) is running (post-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
@@ -180,5 +178,4 @@ func PodIOStress(clients clients.ClientSets) {
 		types.SetEngineEventAttributes(&eventsDetails, types.Summary, msg, "Normal", &chaosDetails)
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
-
 }

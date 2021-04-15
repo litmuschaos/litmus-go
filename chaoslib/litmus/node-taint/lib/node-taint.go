@@ -97,7 +97,7 @@ func PrepareNodeTaint(experimentsDetails *experimentTypes.ExperimentDetails, cli
 	log.Info("[Chaos]: Stopping the experiment")
 
 	// remove taint from the application node
-	if err := RemoveTaintFromNode(experimentsDetails, clients);err != nil {
+	if err := RemoveTaintFromNode(experimentsDetails, clients); err != nil {
 		return err
 	}
 
@@ -227,7 +227,7 @@ func GetTaintDetails(experimentsDetails *experimentTypes.ExperimentDetails) (str
 }
 
 // abortWatcher continuosly watch for the abort signals
-func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets,resultDetails *types.ResultDetails, chaosDetails *types.ChaosDetails, eventsDetails *types.EventDetails) {
+func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, chaosDetails *types.ChaosDetails, eventsDetails *types.EventDetails) {
 
 	for {
 		select {
@@ -237,8 +237,8 @@ func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, clients
 			// retry thrice for the chaos revert
 			retry := 3
 			for retry > 0 {
-				if err := RemoveTaintFromNode(experimentsDetails, clients);err != nil {
-					log.Errorf("Unable to untaint node, err: %v",err)
+				if err := RemoveTaintFromNode(experimentsDetails, clients); err != nil {
+					log.Errorf("Unable to untaint node, err: %v", err)
 				}
 				retry--
 				time.Sleep(1 * time.Second)
