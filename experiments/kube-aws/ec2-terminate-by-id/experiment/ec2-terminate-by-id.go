@@ -1,12 +1,12 @@
 package experiment
 
 import (
-	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/ec2-terminate/lib"
+	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/ec2-terminate-by-id/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/cloud/aws"
 	"github.com/litmuschaos/litmus-go/pkg/events"
-	experimentEnv "github.com/litmuschaos/litmus-go/pkg/kube-aws/ec2-terminate/environment"
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/kube-aws/ec2-terminate/types"
+	experimentEnv "github.com/litmuschaos/litmus-go/pkg/kube-aws/ec2-terminate-by-id/environment"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/kube-aws/ec2-terminate-by-id/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/result"
@@ -15,10 +15,11 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// EC2Terminate inject the ebs volume loss chaos
-func EC2Terminate(clients clients.ClientSets) {
+// EC2TerminateByID inject the ebs volume loss chaos
+func EC2TerminateByID(clients clients.ClientSets) {
 
 	var err error
+	var activeNodeCount int
 	experimentsDetails := experimentTypes.ExperimentDetails{}
 	resultDetails := types.ResultDetails{}
 	eventsDetails := types.EventDetails{}
@@ -55,17 +56,18 @@ func EC2Terminate(clients clients.ClientSets) {
 	// Set the chaos result uid
 	result.SetResultUID(&resultDetails, clients, &chaosDetails)
 
-	//DISPLAY THE APP INFORMATION
-	log.InfoWithValues("The application information is as follows", logrus.Fields{
-		"Namespace":      experimentsDetails.AppNS,
-		"Label":          experimentsDetails.AppLabel,
-		"Chaos Duration": experimentsDetails.ChaosDuration,
-		"Ramp Time":      experimentsDetails.RampTime,
+	//DISPLAY THE INSTANCE INFORMATION
+	log.InfoWithValues("The instance information is as follows", logrus.Fields{
+		"Chaos Duration":  experimentsDetails.ChaosDuration,
+		"Chaos Namespace": experimentsDetails.ChaosNamespace,
+		"Ramp Time":       experimentsDetails.RampTime,
+		"Instance ID":     experimentsDetails.Ec2InstanceID,
+		"Sequence":        experimentsDetails.Sequence,
 	})
 
 	//PRE-CHAOS NODE STATUS CHECK
 	if experimentsDetails.ManagedNodegroup == "enable" {
-		err = aws.PreChaosNodeStatusCheck(&experimentsDetails, clients)
+		activeNodeCount, err = aws.PreChaosNodeStatusCheck(experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 		if err != nil {
 			log.Errorf("Pre chaos node status check failed, err: %v", err)
 			failStep := "Verify that the NUT (Node Under Test) is running (pre-chaos)"
@@ -125,15 +127,9 @@ func EC2Terminate(clients clients.ClientSets) {
 	}
 
 	//Verify the aws ec2 instance is running (pre chaos)
-	instanceState, err := aws.GetEC2InstanceStatus(&experimentsDetails)
+	err = litmusLIB.InstanceStatusCheckByID(&experimentsDetails)
 	if err != nil {
 		log.Errorf("failed to get the ec2 instance status, err: %v", err)
-		failStep := "Verify the AWS ec2 instance status (pre-chaos)"
-		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-		return
-	}
-	if instanceState != "running" {
-		log.Errorf("failed to get the ec2 instance status as running")
 		failStep := "Verify the AWS ec2 instance status (pre-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
@@ -142,7 +138,7 @@ func EC2Terminate(clients clients.ClientSets) {
 
 	// Including the litmus lib for ec2-terminate
 	if experimentsDetails.ChaosLib == "litmus" {
-		err = litmusLIB.InjectEC2Terminate(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
+		err = litmusLIB.PrepareEC2TerminateByID(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
 		if err != nil {
 			log.Errorf("Chaos injection failed, err: %v", err)
 			failStep := "failed in chaos injection phase"
@@ -160,7 +156,7 @@ func EC2Terminate(clients clients.ClientSets) {
 
 	// POST-CHAOS ACTIVE NODE COUNT TEST
 	if experimentsDetails.ManagedNodegroup == "enable" {
-		err = aws.PostChaosActiveNodeCountCheck(&experimentsDetails, clients)
+		err = aws.PostChaosActiveNodeCountCheck(activeNodeCount, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 		if err != nil {
 			log.Errorf("Post chaos active node count check failed, err: %v", err)
 			failStep := "Verify active number of nodes post chaos"
@@ -171,15 +167,9 @@ func EC2Terminate(clients clients.ClientSets) {
 
 	//Verify the aws ec2 instance is running (post chaos)
 	if experimentsDetails.ManagedNodegroup != "enable" {
-		instanceState, err = aws.GetEC2InstanceStatus(&experimentsDetails)
+		err = litmusLIB.InstanceStatusCheckByID(&experimentsDetails)
 		if err != nil {
 			log.Errorf("failed to get the ec2 instance status, err: %v", err)
-			failStep := "Verify the AWS ec2 instance status (post-chaos)"
-			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-			return
-		}
-		if instanceState != "running" {
-			log.Errorf("failed to get the ec2 instance status as running")
 			failStep := "Verify the AWS ec2 instance status (post-chaos)"
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return

@@ -15,6 +15,7 @@ type ExperimentDetails struct {
 	AuxiliaryAppInfo   string
 	ChaosLib           string
 	ChaosDuration      int
+	ChaosInterval      int
 	ChaosUID           clientTypes.UID
 	InstanceID         string
 	ChaosNamespace     string
@@ -24,6 +25,7 @@ type ExperimentDetails struct {
 	Ec2InstanceID      string
 	Region             string
 	ManagedNodegroup   string
+	Sequence           string
 	ActiveNodes        int
 	LIBImagePullPolicy string
 	TargetContainer    string
