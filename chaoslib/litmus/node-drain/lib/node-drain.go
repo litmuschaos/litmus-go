@@ -123,7 +123,7 @@ func DrainNode(experimentsDetails *experimentTypes.ExperimentDetails, clients cl
 	select {
 	case <-inject:
 		// stopping the chaos execution, if abort signal recieved
-		os.Exit(1)
+		os.Exit(0)
 	default:
 		log.Infof("[Inject]: Draining the %v node", experimentsDetails.TargetNode)
 

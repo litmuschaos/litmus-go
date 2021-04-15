@@ -39,7 +39,8 @@ func KafkaBrokerPodFailure(clients clients.ClientSets) {
 	if experimentsDetails.ChaoslibDetail.EngineName != "" {
 		// Intialise the probe details. Bail out upon error, as we haven't entered exp business logic yet
 		if err = probe.InitializeProbesInChaosResultDetails(&chaosDetails, clients, &resultDetails); err != nil {
-			log.Fatalf("Unable to initialize the probes, err: %v", err)
+			log.Errorf("Unable to initialize the probes, err: %v", err)
+			return
 		}
 	}
 
@@ -198,6 +199,7 @@ func KafkaBrokerPodFailure(clients clients.ClientSets) {
 	err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 	if err != nil {
 		log.Errorf("Unable to Update the Chaos Result, err: %v", err)
+		return
 	}
 
 	// generating the event in chaosresult to marked the verdict as pass/fail
