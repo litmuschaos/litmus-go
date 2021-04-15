@@ -9,11 +9,9 @@ import (
 	"time"
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
-	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-autoscaler/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
-	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
@@ -93,13 +91,11 @@ func PreparePodAutoscaler(experimentsDetails *experimentTypes.ExperimentDetails,
 		//calling go routine which will continuously watch for the abort signal
 		go AbortPodAutoScalerChaos(appsUnderTest, experimentsDetails, clients, resultDetails, eventsDetails, chaosDetails)
 
-		err = PodAutoscalerChaosInStatefulset(experimentsDetails, clients, appsUnderTest, resultDetails, eventsDetails, chaosDetails)
-		if err != nil {
+		if err = PodAutoscalerChaosInStatefulset(experimentsDetails, clients, appsUnderTest, resultDetails, eventsDetails, chaosDetails); err != nil {
 			return errors.Errorf("Unable to perform autoscaling, err: %v", err)
 		}
 
-		err = AutoscalerRecoveryInStatefulset(experimentsDetails, clients, appsUnderTest)
-		if err != nil {
+		if err = AutoscalerRecoveryInStatefulset(experimentsDetails, clients, appsUnderTest); err != nil {
 			return errors.Errorf("Unable to rollback the autoscaling, err: %v", err)
 		}
 
@@ -244,7 +240,7 @@ func DeploymentStatusCheck(experimentsDetails *experimentTypes.ExperimentDetails
 					return errors.Errorf("Unable to find the deployment with name %v, err: %v", app.AppName, err)
 				}
 				log.Infof("Deployment's Available Replica Count is %v", deployment.Status.AvailableReplicas)
-				if int(deployment.Status.AvailableReplicas) != app.ReplicaCount {
+				if int(deployment.Status.AvailableReplicas) != experimentsDetails.Replicas {
 					isFailed = true
 					return errors.Errorf("Application %s is not scaled yet, err: %v", app.AppName, err)
 				}
@@ -440,7 +436,7 @@ func AutoscalerRecoveryInStatefulset(experimentsDetails *experimentTypes.Experim
 func int32Ptr(i int32) *int32 { return &i }
 
 //AbortPodAutoScalerChaos go routine will continuously watch for the abort signal for the entire chaos duration and generate the required events and result
-func AbortPodAutoScalerChaos(appsUnderTest []experimentTypes.ApplicationUnderTest, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+func AbortPodAutoScalerChaos(appsUnderTest []experimentTypes.ApplicationUnderTest, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) {
 
 	// signChan channel is used to transmit signal notifications.
 	signChan := make(chan os.Signal, 1)
@@ -450,21 +446,7 @@ func AbortPodAutoScalerChaos(appsUnderTest []experimentTypes.ApplicationUnderTes
 	for {
 		select {
 		case <-signChan:
-			log.Info("[Chaos]: Chaos Experiment Abortion started because of terminated signal received")
-			// updating the chaosresult after stopped
-			failStep := "Chaos injection stopped!"
-			types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep)
-			result.ChaosResult(chaosDetails, clients, resultDetails, "EOT")
-
-			// generating summary event in chaosengine
-			msg := experimentsDetails.ExperimentName + " experiment has been aborted"
-			types.SetEngineEventAttributes(eventsDetails, types.Summary, msg, "Warning", chaosDetails)
-			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
-
-			// generating summary event in chaosresult
-			types.SetResultEventAttributes(eventsDetails, types.StoppedVerdict, msg, "Warning", resultDetails)
-			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosResult")
-
+			log.Info("[Chaos]: Revert Started")
 			// Note that we are attempting recovery (in this case scaling down to original replica count) after ..
 			// .. the tasks to patch results & generate events. This is so because the func AutoscalerRecovery..
 			// ..takes more time to complete - it involves a status check post the downscale. We have a period of ..
@@ -485,8 +467,9 @@ func AbortPodAutoScalerChaos(appsUnderTest []experimentTypes.ApplicationUnderTes
 				}
 
 			default:
-				return errors.Errorf("application type '%s' is not supported for the chaos", experimentsDetails.AppKind)
+				log.Errorf("application type '%s' is not supported for the chaos", experimentsDetails.AppKind)
 			}
+			log.Info("[Chaos]: Revert Completed")
 
 			os.Exit(1)
 		}

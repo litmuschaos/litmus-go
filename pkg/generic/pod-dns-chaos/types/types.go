@@ -10,6 +10,8 @@ type ExperimentDetails struct {
 	ExperimentName                string
 	EngineName                    string
 	ChaosDuration                 int
+	LIBImage                      string
+	LIBImagePullPolicy            string
 	RampTime                      int
 	ChaosLib                      string
 	AppNS                         string
@@ -19,22 +21,21 @@ type ExperimentDetails struct {
 	InstanceID                    string
 	ChaosNamespace                string
 	ChaosPodName                  string
-	TargetContainer               string
-	AuxiliaryAppInfo              string
-	FillPercentage                int
-	ContainerPath                 string
 	RunID                         string
 	Timeout                       int
 	Delay                         int
-	LIBImage                      string
-	LIBImagePullPolicy            string
+	TargetContainer               string
 	TargetPods                    string
 	PodsAffectedPerc              int
 	Annotations                   map[string]string
-	Sequence                      string
-	Resources                     corev1.ResourceRequirements
+	TargetHostNames               string
+	MatchScheme                   string
+	ChaosType                     string
+	ContainerRuntime              string
 	ChaosServiceAccount           string
+	Sequence                      string
+	SocketPath                    string
+	Resources                     corev1.ResourceRequirements
 	ImagePullSecrets              []corev1.LocalObjectReference
-	EphemeralStorageMebibytes     int
 	TerminationGracePeriodSeconds int
 }

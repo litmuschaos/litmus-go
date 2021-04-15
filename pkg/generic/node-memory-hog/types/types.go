@@ -21,6 +21,7 @@ type ExperimentDetails struct {
 	ChaosPodName                string
 	MemoryConsumptionPercentage int
 	MemoryConsumptionMebibytes  int
+	NumberOfWorkers             int
 	RunID                       string
 	LIBImage                    string
 	LIBImagePullPolicy          string

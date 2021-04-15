@@ -25,6 +25,7 @@ import (
 	podAutoscaler "github.com/litmuschaos/litmus-go/experiments/generic/pod-autoscaler/experiment"
 	podCPUHog "github.com/litmuschaos/litmus-go/experiments/generic/pod-cpu-hog/experiment"
 	podDelete "github.com/litmuschaos/litmus-go/experiments/generic/pod-delete/experiment"
+	podDNSChaos "github.com/litmuschaos/litmus-go/experiments/generic/pod-dns-chaos/experiment"
 	podIOStress "github.com/litmuschaos/litmus-go/experiments/generic/pod-io-stress/experiment"
 	podMemoryHog "github.com/litmuschaos/litmus-go/experiments/generic/pod-memory-hog/experiment"
 	podNetworkCorruption "github.com/litmuschaos/litmus-go/experiments/generic/pod-network-corruption/experiment"
@@ -112,6 +113,8 @@ func main() {
 		ebsLoss.EBSLoss(clients)
 	case "node-restart":
 		nodeRestart.NodeRestart(clients)
+	case "pod-dns-chaos":
+		podDNSChaos.PodDNSExperiment(clients)
 	default:
 		log.Fatalf("Unsupported -name %v, please provide the correct value of -name args", *experimentName)
 	}

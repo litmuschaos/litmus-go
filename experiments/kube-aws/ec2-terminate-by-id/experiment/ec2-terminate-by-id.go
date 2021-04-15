@@ -55,12 +55,13 @@ func EC2TerminateByID(clients clients.ClientSets) {
 	// Set the chaos result uid
 	result.SetResultUID(&resultDetails, clients, &chaosDetails)
 
-	//DISPLAY THE APP INFORMATION
-	log.InfoWithValues("The application information is as follows", logrus.Fields{
-		"Namespace":      experimentsDetails.AppNS,
-		"Label":          experimentsDetails.AppLabel,
-		"Chaos Duration": experimentsDetails.ChaosDuration,
-		"Ramp Time":      experimentsDetails.RampTime,
+	//DISPLAY THE INSTANCE INFORMATION
+	log.InfoWithValues("The instance information is as follows", logrus.Fields{
+		"Chaos Duration":  experimentsDetails.ChaosDuration,
+		"Chaos Namespace": experimentsDetails.ChaosNamespace,
+		"Ramp Time":       experimentsDetails.RampTime,
+		"Instance ID":     experimentsDetails.Ec2InstanceID,
+		"Sequence":        experimentsDetails.Sequence,
 	})
 
 	//PRE-CHAOS NODE STATUS CHECK

@@ -17,12 +17,15 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/types"
+	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/resource"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientTypes "k8s.io/apimachinery/pkg/types"
 )
+
+var inject, abort chan os.Signal
 
 func main() {
 
@@ -31,6 +34,16 @@ func main() {
 	eventsDetails := types.EventDetails{}
 	chaosDetails := types.ChaosDetails{}
 	resultDetails := types.ResultDetails{}
+
+	// inject channel is used to transmit signal notifications.
+	inject = make(chan os.Signal, 1)
+	// Catch and relay certain signal(s) to inject channel.
+	signal.Notify(inject, os.Interrupt, syscall.SIGTERM)
+
+	// abort channel is used to transmit signal notifications.
+	abort = make(chan os.Signal, 1)
+	// Catch and relay certain signal(s) to abort channel.
+	signal.Notify(abort, os.Interrupt, syscall.SIGTERM)
 
 	//Getting kubeConfig and Generate ClientSets
 	if err := clients.GenerateClientSetFromKubeConfig(); err != nil {
@@ -54,7 +67,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("helper pod failed, err: %v", err)
 	}
-
 }
 
 //DiskFill contains steps to inject disk-fill chaos
@@ -97,10 +109,10 @@ func DiskFill(experimentsDetails *experimentTypes.ExperimentDetails, clients cli
 	sizeTobeFilled := GetSizeToBeFilled(experimentsDetails, usedEphemeralStorageSize, int(ephemeralStorageLimit))
 
 	log.InfoWithValues("[Info]: Details of application under chaos injection", logrus.Fields{
-		"PodName":               experimentsDetails.TargetPods,
-		"ContainerName":         experimentsDetails.TargetContainer,
+		"PodName":                   experimentsDetails.TargetPods,
+		"ContainerName":             experimentsDetails.TargetContainer,
 		"ephemeralStorageLimit(KB)": ephemeralStorageLimit,
-		"ContainerID":           containerID,
+		"ContainerID":               containerID,
 	})
 
 	log.Infof("ephemeral storage size to be filled: %vKB", strconv.Itoa(sizeTobeFilled))
@@ -112,67 +124,48 @@ func DiskFill(experimentsDetails *experimentTypes.ExperimentDetails, clients cli
 		events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 	}
 
+	// watching for the abort signal and revert the chaos
+	go abortWatcher(experimentsDetails, clients, containerID)
+
 	if sizeTobeFilled > 0 {
 
-		var endTime <-chan time.Time
-		timeDelay := time.Duration(experimentsDetails.ChaosDuration) * time.Second
-
-		// Creating files to fill the required ephemeral storage size of block size of 4K
-		dd := fmt.Sprintf("sudo dd if=/dev/urandom of=/diskfill/%v/diskfill bs=4K count=%v", containerID, strconv.Itoa(sizeTobeFilled/4))
-		cmd := exec.Command("/bin/bash", "-c", dd)
-		out, err := cmd.CombinedOutput()
-		if err != nil {
+		if err := fillDisk(containerID, sizeTobeFilled); err != nil {
 			log.Error(string(out))
 			return err
 		}
 
 		log.Infof("[Chaos]: Waiting for %vs", experimentsDetails.ChaosDuration)
 
-		// signChan channel is used to transmit signal notifications.
-		signChan := make(chan os.Signal, 1)
-		// Catch and relay certain signal(s) to signChan channel.
-		signal.Notify(signChan, os.Interrupt, syscall.SIGTERM, syscall.SIGKILL)
+		common.WaitForDuration(experimentsDetails.ChaosDuration)
 
-	loop:
-		for {
-			endTime = time.After(timeDelay)
-			select {
-			case <-signChan:
-				log.Info("[Chaos]: Killing process started because of terminated signal received")
-				// updating the chaosresult after stopped
-				failStep := "Disk Fill Chaos injection stopped!"
-				types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep)
-				result.ChaosResult(chaosDetails, clients, resultDetails, "EOT")
-
-				// generating summary event in chaosengine
-				msg := experimentsDetails.ExperimentName + " experiment has been aborted"
-				types.SetEngineEventAttributes(eventsDetails, types.Summary, msg, "Warning", chaosDetails)
-				events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
-
-				// generating summary event in chaosresult
-				types.SetResultEventAttributes(eventsDetails, types.StoppedVerdict, msg, "Warning", resultDetails)
-				events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosResult")
-
-				err = Remedy(experimentsDetails, clients, containerID)
-				if err != nil {
-					return errors.Errorf("Unable to perform remedy operation due to %v", err)
-				}
-				os.Exit(1)
-			case <-endTime:
-				log.Infof("[Chaos]: Time is up for experiment: %v", experimentsDetails.ExperimentName)
-				endTime = nil
-				break loop
-			}
-		}
+		log.Info("[Chaos]: Stopping the experiment")
 
 		// It will delete the target pod if target pod is evicted
 		// if target pod is still running then it will delete all the files, which was created earlier during chaos execution
 		err = Remedy(experimentsDetails, clients, containerID)
 		if err != nil {
-			return errors.Errorf("Unable to perform remedy operation due to %v", err)
+			return errors.Errorf("Unable to perform remedy operation, err: %v", err)
 		}
 	} else {
 		log.Warn("No required free space found!, It's Housefull")
+	}
+	return nil
+}
+
+// fillDisk fill the ephemeral disk by creating files
+func fillDisk(containerID string, sizeTobeFilled int) error {
+
+	select {
+	case <-inject:
+		// stopping the chaos execution, if abort signal recieved
+		os.Exit(1)
+	default:
+		// Creating files to fill the required ephemeral storage size of block size of 4K
+		log.Infof("[Fill]: Filling ephemeral storage, size: %vKB", sizeTobeFilled)
+		dd := fmt.Sprintf("sudo dd if=/dev/urandom of=/diskfill/%v/diskfill bs=4K count=%v", containerID, strconv.Itoa(sizeTobeFilled/4))
+		cmd := exec.Command("/bin/bash", "-c", dd)
+		_, err := cmd.CombinedOutput()
+		return err
 	}
 	return nil
 }
@@ -265,6 +258,7 @@ func Remedy(experimentsDetails *experimentTypes.ExperimentDetails, clients clien
 	// Deleting the pod as pod is already evicted
 	podReason := pod.Status.Reason
 	if podReason == "Evicted" {
+		log.Warn("Target pod is evicted, deleting the pod")
 		if err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Delete(experimentsDetails.TargetPods, &v1.DeleteOptions{}); err != nil {
 			return err
 		}
@@ -304,4 +298,27 @@ func Getenv(key string, defaultValue string) string {
 		value = defaultValue
 	}
 	return value
+}
+
+// abortWatcher continuosly watch for the abort signals
+func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, containerID string) {
+
+	for {
+		select {
+		case <-abort:
+			log.Info("[Chaos]: Killing process started because of terminated signal received")
+			log.Info("Chaos Revert Started")
+			// retry thrice for the chaos revert
+			retry := 3
+			for retry > 0 {
+				if err := Remedy(experimentsDetails, clients, containerID); err != nil {
+					log.Errorf("Unable to perform remedy operation, err: %v", err)
+				}
+				retry--
+				time.Sleep(1 * time.Second)
+			}
+			log.Info("Chaos Revert Completed")
+			os.Exit(1)
+		}
+	}
 }

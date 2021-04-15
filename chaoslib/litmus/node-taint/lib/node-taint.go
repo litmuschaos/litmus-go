@@ -23,9 +23,20 @@ import (
 )
 
 var err error
+var inject, abort chan os.Signal
 
 //PrepareNodeTaint contains the prepration steps before chaos injection
 func PrepareNodeTaint(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+
+	// inject channel is used to transmit signal notifications.
+	inject = make(chan os.Signal, 1)
+	// Catch and relay certain signal(s) to inject channel.
+	signal.Notify(inject, os.Interrupt, syscall.SIGTERM)
+
+	// abort channel is used to transmit signal notifications.
+	abort = make(chan os.Signal, 1)
+	// Catch and relay certain signal(s) to abort channel.
+	signal.Notify(abort, os.Interrupt, syscall.SIGTERM)
 
 	//Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
@@ -54,6 +65,9 @@ func PrepareNodeTaint(experimentsDetails *experimentTypes.ExperimentDetails, cli
 		}
 	}
 
+	// watching for the abort signal and revert the chaos
+	go abortWatcher(experimentsDetails, clients, resultDetails, chaosDetails, eventsDetails)
+
 	// taint the application node
 	err := TaintNode(experimentsDetails, clients)
 	if err != nil {
@@ -76,51 +90,14 @@ func PrepareNodeTaint(experimentsDetails *experimentTypes.ExperimentDetails, cli
 		}
 	}
 
-	var endTime <-chan time.Time
-	timeDelay := time.Duration(experimentsDetails.ChaosDuration) * time.Second
-
 	log.Infof("[Chaos]: Waiting for %vs", experimentsDetails.ChaosDuration)
 
-	// signChan channel is used to transmit signal notifications.
-	signChan := make(chan os.Signal, 1)
-	// Catch and relay certain signal(s) to signChan channel.
-	signal.Notify(signChan, os.Interrupt, syscall.SIGTERM, syscall.SIGKILL)
+	common.WaitForDuration(experimentsDetails.ChaosDuration)
 
-loop:
-	for {
-		endTime = time.After(timeDelay)
-		select {
-		case <-signChan:
-			log.Info("[Chaos]: Killing process started because of terminated signal received")
-			// updating the chaosresult after stopped
-			failStep := "Node Taint injection stopped!"
-			types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep)
-			result.ChaosResult(chaosDetails, clients, resultDetails, "EOT")
-
-			// generating summary event in chaosengine
-			msg := experimentsDetails.ExperimentName + " experiment has been aborted"
-			types.SetEngineEventAttributes(eventsDetails, types.Summary, msg, "Warning", chaosDetails)
-			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
-
-			// generating summary event in chaosresult
-			types.SetResultEventAttributes(eventsDetails, types.StoppedVerdict, msg, "Warning", resultDetails)
-			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosResult")
-
-			if err = RemoveTaintFromNode(experimentsDetails, clients); err != nil {
-				log.Errorf("unable to remove taint from the node, err :%v", err)
-
-			}
-			os.Exit(1)
-		case <-endTime:
-			log.Infof("[Chaos]: Time is up for experiment: %v", experimentsDetails.ExperimentName)
-			endTime = nil
-			break loop
-		}
-	}
+	log.Info("[Chaos]: Stopping the experiment")
 
 	// remove taint from the application node
-	err = RemoveTaintFromNode(experimentsDetails, clients)
-	if err != nil {
+	if err := RemoveTaintFromNode(experimentsDetails, clients); err != nil {
 		return err
 	}
 
@@ -162,20 +139,26 @@ func TaintNode(experimentsDetails *experimentTypes.ExperimentDetails, clients cl
 		}
 	}
 
-	if !tainted {
-		node.Spec.Taints = append(node.Spec.Taints, apiv1.Taint{
-			Key:    TaintKey,
-			Value:  TaintValue,
-			Effect: apiv1.TaintEffect(TaintEffect),
-		})
+	select {
+	case <-inject:
+		// stopping the chaos execution, if abort signal recieved
+		os.Exit(1)
+	default:
+		if !tainted {
+			node.Spec.Taints = append(node.Spec.Taints, apiv1.Taint{
+				Key:    TaintKey,
+				Value:  TaintValue,
+				Effect: apiv1.TaintEffect(TaintEffect),
+			})
 
-		updatedNodeWithTaint, err := clients.KubeClient.CoreV1().Nodes().Update(node)
-		if err != nil || updatedNodeWithTaint == nil {
-			return fmt.Errorf("failed to update %v node after adding taints, err: %v", experimentsDetails.TargetNode, err)
+			updatedNodeWithTaint, err := clients.KubeClient.CoreV1().Nodes().Update(node)
+			if err != nil || updatedNodeWithTaint == nil {
+				return fmt.Errorf("failed to update %v node after adding taints, err: %v", experimentsDetails.TargetNode, err)
+			}
 		}
-	}
 
-	log.Infof("Successfully added taint in %v node", experimentsDetails.TargetNode)
+		log.Infof("Successfully added taint in %v node", experimentsDetails.TargetNode)
+	}
 	return nil
 }
 
@@ -241,5 +224,41 @@ func GetTaintDetails(experimentsDetails *experimentTypes.ExperimentDetails) (str
 	}
 
 	return TaintKey, TaintValue, TaintEffect
+}
 
+// abortWatcher continuosly watch for the abort signals
+func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, chaosDetails *types.ChaosDetails, eventsDetails *types.EventDetails) {
+
+	for {
+		select {
+		case <-abort:
+			log.Info("[Chaos]: Killing process started because of terminated signal received")
+			log.Info("Chaos Revert Started")
+			// retry thrice for the chaos revert
+			retry := 3
+			for retry > 0 {
+				if err := RemoveTaintFromNode(experimentsDetails, clients); err != nil {
+					log.Errorf("Unable to untaint node, err: %v", err)
+				}
+				retry--
+				time.Sleep(1 * time.Second)
+			}
+			log.Info("Chaos Revert Completed")
+
+			// updating the chaosresult after stopped
+			failStep := "Chaos injection stopped!"
+			types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep)
+			result.ChaosResult(chaosDetails, clients, resultDetails, "EOT")
+
+			// generating summary event in chaosengine
+			msg := experimentsDetails.ExperimentName + " experiment has been aborted"
+			types.SetEngineEventAttributes(eventsDetails, types.Summary, msg, "Warning", chaosDetails)
+			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
+
+			// generating summary event in chaosresult
+			types.SetResultEventAttributes(eventsDetails, types.StoppedVerdict, msg, "Warning", resultDetails)
+			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosResult")
+			os.Exit(1)
+		}
+	}
 }
