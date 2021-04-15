@@ -9,10 +9,10 @@ import (
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/kafka/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
-	"github.com/pkg/errors"
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -62,7 +62,7 @@ loop:
 	for {
 		// Get the target pod details for the chaos execution
 		// if the target pod is not defined it will derive the random target pod list using pod affected percentage
-		if experimentsDetails.KafkaBroker == "" && chaosDetails.AppDetail.Label == ""{
+		if experimentsDetails.KafkaBroker == "" && chaosDetails.AppDetail.Label == "" {
 			return errors.Errorf("Please provide one of the appLabel or KAFKA_BROKER")
 		}
 		targetPodList, err := common.GetPodList(experimentsDetails.KafkaBroker, experimentsDetails.ChaoslibDetail.PodsAffectedPerc, clients, chaosDetails)
@@ -82,7 +82,7 @@ loop:
 			log.InfoWithValues("[Info]: Killing the following pods", logrus.Fields{
 				"PodName": pod.Name})
 
-			if experimentsDetails.ChaoslibDetail.Force{
+			if experimentsDetails.ChaoslibDetail.Force {
 				err = clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaoslibDetail.AppNS).Delete(pod.Name, &v1.DeleteOptions{GracePeriodSeconds: &GracePeriod})
 			} else {
 				err = clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaoslibDetail.AppNS).Delete(pod.Name, &v1.DeleteOptions{})
@@ -149,7 +149,7 @@ loop:
 	for {
 		// Get the target pod details for the chaos execution
 		// if the target pod is not defined it will derive the random target pod list using pod affected percentage
-		if experimentsDetails.KafkaBroker == "" && chaosDetails.AppDetail.Label == ""{
+		if experimentsDetails.KafkaBroker == "" && chaosDetails.AppDetail.Label == "" {
 			return errors.Errorf("Please provide one of the appLabel or KAFKA_BROKER")
 		}
 		targetPodList, err := common.GetPodList(experimentsDetails.KafkaBroker, experimentsDetails.ChaoslibDetail.PodsAffectedPerc, clients, chaosDetails)
