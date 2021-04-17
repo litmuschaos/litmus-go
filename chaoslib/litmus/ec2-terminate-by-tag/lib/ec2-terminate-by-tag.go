@@ -108,7 +108,7 @@ loop:
 
 				//Wait for ec2 instance to come in running state
 				log.Infof("[Wait]: Wait for EC2 instance '%v' to get in running state", id)
-				if err := awslib.WaitForEC2Up(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.ManagedNodegroup, experimentsDetails.Region, id); err != nil {
+				if err := awslib.WaitForEC2TargetState("running", experimentsDetails.Region, id, experimentsDetails.Timeout, experimentsDetails.Delay); err != nil {
 					return errors.Errorf("unable to start the ec2 instance, err: %v", err)
 				}
 			}
@@ -191,7 +191,7 @@ loop:
 			for _, id := range instanceIDList {
 				//Wait for ec2 instance to come in running state
 				log.Infof("[Wait]: Wait for EC2 instance '%v' to get in running state", id)
-				if err := awslib.WaitForEC2Up(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.ManagedNodegroup, experimentsDetails.Region, id); err != nil {
+				if err := awslib.WaitForEC2TargetState("running", experimentsDetails.Region, id, experimentsDetails.Timeout, experimentsDetails.Delay); err != nil {
 					return errors.Errorf("unable to start the ec2 instance, err: %v", err)
 				}
 			}

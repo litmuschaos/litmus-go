@@ -91,6 +91,28 @@ func EC2Start(instanceID, region string) error {
 	return nil
 }
 
+// WaitForEC2TargetState will wait for the ec2 instance to get in provided target state
+func WaitForEC2TargetState(ec2TragetStatus, instanceID, region string, timeout, delay int) error {
+	log.Info("[Status]: Checking EC2 instance status")
+	err := retry.
+		Times(uint(timeout / delay)).
+		Wait(time.Duration(delay) * time.Second).
+		Try(func(attempt uint) error {
+
+			instanceState, err := GetEC2InstanceStatus(instanceID, region)
+			if err != nil {
+				return errors.Errorf("failed to get the instance status")
+			}
+			if instanceState != ec2TragetStatus {
+				log.Infof("The instance state is %v", instanceState)
+				return errors.Errorf("instance is not yet in %v state", ec2TragetStatus)
+			}
+			log.Infof("The instance state is %v", instanceState)
+			return nil
+		})
+	return err
+}
+
 //WaitForEC2Down will wait for the ec2 instance to get in stopped state
 func WaitForEC2Down(timeout, delay int, managedNodegroup, region, instanceID string) error {
 
@@ -111,36 +133,7 @@ func WaitForEC2Down(timeout, delay int, managedNodegroup, region, instanceID str
 			log.Infof("The instance state is %v", instanceState)
 			return nil
 		})
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-//WaitForEC2Up will wait for the ec2 instance to get in running state
-func WaitForEC2Up(timeout, delay int, managedNodegroup, region, instanceID string) error {
-
-	log.Info("[Status]: Checking EC2 instance status")
-	err := retry.
-		Times(uint(timeout / delay)).
-		Wait(time.Duration(delay) * time.Second).
-		Try(func(attempt uint) error {
-
-			instanceState, err := GetEC2InstanceStatus(instanceID, region)
-			if err != nil {
-				return errors.Errorf("failed to get the instance status")
-			}
-			if instanceState != "running" {
-				log.Infof("The instance state is %v", instanceState)
-				return errors.Errorf("instance is not yet in running state")
-			}
-			log.Infof("The instance state is %v", instanceState)
-			return nil
-		})
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 //GetInstanceList will filter out the target instance under chaos using tag filters or the instance list provided.
@@ -186,4 +179,100 @@ func GetInstanceList(instanceTag, region string) ([]string, error) {
 		}
 	}
 	return instanceList, nil
+}
+
+// GetSpotFleetInstanceID will get the instance id associated with spot request
+func GetSpotFleetInstanceID(spotFleetRequestID, region string) (string, error) {
+
+	// // Load session from shared config
+	sess := session.Must(session.NewSessionWithOptions(session.Options{
+		SharedConfigState: session.SharedConfigEnable,
+		Config:            aws.Config{Region: aws.String(region)},
+	}))
+
+	// Create new EC2 client
+	ec2Svc := ec2.New(sess)
+	input := &ec2.DescribeSpotFleetInstancesInput{
+		SpotFleetRequestId: aws.String(spotFleetRequestID),
+	}
+
+	result, err := ec2Svc.DescribeSpotFleetInstances(input)
+	if err != nil {
+		if aerr, ok := err.(awserr.Error); ok {
+			switch aerr.Code() {
+			default:
+				return "", errors.Errorf(aerr.Error())
+			}
+		} else {
+			return "", errors.Errorf(err.Error())
+		}
+	}
+
+	instanceId := *result.ActiveInstances[0].InstanceId
+
+	return instanceId, nil
+}
+
+// GetSpotFleetRequestState will return the current state of the fleet request
+func GetSpotFleetRequestState(spotFleetRequestID, region string) (string, error) {
+
+	// // Load session from shared config
+	sess := session.Must(session.NewSessionWithOptions(session.Options{
+		SharedConfigState: session.SharedConfigEnable,
+		Config:            aws.Config{Region: aws.String(region)},
+	}))
+
+	// Create new EC2 client
+	ec2Svc := ec2.New(sess)
+
+	input := &ec2.DescribeSpotFleetRequestsInput{
+		SpotFleetRequestIds: []*string{
+			aws.String(spotFleetRequestID),
+		},
+	}
+	result, err := ec2Svc.DescribeSpotFleetRequests(input)
+	if err != nil {
+		if aerr, ok := err.(awserr.Error); ok {
+			switch aerr.Code() {
+			default:
+				return "", errors.Errorf(aerr.Error())
+			}
+		} else {
+			return "", errors.Errorf(err.Error())
+		}
+	}
+
+	return *result.SpotFleetRequestConfigs[0].SpotFleetRequestState, nil
+}
+
+// CancelSpotFleetRequest will cancel the given spot fleet request
+func CancelSpotFleetRequest(spotFleetRequest, region string) error {
+	// // Load session from shared config
+	sess := session.Must(session.NewSessionWithOptions(session.Options{
+		SharedConfigState: session.SharedConfigEnable,
+		Config:            aws.Config{Region: aws.String(region)},
+	}))
+
+	// Create new EC2 client
+	ec2Svc := ec2.New(sess)
+
+	input := &ec2.CancelSpotFleetRequestsInput{
+		SpotFleetRequestIds: []*string{
+			aws.String(spotFleetRequest),
+		},
+		TerminateInstances: aws.Bool(true),
+	}
+
+	_, err := ec2Svc.CancelSpotFleetRequests(input)
+	if err != nil {
+		if aerr, ok := err.(awserr.Error); ok {
+			switch aerr.Code() {
+			default:
+				return errors.Errorf(aerr.Error())
+			}
+		} else {
+			return errors.Errorf(err.Error())
+		}
+	}
+	return nil
 }

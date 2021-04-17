@@ -36,6 +36,7 @@ import (
 	ebsLoss "github.com/litmuschaos/litmus-go/experiments/kube-aws/ebs-loss/experiment"
 	ec2TerminateByID "github.com/litmuschaos/litmus-go/experiments/kube-aws/ec2-terminate-by-id/experiment"
 	ec2TerminateByTag "github.com/litmuschaos/litmus-go/experiments/kube-aws/ec2-terminate-by-tag/experiment"
+	spotInstanceTerminate "github.com/litmuschaos/litmus-go/experiments/kube-aws/spot-instance-terminate/experiment"
 
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/log"
@@ -110,6 +111,8 @@ func main() {
 		ec2TerminateByID.EC2TerminateByID(clients)
 	case "ec2-terminate-by-tag":
 		ec2TerminateByTag.EC2TerminateByTag(clients)
+	case "spot-instance-terminate":
+		spotInstanceTerminate.SpotInstanceTerminate(clients)
 	case "ebs-loss":
 		ebsLoss.EBSLoss(clients)
 	case "node-restart":
