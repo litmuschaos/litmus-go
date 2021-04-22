@@ -64,7 +64,7 @@ func PodAutoscaler(clients clients.ClientSets) {
 	log.InfoWithValues("The application informations are as follows", logrus.Fields{
 		"Namespace": experimentsDetails.AppNS,
 		"AppKind":   experimentsDetails.AppKind,
-		"Label":     experimentsDetails.AppLabel,
+		"AppLabel":  experimentsDetails.AppLabel,
 		"Ramp Time": experimentsDetails.RampTime,
 	})
 
