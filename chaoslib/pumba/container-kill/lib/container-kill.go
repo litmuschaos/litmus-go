@@ -132,7 +132,7 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		log.Info("[Status]: Checking the status of the helper pod")
 		err = status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, appLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 		if err != nil {
-			common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-"+runID, appLabel, chaosDetails, clients)
+			common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-helper-"+runID, appLabel, chaosDetails, clients)
 			return errors.Errorf("helper pod is not in running state, err: %v", err)
 		}
 
@@ -142,13 +142,13 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		// It will verify that the restart count of container should increase after chaos injection
 		err = VerifyRestartCount(experimentsDetails, pod, clients, restartCountBefore)
 		if err != nil {
-			common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-"+runID, appLabel, chaosDetails, clients)
+			common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-helper-"+runID, appLabel, chaosDetails, clients)
 			return errors.Errorf("Target container is not restarted, err: %v", err)
 		}
 
 		//Deleting the helper pod
 		log.Info("[Cleanup]: Deleting the helper pod")
-		err = common.DeletePod(experimentsDetails.ExperimentName+"-"+runID, appLabel, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients)
+		err = common.DeletePod(experimentsDetails.ExperimentName+"-helper-"+runID, appLabel, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients)
 		if err != nil {
 			return errors.Errorf("Unable to delete the helper pod, err: %v", err)
 		}
