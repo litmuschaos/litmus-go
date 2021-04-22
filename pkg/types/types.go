@@ -1,6 +1,7 @@
 package types
 
 import (
+	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
 	clientTypes "k8s.io/apimachinery/pkg/types"
 )
 
@@ -79,6 +80,7 @@ type ChaosDetails struct {
 	JobCleanupPolicy     string
 	ProbeImagePullPolicy string
 	Randomness           bool
+	Targets              []v1alpha1.TargetDetails
 }
 
 // AppDetails contains all the application related envs

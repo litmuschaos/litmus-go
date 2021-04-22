@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/math"
@@ -202,44 +203,71 @@ func GetTargetPodsWhenTargetPodsENVSet(targetPods string, clients clients.Client
 	for _, pod := range podList.Items {
 		for index := range targetPodsList {
 			if targetPodsList[index] == pod.Name {
+				parentName, err := annotation.GetParentName(clients, pod, chaosDetails)
+				if err != nil {
+					return core_v1.PodList{}, err
+				}
 				switch chaosDetails.AppDetail.AnnotationCheck {
 				case true:
-					isPodAnnotated, err := annotation.IsPodParentAnnotated(clients, pod, chaosDetails)
+					isParentAnnotated, err := annotation.IsParentAnnotated(clients, parentName, chaosDetails)
 					if err != nil {
 						return core_v1.PodList{}, err
 					}
-					if !isPodAnnotated {
-						return core_v1.PodList{}, errors.Errorf("%v target pods are not annotated", targetPods)
+					if !isParentAnnotated {
+						return core_v1.PodList{}, errors.Errorf("%v target application is not annotated", parentName)
 					}
 				}
 				realPods.Items = append(realPods.Items, pod)
+				setTargets(parentName, "N/A", chaosDetails)
 			}
 		}
 	}
 	return realPods, nil
 }
 
+// setTargets set the target details in chaosdetails struct
+func setTargets(target, chaosStatus string, chaosDetails *types.ChaosDetails) {
+
+	for i := range chaosDetails.Targets {
+		if chaosDetails.Targets[i].Target == target {
+			return
+		}
+	}
+	newTarget := v1alpha1.TargetDetails{
+		Target:      target,
+		Kind:        chaosDetails.AppDetail.Kind,
+		ChaosStatus: chaosStatus,
+	}
+	chaosDetails.Targets = append(chaosDetails.Targets, newTarget)
+}
+
 // GetTargetPodsWhenTargetPodsENVNotSet derives the random target pod list, if TARGET_PODS env is not set
 func GetTargetPodsWhenTargetPodsENVNotSet(podAffPerc int, clients clients.ClientSets, nonChaosPods core_v1.PodList, chaosDetails *types.ChaosDetails) (core_v1.PodList, error) {
 	filteredPods := core_v1.PodList{}
 	realPods := core_v1.PodList{}
-
-	switch chaosDetails.AppDetail.AnnotationCheck {
-	case true:
-		for _, pod := range nonChaosPods.Items {
-			isPodAnnotated, err := annotation.IsPodParentAnnotated(clients, pod, chaosDetails)
+	for _, pod := range nonChaosPods.Items {
+		parentName, err := annotation.GetParentName(clients, pod, chaosDetails)
+		if err != nil {
+			return core_v1.PodList{}, err
+		}
+		switch chaosDetails.AppDetail.AnnotationCheck {
+		case true:
+			isParentAnnotated, err := annotation.IsParentAnnotated(clients, parentName, chaosDetails)
 			if err != nil {
 				return core_v1.PodList{}, err
 			}
-			if isPodAnnotated {
+			if isParentAnnotated {
 				filteredPods.Items = append(filteredPods.Items, pod)
+				setTargets(parentName, "N/A", chaosDetails)
 			}
+		default:
+			filteredPods.Items = append(filteredPods.Items, pod)
+			setTargets(parentName, "N/A", chaosDetails)
 		}
-		if len(filteredPods.Items) == 0 {
-			return filteredPods, errors.Errorf("No annotated target pod found")
-		}
-	default:
-		filteredPods = nonChaosPods
+	}
+
+	if len(filteredPods.Items) == 0 {
+		return filteredPods, errors.Errorf("No target pod found")
 	}
 
 	newPodListLength := math.Maximum(1, math.Adjustment(podAffPerc, len(filteredPods.Items)))

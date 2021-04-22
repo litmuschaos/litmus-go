@@ -4,6 +4,7 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
 	clientTypes "k8s.io/apimachinery/pkg/types"
 
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-delete/types"
@@ -65,4 +66,5 @@ func InitialiseChaosVariables(chaosDetails *types.ChaosDetails, experimentDetail
 	chaosDetails.AppDetail = appDetails
 	chaosDetails.ProbeImagePullPolicy = experimentDetails.LIBImagePullPolicy
 	chaosDetails.Randomness, _ = strconv.ParseBool(Getenv("RANDOMNESS", "false"))
+	chaosDetails.Targets = []v1alpha1.TargetDetails{}
 }
