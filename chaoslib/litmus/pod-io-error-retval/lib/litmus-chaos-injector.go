@@ -34,20 +34,11 @@ type LitmusChaosInjector struct {
 
 // InjectChaosInSerialMode injects chaos with the given experiment details in serial mode.
 func (injector LitmusChaosInjector) InjectChaosInSerialMode(exp ExperimentOrchestrationDetails) error {
-	orchestrator := litmusChaosOrchestrator{
-		errChannel:    make(chan error),
-		signalChannel: make(chan os.Signal, 1),
-		injector:      injector,
-		exp:           exp,
-	}
-
+	orchestrator := litmusChaosOrchestratorInstance(injector, exp)
 	orchestrator.runProbes()
 
 	for _, pod := range exp.TargetPodList.Items {
-		orchestrator.obtainChaosParams()
-		orchestrator.generateChaosEventsOnPod(pod)
-		orchestrator.logChaosDetails(pod)
-		orchestrator.orchestrateChaos(pod)
+		orchestrator.injectChaosOnPod(pod)
 
 		log.Infof("[Chaos]:Waiting for: %vs", exp.ExperimentDetails.ChaosDuration)
 
@@ -63,20 +54,11 @@ func (injector LitmusChaosInjector) InjectChaosInSerialMode(exp ExperimentOrches
 
 // InjectChaosInParallelMode injects chaos with the given experiment details in parallel mode.
 func (injector LitmusChaosInjector) InjectChaosInParallelMode(exp ExperimentOrchestrationDetails) error {
-	orchestrator := litmusChaosOrchestrator{
-		errChannel:    make(chan error),
-		signalChannel: make(chan os.Signal, 1),
-		injector:      injector,
-		exp:           exp,
-	}
-
+	orchestrator := litmusChaosOrchestratorInstance(injector, exp)
 	orchestrator.runProbes()
 
 	for _, pod := range exp.TargetPodList.Items {
-		orchestrator.obtainChaosParams()
-		orchestrator.generateChaosEventsOnPod(pod)
-		orchestrator.logChaosDetails(pod)
-		orchestrator.orchestrateChaos(pod)
+		orchestrator.injectChaosOnPod(pod)
 	}
 
 	log.Infof("[Chaos]:Waiting for: %vs", exp.ExperimentDetails.ChaosDuration)

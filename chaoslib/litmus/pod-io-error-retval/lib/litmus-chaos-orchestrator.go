@@ -12,7 +12,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-// litmusChaosOrchestrator is an abstraction for maintaining orchestration state and lifting errors.
+// litmusChaosOrchestrator is an abstraction for maintaining orchestration
+// state and lifting errors.
 type litmusChaosOrchestrator struct {
 	errChannel    chan error
 	endTime       <-chan time.Time
@@ -22,6 +23,17 @@ type litmusChaosOrchestrator struct {
 	injector    LitmusChaosInjector
 	exp         ExperimentOrchestrationDetails
 	chaosParams interface{}
+}
+
+func litmusChaosOrchestratorInstance(injector LitmusChaosInjector,
+	exp ExperimentOrchestrationDetails) litmusChaosOrchestrator {
+
+	return litmusChaosOrchestrator{
+		errChannel:    make(chan error),
+		signalChannel: make(chan os.Signal, 1),
+		injector:      injector,
+		exp:           exp,
+	}
 }
 
 func (c *litmusChaosOrchestrator) runProbes() {
@@ -103,6 +115,17 @@ func (c *litmusChaosOrchestrator) orchestrateChaos(pod corev1.Pod) {
 
 	go c.injector.ChaosInjectorFn(
 		executor, c.chaosParams, c.errChannel)
+}
+
+func (c *litmusChaosOrchestrator) injectChaosOnPod(pod corev1.Pod) {
+	if c.err != nil {
+		return
+	}
+
+	c.obtainChaosParams()
+	c.generateChaosEventsOnPod(pod)
+	c.logChaosDetails(pod)
+	c.orchestrateChaos(pod)
 }
 
 func (c *litmusChaosOrchestrator) killChaos(pod corev1.Pod) {
