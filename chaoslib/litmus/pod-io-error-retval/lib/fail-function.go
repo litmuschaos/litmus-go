@@ -83,3 +83,15 @@ func FailFunctionParamsFn(_ *experimentTypes.ExperimentDetails) interface{} {
 		Interval:    safeAtoi(os.Getenv("FAIL_FUNCTION_INTERVAL"), 0),
 	}
 }
+
+func FailFunctionLitmusChaosInjector() LitmusChaosInjector {
+	return LitmusChaosInjector{
+		ChaosParamsFn:   FailFunctionParamsFn,
+		ChaosInjectorFn: InjectFailFunction,
+		ResetChaosFn:    ResetFailFunction,
+	}
+}
+
+func OrchestrateFailFunctionExperiment(exp ExperimentOrchestrationDetails) error {
+	return OrchestrateExperiment(exp, FailFunctionLitmusChaosInjector())
+}
