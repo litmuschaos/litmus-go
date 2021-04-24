@@ -121,16 +121,31 @@ func (exp *safeExperiment) injectChaos(chaosInjector ChaosInjector) {
 	}
 }
 
+func (exp *safeExperiment) waitForRampTimeDuration(sequence string) {
+	rampTime := exp.experiment.ExperimentDetails.RampTime
+	if exp.err != nil || rampTime == 0 {
+		return
+	}
+
+	log.Infof("[Ramp]: Waiting for the %vs ramp time %s injecting chaos",
+		rampTime, sequence)
+	common.WaitForDuration(rampTime)
+}
+
 // OrchestrateExperiment orchestrates a new chaos experiment with the given experiment details
 // and the ChaosInjector for the chaos injection mechanism.
 func OrchestrateExperiment(exp ExperimentOrchestrationDetails, chaosInjector ChaosInjector) error {
 	safeExperimentOrchestrator := safeExperiment{experiment: exp}
+
+	safeExperimentOrchestrator.waitForRampTimeDuration("before")
 
 	safeExperimentOrchestrator.verifyAppLabelOrTargetPodSpecified()
 	safeExperimentOrchestrator.obtainTargetPods()
 	safeExperimentOrchestrator.logTargetPodNames()
 	safeExperimentOrchestrator.obtainTargetContainer()
 	safeExperimentOrchestrator.injectChaos(chaosInjector)
+
+	safeExperimentOrchestrator.waitForRampTimeDuration("after")
 
 	return safeExperimentOrchestrator.err
 }
