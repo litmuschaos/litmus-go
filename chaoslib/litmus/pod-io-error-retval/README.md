@@ -382,6 +382,17 @@ func InjectFailFunction(executor Executor, failFunctionArgs interface{}, errChan
 func ResetFailFunction(executor Executor, _ interface{}) error {
 	return ResetFailFunctionScript().RunOn(Shell{executor: executor, err: nil})
 }
+
+// FailFunctionParamsFn provides parameters for the FailFunction script with some default values.
+// By default: these values emulate that 50% of read() system calls will return EIO.
+func FailFunctionParamsFn(_ *experimentTypes.ExperimentDetails) interface{} {
+	return FailFunctionArgs{
+		FuncName:    safeGetEnv("FAIL_FUNCTION_FUNC_NAME", "read"),
+		RetVal:      safeAtoi(os.Getenv("FAIL_FUNCTION_RETVAL"), int(syscall.EIO)),
+		Probability: safeAtoi(os.Getenv("FAIL_FUNCTION_PROBABILITY"), 50),
+		Interval:    safeAtoi(os.Getenv("FAIL_FUNCTION_INTERVAL"), 0),
+	}
+}
 ```
 
 The `ChaosParamsFn` will be initialized in the application code. As an example this is what it would

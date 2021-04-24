@@ -1,6 +1,13 @@
 package lib
 
-import "fmt"
+import (
+	"fmt"
+	"os"
+	"strconv"
+	"syscall"
+
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-memory-hog/types"
+)
 
 // FailFunctionArgs is a data struct to account for the various
 // parameters required for writing to /sys/kernel/debug/fail_function
@@ -44,4 +51,35 @@ func InjectFailFunction(executor Executor, failFunctionArgs interface{}, errChan
 
 func ResetFailFunction(executor Executor, _ interface{}) error {
 	return ResetFailFunctionScript().RunOn(Shell{executor: executor, err: nil})
+}
+
+func safeGetEnv(key string, defaultValue string) string {
+	value := os.Getenv(key)
+
+	if value == "" {
+		value = defaultValue
+	}
+
+	return value
+}
+
+func safeAtoi(s string, defaultValue int) int {
+	i, err := strconv.Atoi(s)
+
+	if err != nil {
+		i = defaultValue
+	}
+
+	return i
+}
+
+// FailFunctionParamsFn provides parameters for the FailFunction script with some default values.
+// By default: these values emulate that 50% of read() system calls will return EIO.
+func FailFunctionParamsFn(_ *experimentTypes.ExperimentDetails) interface{} {
+	return FailFunctionArgs{
+		FuncName:    safeGetEnv("FAIL_FUNCTION_FUNC_NAME", "read"),
+		RetVal:      safeAtoi(os.Getenv("FAIL_FUNCTION_RETVAL"), int(syscall.EIO)),
+		Probability: safeAtoi(os.Getenv("FAIL_FUNCTION_PROBABILITY"), 50),
+		Interval:    safeAtoi(os.Getenv("FAIL_FUNCTION_INTERVAL"), 0),
+	}
 }
