@@ -318,6 +318,7 @@ code (which in our case is the sequential invocation of `task1` and `task2`).
 
 We use the same pattern in `OrchestrateExperiment`. As a result:
 ```golang
+// OrchestrateExperiment orchestrates a new chaos experiment with the given experiment details
 // and the ChaosInjector for the chaos injection mechanism.
 func OrchestrateExperiment(exp ExperimentOrchestrationDetails, chaosInjector ChaosInjector) error {
 	safeExperimentOrchestrator := safeExperiment{experiment: exp}
