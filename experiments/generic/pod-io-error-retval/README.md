@@ -1,5 +1,7 @@
 ## Experiment Metadata
 
+A more detailed design document can be found [here](../../../pod-io-error-retval/README.md)
+
 <table>
 <tr>
 <th> Name </th>
@@ -8,7 +10,7 @@
 </tr>
 <tr>
  <td> Pod IO Error Retval </td>
- <td> This experiment causes IO errors by using the Linux Kernels's debugfs fail_function feature. We inject failures into application code by instructing the kernel to return errors like ENOMEM, EIO etc. when specific syscalls like read(), open() etc. are called.  A more detailed deisng document can be found [here](../../../pod-io-error-retval/README.md)</td>
+ <td> This experiment causes IO errors by using the Linux Kernels's debugfs fail_function feature. We inject failures into application code by instructing the kernel to return errors like ENOMEM, EIO etc. when specific syscalls like read(), open() etc. are called.  </td>
  <td>  <a href=""> Coming soon </a> </td>
  </tr>
  </table>
