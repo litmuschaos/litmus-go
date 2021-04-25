@@ -2,13 +2,15 @@ package lib
 
 import (
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-memory-hog/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	// we borrow pod-memory-hog's types package since it has almost everything we require
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-memory-hog/types"
 )
 
 // ExperimentOrchestrationDetails bundles together all details connected to the orchestration
