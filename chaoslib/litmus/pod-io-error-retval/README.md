@@ -1,6 +1,6 @@
 # Implementing IO chaos, incorporating hexagonal design, improving code reuse and more.
 
-This is a document intended to outline my work on implementing IO chaos in litmus-go. It is still a work in progress.
+This is a document intended to outline my work on implementing IO chaos in litmus-go.
 Along the way, I found oppurtunities for further improvement in existing work, in addition to some problems.
 I shall attempt to briefly elucidate everything here.
 

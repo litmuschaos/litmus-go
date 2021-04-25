@@ -1,6 +1,6 @@
 ## Experiment Metadata
 
-A more detailed design document can be found [here](https://github.com/arindas/litmus-go/blob/experiment/io-error/chaoslib/litmus/pod-io-error-retval/README.md)
+A more detailed design document can be found [here](https://github.com/arindas/litmus-go/blob/master/chaoslib/litmus/pod-io-error-retval/README.md)
 
 <table>
 <tr>
