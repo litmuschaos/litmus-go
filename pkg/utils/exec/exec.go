@@ -4,10 +4,8 @@ import (
 	"bytes"
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/litmuschaos/litmus-go/pkg/clients"
-	"github.com/litmuschaos/litmus-go/pkg/log"
 	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/remotecommand"
@@ -66,15 +64,7 @@ func Exec(commandDetails *PodDetails, clients clients.ClientSets, command []stri
 	})
 
 	if err != nil {
-		errorCode := strings.Contains(err.Error(), "143")
-		if !errorCode {
-			if strings.Contains(err.Error(), "137") {
-				log.Warn("Chaos process OOM killed as the provided value exceeds resource limits")
-			} else {
-				log.Infof("[Prepare]: Unable to run command inside container, err: %v", err.Error())
-			}
-			return "", err
-		}
+		return "", err
 	}
 
 	return out.String(), nil
