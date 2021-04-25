@@ -2,7 +2,6 @@ package annotation
 
 import (
 	"github.com/litmuschaos/litmus-go/pkg/clients"
-	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/pkg/errors"
 	core_v1 "k8s.io/api/core/v1"
@@ -110,7 +109,6 @@ func getDeploymentName(clients clients.ClientSets, targetPod core_v1.Pod, chaosD
 				ownerRef := rs.OwnerReferences
 				for _, own := range ownerRef {
 					if own.Kind == "Deployment" && own.Name == deploy.Name {
-						log.Infof("[Info]: chaos candidate of kind: %v, name: %v, namespace: %v", chaosDetails.AppDetail.Kind, deploy.Name, deploy.Namespace)
 						return deploy.Name, nil
 					}
 				}
@@ -132,7 +130,6 @@ func getStatefulsetName(clients clients.ClientSets, targetPod core_v1.Pod, chaos
 		ownerRef := targetPod.OwnerReferences
 		for _, own := range ownerRef {
 			if own.Kind == "StatefulSet" && own.Name == sts.Name {
-				log.Infof("[Info]: chaos candidate of kind: %v, name: %v, namespace: %v", chaosDetails.AppDetail.Kind, sts.Name, sts.Namespace)
 				return sts.Name, nil
 			}
 		}
@@ -152,7 +149,6 @@ func getDaemonsetName(clients clients.ClientSets, targetPod core_v1.Pod, chaosDe
 		ownerRef := targetPod.OwnerReferences
 		for _, own := range ownerRef {
 			if own.Kind == "DaemonSet" && own.Name == ds.Name {
-				log.Infof("[Info]: chaos candidate of kind: %v, name: %v, namespace: %v", chaosDetails.AppDetail.Kind, ds.Name, ds.Namespace)
 				return ds.Name, nil
 			}
 		}
@@ -184,7 +180,6 @@ func getDeploymentConfigName(clients clients.ClientSets, targetPod core_v1.Pod, 
 				ownerRef := rc.OwnerReferences
 				for _, own := range ownerRef {
 					if own.Kind == "DeploymentConfig" && own.Name == dc.GetName() {
-						log.Infof("[Info]: chaos candidate of kind: %v, name: %v, namespace: %v", chaosDetails.AppDetail.Kind, dc.GetName(), dc.GetNamespace())
 						return dc.GetName(), nil
 					}
 				}
@@ -218,7 +213,6 @@ func getRolloutName(clients clients.ClientSets, targetPod core_v1.Pod, chaosDeta
 				ownerRef := rs.OwnerReferences
 				for _, own := range ownerRef {
 					if own.Kind == "Rollout" && own.Name == ro.GetName() {
-						log.Infof("[Info]: chaos candidate of kind: %v, name: %v, namespace: %v", chaosDetails.AppDetail.Kind, ro.GetName(), ro.GetNamespace())
 						return ro.GetName(), nil
 					}
 				}

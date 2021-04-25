@@ -12,6 +12,7 @@ import (
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-autoscaler/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
+	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
@@ -67,7 +68,7 @@ func PreparePodAutoscaler(experimentsDetails *experimentTypes.ExperimentDetails,
 			return errors.Errorf("Unable to perform autoscaling, err: %v", err)
 		}
 
-		err = AutoscalerRecoveryInDeployment(experimentsDetails, clients, appsUnderTest)
+		err = AutoscalerRecoveryInDeployment(experimentsDetails, clients, appsUnderTest, chaosDetails)
 		if err != nil {
 			return errors.Errorf("Unable to rollback the autoscaling, err: %v", err)
 		}
@@ -95,7 +96,7 @@ func PreparePodAutoscaler(experimentsDetails *experimentTypes.ExperimentDetails,
 			return errors.Errorf("Unable to perform autoscaling, err: %v", err)
 		}
 
-		if err = AutoscalerRecoveryInStatefulset(experimentsDetails, clients, appsUnderTest); err != nil {
+		if err = AutoscalerRecoveryInStatefulset(experimentsDetails, clients, appsUnderTest, chaosDetails); err != nil {
 			return errors.Errorf("Unable to rollback the autoscaling, err: %v", err)
 		}
 
@@ -173,6 +174,7 @@ func PodAutoscalerChaosInDeployment(experimentsDetails *experimentTypes.Experime
 			if err != nil {
 				return err
 			}
+			common.SetTargets(app.AppName, "injected", "deployment", chaosDetails)
 		}
 		return nil
 	})
@@ -207,6 +209,7 @@ func PodAutoscalerChaosInStatefulset(experimentsDetails *experimentTypes.Experim
 			if err != nil {
 				return err
 			}
+			common.SetTargets(app.AppName, "injected", "statefulset", chaosDetails)
 		}
 		return nil
 	})
@@ -250,7 +253,7 @@ func DeploymentStatusCheck(experimentsDetails *experimentTypes.ExperimentDetails
 		})
 
 	if isFailed {
-		err = AutoscalerRecoveryInDeployment(experimentsDetails, clients, appsUnderTest)
+		err = AutoscalerRecoveryInDeployment(experimentsDetails, clients, appsUnderTest, chaosDetails)
 		if err != nil {
 			return errors.Errorf("Unable to perform autoscaling, err: %v", err)
 		}
@@ -303,7 +306,7 @@ func StatefulsetStatusCheck(experimentsDetails *experimentTypes.ExperimentDetail
 		})
 
 	if isFailed {
-		err = AutoscalerRecoveryInStatefulset(experimentsDetails, clients, appsUnderTest)
+		err = AutoscalerRecoveryInStatefulset(experimentsDetails, clients, appsUnderTest, chaosDetails)
 		if err != nil {
 			return errors.Errorf("Unable to perform autoscaling, err: %v", err)
 		}
@@ -331,7 +334,7 @@ func StatefulsetStatusCheck(experimentsDetails *experimentTypes.ExperimentDetail
 }
 
 //AutoscalerRecoveryInDeployment rollback the replicas to initial values in deployment
-func AutoscalerRecoveryInDeployment(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, appsUnderTest []experimentTypes.ApplicationUnderTest) error {
+func AutoscalerRecoveryInDeployment(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, appsUnderTest []experimentTypes.ApplicationUnderTest, chaosDetails *types.ChaosDetails) error {
 
 	// Scale back to initial number of replicas
 	retryErr := retries.RetryOnConflict(retries.DefaultRetry, func() error {
@@ -348,6 +351,7 @@ func AutoscalerRecoveryInDeployment(experimentsDetails *experimentTypes.Experime
 			if err != nil {
 				return err
 			}
+			common.SetTargets(app.AppName, "recovered", "deployment", chaosDetails)
 		}
 		return nil
 	})
@@ -382,7 +386,7 @@ func AutoscalerRecoveryInDeployment(experimentsDetails *experimentTypes.Experime
 }
 
 //AutoscalerRecoveryInStatefulset rollback the replicas to initial values in deployment
-func AutoscalerRecoveryInStatefulset(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, appsUnderTest []experimentTypes.ApplicationUnderTest) error {
+func AutoscalerRecoveryInStatefulset(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, appsUnderTest []experimentTypes.ApplicationUnderTest, chaosDetails *types.ChaosDetails) error {
 
 	// Scale back to initial number of replicas
 	retryErr := retries.RetryOnConflict(retries.DefaultRetry, func() error {
@@ -399,6 +403,7 @@ func AutoscalerRecoveryInStatefulset(experimentsDetails *experimentTypes.Experim
 			if err != nil {
 				return err
 			}
+			common.SetTargets(app.AppName, "recovered", "statefulset", chaosDetails)
 		}
 		return nil
 	})
@@ -457,18 +462,22 @@ func AbortPodAutoScalerChaos(appsUnderTest []experimentTypes.ApplicationUnderTes
 			// Other experiments have simpler "recoveries" that are more or less guaranteed to work.
 			switch strings.ToLower(experimentsDetails.AppKind) {
 			case "deployment", "deployments":
-				if err := AutoscalerRecoveryInDeployment(experimentsDetails, clients, appsUnderTest); err != nil {
+				if err := AutoscalerRecoveryInDeployment(experimentsDetails, clients, appsUnderTest, chaosDetails); err != nil {
 					log.Errorf("the recovery after abortion failed err: %v", err)
 				}
 			case "statefulset", "statefulsets":
 
-				if err := AutoscalerRecoveryInStatefulset(experimentsDetails, clients, appsUnderTest); err != nil {
+				if err := AutoscalerRecoveryInStatefulset(experimentsDetails, clients, appsUnderTest, chaosDetails); err != nil {
 					log.Errorf("the recovery after abortion failed err: %v", err)
 				}
 
 			default:
 				log.Errorf("application type '%s' is not supported for the chaos", experimentsDetails.AppKind)
 			}
+			// updating the chaosresult after stopped
+			failStep := "Chaos injection stopped!"
+			types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep)
+			result.ChaosResult(chaosDetails, clients, resultDetails, "EOT")
 			log.Info("[Chaos]: Revert Completed")
 
 			os.Exit(1)

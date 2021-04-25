@@ -78,6 +78,10 @@ loop:
 		}
 		log.Infof("Target pods list: %v", podNames)
 
+		for _, target := range chaosDetails.ParentsResources {
+			common.SetTargets(target, "N/A", chaosDetails.AppDetail.Kind, chaosDetails)
+		}
+
 		if experimentsDetails.EngineName != "" {
 			msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on application pod"
 			types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
@@ -170,6 +174,10 @@ loop:
 			podNames = append(podNames, pod.Name)
 		}
 		log.Infof("Target pods list: %v", podNames)
+
+		for _, target := range chaosDetails.ParentsResources {
+			common.SetTargets(target, "N/A", chaosDetails.AppDetail.Kind, chaosDetails)
+		}
 
 		if experimentsDetails.EngineName != "" {
 			msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on application pod"

@@ -74,4 +74,5 @@ func InitialiseChaosVariables(chaosDetails *types.ChaosDetails, cassandraDetails
 	chaosDetails.AppDetail = appDetails
 	chaosDetails.ProbeImagePullPolicy = cassandraDetails.ChaoslibDetail.LIBImagePullPolicy
 	chaosDetails.Randomness, _ = strconv.ParseBool(Getenv("RANDOMNESS", "false"))
+	chaosDetails.ParentsResources = []string{}
 }

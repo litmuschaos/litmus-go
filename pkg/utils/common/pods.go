@@ -218,27 +218,43 @@ func GetTargetPodsWhenTargetPodsENVSet(targetPods string, clients clients.Client
 					}
 				}
 				realPods.Items = append(realPods.Items, pod)
-				setTargets(parentName, "N/A", chaosDetails)
+				setParentName(parentName, chaosDetails)
+				log.Infof("[Info]: chaos candidate of kind: %v, name: %v, namespace: %v", chaosDetails.AppDetail.Kind, parentName, chaosDetails.AppDetail.Namespace)
 			}
 		}
 	}
 	return realPods, nil
 }
 
-// setTargets set the target details in chaosdetails struct
-func setTargets(target, chaosStatus string, chaosDetails *types.ChaosDetails) {
+// SetTargets set the target details in chaosdetails struct
+func SetTargets(target, chaosStatus, kind string, chaosDetails *types.ChaosDetails) {
 
 	for i := range chaosDetails.Targets {
 		if chaosDetails.Targets[i].Target == target {
+			chaosDetails.Targets[i].ChaosStatus = chaosStatus
 			return
 		}
 	}
 	newTarget := v1alpha1.TargetDetails{
 		Target:      target,
-		Kind:        chaosDetails.AppDetail.Kind,
+		Kind:        kind,
 		ChaosStatus: chaosStatus,
 	}
 	chaosDetails.Targets = append(chaosDetails.Targets, newTarget)
+}
+
+// setParentName set the parent name in chaosdetails struct
+func setParentName(parentName string, chaosDetails *types.ChaosDetails) {
+	if chaosDetails.ParentsResources == nil {
+		chaosDetails.ParentsResources = []string{parentName}
+	} else {
+		for i := range chaosDetails.ParentsResources {
+			if chaosDetails.ParentsResources[i] == parentName {
+				return
+			}
+		}
+		chaosDetails.ParentsResources = append(chaosDetails.ParentsResources, parentName)
+	}
 }
 
 // GetTargetPodsWhenTargetPodsENVNotSet derives the random target pod list, if TARGET_PODS env is not set
@@ -258,11 +274,13 @@ func GetTargetPodsWhenTargetPodsENVNotSet(podAffPerc int, clients clients.Client
 			}
 			if isParentAnnotated {
 				filteredPods.Items = append(filteredPods.Items, pod)
-				setTargets(parentName, "N/A", chaosDetails)
+				setParentName(parentName, chaosDetails)
+				log.Infof("[Info]: chaos candidate of kind: %v, name: %v, namespace: %v", chaosDetails.AppDetail.Kind, parentName, chaosDetails.AppDetail.Namespace)
 			}
 		default:
 			filteredPods.Items = append(filteredPods.Items, pod)
-			setTargets(parentName, "N/A", chaosDetails)
+			setParentName(parentName, chaosDetails)
+			log.Infof("[Info]: chaos candidate of kind: %v, name: %v, namespace: %v", chaosDetails.AppDetail.Kind, parentName, chaosDetails.AppDetail.Namespace)
 		}
 	}
 

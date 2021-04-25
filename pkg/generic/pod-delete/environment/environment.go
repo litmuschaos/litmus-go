@@ -67,4 +67,5 @@ func InitialiseChaosVariables(chaosDetails *types.ChaosDetails, experimentDetail
 	chaosDetails.ProbeImagePullPolicy = experimentDetails.LIBImagePullPolicy
 	chaosDetails.Randomness, _ = strconv.ParseBool(Getenv("RANDOMNESS", "false"))
 	chaosDetails.Targets = []v1alpha1.TargetDetails{}
+	chaosDetails.ParentsResources = []string{}
 }

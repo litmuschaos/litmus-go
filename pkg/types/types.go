@@ -81,6 +81,7 @@ type ChaosDetails struct {
 	ProbeImagePullPolicy string
 	Randomness           bool
 	Targets              []v1alpha1.TargetDetails
+	ParentsResources     []string
 }
 
 // AppDetails contains all the application related envs
