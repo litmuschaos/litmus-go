@@ -18,9 +18,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	apiv1 "k8s.io/api/core/v1"
-	k8stypes "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 var err error
@@ -170,15 +169,15 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 		Spec: apiv1.PodSpec{
 			RestartPolicy:    apiv1.RestartPolicyNever,
 			ImagePullSecrets: experimentsDetails.ImagePullSecrets,
-			Affinity: &k8stypes.Affinity{
-				NodeAffinity: &k8stypes.NodeAffinity{
-					RequiredDuringSchedulingIgnoredDuringExecution: &k8stypes.NodeSelector{
-						NodeSelectorTerms: []k8stypes.NodeSelectorTerm{
+			Affinity: &apiv1.Affinity{
+				NodeAffinity: &apiv1.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &apiv1.NodeSelector{
+						NodeSelectorTerms: []apiv1.NodeSelectorTerm{
 							{
-								MatchFields: []k8stypes.NodeSelectorRequirement{
+								MatchFields: []apiv1.NodeSelectorRequirement{
 									{
-										Key:      schedulerapi.NodeFieldSelectorKeyNodeName,
-										Operator: k8stypes.NodeSelectorOpNotIn,
+										Key:      api.ObjectNameField,
+										Operator: apiv1.NodeSelectorOpNotIn,
 										Values:   []string{experimentsDetails.TargetNode},
 									},
 								},
@@ -233,7 +232,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 }
 
 //GetNode will select a random replica of application pod and return the node spec of that application pod
-func GetNode(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) (*k8stypes.Pod, error) {
+func GetNode(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) (*apiv1.Pod, error) {
 	podList, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).List(v1.ListOptions{LabelSelector: experimentsDetails.AppLabel})
 	if err != nil || len(podList.Items) == 0 {
 		return nil, errors.Wrapf(err, "Fail to get the application pod in %v namespace, err: %v", experimentsDetails.AppNS, err)

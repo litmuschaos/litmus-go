@@ -13,6 +13,7 @@ import (
 	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/container-kill/environment"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/container-kill/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
+	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/openebs/maya/pkg/util/retry"
 	"github.com/pkg/errors"
@@ -27,6 +28,7 @@ func main() {
 	clients := clients.ClientSets{}
 	eventsDetails := types.EventDetails{}
 	chaosDetails := types.ChaosDetails{}
+	resultDetails := types.ResultDetails{}
 
 	//Getting kubeConfig and Generate ClientSets
 	if err := clients.GenerateClientSetFromKubeConfig(); err != nil {
@@ -40,7 +42,10 @@ func main() {
 	// Intialise the chaos attributes
 	experimentEnv.InitialiseChaosVariables(&chaosDetails, &experimentsDetails)
 
-	err := KillContainer(&experimentsDetails, clients, &eventsDetails, &chaosDetails)
+	// Intialise Chaos Result Parameters
+	types.SetResultAttributes(&resultDetails, chaosDetails)
+
+	err := KillContainer(&experimentsDetails, clients, &eventsDetails, &chaosDetails, &resultDetails)
 	if err != nil {
 		log.Fatalf("helper pod failed, err: %v", err)
 	}
@@ -50,7 +55,7 @@ func main() {
 // KillContainer kill the random application container
 // it will kill the container till the chaos duration
 // the execution will stop after timestamp passes the given chaos duration
-func KillContainer(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+func KillContainer(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails) error {
 
 	// getting the current timestamp, it will help to kepp track the total chaos duration
 	ChaosStartTimeStamp := time.Now().Unix()
@@ -124,9 +129,11 @@ func KillContainer(experimentsDetails *experimentTypes.ExperimentDetails, client
 		}
 
 	}
+	if err := result.AnnotateChaosResult(resultDetails.Name, chaosDetails.ChaosNamespace, "targeted", "pod", experimentsDetails.TargetPods); err != nil {
+		return err
+	}
 	log.Infof("[Completion]: %v chaos has been completed", experimentsDetails.ExperimentName)
 	return nil
-
 }
 
 //GetContainerID  derive the container id of the application container
@@ -194,7 +201,7 @@ func CheckContainerStatus(experimentsDetails *experimentTypes.ExperimentDetails,
 				return errors.Errorf("Unable to find the pod with name %v, err: %v", appName, err)
 			}
 			for _, container := range pod.Status.ContainerStatuses {
-				if container.Ready != true {
+				if !container.Ready {
 					return errors.Errorf("containers are not yet in running state")
 				}
 				log.InfoWithValues("The running status of container are as follows", logrus.Fields{

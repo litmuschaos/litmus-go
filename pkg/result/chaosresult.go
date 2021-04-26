@@ -1,6 +1,8 @@
 package result
 
 import (
+	"bytes"
+	"os/exec"
 	"reflect"
 	"strconv"
 	"strings"
@@ -10,12 +12,14 @@ import (
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
+	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/openebs/maya/pkg/util/retry"
 	"github.com/pkg/errors"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 //ChaosResult Create and Update the chaos result
@@ -53,6 +57,7 @@ func ChaosResult(chaosDetails *types.ChaosDetails, clients clients.ClientSets, r
 		experimentLabel = chaosPod.Labels
 	}
 	experimentLabel["name"] = resultDetails.Name
+	experimentLabel["chaosUID"] = string(chaosDetails.ChaosUID)
 
 	// if there is no chaos-result with given label, it will create a new chaos-result
 	if len(resultList.Items) == 0 {
@@ -101,6 +106,7 @@ func InitializeChaosResult(chaosDetails *types.ChaosDetails, clients clients.Cli
 				PassedRuns:  0,
 				FailedRuns:  0,
 				StoppedRuns: 0,
+				Targets:     []v1alpha1.TargetDetails{},
 			},
 		},
 	}
@@ -154,6 +160,7 @@ func PatchChaosResult(result *v1alpha1.ChaosResult, clients clients.ClientSets, 
 	// for existing chaos result resource it will patch the label
 	result.ObjectMeta.Labels = chaosResultLabel
 	result.Status.ProbeStatus = GetProbeStatus(resultDetails)
+	result.Status.History.Targets = chaosDetails.Targets
 
 	switch strings.ToLower(resultDetails.Phase) {
 	case "completed":
@@ -236,7 +243,54 @@ func updateHistory(result *v1alpha1.ChaosResult) {
 			PassedRuns:  0,
 			FailedRuns:  0,
 			StoppedRuns: 0,
+			Targets:     []v1alpha1.TargetDetails{},
 		}
 		result.Status.History = history
 	}
+}
+
+// AnnotateChaosResult annotate the chaosResult for the chaos status
+func AnnotateChaosResult(resultName, namespace, status, kind, name string) error {
+	command := exec.Command("kubectl", "annotate", "chaosresult", resultName, "-n", namespace, kind+"/"+name+"="+status, "--overwrite")
+	var out, stderr bytes.Buffer
+	command.Stdout = &out
+	command.Stderr = &stderr
+	if err := command.Run(); err != nil {
+		log.Infof("Error String: %v", stderr.String())
+		return errors.Errorf("unable to annotate the %v chaosresult, err: %v", resultName, err)
+	}
+	return nil
+}
+
+// UpdateChaosStatus update the chaos status based on annotations in chaosresult
+func UpdateChaosStatus(resultDetails *types.ResultDetails, chaosDetails *types.ChaosDetails, clients clients.ClientSets) error {
+
+	result, err := clients.LitmusClient.ChaosResults(chaosDetails.ChaosNamespace).Get(resultDetails.Name, v1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	annotations := result.ObjectMeta.Annotations
+	targetList := []v1alpha1.TargetDetails{}
+	for k, v := range annotations {
+		switch strings.ToLower(v) {
+		case "injected", "reverted", "targeted":
+			kind := strings.TrimSpace(strings.Split(k, "/")[0])
+			name := strings.TrimSpace(strings.Split(k, "/")[1])
+			target := v1alpha1.TargetDetails{
+				Target:      name,
+				Kind:        kind,
+				ChaosStatus: v,
+			}
+			targetList = append(targetList, target)
+			delete(annotations, k)
+		}
+	}
+
+	targetList = append(targetList, result.Status.History.Targets...)
+
+	result.Status.History.Targets = targetList
+	result.ObjectMeta.Annotations = annotations
+	chaosDetails.Targets = targetList
+	_, err = clients.LitmusClient.ChaosResults(chaosDetails.ChaosNamespace).Update(result)
+	return err
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/math"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
+	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
@@ -137,6 +138,9 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		// set an upper limit for the waiting time
 		log.Info("[Wait]: waiting till the completion of the helper pod")
 		podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, appLabel, clients, experimentsDetails.ChaosDuration+experimentsDetails.ChaosInterval+60, experimentsDetails.ExperimentName)
+		if updateErr := result.UpdateChaosStatus(resultDetails, chaosDetails, clients); updateErr != nil {
+			return updateErr
+		}
 		if err != nil || podStatus == "Failed" {
 			common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-"+runID, appLabel, chaosDetails, clients)
 			return errors.Errorf("helper pod failed, err: %v", err)
@@ -193,6 +197,9 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 	// set an upper limit for the waiting time
 	log.Info("[Wait]: waiting till the completion of the helper pod")
 	podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, appLabel, clients, experimentsDetails.ChaosDuration+experimentsDetails.ChaosInterval+60, experimentsDetails.ExperimentName)
+	if updateErr := result.UpdateChaosStatus(resultDetails, chaosDetails, clients); updateErr != nil {
+		return updateErr
+	}
 	if err != nil || podStatus == "Failed" {
 		common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
 		return errors.Errorf("helper pod failed, err: %v", err)

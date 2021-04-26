@@ -1,10 +1,13 @@
 package lib
 
 import (
+	"strconv"
+
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-dns-chaos/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
+	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
@@ -12,7 +15,6 @@ import (
 	"github.com/sirupsen/logrus"
 	apiv1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"strconv"
 )
 
 var err error
@@ -128,6 +130,9 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		// set an upper limit for the waiting time
 		log.Info("[Wait]: waiting till the completion of the helper pod")
 		podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, appLabel, clients, experimentsDetails.ChaosDuration+60, experimentsDetails.ExperimentName)
+		if updateErr := result.UpdateChaosStatus(resultDetails, chaosDetails, clients); updateErr != nil {
+			return updateErr
+		}
 		if err != nil || podStatus == "Failed" {
 			common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-"+runID, appLabel, chaosDetails, clients)
 			return errors.Errorf("helper pod failed due to, err: %v", err)
@@ -185,6 +190,9 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 	// set an upper limit for the waiting time
 	log.Info("[Wait]: waiting till the completion of the helper pod")
 	podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, appLabel, clients, experimentsDetails.ChaosDuration+60, experimentsDetails.ExperimentName)
+	if updateErr := result.UpdateChaosStatus(resultDetails, chaosDetails, clients); updateErr != nil {
+		return updateErr
+	}
 	if err != nil || podStatus == "Failed" {
 		common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
 		return errors.Errorf("helper pod failed due to, err: %v", err)

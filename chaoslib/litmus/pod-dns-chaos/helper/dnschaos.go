@@ -106,6 +106,10 @@ func PreparePodDNSChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 		}
 	}()
 
+	if err = result.AnnotateChaosResult(resultDetails.Name, chaosDetails.ChaosNamespace, "injected", "pod", experimentsDetails.TargetPods); err != nil {
+		return err
+	}
+
 	timeChan := time.Tick(time.Duration(experimentsDetails.ChaosDuration) * time.Second)
 	log.Infof("[Chaos]: Waiting for %vs", experimentsDetails.ChaosDuration)
 
@@ -138,6 +142,9 @@ func PreparePodDNSChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 		}
 		retry--
 		time.Sleep(1 * time.Second)
+	}
+	if err = result.AnnotateChaosResult(resultDetails.Name, chaosDetails.ChaosNamespace, "reverted", "pod", experimentsDetails.TargetPods); err != nil {
+		return err
 	}
 	log.Info("Chaos Revert Completed")
 	return nil
