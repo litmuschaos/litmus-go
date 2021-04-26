@@ -201,7 +201,7 @@ func RemoveTaintFromNode(experimentsDetails *experimentTypes.ExperimentDetails, 
 		}
 	}
 
-	common.SetTargets(node.Name, "recovered", "node", chaosDetails)
+	common.SetTargets(node.Name, "reverted", "node", chaosDetails)
 
 	log.Infof("Successfully removed taint from the %v node", node.Name)
 	return nil

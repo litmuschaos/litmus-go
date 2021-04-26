@@ -81,7 +81,7 @@ func PrepareKubeletKill(experimentsDetails *experimentTypes.ExperimentDetails, c
 		return errors.Errorf("helper pod is not in running state, err: %v", err)
 	}
 
-	common.SetTargets(experimentsDetails.TargetNode, "injected", "node", chaosDetails)
+	common.SetTargets(experimentsDetails.TargetNode, "targeted", "node", chaosDetails)
 
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
@@ -103,7 +103,6 @@ func PrepareKubeletKill(experimentsDetails *experimentTypes.ExperimentDetails, c
 	log.Infof("[Wait]: Waiting for %vs till the completion of the helper pod", experimentsDetails.ChaosDuration+30)
 
 	podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, appLabel, clients, experimentsDetails.ChaosDuration+30, experimentsDetails.ExperimentName)
-	common.SetTargets(experimentsDetails.TargetNode, "recovered", "node", chaosDetails)
 	if err != nil || podStatus == "Failed" {
 		common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-"+experimentsDetails.RunID, appLabel, chaosDetails, clients)
 		return errors.Errorf("helper pod failed, err: %v", err)

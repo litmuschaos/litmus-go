@@ -106,9 +106,6 @@ func PodNetworkLoss(clients clients.ClientSets) {
 
 	// Including the pumba lib for pod-network-loss
 	if experimentsDetails.ChaosLib == "pumba" && experimentsDetails.ContainerRuntime == "docker" {
-		// Calling AbortWatcher go routine, it will continuously watch for the abort signal for the entire chaos duration and generate the required events and result
-		// It is being invoked here, as opposed to within the chaoslib, as these experiments do not need additional recovery/chaos revert steps like in case of network experiments
-		go common.AbortWatcher(experimentsDetails.ExperimentName, clients, &resultDetails, &chaosDetails, &eventsDetails)
 		err = pumbaLIB.PodNetworkLossChaos(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
 		if err != nil {
 			log.Errorf("Chaos injection failed, err: %v", err)

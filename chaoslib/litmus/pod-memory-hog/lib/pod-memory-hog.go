@@ -280,7 +280,7 @@ func KillStressMemorySerial(containerName, podName, namespace, memFreeCmd string
 	if err != nil {
 		return errors.Errorf("Unable to kill stress process inside target container, err: %v", err)
 	}
-	common.SetTargets(podName, "recovered", "pod", chaosDetails)
+	common.SetTargets(podName, "reverted", "pod", chaosDetails)
 	return nil
 }
 

@@ -169,7 +169,7 @@ func UncordonNode(experimentsDetails *experimentTypes.ExperimentDetails, clients
 		return errors.Errorf("Unable to uncordon the %v node, err: %v", experimentsDetails.TargetNode, err)
 	}
 
-	common.SetTargets(experimentsDetails.TargetNode, "injected", "node", chaosDetails)
+	common.SetTargets(experimentsDetails.TargetNode, "reverted", "node", chaosDetails)
 
 	return retry.
 		Times(90).

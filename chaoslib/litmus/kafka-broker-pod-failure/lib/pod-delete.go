@@ -71,7 +71,7 @@ loop:
 		}
 
 		for _, target := range chaosDetails.ParentsResources {
-			common.SetTargets(target, "N/A", chaosDetails.AppDetail.Kind, chaosDetails)
+			common.SetTargets(target, "targeted", chaosDetails.AppDetail.Kind, chaosDetails)
 		}
 
 		if experimentsDetails.ChaoslibDetail.EngineName != "" {
@@ -162,7 +162,7 @@ loop:
 		}
 
 		for _, target := range chaosDetails.ParentsResources {
-			common.SetTargets(target, "N/A", chaosDetails.AppDetail.Kind, chaosDetails)
+			common.SetTargets(target, "targeted", chaosDetails.AppDetail.Kind, chaosDetails)
 		}
 
 		if experimentsDetails.ChaoslibDetail.EngineName != "" {

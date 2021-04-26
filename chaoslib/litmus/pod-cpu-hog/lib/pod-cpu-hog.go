@@ -256,7 +256,7 @@ func KillStressCPUSerial(experimentsDetails *experimentTypes.ExperimentDetails, 
 	if err != nil {
 		return errors.Errorf("Unable to kill the stress process in %v pod, err: %v", podName, err)
 	}
-	common.SetTargets(podName, "recovered", "pod", chaosDetails)
+	common.SetTargets(podName, "reverted", "pod", chaosDetails)
 	return nil
 }
 

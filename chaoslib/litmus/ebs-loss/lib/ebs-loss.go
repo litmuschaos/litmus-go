@@ -155,7 +155,7 @@ func EBSVolumeAttach(experimentsDetails *experimentTypes.ExperimentDetails, chao
 		}
 	}
 
-	common.SetTargets(experimentsDetails.EBSVolumeID, "recovered", "EBS Volume ID", chaosDetails)
+	common.SetTargets(experimentsDetails.EBSVolumeID, "reverted", "EBS Volume ID", chaosDetails)
 
 	log.InfoWithValues("Attaching ebs having:", logrus.Fields{
 		"VolumeId":   *result.VolumeId,
