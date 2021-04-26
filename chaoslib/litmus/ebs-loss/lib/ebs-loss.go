@@ -31,7 +31,7 @@ func InjectEBSLoss(experimentsDetails *experimentTypes.ExperimentDetails, client
 
 	//Detaching the ebs volume from the instance
 	log.Info("[Chaos]: Detaching the EBS volume from the instance")
-	err = EBSVolumeDetach(experimentsDetails)
+	err = EBSVolumeDetach(experimentsDetails, chaosDetails)
 	if err != nil {
 		return errors.Errorf("ebs detachment failed, err: %v", err)
 	}
@@ -62,7 +62,7 @@ func InjectEBSLoss(experimentsDetails *experimentTypes.ExperimentDetails, client
 	if EBSStatus != "attached" {
 		//Attaching the ebs volume from the instance
 		log.Info("[Chaos]: Attaching the EBS volume from the instance")
-		err = EBSVolumeAttach(experimentsDetails)
+		err = EBSVolumeAttach(experimentsDetails, chaosDetails)
 		if err != nil {
 			return errors.Errorf("ebs attachment failed, err: %v", err)
 		}
@@ -85,7 +85,7 @@ func InjectEBSLoss(experimentsDetails *experimentTypes.ExperimentDetails, client
 }
 
 // EBSVolumeDetach will detach the ebs vol from ec2 node
-func EBSVolumeDetach(experimentsDetails *experimentTypes.ExperimentDetails) error {
+func EBSVolumeDetach(experimentsDetails *experimentTypes.ExperimentDetails, chaosDetails *types.ChaosDetails) error {
 
 	// Load session from shared config
 	sess := session.Must(session.NewSessionWithOptions(session.Options{
@@ -112,6 +112,8 @@ func EBSVolumeDetach(experimentsDetails *experimentTypes.ExperimentDetails) erro
 		}
 	}
 
+	common.SetTargets(experimentsDetails.EBSVolumeID, "injected", "EBS Volume ID", chaosDetails)
+
 	log.InfoWithValues("Detaching ebs having:", logrus.Fields{
 		"VolumeId":   *result.VolumeId,
 		"State":      *result.State,
@@ -123,7 +125,7 @@ func EBSVolumeDetach(experimentsDetails *experimentTypes.ExperimentDetails) erro
 }
 
 // EBSVolumeAttach will detach the ebs vol from ec2 node
-func EBSVolumeAttach(experimentsDetails *experimentTypes.ExperimentDetails) error {
+func EBSVolumeAttach(experimentsDetails *experimentTypes.ExperimentDetails, chaosDetails *types.ChaosDetails) error {
 
 	// Load session from shared config
 	sess := session.Must(session.NewSessionWithOptions(session.Options{
@@ -152,6 +154,8 @@ func EBSVolumeAttach(experimentsDetails *experimentTypes.ExperimentDetails) erro
 			return errors.Errorf(err.Error())
 		}
 	}
+
+	common.SetTargets(experimentsDetails.EBSVolumeID, "recovered", "EBS Volume ID", chaosDetails)
 
 	log.InfoWithValues("Attaching ebs having:", logrus.Fields{
 		"VolumeId":   *result.VolumeId,

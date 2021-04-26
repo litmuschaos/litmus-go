@@ -11,6 +11,7 @@ import (
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-cpu-hog/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
+	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	litmusexec "github.com/litmuschaos/litmus-go/pkg/utils/exec"
@@ -107,6 +108,8 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 			go StressCPU(experimentsDetails, pod.Name, clients)
 		}
 
+		common.SetTargets(pod.Name, "injected", "pod", chaosDetails)
+
 		log.Infof("[Chaos]:Waiting for: %vs", experimentsDetails.ChaosDuration)
 
 		// signChan channel is used to transmit signal notifications.
@@ -119,10 +122,14 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 			select {
 			case <-signChan:
 				log.Info("[Chaos]: Revert Started")
-				err := KillStressCPUSerial(experimentsDetails, pod.Name, clients)
+				err := KillStressCPUSerial(experimentsDetails, pod.Name, clients, chaosDetails)
 				if err != nil {
 					log.Errorf("Error in Kill stress after abortion, err: %v", err)
 				}
+				// updating the chaosresult after stopped
+				failStep := "Chaos injection stopped!"
+				types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep)
+				result.ChaosResult(chaosDetails, clients, resultDetails, "EOT")
 				log.Info("[Chaos]: Revert Completed")
 				os.Exit(1)
 			case <-endTime:
@@ -131,7 +138,7 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 				break loop
 			}
 		}
-		if err := KillStressCPUSerial(experimentsDetails, pod.Name, clients); err != nil {
+		if err := KillStressCPUSerial(experimentsDetails, pod.Name, clients, chaosDetails); err != nil {
 			return err
 		}
 	}
@@ -167,6 +174,7 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		for i := 0; i < experimentsDetails.CPUcores; i++ {
 			go StressCPU(experimentsDetails, pod.Name, clients)
 		}
+		common.SetTargets(pod.Name, "injected", "pod", chaosDetails)
 	}
 
 	log.Infof("[Chaos]:Waiting for: %vs", experimentsDetails.ChaosDuration)
@@ -181,9 +189,13 @@ loop:
 		select {
 		case <-signChan:
 			log.Info("[Chaos]: Revert Started")
-			if err := KillStressCPUParallel(experimentsDetails, targetPodList, clients); err != nil {
+			if err := KillStressCPUParallel(experimentsDetails, targetPodList, clients, chaosDetails); err != nil {
 				log.Errorf("Error in Kill stress after abortion, err: %v", err)
 			}
+			// updating the chaosresult after stopped
+			failStep := "Chaos injection stopped!"
+			types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep)
+			result.ChaosResult(chaosDetails, clients, resultDetails, "EOT")
 			log.Info("[Chaos]: Revert Completed")
 			os.Exit(1)
 		case <-endTime:
@@ -192,7 +204,7 @@ loop:
 			break loop
 		}
 	}
-	if err := KillStressCPUParallel(experimentsDetails, targetPodList, clients); err != nil {
+	if err := KillStressCPUParallel(experimentsDetails, targetPodList, clients, chaosDetails); err != nil {
 		return err
 	}
 
@@ -233,7 +245,7 @@ func GetTargetContainer(experimentsDetails *experimentTypes.ExperimentDetails, a
 
 // KillStressCPUSerial function to kill a stress process running inside target container
 //  Triggered by either timeout of chaos duration or termination of the experiment
-func KillStressCPUSerial(experimentsDetails *experimentTypes.ExperimentDetails, podName string, clients clients.ClientSets) error {
+func KillStressCPUSerial(experimentsDetails *experimentTypes.ExperimentDetails, podName string, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
 	// It will contains all the pod & container details required for exec command
 	execCommandDetails := litmusexec.PodDetails{}
 
@@ -244,17 +256,17 @@ func KillStressCPUSerial(experimentsDetails *experimentTypes.ExperimentDetails, 
 	if err != nil {
 		return errors.Errorf("Unable to kill the stress process in %v pod, err: %v", podName, err)
 	}
-
+	common.SetTargets(podName, "recovered", "pod", chaosDetails)
 	return nil
 }
 
 // KillStressCPUParallel function to kill all the stress process running inside target container
 // Triggered by either timeout of chaos duration or termination of the experiment
-func KillStressCPUParallel(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList corev1.PodList, clients clients.ClientSets) error {
+func KillStressCPUParallel(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList corev1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
 
 	for _, pod := range targetPodList.Items {
 
-		if err := KillStressCPUSerial(experimentsDetails, pod.Name, clients); err != nil {
+		if err := KillStressCPUSerial(experimentsDetails, pod.Name, clients, chaosDetails); err != nil {
 			return err
 		}
 	}

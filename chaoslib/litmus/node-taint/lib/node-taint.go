@@ -69,7 +69,7 @@ func PrepareNodeTaint(experimentsDetails *experimentTypes.ExperimentDetails, cli
 	go abortWatcher(experimentsDetails, clients, resultDetails, chaosDetails, eventsDetails)
 
 	// taint the application node
-	err := TaintNode(experimentsDetails, clients)
+	err := TaintNode(experimentsDetails, clients, chaosDetails)
 	if err != nil {
 		return err
 	}
@@ -97,7 +97,7 @@ func PrepareNodeTaint(experimentsDetails *experimentTypes.ExperimentDetails, cli
 	log.Info("[Chaos]: Stopping the experiment")
 
 	// remove taint from the application node
-	if err := RemoveTaintFromNode(experimentsDetails, clients); err != nil {
+	if err := RemoveTaintFromNode(experimentsDetails, clients, chaosDetails); err != nil {
 		return err
 	}
 
@@ -117,7 +117,7 @@ func PrepareNodeTaint(experimentsDetails *experimentTypes.ExperimentDetails, cli
 }
 
 // TaintNode taint the application node
-func TaintNode(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) error {
+func TaintNode(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
 
 	// get the taint labels & effect
 	TaintKey, TaintValue, TaintEffect := GetTaintDetails(experimentsDetails)
@@ -157,13 +157,15 @@ func TaintNode(experimentsDetails *experimentTypes.ExperimentDetails, clients cl
 			}
 		}
 
+		common.SetTargets(node.Name, "injected", "node", chaosDetails)
+
 		log.Infof("Successfully added taint in %v node", experimentsDetails.TargetNode)
 	}
 	return nil
 }
 
 // RemoveTaintFromNode remove the taint from the application node
-func RemoveTaintFromNode(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) error {
+func RemoveTaintFromNode(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
 
 	// Get the taint key
 	TaintLabel := strings.Split(experimentsDetails.Taints, ":")
@@ -198,6 +200,8 @@ func RemoveTaintFromNode(experimentsDetails *experimentTypes.ExperimentDetails, 
 			return fmt.Errorf("failed to update %v node after removing taints, err: %v", experimentsDetails.TargetNode, err)
 		}
 	}
+
+	common.SetTargets(node.Name, "recovered", "node", chaosDetails)
 
 	log.Infof("Successfully removed taint from the %v node", node.Name)
 	return nil
@@ -237,7 +241,7 @@ func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, clients
 			// retry thrice for the chaos revert
 			retry := 3
 			for retry > 0 {
-				if err := RemoveTaintFromNode(experimentsDetails, clients); err != nil {
+				if err := RemoveTaintFromNode(experimentsDetails, clients, chaosDetails); err != nil {
 					log.Errorf("Unable to untaint node, err: %v", err)
 				}
 				retry--

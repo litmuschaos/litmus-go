@@ -75,6 +75,8 @@ loop:
 				return errors.Errorf("ec2 instance failed to stop, err: %v", err)
 			}
 
+			common.SetTargets(id, "injected", "EC2 Instance ID", chaosDetails)
+
 			//Wait for ec2 instance to completely stop
 			log.Infof("[Wait]: Wait for EC2 instance '%v' to come in stopped state", id)
 			if err := awslib.WaitForEC2Down(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.ManagedNodegroup, experimentsDetails.Region, id); err != nil {
@@ -99,6 +101,8 @@ loop:
 				if err != nil {
 					return errors.Errorf("ec2 instance failed to start, err: %v", err)
 				}
+
+				common.SetTargets(id, "reverted", "EC2 Instance ID", chaosDetails)
 
 				//Wait for ec2 instance to come in running state
 				log.Infof("[Wait]: Wait for EC2 instance '%v' to get in running state", id)
@@ -150,6 +154,7 @@ loop:
 			if err != nil {
 				return errors.Errorf("ec2 instance failed to stop, err: %v", err)
 			}
+			common.SetTargets(id, "injected", "EC2 Instance ID", chaosDetails)
 		}
 
 		for _, id := range instanceIDList {
@@ -180,6 +185,7 @@ loop:
 				if err != nil {
 					return errors.Errorf("ec2 instance failed to start, err: %v", err)
 				}
+				common.SetTargets(id, "reverted", "EC2 Instance ID", chaosDetails)
 			}
 
 			for _, id := range instanceIDList {
