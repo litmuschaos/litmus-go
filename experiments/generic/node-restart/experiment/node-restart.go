@@ -58,7 +58,8 @@ func NodeRestart(clients clients.ClientSets) {
 	//DISPLAY THE APP INFORMATION
 	log.InfoWithValues("The application information is as follows", logrus.Fields{
 		"Namespace":      experimentsDetails.AppNS,
-		"Label":          experimentsDetails.AppLabel,
+		"App Label":      experimentsDetails.AppLabel,
+		"Node Label":     experimentsDetails.NodeLabel,
 		"Target Node":    experimentsDetails.TargetNode,
 		"Chaos Duration": experimentsDetails.ChaosDuration,
 		"Ramp Time":      experimentsDetails.RampTime,

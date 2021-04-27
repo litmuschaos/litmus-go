@@ -35,6 +35,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.NodesAffectedPerc, _ = strconv.Atoi(Getenv("NODES_AFFECTED_PERC", "0"))
 	experimentDetails.Sequence = Getenv("SEQUENCE", "parallel")
 	experimentDetails.TargetContainer = Getenv("TARGET_CONTAINER", "")
+	experimentDetails.NodeLabel = Getenv("NODE_LABEL", "")
 }
 
 // Getenv fetch the env and set the default value, if any

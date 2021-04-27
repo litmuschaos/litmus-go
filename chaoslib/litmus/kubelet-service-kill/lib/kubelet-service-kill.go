@@ -23,7 +23,7 @@ func PrepareKubeletKill(experimentsDetails *experimentTypes.ExperimentDetails, c
 	var err error
 	if experimentsDetails.TargetNode == "" {
 		//Select node for kubelet-service-kill
-		experimentsDetails.TargetNode, err = common.GetNodeName(experimentsDetails.AppNS, experimentsDetails.AppLabel, clients)
+		experimentsDetails.TargetNode, err = common.GetNodeName(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.NodeLabel, clients)
 		if err != nil {
 			return err
 		}
