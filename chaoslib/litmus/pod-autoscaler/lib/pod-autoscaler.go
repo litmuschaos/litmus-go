@@ -241,7 +241,7 @@ func DeploymentStatusCheck(experimentsDetails *experimentTypes.ExperimentDetails
 				}
 				if int(deployment.Status.ReadyReplicas) != experimentsDetails.Replicas {
 					isFailed = true
-					return errors.Errorf("application %s is not scaled yet, the desired replica count is: %v and redy replica count is: %v", app.AppName, experimentsDetails.Replicas, deployment.Status.ReadyReplicas)
+					return errors.Errorf("application %s is not scaled yet, the desired replica count is: %v and ready replica count is: %v", app.AppName, experimentsDetails.Replicas, deployment.Status.ReadyReplicas)
 				}
 			}
 			isFailed = false
