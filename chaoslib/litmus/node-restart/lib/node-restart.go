@@ -14,12 +14,13 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
+	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	apiv1 "k8s.io/api/core/v1"
-	k8stypes "k8s.io/api/core/v1"
+
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 var err error
@@ -169,15 +170,15 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 		Spec: apiv1.PodSpec{
 			RestartPolicy:    apiv1.RestartPolicyNever,
 			ImagePullSecrets: experimentsDetails.ImagePullSecrets,
-			Affinity: &k8stypes.Affinity{
-				NodeAffinity: &k8stypes.NodeAffinity{
-					RequiredDuringSchedulingIgnoredDuringExecution: &k8stypes.NodeSelector{
-						NodeSelectorTerms: []k8stypes.NodeSelectorTerm{
+			Affinity: &apiv1.Affinity{
+				NodeAffinity: &apiv1.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &apiv1.NodeSelector{
+						NodeSelectorTerms: []apiv1.NodeSelectorTerm{
 							{
-								MatchFields: []k8stypes.NodeSelectorRequirement{
+								MatchFields: []apiv1.NodeSelectorRequirement{
 									{
-										Key:      schedulerapi.NodeFieldSelectorKeyNodeName,
-										Operator: k8stypes.NodeSelectorOpNotIn,
+										Key:      api.ObjectNameField,
+										Operator: apiv1.NodeSelectorOpNotIn,
 										Values:   []string{experimentsDetails.TargetNode},
 									},
 								},
@@ -232,7 +233,7 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 }
 
 //GetNode will select a random replica of application pod and return the node spec of that application pod
-func GetNode(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) (*k8stypes.Pod, error) {
+func GetNode(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) (*apiv1.Pod, error) {
 	podList, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).List(v1.ListOptions{LabelSelector: experimentsDetails.AppLabel})
 	if err != nil || len(podList.Items) == 0 {
 		return nil, errors.Wrapf(err, "Fail to get the application pod in %v namespace, err: %v", experimentsDetails.AppNS, err)
@@ -248,18 +249,37 @@ func GetNode(experimentsDetails *experimentTypes.ExperimentDetails, clients clie
 // CheckApplicationStatus checks the status of the AUT
 func CheckApplicationStatus(appNs, appLabel string, timeout, delay int, clients clients.ClientSets) error {
 
-	// Checking whether application containers are in ready state
-	log.Info("[Status]: Checking whether application containers are in ready state")
-	err := status.CheckContainerStatus(appNs, appLabel, "", timeout, delay, clients)
-	if err != nil {
+	// Checking whether application containers are not terminated
+	log.Info("[Status]: Checking whether application containers are not in terminated state")
+	if err := CheckContainerStatus(appNs, appLabel, timeout, delay, clients); err != nil {
 		return err
 	}
 	// Checking whether application pods are in running or completed state
 	log.Info("[Status]: Checking whether application pods are in running or completed state")
-	err = status.CheckPodStatusPhase(appNs, appLabel, timeout, delay, clients, "Running", "Completed")
-	if err != nil {
+	if err := status.CheckPodStatusPhase(appNs, appLabel, timeout, delay, clients, "Running", "Completed", "Succeeded"); err != nil {
 		return err
 	}
-
 	return nil
+}
+
+// CheckContainerStatus checks the status of the application container
+func CheckContainerStatus(appNs, appLabel string, timeout, delay int, clients clients.ClientSets) error {
+
+	return retry.
+		Times(uint(timeout / delay)).
+		Wait(time.Duration(delay) * time.Second).
+		Try(func(attempt uint) error {
+			podList, err := clients.KubeClient.CoreV1().Pods(appNs).List(v1.ListOptions{LabelSelector: appLabel})
+			if err != nil || len(podList.Items) == 0 {
+				return errors.Errorf("Unable to find the pods with matching labels, err: %v", err)
+			}
+			for _, pod := range podList.Items {
+				for _, container := range pod.Status.ContainerStatuses {
+					if container.State.Terminated != nil && container.State.Terminated.Reason != "Completed" {
+						return errors.Errorf("container is terminated with %v reason", container.State.Terminated.Reason)
+					}
+				}
+			}
+			return nil
+		})
 }

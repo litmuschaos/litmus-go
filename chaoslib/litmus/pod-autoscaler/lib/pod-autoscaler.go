@@ -351,7 +351,7 @@ func AutoscalerRecoveryInDeployment(experimentsDetails *experimentTypes.Experime
 			if err != nil {
 				return err
 			}
-			common.SetTargets(app.AppName, "recovered", "deployment", chaosDetails)
+			common.SetTargets(app.AppName, "reverted", "deployment", chaosDetails)
 		}
 		return nil
 	})
@@ -403,7 +403,7 @@ func AutoscalerRecoveryInStatefulset(experimentsDetails *experimentTypes.Experim
 			if err != nil {
 				return err
 			}
-			common.SetTargets(app.AppName, "recovered", "statefulset", chaosDetails)
+			common.SetTargets(app.AppName, "reverted", "statefulset", chaosDetails)
 		}
 		return nil
 	})

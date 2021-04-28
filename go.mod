@@ -4,9 +4,6 @@ go 1.13
 
 require (
 	github.com/aws/aws-sdk-go v1.36.27
-	github.com/containerd/containerd v1.3.0
-	github.com/containerd/ttrpc v1.0.2 // indirect
-	github.com/docker/go-events v0.0.0-20190806004212-e31b211e4f1c // indirect
 	github.com/emicklei/go-restful v2.12.0+incompatible // indirect
 	github.com/go-openapi/spec v0.19.7 // indirect
 	github.com/go-openapi/swag v0.19.9 // indirect
@@ -15,13 +12,12 @@ require (
 	github.com/imdario/mergo v0.3.9 // indirect
 	github.com/kr/pretty v0.2.0 // indirect
 	github.com/kyokomi/emoji v2.2.4+incompatible
-	github.com/litmuschaos/chaos-operator v0.0.0-20210325093226-50a357ad2256
+	github.com/litmuschaos/chaos-operator v0.0.0-20210427130225-719c08eb082a
 	github.com/mailru/easyjson v0.7.1 // indirect
-	github.com/openebs/maya v0.0.0-20200411140727-1c81f9e017b0
+	github.com/openebs/maya v1.12.1
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.7.0
 	github.com/spf13/cobra v1.0.0
-	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d // indirect
 	golang.org/x/sys v0.0.0-20210119212857-b64e53b001e4 // indirect
 	golang.org/x/time v0.0.0-20200416051211-89c76fbcd5d1 // indirect
 	google.golang.org/appengine v1.6.6 // indirect
@@ -30,9 +26,8 @@ require (
 	k8s.io/api v0.17.3
 	k8s.io/apimachinery v0.17.3
 	k8s.io/client-go v12.0.0+incompatible
-	k8s.io/klog v1.0.0
 	k8s.io/kube-openapi v0.0.0-20200121204235-bf4fb3bd569c // indirect
-	k8s.io/kubernetes v1.16.2
+	k8s.io/kubernetes v1.17.3
 	k8s.io/utils v0.0.0-20200414100711-2df71ebbae66 // indirect
 	sigs.k8s.io/yaml v1.2.0 // indirect
 )
