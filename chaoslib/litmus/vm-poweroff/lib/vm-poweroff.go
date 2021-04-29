@@ -10,7 +10,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/pkg/errors"
 	"github.com/litmuschaos/litmus-go/pkg/types"
-
+        "github.com/litmuschaos/litmus-go/pkg/events"
 )
 
 func InjectVMPowerOffChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, cookie string) error {
@@ -21,6 +21,12 @@ func InjectVMPowerOffChaos(experimentsDetails *experimentTypes.ExperimentDetails
 	if experimentsDetails.RampTime != 0 {
 		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", experimentsDetails.RampTime)
 		common.WaitForDuration(experimentsDetails.RampTime)
+	}
+
+	if experimentsDetails.EngineName != "" {
+		msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on vm poweroff"
+		types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
+		events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 	}
 	
 	if experimentsDetails.AppVmMoid == "" {
