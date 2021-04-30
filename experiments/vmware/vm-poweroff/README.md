@@ -17,6 +17,7 @@
 ## Prerequisites
 
 - Ensure that Kubernetes Version > 1.13
+- Ensure that Vcenter Version is 6.X (Support for 7.X will be added soon)
 - Ensure that the Litmus Chaos Operator is running by executing `kubectl get pods` in operator namespace (typically, `litmus`). If not, install from [here](https://docs.litmuschaos.io/docs/getstarted/#install-litmus)
 - Ensure that the `vm-poweroff` experiment resource is available in the cluster by executing `kubectl get chaosexperiments` in the desired namespace If not, install from [here](https://hub.litmuschaos.io/api/chaos/master?file=charts/vmware/vm-poweroff/experiment.yaml)
 - Ensure that you have sufficient Vcenter access to stop and start the vm. 
