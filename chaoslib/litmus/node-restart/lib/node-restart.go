@@ -2,8 +2,8 @@ package lib
 
 import (
 	"fmt"
-	"math/rand"
 	"strconv"
+	"strings"
 	"time"
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
@@ -42,13 +42,14 @@ func PrepareNodeRestart(experimentsDetails *experimentTypes.ExperimentDetails, c
 	//Select the node
 	if experimentsDetails.TargetNode == "" {
 		//Select node for node-restart
-		targetNode, err := GetNode(experimentsDetails, clients)
+		experimentsDetails.TargetNode, err = common.GetNodeName(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.NodeLabel, clients)
 		if err != nil {
 			return err
 		}
-
-		experimentsDetails.TargetNode = targetNode.Spec.NodeName
-		experimentsDetails.TargetNodeIP = targetNode.Status.HostIP
+		experimentsDetails.TargetNodeIP, err = getInternalIP(experimentsDetails.TargetNode, clients)
+		if err != nil {
+			return err
+		}
 	}
 
 	log.InfoWithValues("[Info]: Details of application under chaos injection", logrus.Fields{
@@ -232,20 +233,6 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 	return err
 }
 
-//GetNode will select a random replica of application pod and return the node spec of that application pod
-func GetNode(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) (*k8stypes.Pod, error) {
-	podList, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).List(v1.ListOptions{LabelSelector: experimentsDetails.AppLabel})
-	if err != nil || len(podList.Items) == 0 {
-		return nil, errors.Wrapf(err, "Fail to get the application pod in %v namespace, err: %v", experimentsDetails.AppNS, err)
-	}
-
-	rand.Seed(time.Now().Unix())
-	randomIndex := rand.Intn(len(podList.Items))
-	podForNodeCandidate := podList.Items[randomIndex]
-
-	return &podForNodeCandidate, nil
-}
-
 // CheckApplicationStatus checks the status of the AUT
 func CheckApplicationStatus(appNs, appLabel string, timeout, delay int, clients clients.ClientSets) error {
 
@@ -282,4 +269,18 @@ func CheckContainerStatus(appNs, appLabel string, timeout, delay int, clients cl
 			}
 			return nil
 		})
+}
+
+// getInternalIP gets the internal ip of the given node
+func getInternalIP(nodeName string, clients clients.ClientSets) (string, error) {
+	node, err := clients.KubeClient.CoreV1().Nodes().Get(nodeName, v1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+	for _, addr := range node.Status.Addresses {
+		if strings.ToLower(string(addr.Type)) == "internalip" {
+			return addr.Address, nil
+		}
+	}
+	return "", errors.Errorf("unable to find the internal ip of the %v node", nodeName)
 }
