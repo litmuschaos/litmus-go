@@ -3,12 +3,11 @@ package vmware
 import (
 	"net/http"	
 	"crypto/tls"
-	"github.com/pkg/errors"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/vmware/vm-poweroff/types"
 )
 
-
-func StopVM(experimentsDetails *experimentTypes.ExperimentDetails, cookie string) (error) {
+//StopVM stops the desired VMWare VM
+func StopVM(experimentsDetails *experimentTypes.ExperimentDetails, cookie string) error {
 
 	//Leverage Go's HTTP Post function to make request
 	req, err := http.NewRequest("POST","https://"+ experimentsDetails.VcenterServer +"/rest/vcenter/vm/"+ experimentsDetails.AppVmMoid +"/power/stop", nil)
@@ -22,7 +21,7 @@ func StopVM(experimentsDetails *experimentTypes.ExperimentDetails, cookie string
 	resp, err := client.Do(req)
 	//Handle Error
 	if err != nil {
-		return errors.Errorf("%v", err)
+		return err
 	}
 	defer resp.Body.Close()
 	return nil

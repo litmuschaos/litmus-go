@@ -13,7 +13,8 @@ import (
 type Message struct {
 	MsgValue string `json:"value"`
 }
-	
+
+//GetVcenterSessionID returns the vcenter sessionid
 func GetVcenterSessionID(experimentsDetails *experimentTypes.ExperimentDetails) (string, error) {
 
 	//Leverage Go's HTTP Post function to make request
@@ -38,5 +39,5 @@ func GetVcenterSessionID(experimentsDetails *experimentTypes.ExperimentDetails) 
    
    
 	login := "vmware-api-session-id=" + m.MsgValue + ";Path=/rest;Secure;HttpOnly"
-	return string(login),nil
+	return login,nil
 }

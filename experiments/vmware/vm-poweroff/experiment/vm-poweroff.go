@@ -1,7 +1,6 @@
 package experiment
 
 import (
-	"strings"	
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/vm-poweroff/lib"
 	vmwarelib "github.com/litmuschaos/litmus-go/pkg/cloud/vmware"
@@ -41,6 +40,7 @@ func VMPoweroff(clients clients.ClientSets){
 		// Intialise the probe details. Bail out upon error, as we haven't entered exp business logic yet
 		if err = probe.InitializeProbesInChaosResultDetails(&chaosDetails, clients, &resultDetails); err != nil {
 			log.Errorf("Unable to initialize the probes, err: %v", err)
+			return
 		}
 	}
 
@@ -101,20 +101,23 @@ func VMPoweroff(clients clients.ClientSets){
     // PRE-CHAOS INSTANCE STATUS CHECK
 	log.Info("[Status]: Verify that the IUT (Instance Under Test) is running (pre-chaos)")
 	vmstatus ,err := vmwarelib.GetVMStatus(&experimentsDetails, cookie)
-	if !strings.Contains(string(vmstatus), "POWERED_ON") {
-		log.Errorf("Instance status check failed, err: %v", err)
+	if err != nil{
+		log.Errorf("[Verification]: Unable to get Instance status(pre-chaos), err: %v", err)
+		return
+	}
+	if vmstatus != "POWERED_ON" {
 		failStep := "Verify that the IUT (Instance Under Test) is running (pre-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-		log.Errorf("[Verification]: VM is not in running state . ")
+		log.Errorf("[Verification]: VM is not in running state")
 		return
 	} 
-		log.Info("[Verification]:VM is in running state(pre-chaos) . ")
+		log.Info("[Verification]: VM is in running state(pre-chaos)")
 	
     
 
 	if experimentsDetails.EngineName != "" {
 		// marking IUT as running, as we already checked the status of instance under test
-		msg := "ITU: Running"
+		msg := "IUT: Running"
 
 		// run the probes in the pre-chaos check
 		if len(resultDetails.ProbeDetails) != 0 {
@@ -179,14 +182,18 @@ func VMPoweroff(clients clients.ClientSets){
 	//POST-CHAOS INSTANCE STATUS CHECK
 	log.Info("[Status]: Verify that the IUT (Instance Under Test) is running (post-chaos)")
 	vmstatus1 ,err := vmwarelib.GetVMStatus(&experimentsDetails, cookie)
-	if !strings.Contains(string(vmstatus1), "POWERED_ON") {
-		log.Errorf("Instance status check failed, err: %v", err)
+        if err != nil{
+                 log.Errorf("[Verification]: Unable to get Instance status(post-chaos), err: %v", err)
+                 return
+         }
+
+	if vmstatus1 != "POWERED_ON" {
 		failStep := "Verify that the IUT (Intance Under Test) is running (pre-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-		log.Errorf("[Verification]: VM is not in running state(post-chaos) ")
+		log.Errorf("[Verification]: VM is not in running state(post-chaos)")
 		return
 	} 
-		log.Info("[Verification]:VM is in running state (post-chaos ). ")
+		log.Info("[Verification]: VM is in running state (post-chaos )")
 	
 
 
@@ -220,6 +227,7 @@ func VMPoweroff(clients clients.ClientSets){
 	err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 	if err != nil {
 		log.Errorf("Unable to Update the Chaos Result, err: %v", err)
+		return
 	}
 
 	// generating the event in chaosresult to marked the verdict as pass/fail

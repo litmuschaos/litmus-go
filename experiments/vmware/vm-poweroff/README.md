@@ -120,36 +120,42 @@ subjects:
     <th> Description </th>
     <th> Specify In ChaosEngine </th>
     <th> Notes </th>
+	<th> How to get</th>
   </tr>
-  <tr> 
+  <tr>
     <td> APP_VM_MOID </td>
     <td> Moid of the vmware instance</td>
     <td> Required </td>
     <td> </td>
+	<td> Once you open VM in vCenter WebClient, you can find MOID in address field (VirtualMachine:vm-5365). Eg: vm-5365 </td>
   </tr>
-  <tr> 
+  <tr>
     <td> TOTAL_CHAOS_DURATION </td>
     <td> The time duration for chaos insertion (sec) </td>
     <td> Optional </td>
     <td> Defaults to 30s </td>
+	<td> </td>
   </tr>
   <tr>
     <td> VCENTERSERVER </td>
     <td> IP Address of the vcenter </td>
     <td> Required </td>
     <td> Should be specified in secret created </td>
+	<td> IP Address/DNS of Vcenter server</td>
   </tr>
-  <tr> 
+  <tr>
     <td> VCENTERUSER </td>
     <td> Username of Vcenter </td>
     <td> Required </td>
     <td> Should be specified in secret created having access to start/stop the vm </td>
+	<td> </td>
   </tr>
-  <tr> 
+  <tr>
     <td> VCENTERPASS </td>
     <td> Password of Vcenter </td>
     <td> Required </td>
     <td> Should be specified in secret created </td>
+	<td> </td>
   </tr>
 </table>
 
@@ -182,7 +188,7 @@ spec:
             - name: TOTAL_CHAOS_DURATION
               value: '60'
 
-            # provide the kill count
+            # provide the vm moid
             - name: APP_VM_MOID
               value: ''              
 
