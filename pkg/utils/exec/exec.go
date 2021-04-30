@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/litmuschaos/litmus-go/pkg/clients"
-	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/pkg/errors"
 	apiv1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -77,15 +76,7 @@ func Exec(commandDetails *PodDetails, clients clients.ClientSets, command []stri
 	})
 
 	if err != nil {
-		errorCode := strings.Contains(err.Error(), "143")
-		if !errorCode {
-			if strings.Contains(err.Error(), "137") {
-				log.Warn("Chaos process OOM killed as the provided value exceeds resource limits")
-			} else {
-				log.Infof("[Prepare]: Unable to run command inside container, err: %v", err.Error())
-			}
-			return "", err
-		}
+		return "", err
 	}
 
 	return out.String(), nil
