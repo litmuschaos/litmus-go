@@ -62,7 +62,8 @@ func NodeDrain(clients clients.ClientSets) {
 	//DISPLAY THE APP INFORMATION
 	log.InfoWithValues("[Info]: The application information is as follows", logrus.Fields{
 		"Namespace":   experimentsDetails.AppNS,
-		"Label":       experimentsDetails.AppLabel,
+		"App Label":   experimentsDetails.AppLabel,
+		"Node Label":  experimentsDetails.NodeLabel,
 		"Target Node": experimentsDetails.TargetNode,
 		"Ramp Time":   experimentsDetails.RampTime,
 	})
