@@ -2,8 +2,8 @@ package lib
 
 import (
 	"fmt"
-	"math/rand"
 	"strconv"
+	"strings"
 	"time"
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
@@ -14,6 +14,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
+	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	apiv1 "k8s.io/api/core/v1"
@@ -41,13 +42,14 @@ func PrepareNodeRestart(experimentsDetails *experimentTypes.ExperimentDetails, c
 	//Select the node
 	if experimentsDetails.TargetNode == "" {
 		//Select node for node-restart
-		targetNode, err := GetNode(experimentsDetails, clients)
+		experimentsDetails.TargetNode, err = common.GetNodeName(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.NodeLabel, clients)
 		if err != nil {
 			return err
 		}
-
-		experimentsDetails.TargetNode = targetNode.Spec.NodeName
-		experimentsDetails.TargetNodeIP = targetNode.Status.HostIP
+		experimentsDetails.TargetNodeIP, err = getInternalIP(experimentsDetails.TargetNode, clients)
+		if err != nil {
+			return err
+		}
 	}
 
 	log.InfoWithValues("[Info]: Details of application under chaos injection", logrus.Fields{
@@ -63,7 +65,7 @@ func PrepareNodeRestart(experimentsDetails *experimentTypes.ExperimentDetails, c
 	}
 
 	experimentsDetails.RunID = common.GetRunID()
-	appLabel := "name=" + experimentsDetails.ExperimentName + "-" + experimentsDetails.RunID
+	appLabel := "name=" + experimentsDetails.ExperimentName + "-helper-" + experimentsDetails.RunID
 
 	//Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
@@ -104,7 +106,7 @@ func PrepareNodeRestart(experimentsDetails *experimentTypes.ExperimentDetails, c
 	log.Info("[Status]: Checking the status of the helper pod")
 	err = CheckApplicationStatus(experimentsDetails.ChaosNamespace, appLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 	if err != nil {
-		common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-"+experimentsDetails.RunID, appLabel, chaosDetails, clients)
+		common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-helper-"+experimentsDetails.RunID, appLabel, chaosDetails, clients)
 		return errors.Errorf("helper pod is not in running state, err: %v", err)
 	}
 
@@ -121,7 +123,7 @@ func PrepareNodeRestart(experimentsDetails *experimentTypes.ExperimentDetails, c
 
 	podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, appLabel, clients, experimentsDetails.ChaosDuration+30, experimentsDetails.ExperimentName)
 	if err != nil || podStatus == "Failed" {
-		common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-"+experimentsDetails.RunID, appLabel, chaosDetails, clients)
+		common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-helper-"+experimentsDetails.RunID, appLabel, chaosDetails, clients)
 		return errors.Errorf("helper pod failed due to, err: %v", err)
 	}
 
@@ -129,13 +131,13 @@ func PrepareNodeRestart(experimentsDetails *experimentTypes.ExperimentDetails, c
 	log.Info("[Status]: Getting the status of application node")
 	err = status.CheckNodeStatus(experimentsDetails.TargetNode, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 	if err != nil {
-		common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-"+experimentsDetails.RunID, appLabel, chaosDetails, clients)
+		common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-helper-"+experimentsDetails.RunID, appLabel, chaosDetails, clients)
 		log.Warnf("Application node is not in the ready state, you may need to manually recover the node, err: %v", err)
 	}
 
 	//Deleting the helper pod
 	log.Info("[Cleanup]: Deleting the helper pod")
-	err = common.DeletePod(experimentsDetails.ExperimentName+"-"+experimentsDetails.RunID, appLabel, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients)
+	err = common.DeletePod(experimentsDetails.ExperimentName+"-helper-"+experimentsDetails.RunID, appLabel, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients)
 	if err != nil {
 		return errors.Errorf("Unable to delete the helper pod, err: %v", err)
 	}
@@ -156,11 +158,11 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 
 	helperPod := &apiv1.Pod{
 		ObjectMeta: v1.ObjectMeta{
-			Name:      experimentsDetails.ExperimentName + "-" + experimentsDetails.RunID,
+			Name:      experimentsDetails.ExperimentName + "-helper-" + experimentsDetails.RunID,
 			Namespace: experimentsDetails.ChaosNamespace,
 			Labels: map[string]string{
 				"app":                       experimentsDetails.ExperimentName + "-" + "helper",
-				"name":                      experimentsDetails.ExperimentName + "-" + experimentsDetails.RunID,
+				"name":                      experimentsDetails.ExperimentName + "-helper-" + experimentsDetails.RunID,
 				"chaosUID":                  string(experimentsDetails.ChaosUID),
 				"app.kubernetes.io/part-of": "litmus",
 			},
@@ -231,35 +233,54 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 	return err
 }
 
-//GetNode will select a random replica of application pod and return the node spec of that application pod
-func GetNode(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) (*k8stypes.Pod, error) {
-	podList, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).List(v1.ListOptions{LabelSelector: experimentsDetails.AppLabel})
-	if err != nil || len(podList.Items) == 0 {
-		return nil, errors.Wrapf(err, "Fail to get the application pod in %v namespace, err: %v", experimentsDetails.AppNS, err)
-	}
-
-	rand.Seed(time.Now().Unix())
-	randomIndex := rand.Intn(len(podList.Items))
-	podForNodeCandidate := podList.Items[randomIndex]
-
-	return &podForNodeCandidate, nil
-}
-
 // CheckApplicationStatus checks the status of the AUT
 func CheckApplicationStatus(appNs, appLabel string, timeout, delay int, clients clients.ClientSets) error {
 
-	// Checking whether application containers are in ready state
-	log.Info("[Status]: Checking whether application containers are in ready state")
-	err := status.CheckContainerStatus(appNs, appLabel, "", timeout, delay, clients)
-	if err != nil {
+	// Checking whether application containers are not terminated
+	log.Info("[Status]: Checking whether application containers are not in terminated state")
+	if err := CheckContainerStatus(appNs, appLabel, timeout, delay, clients); err != nil {
 		return err
 	}
 	// Checking whether application pods are in running or completed state
 	log.Info("[Status]: Checking whether application pods are in running or completed state")
-	err = status.CheckPodStatusPhase(appNs, appLabel, timeout, delay, clients, "Running", "Completed")
-	if err != nil {
+	if err := status.CheckPodStatusPhase(appNs, appLabel, timeout, delay, clients, "Running", "Completed", "Succeeded"); err != nil {
 		return err
 	}
-
 	return nil
+}
+
+// CheckContainerStatus checks the status of the application container
+func CheckContainerStatus(appNs, appLabel string, timeout, delay int, clients clients.ClientSets) error {
+
+	return retry.
+		Times(uint(timeout / delay)).
+		Wait(time.Duration(delay) * time.Second).
+		Try(func(attempt uint) error {
+			podList, err := clients.KubeClient.CoreV1().Pods(appNs).List(v1.ListOptions{LabelSelector: appLabel})
+			if err != nil || len(podList.Items) == 0 {
+				return errors.Errorf("Unable to find the pods with matching labels, err: %v", err)
+			}
+			for _, pod := range podList.Items {
+				for _, container := range pod.Status.ContainerStatuses {
+					if container.State.Terminated != nil && container.State.Terminated.Reason != "Completed" {
+						return errors.Errorf("container is terminated with %v reason", container.State.Terminated.Reason)
+					}
+				}
+			}
+			return nil
+		})
+}
+
+// getInternalIP gets the internal ip of the given node
+func getInternalIP(nodeName string, clients clients.ClientSets) (string, error) {
+	node, err := clients.KubeClient.CoreV1().Nodes().Get(nodeName, v1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+	for _, addr := range node.Status.Addresses {
+		if strings.ToLower(string(addr.Type)) == "internalip" {
+			return addr.Address, nil
+		}
+	}
+	return "", errors.Errorf("unable to find the internal ip of the %v node", nodeName)
 }
