@@ -65,6 +65,9 @@ func EC2TerminateByID(clients clients.ClientSets) {
 		"Sequence":        experimentsDetails.Sequence,
 	})
 
+	// Calling AbortWatcher go routine, it will continuously watch for the abort signal and generate the required events and result
+	go litmusLIB.AbortWatcher(&experimentsDetails, clients, &resultDetails, &chaosDetails, &eventsDetails)
+
 	//PRE-CHAOS NODE STATUS CHECK
 	if experimentsDetails.ManagedNodegroup == "enable" {
 		activeNodeCount, err = aws.PreChaosNodeStatusCheck(experimentsDetails.Timeout, experimentsDetails.Delay, clients)

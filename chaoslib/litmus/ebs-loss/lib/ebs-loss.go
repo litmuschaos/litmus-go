@@ -1,6 +1,9 @@
 package lib
 
 import (
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -9,9 +12,11 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	ebs "github.com/litmuschaos/litmus-go/pkg/cloud/aws"
+	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/kube-aws/ebs-loss/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
+	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
@@ -212,4 +217,58 @@ func WaitForVolumeAttachment(experimentsDetails *experimentTypes.ExperimentDetai
 		return err
 	}
 	return nil
+}
+
+// AbortWatcher continuosly watch for the abort signals
+// it will update chaosresult w/ failed step and create an abort event, if it recieved abort signal during chaos
+func AbortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, chaosDetails *types.ChaosDetails, eventsDetails *types.EventDetails) {
+	AbortWatcherWithoutExit(experimentsDetails, clients, resultDetails, chaosDetails, eventsDetails)
+	os.Exit(1)
+}
+
+// AbortWatcherWithoutExit continuosly watch for the abort signals
+func AbortWatcherWithoutExit(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, chaosDetails *types.ChaosDetails, eventsDetails *types.EventDetails) {
+
+	// signChan channel is used to transmit signal notifications.
+	signChan := make(chan os.Signal, 1)
+	// Catch and relay certain signal(s) to signChan channel.
+	signal.Notify(signChan, os.Interrupt, syscall.SIGTERM)
+
+loop:
+	for {
+		select {
+		case <-signChan:
+
+			log.Info("[Chaos]: Chaos Experiment Abortion started because of terminated signal received")
+			//Getting the EBS volume attachment status
+			EBSStatus, err := ebs.GetEBSStatus(experimentsDetails)
+			if err != nil {
+				log.Errorf("failed to get the ebs status when an abort signal is received, err: %v", err)
+			}
+
+			if EBSStatus != "attached" {
+				//Attaching the ebs volume from the instance
+				log.Info("[Chaos]: Attaching the EBS volume from the instance")
+				err = EBSVolumeAttach(experimentsDetails)
+				if err != nil {
+					log.Errorf("ebs attachment failed when an abort signal is received, err: %v", err)
+				}
+			}
+
+			// updating the chaosresult after stopped
+			failStep := "Chaos injection stopped!"
+			types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep)
+			result.ChaosResult(chaosDetails, clients, resultDetails, "EOT")
+
+			// generating summary event in chaosengine
+			msg := experimentsDetails.ExperimentName + " experiment has been aborted"
+			types.SetEngineEventAttributes(eventsDetails, types.Summary, msg, "Warning", chaosDetails)
+			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
+
+			// generating summary event in chaosresult
+			types.SetResultEventAttributes(eventsDetails, types.Summary, msg, "Warning", resultDetails)
+			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosResult")
+			break loop
+		}
+	}
 }

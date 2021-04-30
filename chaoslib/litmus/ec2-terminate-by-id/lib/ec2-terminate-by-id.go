@@ -1,7 +1,10 @@
 package lib
 
 import (
+	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
@@ -10,6 +13,7 @@ import (
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/kube-aws/ec2-terminate-by-id/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
+	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/pkg/errors"
@@ -226,4 +230,64 @@ func InstanceStatusCheckByID(experimentsDetails *experimentTypes.ExperimentDetai
 		}
 	}
 	return nil
+}
+
+// AbortWatcher continuosly watch for the abort signals
+// it will update chaosresult w/ failed step and create an abort event, if it recieved abort signal during chaos
+func AbortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, chaosDetails *types.ChaosDetails, eventsDetails *types.EventDetails) {
+	AbortWatcherWithoutExit(experimentsDetails, clients, resultDetails, chaosDetails, eventsDetails)
+	os.Exit(1)
+}
+
+// AbortWatcherWithoutExit continuosly watch for the abort signals
+func AbortWatcherWithoutExit(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, chaosDetails *types.ChaosDetails, eventsDetails *types.EventDetails) {
+
+	// signChan channel is used to transmit signal notifications.
+	signChan := make(chan os.Signal, 1)
+	// Catch and relay certain signal(s) to signChan channel.
+	signal.Notify(signChan, os.Interrupt, syscall.SIGTERM)
+
+loop:
+	for {
+		select {
+		case <-signChan:
+
+			log.Info("[Chaos]: Chaos Experiment Abortion started because of terminated signal received")
+
+			instanceIDList := strings.Split(experimentsDetails.Ec2InstanceID, ",")
+			if len(instanceIDList) == 0 {
+				log.Errorf("no instance id found to terminate")
+			}
+			for _, id := range instanceIDList {
+				instanceState, err := awslib.GetEC2InstanceStatus(id, experimentsDetails.Region)
+				if err != nil {
+					log.Errorf("fail to get instance status when an abort signal is received,err :%v", err)
+				}
+				if instanceState != "running" && experimentsDetails.ManagedNodegroup != "enable" {
+
+					log.Info("[Abort]: Starting EC2 instance as abort signal received")
+					err := awslib.EC2Start(id, experimentsDetails.Region)
+					if err != nil {
+						log.Errorf("ec2 instance failed to start when an abort signal is received, err: %v", err)
+					}
+
+				}
+			}
+
+			// updating the chaosresult after stopped
+			failStep := "Chaos injection stopped!"
+			types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep)
+			result.ChaosResult(chaosDetails, clients, resultDetails, "EOT")
+
+			// generating summary event in chaosengine
+			msg := experimentsDetails.ExperimentName + " experiment has been aborted"
+			types.SetEngineEventAttributes(eventsDetails, types.Summary, msg, "Warning", chaosDetails)
+			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
+
+			// generating summary event in chaosresult
+			types.SetResultEventAttributes(eventsDetails, types.Summary, msg, "Warning", resultDetails)
+			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosResult")
+			break loop
+		}
+	}
 }
