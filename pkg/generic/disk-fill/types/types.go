@@ -37,4 +37,5 @@ type ExperimentDetails struct {
 	ImagePullSecrets              []corev1.LocalObjectReference
 	EphemeralStorageMebibytes     int
 	TerminationGracePeriodSeconds int
+	DataBlockSize                 int
 }

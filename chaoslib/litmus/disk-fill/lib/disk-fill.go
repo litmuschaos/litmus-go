@@ -298,6 +298,7 @@ func GetPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, podName st
 		"EXPERIMENT_NAME":             experimentsDetails.ExperimentName,
 		"FILL_PERCENTAGE":             strconv.Itoa(experimentsDetails.FillPercentage),
 		"EPHEMERAL_STORAGE_MEBIBYTES": strconv.Itoa(experimentsDetails.EphemeralStorageMebibytes),
+		"DATA_BLOCK_SIZE":             strconv.Itoa(experimentsDetails.DataBlockSize),
 	}
 	for key, value := range ENVList {
 		var perEnv apiv1.EnvVar
