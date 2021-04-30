@@ -293,7 +293,7 @@ func StatefulsetStatusCheck(experimentsDetails *experimentTypes.ExperimentDetail
 				}
 				if int(statefulset.Status.ReadyReplicas) != experimentsDetails.Replicas {
 					isFailed = true
-					return errors.Errorf("application %s is not scaled yet, the desired replica count is: %v and redy replica count is: %v", app.AppName, experimentsDetails.Replicas, statefulset.Status.ReadyReplicas)
+					return errors.Errorf("application %s is not scaled yet, the desired replica count is: %v and ready replica count is: %v", app.AppName, experimentsDetails.Replicas, statefulset.Status.ReadyReplicas)
 				}
 			}
 			isFailed = false
