@@ -63,7 +63,8 @@ func NodeIOStress(clients clients.ClientSets) {
 	//DISPLAY THE APP INFORMATION
 	log.InfoWithValues("The application information is as follows", logrus.Fields{
 		"Namespace":                       experimentsDetails.AppNS,
-		"Label":                           experimentsDetails.AppLabel,
+		"App Label":                       experimentsDetails.AppLabel,
+		"Node Label":                      experimentsDetails.NodeLabel,
 		"Chaos Duration":                  experimentsDetails.ChaosDuration,
 		"Target Nodes":                    experimentsDetails.TargetNodes,
 		"Ramp Time":                       experimentsDetails.RampTime,
