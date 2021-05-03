@@ -12,6 +12,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
+	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/sirupsen/logrus"
 )
 
@@ -51,9 +52,11 @@ func EC2TerminateByTag(clients clients.ClientSets) {
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
-
 	// Set the chaos result uid
 	result.SetResultUID(&resultDetails, clients, &chaosDetails)
+
+	// Calling AbortWatcher go routine, it will continuously watch for the abort signal and generate the required events and result
+	go common.AbortWatcher(experimentsDetails.ExperimentName, clients, &resultDetails, &chaosDetails, &eventsDetails)
 
 	//DISPLAY THE INSTANCE INFORMATION
 	log.InfoWithValues("The instance information is as follows", logrus.Fields{
@@ -64,9 +67,6 @@ func EC2TerminateByTag(clients clients.ClientSets) {
 		"Instance Affected Percentage": experimentsDetails.InstanceAffectedPerc,
 		"Sequence":                     experimentsDetails.Sequence,
 	})
-
-	// Calling AbortWatcher go routine, it will continuously watch for the abort signal and generate the required events and result
-	go litmusLIB.AbortWatcher(&experimentsDetails, clients, &resultDetails, &chaosDetails, &eventsDetails)
 
 	//PRE-CHAOS NODE STATUS CHECK
 	if experimentsDetails.ManagedNodegroup == "enable" {
