@@ -9,16 +9,9 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/types"
 )
 
-var err error
-
 //PodNetworkCorruptionChaos contains the steps to prepare and inject chaos
 func PodNetworkCorruptionChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	args := "corrupt " + strconv.Itoa(experimentsDetails.NetworkPacketCorruptionPercentage)
-	err = network_chaos.PrepareAndInjectChaos(experimentsDetails, clients, resultDetails, eventsDetails, chaosDetails, args)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return network_chaos.PrepareAndInjectChaos(experimentsDetails, clients, resultDetails, eventsDetails, chaosDetails, args)
 }
