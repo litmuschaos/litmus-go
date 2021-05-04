@@ -22,7 +22,6 @@ import (
 //InjectEBSLoss contains the chaos injection steps for ebs loss
 func InjectEBSLoss(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
-	var err error
 	//Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
 		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", experimentsDetails.RampTime)
@@ -31,27 +30,26 @@ func InjectEBSLoss(experimentsDetails *experimentTypes.ExperimentDetails, client
 
 	//Detaching the ebs volume from the instance
 	log.Info("[Chaos]: Detaching the EBS volume from the instance")
-	err = EBSVolumeDetach(experimentsDetails)
-	if err != nil {
+	if err := ebsVolumeDetach(experimentsDetails); err != nil {
 		return errors.Errorf("ebs detachment failed, err: %v", err)
 	}
 
 	//Wait for ebs volume detachment
 	log.Info("[Wait]: Wait for EBS volume detachment")
-	if err = WaitForVolumeDetachment(experimentsDetails); err != nil {
+	if err := waitForVolumeDetachment(experimentsDetails); err != nil {
 		return errors.Errorf("unable to detach the ebs volume to the ec2 instance, err: %v", err)
 	}
 
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
-		if err = probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+		if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
 			return err
 		}
 	}
 
 	//Wait for chaos duration
 	log.Infof("[Wait]: Waiting for the chaos duration of %vs", experimentsDetails.ChaosDuration)
-	time.Sleep(time.Duration(experimentsDetails.ChaosDuration) * time.Second)
+	common.WaitForDuration(experimentsDetails.ChaosDuration)
 
 	//Getting the EBS volume attachment status
 	EBSStatus, err := ebs.GetEBSStatus(experimentsDetails)
@@ -62,14 +60,13 @@ func InjectEBSLoss(experimentsDetails *experimentTypes.ExperimentDetails, client
 	if EBSStatus != "attached" {
 		//Attaching the ebs volume from the instance
 		log.Info("[Chaos]: Attaching the EBS volume from the instance")
-		err = EBSVolumeAttach(experimentsDetails)
-		if err != nil {
+		if err = ebsVolumeAttach(experimentsDetails); err != nil {
 			return errors.Errorf("ebs attachment failed, err: %v", err)
 		}
 
 		//Wait for ebs volume attachment
 		log.Info("[Wait]: Wait for EBS volume attachment")
-		if err = WaitForVolumeAttachment(experimentsDetails); err != nil {
+		if err = waitForVolumeAttachment(experimentsDetails); err != nil {
 			return errors.Errorf("unable to attach the ebs volume to the ec2 instance, err: %v", err)
 		}
 	} else {
@@ -84,8 +81,8 @@ func InjectEBSLoss(experimentsDetails *experimentTypes.ExperimentDetails, client
 	return nil
 }
 
-// EBSVolumeDetach will detach the ebs vol from ec2 node
-func EBSVolumeDetach(experimentsDetails *experimentTypes.ExperimentDetails) error {
+// ebsVolumeDetach will detach the ebs vol from ec2 node
+func ebsVolumeDetach(experimentsDetails *experimentTypes.ExperimentDetails) error {
 
 	// Load session from shared config
 	sess := session.Must(session.NewSessionWithOptions(session.Options{
@@ -122,8 +119,8 @@ func EBSVolumeDetach(experimentsDetails *experimentTypes.ExperimentDetails) erro
 	return nil
 }
 
-// EBSVolumeAttach will detach the ebs vol from ec2 node
-func EBSVolumeAttach(experimentsDetails *experimentTypes.ExperimentDetails) error {
+// ebsVolumeAttach will detach the ebs vol from ec2 node
+func ebsVolumeAttach(experimentsDetails *experimentTypes.ExperimentDetails) error {
 
 	// Load session from shared config
 	sess := session.Must(session.NewSessionWithOptions(session.Options{
@@ -162,11 +159,11 @@ func EBSVolumeAttach(experimentsDetails *experimentTypes.ExperimentDetails) erro
 	return nil
 }
 
-// WaitForVolumeDetachment will wait the ebs volume to completely detach
-func WaitForVolumeDetachment(experimentsDetails *experimentTypes.ExperimentDetails) error {
+// waitForVolumeDetachment will wait the ebs volume to completely detach
+func waitForVolumeDetachment(experimentsDetails *experimentTypes.ExperimentDetails) error {
 
 	log.Info("[Status]: Checking ebs volume status for detachment")
-	err := retry.
+	return retry.
 		Times(uint(experimentsDetails.Timeout / experimentsDetails.Delay)).
 		Wait(time.Duration(experimentsDetails.Delay) * time.Second).
 		Try(func(attempt uint) error {
@@ -182,17 +179,13 @@ func WaitForVolumeDetachment(experimentsDetails *experimentTypes.ExperimentDetai
 			log.Infof("The instance state is %v", instanceState)
 			return nil
 		})
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
-// WaitForVolumeAttachment will wait for the ebs volume to get attached on ec2 instance
-func WaitForVolumeAttachment(experimentsDetails *experimentTypes.ExperimentDetails) error {
+// waitForVolumeAttachment will wait for the ebs volume to get attached on ec2 instance
+func waitForVolumeAttachment(experimentsDetails *experimentTypes.ExperimentDetails) error {
 
 	log.Info("[Status]: Checking ebs volume status for attachment")
-	err := retry.
+	return retry.
 		Times(uint(experimentsDetails.Timeout / experimentsDetails.Delay)).
 		Wait(time.Duration(experimentsDetails.Delay) * time.Second).
 		Try(func(attempt uint) error {
@@ -208,8 +201,4 @@ func WaitForVolumeAttachment(experimentsDetails *experimentTypes.ExperimentDetai
 			log.Infof("The instance state is %v", instanceState)
 			return nil
 		})
-	if err != nil {
-		return err
-	}
-	return nil
 }

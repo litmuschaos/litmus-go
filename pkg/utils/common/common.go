@@ -91,3 +91,12 @@ loop:
 		}
 	}
 }
+
+// Getenv fetch the env and set the default value, if any
+func Getenv(key string, defaultValue string) string {
+	value := os.Getenv(key)
+	if value == "" {
+		value = defaultValue
+	}
+	return value
+}
