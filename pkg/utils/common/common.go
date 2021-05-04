@@ -15,6 +15,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/pkg/errors"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 //WaitForDuration waits for the given time duration (in seconds)
@@ -90,4 +91,14 @@ loop:
 			break loop
 		}
 	}
+}
+
+//GetTargetContainer will fetch the container name from application pod
+//This container will be used as target container
+func GetTargetContainer(appNamespace, appName string, clients clients.ClientSets) (string, error) {
+	pod, err := clients.KubeClient.CoreV1().Pods(appNamespace).Get(appName, v1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+	return pod.Spec.Containers[0].Name, nil
 }

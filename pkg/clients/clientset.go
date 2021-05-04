@@ -26,11 +26,11 @@ func (clientSets *ClientSets) GenerateClientSetFromKubeConfig() error {
 	if err != nil {
 		return err
 	}
-	k8sClientSet, err := GenerateK8sClientSet(config)
+	k8sClientSet, err := generateK8sClientSet(config)
 	if err != nil {
 		return err
 	}
-	litmusClientSet, err := GenerateLitmusClientSet(config)
+	litmusClientSet, err := generateLitmusClientSet(config)
 	if err != nil {
 		return err
 	}
@@ -54,8 +54,8 @@ func getKubeConfig() (*rest.Config, error) {
 	return config, err
 }
 
-// GenerateK8sClientSet will generation k8s client
-func GenerateK8sClientSet(config *rest.Config) (*kubernetes.Clientset, error) {
+// generateK8sClientSet will generation k8s client
+func generateK8sClientSet(config *rest.Config) (*kubernetes.Clientset, error) {
 	k8sClientSet, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		return nil, errors.Wrapf(err, "Unable to generate kubernetes clientSet, err: %v: ", err)
@@ -63,8 +63,8 @@ func GenerateK8sClientSet(config *rest.Config) (*kubernetes.Clientset, error) {
 	return k8sClientSet, nil
 }
 
-// GenerateLitmusClientSet will generate a LitmusClient
-func GenerateLitmusClientSet(config *rest.Config) (*chaosClient.LitmuschaosV1alpha1Client, error) {
+// generateLitmusClientSet will generate a LitmusClient
+func generateLitmusClientSet(config *rest.Config) (*chaosClient.LitmuschaosV1alpha1Client, error) {
 	litmusClientSet, err := chaosClient.NewForConfig(config)
 	if err != nil {
 		return nil, errors.Wrapf(err, "Unable to create LitmusClientSet, err: %v", err)
