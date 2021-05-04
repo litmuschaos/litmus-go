@@ -29,6 +29,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.Delay, _ = strconv.Atoi(Getenv("STATUS_CHECK_DELAY", "2"))
 	experimentDetails.Timeout, _ = strconv.Atoi(Getenv("STATUS_CHECK_TIMEOUT", "180"))
 	experimentDetails.TargetContainer = Getenv("TARGET_CONTAINER", "")
+	experimentDetails.NodeLabel = Getenv("NODE_LABEL", "")
 }
 
 // Getenv fetch the env and set the default value, if any

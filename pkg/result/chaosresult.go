@@ -153,12 +153,18 @@ func GetProbeStatus(resultDetails *types.ResultDetails) []v1alpha1.ProbeStatus {
 //PatchChaosResult Update the chaos result
 func PatchChaosResult(result *v1alpha1.ChaosResult, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, chaosResultLabel map[string]string) error {
 
+	annotations, err := GetChaosStatus(resultDetails, chaosDetails, clients)
+	if err != nil {
+		return err
+	}
+
 	result.Status.ExperimentStatus.Phase = resultDetails.Phase
 	result.Status.ExperimentStatus.Verdict = resultDetails.Verdict
 	result.Spec.InstanceID = chaosDetails.InstanceID
 	result.Status.ExperimentStatus.FailStep = resultDetails.FailStep
 	// for existing chaos result resource it will patch the label
 	result.ObjectMeta.Labels = chaosResultLabel
+	result.ObjectMeta.Annotations = annotations
 	result.Status.ProbeStatus = GetProbeStatus(resultDetails)
 	result.Status.History.Targets = chaosDetails.Targets
 
@@ -262,12 +268,12 @@ func AnnotateChaosResult(resultName, namespace, status, kind, name string) error
 	return nil
 }
 
-// UpdateChaosStatus update the chaos status based on annotations in chaosresult
-func UpdateChaosStatus(resultDetails *types.ResultDetails, chaosDetails *types.ChaosDetails, clients clients.ClientSets) error {
+// GetChaosStatus get the chaos status based on annotations in chaosresult
+func GetChaosStatus(resultDetails *types.ResultDetails, chaosDetails *types.ChaosDetails, clients clients.ClientSets) (map[string]string, error) {
 
 	result, err := clients.LitmusClient.ChaosResults(chaosDetails.ChaosNamespace).Get(resultDetails.Name, v1.GetOptions{})
 	if err != nil {
-		return err
+		return nil, err
 	}
 	annotations := result.ObjectMeta.Annotations
 	targetList := []v1alpha1.TargetDetails{}
@@ -286,11 +292,6 @@ func UpdateChaosStatus(resultDetails *types.ResultDetails, chaosDetails *types.C
 		}
 	}
 
-	targetList = append(targetList, result.Status.History.Targets...)
-
-	result.Status.History.Targets = targetList
-	result.ObjectMeta.Annotations = annotations
 	chaosDetails.Targets = targetList
-	_, err = clients.LitmusClient.ChaosResults(chaosDetails.ChaosNamespace).Update(result)
-	return err
+	return annotations, nil
 }

@@ -77,7 +77,9 @@ loop:
 			// updating the chaosresult after stopped
 			failStep := "Chaos injection stopped!"
 			types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep)
-			result.ChaosResult(chaosDetails, clients, resultDetails, "EOT")
+			if err := result.ChaosResult(chaosDetails, clients, resultDetails, "EOT"); err != nil {
+				log.Errorf("unable to update the chaosresult, err: %v", err)
+			}
 
 			// generating summary event in chaosengine
 			msg := expname + " experiment has been aborted"

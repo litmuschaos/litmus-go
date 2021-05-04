@@ -129,7 +129,7 @@ func DiskFill(experimentsDetails *experimentTypes.ExperimentDetails, clients cli
 
 	if sizeTobeFilled > 0 {
 
-		if err := fillDisk(containerID, sizeTobeFilled); err != nil {
+		if err := fillDisk(containerID, sizeTobeFilled, experimentsDetails.DataBlockSize); err != nil {
 			log.Error(string(out))
 			return err
 		}
@@ -160,7 +160,7 @@ func DiskFill(experimentsDetails *experimentTypes.ExperimentDetails, clients cli
 }
 
 // fillDisk fill the ephemeral disk by creating files
-func fillDisk(containerID string, sizeTobeFilled int) error {
+func fillDisk(containerID string, sizeTobeFilled, bs int) error {
 
 	select {
 	case <-inject:
@@ -169,7 +169,8 @@ func fillDisk(containerID string, sizeTobeFilled int) error {
 	default:
 		// Creating files to fill the required ephemeral storage size of block size of 4K
 		log.Infof("[Fill]: Filling ephemeral storage, size: %vKB", sizeTobeFilled)
-		dd := fmt.Sprintf("sudo dd if=/dev/urandom of=/diskfill/%v/diskfill bs=4K count=%v", containerID, strconv.Itoa(sizeTobeFilled/4))
+		dd := fmt.Sprintf("sudo dd if=/dev/urandom of=/diskfill/%v/diskfill bs=%vK count=%v", containerID, bs, strconv.Itoa(sizeTobeFilled/bs))
+		log.Infof("dd: {%v}", dd)
 		cmd := exec.Command("/bin/bash", "-c", dd)
 		_, err := cmd.CombinedOutput()
 		return err
@@ -296,6 +297,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, name string) {
 	experimentDetails.ChaosPodName = Getenv("POD_NAME", "")
 	experimentDetails.FillPercentage, _ = strconv.Atoi(Getenv("FILL_PERCENTAGE", ""))
 	experimentDetails.EphemeralStorageMebibytes, _ = strconv.Atoi(Getenv("EPHEMERAL_STORAGE_MEBIBYTES", ""))
+	experimentDetails.DataBlockSize, _ = strconv.Atoi(Getenv("DATA_BLOCK_SIZE", "256"))
 }
 
 // Getenv fetch the env and set the default value, if any

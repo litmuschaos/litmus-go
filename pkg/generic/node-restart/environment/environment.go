@@ -33,6 +33,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.TargetNode = Getenv("TARGET_NODE", "")
 	experimentDetails.TargetNodeIP = Getenv("TARGET_NODE_IP", "")
 	experimentDetails.TargetContainer = Getenv("TARGET_CONTAINER", "")
+	experimentDetails.NodeLabel = Getenv("NODE_LABEL", "")
 }
 
 // Getenv fetch the env and set the default value, if any
