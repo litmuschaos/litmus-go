@@ -307,6 +307,7 @@ func GetPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, podName st
 		"EXPERIMENT_NAME":   experimentsDetails.ExperimentName,
 		"SOCKET_PATH":       experimentsDetails.SocketPath,
 		"TARGET_HOSTNAMES":  experimentsDetails.TargetHostNames,
+		"SPOOF_MAP":         experimentsDetails.SpoofMap,
 		"MATCH_SCHEME":      experimentsDetails.MatchScheme,
 		"CHAOS_TYPE":        experimentsDetails.ChaosType,
 	}

@@ -55,7 +55,7 @@ RUN curl -L https://github.com/litmuschaos/test-tools/raw/master/custom/promql-c
 RUN curl -L https://github.com/litmuschaos/test-tools/raw/master/custom/nsutil/nsutil --output /usr/local/bin/nsutil && chmod +x /usr/local/bin/nsutil
 
 #Installing dns_interceptor cli binaries
-RUN curl -L https://github.com/litmuschaos/test-tools/raw/master/custom/dns_interceptor/dns_interceptor --output /usr/local/bin/dns_interceptor && chmod +x /usr/local/bin/dns_interceptor
+RUN curl -L https://github.com/gdsoumya/test-tools/raw/dns_update/custom/dns_interceptor/dns_interceptor --output /usr/local/bin/dns_interceptor && chmod +x /usr/local/bin/dns_interceptor
 
 COPY --from=docker:19.03 /usr/local/bin/docker /usr/local/bin/
 

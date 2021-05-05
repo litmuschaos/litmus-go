@@ -31,6 +31,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.TargetPods = Getenv("TARGET_PODS", "")
 	experimentDetails.PodsAffectedPerc, _ = strconv.Atoi(Getenv("PODS_AFFECTED_PERC", "0"))
 	experimentDetails.TargetHostNames = Getenv("TARGET_HOSTNAMES", "")
+	experimentDetails.SpoofMap = Getenv("SPOOF_MAP", "")
 	experimentDetails.MatchScheme = Getenv("MATCH_SCHEME", "exact")
 	experimentDetails.ChaosType = Getenv("CHAOS_TYPE", "error")
 	experimentDetails.ContainerRuntime = Getenv("CONTAINER_RUNTIME", "docker")
