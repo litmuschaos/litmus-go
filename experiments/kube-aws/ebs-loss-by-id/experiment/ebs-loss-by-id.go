@@ -1,12 +1,12 @@
 package experiment
 
 import (
-	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/ebs-loss/lib"
+	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/ebs-loss-by-id/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/cloud/aws"
 	"github.com/litmuschaos/litmus-go/pkg/events"
-	experimentEnv "github.com/litmuschaos/litmus-go/pkg/kube-aws/ebs-loss/environment"
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/kube-aws/ebs-loss/types"
+	experimentEnv "github.com/litmuschaos/litmus-go/pkg/kube-aws/ebs-loss-by-id/environment"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/kube-aws/ebs-loss-by-id/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/result"
@@ -15,8 +15,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// EBSLoss inject the ebs volume loss chaos
-func EBSLoss(clients clients.ClientSets) {
+// EBSLossByID inject the ebs volume loss chaos
+func EBSLossByID(clients clients.ClientSets) {
 
 	var err error
 	experimentsDetails := experimentTypes.ExperimentDetails{}
@@ -113,7 +113,7 @@ func EBSLoss(clients clients.ClientSets) {
 	}
 
 	//Verify the aws ec2 instance is attached to ebs volume
-	EBSStatus, err := aws.GetEBSStatus(&experimentsDetails)
+	EBSStatus, err := aws.GetEBSStatus(experimentsDetails.EBSVolumeID, experimentsDetails.Ec2InstanceID, experimentsDetails.Region)
 	if err != nil || EBSStatus != "attached" {
 		log.Errorf("failed to verify the ebs volume is attached to an ec2 instance, err: %v", err)
 		failStep := "Verify the ebs volume is attached to an ec2 instance (pre-chaos)"
@@ -161,7 +161,7 @@ func EBSLoss(clients clients.ClientSets) {
 	}
 
 	//Verify the aws ec2 instance is attached to ebs volume
-	EBSStatus, err = aws.GetEBSStatus(&experimentsDetails)
+	EBSStatus, err = aws.GetEBSStatus(experimentsDetails.EBSVolumeID, experimentsDetails.Ec2InstanceID, experimentsDetails.Region)
 	if err != nil || EBSStatus != "attached" {
 		log.Errorf("failed to verify the ebs volume is attached to an ec2 instance, err: %v", err)
 		failStep := "Verify the ebs volume is attached to an ec2 instance (post-chaos)"
