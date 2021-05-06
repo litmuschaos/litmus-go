@@ -28,20 +28,48 @@ var err error
 // StressMemory Uses the REST API to exec into the target container of the target pod
 // The function will be constantly increasing the Memory utilisation until it reaches the maximum available or allowed number.
 // Using the TOTAL_CHAOS_DURATION we will need to specify for how long this experiment will last
-func StressMemory(MemoryConsumption, containerName, podName, namespace string, clients clients.ClientSets, stressErr chan error) {
+func StressMemory(MemoryConsumption int, containerName, podName, namespace string, clients clients.ClientSets, stressErr chan error) {
 
-	log.Infof("The memory consumption is: %v", MemoryConsumption)
+	log.Infof("[Info]: Consuming %dM amount of memory, or as much as is available whichever is lower", MemoryConsumption)
 
 	// It will contain all the pod & container details required for exec command
 	execCommandDetails := litmusexec.PodDetails{}
+	// The memory block size is 500M
+	// It will create a thread of dd process with each of size 500M
+	memoryToConsume := 500
+	iterations, extraMemory := getMemoryBlocks(MemoryConsumption)
 
-	ddCmd := fmt.Sprintf("dd if=/dev/zero of=/dev/null bs=" + MemoryConsumption + "M")
-	command := []string{"/bin/sh", "-c", ddCmd}
+	for i := 0; i < iterations; i++ {
 
-	litmusexec.SetExecCommandAttributes(&execCommandDetails, podName, containerName, namespace)
-	_, err := litmusexec.Exec(&execCommandDetails, clients, command)
+		if i == (iterations-1) && extraMemory != 0 {
+			memoryToConsume = extraMemory
+		}
+		ddCmd := fmt.Sprintf("dd if=/dev/zero of=/dev/null bs=" + strconv.Itoa(memoryToConsume) + "M &")
+		command := []string{"/bin/sh", "-c", ddCmd}
 
-	stressErr <- err
+		litmusexec.SetExecCommandAttributes(&execCommandDetails, podName, containerName, namespace)
+		_, err = litmusexec.Exec(&execCommandDetails, clients, command)
+		stressErr <- err
+	}
+
+}
+
+//getMemoryBlocks will break the total memory into memory blocks of 2000M and return it
+func getMemoryBlocks(totalMemoryConsumption int) (numberOfMemoryBlocks, extraMemoryChunk int) {
+
+	switch true {
+
+	case totalMemoryConsumption < 500:
+		return 1, totalMemoryConsumption
+
+	default:
+		numberOfMemoryBlocks := totalMemoryConsumption / 500
+		extraMemoryChunk := totalMemoryConsumption % 500
+		if extraMemoryChunk != 0 {
+			numberOfMemoryBlocks++
+		}
+		return numberOfMemoryBlocks, extraMemoryChunk
+	}
 }
 
 //ExperimentMemory function orchestrates the experiment by calling the StressMemory function, of every container, of every pod that is targeted
@@ -112,7 +140,7 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 			"Target Pod":             pod.Name,
 			"Memory Consumption(MB)": experimentsDetails.MemoryConsumption,
 		})
-		go StressMemory(strconv.Itoa(experimentsDetails.MemoryConsumption), experimentsDetails.TargetContainer, pod.Name, experimentsDetails.AppNS, clients, stressErr)
+		go StressMemory(experimentsDetails.MemoryConsumption, experimentsDetails.TargetContainer, pod.Name, experimentsDetails.AppNS, clients, stressErr)
 
 		log.Infof("[Chaos]:Waiting for: %vs", experimentsDetails.ChaosDuration)
 
@@ -185,7 +213,7 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 			"Memory Consumption(MB)": experimentsDetails.MemoryConsumption,
 		})
 
-		go StressMemory(strconv.Itoa(experimentsDetails.MemoryConsumption), experimentsDetails.TargetContainer, pod.Name, experimentsDetails.AppNS, clients, stressErr)
+		go StressMemory(experimentsDetails.MemoryConsumption, experimentsDetails.TargetContainer, pod.Name, experimentsDetails.AppNS, clients, stressErr)
 	}
 
 	log.Infof("[Chaos]:Waiting for: %vs", experimentsDetails.ChaosDuration)
