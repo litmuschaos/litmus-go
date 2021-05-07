@@ -133,9 +133,9 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 
 			//checking the status of the helper pods, wait till the pod comes to running state else fail the experiment
 			log.Info("[Status]: Checking the status of the helper pods")
-			err = status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, appLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
+			err = status.CheckHelperStatus(experimentsDetails.ChaosNamespace, appLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 			if err != nil {
-				common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-"+runID, appLabel, chaosDetails, clients)
+				common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-helper-"+runID, appLabel, chaosDetails, clients)
 				return errors.Errorf("helper pods are not in running state, err: %v", err)
 			}
 
@@ -217,7 +217,7 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 
 		//checking the status of the helper pods, wait till the pod comes to running state else fail the experiment
 		log.Info("[Status]: Checking the status of the helper pods")
-		err = status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, appLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
+		err = status.CheckHelperStatus(experimentsDetails.ChaosNamespace, appLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 		if err != nil {
 			common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
 			return errors.Errorf("helper pods are not in running state, err: %v", err)
@@ -232,7 +232,7 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 			return errors.Errorf("helper pod failed due to, err: %v", err)
 		}
 
-		//Deleting all the helper pod for container-kill chaos
+		//Deleting all the helper pod for network-chaos
 		log.Info("[Cleanup]: Deleting all the helper pod")
 		err = common.DeleteAllPod(appLabel, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients)
 		if err != nil {
