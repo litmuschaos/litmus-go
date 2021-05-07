@@ -116,7 +116,7 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 
 				//Wait for chaos interval
 				log.Infof("[Wait]: Waiting for chaos interval of %vs before starting the instance", experimentsDetails.ChaosInterval)
-				time.Sleep(time.Duration(experimentsDetails.ChaosInterval) * time.Second)
+				common.WaitForDuration(experimentsDetails.ChaosInterval)
 
 				//Starting the EC2 instance
 				if experimentsDetails.ManagedNodegroup != "enable" {
@@ -265,38 +265,33 @@ func InstanceStatusCheckByID(experimentsDetails *experimentTypes.ExperimentDetai
 // watching for the abort signal and revert the chaos
 func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, chaosDetails *types.ChaosDetails, eventsDetails *types.EventDetails) {
 
-	// signChan channel is used to transmit signal notifications.
-	signChan := make(chan os.Signal, 1)
-	// Catch and relay certain signal(s) to signChan channel.
-	signal.Notify(signChan, os.Interrupt, syscall.SIGTERM)
+	<-abort
 
-loop:
-	for {
-		select {
-		case <-signChan:
+	log.Info("[Chaos]: Chaos Experiment Abortion started because of terminated signal received")
 
-			log.Info("[Chaos]: Chaos Experiment Abortion started because of terminated signal received")
+	instanceIDList := strings.Split(experimentsDetails.Ec2InstanceID, ",")
+	if len(instanceIDList) == 0 {
+		log.Errorf("no instance id found to terminate")
+	}
+	for _, id := range instanceIDList {
+		instanceState, err := awslib.GetEC2InstanceStatus(id, experimentsDetails.Region)
+		if err != nil {
+			log.Errorf("fail to get instance status when an abort signal is received,err :%v", err)
+		}
+		if instanceState != "running" && experimentsDetails.ManagedNodegroup != "enable" {
 
-			instanceIDList := strings.Split(experimentsDetails.Ec2InstanceID, ",")
-			if len(instanceIDList) == 0 {
-				log.Errorf("no instance id found to terminate")
+			log.Info("[Abort]: Waiting for the EC2 instance to get down")
+			if err := awslib.WaitForEC2Down(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.ManagedNodegroup, experimentsDetails.Region, id); err != nil {
+				log.Errorf("unable to wait till stop of the instance, err: %v", err)
 			}
-			for _, id := range instanceIDList {
-				instanceState, err := awslib.GetEC2InstanceStatus(id, experimentsDetails.Region)
-				if err != nil {
-					log.Errorf("fail to get instance status when an abort signal is received,err :%v", err)
-				}
-				if instanceState != "running" && experimentsDetails.ManagedNodegroup != "enable" {
 
-					log.Info("[Abort]: Starting EC2 instance as abort signal received")
-					err := awslib.EC2Start(id, experimentsDetails.Region)
-					if err != nil {
-						log.Errorf("ec2 instance failed to start when an abort signal is received, err: %v", err)
-					}
-
-				}
+			log.Info("[Abort]: Starting EC2 instance as abort signal received")
+			err := awslib.EC2Start(id, experimentsDetails.Region)
+			if err != nil {
+				log.Errorf("ec2 instance failed to start when an abort signal is received, err: %v", err)
 			}
-			break loop
+
 		}
 	}
+	os.Exit(1)
 }

@@ -58,7 +58,7 @@ func EC2TerminateByID(clients clients.ClientSets) {
 	result.SetResultUID(&resultDetails, clients, &chaosDetails)
 
 	// Calling AbortWatcher go routine, it will continuously watch for the abort signal and generate the required events and result
-	go common.AbortWatcher(experimentsDetails.ExperimentName, clients, &resultDetails, &chaosDetails, &eventsDetails)
+	go common.AbortWatcherWithoutExit(experimentsDetails.ExperimentName, clients, &resultDetails, &chaosDetails, &eventsDetails)
 
 	//DISPLAY THE INSTANCE INFORMATION
 	log.InfoWithValues("The instance information is as follows", logrus.Fields{

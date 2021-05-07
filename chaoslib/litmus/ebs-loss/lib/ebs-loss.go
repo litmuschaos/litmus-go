@@ -76,7 +76,7 @@ func InjectEBSLoss(experimentsDetails *experimentTypes.ExperimentDetails, client
 
 		//Wait for chaos duration
 		log.Infof("[Wait]: Waiting for the chaos duration of %vs", experimentsDetails.ChaosDuration)
-		time.Sleep(time.Duration(experimentsDetails.ChaosDuration) * time.Second)
+		common.WaitForDuration(experimentsDetails.ChaosDuration)
 
 		//Getting the EBS volume attachment status
 		EBSStatus, err := ebs.GetEBSStatus(experimentsDetails)
@@ -243,32 +243,26 @@ func WaitForVolumeAttachment(experimentsDetails *experimentTypes.ExperimentDetai
 // watching for the abort signal and revert the chaos
 func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, chaosDetails *types.ChaosDetails, eventsDetails *types.EventDetails) {
 
-	// signChan channel is used to transmit signal notifications.
-	signChan := make(chan os.Signal, 1)
-	// Catch and relay certain signal(s) to signChan channel.
-	signal.Notify(signChan, os.Interrupt, syscall.SIGTERM)
+	<-abort
+	log.Info("[Chaos]: Chaos Experiment Abortion started because of terminated signal received")
+	//Getting the EBS volume attachment status
+	EBSStatus, err := ebs.GetEBSStatus(experimentsDetails)
+	if err != nil {
+		log.Errorf("failed to get the ebs status when an abort signal is received, err: %v", err)
+	}
+	if EBSStatus != "attached" {
 
-loop:
-	for {
-		select {
-		case <-signChan:
-
-			log.Info("[Chaos]: Chaos Experiment Abortion started because of terminated signal received")
-			//Getting the EBS volume attachment status
-			EBSStatus, err := ebs.GetEBSStatus(experimentsDetails)
-			if err != nil {
-				log.Errorf("failed to get the ebs status when an abort signal is received, err: %v", err)
-			}
-
-			if EBSStatus != "attached" {
-				//Attaching the ebs volume from the instance
-				log.Info("[Chaos]: Attaching the EBS volume from the instance")
-				err = EBSVolumeAttach(experimentsDetails)
-				if err != nil {
-					log.Errorf("ebs attachment failed when an abort signal is received, err: %v", err)
-				}
-			}
-			break loop
+		//Wait for ebs volume detachment
+		log.Info("[Abort]: Wait for EBS complete volume detachment")
+		if err = WaitForVolumeDetachment(experimentsDetails); err != nil {
+			log.Errorf("unable to detach the ebs volume, err: %v", err)
+		}
+		//Attaching the ebs volume from the instance
+		log.Info("[Chaos]: Attaching the EBS volume from the instance")
+		err = EBSVolumeAttach(experimentsDetails)
+		if err != nil {
+			log.Errorf("ebs attachment failed when an abort signal is received, err: %v", err)
 		}
 	}
+	os.Exit(1)
 }
