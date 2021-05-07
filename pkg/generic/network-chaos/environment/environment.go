@@ -42,8 +42,8 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.SocketPath = Getenv("SOCKET_PATH", "/var/run/docker.sock")
 	experimentDetails.Sequence = Getenv("SEQUENCE", "parallel")
 	experimentDetails.ChaosInterval = Getenv("CHAOS_INTERVAL", "")
-	experimentDetails.NetworkChaosDuration, _ = strconv.Atoi(Getenv("NETWORK_CHAOS_DURATION", "60"))
-	experimentDetails.ChaosDuration, _ = strconv.Atoi(Getenv("TOTAL_CHAOS_DURATION", strconv.Itoa(experimentDetails.NetworkChaosDuration)))
+	experimentDetails.NetworkFaultWindow, _ = strconv.Atoi(Getenv("NETWORK_FAULT_WINDOW", "60"))
+	experimentDetails.ChaosDuration, _ = strconv.Atoi(Getenv("TOTAL_CHAOS_DURATION", strconv.Itoa(experimentDetails.NetworkFaultWindow)))
 	experimentDetails.TerminationGracePeriodSeconds, _ = strconv.Atoi(Getenv("TERMINATION_GRACE_PERIOD_SECONDS", ""))
 }
 

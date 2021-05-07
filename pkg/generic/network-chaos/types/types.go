@@ -43,6 +43,6 @@ type ExperimentDetails struct {
 	Resources                          corev1.ResourceRequirements
 	ImagePullSecrets                   []corev1.LocalObjectReference
 	ChaosInterval                      string
-	NetworkChaosDuration               int
+	NetworkFaultWindow                 int
 	TerminationGracePeriodSeconds      int
 }

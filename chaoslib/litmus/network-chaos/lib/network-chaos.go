@@ -129,7 +129,7 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 				return errors.Errorf("Unable to create the helper pod, err: %v", err)
 			}
 
-			appLabel := "name=" + experimentsDetails.ExperimentName + "-" + runID
+			appLabel := "name=" + experimentsDetails.ExperimentName + "-helper-" + runID
 
 			//checking the status of the helper pods, wait till the pod comes to running state else fail the experiment
 			log.Info("[Status]: Checking the status of the helper pods")
@@ -152,7 +152,7 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 			log.Info("[Cleanup]: Deleting the the helper pod")
 			err = common.DeletePod(experimentsDetails.ExperimentName+"-"+runID, appLabel, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients)
 			if err != nil {
-				return errors.Errorf("Unable to delete the helper pods, err: %v", err)
+				return errors.Errorf("unable to delete the helper pods, err: %v", err)
 			}
 
 			switch chaosDetails.Randomness {
@@ -292,11 +292,11 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 
 	helperPod := &apiv1.Pod{
 		ObjectMeta: v1.ObjectMeta{
-			Name:      experimentsDetails.ExperimentName + "-" + runID,
+			Name:      experimentsDetails.ExperimentName + "-helper-" + runID,
 			Namespace: experimentsDetails.ChaosNamespace,
 			Labels: map[string]string{
 				"app":                       experimentsDetails.ExperimentName + "-helper-" + labelSuffix,
-				"name":                      experimentsDetails.ExperimentName + "-" + runID,
+				"name":                      experimentsDetails.ExperimentName + "-helper-" + runID,
 				"chaosUID":                  string(experimentsDetails.ChaosUID),
 				"app.kubernetes.io/part-of": "litmus",
 			},
@@ -367,7 +367,7 @@ func GetPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, podName, a
 		"APP_NS":               experimentsDetails.AppNS,
 		"APP_POD":              podName,
 		"APP_CONTAINER":        experimentsDetails.TargetContainer,
-		"TOTAL_CHAOS_DURATION": strconv.Itoa(experimentsDetails.NetworkChaosDuration),
+		"TOTAL_CHAOS_DURATION": strconv.Itoa(experimentsDetails.NetworkFaultWindow),
 		"CHAOS_NAMESPACE":      experimentsDetails.ChaosNamespace,
 		"CHAOS_ENGINE":         experimentsDetails.EngineName,
 		"CHAOS_UID":            string(experimentsDetails.ChaosUID),

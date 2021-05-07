@@ -25,10 +25,10 @@ func AUTStatusCheck(appNs, appLabel, containerName string, timeout, delay int, c
 		return AnnotatedApplicationsStatusCheck(appNs, appLabel, containerName, timeout, delay, clients, chaosDetails)
 	default:
 		switch appLabel {
-			case "":
-				// Checking whether applications are healthy
-				log.Info("[Status]: No appLabels provided, skipping the application status checks")
-			default:
+		case "":
+			// Checking whether applications are healthy
+			log.Info("[Status]: No appLabels provided, skipping the application status checks")
+		default:
 			// Checking whether application containers are in ready state
 			log.Info("[Status]: Checking whether application containers are in ready state")
 			if err := CheckContainerStatus(appNs, appLabel, containerName, timeout, delay, clients); err != nil {
@@ -67,7 +67,7 @@ func AnnotatedApplicationsStatusCheck(appNs, appLabel, containerName string, tim
 							if container.State.Terminated != nil {
 								return errors.Errorf("container is in terminated state")
 							}
-							if !container.Ready   {
+							if !container.Ready {
 								return errors.Errorf("containers are not yet in running state")
 							}
 							log.InfoWithValues("[Status]: The Container status are as follows", logrus.Fields{
@@ -79,7 +79,7 @@ func AnnotatedApplicationsStatusCheck(appNs, appLabel, containerName string, tim
 								if container.State.Terminated != nil {
 									return errors.Errorf("container is in terminated state")
 								}
-								if !container.Ready{
+								if !container.Ready {
 									return errors.Errorf("containers are not yet in running state")
 								}
 								log.InfoWithValues("[Status]: The Container status are as follows", logrus.Fields{
@@ -205,7 +205,7 @@ func validateContainerStatus(containerName, podName string, ContainerStatuses []
 			if container.State.Terminated != nil {
 				return errors.Errorf("container is in terminated state")
 			}
-			if !container.Ready{
+			if !container.Ready {
 				return errors.Errorf("containers are not yet in running state")
 			}
 			log.InfoWithValues("[Status]: The Container status are as follows", logrus.Fields{

@@ -25,6 +25,7 @@ import (
 	podAutoscaler "github.com/litmuschaos/litmus-go/experiments/generic/pod-autoscaler/experiment"
 	podCPUHog "github.com/litmuschaos/litmus-go/experiments/generic/pod-cpu-hog/experiment"
 	podDelete "github.com/litmuschaos/litmus-go/experiments/generic/pod-delete/experiment"
+	podDNSChaos "github.com/litmuschaos/litmus-go/experiments/generic/pod-dns-chaos/experiment"
 	podIOStress "github.com/litmuschaos/litmus-go/experiments/generic/pod-io-stress/experiment"
 	podMemoryHog "github.com/litmuschaos/litmus-go/experiments/generic/pod-memory-hog/experiment"
 	podNetworkCorruption "github.com/litmuschaos/litmus-go/experiments/generic/pod-network-corruption/experiment"
@@ -33,7 +34,9 @@ import (
 	podNetworkLoss "github.com/litmuschaos/litmus-go/experiments/generic/pod-network-loss/experiment"
 	kafkaBrokerPodFailure "github.com/litmuschaos/litmus-go/experiments/kafka/kafka-broker-pod-failure/experiment"
 	ebsLoss "github.com/litmuschaos/litmus-go/experiments/kube-aws/ebs-loss/experiment"
-	ec2terminate "github.com/litmuschaos/litmus-go/experiments/kube-aws/ec2-terminate/experiment"
+	ec2TerminateByID "github.com/litmuschaos/litmus-go/experiments/kube-aws/ec2-terminate-by-id/experiment"
+	ec2TerminateByTag "github.com/litmuschaos/litmus-go/experiments/kube-aws/ec2-terminate-by-tag/experiment"
+	vmpoweroff "github.com/litmuschaos/litmus-go/experiments/vmware/vm-poweroff/experiment"
 
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/log"
@@ -58,7 +61,8 @@ func main() {
 
 	//Getting kubeConfig and Generate ClientSets
 	if err := clients.GenerateClientSetFromKubeConfig(); err != nil {
-		log.Fatalf("Unable to Get the kubeconfig, err: %v", err)
+		log.Errorf("Unable to Get the kubeconfig, err: %v", err)
+		return
 	}
 
 	log.Infof("Experiment Name: %v", *experimentName)
@@ -103,13 +107,21 @@ func main() {
 		podNetworkLoss.PodNetworkLoss(clients)
 	case "cassandra-pod-delete":
 		cassandraPodDelete.CasssandraPodDelete(clients)
-	case "ec2-terminate":
-		ec2terminate.EC2Terminate(clients)
+	case "ec2-terminate-by-id":
+		ec2TerminateByID.EC2TerminateByID(clients)
+	case "ec2-terminate-by-tag":
+		ec2TerminateByTag.EC2TerminateByTag(clients)
 	case "ebs-loss":
 		ebsLoss.EBSLoss(clients)
 	case "node-restart":
 		nodeRestart.NodeRestart(clients)
+	case "pod-dns-chaos":
+		podDNSChaos.PodDNSExperiment(clients)
+        case "vm-poweroff":
+                vmpoweroff.VMPoweroff(clients)
+
 	default:
-		log.Fatalf("Unsupported -name %v, please provide the correct value of -name args", *experimentName)
+		log.Errorf("Unsupported -name %v, please provide the correct value of -name args", *experimentName)
+		return
 	}
 }

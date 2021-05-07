@@ -30,7 +30,7 @@ func GetContainerArguments(experimentsDetails *experimentTypes.ExperimentDetails
 		"--interface",
 		experimentsDetails.NetworkInterface,
 		"--duration",
-		strconv.Itoa(experimentsDetails.NetworkChaosDuration) + "s",
+		strconv.Itoa(experimentsDetails.ChaosDuration) + "s",
 	}
 
 	args := baseArgs

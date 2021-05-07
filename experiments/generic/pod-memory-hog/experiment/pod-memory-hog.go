@@ -14,7 +14,6 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/sirupsen/logrus"
-	"k8s.io/klog"
 )
 
 // PodMemoryHog inject the pod-memory-hog chaos
@@ -39,7 +38,8 @@ func PodMemoryHog(clients clients.ClientSets) {
 	if experimentsDetails.EngineName != "" {
 		// Intialise the probe details. Bail out upon error, as we haven't entered exp business logic yet
 		if err = probe.InitializeProbesInChaosResultDetails(&chaosDetails, clients, &resultDetails); err != nil {
-			log.Fatalf("Unable to initialize the probes, err: %v", err)
+			log.Errorf("Unable to initialize the probes, err: %v", err)
+			return
 		}
 	}
 
@@ -110,7 +110,7 @@ func PodMemoryHog(clients clients.ClientSets) {
 	if experimentsDetails.ChaosLib == "litmus" {
 		err = litmusLIB.PrepareMemoryStress(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
 		if err != nil {
-			log.Errorf("[Error]: pod memory hog failed,, err: %v", err)
+			log.Errorf("[Error]: pod memory hog failed, err: %v", err)
 			failStep := "failed in chaos injection phase"
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
@@ -141,7 +141,7 @@ func PodMemoryHog(clients clients.ClientSets) {
 	//POST-CHAOS APPLICATION STATUS CHECK
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (post-chaos)")
 	if err = status.AUTStatusCheck(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.TargetContainer, experimentsDetails.Timeout, experimentsDetails.Delay, clients, &chaosDetails); err != nil {
-		klog.V(0).Infof("Application status check failed, err: %v", err)
+		log.Infof("Application status check failed, err: %v", err)
 		failStep := "Verify that the AUT (Application Under Test) is running (post-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
@@ -175,7 +175,8 @@ func PodMemoryHog(clients clients.ClientSets) {
 	log.Infof("[The End]: Updating the chaos result of %v experiment (EOT)", experimentsDetails.ExperimentName)
 	err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 	if err != nil {
-		log.Fatalf("Unable to Update the Chaos Result, err: %v", err)
+		log.Errorf("Unable to Update the Chaos Result, err: %v", err)
+		return
 	}
 
 	// generating the event in chaosresult to marked the verdict as pass/fail
