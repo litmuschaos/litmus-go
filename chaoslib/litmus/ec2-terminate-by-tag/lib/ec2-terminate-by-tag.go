@@ -22,7 +22,6 @@ import (
 )
 
 var inject, abort chan os.Signal
-var err error
 
 //PrepareEC2TerminateByTag contains the prepration and injection steps for the experiment
 func PrepareEC2TerminateByTag(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
@@ -50,11 +49,11 @@ func PrepareEC2TerminateByTag(experimentsDetails *experimentTypes.ExperimentDeta
 	go abortWatcher(experimentsDetails, clients, resultDetails, chaosDetails, eventsDetails)
 
 	if strings.ToLower(experimentsDetails.Sequence) == "serial" {
-		if err = InjectChaosInSerialMode(experimentsDetails, instanceIDList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+		if err := InjectChaosInSerialMode(experimentsDetails, instanceIDList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
 			return err
 		}
 	} else {
-		if err = InjectChaosInParallelMode(experimentsDetails, instanceIDList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+		if err := InjectChaosInParallelMode(experimentsDetails, instanceIDList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
 			return err
 		}
 	}
