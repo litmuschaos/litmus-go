@@ -131,6 +131,7 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 				// oom kill occurs if memory to be stressed exceed than the resource limit for the target container
 				if err != nil {
 					if strings.Contains(err.Error(), "137") {
+						log.Warn("Chaos process OOM killed")
 						return nil
 					}
 					return err
@@ -203,6 +204,7 @@ loop:
 			// oom kill occurs if memory to be stressed exceed than the resource limit for the target container
 			if err != nil {
 				if strings.Contains(err.Error(), "137") {
+					log.Warn("Chaos process OOM killed")
 					return nil
 				}
 				return err

@@ -18,9 +18,11 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 var inject, abort chan os.Signal
+var err error
 
 //PrepareEC2TerminateByTag contains the prepration and injection steps for the experiment
 func PrepareEC2TerminateByTag(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
@@ -34,20 +36,14 @@ func PrepareEC2TerminateByTag(experimentsDetails *experimentTypes.ExperimentDeta
 	abort = make(chan os.Signal, 1)
 	// Catch and relay certain signal(s) to abort channel.
 	signal.Notify(abort, os.Interrupt, syscall.SIGTERM)
+
 	//Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
 		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", experimentsDetails.RampTime)
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 
-	instanceIDList, err := awslib.GetInstanceList(experimentsDetails.InstanceTag, experimentsDetails.Region)
-	if err != nil {
-		return err
-	}
-	if len(instanceIDList) == 0 {
-		return errors.Errorf("fail to extract the instance id")
-	}
-	instanceIDList = CalculateInstanceAffPerc(experimentsDetails.InstanceAffectedPerc, instanceIDList)
+	instanceIDList := CalculateInstanceAffPerc(experimentsDetails.InstanceAffectedPerc, experimentsDetails.TargetInstanceIDList)
 	log.Infof("[Chaos]:Number of Instance targeted: %v", len(instanceIDList))
 
 	// watching for the abort signal and revert the chaos
@@ -78,14 +74,13 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		// stopping the chaos execution, if abort signal recieved
 		os.Exit(0)
 	default:
-
 		//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
 		ChaosStartTimeStamp := time.Now().Unix()
 
 	loop:
 		for {
 
-			log.Infof("Target instanceID list, %v", instanceIDList)
+			log.Infof("[Info]: Target instanceID list, %v", instanceIDList)
 
 			if experimentsDetails.EngineName != "" {
 				msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on ec2 instance"
@@ -96,15 +91,15 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 			//PowerOff the instance
 			for _, id := range instanceIDList {
 
-				//Stoping the EC2 instance
-				log.Info("[Chaos]: Stoping the desired EC2 instance")
+				//Stopping the EC2 instance
+				log.Info("[Chaos]: Stopping the desired EC2 instance")
 				err := awslib.EC2Stop(id, experimentsDetails.Region)
 				if err != nil {
 					return errors.Errorf("ec2 instance failed to stop, err: %v", err)
 				}
 
 				//Wait for ec2 instance to completely stop
-				log.Infof("[Wait]: Wait for EC2 instance '%v' to come in stopped state", id)
+				log.Infof("[Wait]: Wait for EC2 instance '%v' to get in stopped state", id)
 				if err := awslib.WaitForEC2Down(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.ManagedNodegroup, experimentsDetails.Region, id); err != nil {
 					return errors.Errorf("unable to stop the ec2 instance, err: %v", err)
 				}
@@ -117,8 +112,8 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 				}
 
 				//Wait for chaos interval
-				log.Infof("[Wait]: Waiting for chaos interval of %vs before starting the instance", experimentsDetails.ChaosInterval)
-				common.WaitForDuration(experimentsDetails.ChaosDuration)
+				log.Infof("[Wait]: Waiting for chaos interval of %vs", experimentsDetails.ChaosInterval)
+				time.Sleep(time.Duration(experimentsDetails.ChaosInterval) * time.Second)
 
 				//Starting the EC2 instance
 				if experimentsDetails.ManagedNodegroup != "enable" {
@@ -128,7 +123,7 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 						return errors.Errorf("ec2 instance failed to start, err: %v", err)
 					}
 
-					//Wait for ec2 instance to come in running state
+					//Wait for ec2 instance to get in running state
 					log.Infof("[Wait]: Wait for EC2 instance '%v' to get in running state", id)
 					if err := awslib.WaitForEC2Up(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.ManagedNodegroup, experimentsDetails.Region, id); err != nil {
 						return errors.Errorf("unable to start the ec2 instance, err: %v", err)
@@ -150,7 +145,6 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 			}
 		}
 	}
-
 	return nil
 }
 
@@ -162,14 +156,13 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		// stopping the chaos execution, if abort signal recieved
 		os.Exit(0)
 	default:
-
 		//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
 		ChaosStartTimeStamp := time.Now().Unix()
 
 	loop:
 		for {
 
-			log.Infof("Target instanceID list, %v", instanceIDList)
+			log.Infof("[Info]: Target instanceID list, %v", instanceIDList)
 
 			if experimentsDetails.EngineName != "" {
 				msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on ec2 instance"
@@ -179,8 +172,8 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 
 			//PowerOff the instance
 			for _, id := range instanceIDList {
-				//Stoping the EC2 instance
-				log.Info("[Chaos]: Stoping the desired EC2 instance")
+				//Stopping the EC2 instance
+				log.Info("[Chaos]: Stopping the desired EC2 instance")
 				err := awslib.EC2Stop(id, experimentsDetails.Region)
 				if err != nil {
 					return errors.Errorf("ec2 instance failed to stop, err: %v", err)
@@ -189,7 +182,7 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 
 			for _, id := range instanceIDList {
 				//Wait for ec2 instance to completely stop
-				log.Infof("[Wait]: Wait for EC2 instance '%v' to come in stopped state", id)
+				log.Infof("[Wait]: Wait for EC2 instance '%v' to get in stopped state", id)
 				if err := awslib.WaitForEC2Down(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.ManagedNodegroup, experimentsDetails.Region, id); err != nil {
 					return errors.Errorf("unable to stop the ec2 instance, err: %v", err)
 				}
@@ -203,7 +196,7 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 			}
 
 			//Wait for chaos interval
-			log.Infof("[Wait]: Waiting for chaos interval of %vs before starting the instance", experimentsDetails.ChaosInterval)
+			log.Infof("[Wait]: Waiting for chaos interval of %vs", experimentsDetails.ChaosInterval)
 			time.Sleep(time.Duration(experimentsDetails.ChaosInterval) * time.Second)
 
 			//Starting the EC2 instance
@@ -218,7 +211,7 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 				}
 
 				for _, id := range instanceIDList {
-					//Wait for ec2 instance to come in running state
+					//Wait for ec2 instance to get in running state
 					log.Infof("[Wait]: Wait for EC2 instance '%v' to get in running state", id)
 					if err := awslib.WaitForEC2Up(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.ManagedNodegroup, experimentsDetails.Region, id); err != nil {
 						return errors.Errorf("unable to start the ec2 instance, err: %v", err)
@@ -239,7 +232,6 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 			}
 		}
 	}
-
 	return nil
 }
 
@@ -260,23 +252,50 @@ func CalculateInstanceAffPerc(InstanceAffPerc int, instanceList []string) []stri
 	return newIDList
 }
 
-//InstanceStatusCheckByTag is used to check the instance status of all the instance under chaos.
-func InstanceStatusCheckByTag(instanceTag, region string) error {
+//PostChaosInstanceStatusCheck is used to check the instance status of the instances under chaos post chaos.
+func PostChaosInstanceStatusCheck(targetInstanceIDList []string, region string) error {
 
-	instanceIDList, err := awslib.GetInstanceList(instanceTag, region)
-	if err != nil {
-		return err
-	}
-	log.Infof("[Info]: The instances under chaos(IUC) are: %v", instanceIDList)
-	for _, id := range instanceIDList {
+	for _, id := range targetInstanceIDList {
 		instanceState, err := awslib.GetEC2InstanceStatus(id, region)
 		if err != nil {
 			return err
 		}
 		if instanceState != "running" {
-			return errors.Errorf("failed to get the ec2 instance '%v' status as running", id)
+			return errors.Errorf("failed to get the ec2 instance '%v' in running sate, current state: %v", id, instanceState)
 		}
 	}
+	return nil
+}
+
+//SetTargetInstance will select the target instance which are in running state and filtered from the given instance tag
+func SetTargetInstance(experimentsDetails *experimentTypes.ExperimentDetails) error {
+
+	instanceIDList, err := awslib.GetInstanceList(experimentsDetails.InstanceTag, experimentsDetails.Region)
+	if err != nil {
+		return err
+	}
+	if len(instanceIDList) == 0 {
+		return errors.Errorf("no instance found with the given tag %v, in region %v", experimentsDetails.InstanceTag, experimentsDetails.Region)
+	}
+
+	for _, id := range instanceIDList {
+		instanceState, err := awslib.GetEC2InstanceStatus(id, experimentsDetails.Region)
+		if err != nil {
+			return errors.Errorf("fail to get the instance status while selecting the target instances, err: %v", err)
+		}
+		if instanceState == "running" {
+			experimentsDetails.TargetInstanceIDList = append(experimentsDetails.TargetInstanceIDList, id)
+		}
+	}
+
+	if len(experimentsDetails.TargetInstanceIDList) == 0 {
+		return errors.Errorf("fail to get any running instance having instance tag: %v", experimentsDetails.InstanceTag)
+	}
+
+	log.InfoWithValues("[Info]: Targeting the running instances filtered from instance tag", logrus.Fields{
+		"Total number of instances filtered":   len(instanceIDList),
+		"Number of running instances filtered": len(experimentsDetails.TargetInstanceIDList),
+	})
 	return nil
 }
 
