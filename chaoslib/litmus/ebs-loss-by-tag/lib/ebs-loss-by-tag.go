@@ -134,6 +134,11 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		}
 	}
 
+	log.Info("[Info]: Checking if the detachment process initiated")
+	if err := ebs.CheckEBSDetachmentInitialisation(targetEBSVolumeIDList, ec2InstanceIDList, experimentsDetails.Region); err != nil {
+		return errors.Errorf("fail to initialise the detachment")
+	}
+
 	for i, volumeID := range targetEBSVolumeIDList {
 		//Wait for ebs volume detachment
 		log.Infof("[Wait]: Wait for EBS volume detachment for volume %v", volumeID)
@@ -141,6 +146,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 			return errors.Errorf("unable to detach the ebs volume to the ec2 instance, err: %v", err)
 		}
 	}
+
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
 		if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
