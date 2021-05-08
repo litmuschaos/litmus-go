@@ -29,8 +29,8 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.AuxiliaryAppInfo = Getenv("AUXILIARY_APPINFO", "")
 	experimentDetails.Delay, _ = strconv.Atoi(Getenv("STATUS_CHECK_DELAY", "2"))
 	experimentDetails.Timeout, _ = strconv.Atoi(Getenv("STATUS_CHECK_TIMEOUT", "180"))
-	experimentDetails.VolumeTag = Getenv("VOLUME_TAG", "team:devops")
-	experimentDetails.Region = Getenv("REGION", "us-east-1")
+	experimentDetails.VolumeTag = Getenv("VOLUME_TAG", "")
+	experimentDetails.Region = Getenv("REGION", "")
 	experimentDetails.Sequence = Getenv("SEQUENCE", "parallel")
 	experimentDetails.TargetContainer = Getenv("TARGET_CONTAINER", "")
 }
