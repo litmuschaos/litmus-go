@@ -28,6 +28,9 @@ func WaitForVolumeDetachment(ebsVolumeID, ec2InstanceID, region string, delay, t
 			if err != nil {
 				return errors.Errorf("failed to get the volume state")
 			}
+			// We are checking the the attached state as well here as in case of PVs the volume may get attached itself
+			// To check if all the volumes have undergone detachment process we make use of CheckEBSDetachmentInitialisation
+			// TODO: Need to check an optimised approach to do this using apis.
 			if volumeState != "detached" && volumeState != "attached" {
 				log.Infof("[Info]: The volume state is %v", volumeState)
 				return errors.Errorf("volume is not yet in detached state")
@@ -159,14 +162,23 @@ func PostChaosVolumeStatusCheck(experimentsDetails *experimentTypes.ExperimentDe
 //CheckEBSDetachmentInitialisation will check the start of volume detachment process
 func CheckEBSDetachmentInitialisation(volumeIDs []string, instanceID []string, region string) error {
 
-	for i, id := range volumeIDs {
-		currentVolumeState, err := GetEBSStatus(id, instanceID[i], region)
-		if err != nil {
-			return errors.Errorf("failed to get the volume status")
-		}
-		if currentVolumeState == "attached" {
-			return errors.Errorf("the volume detachment has not started yet for volume %v", id)
-		}
-	}
-	return nil
+	timeout := 3
+	delay := 1
+	err := retry.
+		Times(uint(timeout / delay)).
+		Wait(time.Duration(delay) * time.Second).
+		Try(func(attempt uint) error {
+
+			for i, id := range volumeIDs {
+				currentVolumeState, err := GetEBSStatus(id, instanceID[i], region)
+				if err != nil {
+					return errors.Errorf("failed to get the volume status")
+				}
+				if currentVolumeState == "attached" {
+					return errors.Errorf("the volume detachment has not started yet for volume %v", id)
+				}
+			}
+			return nil
+		})
+	return err
 }
