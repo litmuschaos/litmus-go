@@ -1,6 +1,7 @@
 package aws
 
 import (
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -23,15 +24,15 @@ func WaitForVolumeDetachment(ebsVolumeID, ec2InstanceID, region string, delay, t
 		Wait(time.Duration(delay) * time.Second).
 		Try(func(attempt uint) error {
 
-			instanceState, err := GetEBSStatus(ebsVolumeID, ec2InstanceID, region)
+			volumeState, err := GetEBSStatus(ebsVolumeID, ec2InstanceID, region)
 			if err != nil {
-				return errors.Errorf("failed to get the instance status")
+				return errors.Errorf("failed to get the volume state")
 			}
-			if instanceState != "detached" {
-				log.Infof("The instance state is %v", instanceState)
-				return errors.Errorf("instance is not yet in detached state")
+			if volumeState != "detached" {
+				log.Infof("[Info]: The volume state is %v", volumeState)
+				return errors.Errorf("volume is not yet in detached state")
 			}
-			log.Infof("The instance state is %v", instanceState)
+			log.Infof("[Info]: The volume state is %v", volumeState)
 			return nil
 		})
 	return err
@@ -46,15 +47,15 @@ func WaitForVolumeAttachment(ebsVolumeID, ec2InstanceID, region string, delay, t
 		Wait(time.Duration(delay) * time.Second).
 		Try(func(attempt uint) error {
 
-			instanceState, err := GetEBSStatus(ebsVolumeID, ec2InstanceID, region)
+			volumeState, err := GetEBSStatus(ebsVolumeID, ec2InstanceID, region)
 			if err != nil {
-				return errors.Errorf("failed to get the instance status")
+				return errors.Errorf("failed to get the volume status")
 			}
-			if instanceState != "attached" {
-				log.Infof("The instance state is %v", instanceState)
-				return errors.Errorf("instance is not yet in attached state")
+			if volumeState != "attached" {
+				log.Infof("[Info]: The volume state is %v", volumeState)
+				return errors.Errorf("volume is not yet in attached state")
 			}
-			log.Infof("The instance state is %v", instanceState)
+			log.Infof("[Info]: The volume state is %v", volumeState)
 			return nil
 		})
 	return err
@@ -108,6 +109,26 @@ func GetEBSStatus(ebsVolumeID, ec2InstanceID, region string) (string, error) {
 		}
 	}
 	return "", errors.Errorf("unable to find the ebs volume with volumeId %v", ebsVolumeID)
+}
+
+//EBSStateCheckByID will check the attachment state of the given volume
+func EBSStateCheckByID(volumeIDs, region string) error {
+
+	volumeIDList := strings.Split(volumeIDs, ",")
+	for _, id := range volumeIDList {
+		instanceID, _, err := GetVolumeAttachmentDetails(id, "", region)
+		if err != nil {
+			return errors.Errorf("fail to get the instanceID for the given volume, err: %v", err)
+		}
+		volumeState, err := GetEBSStatus(id, instanceID, region)
+		if err != nil || volumeState != "attached" {
+			return errors.Errorf("fail to get the ebs volume %v in attached state, err: %v", id, err)
+		}
+	}
+	if len(volumeIDList) == 0 {
+		return errors.Errorf("no volumeID provided, please provide a volume to detach")
+	}
+	return nil
 }
 
 //PostChaosVolumeStatusCheck is the ebs volume state check after chaos

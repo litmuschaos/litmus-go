@@ -22,7 +22,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.AppNS = Getenv("APP_NAMESPACE", "")
 	experimentDetails.AppLabel = Getenv("APP_LABEL", "")
 	experimentDetails.AppKind = Getenv("APP_KIND", "")
-	experimentDetails.VolumeAffectedPerc, _ = strconv.Atoi(Getenv("VOLUME_AFFECTED_PERC", "50"))
+	experimentDetails.VolumeAffectedPerc, _ = strconv.Atoi(Getenv("VOLUME_AFFECTED_PERC", "0"))
 	experimentDetails.ChaosUID = clientTypes.UID(Getenv("CHAOS_UID", ""))
 	experimentDetails.InstanceID = Getenv("INSTANCE_ID", "")
 	experimentDetails.ChaosPodName = Getenv("POD_NAME", "")

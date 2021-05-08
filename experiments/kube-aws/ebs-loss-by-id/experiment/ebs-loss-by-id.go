@@ -113,17 +113,17 @@ func EBSLossByID(clients clients.ClientSets) {
 	}
 
 	//Verify the aws ec2 instance is attached to ebs volume
-	EBSStatus, err := aws.GetEBSStatus(experimentsDetails.EBSVolumeID, experimentsDetails.Ec2InstanceID, experimentsDetails.Region)
-	if err != nil || EBSStatus != "attached" {
-		log.Errorf("failed to verify the ebs volume is attached to an ec2 instance, err: %v", err)
-		failStep := "Verify the ebs volume is attached to an ec2 instance (pre-chaos)"
+	err = aws.EBSStateCheckByID(experimentsDetails.EBSVolumeID, experimentsDetails.Region)
+	if err != nil {
+		log.Errorf("volume status check failed pre chaos, err: %v", err)
+		failStep := "Verify the ebs volume is attached to ec2 instance (pre-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
 
 	// Including the litmus lib for ebs-loss
 	if experimentsDetails.ChaosLib == "litmus" {
-		err = litmusLIB.InjectEBSLoss(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
+		err = litmusLIB.PrepareEBSLossByID(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
 		if err != nil {
 			log.Errorf("Chaos injection failed, err: %v", err)
 			failStep := "failed in chaos injection phase"
@@ -161,9 +161,9 @@ func EBSLossByID(clients clients.ClientSets) {
 	}
 
 	//Verify the aws ec2 instance is attached to ebs volume
-	EBSStatus, err = aws.GetEBSStatus(experimentsDetails.EBSVolumeID, experimentsDetails.Ec2InstanceID, experimentsDetails.Region)
-	if err != nil || EBSStatus != "attached" {
-		log.Errorf("failed to verify the ebs volume is attached to an ec2 instance, err: %v", err)
+	err = aws.EBSStateCheckByID(experimentsDetails.EBSVolumeID, experimentsDetails.Region)
+	if err != nil {
+		log.Errorf("volume status check failed post chaos, err: %v", err)
 		failStep := "Verify the ebs volume is attached to an ec2 instance (post-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return

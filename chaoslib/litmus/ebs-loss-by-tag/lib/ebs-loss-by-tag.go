@@ -66,7 +66,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		}
 
 		//Wait for ebs volume detachment
-		log.Info("[Wait]: Wait for EBS volume detachment")
+		log.Infof("[Wait]: Wait for EBS volume detachment for volume %v", volumeID)
 		if err = ebs.WaitForVolumeDetachment(volumeID, ec2InstanceID, experimentsDetails.Region, experimentsDetails.Delay, experimentsDetails.Timeout); err != nil {
 			return errors.Errorf("unable to detach the ebs volume to the ec2 instance, err: %v", err)
 		}
@@ -77,6 +77,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 				return err
 			}
 		}
+
 		//Wait for chaos duration
 		log.Infof("[Wait]: Waiting for the chaos interval of %vs", experimentsDetails.ChaosInterval)
 		common.WaitForDuration(experimentsDetails.ChaosInterval)
@@ -92,14 +93,14 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 			log.Info("[Skip]: The EBS volume is already attached")
 		default:
 			//Attaching the ebs volume from the instance
-			log.Info("[Chaos]: Attaching the EBS volume from the instance")
+			log.Info("[Chaos]: Attaching the EBS volume back to the instance")
 			err = ebs.EBSVolumeAttach(volumeID, ec2InstanceID, device, experimentsDetails.Region)
 			if err != nil {
 				return errors.Errorf("ebs attachment failed, err: %v", err)
 			}
 
 			//Wait for ebs volume attachment
-			log.Info("[Wait]: Wait for EBS volume attachment")
+			log.Infof("[Wait]: Wait for EBS volume attachment for %v volume", volumeID)
 			if err = ebs.WaitForVolumeAttachment(volumeID, ec2InstanceID, experimentsDetails.Region, experimentsDetails.Delay, experimentsDetails.Timeout); err != nil {
 				return errors.Errorf("unable to attach the ebs volume to the ec2 instance, err: %v", err)
 			}
@@ -114,8 +115,8 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 	var ec2InstanceIDList []string
 	var deviceList []string
 
+	//prepare the instaceIDs and device name for all the give volume
 	for _, volumeID := range targetEBSVolumeIDList {
-		//Get volume attachment details
 		ec2InstanceID, device, err := ebs.GetVolumeAttachmentDetails(volumeID, experimentsDetails.VolumeTag, experimentsDetails.Region)
 		if err != nil || ec2InstanceID == "" || device == "" {
 			return errors.Errorf("fail to get the attachment info, err: %v", err)
@@ -135,7 +136,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 
 	for i, volumeID := range targetEBSVolumeIDList {
 		//Wait for ebs volume detachment
-		log.Info("[Wait]: Wait for EBS volume detachment")
+		log.Infof("[Wait]: Wait for EBS volume detachment for volume %v", volumeID)
 		if err := ebs.WaitForVolumeDetachment(volumeID, ec2InstanceIDList[i], experimentsDetails.Region, experimentsDetails.Delay, experimentsDetails.Timeout); err != nil {
 			return errors.Errorf("unable to detach the ebs volume to the ec2 instance, err: %v", err)
 		}
@@ -171,7 +172,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 			}
 
 			//Wait for ebs volume attachment
-			log.Info("[Wait]: Wait for EBS volume attachment")
+			log.Infof("[Wait]: Wait for EBS volume attachment for volume %v", volumeID)
 			if err = ebs.WaitForVolumeAttachment(volumeID, ec2InstanceIDList[i], experimentsDetails.Region, experimentsDetails.Delay, experimentsDetails.Timeout); err != nil {
 				return errors.Errorf("unable to attach the ebs volume to the ec2 instance, err: %v", err)
 			}

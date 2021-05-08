@@ -98,7 +98,7 @@ func SetTargetVolumeIDs(experimentsDetails *experimentTypes.ExperimentDetails) e
 		Config:            aws.Config{Region: aws.String(experimentsDetails.Region)},
 	}))
 
-	params := setVolumeParameter(experimentsDetails.VolumeTag)
+	params := getVolumeFilter(experimentsDetails.VolumeTag)
 	ec2Svc := ec2.New(sess)
 	res, err := ec2Svc.DescribeVolumes(params)
 	if err != nil {
@@ -130,33 +130,36 @@ func GetVolumeAttachmentDetails(volumeID, volumeTag, region string) (string, str
 		Config:            aws.Config{Region: aws.String(region)},
 	}))
 
-	params := setVolumeParameter(volumeTag)
 	ec2Svc := ec2.New(sess)
-	res, err := ec2Svc.DescribeVolumes(params)
+	param := getVolumeFilter(volumeTag)
+	res, err := ec2Svc.DescribeVolumes(param)
 	if err != nil {
 		return "", "", errors.Errorf("fail to describe the volumes of given tag, err: %v", err.Error())
 	}
 	for _, volumeDetails := range res.Volumes {
 		if *volumeDetails.VolumeId == volumeID {
+			//As the first iteam of the attachment list contains the attachment details
 			return *volumeDetails.Attachments[0].InstanceId, *volumeDetails.Attachments[0].Device, nil
 		}
 	}
-
-	return "", "", errors.Errorf("no attachment details found for the given volume")
+	return "", "", errors.Errorf("no attachment details found for the given volumeID: %v", volumeID)
 }
 
-//setVolumeParameter will set a filter to get the volume with a given tag
-func setVolumeParameter(ebsVolumeTag string) *ec2.DescribeVolumesInput {
-	volumeTag := strings.Split(ebsVolumeTag, ":")
-	params := &ec2.DescribeVolumesInput{
-		Filters: []*ec2.Filter{
-			&ec2.Filter{
-				Name: aws.String("tag:" + volumeTag[0]),
-				Values: []*string{
-					aws.String(volumeTag[1]),
+//getVolumeFilter will set a filter and return to get the volume with a given tag
+func getVolumeFilter(ebsVolumeTag string) *ec2.DescribeVolumesInput {
+	if ebsVolumeTag != "" {
+		volumeTag := strings.Split(ebsVolumeTag, ":")
+		params := &ec2.DescribeVolumesInput{
+			Filters: []*ec2.Filter{
+				&ec2.Filter{
+					Name: aws.String("tag:" + volumeTag[0]),
+					Values: []*string{
+						aws.String(volumeTag[1]),
+					},
 				},
 			},
-		},
+		}
+		return params
 	}
-	return params
+	return nil
 }

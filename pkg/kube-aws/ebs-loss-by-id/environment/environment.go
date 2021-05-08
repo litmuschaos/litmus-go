@@ -15,7 +15,8 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.ExperimentName = Getenv("EXPERIMENT_NAME", "ebs-loss")
 	experimentDetails.ChaosNamespace = Getenv("CHAOS_NAMESPACE", "litmus")
 	experimentDetails.EngineName = Getenv("CHAOSENGINE", "")
-	experimentDetails.ChaosDuration, _ = strconv.Atoi(Getenv("TOTAL_CHAOS_DURATION", "60"))
+	experimentDetails.ChaosDuration, _ = strconv.Atoi(Getenv("TOTAL_CHAOS_DURATION", "30"))
+	experimentDetails.ChaosInterval, _ = strconv.Atoi(Getenv("CHAOS_INTERVAL", "30"))
 	experimentDetails.RampTime, _ = strconv.Atoi(Getenv("RAMP_TIME", "0"))
 	experimentDetails.ChaosLib = Getenv("LIB", "litmus")
 	experimentDetails.AppNS = Getenv("APP_NAMESPACE", "")
@@ -27,10 +28,9 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.AuxiliaryAppInfo = Getenv("AUXILIARY_APPINFO", "")
 	experimentDetails.Delay, _ = strconv.Atoi(Getenv("STATUS_CHECK_DELAY", "2"))
 	experimentDetails.Timeout, _ = strconv.Atoi(Getenv("STATUS_CHECK_TIMEOUT", "180"))
-	experimentDetails.Ec2InstanceID = Getenv("EC2_INSTANCE_ID", "")
-	experimentDetails.EBSVolumeID = Getenv("EBS_VOL_ID", "")
-	experimentDetails.DeviceName = Getenv("DEVICE_NAME", "")
+	experimentDetails.EBSVolumeID = Getenv("EBS_VOLUME_ID", "")
 	experimentDetails.Region = Getenv("REGION", "")
+	experimentDetails.Sequence = Getenv("SEQUENCE", "parallel")
 	experimentDetails.TargetContainer = Getenv("TARGET_CONTAINER", "")
 }
 
