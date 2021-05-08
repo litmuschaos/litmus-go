@@ -43,7 +43,7 @@ func EC2Stop(instanceID, region string) error {
 		}
 	}
 
-	log.InfoWithValues("Stopping an ec2 instance:", logrus.Fields{
+	log.InfoWithValues("Stopping ec2 instance:", logrus.Fields{
 		"CurrentState":  *result.StoppingInstances[0].CurrentState.Name,
 		"PreviousState": *result.StoppingInstances[0].PreviousState.Name,
 		"InstanceId":    *result.StoppingInstances[0].InstanceId,
