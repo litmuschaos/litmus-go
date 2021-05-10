@@ -118,7 +118,7 @@ func main() {
 		nodeRestart.NodeRestart(clients)
 	case "pod-dns-error":
 		podDNSError.PodDNSExperiment(clients)
-	case "pod-dns-spooff":
+	case "pod-dns-spoof":
 		podDNSSpoof.PodDNSExperiment(clients)
 	case "vm-poweroff":
 		vmpoweroff.VMPoweroff(clients)
