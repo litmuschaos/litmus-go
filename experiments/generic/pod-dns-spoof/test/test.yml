@@ -34,7 +34,7 @@ spec:
           - name: APP_KIND
             value: 'deployment'
 
-          # list of the target hostnames or kewywords eg. '["litmuschaos","chaosnative.io"]' . If empty all hostnames are targets
+          # map of the target hostnames eg. '{"abc.com":"spoofabc.com"}' . If empty no queries will be spoofed
           - name: SPOOF_MAP
             value: '{"abc.com":"spoofabc.com"}'
 
