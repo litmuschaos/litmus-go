@@ -26,7 +26,7 @@ func PodDNSExperiment(clients clients.ClientSets) {
 
 	//Fetching all the ENV passed from the runner pod
 	log.Infof("[PreReq]: Getting the ENV for the %v experiment", experimentsDetails.ExperimentName)
-	experimentEnv.GetENV(&experimentsDetails)
+	experimentEnv.GetENV(&experimentsDetails, experimentEnv.Error)
 
 	// Initialise the chaos attributes
 	experimentEnv.InitialiseChaosVariables(&chaosDetails, &experimentsDetails)

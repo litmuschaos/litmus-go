@@ -9,9 +9,15 @@ import (
 	clientTypes "k8s.io/apimachinery/pkg/types"
 )
 
+type DNSChaosType string
+
+const (
+	Error DNSChaosType = "error"
+	Spoof DNSChaosType = "spoof"
+)
+
 //GetENV fetches all the env variables from the runner pod
-func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
-	experimentDetails.ExperimentName = Getenv("EXPERIMENT_NAME", "pod-dns-chaos")
+func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expType DNSChaosType) {
 	experimentDetails.ChaosNamespace = Getenv("CHAOS_NAMESPACE", "litmus")
 	experimentDetails.EngineName = Getenv("CHAOSENGINE", "")
 	experimentDetails.ChaosDuration, _ = strconv.Atoi(Getenv("TOTAL_CHAOS_DURATION", "60"))
@@ -30,15 +36,22 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.Timeout, _ = strconv.Atoi(Getenv("STATUS_CHECK_TIMEOUT", "180"))
 	experimentDetails.TargetPods = Getenv("TARGET_PODS", "")
 	experimentDetails.PodsAffectedPerc, _ = strconv.Atoi(Getenv("PODS_AFFECTED_PERC", "0"))
-	experimentDetails.TargetHostNames = Getenv("TARGET_HOSTNAMES", "")
-	experimentDetails.SpoofMap = Getenv("SPOOF_MAP", "")
-	experimentDetails.MatchScheme = Getenv("MATCH_SCHEME", "exact")
-	experimentDetails.ChaosType = Getenv("CHAOS_TYPE", "error")
 	experimentDetails.ContainerRuntime = Getenv("CONTAINER_RUNTIME", "docker")
 	experimentDetails.SocketPath = Getenv("SOCKET_PATH", "/var/run/docker.sock")
 	experimentDetails.ChaosServiceAccount = Getenv("CHAOS_SERVICE_ACCOUNT", "")
 	experimentDetails.Sequence = Getenv("SEQUENCE", "parallel")
 	experimentDetails.TerminationGracePeriodSeconds, _ = strconv.Atoi(Getenv("TERMINATION_GRACE_PERIOD_SECONDS", ""))
+	switch expType {
+	case Error:
+		experimentDetails.ExperimentName = Getenv("EXPERIMENT_NAME", "pod-dns-error")
+		experimentDetails.TargetHostNames = Getenv("TARGET_HOSTNAMES", "")
+		experimentDetails.MatchScheme = Getenv("MATCH_SCHEME", "exact")
+		experimentDetails.ChaosType = Getenv("CHAOS_TYPE", "error")
+	case Spoof:
+		experimentDetails.ExperimentName = Getenv("EXPERIMENT_NAME", "pod-dns-spoof")
+		experimentDetails.SpoofMap = Getenv("SPOOF_MAP", "")
+		experimentDetails.ChaosType = Getenv("CHAOS_TYPE", "spoof")
+	}
 }
 
 // Getenv fetch the env and set the default value, if any
