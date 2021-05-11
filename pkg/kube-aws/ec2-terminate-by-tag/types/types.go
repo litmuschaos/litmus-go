@@ -30,4 +30,5 @@ type ExperimentDetails struct {
 	ActiveNodes          int
 	LIBImagePullPolicy   string
 	TargetContainer      string
+	TargetInstanceIDList []string
 }
