@@ -307,7 +307,7 @@ func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, clients
 
 	instanceIDList, err := awslib.GetInstanceList(experimentsDetails.InstanceTag, experimentsDetails.Region)
 	if err != nil {
-		log.Errorf("fail to get instance list when abort signal is received", err)
+		log.Errorf("fail to get instance list when abort signal is received, err: %v", err)
 	}
 	for _, id := range instanceIDList {
 		instanceState, err := awslib.GetEC2InstanceStatus(id, experimentsDetails.Region)
