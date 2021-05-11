@@ -19,11 +19,10 @@ import (
 func WaitForVolumeDetachment(ebsVolumeID, ec2InstanceID, region string, delay, timeout int) error {
 
 	log.Info("[Status]: Checking ebs volume status for detachment")
-	err := retry.
+	return retry.
 		Times(uint(timeout / delay)).
 		Wait(time.Duration(delay) * time.Second).
 		Try(func(attempt uint) error {
-
 			volumeState, err := GetEBSStatus(ebsVolumeID, ec2InstanceID, region)
 			if err != nil {
 				return errors.Errorf("failed to get the volume state")
@@ -38,14 +37,13 @@ func WaitForVolumeDetachment(ebsVolumeID, ec2InstanceID, region string, delay, t
 			log.Infof("[Info]: The volume state is %v", volumeState)
 			return nil
 		})
-	return err
 }
 
 // WaitForVolumeAttachment will wait for the ebs volume to get attached on ec2 instance
 func WaitForVolumeAttachment(ebsVolumeID, ec2InstanceID, region string, delay, timeout int) error {
 
 	log.Info("[Status]: Checking ebs volume status for attachment")
-	err := retry.
+	return retry.
 		Times(uint(timeout / delay)).
 		Wait(time.Duration(delay) * time.Second).
 		Try(func(attempt uint) error {
@@ -61,10 +59,9 @@ func WaitForVolumeAttachment(ebsVolumeID, ec2InstanceID, region string, delay, t
 			log.Infof("[Info]: The volume state is %v", volumeState)
 			return nil
 		})
-	return err
 }
 
-//GetEBSStatus will verify and give the ec2 instance details along with ebs volume idetails.
+//GetEBSStatus will verify and give the ec2 instance details along with ebs volume details.
 func GetEBSStatus(ebsVolumeID, ec2InstanceID, region string) (string, error) {
 
 	// Load session from shared config
@@ -118,6 +115,9 @@ func GetEBSStatus(ebsVolumeID, ec2InstanceID, region string) (string, error) {
 func EBSStateCheckByID(volumeIDs, region string) error {
 
 	volumeIDList := strings.Split(volumeIDs, ",")
+	if len(volumeIDList) == 0 {
+		return errors.Errorf("no volumeID provided, please provide a volume to detach")
+	}
 	for _, id := range volumeIDList {
 		instanceID, _, err := GetVolumeAttachmentDetails(id, "", region)
 		if err != nil {
@@ -127,9 +127,6 @@ func EBSStateCheckByID(volumeIDs, region string) error {
 		if err != nil || volumeState != "attached" {
 			return errors.Errorf("fail to get the ebs volume %v in attached state, err: %v", id, err)
 		}
-	}
-	if len(volumeIDList) == 0 {
-		return errors.Errorf("no volumeID provided, please provide a volume to detach")
 	}
 	return nil
 }
@@ -164,7 +161,7 @@ func CheckEBSDetachmentInitialisation(volumeIDs []string, instanceID []string, r
 
 	timeout := 3
 	delay := 1
-	err := retry.
+	return retry.
 		Times(uint(timeout / delay)).
 		Wait(time.Duration(delay) * time.Second).
 		Try(func(attempt uint) error {
@@ -180,5 +177,4 @@ func CheckEBSDetachmentInitialisation(volumeIDs []string, instanceID []string, r
 			}
 			return nil
 		})
-	return err
 }

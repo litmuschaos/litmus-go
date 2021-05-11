@@ -12,6 +12,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	"github.com/litmuschaos/litmus-go/pkg/log"
+	"github.com/litmuschaos/litmus-go/pkg/math"
 	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/pkg/errors"
@@ -90,4 +91,21 @@ loop:
 			break loop
 		}
 	}
+}
+
+//CalculateVolumeAffPerc will calculate the target volume ids according to the volume affected percentage provided.
+func CalculateVolumeAffPerc(volumeAffPerc int, volumeList []string) []string {
+
+	var newVolumeIDList []string
+	newInstanceListLength := math.Maximum(1, math.Adjustment(volumeAffPerc, len(volumeList)))
+	rand.Seed(time.Now().UnixNano())
+
+	// it will generate the random instanceList
+	// it starts from the random index and choose requirement no of volumeID next to that index in a circular way.
+	index := rand.Intn(len(volumeList))
+	for i := 0; i < newInstanceListLength; i++ {
+		newVolumeIDList = append(newVolumeIDList, volumeList[index])
+		index = (index + 1) % len(volumeList)
+	}
+	return newVolumeIDList
 }

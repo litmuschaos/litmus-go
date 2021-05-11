@@ -31,15 +31,20 @@ func PrepareEC2TerminateByID(experimentsDetails *experimentTypes.ExperimentDetai
 		return errors.Errorf("no instance id found to terminate")
 	}
 
-	if strings.ToLower(experimentsDetails.Sequence) == "serial" {
-		if err = InjectChaosInSerialMode(experimentsDetails, instanceIDList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+	switch strings.ToLower(experimentsDetails.Sequence) {
+	case "serial":
+		if err = injectChaosInSerialMode(experimentsDetails, instanceIDList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
 			return err
 		}
-	} else {
-		if err = InjectChaosInParallelMode(experimentsDetails, instanceIDList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+	case "parallel":
+		if err = injectChaosInParallelMode(experimentsDetails, instanceIDList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
 			return err
 		}
+	default:
+		return errors.Errorf("%v sequence is not supported", experimentsDetails.Sequence)
+
 	}
+
 	//Waiting for the ramp time after chaos injection
 	if experimentsDetails.RampTime != 0 {
 		log.Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", experimentsDetails.RampTime)
@@ -48,8 +53,8 @@ func PrepareEC2TerminateByID(experimentsDetails *experimentTypes.ExperimentDetai
 	return nil
 }
 
-//InjectChaosInSerialMode will inject the ec2 instance termination in serial mode that is one after other
-func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, instanceIDList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+//injectChaosInSerialMode will inject the ec2 instance termination in serial mode that is one after other
+func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, instanceIDList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
 	ChaosStartTimeStamp := time.Now().Unix()
@@ -70,8 +75,7 @@ loop:
 
 			//Stopping the EC2 instance
 			log.Info("[Chaos]: Stopping the desired EC2 instance")
-			err := awslib.EC2Stop(id, experimentsDetails.Region)
-			if err != nil {
+			if err := awslib.EC2Stop(id, experimentsDetails.Region); err != nil {
 				return errors.Errorf("ec2 instance failed to stop, err: %v", err)
 			}
 
@@ -83,7 +87,7 @@ loop:
 
 			// run the probes during chaos
 			if len(resultDetails.ProbeDetails) != 0 {
-				if err = probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+				if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
 					return err
 				}
 			}
@@ -95,8 +99,7 @@ loop:
 			//Starting the EC2 instance
 			if experimentsDetails.ManagedNodegroup != "enable" {
 				log.Info("[Chaos]: Starting back the EC2 instance")
-				err = awslib.EC2Start(id, experimentsDetails.Region)
-				if err != nil {
+				if err := awslib.EC2Start(id, experimentsDetails.Region); err != nil {
 					return errors.Errorf("ec2 instance failed to start, err: %v", err)
 				}
 
@@ -125,8 +128,8 @@ loop:
 	return nil
 }
 
-// InjectChaosInParallelMode will inject the ec2 instance termination in parallel mode that is all at once
-func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, instanceIDList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+// injectChaosInParallelMode will inject the ec2 instance termination in parallel mode that is all at once
+func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, instanceIDList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
 	ChaosStartTimeStamp := time.Now().Unix()
@@ -146,8 +149,7 @@ loop:
 		for _, id := range instanceIDList {
 			//Stopping the EC2 instance
 			log.Info("[Chaos]: Stopping the desired EC2 instance")
-			err := awslib.EC2Stop(id, experimentsDetails.Region)
-			if err != nil {
+			if err := awslib.EC2Stop(id, experimentsDetails.Region); err != nil {
 				return errors.Errorf("ec2 instance failed to stop, err: %v", err)
 			}
 		}
@@ -176,8 +178,7 @@ loop:
 
 			for _, id := range instanceIDList {
 				log.Info("[Chaos]: Starting back the EC2 instance")
-				err := awslib.EC2Start(id, experimentsDetails.Region)
-				if err != nil {
+				if err := awslib.EC2Start(id, experimentsDetails.Region); err != nil {
 					return errors.Errorf("ec2 instance failed to start, err: %v", err)
 				}
 			}

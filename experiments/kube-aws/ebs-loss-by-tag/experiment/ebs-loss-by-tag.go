@@ -37,16 +37,15 @@ func EBSLossByTag(clients clients.ClientSets) {
 	if experimentsDetails.EngineName != "" {
 		// Intialise the probe details. Bail out upon error, as we haven't entered exp business logic yet
 		if err = probe.InitializeProbesInChaosResultDetails(&chaosDetails, clients, &resultDetails); err != nil {
-			log.Errorf("Unable to initialize the probes, err: %v", err)
+			log.Errorf("unable to initialize the probes, err: %v", err)
 			return
 		}
 	}
 
 	//Updating the chaos result in the beginning of experiment
 	log.Infof("[PreReq]: Updating the chaos result of %v experiment (SOT)", experimentsDetails.ExperimentName)
-	err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT")
-	if err != nil {
-		log.Errorf("Unable to Create the Chaos Result, err: %v", err)
+	if err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT"); err != nil {
+		log.Errorf("unable to Create the Chaos Result, err: %v", err)
 		failStep := "Updating the chaos result of ebs-loss experiment (SOT)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
@@ -67,6 +66,13 @@ func EBSLossByTag(clients clients.ClientSets) {
 		"Ramp Time":     experimentsDetails.RampTime,
 	})
 
+	//DISPLAY THE VOLUME INFORMATION
+	log.InfoWithValues("The volume information is as follows", logrus.Fields{
+		"Volume Tag": experimentsDetails.VolumeTag,
+		"Region":     experimentsDetails.Region,
+		"Ramp Time":  experimentsDetails.RampTime,
+	})
+
 	//PRE-CHAOS APPLICATION STATUS CHECK
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (pre-chaos)")
 	if err = status.AUTStatusCheck(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.TargetContainer, experimentsDetails.Timeout, experimentsDetails.Delay, clients, &chaosDetails); err != nil {
@@ -78,8 +84,7 @@ func EBSLossByTag(clients clients.ClientSets) {
 
 	//selecting the target volumes (pre chaos)
 	//if no volumes found in attached state then this check will fail
-	err = aws.SetTargetVolumeIDs(&experimentsDetails)
-	if err != nil {
+	if err = aws.SetTargetVolumeIDs(&experimentsDetails); err != nil {
 		log.Errorf("failed to set the volumes under chaos, err: %v", err)
 		failStep := "Select the target EBS volumes from tag (pre-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
@@ -93,8 +98,7 @@ func EBSLossByTag(clients clients.ClientSets) {
 		// run the probes in the pre-chaos check
 		if len(resultDetails.ProbeDetails) != 0 {
 
-			err = probe.RunProbes(&chaosDetails, clients, &resultDetails, "PreChaos", &eventsDetails)
-			if err != nil {
+			if err = probe.RunProbes(&chaosDetails, clients, &resultDetails, "PreChaos", &eventsDetails); err != nil {
 				log.Errorf("Probe Failed, err: %v", err)
 				failStep := "Failed while running probes"
 				msg := "AUT: Running, Probes: Unsuccessful"
@@ -113,8 +117,7 @@ func EBSLossByTag(clients clients.ClientSets) {
 	//PRE-CHAOS AUXILIARY APPLICATION STATUS CHECK
 	if experimentsDetails.AuxiliaryAppInfo != "" {
 		log.Info("[Status]: Verify that the Auxiliary Applications are running (pre-chaos)")
-		err = status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
-		if err != nil {
+		if err = status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
 			log.Errorf("Auxiliary Application status check failed, err: %v", err)
 			failStep := "Verify that the Auxiliary Applications are running (pre-chaos)"
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
@@ -124,8 +127,7 @@ func EBSLossByTag(clients clients.ClientSets) {
 
 	// Including the litmus lib for ebs-loss
 	if experimentsDetails.ChaosLib == "litmus" {
-		err = litmusLIB.PrepareEBSLossByTag(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
-		if err != nil {
+		if err = litmusLIB.PrepareEBSLossByTag(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
 			log.Errorf("Chaos injection failed, err: %v", err)
 			failStep := "failed in chaos injection phase"
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
@@ -152,8 +154,7 @@ func EBSLossByTag(clients clients.ClientSets) {
 	//POST-CHAOS AUXILIARY APPLICATION STATUS CHECK
 	if experimentsDetails.AuxiliaryAppInfo != "" {
 		log.Info("[Status]: Verify that the Auxiliary Applications are running (post-chaos)")
-		err = status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
-		if err != nil {
+		if err = status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
 			log.Errorf("Auxiliary Application status check failed, err: %v", err)
 			failStep := "Verify that the Auxiliary Applications are running (post-chaos)"
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
@@ -162,8 +163,7 @@ func EBSLossByTag(clients clients.ClientSets) {
 	}
 
 	//Verify the aws ec2 instance is attached to ebs volume
-	err = aws.PostChaosVolumeStatusCheck(&experimentsDetails)
-	if err != nil {
+	if err = aws.PostChaosVolumeStatusCheck(&experimentsDetails); err != nil {
 		log.Errorf("failed to verify the ebs volume is attached to an instance, err: %v", err)
 		failStep := "Verify the ebs volume is attached to an instance (post-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
@@ -196,9 +196,8 @@ func EBSLossByTag(clients clients.ClientSets) {
 
 	//Updating the chaosResult in the end of experiment
 	log.Infof("[The End]: Updating the chaos result of %v experiment (EOT)", experimentsDetails.ExperimentName)
-	err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
-	if err != nil {
-		log.Errorf("Unable to Update the Chaos Result, err: %v", err)
+	if err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT"); err != nil {
+		log.Errorf("unable to Update the Chaos Result, err: %v", err)
 		return
 	}
 
