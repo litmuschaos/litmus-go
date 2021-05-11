@@ -31,6 +31,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.LIBImage = Getenv("LIB_IMAGE", "ubuntu:16.04")
 	experimentDetails.LIBImagePullPolicy = Getenv("LIB_IMAGE_PULL_POLICY", "Always")
 	experimentDetails.TargetContainer = Getenv("TARGET_CONTAINER", "")
+	experimentDetails.NodeLabel = Getenv("NODE_LABEL", "")
 }
 
 // Getenv fetch the env and set the default value, if any

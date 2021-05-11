@@ -30,7 +30,7 @@ var (
 	appsv1StatefulsetClient appsv1.StatefulSetInterface
 )
 
-//PreparePodAutoscaler contains the prepration steps before chaos injection
+//PreparePodAutoscaler contains the prepration steps and chaos injection steps
 func PreparePodAutoscaler(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	//Waiting for the ramp time before chaos injection
@@ -48,7 +48,7 @@ func PreparePodAutoscaler(experimentsDetails *experimentTypes.ExperimentDetails,
 
 		appsUnderTest, err := GetDeploymentDetails(experimentsDetails, clients)
 		if err != nil {
-			return errors.Errorf("Unable to get the name & replicaCount of the deployment, err: %v", err)
+			return errors.Errorf("fail to get the name & initial replica count of the deployment, err: %v", err)
 		}
 
 		deploymentList := []string{}
@@ -56,8 +56,8 @@ func PreparePodAutoscaler(experimentsDetails *experimentTypes.ExperimentDetails,
 			deploymentList = append(deploymentList, deployment.AppName)
 		}
 		log.InfoWithValues("[Info]: Details of Deployments under chaos injection", logrus.Fields{
-			"No. Of Deployments": len(deploymentList),
-			"Target Deployments": deploymentList,
+			"Number Of Deployment": len(deploymentList),
+			"Target Deployments":   deploymentList,
 		})
 
 		//calling go routine which will continuously watch for the abort signal
@@ -65,19 +65,19 @@ func PreparePodAutoscaler(experimentsDetails *experimentTypes.ExperimentDetails,
 
 		err = PodAutoscalerChaosInDeployment(experimentsDetails, clients, appsUnderTest, resultDetails, eventsDetails, chaosDetails)
 		if err != nil {
-			return errors.Errorf("Unable to perform autoscaling, err: %v", err)
+			return errors.Errorf("fail to perform autoscaling, err: %v", err)
 		}
 
 		err = AutoscalerRecoveryInDeployment(experimentsDetails, clients, appsUnderTest, chaosDetails)
 		if err != nil {
-			return errors.Errorf("Unable to rollback the autoscaling, err: %v", err)
+			return errors.Errorf("fail to rollback the autoscaling, err: %v", err)
 		}
 
 	case "statefulset", "statefulsets":
 
 		appsUnderTest, err := GetStatefulsetDetails(experimentsDetails, clients)
 		if err != nil {
-			return errors.Errorf("Unable to get the name & replicaCount of the statefulset, err: %v", err)
+			return errors.Errorf("fail to get the name & initial replica count of the statefulset, err: %v", err)
 		}
 
 		stsList := []string{}
@@ -85,19 +85,19 @@ func PreparePodAutoscaler(experimentsDetails *experimentTypes.ExperimentDetails,
 			stsList = append(stsList, sts.AppName)
 		}
 		log.InfoWithValues("[Info]: Details of Statefulsets under chaos injection", logrus.Fields{
-			"No. Of Statefulsets": len(stsList),
-			"Target Statefulsets": stsList,
+			"Number Of Statefulsets": len(stsList),
+			"Target Statefulsets":    stsList,
 		})
 
 		//calling go routine which will continuously watch for the abort signal
 		go AbortPodAutoScalerChaos(appsUnderTest, experimentsDetails, clients, resultDetails, eventsDetails, chaosDetails)
 
 		if err = PodAutoscalerChaosInStatefulset(experimentsDetails, clients, appsUnderTest, resultDetails, eventsDetails, chaosDetails); err != nil {
-			return errors.Errorf("Unable to perform autoscaling, err: %v", err)
+			return errors.Errorf("fail to perform autoscaling, err: %v", err)
 		}
 
-		if err = AutoscalerRecoveryInStatefulset(experimentsDetails, clients, appsUnderTest, chaosDetails); err != nil {
-			return errors.Errorf("Unable to rollback the autoscaling, err: %v", err)
+		if err = AutoscalerRecoveryInStatefulset(experimentsDetails, clients, appsUnderTest); err != nil {
+			return errors.Errorf("fail to rollback the autoscaling, err: %v", err)
 		}
 
 	default:
@@ -126,11 +126,11 @@ func GetDeploymentDetails(experimentsDetails *experimentTypes.ExperimentDetails,
 
 	deploymentList, err := appsv1DeploymentClient.List(metav1.ListOptions{LabelSelector: experimentsDetails.AppLabel})
 	if err != nil || len(deploymentList.Items) == 0 {
-		return nil, errors.Errorf("Unable to find the deployments with matching labels, err: %v", err)
+		return nil, errors.Errorf("fail to get the deployments with matching labels, err: %v", err)
 	}
 	appsUnderTest := []experimentTypes.ApplicationUnderTest{}
 	for _, app := range deploymentList.Items {
-		log.Infof("[DeploymentDetails]: Found deployment name %s with replica count %d", app.Name, int(*app.Spec.Replicas))
+		log.Infof("[Info]: Found deployment name '%s' with replica count '%d'", app.Name, int(*app.Spec.Replicas))
 		appsUnderTest = append(appsUnderTest, experimentTypes.ApplicationUnderTest{AppName: app.Name, ReplicaCount: int(*app.Spec.Replicas)})
 	}
 	// Applying the APP_AFFECT_PERC variable to determine the total target deployments to scale
@@ -143,12 +143,12 @@ func GetStatefulsetDetails(experimentsDetails *experimentTypes.ExperimentDetails
 
 	statefulsetList, err := appsv1StatefulsetClient.List(metav1.ListOptions{LabelSelector: experimentsDetails.AppLabel})
 	if err != nil || len(statefulsetList.Items) == 0 {
-		return nil, errors.Errorf("Unable to find the statefulsets with matching labels, err: %v", err)
+		return nil, errors.Errorf("fail to get the statefulsets with matching labels, err: %v", err)
 	}
 
 	appsUnderTest := []experimentTypes.ApplicationUnderTest{}
 	for _, app := range statefulsetList.Items {
-		log.Infof("[DeploymentDetails]: Found statefulset name %s with replica count %d", app.Name, int(*app.Spec.Replicas))
+		log.Infof("[Info]: Found statefulset name '%s' with replica count '%d'", app.Name, int(*app.Spec.Replicas))
 		appsUnderTest = append(appsUnderTest, experimentTypes.ApplicationUnderTest{AppName: app.Name, ReplicaCount: int(*app.Spec.Replicas)})
 	}
 	// Applying the APP_AFFECT_PERC variable to determine the total target deployments to scale
@@ -165,11 +165,11 @@ func PodAutoscalerChaosInDeployment(experimentsDetails *experimentTypes.Experime
 			// RetryOnConflict uses exponential backoff to avoid exhausting the apiserver
 			appUnderTest, err := appsv1DeploymentClient.Get(app.AppName, metav1.GetOptions{})
 			if err != nil {
-				return errors.Errorf("Failed to get latest version of Application Deployment, err: %v", err)
+				return errors.Errorf("fail to get latest version of application deployment, err: %v", err)
 			}
 			// modifying the replica count
 			appUnderTest.Spec.Replicas = int32Ptr(int32(experimentsDetails.Replicas))
-			log.Infof("Updating deployment %s to number of replicas %d", appUnderTest.ObjectMeta.Name, experimentsDetails.Replicas)
+			log.Infof("Updating deployment '%s' to number of replicas '%d'", appUnderTest.ObjectMeta.Name, experimentsDetails.Replicas)
 			_, err = appsv1DeploymentClient.Update(appUnderTest)
 			if err != nil {
 				return err
@@ -179,13 +179,13 @@ func PodAutoscalerChaosInDeployment(experimentsDetails *experimentTypes.Experime
 		return nil
 	})
 	if retryErr != nil {
-		return errors.Errorf("Unable to scale the deployment, err: %v", retryErr)
+		return errors.Errorf("fail to update the replica count of the deployment, err: %v", retryErr)
 	}
-	log.Info("Application Started Scaling")
+	log.Info("[Info]: The application started scaling")
 
 	err = DeploymentStatusCheck(experimentsDetails, clients, appsUnderTest, resultDetails, eventsDetails, chaosDetails)
 	if err != nil {
-		return errors.Errorf("Status Check failed, err: %v", err)
+		return errors.Errorf("application deployment status check failed, err: %v", err)
 	}
 
 	return nil
@@ -201,7 +201,7 @@ func PodAutoscalerChaosInStatefulset(experimentsDetails *experimentTypes.Experim
 			// RetryOnConflict uses exponential backoff to avoid exhausting the apiserver
 			appUnderTest, err := appsv1StatefulsetClient.Get(app.AppName, metav1.GetOptions{})
 			if err != nil {
-				return errors.Errorf("Failed to get latest version of Application Statefulset, err: %v", err)
+				return errors.Errorf("fail to get latest version of the target statefulset application , err: %v", err)
 			}
 			// modifying the replica count
 			appUnderTest.Spec.Replicas = int32Ptr(int32(experimentsDetails.Replicas))
@@ -214,13 +214,13 @@ func PodAutoscalerChaosInStatefulset(experimentsDetails *experimentTypes.Experim
 		return nil
 	})
 	if retryErr != nil {
-		return errors.Errorf("Unable to scale the statefulset, err: %v", retryErr)
+		return errors.Errorf("fail to update the replica count of the statefulset application, err: %v", retryErr)
 	}
-	log.Info("Application Started Scaling")
+	log.Info("[Info]: The application started scaling")
 
 	err = StatefulsetStatusCheck(experimentsDetails, clients, appsUnderTest, resultDetails, eventsDetails, chaosDetails)
 	if err != nil {
-		return errors.Errorf("Status Check failed, err: %v", err)
+		return errors.Errorf("statefulset application status check failed, err: %v", err)
 	}
 
 	return nil
@@ -240,12 +240,11 @@ func DeploymentStatusCheck(experimentsDetails *experimentTypes.ExperimentDetails
 			for _, app := range appsUnderTest {
 				deployment, err := appsv1DeploymentClient.Get(app.AppName, metav1.GetOptions{})
 				if err != nil {
-					return errors.Errorf("Unable to find the deployment with name %v, err: %v", app.AppName, err)
+					return errors.Errorf("fail to find the deployment with name %v, err: %v", app.AppName, err)
 				}
-				log.Infof("Deployment's Available Replica Count is %v", deployment.Status.AvailableReplicas)
-				if int(deployment.Status.AvailableReplicas) != experimentsDetails.Replicas {
+				if int(deployment.Status.ReadyReplicas) != experimentsDetails.Replicas {
 					isFailed = true
-					return errors.Errorf("Application %s is not scaled yet, err: %v", app.AppName, err)
+					return errors.Errorf("application %s is not scaled yet, the desired replica count is: %v and ready replica count is: %v", app.AppName, experimentsDetails.Replicas, deployment.Status.ReadyReplicas)
 				}
 			}
 			isFailed = false
@@ -255,9 +254,9 @@ func DeploymentStatusCheck(experimentsDetails *experimentTypes.ExperimentDetails
 	if isFailed {
 		err = AutoscalerRecoveryInDeployment(experimentsDetails, clients, appsUnderTest, chaosDetails)
 		if err != nil {
-			return errors.Errorf("Unable to perform autoscaling, err: %v", err)
+			return errors.Errorf("fail to perform the autoscaler recovery of the deployment, err: %v", err)
 		}
-		return errors.Errorf("Failed to scale the application")
+		return errors.Errorf("fail to scale the deployment to the desired replica count in the given chaos duration")
 	}
 	if err != nil {
 		return err
@@ -293,12 +292,11 @@ func StatefulsetStatusCheck(experimentsDetails *experimentTypes.ExperimentDetail
 			for _, app := range appsUnderTest {
 				statefulset, err := appsv1StatefulsetClient.Get(app.AppName, metav1.GetOptions{})
 				if err != nil {
-					return errors.Errorf("Unable to find the statefulset with name %v, err: %v", app.AppName, err)
+					return errors.Errorf("fail to find the statefulset with name %v, err: %v", app.AppName, err)
 				}
-				log.Infof("Statefulset's Ready Replica Count is: %v", statefulset.Status.ReadyReplicas)
 				if int(statefulset.Status.ReadyReplicas) != experimentsDetails.Replicas {
 					isFailed = true
-					return errors.Errorf("Application is not scaled yet, err: %v", err)
+					return errors.Errorf("application %s is not scaled yet, the desired replica count is: %v and ready replica count is: %v", app.AppName, experimentsDetails.Replicas, statefulset.Status.ReadyReplicas)
 				}
 			}
 			isFailed = false
@@ -308,9 +306,9 @@ func StatefulsetStatusCheck(experimentsDetails *experimentTypes.ExperimentDetail
 	if isFailed {
 		err = AutoscalerRecoveryInStatefulset(experimentsDetails, clients, appsUnderTest, chaosDetails)
 		if err != nil {
-			return errors.Errorf("Unable to perform autoscaling, err: %v", err)
+			return errors.Errorf("fail to perform the autoscaler recovery of the application, err: %v", err)
 		}
-		return errors.Errorf("Failed to scale the application")
+		return errors.Errorf("fail to scale the application to the desired replica count in the given chaos duration")
 	}
 	if err != nil {
 		return err
@@ -343,7 +341,7 @@ func AutoscalerRecoveryInDeployment(experimentsDetails *experimentTypes.Experime
 		for _, app := range appsUnderTest {
 			appUnderTest, err := appsv1DeploymentClient.Get(app.AppName, metav1.GetOptions{})
 			if err != nil {
-				return errors.Errorf("Failed to find the latest version of Application Deployment with name %v, err: %v", app.AppName, err)
+				return errors.Errorf("fail to find the latest version of Application Deployment with name %v, err: %v", app.AppName, err)
 			}
 
 			appUnderTest.Spec.Replicas = int32Ptr(int32(app.ReplicaCount)) // modify replica count
@@ -356,9 +354,9 @@ func AutoscalerRecoveryInDeployment(experimentsDetails *experimentTypes.Experime
 		return nil
 	})
 	if retryErr != nil {
-		return errors.Errorf("Unable to rollback the deployment, err: %v", retryErr)
+		return errors.Errorf("fail to rollback the deployment, err: %v", retryErr)
 	}
-	log.Info("[Info]: Application pod started rolling back")
+	log.Info("[Info]: Application started rolling back to original replica count")
 
 	err = retry.
 		Times(uint(experimentsDetails.Timeout / experimentsDetails.Delay)).
@@ -367,11 +365,11 @@ func AutoscalerRecoveryInDeployment(experimentsDetails *experimentTypes.Experime
 			for _, app := range appsUnderTest {
 				applicationDeploy, err := appsv1DeploymentClient.Get(app.AppName, metav1.GetOptions{})
 				if err != nil {
-					return errors.Errorf("Unable to find the deployment with name %v, err: %v", app.AppName, err)
+					return errors.Errorf("fail to find the deployment with name %v, err: %v", app.AppName, err)
 				}
-				if int(applicationDeploy.Status.AvailableReplicas) != app.ReplicaCount {
-					log.Infof("Application Available Replica Count is: %v", applicationDeploy.Status.AvailableReplicas)
-					return errors.Errorf("Unable to rollback to older replica count, err: %v", err)
+				if int(applicationDeploy.Status.ReadyReplicas) != app.ReplicaCount {
+					log.Infof("[Info]: Application ready replica count is: %v", applicationDeploy.Status.ReadyReplicas)
+					return errors.Errorf("fail to rollback to original replica count, err: %v", err)
 				}
 			}
 			return nil
@@ -380,7 +378,7 @@ func AutoscalerRecoveryInDeployment(experimentsDetails *experimentTypes.Experime
 	if err != nil {
 		return err
 	}
-	log.Info("[RollBack]: Application Pod roll back to initial number of replicas")
+	log.Info("[RollBack]: Application rollback to the initial number of replicas")
 
 	return nil
 }
@@ -395,7 +393,7 @@ func AutoscalerRecoveryInStatefulset(experimentsDetails *experimentTypes.Experim
 			// RetryOnConflict uses exponential backoff to avoid exhausting the apiserver
 			appUnderTest, err := appsv1StatefulsetClient.Get(app.AppName, metav1.GetOptions{})
 			if err != nil {
-				return errors.Errorf("Failed to find the latest version of Statefulset with name %v, err: %v", app.AppName, err)
+				return errors.Errorf("failed to find the latest version of Statefulset with name %v, err: %v", app.AppName, err)
 			}
 
 			appUnderTest.Spec.Replicas = int32Ptr(int32(app.ReplicaCount)) // modify replica count
@@ -408,7 +406,7 @@ func AutoscalerRecoveryInStatefulset(experimentsDetails *experimentTypes.Experim
 		return nil
 	})
 	if retryErr != nil {
-		return errors.Errorf("Unable to rollback the statefulset, err: %v", retryErr)
+		return errors.Errorf("fail to rollback the statefulset, err: %v", retryErr)
 	}
 	log.Info("[Info]: Application pod started rolling back")
 
@@ -418,13 +416,12 @@ func AutoscalerRecoveryInStatefulset(experimentsDetails *experimentTypes.Experim
 		Try(func(attempt uint) error {
 			for _, app := range appsUnderTest {
 				applicationDeploy, err := appsv1StatefulsetClient.Get(app.AppName, metav1.GetOptions{})
-
 				if err != nil {
-					return errors.Errorf("Unable to find the statefulset with name %v, err: %v", app.AppName, err)
+					return errors.Errorf("fail to get the statefulset with name %v, err: %v", app.AppName, err)
 				}
 				if int(applicationDeploy.Status.ReadyReplicas) != app.ReplicaCount {
-					log.Infof("Application Ready Replica Count is: %v", applicationDeploy.Status.ReadyReplicas)
-					return errors.Errorf("Unable to roll back to older replica count, err: %v", err)
+					log.Infof("Application ready replica count is: %v", applicationDeploy.Status.ReadyReplicas)
+					return errors.Errorf("fail to roll back to original replica count, err: %v", err)
 				}
 			}
 			return nil
@@ -433,7 +430,7 @@ func AutoscalerRecoveryInStatefulset(experimentsDetails *experimentTypes.Experim
 	if err != nil {
 		return err
 	}
-	log.Info("[RollBack]: Application Pod roll back to initial number of replicas")
+	log.Info("[RollBack]: Application roll back to initial number of replicas")
 
 	return nil
 }

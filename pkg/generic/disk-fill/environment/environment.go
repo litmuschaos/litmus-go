@@ -37,6 +37,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.Sequence = Getenv("SEQUENCE", "parallel")
 	experimentDetails.EphemeralStorageMebibytes, _ = strconv.Atoi(Getenv("EPHEMERAL_STORAGE_MEBIBYTES", ""))
 	experimentDetails.TerminationGracePeriodSeconds, _ = strconv.Atoi(Getenv("TERMINATION_GRACE_PERIOD_SECONDS", ""))
+	experimentDetails.DataBlockSize, _ = strconv.Atoi(Getenv("DATA_BLOCK_SIZE", "256"))
 }
 
 // Getenv fetch the env and set the default value, if any
