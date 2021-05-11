@@ -87,7 +87,7 @@ func GetPID(runtime, containerID, socketPath string) (int, error) {
 		return 0, errors.Errorf("%v container runtime not suported", runtime)
 	}
 
-	log.Info(fmt.Sprintf("[cri]: Container ID=%s has process PID=%d", containerID, PID))
+	log.Info(fmt.Sprintf("[Info]: Container ID=%s has process PID=%d", containerID, PID))
 
 	return PID, nil
 }
@@ -130,7 +130,7 @@ func parsePIDFromJSON(j []byte, runtime string) (int, error) {
 			pid = resp.Info.PID
 		}
 	default:
-		return 0, errors.Errorf("[cri]: No supported container runtime, runtime: %v", runtime)
+		return 0, errors.Errorf("[cri]: unsupported container runtime, runtime: %v", runtime)
 	}
 	if pid == 0 {
 		return 0, errors.Errorf("[cri]: No running target container found, pid: %d", pid)

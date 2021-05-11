@@ -56,7 +56,7 @@ func killContainer(experimentsDetails *experimentTypes.ExperimentDetails, client
 
 	for duration < experimentsDetails.ChaosDuration {
 
-		//GetRestartCount return the restart count of target container
+		//getRestartCount return the restart count of target container
 		restartCountBefore, err := getRestartCount(experimentsDetails, experimentsDetails.TargetPods, clients)
 		if err != nil {
 			return err
