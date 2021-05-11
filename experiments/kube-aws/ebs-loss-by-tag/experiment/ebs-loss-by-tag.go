@@ -1,12 +1,12 @@
 package experiment
 
 import (
-	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/ebs-loss-by-tag/lib"
+	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/ebs-loss/lib/ebs-loss-by-tag/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/cloud/aws"
 	"github.com/litmuschaos/litmus-go/pkg/events"
-	experimentEnv "github.com/litmuschaos/litmus-go/pkg/kube-aws/ebs-loss-by-tag/environment"
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/kube-aws/ebs-loss-by-tag/types"
+	experimentEnv "github.com/litmuschaos/litmus-go/pkg/kube-aws/ebs-loss/environment"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/kube-aws/ebs-loss/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/result"
@@ -42,7 +42,7 @@ func EBSLossByTag(clients clients.ClientSets) {
 		}
 	}
 
-	//Updating the chaos result in the beginning of experiment
+	//Updachange it here by replacing litmuschaos/go-runner with your image:tagting the chaos result in the beginning of experiment
 	log.Infof("[PreReq]: Updating the chaos result of %v experiment (SOT)", experimentsDetails.ExperimentName)
 	if err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT"); err != nil {
 		log.Errorf("unable to Create the Chaos Result, err: %v", err)

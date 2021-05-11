@@ -6,13 +6,13 @@ import (
 
 	clientTypes "k8s.io/apimachinery/pkg/types"
 
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/kube-aws/ebs-loss-by-tag/types"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/kube-aws/ebs-loss/types"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 )
 
 //GetENV fetches all the env variables from the runner pod
 func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
-	experimentDetails.ExperimentName = Getenv("EXPERIMENT_NAME", "ebs-loss-by-tag")
+	experimentDetails.ExperimentName = Getenv("EXPERIMENT_NAME", "ebs-loss")
 	experimentDetails.ChaosNamespace = Getenv("CHAOS_NAMESPACE", "litmus")
 	experimentDetails.EngineName = Getenv("CHAOSENGINE", "")
 	experimentDetails.ChaosDuration, _ = strconv.Atoi(Getenv("TOTAL_CHAOS_DURATION", "30"))
@@ -22,14 +22,14 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.AppNS = Getenv("APP_NAMESPACE", "")
 	experimentDetails.AppLabel = Getenv("APP_LABEL", "")
 	experimentDetails.AppKind = Getenv("APP_KIND", "")
-	experimentDetails.VolumeAffectedPerc, _ = strconv.Atoi(Getenv("VOLUME_AFFECTED_PERC", "0"))
 	experimentDetails.ChaosUID = clientTypes.UID(Getenv("CHAOS_UID", ""))
 	experimentDetails.InstanceID = Getenv("INSTANCE_ID", "")
 	experimentDetails.ChaosPodName = Getenv("POD_NAME", "")
 	experimentDetails.AuxiliaryAppInfo = Getenv("AUXILIARY_APPINFO", "")
 	experimentDetails.Delay, _ = strconv.Atoi(Getenv("STATUS_CHECK_DELAY", "2"))
 	experimentDetails.Timeout, _ = strconv.Atoi(Getenv("STATUS_CHECK_TIMEOUT", "180"))
-	experimentDetails.VolumeTag = Getenv("VOLUME_TAG", "")
+	experimentDetails.EBSVolumeID = Getenv("EBS_VOLUME_ID", "")
+	experimentDetails.VolumeTag = Getenv("EBS_VOLUME_TAG", "")
 	experimentDetails.Region = Getenv("REGION", "")
 	experimentDetails.Sequence = Getenv("SEQUENCE", "parallel")
 	experimentDetails.TargetContainer = Getenv("TARGET_CONTAINER", "")

@@ -1,12 +1,12 @@
 package experiment
 
 import (
-	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/ebs-loss-by-id/lib"
+	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/ebs-loss/lib/ebs-loss-by-id/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/cloud/aws"
 	"github.com/litmuschaos/litmus-go/pkg/events"
-	experimentEnv "github.com/litmuschaos/litmus-go/pkg/kube-aws/ebs-loss-by-id/environment"
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/kube-aws/ebs-loss-by-id/types"
+	experimentEnv "github.com/litmuschaos/litmus-go/pkg/kube-aws/ebs-loss/environment"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/kube-aws/ebs-loss/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/result"

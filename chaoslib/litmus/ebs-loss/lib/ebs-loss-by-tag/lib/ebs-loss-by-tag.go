@@ -7,7 +7,7 @@ import (
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	ebs "github.com/litmuschaos/litmus-go/pkg/cloud/aws"
 	"github.com/litmuschaos/litmus-go/pkg/events"
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/kube-aws/ebs-loss-by-tag/types"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/kube-aws/ebs-loss/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/types"

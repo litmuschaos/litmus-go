@@ -1,13 +1,12 @@
 package lib
 
 import (
-	"strings"
 	"time"
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	ebs "github.com/litmuschaos/litmus-go/pkg/cloud/aws"
 	"github.com/litmuschaos/litmus-go/pkg/events"
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/kube-aws/ebs-loss-by-id/types"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/kube-aws/ebs-loss/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/types"
@@ -15,41 +14,8 @@ import (
 	"github.com/pkg/errors"
 )
 
-//PrepareEBSLossByID contains the prepration and injection steps for the experiment
-func PrepareEBSLossByID(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-
-	var err error
-	//Waiting for the ramp time before chaos injection
-	if experimentsDetails.RampTime != 0 {
-		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", experimentsDetails.RampTime)
-		common.WaitForDuration(experimentsDetails.RampTime)
-	}
-
-	//get the volume id or list of instance ids
-	volumeIDList := strings.Split(experimentsDetails.EBSVolumeID, ",")
-	if len(volumeIDList) == 0 {
-		return errors.Errorf("no volume id found to detach")
-	}
-
-	if strings.ToLower(experimentsDetails.Sequence) == "serial" {
-		if err = injectChaosInSerialMode(experimentsDetails, volumeIDList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
-			return err
-		}
-	} else {
-		if err = injectChaosInParallelMode(experimentsDetails, volumeIDList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
-			return err
-		}
-	}
-	//Waiting for the ramp time after chaos injection
-	if experimentsDetails.RampTime != 0 {
-		log.Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", experimentsDetails.RampTime)
-		common.WaitForDuration(experimentsDetails.RampTime)
-	}
-	return nil
-}
-
-//injectChaosInSerialMode will inject the ec2 instance termination in serial mode that is one after other
-func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, volumeIDList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+//InjectChaosInSerialMode will inject the ec2 instance termination in serial mode that is one after other
+func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, volumeIDList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
 	ChaosStartTimeStamp := time.Now()
@@ -123,8 +89,8 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 	return nil
 }
 
-//injectChaosInParallelMode will inject the chaos in parallel mode that means all at once
-func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, targetEBSVolumeIDList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+//InjectChaosInParallelMode will inject the chaos in parallel mode that means all at once
+func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, targetEBSVolumeIDList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	var ec2InstanceIDList []string
 	var deviceList []string

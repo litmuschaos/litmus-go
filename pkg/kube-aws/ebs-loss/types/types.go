@@ -23,9 +23,12 @@ type ExperimentDetails struct {
 	RunID              string
 	Timeout            int
 	Delay              int
-	EBSVolumeID        string
+	Sequence           string
+	VolumeTag          string
 	Region             string
 	LIBImagePullPolicy string
 	TargetContainer    string
-	Sequence           string
+	VolumeAffectedPerc int
+	EBSVolumeID        string
+	TargetVolumeIDList []string
 }

@@ -39,7 +39,7 @@ spec:
           - name: LIB
             value: 'litmus'
 
-          - name: VOLUME_TAG
+          - name: EBS_VOLUME_TAG
             value: ''
             
           - name: CHAOS_NAMESPACE
