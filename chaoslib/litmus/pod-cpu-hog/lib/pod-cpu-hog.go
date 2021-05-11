@@ -3,6 +3,7 @@ package lib
 import (
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -24,17 +25,13 @@ import (
 // StressCPU Uses the REST API to exec into the target container of the target pod
 // The function will be constantly increasing the CPU utilisation until it reaches the maximum available or allowed number.
 // Using the TOTAL_CHAOS_DURATION we will need to specify for how long this experiment will last
-func StressCPU(experimentsDetails *experimentTypes.ExperimentDetails, podName string, clients clients.ClientSets) error {
+func StressCPU(experimentsDetails *experimentTypes.ExperimentDetails, podName string, clients clients.ClientSets, stressErr chan error) {
 	// It will contains all the pod & container details required for exec command
 	execCommandDetails := litmusexec.PodDetails{}
 	command := []string{"/bin/sh", "-c", experimentsDetails.ChaosInjectCmd}
 	litmusexec.SetExecCommandAttributes(&execCommandDetails, podName, experimentsDetails.TargetContainer, experimentsDetails.AppNS)
 	_, err := litmusexec.Exec(&execCommandDetails, clients, command)
-	if err != nil {
-		return errors.Errorf("Unable to run stress command inside target container, err: %v", err)
-	}
-
-	return nil
+	stressErr <- err
 }
 
 //ExperimentCPU function orchestrates the experiment by calling the StressCPU function for every core, of every container, of every pod that is targeted
@@ -79,6 +76,8 @@ func ExperimentCPU(experimentsDetails *experimentTypes.ExperimentDetails, client
 
 // InjectChaosInSerialMode stressed the cpu of all target application serially (one by one)
 func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList corev1.PodList, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	// creating err channel to recieve the error from the go routine
+	stressErr := make(chan error)
 
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
@@ -105,7 +104,7 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		})
 
 		for i := 0; i < experimentsDetails.CPUcores; i++ {
-			go StressCPU(experimentsDetails, pod.Name, clients)
+			go StressCPU(experimentsDetails, pod.Name, clients, stressErr)
 		}
 
 		common.SetTargets(pod.Name, "injected", "pod", chaosDetails)
@@ -120,6 +119,17 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		for {
 			endTime = time.After(timeDelay)
 			select {
+			case err := <-stressErr:
+				// skipping the execution, if recieved any error other than 137, while executing stress command and marked result as fail
+				// it will ignore the error code 137(oom kill), it will skip further execution and marked the result as pass
+				// oom kill occurs if memory to be stressed exceed than the resource limit for the target container
+				if err != nil {
+					if strings.Contains(err.Error(), "137") {
+						log.Warn("Chaos process OOM killed")
+						return nil
+					}
+					return err
+				}
 			case <-signChan:
 				log.Info("[Chaos]: Revert Started")
 				err := KillStressCPUSerial(experimentsDetails, pod.Name, clients, chaosDetails)
@@ -147,6 +157,8 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 
 // InjectChaosInParallelMode stressed the cpu of all target application in parallel mode (all at once)
 func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList corev1.PodList, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	// creating err channel to recieve the error from the go routine
+	stressErr := make(chan error)
 
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
@@ -172,7 +184,7 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 			"CPU CORE":         experimentsDetails.CPUcores,
 		})
 		for i := 0; i < experimentsDetails.CPUcores; i++ {
-			go StressCPU(experimentsDetails, pod.Name, clients)
+			go StressCPU(experimentsDetails, pod.Name, clients, stressErr)
 		}
 		common.SetTargets(pod.Name, "injected", "pod", chaosDetails)
 	}
@@ -187,6 +199,17 @@ loop:
 	for {
 		endTime = time.After(timeDelay)
 		select {
+		case err := <-stressErr:
+			// skipping the execution, if recieved any error other than 137, while executing stress command and marked result as fail
+			// it will ignore the error code 137(oom kill), it will skip further execution and marked the result as pass
+			// oom kill occurs if memory to be stressed exceed than the resource limit for the target container
+			if err != nil {
+				if strings.Contains(err.Error(), "137") {
+					log.Warn("Chaos process OOM killed")
+					return nil
+				}
+				return err
+			}
 		case <-signChan:
 			log.Info("[Chaos]: Revert Started")
 			if err := KillStressCPUParallel(experimentsDetails, targetPodList, clients, chaosDetails); err != nil {

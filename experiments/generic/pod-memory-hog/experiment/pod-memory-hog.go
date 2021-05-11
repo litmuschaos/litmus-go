@@ -110,7 +110,7 @@ func PodMemoryHog(clients clients.ClientSets) {
 	if experimentsDetails.ChaosLib == "litmus" {
 		err = litmusLIB.PrepareMemoryStress(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
 		if err != nil {
-			log.Errorf("[Error]: pod memory hog failed,, err: %v", err)
+			log.Errorf("[Error]: pod memory hog failed, err: %v", err)
 			failStep := "failed in chaos injection phase"
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
