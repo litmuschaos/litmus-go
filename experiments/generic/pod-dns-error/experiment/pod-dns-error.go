@@ -15,8 +15,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// PodDNSExperiment contains steps to inject chaos
-func PodDNSExperiment(clients clients.ClientSets) {
+// PodDNSError contains steps to inject chaos
+func PodDNSError(clients clients.ClientSets) {
 
 	var err error
 	experimentsDetails := experimentTypes.ExperimentDetails{}
