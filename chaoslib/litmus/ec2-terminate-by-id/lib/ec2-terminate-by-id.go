@@ -60,7 +60,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 
 	for duration < experimentsDetails.ChaosDuration {
 
-		log.Infof("Target instanceID list, %v", instanceIDList)
+		log.Infof("[Info]: Target instanceID list, %v", instanceIDList)
 
 		if experimentsDetails.EngineName != "" {
 			msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on ec2 instance"
@@ -78,7 +78,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 			}
 
 			//Wait for ec2 instance to completely stop
-			log.Infof("[Wait]: Wait for EC2 instance '%v' to come in stopped state", id)
+			log.Infof("[Wait]: Wait for EC2 instance '%v' to get in stopped state", id)
 			if err := awslib.WaitForEC2Down(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.ManagedNodegroup, experimentsDetails.Region, id); err != nil {
 				return errors.Errorf("unable to stop the ec2 instance, err: %v", err)
 			}
@@ -97,7 +97,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 					return errors.Errorf("ec2 instance failed to start, err: %v", err)
 				}
 
-				//Wait for ec2 instance to come in running state
+				//Wait for ec2 instance to get in running state
 				log.Infof("[Wait]: Wait for EC2 instance '%v' to get in running state", id)
 				if err := awslib.WaitForEC2Up(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.ManagedNodegroup, experimentsDetails.Region, id); err != nil {
 					return errors.Errorf("unable to start the ec2 instance, err: %v", err)
@@ -121,7 +121,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 
 	for duration < experimentsDetails.ChaosDuration {
 
-		log.Infof("Target instanceID list, %v", instanceIDList)
+		log.Infof("[Info]: Target instanceID list, %v", instanceIDList)
 
 		if experimentsDetails.EngineName != "" {
 			msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on ec2 instance"
@@ -140,7 +140,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 
 		for _, id := range instanceIDList {
 			//Wait for ec2 instance to completely stop
-			log.Infof("[Wait]: Wait for EC2 instance '%v' to come in stopped state", id)
+			log.Infof("[Wait]: Wait for EC2 instance '%v' to get in stopped state", id)
 			if err := awslib.WaitForEC2Down(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.ManagedNodegroup, experimentsDetails.Region, id); err != nil {
 				return errors.Errorf("unable to stop the ec2 instance, err: %v", err)
 			}
@@ -164,7 +164,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 			}
 
 			for _, id := range instanceIDList {
-				//Wait for ec2 instance to come in running state
+				//Wait for ec2 instance to get in running state
 				log.Infof("[Wait]: Wait for EC2 instance '%v' to get in running state", id)
 				experimentsDetails.Ec2InstanceID = id
 				if err := awslib.WaitForEC2Up(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.ManagedNodegroup, experimentsDetails.Region, id); err != nil {

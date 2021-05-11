@@ -128,14 +128,13 @@ func EC2TerminateByTag(clients clients.ClientSets) {
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
-	//Verify the aws ec2 instance is running (pre chaos)
-	if err = aws.InstanceStatusCheckByTag(experimentsDetails.InstanceTag, experimentsDetails.Region); err != nil {
-		log.Errorf("failed to get the ec2 instance status, err: %v", err)
-		failStep := "Verify the AWS ec2 instance status (pre-chaos)"
+	//selecting the target instance (pre chaos)
+	if err = litmusLIB.SetTargetInstance(&experimentsDetails); err != nil {
+		log.Errorf("failed to get the target ec2 instance, err: %v", err)
+		failStep := "Select the target AWS ec2 instance from tag (pre-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
-	log.Info("[Status]: EC2 instance is in running state")
 
 	// Including the litmus lib for ec2-terminate
 	switch experimentsDetails.ChaosLib {
@@ -168,8 +167,8 @@ func EC2TerminateByTag(clients clients.ClientSets) {
 
 	//Verify the aws ec2 instance is running (post chaos)
 	if experimentsDetails.ManagedNodegroup != "enable" {
-		if err = aws.InstanceStatusCheckByTag(experimentsDetails.InstanceTag, experimentsDetails.Region); err != nil {
-			log.Errorf("failed to get the ec2 instance status, err: %v", err)
+		if err = litmusLIB.PostChaosInstanceStatusCheck(experimentsDetails.TargetInstanceIDList, experimentsDetails.Region); err != nil {
+			log.Errorf("failed to get the ec2 instance status as running post chaos, err: %v", err)
 			failStep := "Verify the AWS ec2 instance status (post-chaos)"
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
