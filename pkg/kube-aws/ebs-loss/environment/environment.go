@@ -32,6 +32,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.VolumeTag = Getenv("EBS_VOLUME_TAG", "")
 	experimentDetails.Region = Getenv("REGION", "")
 	experimentDetails.Sequence = Getenv("SEQUENCE", "parallel")
+	experimentDetails.VolumeAffectedPerc, _ = strconv.Atoi(Getenv("VOLUME_AFFECTED_PERC", "0"))
 	experimentDetails.TargetContainer = Getenv("TARGET_CONTAINER", "")
 }
 
