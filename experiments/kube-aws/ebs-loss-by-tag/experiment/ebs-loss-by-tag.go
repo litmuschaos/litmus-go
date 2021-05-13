@@ -42,7 +42,7 @@ func EBSLossByTag(clients clients.ClientSets) {
 		}
 	}
 
-	//Updachange it here by replacing litmuschaos/go-runner with your image:tagting the chaos result in the beginning of experiment
+	//Updating the chaos result in the beginning of experiment
 	log.Infof("[PreReq]: Updating the chaos result of %v experiment (SOT)", experimentsDetails.ExperimentName)
 	if err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT"); err != nil {
 		log.Errorf("unable to Create the Chaos Result, err: %v", err)

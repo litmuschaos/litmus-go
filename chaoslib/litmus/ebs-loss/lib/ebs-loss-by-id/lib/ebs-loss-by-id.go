@@ -28,15 +28,19 @@ func PrepareEBSLossByID(experimentsDetails *experimentTypes.ExperimentDetails, c
 		return errors.Errorf("no volume id found to detach")
 	}
 
-	if strings.ToLower(experimentsDetails.Sequence) == "serial" {
+	switch strings.ToLower(experimentsDetails.Sequence) {
+	case "serial":
 		if err = ebsloss.InjectChaosInSerialMode(experimentsDetails, volumeIDList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
 			return err
 		}
-	} else {
+	case "parallel":
 		if err = ebsloss.InjectChaosInParallelMode(experimentsDetails, volumeIDList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
 			return err
 		}
+	default:
+		return errors.Errorf("%v sequence is not supported", experimentsDetails.Sequence)
 	}
+
 	//Waiting for the ramp time after chaos injection
 	if experimentsDetails.RampTime != 0 {
 		log.Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", experimentsDetails.RampTime)

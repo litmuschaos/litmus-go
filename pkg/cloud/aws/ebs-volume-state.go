@@ -131,7 +131,7 @@ func EBSStateCheckByID(volumeIDs, region string) error {
 	return nil
 }
 
-//PostChaosVolumeStatusCheck is the ebs volume state check after chaos
+//PostChaosVolumeStatusCheck is the volume state check after chaos completion
 func PostChaosVolumeStatusCheck(experimentsDetails *experimentTypes.ExperimentDetails) error {
 
 	var ec2InstanceIDList []string

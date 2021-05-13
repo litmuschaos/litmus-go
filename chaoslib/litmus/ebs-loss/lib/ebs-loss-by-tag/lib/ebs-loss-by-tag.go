@@ -37,6 +37,8 @@ func PrepareEBSLossByTag(experimentsDetails *experimentTypes.ExperimentDetails, 
 		if err = injectChaosInParallelMode(experimentsDetails, targetEBSVolumeIDList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
 			return err
 		}
+	default:
+		return errors.Errorf("%v sequence is not supported", experimentsDetails.Sequence)
 	}
 	//Waiting for the ramp time after chaos injection
 	if experimentsDetails.RampTime != 0 {
@@ -137,7 +139,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 		}
 
-		//prepare the instaceIDs and device name for all the give volume
+		//prepare the instaceIDs and device name for all the given volume
 		for _, volumeID := range targetEBSVolumeIDList {
 			ec2InstanceID, device, err := ebs.GetVolumeAttachmentDetails(volumeID, experimentsDetails.VolumeTag, experimentsDetails.Region)
 			if err != nil || ec2InstanceID == "" || device == "" {
