@@ -1,12 +1,12 @@
 package experiment
 
 import (
-	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/ec2-terminate-by-id/lib"
+	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/ec2-stop-by-tag/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/cloud/aws"
 	"github.com/litmuschaos/litmus-go/pkg/events"
-	experimentEnv "github.com/litmuschaos/litmus-go/pkg/kube-aws/ec2-terminate-by-id/environment"
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/kube-aws/ec2-terminate-by-id/types"
+	experimentEnv "github.com/litmuschaos/litmus-go/pkg/kube-aws/ec2-stop-by-tag/environment"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/kube-aws/ec2-stop-by-tag/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/result"
@@ -15,8 +15,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// EC2TerminateByID inject the ebs volume loss chaos
-func EC2TerminateByID(clients clients.ClientSets) {
+// EC2StopByTag inject the ebs volume loss chaos
+func EC2StopByTag(clients clients.ClientSets) {
 
 	var err error
 	var activeNodeCount int
@@ -38,8 +38,7 @@ func EC2TerminateByID(clients clients.ClientSets) {
 	if experimentsDetails.EngineName != "" {
 		// Intialise the probe details. Bail out upon error, as we haven't entered exp business logic yet
 		if err = probe.InitializeProbesInChaosResultDetails(&chaosDetails, clients, &resultDetails); err != nil {
-			log.Errorf("Unable to initialize the probes, err: %v", err)
-			return
+			log.Fatalf("Unable to initialize the probes, err: %v", err)
 		}
 	}
 
@@ -48,7 +47,7 @@ func EC2TerminateByID(clients clients.ClientSets) {
 	err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT")
 	if err != nil {
 		log.Errorf("Unable to Create the Chaos Result, err: %v", err)
-		failStep := "Updating the chaos result of ec2 terminate experiment (SOT)"
+		failStep := "Updating the chaos result of ec2 stop experiment (SOT)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -58,11 +57,12 @@ func EC2TerminateByID(clients clients.ClientSets) {
 
 	//DISPLAY THE INSTANCE INFORMATION
 	log.InfoWithValues("The instance information is as follows", logrus.Fields{
-		"Chaos Duration":  experimentsDetails.ChaosDuration,
-		"Chaos Namespace": experimentsDetails.ChaosNamespace,
-		"Ramp Time":       experimentsDetails.RampTime,
-		"Instance ID":     experimentsDetails.Ec2InstanceID,
-		"Sequence":        experimentsDetails.Sequence,
+		"Chaos Duration":               experimentsDetails.ChaosDuration,
+		"Chaos Namespace":              experimentsDetails.ChaosNamespace,
+		"Ramp Time":                    experimentsDetails.RampTime,
+		"Instance Tag":                 experimentsDetails.InstanceTag,
+		"Instance Affected Percentage": experimentsDetails.InstanceAffectedPerc,
+		"Sequence":                     experimentsDetails.Sequence,
 	})
 
 	//PRE-CHAOS NODE STATUS CHECK
@@ -126,26 +126,25 @@ func EC2TerminateByID(clients clients.ClientSets) {
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
-	//Verify the aws ec2 instance is running (pre chaos)
-	err = litmusLIB.InstanceStatusCheckByID(&experimentsDetails)
+	//selecting the target instance (pre chaos)
+	err = litmusLIB.SetTargetInstance(&experimentsDetails)
 	if err != nil {
-		log.Errorf("failed to get the ec2 instance status, err: %v", err)
-		failStep := "Verify the AWS ec2 instance status (pre-chaos)"
+		log.Errorf("failed to get the target ec2 instance, err: %v", err)
+		failStep := "Select the target AWS ec2 instance from tag (pre-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
-	log.Info("[Status]: EC2 instance is in running state")
 
-	// Including the litmus lib for ec2-terminate
+	// Including the litmus lib for ec2-stop
 	if experimentsDetails.ChaosLib == "litmus" {
-		err = litmusLIB.PrepareEC2TerminateByID(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
+		err = litmusLIB.PrepareEC2StopByTag(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
 		if err != nil {
 			log.Errorf("Chaos injection failed, err: %v", err)
 			failStep := "failed in chaos injection phase"
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}
-		log.Info("[Confirmation]: EC2 terminate chaos has been injected successfully")
+		log.Info("[Confirmation]: EC2 stop chaos has been injected successfully")
 		resultDetails.Verdict = "Pass"
 	} else {
 		log.Error("[Invalid]: Please Provide the correct LIB")
@@ -167,9 +166,9 @@ func EC2TerminateByID(clients clients.ClientSets) {
 
 	//Verify the aws ec2 instance is running (post chaos)
 	if experimentsDetails.ManagedNodegroup != "enable" {
-		err = litmusLIB.InstanceStatusCheckByID(&experimentsDetails)
+		err = litmusLIB.PostChaosInstanceStatusCheck(experimentsDetails.TargetInstanceIDList, experimentsDetails.Region)
 		if err != nil {
-			log.Errorf("failed to get the ec2 instance status, err: %v", err)
+			log.Errorf("failed to get the ec2 instance status as running post chaos, err: %v", err)
 			failStep := "Verify the AWS ec2 instance status (post-chaos)"
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
@@ -226,8 +225,7 @@ func EC2TerminateByID(clients clients.ClientSets) {
 	log.Infof("[The End]: Updating the chaos result of %v experiment (EOT)", experimentsDetails.ExperimentName)
 	err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 	if err != nil {
-		log.Errorf("Unable to Update the Chaos Result, err:  %v", err)
-		return
+		log.Fatalf("Unable to Update the Chaos Result, err:  %v", err)
 	}
 
 	// generating the event in chaosresult to marked the verdict as pass/fail

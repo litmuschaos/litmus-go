@@ -34,8 +34,8 @@ import (
 	podNetworkLoss "github.com/litmuschaos/litmus-go/experiments/generic/pod-network-loss/experiment"
 	kafkaBrokerPodFailure "github.com/litmuschaos/litmus-go/experiments/kafka/kafka-broker-pod-failure/experiment"
 	ebsLoss "github.com/litmuschaos/litmus-go/experiments/kube-aws/ebs-loss/experiment"
-	ec2TerminateByID "github.com/litmuschaos/litmus-go/experiments/kube-aws/ec2-terminate-by-id/experiment"
-	ec2TerminateByTag "github.com/litmuschaos/litmus-go/experiments/kube-aws/ec2-terminate-by-tag/experiment"
+	ec2StopByID "github.com/litmuschaos/litmus-go/experiments/kube-aws/ec2-stop-by-id/experiment"
+	ec2StopByTag "github.com/litmuschaos/litmus-go/experiments/kube-aws/ec2-stop-by-tag/experiment"
 	vmpoweroff "github.com/litmuschaos/litmus-go/experiments/vmware/vm-poweroff/experiment"
 
 	"github.com/litmuschaos/litmus-go/pkg/clients"
@@ -107,18 +107,18 @@ func main() {
 		podNetworkLoss.PodNetworkLoss(clients)
 	case "cassandra-pod-delete":
 		cassandraPodDelete.CasssandraPodDelete(clients)
-	case "ec2-terminate-by-id":
-		ec2TerminateByID.EC2TerminateByID(clients)
-	case "ec2-terminate-by-tag":
-		ec2TerminateByTag.EC2TerminateByTag(clients)
+	case "ec2-stop-by-id":
+		ec2StopByID.EC2StopByID(clients)
+	case "ec2-stop-by-tag":
+		ec2StopByTag.EC2StopByTag(clients)
 	case "ebs-loss":
 		ebsLoss.EBSLoss(clients)
 	case "node-restart":
 		nodeRestart.NodeRestart(clients)
 	case "pod-dns-chaos":
 		podDNSChaos.PodDNSExperiment(clients)
-        case "vm-poweroff":
-                vmpoweroff.VMPoweroff(clients)
+	case "vm-poweroff":
+		vmpoweroff.VMPoweroff(clients)
 
 	default:
 		log.Errorf("Unsupported -name %v, please provide the correct value of -name args", *experimentName)

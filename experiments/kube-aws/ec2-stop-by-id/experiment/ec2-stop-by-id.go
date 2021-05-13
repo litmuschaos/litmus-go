@@ -1,12 +1,12 @@
 package experiment
 
 import (
-	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/ec2-terminate-by-tag/lib"
+	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/ec2-stop-by-id/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/cloud/aws"
 	"github.com/litmuschaos/litmus-go/pkg/events"
-	experimentEnv "github.com/litmuschaos/litmus-go/pkg/kube-aws/ec2-terminate-by-tag/environment"
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/kube-aws/ec2-terminate-by-tag/types"
+	experimentEnv "github.com/litmuschaos/litmus-go/pkg/kube-aws/ec2-stop-by-id/environment"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/kube-aws/ec2-stop-by-id/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/result"
@@ -15,11 +15,13 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// EC2TerminateByTag inject the ebs volume loss chaos
-func EC2TerminateByTag(clients clients.ClientSets) {
+// EC2StopByID inject the ebs volume loss chaos
+func EC2StopByID(clients clients.ClientSets) {
 
-	var err error
-	var activeNodeCount int
+	var (
+		err             error
+		activeNodeCount int
+	)
 	experimentsDetails := experimentTypes.ExperimentDetails{}
 	resultDetails := types.ResultDetails{}
 	eventsDetails := types.EventDetails{}
@@ -38,7 +40,8 @@ func EC2TerminateByTag(clients clients.ClientSets) {
 	if experimentsDetails.EngineName != "" {
 		// Intialise the probe details. Bail out upon error, as we haven't entered exp business logic yet
 		if err = probe.InitializeProbesInChaosResultDetails(&chaosDetails, clients, &resultDetails); err != nil {
-			log.Fatalf("Unable to initialize the probes, err: %v", err)
+			log.Errorf("Unable to initialize the probes, err: %v", err)
+			return
 		}
 	}
 
@@ -47,7 +50,7 @@ func EC2TerminateByTag(clients clients.ClientSets) {
 	err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT")
 	if err != nil {
 		log.Errorf("Unable to Create the Chaos Result, err: %v", err)
-		failStep := "Updating the chaos result of ec2 terminate experiment (SOT)"
+		failStep := "Updating the chaos result of ec2 stop experiment (SOT)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -57,12 +60,11 @@ func EC2TerminateByTag(clients clients.ClientSets) {
 
 	//DISPLAY THE INSTANCE INFORMATION
 	log.InfoWithValues("The instance information is as follows", logrus.Fields{
-		"Chaos Duration":               experimentsDetails.ChaosDuration,
-		"Chaos Namespace":              experimentsDetails.ChaosNamespace,
-		"Ramp Time":                    experimentsDetails.RampTime,
-		"Instance Tag":                 experimentsDetails.InstanceTag,
-		"Instance Affected Percentage": experimentsDetails.InstanceAffectedPerc,
-		"Sequence":                     experimentsDetails.Sequence,
+		"Chaos Duration":  experimentsDetails.ChaosDuration,
+		"Chaos Namespace": experimentsDetails.ChaosNamespace,
+		"Ramp Time":       experimentsDetails.RampTime,
+		"Instance ID":     experimentsDetails.Ec2InstanceID,
+		"Sequence":        experimentsDetails.Sequence,
 	})
 
 	//PRE-CHAOS NODE STATUS CHECK
@@ -126,25 +128,26 @@ func EC2TerminateByTag(clients clients.ClientSets) {
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
-	//selecting the target instance (pre chaos)
-	err = litmusLIB.SetTargetInstance(&experimentsDetails)
+	//Verify the aws ec2 instance is running (pre chaos)
+	err = litmusLIB.InstanceStatusCheckByID(&experimentsDetails)
 	if err != nil {
-		log.Errorf("failed to get the target ec2 instance, err: %v", err)
-		failStep := "Select the target AWS ec2 instance from tag (pre-chaos)"
+		log.Errorf("failed to get the ec2 instance status, err: %v", err)
+		failStep := "Verify the AWS ec2 instance status (pre-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
+	log.Info("[Status]: EC2 instance is in running state")
 
-	// Including the litmus lib for ec2-terminate
+	// Including the litmus lib for ec2-stop
 	if experimentsDetails.ChaosLib == "litmus" {
-		err = litmusLIB.PrepareEC2TerminateByTag(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
+		err = litmusLIB.PrepareEC2StopByID(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
 		if err != nil {
 			log.Errorf("Chaos injection failed, err: %v", err)
 			failStep := "failed in chaos injection phase"
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}
-		log.Info("[Confirmation]: EC2 terminate chaos has been injected successfully")
+		log.Info("[Confirmation]: EC2 stop chaos has been injected successfully")
 		resultDetails.Verdict = "Pass"
 	} else {
 		log.Error("[Invalid]: Please Provide the correct LIB")
@@ -166,9 +169,9 @@ func EC2TerminateByTag(clients clients.ClientSets) {
 
 	//Verify the aws ec2 instance is running (post chaos)
 	if experimentsDetails.ManagedNodegroup != "enable" {
-		err = litmusLIB.PostChaosInstanceStatusCheck(experimentsDetails.TargetInstanceIDList, experimentsDetails.Region)
+		err = litmusLIB.InstanceStatusCheckByID(&experimentsDetails)
 		if err != nil {
-			log.Errorf("failed to get the ec2 instance status as running post chaos, err: %v", err)
+			log.Errorf("failed to get the ec2 instance status, err: %v", err)
 			failStep := "Verify the AWS ec2 instance status (post-chaos)"
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
@@ -225,7 +228,8 @@ func EC2TerminateByTag(clients clients.ClientSets) {
 	log.Infof("[The End]: Updating the chaos result of %v experiment (EOT)", experimentsDetails.ExperimentName)
 	err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 	if err != nil {
-		log.Fatalf("Unable to Update the Chaos Result, err:  %v", err)
+		log.Errorf("Unable to Update the Chaos Result, err:  %v", err)
+		return
 	}
 
 	// generating the event in chaosresult to marked the verdict as pass/fail

@@ -6,13 +6,13 @@ import (
 
 	clientTypes "k8s.io/apimachinery/pkg/types"
 
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/kube-aws/ec2-terminate-by-tag/types"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/kube-aws/ec2-stop-by-tag/types"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 )
 
 //GetENV fetches all the env variables from the runner pod
 func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
-	experimentDetails.ExperimentName = Getenv("EXPERIMENT_NAME", "ec2-terminate-by-tag")
+	experimentDetails.ExperimentName = Getenv("EXPERIMENT_NAME", "ec2-stop-by-tag")
 	experimentDetails.ChaosNamespace = Getenv("CHAOS_NAMESPACE", "litmus")
 	experimentDetails.EngineName = Getenv("CHAOSENGINE", "")
 	experimentDetails.AppNS = Getenv("APP_NAMESPACE", "")
