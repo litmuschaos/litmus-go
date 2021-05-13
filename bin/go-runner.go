@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-
 	// Uncomment to load all auth plugins
 	// _ "k8s.io/client-go/plugin/pkg/client/auth"
 
@@ -25,7 +24,8 @@ import (
 	podAutoscaler "github.com/litmuschaos/litmus-go/experiments/generic/pod-autoscaler/experiment"
 	podCPUHog "github.com/litmuschaos/litmus-go/experiments/generic/pod-cpu-hog/experiment"
 	podDelete "github.com/litmuschaos/litmus-go/experiments/generic/pod-delete/experiment"
-	podDNSChaos "github.com/litmuschaos/litmus-go/experiments/generic/pod-dns-chaos/experiment"
+	podDNSError "github.com/litmuschaos/litmus-go/experiments/generic/pod-dns-error/experiment"
+	podDNSSpoof "github.com/litmuschaos/litmus-go/experiments/generic/pod-dns-spoof/experiment"
 	podIOStress "github.com/litmuschaos/litmus-go/experiments/generic/pod-io-stress/experiment"
 	podMemoryHog "github.com/litmuschaos/litmus-go/experiments/generic/pod-memory-hog/experiment"
 	podNetworkCorruption "github.com/litmuschaos/litmus-go/experiments/generic/pod-network-corruption/experiment"
@@ -115,10 +115,12 @@ func main() {
 		ebsLoss.EBSLoss(clients)
 	case "node-restart":
 		nodeRestart.NodeRestart(clients)
-	case "pod-dns-chaos":
-		podDNSChaos.PodDNSExperiment(clients)
-        case "vm-poweroff":
-                vmpoweroff.VMPoweroff(clients)
+	case "pod-dns-error":
+		podDNSError.PodDNSError(clients)
+	case "pod-dns-spoof":
+		podDNSSpoof.PodDNSSpoof(clients)
+	case "vm-poweroff":
+		vmpoweroff.VMPoweroff(clients)
 
 	default:
 		log.Errorf("Unsupported -name %v, please provide the correct value of -name args", *experimentName)
