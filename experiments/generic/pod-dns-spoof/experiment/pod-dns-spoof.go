@@ -1,23 +1,22 @@
 package experiment
 
 import (
-	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/vm-poweroff/lib"
-	clients "github.com/litmuschaos/litmus-go/pkg/clients"
-	vmwarelib "github.com/litmuschaos/litmus-go/pkg/cloud/vmware"
+	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/pod-dns-chaos/lib"
+	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
+	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/pod-dns-chaos/environment"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-dns-chaos/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
-	experimentEnv "github.com/litmuschaos/litmus-go/pkg/vmware/vm-poweroff/environment"
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/vmware/vm-poweroff/types"
-	//"github.com/pkg/errors"
+	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/sirupsen/logrus"
 )
 
-// Experiment contains steps to inject chaos
-func VMPoweroff(clients clients.ClientSets) {
+// PodDNSSpoof contains steps to inject chaos
+func PodDNSSpoof(clients clients.ClientSets) {
 
 	var err error
 	experimentsDetails := experimentTypes.ExperimentDetails{}
@@ -27,16 +26,16 @@ func VMPoweroff(clients clients.ClientSets) {
 
 	//Fetching all the ENV passed from the runner pod
 	log.Infof("[PreReq]: Getting the ENV for the %v experiment", experimentsDetails.ExperimentName)
-	experimentEnv.GetENV(&experimentsDetails)
+	experimentEnv.GetENV(&experimentsDetails, experimentEnv.Spoof)
 
-	// Intialise the chaos attributes
+	// Initialise the chaos attributes
 	experimentEnv.InitialiseChaosVariables(&chaosDetails, &experimentsDetails)
 
-	// Intialise Chaos Result Parameters
+	// Initialise Chaos Result Parameters
 	types.SetResultAttributes(&resultDetails, chaosDetails)
 
 	if experimentsDetails.EngineName != "" {
-		// Intialise the probe details. Bail out upon error, as we haven't entered exp business logic yet
+		// Initialise the probe details. Bail out upon error, as we haven't entered exp business logic yet
 		if err = probe.InitializeProbesInChaosResultDetails(&chaosDetails, clients, &resultDetails); err != nil {
 			log.Errorf("Unable to initialize the probes, err: %v", err)
 			return
@@ -45,10 +44,9 @@ func VMPoweroff(clients clients.ClientSets) {
 
 	//Updating the chaos result in the beginning of experiment
 	log.Infof("[PreReq]: Updating the chaos result of %v experiment (SOT)", experimentsDetails.ExperimentName)
-	err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT")
-	if err != nil {
+	if err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT"); err != nil {
 		log.Errorf("Unable to Create the Chaos Result, err: %v", err)
-		failStep := "Updating the chaos result of pod-delete experiment (SOT)"
+		failStep := "Updating the chaos result of pod-dns-spoof experiment (SOT)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -61,20 +59,15 @@ func VMPoweroff(clients clients.ClientSets) {
 	types.SetResultEventAttributes(&eventsDetails, types.AwaitedVerdict, msg, "Normal", &resultDetails)
 	events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosResult")
 
-	//DISPLAY THE INSTANCE INFORMATION
-	log.InfoWithValues("[Info]: The Instance information is as follows", logrus.Fields{
-		"VM_INSTANCE_MOID": experimentsDetails.AppVmMoid,
-		"Ramp Time":        experimentsDetails.RampTime,
+	//DISPLAY THE APP INFORMATION
+	log.InfoWithValues("[Info]: The application information is as follows", logrus.Fields{
+		"Namespace": experimentsDetails.AppNS,
+		"Label":     experimentsDetails.AppLabel,
+		"Ramp Time": experimentsDetails.RampTime,
 	})
 
-	// GET SESSION ID TO LOGIN TO VCENTER
-	cookie, err := vmwarelib.GetVcenterSessionID(&experimentsDetails)
-	if err != nil {
-		failStep := "Unable to get Vcenter session ID"
-		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-		log.Errorf("Vcenter Login failed, err: %v", err)
-		return
-	}
+	// Calling AbortWatcher go routine, it will continuously watch for the abort signal and generate the required events and result
+	go common.AbortWatcher(experimentsDetails.ExperimentName, clients, &resultDetails, &chaosDetails, &eventsDetails)
 
 	//PRE-CHAOS APPLICATION STATUS CHECK
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (pre-chaos)")
@@ -85,36 +78,9 @@ func VMPoweroff(clients clients.ClientSets) {
 		return
 	}
 
-	//PRE-CHAOS AUXILIARY APPLICATION STATUS CHECK
-	if experimentsDetails.AuxiliaryAppInfo != "" {
-		log.Info("[Status]: Verify that the Auxiliary Applications are running (pre-chaos)")
-		err = status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
-		if err != nil {
-			log.Errorf("Auxiliary Application status check failed, err: %v", err)
-			failStep := "Verify that the Auxiliary Applications are running (pre-chaos)"
-			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-			return
-		}
-	}
-
-	// PRE-CHAOS INSTANCE STATUS CHECK
-	log.Info("[Status]: Verify that the IUT (Instance Under Test) is running (pre-chaos)")
-	vmstatus, err := vmwarelib.GetVMStatus(&experimentsDetails, cookie)
-	if err != nil {
-		log.Errorf("[Verification]: Unable to get Instance status(pre-chaos), err: %v", err)
-		return
-	}
-	if vmstatus != "POWERED_ON" {
-		failStep := "Verify that the IUT (Instance Under Test) is running (pre-chaos)"
-		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-		log.Errorf("[Verification]: VM is not in running state")
-		return
-	}
-	log.Info("[Verification]: VM is in running state(pre-chaos)")
-
 	if experimentsDetails.EngineName != "" {
-		// marking IUT as running, as we already checked the status of instance under test
-		msg := "IUT: Running"
+		// marking AUT as running, as we already checked the status of application under test
+		msg := "AUT: Running"
 
 		// run the probes in the pre-chaos check
 		if len(resultDetails.ProbeDetails) != 0 {
@@ -123,13 +89,13 @@ func VMPoweroff(clients clients.ClientSets) {
 			if err != nil {
 				log.Errorf("Probe Failed, err: %v", err)
 				failStep := "Failed while running probes"
-				msg := "IUT: Running, Probes: Unsuccessful"
+				msg := "AUT: Running, Probes: Unsuccessful"
 				types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, msg, "Warning", &chaosDetails)
 				events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 				result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 				return
 			}
-			msg = "IUT: Running, Probes: Successful"
+			msg = "AUT: Running, Probes: Successful"
 		}
 		// generating the events for the pre-chaos check
 		types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, msg, "Normal", &chaosDetails)
@@ -137,9 +103,9 @@ func VMPoweroff(clients clients.ClientSets) {
 	}
 
 	// Including the litmus lib
-	if experimentsDetails.ChaosLib == "litmus" {
-		err = litmusLIB.InjectVMPowerOffChaos(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails, cookie)
-		if err != nil {
+	switch experimentsDetails.ChaosLib {
+	case "litmus":
+		if err = litmusLIB.PrepareAndInjectChaos(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
 			log.Errorf("Chaos injection failed, err: %v", err)
 			failStep := "failed in chaos injection phase"
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
@@ -147,7 +113,7 @@ func VMPoweroff(clients clients.ClientSets) {
 		}
 		log.Info("[Confirmation]: chaos has been injected successfully")
 		resultDetails.Verdict = "Pass"
-	} else {
+	default:
 		log.Error("[Invalid]: Please Provide the correct LIB")
 		failStep := "no match found for specified lib"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
@@ -163,51 +129,22 @@ func VMPoweroff(clients clients.ClientSets) {
 		return
 	}
 
-	//POST-CHAOS AUXILIARY APPLICATION STATUS CHECK
-	if experimentsDetails.AuxiliaryAppInfo != "" {
-		log.Info("[Status]: Verify that the Auxiliary Applications are running (post-chaos)")
-		err = status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
-		if err != nil {
-			log.Errorf("Auxiliary Application status check failed, err: %v", err)
-			failStep := "Verify that the Auxiliary Applications are running (post-chaos)"
-			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-			return
-		}
-	}
-
-	//POST-CHAOS INSTANCE STATUS CHECK
-	log.Info("[Status]: Verify that the IUT (Instance Under Test) is running (post-chaos)")
-	vmstatus1, err := vmwarelib.GetVMStatus(&experimentsDetails, cookie)
-	if err != nil {
-		log.Errorf("[Verification]: Unable to get Instance status(post-chaos), err: %v", err)
-		return
-	}
-
-	if vmstatus1 != "POWERED_ON" {
-		failStep := "Verify that the IUT (Intance Under Test) is running (pre-chaos)"
-		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-		log.Errorf("[Verification]: VM is not in running state(post-chaos)")
-		return
-	}
-	log.Info("[Verification]: VM is in running state (post-chaos )")
-
 	if experimentsDetails.EngineName != "" {
-		// marking IUT as running, as we already checked the status of instance under test
-		msg := "IUT: Running"
+		// marking AUT as running, as we already checked the status of application under test
+		msg := "AUT: Running"
 
 		// run the probes in the post-chaos check
 		if len(resultDetails.ProbeDetails) != 0 {
-			err = probe.RunProbes(&chaosDetails, clients, &resultDetails, "PostChaos", &eventsDetails)
-			if err != nil {
+			if err = probe.RunProbes(&chaosDetails, clients, &resultDetails, "PostChaos", &eventsDetails); err != nil {
 				log.Errorf("Probes Failed, err: %v", err)
 				failStep := "Failed while running probes"
-				msg := "IUT: Running, Probes: Unsuccessful"
+				msg := "AUT: Running, Probes: Unsuccessful"
 				types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, msg, "Warning", &chaosDetails)
 				events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 				result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 				return
 			}
-			msg = "IUT: Running, Probes: Successful"
+			msg = "AUT: Running, Probes: Successful"
 		}
 
 		// generating post chaos event
@@ -217,8 +154,7 @@ func VMPoweroff(clients clients.ClientSets) {
 
 	//Updating the chaosResult in the end of experiment
 	log.Infof("[The End]: Updating the chaos result of %v experiment (EOT)", experimentsDetails.ExperimentName)
-	err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
-	if err != nil {
+	if err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT"); err != nil {
 		log.Errorf("Unable to Update the Chaos Result, err: %v", err)
 		return
 	}
