@@ -263,8 +263,8 @@ func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, instanc
 			if err != nil {
 				log.Errorf("ec2 instance failed to start when an abort signal is received, err: %v", err)
 			}
-
 		}
 	}
+	log.Info("[Abort]: Chaos Revert Completed")
 	os.Exit(1)
 }

@@ -299,5 +299,6 @@ func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, instanc
 			}
 		}
 	}
+	log.Info("[Abort]: Chaos Revert Completed")
 	os.Exit(1)
 }

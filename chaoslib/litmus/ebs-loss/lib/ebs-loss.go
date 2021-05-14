@@ -1,6 +1,7 @@
 package lib
 
 import (
+	"os"
 	"time"
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
@@ -174,4 +175,42 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		duration = int(time.Since(ChaosStartTimeStamp).Seconds())
 	}
 	return nil
+}
+
+// AbortWatcher will watching for the abort signal and revert the chaos
+func AbortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, volumeIDList []string, abort chan os.Signal) {
+
+	<-abort
+
+	log.Info("[Abort]: Chaos Revert Started")
+	for _, volumeID := range volumeIDList {
+		//Get volume attachment details
+		instanceID, deviceName, err := ebs.GetVolumeAttachmentDetails(volumeID, experimentsDetails.VolumeTag, experimentsDetails.Region)
+		if err != nil {
+			log.Errorf("fail to get the attachment info, err: %v", err)
+		}
+
+		//Getting the EBS volume attachment status
+		ebsState, err := ebs.GetEBSStatus(experimentsDetails.EBSVolumeID, instanceID, experimentsDetails.Region)
+		if err != nil {
+			log.Errorf("failed to get the ebs status when an abort signal is received, err: %v", err)
+		}
+		if ebsState != "attached" {
+
+			//Wait for ebs volume detachment
+			//We first wait for the volume to get in detached state then we are attaching it.
+			log.Info("[Abort]: Wait for EBS complete volume detachment")
+			if err = ebs.WaitForVolumeDetachment(experimentsDetails.EBSVolumeID, instanceID, experimentsDetails.Region, experimentsDetails.Delay, experimentsDetails.Timeout); err != nil {
+				log.Errorf("unable to detach the ebs volume, err: %v", err)
+			}
+			//Attaching the ebs volume from the instance
+			log.Info("[Chaos]: Attaching the EBS volume from the instance")
+			err = ebs.EBSVolumeAttach(experimentsDetails.EBSVolumeID, instanceID, deviceName, experimentsDetails.Region)
+			if err != nil {
+				log.Errorf("ebs attachment failed when an abort signal is received, err: %v", err)
+			}
+		}
+	}
+	log.Info("[Abort]: Chaos Revert Completed")
+	os.Exit(1)
 }
