@@ -46,17 +46,21 @@ func PrepareEC2TerminateByTag(experimentsDetails *experimentTypes.ExperimentDeta
 	log.Infof("[Chaos]:Number of Instance targeted: %v", len(instanceIDList))
 
 	// watching for the abort signal and revert the chaos
-	go abortWatcher(experimentsDetails, clients, resultDetails, chaosDetails, eventsDetails)
+	go abortWatcher(experimentsDetails, instanceIDList)
 
-	if strings.ToLower(experimentsDetails.Sequence) == "serial" {
-		if err := InjectChaosInSerialMode(experimentsDetails, instanceIDList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+	switch strings.ToLower(experimentsDetails.Sequence) {
+	case "serial":
+		if err := injectChaosInSerialMode(experimentsDetails, instanceIDList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
 			return err
 		}
-	} else {
-		if err := InjectChaosInParallelMode(experimentsDetails, instanceIDList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+	case "parallel":
+		if err := injectChaosInParallelMode(experimentsDetails, instanceIDList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
 			return err
 		}
+	default:
+		return errors.Errorf("%v sequence is not supported", experimentsDetails.Sequence)
 	}
+
 	//Waiting for the ramp time after chaos injection
 	if experimentsDetails.RampTime != 0 {
 		log.Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", experimentsDetails.RampTime)
@@ -65,8 +69,8 @@ func PrepareEC2TerminateByTag(experimentsDetails *experimentTypes.ExperimentDeta
 	return nil
 }
 
-//InjectChaosInSerialMode will inject the ce2 instance termination in serial mode that is one after other
-func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, instanceIDList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+//injectChaosInSerialMode will inject the ce2 instance termination in serial mode that is one after other
+func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, instanceIDList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	select {
 	case <-inject:
@@ -74,10 +78,10 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		os.Exit(0)
 	default:
 		//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
-		ChaosStartTimeStamp := time.Now().Unix()
+		ChaosStartTimeStamp := time.Now()
+		duration := int(time.Since(ChaosStartTimeStamp).Seconds())
 
-	loop:
-		for {
+		for duration < experimentsDetails.ChaosDuration {
 
 			log.Infof("[Info]: Target instanceID list, %v", instanceIDList)
 
@@ -88,12 +92,11 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 			}
 
 			//PowerOff the instance
-			for _, id := range instanceIDList {
+			for i, id := range instanceIDList {
 
 				//Stopping the EC2 instance
 				log.Info("[Chaos]: Stopping the desired EC2 instance")
-				err := awslib.EC2Stop(id, experimentsDetails.Region)
-				if err != nil {
+				if err := awslib.EC2Stop(id, experimentsDetails.Region); err != nil {
 					return errors.Errorf("ec2 instance failed to stop, err: %v", err)
 				}
 
@@ -104,8 +107,8 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 				}
 
 				// run the probes during chaos
-				if len(resultDetails.ProbeDetails) != 0 {
-					if err = probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+				if len(resultDetails.ProbeDetails) != 0 && i == 0 {
+					if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
 						return err
 					}
 				}
@@ -117,8 +120,7 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 				//Starting the EC2 instance
 				if experimentsDetails.ManagedNodegroup != "enable" {
 					log.Info("[Chaos]: Starting back the EC2 instance")
-					err = awslib.EC2Start(id, experimentsDetails.Region)
-					if err != nil {
+					if err := awslib.EC2Start(id, experimentsDetails.Region); err != nil {
 						return errors.Errorf("ec2 instance failed to start, err: %v", err)
 					}
 
@@ -128,27 +130,15 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 						return errors.Errorf("unable to start the ec2 instance, err: %v", err)
 					}
 				}
-
-				//ChaosCurrentTimeStamp contains the current timestamp
-				ChaosCurrentTimeStamp := time.Now().Unix()
-
-				//ChaosDiffTimeStamp contains the difference of current timestamp and start timestamp
-				//It will helpful to track the total chaos duration
-				chaosDiffTimeStamp := ChaosCurrentTimeStamp - ChaosStartTimeStamp
-
-				if int(chaosDiffTimeStamp) >= experimentsDetails.ChaosDuration {
-					log.Infof("[Chaos]: Time is up for experiment: %v", experimentsDetails.ExperimentName)
-					break loop
-				}
-
 			}
+			duration = int(time.Since(ChaosStartTimeStamp).Seconds())
 		}
 	}
 	return nil
 }
 
-// InjectChaosInParallelMode will inject the ce2 instance termination in parallel mode that is all at once
-func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, instanceIDList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+// injectChaosInParallelMode will inject the ce2 instance termination in parallel mode that is all at once
+func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, instanceIDList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	select {
 	case <-inject:
@@ -156,11 +146,10 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		os.Exit(0)
 	default:
 		//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
-		ChaosStartTimeStamp := time.Now().Unix()
+		ChaosStartTimeStamp := time.Now()
+		duration := int(time.Since(ChaosStartTimeStamp).Seconds())
 
-	loop:
-		for {
-
+		for duration < experimentsDetails.ChaosDuration {
 			log.Infof("[Info]: Target instanceID list, %v", instanceIDList)
 
 			if experimentsDetails.EngineName != "" {
@@ -173,8 +162,7 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 			for _, id := range instanceIDList {
 				//Stopping the EC2 instance
 				log.Info("[Chaos]: Stopping the desired EC2 instance")
-				err := awslib.EC2Stop(id, experimentsDetails.Region)
-				if err != nil {
+				if err := awslib.EC2Stop(id, experimentsDetails.Region); err != nil {
 					return errors.Errorf("ec2 instance failed to stop, err: %v", err)
 				}
 			}
@@ -203,8 +191,7 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 
 				for _, id := range instanceIDList {
 					log.Info("[Chaos]: Starting back the EC2 instance")
-					err := awslib.EC2Start(id, experimentsDetails.Region)
-					if err != nil {
+					if err := awslib.EC2Start(id, experimentsDetails.Region); err != nil {
 						return errors.Errorf("ec2 instance failed to start, err: %v", err)
 					}
 				}
@@ -217,18 +204,7 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 					}
 				}
 			}
-
-			//ChaosCurrentTimeStamp contains the current timestamp
-			ChaosCurrentTimeStamp := time.Now().Unix()
-
-			//ChaosDiffTimeStamp contains the difference of current timestamp and start timestamp
-			//It will helpful to track the total chaos duration
-			chaosDiffTimeStamp := ChaosCurrentTimeStamp - ChaosStartTimeStamp
-
-			if int(chaosDiffTimeStamp) >= experimentsDetails.ChaosDuration {
-				log.Infof("[Chaos]: Time is up for experiment: %v", experimentsDetails.ExperimentName)
-				break loop
-			}
+			duration = int(time.Since(ChaosStartTimeStamp).Seconds())
 		}
 	}
 	return nil
@@ -299,16 +275,11 @@ func SetTargetInstance(experimentsDetails *experimentTypes.ExperimentDetails) er
 }
 
 // watching for the abort signal and revert the chaos
-func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, chaosDetails *types.ChaosDetails, eventsDetails *types.EventDetails) {
+func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, instanceIDList []string) {
 
 	<-abort
 
-	log.Info("[Abort]: Chaos Experiment Abortion started because of terminated signal received")
-
-	instanceIDList, err := awslib.GetInstanceList(experimentsDetails.InstanceTag, experimentsDetails.Region)
-	if err != nil {
-		log.Errorf("fail to get instance list when abort signal is received", err)
-	}
+	log.Info("[Abort]: Chaos Revert Started")
 	for _, id := range instanceIDList {
 		instanceState, err := awslib.GetEC2InstanceStatus(id, experimentsDetails.Region)
 		if err != nil {

@@ -1,268 +1,177 @@
 package lib
 
 import (
-	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/ec2"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	ebs "github.com/litmuschaos/litmus-go/pkg/cloud/aws"
+	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/kube-aws/ebs-loss/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
-	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
-var (
-	err           error
-	inject, abort chan os.Signal
-)
+//InjectChaosInSerialMode will inject the ebs loss chaos in serial mode which means one after other
+func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, targetEBSVolumeIDList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
-//InjectEBSLoss contains the chaos injection steps for ebs loss
-func InjectEBSLoss(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
+	ChaosStartTimeStamp := time.Now()
+	duration := int(time.Since(ChaosStartTimeStamp).Seconds())
 
-	// inject channel is used to transmit signal notifications.
-	inject = make(chan os.Signal, 1)
-	// Catch and relay certain signal(s) to inject channel.
-	signal.Notify(inject, os.Interrupt, syscall.SIGTERM)
+	for duration < experimentsDetails.ChaosDuration {
 
-	// abort channel is used to transmit signal notifications.
-	abort = make(chan os.Signal, 1)
-	// Catch and relay certain signal(s) to abort channel.
-	signal.Notify(abort, os.Interrupt, syscall.SIGTERM)
+		if experimentsDetails.EngineName != "" {
+			msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on ec2 instance"
+			types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
+			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
+		}
+		for _, volumeID := range targetEBSVolumeIDList {
 
-	//Waiting for the ramp time before chaos injection
-	if experimentsDetails.RampTime != 0 {
-		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", experimentsDetails.RampTime)
-		common.WaitForDuration(experimentsDetails.RampTime)
+			//Get volume attachment details
+			ec2InstanceID, device, err := ebs.GetVolumeAttachmentDetails(volumeID, experimentsDetails.VolumeTag, experimentsDetails.Region)
+			if err != nil {
+				return errors.Errorf("fail to get the attachment info, err: %v", err)
+			}
+
+			//Detaching the ebs volume from the instance
+			log.Info("[Chaos]: Detaching the EBS volume from the instance")
+			if err = ebs.EBSVolumeDetach(volumeID, experimentsDetails.Region); err != nil {
+				return errors.Errorf("ebs detachment failed, err: %v", err)
+			}
+
+			//Wait for ebs volume detachment
+			log.Infof("[Wait]: Wait for EBS volume detachment for volume %v", volumeID)
+			if err = ebs.WaitForVolumeDetachment(volumeID, ec2InstanceID, experimentsDetails.Region, experimentsDetails.Delay, experimentsDetails.Timeout); err != nil {
+				return errors.Errorf("unable to detach the ebs volume to the ec2 instance, err: %v", err)
+			}
+
+			// run the probes during chaos
+			if len(resultDetails.ProbeDetails) != 0 {
+				if err = probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+					return err
+				}
+			}
+
+			//Wait for chaos duration
+			log.Infof("[Wait]: Waiting for the chaos interval of %vs", experimentsDetails.ChaosInterval)
+			common.WaitForDuration(experimentsDetails.ChaosInterval)
+
+			//Getting the EBS volume attachment status
+			ebsState, err := ebs.GetEBSStatus(volumeID, ec2InstanceID, experimentsDetails.Region)
+			if err != nil {
+				return errors.Errorf("failed to get the ebs status, err: %v", err)
+			}
+
+			switch ebsState {
+			case "attached":
+				log.Info("[Skip]: The EBS volume is already attached")
+			default:
+				//Attaching the ebs volume from the instance
+				log.Info("[Chaos]: Attaching the EBS volume back to the instance")
+				if err = ebs.EBSVolumeAttach(volumeID, ec2InstanceID, device, experimentsDetails.Region); err != nil {
+					return errors.Errorf("ebs attachment failed, err: %v", err)
+				}
+
+				//Wait for ebs volume attachment
+				log.Infof("[Wait]: Wait for EBS volume attachment for %v volume", volumeID)
+				if err = ebs.WaitForVolumeAttachment(volumeID, ec2InstanceID, experimentsDetails.Region, experimentsDetails.Delay, experimentsDetails.Timeout); err != nil {
+					return errors.Errorf("unable to attach the ebs volume to the ec2 instance, err: %v", err)
+				}
+			}
+		}
+		duration = int(time.Since(ChaosStartTimeStamp).Seconds())
 	}
-	// watching for the abort signal and revert the chaos
-	go abortWatcher(experimentsDetails, clients, resultDetails, chaosDetails, eventsDetails)
+	return nil
+}
 
-	select {
-	case <-inject:
-		// stopping the chaos execution, if abort signal recieved
-		os.Exit(0)
-	default:
+//InjectChaosInParallelMode will inject the chaos in parallel mode that means all at once
+func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, targetEBSVolumeIDList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
-		//Detaching the ebs volume from the instance
-		log.Info("[Chaos]: Detaching the EBS volume from the instance")
-		err = EBSVolumeDetach(experimentsDetails)
-		if err != nil {
-			return errors.Errorf("ebs detachment failed, err: %v", err)
+	var ec2InstanceIDList, deviceList []string
+
+	//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
+	ChaosStartTimeStamp := time.Now()
+	duration := int(time.Since(ChaosStartTimeStamp).Seconds())
+
+	for duration < experimentsDetails.ChaosDuration {
+
+		if experimentsDetails.EngineName != "" {
+			msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on ec2 instance"
+			types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
+			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 		}
 
-		//Wait for ebs volume detachment
-		log.Info("[Wait]: Wait for EBS volume detachment")
-		if err = WaitForVolumeDetachment(experimentsDetails); err != nil {
-			return errors.Errorf("unable to detach the ebs volume to the ec2 instance, err: %v", err)
+		//prepare the instaceIDs and device name for all the given volume
+		for _, volumeID := range targetEBSVolumeIDList {
+			ec2InstanceID, device, err := ebs.GetVolumeAttachmentDetails(volumeID, experimentsDetails.VolumeTag, experimentsDetails.Region)
+			if err != nil || ec2InstanceID == "" || device == "" {
+				return errors.Errorf("fail to get the attachment info, err: %v", err)
+			}
+			ec2InstanceIDList = append(ec2InstanceIDList, ec2InstanceID)
+			deviceList = append(deviceList, device)
+		}
+
+		for _, volumeID := range targetEBSVolumeIDList {
+			//Detaching the ebs volume from the instance
+			log.Info("[Chaos]: Detaching the EBS volume from the instance")
+			if err := ebs.EBSVolumeDetach(volumeID, experimentsDetails.Region); err != nil {
+				return errors.Errorf("ebs detachment failed, err: %v", err)
+			}
+		}
+
+		log.Info("[Info]: Checking if the detachment process initiated")
+		if err := ebs.CheckEBSDetachmentInitialisation(targetEBSVolumeIDList, ec2InstanceIDList, experimentsDetails.Region); err != nil {
+			return errors.Errorf("fail to initialise the detachment")
+		}
+
+		for i, volumeID := range targetEBSVolumeIDList {
+			//Wait for ebs volume detachment
+			log.Infof("[Wait]: Wait for EBS volume detachment for volume %v", volumeID)
+			if err := ebs.WaitForVolumeDetachment(volumeID, ec2InstanceIDList[i], experimentsDetails.Region, experimentsDetails.Delay, experimentsDetails.Timeout); err != nil {
+				return errors.Errorf("unable to detach the ebs volume to the ec2 instance, err: %v", err)
+			}
 		}
 
 		// run the probes during chaos
 		if len(resultDetails.ProbeDetails) != 0 {
-			if err = probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+			if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
 				return err
 			}
 		}
 
-		//Wait for chaos duration
-		log.Infof("[Wait]: Waiting for the chaos duration of %vs", experimentsDetails.ChaosDuration)
-		common.WaitForDuration(experimentsDetails.ChaosDuration)
+		//Wait for chaos interval
+		log.Infof("[Wait]: Waiting for the chaos interval of %vs", experimentsDetails.ChaosInterval)
+		common.WaitForDuration(experimentsDetails.ChaosInterval)
 
-		//Getting the EBS volume attachment status
-		EBSStatus, err := ebs.GetEBSStatus(experimentsDetails)
-		if err != nil {
-			return errors.Errorf("failed to get the ebs status, err: %v", err)
-		}
+		for i, volumeID := range targetEBSVolumeIDList {
 
-		if EBSStatus != "attached" {
-			//Attaching the ebs volume from the instance
-			log.Info("[Chaos]: Attaching the EBS volume from the instance")
-			err = EBSVolumeAttach(experimentsDetails)
+			//Getting the EBS volume attachment status
+			ebsState, err := ebs.GetEBSStatus(volumeID, ec2InstanceIDList[i], experimentsDetails.Region)
 			if err != nil {
-				return errors.Errorf("ebs attachment failed, err: %v", err)
+				return errors.Errorf("failed to get the ebs status, err: %v", err)
 			}
 
-			//Wait for ebs volume attachment
-			log.Info("[Wait]: Wait for EBS volume attachment")
-			if err = WaitForVolumeAttachment(experimentsDetails); err != nil {
-				return errors.Errorf("unable to attach the ebs volume to the ec2 instance, err: %v", err)
-			}
-		} else {
-			log.Info("[Skip]: The EBS volume is already attached")
-		}
-	}
-
-	//Waiting for the ramp time after chaos injection
-	if experimentsDetails.RampTime != 0 {
-		log.Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", experimentsDetails.RampTime)
-		common.WaitForDuration(experimentsDetails.RampTime)
-	}
-	return nil
-}
-
-// EBSVolumeDetach will detach the ebs vol from ec2 node
-func EBSVolumeDetach(experimentsDetails *experimentTypes.ExperimentDetails) error {
-
-	// Load session from shared config
-	sess := session.Must(session.NewSessionWithOptions(session.Options{
-		SharedConfigState: session.SharedConfigEnable,
-		Config:            aws.Config{Region: aws.String(experimentsDetails.Region)},
-	}))
-
-	// Create new EC2 client
-	ec2Svc := ec2.New(sess)
-
-	input := &ec2.DetachVolumeInput{
-		VolumeId: aws.String(experimentsDetails.EBSVolumeID),
-	}
-
-	result, err := ec2Svc.DetachVolume(input)
-	if err != nil {
-		if aerr, ok := err.(awserr.Error); ok {
-			switch aerr.Code() {
+			switch ebsState {
+			case "attached":
+				log.Info("[Skip]: The EBS volume is already attached")
 			default:
-				return errors.Errorf(aerr.Error())
+				//Attaching the ebs volume from the instance
+				log.Info("[Chaos]: Attaching the EBS volume from the instance")
+				if err = ebs.EBSVolumeAttach(volumeID, ec2InstanceIDList[i], deviceList[i], experimentsDetails.Region); err != nil {
+					return errors.Errorf("ebs attachment failed, err: %v", err)
+				}
+
+				//Wait for ebs volume attachment
+				log.Infof("[Wait]: Wait for EBS volume attachment for volume %v", volumeID)
+				if err = ebs.WaitForVolumeAttachment(volumeID, ec2InstanceIDList[i], experimentsDetails.Region, experimentsDetails.Delay, experimentsDetails.Timeout); err != nil {
+					return errors.Errorf("unable to attach the ebs volume to the ec2 instance, err: %v", err)
+				}
 			}
-		} else {
-			return errors.Errorf(err.Error())
 		}
-	}
-
-	log.InfoWithValues("Detaching ebs having:", logrus.Fields{
-		"VolumeId":   *result.VolumeId,
-		"State":      *result.State,
-		"Device":     *result.Device,
-		"InstanceId": *result.InstanceId,
-	})
-
-	return nil
-}
-
-// EBSVolumeAttach will detach the ebs vol from ec2 node
-func EBSVolumeAttach(experimentsDetails *experimentTypes.ExperimentDetails) error {
-
-	// Load session from shared config
-	sess := session.Must(session.NewSessionWithOptions(session.Options{
-		SharedConfigState: session.SharedConfigEnable,
-		Config:            aws.Config{Region: aws.String(experimentsDetails.Region)},
-	}))
-
-	// Create new EC2 client
-	ec2Svc := ec2.New(sess)
-
-	//Attaching the ebs volume after chaos
-	input := &ec2.AttachVolumeInput{
-		Device:     aws.String(experimentsDetails.DeviceName),
-		InstanceId: aws.String(experimentsDetails.Ec2InstanceID),
-		VolumeId:   aws.String(experimentsDetails.EBSVolumeID),
-	}
-
-	result, err := ec2Svc.AttachVolume(input)
-	if err != nil {
-		if aerr, ok := err.(awserr.Error); ok {
-			switch aerr.Code() {
-			default:
-				return errors.Errorf(aerr.Error())
-			}
-		} else {
-			return errors.Errorf(err.Error())
-		}
-	}
-
-	log.InfoWithValues("Attaching ebs having:", logrus.Fields{
-		"VolumeId":   *result.VolumeId,
-		"State":      *result.State,
-		"Device":     *result.Device,
-		"InstanceId": *result.InstanceId,
-	})
-	return nil
-}
-
-// WaitForVolumeDetachment will wait the ebs volume to completely detach
-func WaitForVolumeDetachment(experimentsDetails *experimentTypes.ExperimentDetails) error {
-
-	log.Info("[Status]: Checking ebs volume status for detachment")
-	err := retry.
-		Times(uint(experimentsDetails.Timeout / experimentsDetails.Delay)).
-		Wait(time.Duration(experimentsDetails.Delay) * time.Second).
-		Try(func(attempt uint) error {
-
-			instanceState, err := ebs.GetEBSStatus(experimentsDetails)
-			if err != nil {
-				return errors.Errorf("failed to get the instance status")
-			}
-			if instanceState != "detached" {
-				log.Infof("The instance state is %v", instanceState)
-				return errors.Errorf("instance is not yet in detached state")
-			}
-			log.Infof("The instance state is %v", instanceState)
-			return nil
-		})
-	if err != nil {
-		return err
+		duration = int(time.Since(ChaosStartTimeStamp).Seconds())
 	}
 	return nil
-}
-
-// WaitForVolumeAttachment will wait for the ebs volume to get attached on ec2 instance
-func WaitForVolumeAttachment(experimentsDetails *experimentTypes.ExperimentDetails) error {
-
-	log.Info("[Status]: Checking ebs volume status for attachment")
-	err := retry.
-		Times(uint(experimentsDetails.Timeout / experimentsDetails.Delay)).
-		Wait(time.Duration(experimentsDetails.Delay) * time.Second).
-		Try(func(attempt uint) error {
-
-			instanceState, err := ebs.GetEBSStatus(experimentsDetails)
-			if err != nil {
-				return errors.Errorf("failed to get the instance status")
-			}
-			if instanceState != "attached" {
-				log.Infof("The instance state is %v", instanceState)
-				return errors.Errorf("instance is not yet in attached state")
-			}
-			log.Infof("The instance state is %v", instanceState)
-			return nil
-		})
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-// watching for the abort signal and revert the chaos
-func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, chaosDetails *types.ChaosDetails, eventsDetails *types.EventDetails) {
-
-	<-abort
-	log.Info("[Chaos]: Chaos Experiment Abortion started because of terminated signal received")
-	//Getting the EBS volume attachment status
-	EBSStatus, err := ebs.GetEBSStatus(experimentsDetails)
-	if err != nil {
-		log.Errorf("failed to get the ebs status when an abort signal is received, err: %v", err)
-	}
-	if EBSStatus != "attached" {
-
-		//Wait for ebs volume detachment
-		log.Info("[Abort]: Wait for EBS complete volume detachment")
-		if err = WaitForVolumeDetachment(experimentsDetails); err != nil {
-			log.Errorf("unable to detach the ebs volume, err: %v", err)
-		}
-		//Attaching the ebs volume from the instance
-		log.Info("[Chaos]: Attaching the EBS volume from the instance")
-		err = EBSVolumeAttach(experimentsDetails)
-		if err != nil {
-			log.Errorf("ebs attachment failed when an abort signal is received, err: %v", err)
-		}
-	}
-	os.Exit(1)
 }

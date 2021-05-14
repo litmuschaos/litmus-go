@@ -1,0 +1,63 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: litmus-experiment
+spec:
+  replicas: 1
+  selector: 
+    matchLabels:
+      app: litmus-experiment
+  template:
+    metadata:
+      labels:
+        app: litmus-experiment
+    spec:
+      serviceAccountName: ebs-loss-by-id-sa
+      containers:
+      - name: gotest
+        image: busybox
+        command:
+          - sleep 
+          - "3600"
+        env:
+          - name: APP_NAMESPACE
+            value: 'default'
+
+          - name: APP_LABEL
+            value: 'run=nginx'
+
+          - name: APP_KIND
+            value: 'deployment'
+
+          - name: TOTAL_CHAOS_DURATION
+            value: '60'
+
+          - name: LIB
+            value: 'litmus'
+
+          - name: EC2_INSTANCE_ID
+            value: ''
+
+          - name: EBS_VOL_ID
+            value: ''
+
+          - name: DEVICE_NAME
+            value: '/dev/sdf'
+
+          - name: CHAOS_NAMESPACE
+            value: 'default'
+
+          - name: REGION
+            value: ''
+
+          - name: RAMP_TIME
+            value: ''
+
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          secrets:
+            - name: cloud-secret
+              mountPath: /tmp/
