@@ -28,7 +28,7 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 			types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
 			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 		}
-		for _, volumeID := range targetEBSVolumeIDList {
+		for i, volumeID := range targetEBSVolumeIDList {
 
 			//Get volume attachment details
 			ec2InstanceID, device, err := ebs.GetVolumeAttachmentDetails(volumeID, experimentsDetails.VolumeTag, experimentsDetails.Region)
@@ -49,7 +49,7 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 			}
 
 			// run the probes during chaos
-			if len(resultDetails.ProbeDetails) != 0 {
+			if len(resultDetails.ProbeDetails) != 0 && i == 0 {
 				if err = probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
 					return err
 				}

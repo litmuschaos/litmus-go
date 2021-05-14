@@ -96,7 +96,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 			}
 
 			//PowerOff the instance
-			for _, id := range instanceIDList {
+			for i, id := range instanceIDList {
 
 				//Stopping the EC2 instance
 				log.Info("[Chaos]: Stopping the desired EC2 instance")
@@ -112,7 +112,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 				}
 
 				// run the probes during chaos
-				if len(resultDetails.ProbeDetails) != 0 {
+				if len(resultDetails.ProbeDetails) != 0 && i == 0 {
 					if err = probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
 						return err
 					}
