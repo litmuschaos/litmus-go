@@ -1,0 +1,85 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: litmus-experiment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: litmus-experiment
+  template:
+    metadata:
+      labels: 
+        app: litmus-experiment
+    spec:
+      serviceAccountName: pod-dns-spoof-sa
+      containers:
+      - name: gotest
+        image: busybox 
+        command: 
+          - sleep
+          - "3600"
+        env:
+          - name: APP_NAMESPACE
+            value: 'default'
+
+          - name: APP_LABEL
+            value: 'run=nginx'
+
+          - name: TARGET_CONTAINER
+            value: 'nginx'
+
+          # provide application kind
+          - name: APP_KIND
+            value: 'deployment'
+
+          # map of the target hostnames eg. '{"abc.com":"spoofabc.com"}' . If empty no queries will be spoofed
+          - name: SPOOF_MAP
+            value: '{"abc.com":"spoofabc.com"}'
+
+          # in sec
+          - name: TOTAL_CHAOS_DURATION
+            value: '60'
+
+          - name: LIB
+            value: 'litmus'
+
+          - name: TARGET_PODS
+            value: ''
+
+          - name: LIB_IMAGE
+            value: 'litmuschaos/go-runner:ci'
+
+          - name: CHAOS_NAMESPACE
+            value: 'default'
+
+            ## Period to wait before/after injection of chaos
+          - name: RAMP_TIME
+            value: ''
+
+          ## percentage of total pods to target
+          - name: PODS_AFFECTED_PERC
+            value: ''
+
+          # provide the name of container runtime
+          # it supports docker, containerd, crio
+          # default to docker
+          - name: CONTAINER_RUNTIME
+            value: 'docker'
+
+          # provide the container runtime path
+          - name: SOCKET_PATH
+            value: '/var/run/docker.sock'
+
+          - name: CHAOS_SERVICE_ACCOUNT
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.serviceAccountName
+
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+
+

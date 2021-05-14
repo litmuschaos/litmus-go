@@ -87,7 +87,7 @@ func PreparePodDNSChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 	}
 
 	// prepare dns interceptor
-	commandTemplate := fmt.Sprintf("sudo TARGET_PID=%d CHAOS_TYPE=%s TARGET_HOSTNAMES='%s' CHAOS_DURATION=%d MATCH_SCHEME=%s nsutil -p -n -t %d -- dns_interceptor", pid, experimentsDetails.ChaosType, experimentsDetails.TargetHostNames, experimentsDetails.ChaosDuration, experimentsDetails.MatchScheme, pid)
+	commandTemplate := fmt.Sprintf("sudo TARGET_PID=%d CHAOS_TYPE=%s SPOOF_MAP='%s' TARGET_HOSTNAMES='%s' CHAOS_DURATION=%d MATCH_SCHEME=%s nsutil -p -n -t %d -- dns_interceptor", pid, experimentsDetails.ChaosType, experimentsDetails.SpoofMap, experimentsDetails.TargetHostNames, experimentsDetails.ChaosDuration, experimentsDetails.MatchScheme, pid)
 	cmd := exec.Command("/bin/bash", "-c", commandTemplate)
 	log.Info(cmd.String())
 	cmd.Stdout = os.Stdout
@@ -320,6 +320,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.ChaosPodName = Getenv("POD_NAME", "")
 	experimentDetails.ContainerRuntime = Getenv("CONTAINER_RUNTIME", "")
 	experimentDetails.TargetHostNames = Getenv("TARGET_HOSTNAMES", "")
+	experimentDetails.SpoofMap = Getenv("SPOOF_MAP", "")
 	experimentDetails.MatchScheme = Getenv("MATCH_SCHEME", "exact")
 	experimentDetails.ChaosType = Getenv("CHAOS_TYPE", "error")
 	experimentDetails.SocketPath = Getenv("SOCKET_PATH", "")

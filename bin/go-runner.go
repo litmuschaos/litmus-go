@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-
 	// Uncomment to load all auth plugins
 	// _ "k8s.io/client-go/plugin/pkg/client/auth"
 
@@ -25,7 +24,8 @@ import (
 	podAutoscaler "github.com/litmuschaos/litmus-go/experiments/generic/pod-autoscaler/experiment"
 	podCPUHog "github.com/litmuschaos/litmus-go/experiments/generic/pod-cpu-hog/experiment"
 	podDelete "github.com/litmuschaos/litmus-go/experiments/generic/pod-delete/experiment"
-	podDNSChaos "github.com/litmuschaos/litmus-go/experiments/generic/pod-dns-chaos/experiment"
+	podDNSError "github.com/litmuschaos/litmus-go/experiments/generic/pod-dns-error/experiment"
+	podDNSSpoof "github.com/litmuschaos/litmus-go/experiments/generic/pod-dns-spoof/experiment"
 	podIOStress "github.com/litmuschaos/litmus-go/experiments/generic/pod-io-stress/experiment"
 	podMemoryHog "github.com/litmuschaos/litmus-go/experiments/generic/pod-memory-hog/experiment"
 	podNetworkCorruption "github.com/litmuschaos/litmus-go/experiments/generic/pod-network-corruption/experiment"
@@ -33,7 +33,8 @@ import (
 	podNetworkLatency "github.com/litmuschaos/litmus-go/experiments/generic/pod-network-latency/experiment"
 	podNetworkLoss "github.com/litmuschaos/litmus-go/experiments/generic/pod-network-loss/experiment"
 	kafkaBrokerPodFailure "github.com/litmuschaos/litmus-go/experiments/kafka/kafka-broker-pod-failure/experiment"
-	ebsLoss "github.com/litmuschaos/litmus-go/experiments/kube-aws/ebs-loss/experiment"
+	ebsLossByID "github.com/litmuschaos/litmus-go/experiments/kube-aws/ebs-loss-by-id/experiment"
+	ebsLossByTag "github.com/litmuschaos/litmus-go/experiments/kube-aws/ebs-loss-by-tag/experiment"
 	ec2TerminateByID "github.com/litmuschaos/litmus-go/experiments/kube-aws/ec2-terminate-by-id/experiment"
 	ec2TerminateByTag "github.com/litmuschaos/litmus-go/experiments/kube-aws/ec2-terminate-by-tag/experiment"
 	vmpoweroff "github.com/litmuschaos/litmus-go/experiments/vmware/vm-poweroff/experiment"
@@ -111,14 +112,18 @@ func main() {
 		ec2TerminateByID.EC2TerminateByID(clients)
 	case "ec2-terminate-by-tag":
 		ec2TerminateByTag.EC2TerminateByTag(clients)
-	case "ebs-loss":
-		ebsLoss.EBSLoss(clients)
+	case "ebs-loss-by-id":
+		ebsLossByID.EBSLossByID(clients)
+	case "ebs-loss-by-tag":
+		ebsLossByTag.EBSLossByTag(clients)
 	case "node-restart":
 		nodeRestart.NodeRestart(clients)
-	case "pod-dns-chaos":
-		podDNSChaos.PodDNSExperiment(clients)
-        case "vm-poweroff":
-                vmpoweroff.VMPoweroff(clients)
+	case "pod-dns-error":
+		podDNSError.PodDNSError(clients)
+	case "pod-dns-spoof":
+		podDNSSpoof.PodDNSSpoof(clients)
+	case "vm-poweroff":
+		vmpoweroff.VMPoweroff(clients)
 
 	default:
 		log.Errorf("Unsupported -name %v, please provide the correct value of -name args", *experimentName)
