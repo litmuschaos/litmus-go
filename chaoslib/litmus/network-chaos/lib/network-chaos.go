@@ -299,7 +299,7 @@ func getPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, podName, a
 	return envVar
 }
 
-// getTargetIps return the comma separated target ips
+// GetTargetIps return the comma separated target ips
 // It fetch the ips from the target ips (if defined by users)
 // it append the ips from the host, if target host is provided
 func GetTargetIps(targetIPs, targetHosts string) (string, error) {

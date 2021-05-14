@@ -9,9 +9,18 @@ import (
 	clientTypes "k8s.io/apimachinery/pkg/types"
 )
 
+// DNSChaosType represents the DNS chaos type
+type DNSChaosType string
+
+const (
+	// Error represents DNS error
+	Error DNSChaosType = "error"
+	// Spoof represents DNS spoofing
+	Spoof DNSChaosType = "spoof"
+)
+
 //GetENV fetches all the env variables from the runner pod
-func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
-	experimentDetails.ExperimentName = common.Getenv("EXPERIMENT_NAME", "pod-dns-chaos")
+func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expType DNSChaosType) {
 	experimentDetails.ChaosNamespace = common.Getenv("CHAOS_NAMESPACE", "litmus")
 	experimentDetails.EngineName = common.Getenv("CHAOSENGINE", "")
 	experimentDetails.ChaosDuration, _ = strconv.Atoi(common.Getenv("TOTAL_CHAOS_DURATION", "60"))
@@ -30,14 +39,22 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.Timeout, _ = strconv.Atoi(common.Getenv("STATUS_CHECK_TIMEOUT", "180"))
 	experimentDetails.TargetPods = common.Getenv("TARGET_PODS", "")
 	experimentDetails.PodsAffectedPerc, _ = strconv.Atoi(common.Getenv("PODS_AFFECTED_PERC", "0"))
-	experimentDetails.TargetHostNames = common.Getenv("TARGET_HOSTNAMES", "")
-	experimentDetails.MatchScheme = common.Getenv("MATCH_SCHEME", "exact")
-	experimentDetails.ChaosType = common.Getenv("CHAOS_TYPE", "error")
 	experimentDetails.ContainerRuntime = common.Getenv("CONTAINER_RUNTIME", "docker")
 	experimentDetails.SocketPath = common.Getenv("SOCKET_PATH", "/var/run/docker.sock")
 	experimentDetails.ChaosServiceAccount = common.Getenv("CHAOS_SERVICE_ACCOUNT", "")
 	experimentDetails.Sequence = common.Getenv("SEQUENCE", "parallel")
 	experimentDetails.TerminationGracePeriodSeconds, _ = strconv.Atoi(common.Getenv("TERMINATION_GRACE_PERIOD_SECONDS", ""))
+	switch expType {
+	case Error:
+		experimentDetails.ExperimentName = common.Getenv("EXPERIMENT_NAME", "pod-dns-error")
+		experimentDetails.TargetHostNames = common.Getenv("TARGET_HOSTNAMES", "")
+		experimentDetails.MatchScheme = common.Getenv("MATCH_SCHEME", "exact")
+		experimentDetails.ChaosType = common.Getenv("CHAOS_TYPE", "error")
+	case Spoof:
+		experimentDetails.ExperimentName = common.Getenv("EXPERIMENT_NAME", "pod-dns-spoof")
+		experimentDetails.SpoofMap = common.Getenv("SPOOF_MAP", "")
+		experimentDetails.ChaosType = common.Getenv("CHAOS_TYPE", "spoof")
+	}
 }
 
 //InitialiseChaosVariables initialise all the global variables

@@ -6,8 +6,8 @@ import (
 
 	clientTypes "k8s.io/apimachinery/pkg/types"
 
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/vmware/vm-poweroff/types"
 	"github.com/litmuschaos/litmus-go/pkg/types"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/vmware/vm-poweroff/types"
 )
 
 // STEPS TO GETENV OF YOUR CHOICE HERE
@@ -31,7 +31,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.TargetContainer = Getenv("TARGET_CONTAINER", "")
 	experimentDetails.Delay, _ = strconv.Atoi(Getenv("STATUS_CHECK_DELAY", "2"))
 	experimentDetails.Timeout, _ = strconv.Atoi(Getenv("STATUS_CHECK_TIMEOUT", "180"))
-	experimentDetails.AppVmMoid = Getenv("APP_VM_MOID", "")
+	experimentDetails.AppVMMoid = Getenv("APP_VM_MOID", "")
 	experimentDetails.VcenterServer = Getenv("VCENTERSERVER", "")
 	experimentDetails.VcenterUser = Getenv("VCENTERUSER", "")
 	experimentDetails.VcenterPass = Getenv("VCENTERPASS", "")

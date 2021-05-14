@@ -1,16 +1,15 @@
 package vmware
 
 import (
-	"encoding/json"
-	"net/http"	
-	"io/ioutil"	
 	"crypto/tls"
-	
-	"github.com/pkg/errors"
+	"encoding/json"
+	"io/ioutil"
+	"net/http"
+
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/vmware/vm-poweroff/types"
 )
 
-type Message struct {
+type message struct {
 	MsgValue string `json:"value"`
 }
 
@@ -18,26 +17,30 @@ type Message struct {
 func GetVcenterSessionID(experimentsDetails *experimentTypes.ExperimentDetails) (string, error) {
 
 	//Leverage Go's HTTP Post function to make request
-	req, err := http.NewRequest("POST","https://"+ experimentsDetails.VcenterServer +"/rest/com/vmware/cis/session", nil)
+	req, err := http.NewRequest("POST", "https://"+experimentsDetails.VcenterServer+"/rest/com/vmware/cis/session", nil)
+	if err != nil {
+		return "", err
+	}
 	req.Header.Set("Content-Type", "application/json")
 	req.SetBasicAuth(experimentsDetails.VcenterUser, experimentsDetails.VcenterPass)
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
-	
+
 	client := &http.Client{Transport: tr}
 	resp, err := client.Do(req)
-	//Handle Error
 	if err != nil {
-		return "",errors.Errorf("%v", err)
+		return "", err
 	}
 	defer resp.Body.Close()
 	//Read the response body
-	body, err := ioutil.ReadAll(resp.Body)   
-	var m Message
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+	var m message
 	json.Unmarshal([]byte(body), &m)
-   
-   
+
 	login := "vmware-api-session-id=" + m.MsgValue + ";Path=/rest;Secure;HttpOnly"
-	return login,nil
+	return login, nil
 }

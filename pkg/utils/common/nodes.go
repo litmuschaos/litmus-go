@@ -13,6 +13,8 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+var err error
+
 //GetNodeList check for the availibilty of the application node for the chaos execution
 // if the application node is not defined it will derive the random target node list using node affected percentage
 func GetNodeList(nodeName, nodeLabel string, nodeAffPerc int, clients clients.ClientSets) ([]string, error) {
@@ -27,12 +29,12 @@ func GetNodeList(nodeName, nodeLabel string, nodeAffPerc int, clients clients.Cl
 
 	switch nodeLabel {
 	case "":
-		nodes, err := clients.KubeClient.CoreV1().Nodes().List(v1.ListOptions{})
+		nodes, err = clients.KubeClient.CoreV1().Nodes().List(v1.ListOptions{})
 		if err != nil || len(nodes.Items) == 0 {
 			return nil, errors.Errorf("Failed to find the nodes, err: %v", err)
 		}
 	default:
-		nodes, err := clients.KubeClient.CoreV1().Nodes().List(v1.ListOptions{LabelSelector: nodeLabel})
+		nodes, err = clients.KubeClient.CoreV1().Nodes().List(v1.ListOptions{LabelSelector: nodeLabel})
 		if err != nil || len(nodes.Items) == 0 {
 			return nil, errors.Errorf("Failed to find the nodes with matching label, err: %v", err)
 		}
