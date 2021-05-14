@@ -67,17 +67,15 @@ func EBSLossByTag(clients clients.ClientSets) {
 		"Ramp Time":     experimentsDetails.RampTime,
 	})
 
-<<<<<<< HEAD:experiments/kube-aws/ebs-loss/experiment/ebs-loss.go
 	// Calling AbortWatcher go routine, it will continuously watch for the abort signal and generate the required events and result
 	go common.AbortWatcherWithoutExit(experimentsDetails.ExperimentName, clients, &resultDetails, &chaosDetails, &eventsDetails)
-=======
+
 	//DISPLAY THE VOLUME INFORMATION
 	log.InfoWithValues("The volume information is as follows", logrus.Fields{
 		"Volume Tag": experimentsDetails.VolumeTag,
 		"Region":     experimentsDetails.Region,
 		"Ramp Time":  experimentsDetails.RampTime,
 	})
->>>>>>> c10cde259506ef401f35da4b449396187fee1036:experiments/kube-aws/ebs-loss-by-tag/experiment/ebs-loss-by-tag.go
 
 	//PRE-CHAOS APPLICATION STATUS CHECK
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (pre-chaos)")

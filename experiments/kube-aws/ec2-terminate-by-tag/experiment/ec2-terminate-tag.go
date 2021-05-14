@@ -19,8 +19,10 @@ import (
 // EC2TerminateByTag inject the ebs volume loss chaos
 func EC2TerminateByTag(clients clients.ClientSets) {
 
-	var err error
-	var activeNodeCount int
+	var (
+		err             error
+		activeNodeCount int
+	)
 	experimentsDetails := experimentTypes.ExperimentDetails{}
 	resultDetails := types.ResultDetails{}
 	eventsDetails := types.EventDetails{}
