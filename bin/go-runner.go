@@ -33,7 +33,8 @@ import (
 	podNetworkLatency "github.com/litmuschaos/litmus-go/experiments/generic/pod-network-latency/experiment"
 	podNetworkLoss "github.com/litmuschaos/litmus-go/experiments/generic/pod-network-loss/experiment"
 	kafkaBrokerPodFailure "github.com/litmuschaos/litmus-go/experiments/kafka/kafka-broker-pod-failure/experiment"
-	ebsLoss "github.com/litmuschaos/litmus-go/experiments/kube-aws/ebs-loss/experiment"
+	ebsLossByID "github.com/litmuschaos/litmus-go/experiments/kube-aws/ebs-loss-by-id/experiment"
+	ebsLossByTag "github.com/litmuschaos/litmus-go/experiments/kube-aws/ebs-loss-by-tag/experiment"
 	ec2TerminateByID "github.com/litmuschaos/litmus-go/experiments/kube-aws/ec2-terminate-by-id/experiment"
 	ec2TerminateByTag "github.com/litmuschaos/litmus-go/experiments/kube-aws/ec2-terminate-by-tag/experiment"
 	vmpoweroff "github.com/litmuschaos/litmus-go/experiments/vmware/vm-poweroff/experiment"
@@ -111,8 +112,10 @@ func main() {
 		ec2TerminateByID.EC2TerminateByID(clients)
 	case "ec2-terminate-by-tag":
 		ec2TerminateByTag.EC2TerminateByTag(clients)
-	case "ebs-loss":
-		ebsLoss.EBSLoss(clients)
+	case "ebs-loss-by-id":
+		ebsLossByID.EBSLossByID(clients)
+	case "ebs-loss-by-tag":
+		ebsLossByTag.EBSLossByTag(clients)
 	case "node-restart":
 		nodeRestart.NodeRestart(clients)
 	case "pod-dns-error":
