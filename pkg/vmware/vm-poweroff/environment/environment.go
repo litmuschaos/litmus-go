@@ -6,8 +6,8 @@ import (
 
 	clientTypes "k8s.io/apimachinery/pkg/types"
 
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/vmware/vm-poweroff/types"
 	"github.com/litmuschaos/litmus-go/pkg/types"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/vmware/vm-poweroff/types"
 )
 
 // STEPS TO GETENV OF YOUR CHOICE HERE

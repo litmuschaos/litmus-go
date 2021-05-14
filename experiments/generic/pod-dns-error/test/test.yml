@@ -13,7 +13,7 @@ spec:
       labels: 
         app: litmus-experiment
     spec:
-      serviceAccountName: pod-dns-chaos-sa
+      serviceAccountName: pod-dns-error-sa
       containers:
       - name: gotest
         image: busybox 
@@ -41,10 +41,6 @@ spec:
           # can be either exact or substring, determines whether the dns query has to match exactly with one of the targets or can have any of the targets as substring
           - name: MATCH_SCHEME
             value: 'exact'
-
-          # currently only error chaos is supported
-          - name: CHAOS_TYPE
-            value: 'error'
 
           # in sec
           - name: TOTAL_CHAOS_DURATION
