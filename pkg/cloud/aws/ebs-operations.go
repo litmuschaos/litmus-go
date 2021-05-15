@@ -151,7 +151,7 @@ func getVolumeFilter(ebsVolumeTag string) *ec2.DescribeVolumesInput {
 		volumeTag := strings.Split(ebsVolumeTag, ":")
 		params := &ec2.DescribeVolumesInput{
 			Filters: []*ec2.Filter{
-				&ec2.Filter{
+				{
 					Name: aws.String("tag:" + volumeTag[0]),
 					Values: []*string{
 						aws.String(volumeTag[1]),
