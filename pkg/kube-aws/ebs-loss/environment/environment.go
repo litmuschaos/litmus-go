@@ -12,7 +12,8 @@ import (
 
 //GetENV fetches all the env variables from the runner pod
 func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
-	experimentDetails.ExperimentName = common.Getenv("EXPERIMENT_NAME", "ebs-loss")
+	// setting default value for EXPERIMENT_NAME to "" as this is a common util for the ebs-loss-byid/tag experiments
+	experimentDetails.ExperimentName = common.Getenv("EXPERIMENT_NAME", "")
 	experimentDetails.ChaosNamespace = common.Getenv("CHAOS_NAMESPACE", "litmus")
 	experimentDetails.EngineName = common.Getenv("CHAOSENGINE", "")
 	experimentDetails.ChaosDuration, _ = strconv.Atoi(common.Getenv("TOTAL_CHAOS_DURATION", "30"))
