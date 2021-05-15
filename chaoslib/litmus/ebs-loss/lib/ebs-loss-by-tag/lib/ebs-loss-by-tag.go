@@ -45,7 +45,7 @@ func PrepareEBSLossByTag(experimentsDetails *experimentTypes.ExperimentDetails, 
 		os.Exit(0)
 	default:
 
-		targetEBSVolumeIDList := common.CalculateVolumeAffPerc(experimentsDetails.VolumeAffectedPerc, experimentsDetails.TargetVolumeIDList)
+		targetEBSVolumeIDList := common.FilterBasedOnPercentage(experimentsDetails.VolumeAffectedPerc, experimentsDetails.TargetVolumeIDList)
 		log.Infof("[Chaos]:Number of volumes targeted: %v", len(targetEBSVolumeIDList))
 
 		// watching for the abort signal and revert the chaos
