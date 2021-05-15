@@ -17,7 +17,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// VMPoweroff contains steps to inject chaos
+// VMPoweroff contains steps to inject vm-power-off chaos
 func VMPoweroff(clients clients.ClientSets) {
 
 	experimentsDetails := experimentTypes.ExperimentDetails{}

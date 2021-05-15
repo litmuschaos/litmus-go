@@ -16,6 +16,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/pkg/errors"
+	apiv1 "k8s.io/api/core/v1"
 )
 
 //WaitForDuration waits for the given time duration (in seconds)
@@ -70,27 +71,43 @@ func AbortWatcherWithoutExit(expname string, clients clients.ClientSets, resultD
 	// Catch and relay certain signal(s) to signChan channel.
 	signal.Notify(signChan, os.Interrupt, syscall.SIGTERM)
 
-loop:
-	for {
-		select {
-		case <-signChan:
-			log.Info("[Chaos]: Chaos Experiment Abortion started because of terminated signal received")
-			// updating the chaosresult after stopped
-			failStep := "Chaos injection stopped!"
-			types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep)
-			result.ChaosResult(chaosDetails, clients, resultDetails, "EOT")
+	// waiting until the abort signal recieved
+	<-signChan
 
-			// generating summary event in chaosengine
-			msg := expname + " experiment has been aborted"
-			types.SetEngineEventAttributes(eventsDetails, types.Summary, msg, "Warning", chaosDetails)
-			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
+	log.Info("[Chaos]: Chaos Experiment Abortion started because of terminated signal received")
+	// updating the chaosresult after stopped
+	failStep := "Chaos injection stopped!"
+	types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep)
+	result.ChaosResult(chaosDetails, clients, resultDetails, "EOT")
 
-			// generating summary event in chaosresult
-			types.SetResultEventAttributes(eventsDetails, types.Summary, msg, "Warning", resultDetails)
-			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosResult")
-			break loop
-		}
+	// generating summary event in chaosengine
+	msg := expname + " experiment has been aborted"
+	types.SetEngineEventAttributes(eventsDetails, types.Summary, msg, "Warning", chaosDetails)
+	events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
+
+	// generating summary event in chaosresult
+	types.SetResultEventAttributes(eventsDetails, types.Summary, msg, "Warning", resultDetails)
+	events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosResult")
+}
+
+//GetIterations derive the iterations value from given parameters
+func GetIterations(duration, interval int) int {
+	var iterations int
+	if interval != 0 {
+		iterations = duration / interval
 	}
+	return math.Maximum(iterations, 1)
+}
+
+// GetValueFromDownwardAPI returns the value from downwardApi
+func GetValueFromDownwardAPI(apiVersion string, fieldPath string) apiv1.EnvVarSource {
+	downwardENV := apiv1.EnvVarSource{
+		FieldRef: &apiv1.ObjectFieldSelector{
+			APIVersion: apiVersion,
+			FieldPath:  fieldPath,
+		},
+	}
+	return downwardENV
 }
 
 // Getenv fetch the env and set the default value, if any

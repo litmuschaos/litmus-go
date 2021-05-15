@@ -18,34 +18,34 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// PreparePromProbe contains the steps to prepare the prometheus probe
+// preparePromProbe contains the steps to prepare the prometheus probe
 // which compares the metrices output exposed at the given endpoint
-func PreparePromProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, phase string, eventsDetails *types.EventDetails) error {
+func preparePromProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, phase string, eventsDetails *types.EventDetails) error {
 
-	switch phase {
-	case "PreChaos":
-		if err := PreChaosPromProbe(probe, resultDetails, clients, chaosDetails); err != nil {
+	switch strings.ToLower(phase) {
+	case "prechaos":
+		if err := preChaosPromProbe(probe, resultDetails, clients, chaosDetails); err != nil {
 			return err
 		}
-	case "PostChaos":
-		if err := PostChaosPromProbe(probe, resultDetails, clients, chaosDetails); err != nil {
+	case "postchaos":
+		if err := postChaosPromProbe(probe, resultDetails, clients, chaosDetails); err != nil {
 			return err
 		}
-	case "DuringChaos":
-		if err := OnChaosPromProbe(probe, resultDetails, clients, chaosDetails); err != nil {
+	case "duringchaos":
+		if err := onChaosPromProbe(probe, resultDetails, clients, chaosDetails); err != nil {
 			return err
 		}
 	default:
-		return fmt.Errorf("phase '%s' not supported in the prom probe", phase)
+		return errors.Errorf("phase '%s' not supported in the prom probe", phase)
 	}
 	return nil
 }
 
-//PreChaosPromProbe trigger the prometheus probe for prechaos phase
-func PreChaosPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
+//preChaosPromProbe trigger the prometheus probe for prechaos phase
+func preChaosPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
 
-	switch probe.Mode {
-	case "SOT", "Edge":
+	switch strings.ToLower(probe.Mode) {
+	case "sot", "edge":
 
 		//DISPLAY THE PROMETHEUS PROBE INFO
 		log.InfoWithValues("[Probe]: The prometheus probe information is as follows", logrus.Fields{
@@ -65,15 +65,15 @@ func PreChaosPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resu
 		}
 
 		// triggering the prom probe and storing the output into the out buffer
-		err = TriggerPromProbe(probe, resultDetails)
+		err = triggerPromProbe(probe, resultDetails)
 
 		// failing the probe, if the success condition doesn't met after the retry & timeout combinations
 		// it will update the status of all the unrun probes as well
-		if err = MarkedVerdictInEnd(err, resultDetails, probe.Name, probe.Mode, probe.Type, "PreChaos"); err != nil {
+		if err = markedVerdictInEnd(err, resultDetails, probe.Name, probe.Mode, probe.Type, "PreChaos"); err != nil {
 			return err
 		}
 
-	case "Continuous":
+	case "continuous":
 
 		//DISPLAY THE PROMETHEUS PROBE INFO
 		log.InfoWithValues("[Probe]: The prometheus probe information is as follows", logrus.Fields{
@@ -87,17 +87,17 @@ func PreChaosPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resu
 		})
 
 		// trigger the continuous cmd probe
-		go TriggerContinuousPromProbe(probe, resultDetails)
+		go triggerContinuousPromProbe(probe, resultDetails)
 	}
 
 	return nil
 }
 
-//PostChaosPromProbe trigger the prometheus probe for postchaos phase
-func PostChaosPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
+//postChaosPromProbe trigger the prometheus probe for postchaos phase
+func postChaosPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
 
-	switch probe.Mode {
-	case "EOT", "Edge":
+	switch strings.ToLower(probe.Mode) {
+	case "eot", "edge":
 
 		//DISPLAY THE PROMETHEUS PROBE INFO
 		log.InfoWithValues("[Probe]: The prometheus probe information is as follows", logrus.Fields{
@@ -117,21 +117,21 @@ func PostChaosPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Res
 		}
 
 		// triggering the prom probe and storing the output into the out buffer
-		err = TriggerPromProbe(probe, resultDetails)
+		err = triggerPromProbe(probe, resultDetails)
 
 		// failing the probe, if the success condition doesn't met after the retry & timeout combinations
 		// it will update the status of all the unrun probes as well
-		if err = MarkedVerdictInEnd(err, resultDetails, probe.Name, probe.Mode, probe.Type, "PostChaos"); err != nil {
+		if err = markedVerdictInEnd(err, resultDetails, probe.Name, probe.Mode, probe.Type, "PostChaos"); err != nil {
 			return err
 		}
 
-	case "Continuous", "OnChaos":
+	case "continuous", "onchaos":
 
 		// it will check for the error, It will detect the error if any error encountered in probe during chaos
-		err = CheckForErrorInContinuousProbe(resultDetails, probe.Name)
+		err = checkForErrorInContinuousProbe(resultDetails, probe.Name)
 
 		// failing the probe, if the success condition doesn't met after the retry & timeout combinations
-		if err = MarkedVerdictInEnd(err, resultDetails, probe.Name, probe.Mode, probe.Type, "PostChaos"); err != nil {
+		if err = markedVerdictInEnd(err, resultDetails, probe.Name, probe.Mode, probe.Type, "PostChaos"); err != nil {
 			return err
 		}
 
@@ -139,11 +139,11 @@ func PostChaosPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Res
 	return nil
 }
 
-//OnChaosPromProbe trigger the prom probe for DuringChaos phase
-func OnChaosPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
+//onChaosPromProbe trigger the prom probe for DuringChaos phase
+func onChaosPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
 
-	switch probe.Mode {
-	case "OnChaos":
+	switch strings.ToLower(probe.Mode) {
+	case "onchaos":
 
 		//DISPLAY THE PROMETHEUS PROBE INFO
 		log.InfoWithValues("[Probe]: The prometheus probe information is as follows", logrus.Fields{
@@ -157,13 +157,13 @@ func OnChaosPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 		})
 
 		// trigger the continuous prom probe
-		go TriggerOnChaosPromProbe(probe, resultDetails, chaosDetails.ChaosDuration)
+		go triggerOnChaosPromProbe(probe, resultDetails, chaosDetails.ChaosDuration)
 	}
 	return nil
 }
 
-// TriggerPromProbe trigger the prometheus probe inside the external pod
-func TriggerPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails) error {
+// triggerPromProbe trigger the prometheus probe inside the external pod
+func triggerPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails) error {
 
 	// running the prom probe command and matching the output
 	// it will retry for some retry count, in each iterations of try it contains following things
@@ -194,7 +194,7 @@ func TriggerPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 			}
 
 			// extract the values from the metrics
-			value, err := ExtractValueFromMetrics(strings.TrimSpace(out.String()))
+			value, err := extractValueFromMetrics(strings.TrimSpace(out.String()))
 			if err != nil {
 				return err
 			}
@@ -213,8 +213,8 @@ func TriggerPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 		})
 }
 
-// TriggerContinuousPromProbe trigger the continuous prometheus probe
-func TriggerContinuousPromProbe(probe v1alpha1.ProbeAttributes, chaosresult *types.ResultDetails) {
+// triggerContinuousPromProbe trigger the continuous prometheus probe
+func triggerContinuousPromProbe(probe v1alpha1.ProbeAttributes, chaosresult *types.ResultDetails) {
 
 	// waiting for initial delay
 	if probe.RunProperties.InitialDelaySeconds != 0 {
@@ -226,7 +226,7 @@ func TriggerContinuousPromProbe(probe v1alpha1.ProbeAttributes, chaosresult *typ
 	// it marked the error for the probes, if any
 loop:
 	for {
-		err = TriggerPromProbe(probe, chaosresult)
+		err = triggerPromProbe(probe, chaosresult)
 		// record the error inside the probeDetails, we are maintaining a dedicated variable for the err, inside probeDetails
 		if err != nil {
 			for index := range chaosresult.ProbeDetails {
@@ -242,8 +242,8 @@ loop:
 	}
 }
 
-// TriggerOnChaosPromProbe trigger the onchaos prom probe
-func TriggerOnChaosPromProbe(probe v1alpha1.ProbeAttributes, chaosresult *types.ResultDetails, duration int) {
+// triggerOnChaosPromProbe trigger the onchaos prom probe
+func triggerOnChaosPromProbe(probe v1alpha1.ProbeAttributes, chaosresult *types.ResultDetails, duration int) {
 
 	// waiting for initial delay
 	if probe.RunProperties.InitialDelaySeconds != 0 {
@@ -267,7 +267,7 @@ loop:
 			break loop
 		default:
 			// record the error inside the probeDetails, we are maintaining a dedicated variable for the err, inside probeDetails
-			if err = TriggerPromProbe(probe, chaosresult); err != nil {
+			if err = triggerPromProbe(probe, chaosresult); err != nil {
 				for index := range chaosresult.ProbeDetails {
 					if chaosresult.ProbeDetails[index].Name == probe.Name {
 						chaosresult.ProbeDetails[index].IsProbeFailedWithError = err
@@ -282,8 +282,8 @@ loop:
 	}
 }
 
-// ExtractValueFromMetrics extract the value field from the prometheus metrix
-func ExtractValueFromMetrics(metrics string) (string, error) {
+// extractValueFromMetrics extract the value field from the prometheus metrix
+func extractValueFromMetrics(metrics string) (string, error) {
 
 	// spliting the metrics based on newline as metrics may have multiple entries
 	rows := strings.Split(metrics, "\n")
