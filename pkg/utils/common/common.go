@@ -12,6 +12,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	"github.com/litmuschaos/litmus-go/pkg/log"
+	"github.com/litmuschaos/litmus-go/pkg/math"
 	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/pkg/errors"
@@ -99,4 +100,21 @@ func Getenv(key string, defaultValue string) string {
 		value = defaultValue
 	}
 	return value
+}
+
+//FilterBasedOnPercentage return the slice of list based on the the provided percentage
+func FilterBasedOnPercentage(percentage int, list []string) []string {
+
+	var finalList []string
+	newInstanceListLength := math.Maximum(1, math.Adjustment(percentage, len(list)))
+	rand.Seed(time.Now().UnixNano())
+
+	// it will generate the random instanceList
+	// it starts from the random index and choose requirement no of volumeID next to that index in a circular way.
+	index := rand.Intn(len(list))
+	for i := 0; i < newInstanceListLength; i++ {
+		finalList = append(finalList, list[index])
+		index = (index + 1) % len(list)
+	}
+	return finalList
 }

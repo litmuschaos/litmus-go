@@ -119,16 +119,7 @@ func InstanceStatusCheckByID(instanceID, region string) error {
 		return errors.Errorf("no instance id found to terminate")
 	}
 	log.Infof("[Info]: The instances under chaos(IUC) are: %v", instanceIDList)
-	for _, id := range instanceIDList {
-		instanceState, err := GetEC2InstanceStatus(id, region)
-		if err != nil {
-			return err
-		}
-		if instanceState != "running" {
-			return errors.Errorf("failed to get the ec2 instance '%v' status as running", id)
-		}
-	}
-	return nil
+	return InstanceStatusCheck(instanceIDList, region)
 }
 
 //InstanceStatusCheckByTag is used to check the instance status of all the instance under chaos.
@@ -139,13 +130,19 @@ func InstanceStatusCheckByTag(instanceTag, region string) error {
 		return err
 	}
 	log.Infof("[Info]: The instances under chaos(IUC) are: %v", instanceIDList)
-	for _, id := range instanceIDList {
+	return InstanceStatusCheck(instanceIDList, region)
+}
+
+//InstanceStatusCheck is used to check the instance status of the instances
+func InstanceStatusCheck(targetInstanceIDList []string, region string) error {
+
+	for _, id := range targetInstanceIDList {
 		instanceState, err := GetEC2InstanceStatus(id, region)
 		if err != nil {
 			return err
 		}
 		if instanceState != "running" {
-			return errors.Errorf("failed to get the ec2 instance '%v' status as running", id)
+			return errors.Errorf("failed to get the ec2 instance '%v' in running sate, current state: %v", id, instanceState)
 		}
 	}
 	return nil

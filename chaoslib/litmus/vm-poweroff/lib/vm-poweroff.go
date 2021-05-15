@@ -93,7 +93,6 @@ func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, clients
 	// waiting till the abort signal recieved
 	<-abort
 
-	log.Info("[Chaos]: Killing process started because of terminated signal received")
 	log.Info("Chaos Revert Started")
 
 	//Starting the vmware VM
