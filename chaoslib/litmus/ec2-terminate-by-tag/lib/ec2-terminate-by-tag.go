@@ -1,7 +1,6 @@
 package lib
 
 import (
-	"math/rand"
 	"os"
 	"os/signal"
 	"strings"
@@ -13,7 +12,6 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/kube-aws/ec2-terminate-by-tag/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
-	"github.com/litmuschaos/litmus-go/pkg/math"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
@@ -42,7 +40,7 @@ func PrepareEC2TerminateByTag(experimentsDetails *experimentTypes.ExperimentDeta
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 
-	instanceIDList := CalculateInstanceAffPerc(experimentsDetails.InstanceAffectedPerc, experimentsDetails.TargetInstanceIDList)
+	instanceIDList := common.FilterBasedOnPercentage(experimentsDetails.InstanceAffectedPerc, experimentsDetails.TargetInstanceIDList)
 	log.Infof("[Chaos]:Number of Instance targeted: %v", len(instanceIDList))
 
 	// watching for the abort signal and revert the chaos
@@ -205,38 +203,6 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 				}
 			}
 			duration = int(time.Since(ChaosStartTimeStamp).Seconds())
-		}
-	}
-	return nil
-}
-
-//CalculateInstanceAffPerc will calculate the target instance ids according to the instance affected percentage provided.
-func CalculateInstanceAffPerc(InstanceAffPerc int, instanceList []string) []string {
-
-	var newIDList []string
-	newInstanceListLength := math.Maximum(1, math.Adjustment(InstanceAffPerc, len(instanceList)))
-	rand.Seed(time.Now().UnixNano())
-
-	// it will generate the random instanceList
-	// it starts from the random index and choose requirement no of instanceID next to that index in a circular way.
-	index := rand.Intn(len(instanceList))
-	for i := 0; i < newInstanceListLength; i++ {
-		newIDList = append(newIDList, instanceList[index])
-		index = (index + 1) % len(instanceList)
-	}
-	return newIDList
-}
-
-//PostChaosInstanceStatusCheck is used to check the instance status of the instances under chaos post chaos.
-func PostChaosInstanceStatusCheck(targetInstanceIDList []string, region string) error {
-
-	for _, id := range targetInstanceIDList {
-		instanceState, err := awslib.GetEC2InstanceStatus(id, region)
-		if err != nil {
-			return err
-		}
-		if instanceState != "running" {
-			return errors.Errorf("failed to get the ec2 instance '%v' in running sate, current state: %v", id, instanceState)
 		}
 	}
 	return nil

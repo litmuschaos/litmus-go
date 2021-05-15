@@ -129,21 +129,23 @@ func EBSLossByID(clients clients.ClientSets) {
 	}
 
 	// Including the litmus lib for ebs-loss
-	if experimentsDetails.ChaosLib == "litmus" {
+	switch experimentsDetails.ChaosLib {
+	case "litmus":
 		if err = litmusLIB.PrepareEBSLossByID(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
 			log.Errorf("Chaos injection failed, err: %v", err)
 			failStep := "failed in chaos injection phase"
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}
-		log.Info("[Confirmation]: EBS loss chaos has been injected successfully")
-		resultDetails.Verdict = "Pass"
-	} else {
+	default:
 		log.Error("[Invalid]: Please Provide the correct LIB")
 		failStep := "no match found for specified lib"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
+
+	log.Infof("[Confirmation]: %v chaos has been injected successfully", experimentsDetails.ExperimentName)
+	resultDetails.Verdict = "Pass"
 
 	//POST-CHAOS APPLICATION STATUS CHECK
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (post-chaos)")

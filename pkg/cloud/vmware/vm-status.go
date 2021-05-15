@@ -20,6 +20,9 @@ func GetVMStatus(experimentsDetails *experimentTypes.ExperimentDetails, cookie s
 
 	//Leverage Go's HTTP Post function to make request
 	req, err := http.NewRequest("GET", "https://"+experimentsDetails.VcenterServer+"/rest/vcenter/vm/"+experimentsDetails.AppVMMoid+"/power/", nil)
+	if err != nil {
+		return "", err
+	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Cookie", cookie)
 	tr := &http.Transport{
@@ -41,5 +44,4 @@ func GetVMStatus(experimentsDetails *experimentTypes.ExperimentDetails, cookie s
 	var m1 Message
 	json.Unmarshal([]byte(body), &m1)
 	return string(m1.MsgValue.StateValue), nil
-
 }

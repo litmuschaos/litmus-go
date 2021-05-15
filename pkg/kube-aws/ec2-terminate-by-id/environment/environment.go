@@ -1,47 +1,38 @@
 package environment
 
 import (
-	"os"
 	"strconv"
 
 	clientTypes "k8s.io/apimachinery/pkg/types"
 
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/kube-aws/ec2-terminate-by-id/types"
 	"github.com/litmuschaos/litmus-go/pkg/types"
+	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 )
 
 //GetENV fetches all the env variables from the runner pod
 func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
-	experimentDetails.ExperimentName = Getenv("EXPERIMENT_NAME", "ec2-terminate-by-id")
-	experimentDetails.ChaosNamespace = Getenv("CHAOS_NAMESPACE", "litmus")
-	experimentDetails.EngineName = Getenv("CHAOSENGINE", "")
-	experimentDetails.AppNS = Getenv("APP_NAMESPACE", "")
-	experimentDetails.AppLabel = Getenv("APP_LABEL", "")
-	experimentDetails.AppKind = Getenv("APP_KIND", "")
-	experimentDetails.AuxiliaryAppInfo = Getenv("AUXILIARY_APPINFO", "")
-	experimentDetails.ChaosDuration, _ = strconv.Atoi(Getenv("TOTAL_CHAOS_DURATION", "30"))
-	experimentDetails.ChaosInterval, _ = strconv.Atoi(Getenv("CHAOS_INTERVAL", "30"))
-	experimentDetails.RampTime, _ = strconv.Atoi(Getenv("RAMP_TIME", "0"))
-	experimentDetails.ChaosLib = Getenv("LIB", "litmus")
-	experimentDetails.ChaosUID = clientTypes.UID(Getenv("CHAOS_UID", ""))
-	experimentDetails.InstanceID = Getenv("INSTANCE_ID", "")
-	experimentDetails.ChaosPodName = Getenv("POD_NAME", "")
-	experimentDetails.Delay, _ = strconv.Atoi(Getenv("STATUS_CHECK_DELAY", "2"))
-	experimentDetails.Timeout, _ = strconv.Atoi(Getenv("STATUS_CHECK_TIMEOUT", "180"))
-	experimentDetails.Ec2InstanceID = Getenv("EC2_INSTANCE_ID", "")
-	experimentDetails.Region = Getenv("REGION", "")
-	experimentDetails.ManagedNodegroup = Getenv("MANAGED_NODEGROUP", "disable")
-	experimentDetails.Sequence = Getenv("SEQUENCE", "parallel")
-	experimentDetails.TargetContainer = Getenv("TARGET_CONTAINER", "")
-}
-
-// Getenv fetch the env and set the default value, if any
-func Getenv(key string, defaultValue string) string {
-	value := os.Getenv(key)
-	if value == "" {
-		value = defaultValue
-	}
-	return value
+	experimentDetails.ExperimentName = common.Getenv("EXPERIMENT_NAME", "ec2-terminate-by-id")
+	experimentDetails.ChaosNamespace = common.Getenv("CHAOS_NAMESPACE", "litmus")
+	experimentDetails.EngineName = common.Getenv("CHAOSENGINE", "")
+	experimentDetails.AppNS = common.Getenv("APP_NAMESPACE", "")
+	experimentDetails.AppLabel = common.Getenv("APP_LABEL", "")
+	experimentDetails.AppKind = common.Getenv("APP_KIND", "")
+	experimentDetails.AuxiliaryAppInfo = common.Getenv("AUXILIARY_APPINFO", "")
+	experimentDetails.ChaosDuration, _ = strconv.Atoi(common.Getenv("TOTAL_CHAOS_DURATION", "30"))
+	experimentDetails.ChaosInterval, _ = strconv.Atoi(common.Getenv("CHAOS_INTERVAL", "30"))
+	experimentDetails.RampTime, _ = strconv.Atoi(common.Getenv("RAMP_TIME", "0"))
+	experimentDetails.ChaosLib = common.Getenv("LIB", "litmus")
+	experimentDetails.ChaosUID = clientTypes.UID(common.Getenv("CHAOS_UID", ""))
+	experimentDetails.InstanceID = common.Getenv("INSTANCE_ID", "")
+	experimentDetails.ChaosPodName = common.Getenv("POD_NAME", "")
+	experimentDetails.Delay, _ = strconv.Atoi(common.Getenv("STATUS_CHECK_DELAY", "2"))
+	experimentDetails.Timeout, _ = strconv.Atoi(common.Getenv("STATUS_CHECK_TIMEOUT", "180"))
+	experimentDetails.Ec2InstanceID = common.Getenv("EC2_INSTANCE_ID", "")
+	experimentDetails.Region = common.Getenv("REGION", "")
+	experimentDetails.ManagedNodegroup = common.Getenv("MANAGED_NODEGROUP", "disable")
+	experimentDetails.Sequence = common.Getenv("SEQUENCE", "parallel")
+	experimentDetails.TargetContainer = common.Getenv("TARGET_CONTAINER", "")
 }
 
 //InitialiseChaosVariables initialise all the global variables

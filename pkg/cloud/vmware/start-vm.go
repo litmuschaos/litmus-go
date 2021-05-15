@@ -12,6 +12,9 @@ func StartVM(experimentsDetails *experimentTypes.ExperimentDetails, cookie strin
 
 	//Leverage Go's HTTP Post function to make request
 	req, err := http.NewRequest("POST", "https://"+experimentsDetails.VcenterServer+"/rest/vcenter/vm/"+experimentsDetails.AppVMMoid+"/power/start", nil)
+	if err != nil {
+		return err
+	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Cookie", cookie)
 	tr := &http.Transport{

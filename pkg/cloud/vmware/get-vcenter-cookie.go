@@ -9,7 +9,8 @@ import (
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/vmware/vm-poweroff/types"
 )
 
-type message struct {
+// Message contains attribute for message
+type Message struct {
 	MsgValue string `json:"value"`
 }
 
@@ -29,6 +30,7 @@ func GetVcenterSessionID(experimentsDetails *experimentTypes.ExperimentDetails) 
 
 	client := &http.Client{Transport: tr}
 	resp, err := client.Do(req)
+	//Handle Error
 	if err != nil {
 		return "", err
 	}
@@ -38,7 +40,7 @@ func GetVcenterSessionID(experimentsDetails *experimentTypes.ExperimentDetails) 
 	if err != nil {
 		return "", err
 	}
-	var m message
+	var m Message
 	json.Unmarshal([]byte(body), &m)
 
 	login := "vmware-api-session-id=" + m.MsgValue + ";Path=/rest;Secure;HttpOnly"

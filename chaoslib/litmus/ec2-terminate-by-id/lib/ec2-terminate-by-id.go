@@ -62,7 +62,6 @@ func PrepareEC2TerminateByID(experimentsDetails *experimentTypes.ExperimentDetai
 		}
 	default:
 		return errors.Errorf("%v sequence is not supported", experimentsDetails.Sequence)
-
 	}
 
 	//Waiting for the ramp time after chaos injection
@@ -100,8 +99,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 
 				//Stopping the EC2 instance
 				log.Info("[Chaos]: Stopping the desired EC2 instance")
-				err := awslib.EC2Stop(id, experimentsDetails.Region)
-				if err != nil {
+				if err := awslib.EC2Stop(id, experimentsDetails.Region); err != nil {
 					return errors.Errorf("ec2 instance failed to stop, err: %v", err)
 				}
 
@@ -125,8 +123,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 				//Starting the EC2 instance
 				if experimentsDetails.ManagedNodegroup != "enable" {
 					log.Info("[Chaos]: Starting back the EC2 instance")
-					err = awslib.EC2Start(id, experimentsDetails.Region)
-					if err != nil {
+					if err := awslib.EC2Start(id, experimentsDetails.Region); err != nil {
 						return errors.Errorf("ec2 instance failed to start, err: %v", err)
 					}
 
@@ -169,8 +166,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 			for _, id := range instanceIDList {
 				//Stopping the EC2 instance
 				log.Info("[Chaos]: Stopping the desired EC2 instance")
-				err := awslib.EC2Stop(id, experimentsDetails.Region)
-				if err != nil {
+				if err := awslib.EC2Stop(id, experimentsDetails.Region); err != nil {
 					return errors.Errorf("ec2 instance failed to stop, err: %v", err)
 				}
 			}
@@ -199,8 +195,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 
 				for _, id := range instanceIDList {
 					log.Info("[Chaos]: Starting back the EC2 instance")
-					err := awslib.EC2Start(id, experimentsDetails.Region)
-					if err != nil {
+					if err := awslib.EC2Start(id, experimentsDetails.Region); err != nil {
 						return errors.Errorf("ec2 instance failed to start, err: %v", err)
 					}
 				}
@@ -215,26 +210,6 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 				}
 			}
 			duration = int(time.Since(ChaosStartTimeStamp).Seconds())
-		}
-	}
-	return nil
-}
-
-//InstanceStatusCheckByID is used to check the instance status of all the instance under chaos.
-func InstanceStatusCheckByID(experimentsDetails *experimentTypes.ExperimentDetails) error {
-
-	instanceIDList := strings.Split(experimentsDetails.Ec2InstanceID, ",")
-	if len(instanceIDList) == 0 {
-		return errors.Errorf("no instance id found to terminate")
-	}
-	log.Infof("[Info]: The instances under chaos(IUC) are: %v", instanceIDList)
-	for _, id := range instanceIDList {
-		instanceState, err := awslib.GetEC2InstanceStatus(id, experimentsDetails.Region)
-		if err != nil {
-			return err
-		}
-		if instanceState != "running" {
-			return errors.Errorf("failed to get the ec2 instance '%v' status as running", id)
 		}
 	}
 	return nil
