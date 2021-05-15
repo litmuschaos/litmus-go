@@ -3,9 +3,10 @@ package vmware
 import (
 	"crypto/tls"
 	"encoding/json"
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/vmware/vm-poweroff/types"
 	"io/ioutil"
 	"net/http"
+
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/vmware/vm-poweroff/types"
 )
 
 //GetVMStatus gets the current status of Vcenter VM
@@ -18,7 +19,7 @@ func GetVMStatus(experimentsDetails *experimentTypes.ExperimentDetails, cookie s
 	}
 
 	//Leverage Go's HTTP Post function to make request
-	req, err := http.NewRequest("GET", "https://"+experimentsDetails.VcenterServer+"/rest/vcenter/vm/"+experimentsDetails.AppVmMoid+"/power/", nil)
+	req, err := http.NewRequest("GET", "https://"+experimentsDetails.VcenterServer+"/rest/vcenter/vm/"+experimentsDetails.AppVMMoid+"/power/", nil)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Cookie", cookie)
 	tr := &http.Transport{

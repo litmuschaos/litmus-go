@@ -1,6 +1,11 @@
 package lib
 
 import (
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	vmwarelib "github.com/litmuschaos/litmus-go/pkg/cloud/vmware"
 	"github.com/litmuschaos/litmus-go/pkg/events"
@@ -11,12 +16,9 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/vmware/vm-poweroff/types"
 	"github.com/pkg/errors"
-	"os"
-	"os/signal"
-	"syscall"
-	"time"
 )
 
+// InjectVMPowerOffChaos inject the vm power-off chaos
 func InjectVMPowerOffChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, cookie string) error {
 
 	var err error
@@ -33,7 +35,7 @@ func InjectVMPowerOffChaos(experimentsDetails *experimentTypes.ExperimentDetails
 		events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 	}
 
-	if experimentsDetails.AppVmMoid == "" {
+	if experimentsDetails.AppVMMoid == "" {
 		return errors.Errorf("VM Moid not found to terminate vm instance")
 	}
 
