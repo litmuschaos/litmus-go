@@ -105,6 +105,15 @@ func GetTargetContainer(appNamespace, appName string, clients clients.ClientSets
 
 }
 
+// Getenv fetch the env and set the default value, if any
+func Getenv(key string, defaultValue string) string {
+	value := os.Getenv(key)
+	if value == "" {
+		value = defaultValue
+	}
+	return value
+}
+
 //CalculateVolumeAffPerc will calculate the target volume ids according to the volume affected percentage provided.
 func CalculateVolumeAffPerc(volumeAffPerc int, volumeList []string) []string {
 
