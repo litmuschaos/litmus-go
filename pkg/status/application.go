@@ -271,3 +271,33 @@ func WaitForCompletion(appNs, appLabel string, clients clients.ClientSets, durat
 	}
 	return podStatus, err
 }
+
+// CheckHelperStatus checks the status of the helper pod
+// and wait until the helper pod comes to one of the {running,completed} states
+func CheckHelperStatus(appNs, appLabel string, timeout, delay int, clients clients.ClientSets) error {
+
+	return retry.
+		Times(uint(timeout / delay)).
+		Wait(time.Duration(delay) * time.Second).
+		Try(func(attempt uint) error {
+			podList, err := clients.KubeClient.CoreV1().Pods(appNs).List(metav1.ListOptions{LabelSelector: appLabel})
+			if err != nil || len(podList.Items) == 0 {
+				return errors.Errorf("unable to find the pods with matching labels, err: %v", err)
+			}
+			for _, pod := range podList.Items {
+				podStatus := string(pod.Status.Phase)
+				switch strings.ToLower(podStatus) {
+				case "running", "succeeded":
+					log.Infof("%v helper pod is in %v state", pod.Name, podStatus)
+				default:
+					return errors.Errorf("%v pod is in %v state", pod.Name, podStatus)
+				}
+				for _, container := range pod.Status.ContainerStatuses {
+					if container.State.Terminated != nil && container.State.Terminated.Reason != "Completed" {
+						return errors.Errorf("container is terminated with %v reason", container.State.Terminated.Reason)
+					}
+				}
+			}
+			return nil
+		})
+}

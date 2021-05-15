@@ -9,6 +9,7 @@ type ExperimentDetails struct {
 	ExperimentName     string
 	EngineName         string
 	ChaosDuration      int
+	ChaosInterval      int
 	RampTime           int
 	ChaosLib           string
 	AppNS              string
@@ -22,10 +23,12 @@ type ExperimentDetails struct {
 	RunID              string
 	Timeout            int
 	Delay              int
-	Ec2InstanceID      string
-	EBSVolumeID        string
-	DeviceName         string
+	Sequence           string
+	VolumeTag          string
 	Region             string
 	LIBImagePullPolicy string
 	TargetContainer    string
+	VolumeAffectedPerc int
+	EBSVolumeID        string
+	TargetVolumeIDList []string
 }

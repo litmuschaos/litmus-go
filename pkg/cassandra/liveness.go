@@ -17,40 +17,37 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
 	appsv1 "k8s.io/api/apps/v1"
 	apiv1 "k8s.io/api/core/v1"
-	corev1 "k8s.io/api/core/v1"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // LivenessCheck will create an external liveness pod which will continuously check for the liveness of cassandra statefulset
 func LivenessCheck(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) (string, error) {
-	var err error
 
 	// Generate the run_id for the liveness pod
 	experimentsDetails.RunID = common.GetRunID()
 
 	// Creating liveness deployment
-	err = CreateLivenessPod(experimentsDetails, clients)
-	if err != nil {
+	if err := CreateLivenessPod(experimentsDetails, clients); err != nil {
 		return "", err
 	}
 
 	// Creating liveness service
-	err = CreateLivenessService(experimentsDetails, clients)
-	if err != nil {
+	if err := CreateLivenessService(experimentsDetails, clients); err != nil {
 		return "", err
 	}
 
 	// Checking the status of liveness deployment pod
 	log.Info("[Status]: Checking the status of the cassandra liveness pod")
 	// Record cassandra liveness pod resource version
-	if err = status.CheckApplicationStatus(experimentsDetails.ChaoslibDetail.AppNS, "name=cassandra-liveness-deploy-"+experimentsDetails.RunID, experimentsDetails.ChaoslibDetail.Timeout, experimentsDetails.ChaoslibDetail.Delay, clients); err != nil {
-		return "", errors.Errorf("Liveness pod is not in running state, err: %v", err)
+	if err := status.CheckApplicationStatus(experimentsDetails.ChaoslibDetail.AppNS, "name=cassandra-liveness-deploy-"+experimentsDetails.RunID, experimentsDetails.ChaoslibDetail.Timeout, experimentsDetails.ChaoslibDetail.Delay, clients); err != nil {
+		return "", errors.Errorf("liveness pod is not in running state, err: %v", err)
 	}
 
 	// Record cassandra liveness pod resource version
 	ResourceVersionBefore, err := GetLivenessPodResourceVersion(experimentsDetails, clients)
 	if err != nil {
-		return ResourceVersionBefore, errors.Errorf("Failed to get the pod resource version, err: %v", err)
+		return ResourceVersionBefore, errors.Errorf("failed to get the pod resource version, err: %v", err)
 	}
 
 	return ResourceVersionBefore, nil
@@ -64,13 +61,13 @@ func LivenessCleanup(experimentsDetails *experimentTypes.ExperimentDetails, clie
 	log.Info("[CleanUP]: Getting ClusterIP of liveness service")
 	ClusterIP, err := GetServiceClusterIP(experimentsDetails, clients)
 	if err != nil {
-		return errors.Errorf("Failed to get the ClusterIP of liveness service, err: %v", err)
+		return errors.Errorf("failed to get the ClusterIP of liveness service, err: %v", err)
 	}
 
 	// Record cassandra liveness pod resource version after chaos
 	ResourceVersionAfter, err := GetLivenessPodResourceVersion(experimentsDetails, clients)
 	if err != nil {
-		return errors.Errorf("Failed to get the pod resource version, err: %v", err)
+		return errors.Errorf("failed to get the pod resource version, err: %v", err)
 	}
 
 	if err = ResourceVersionCheck(ResourceVersionBefore, ResourceVersionAfter); err != nil {
@@ -82,13 +79,13 @@ func LivenessCleanup(experimentsDetails *experimentTypes.ExperimentDetails, clie
 	}
 
 	if err = DeleteLivenessDeployment(experimentsDetails, clients); err != nil {
-		return errors.Errorf("Liveness deployment deletion failed, err: %v", err)
+		return errors.Errorf("liveness deployment deletion failed, err: %v", err)
 	}
 
 	log.Info("[Cleanup]: Cassandra liveness deployment has been deleted successfully")
 
 	if err = DeleteLivenessService(experimentsDetails, clients); err != nil {
-		return errors.Errorf("Liveness service deletion failed, err: %v", err)
+		return errors.Errorf("liveness service deletion failed, err: %v", err)
 	}
 
 	log.Info("[Cleanup]: Cassandra liveness service has been deleted successfully")
@@ -101,7 +98,7 @@ func GetLivenessPodResourceVersion(experimentsDetails *experimentTypes.Experimen
 
 	livenessPods, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaoslibDetail.AppNS).List(metav1.ListOptions{LabelSelector: "name=cassandra-liveness-deploy-" + experimentsDetails.RunID})
 	if err != nil || len(livenessPods.Items) == 0 {
-		return "", errors.Errorf("Unable to get the liveness pod, err: %v", err)
+		return "", errors.Errorf("unable to get the liveness pod, err: %v", err)
 	}
 	ResourceVersion := livenessPods.Items[0].ResourceVersion
 
@@ -133,12 +130,12 @@ func WaitTillCycleComplete(experimentsDetails *experimentTypes.ExperimentDetails
 		Try(func(attempt uint) error {
 			response, err := http.Get(URL)
 			if err != nil {
-				return errors.Errorf("The HTTP request failed with error %s", err)
+				return errors.Errorf("the HTTP request failed with error %s", err)
 			}
 			data, _ := ioutil.ReadAll(response.Body)
 			if !strings.Contains(string(data), "CycleComplete") {
 				log.Info("[Verification]: Wait for liveness pod to come in CycleComplete state")
-				return errors.Errorf("Livenss pod is not in completed state")
+				return errors.Errorf("livenss pod is not in completed state")
 			}
 			log.Info("Liveness pod comes to CycleComplete state")
 			return nil
@@ -149,7 +146,7 @@ func WaitTillCycleComplete(experimentsDetails *experimentTypes.ExperimentDetails
 func ResourceVersionCheck(ResourceVersionBefore, ResourceVersionAfter string) error {
 
 	if ResourceVersionBefore != ResourceVersionAfter {
-		return errors.Errorf("Resource Version Check failed, Resource version remains same")
+		return errors.Errorf("resource version check failed, Resource version remains same")
 	}
 	log.Info("The cassandra cluster is active")
 
@@ -171,7 +168,7 @@ func DeleteLivenessDeployment(experimentsDetails *experimentTypes.ExperimentDeta
 		Try(func(attempt uint) error {
 			podSpec, err := clients.KubeClient.AppsV1().Deployments(experimentsDetails.ChaoslibDetail.AppNS).List(metav1.ListOptions{LabelSelector: "name=cassandra-liveness-deploy-" + experimentsDetails.RunID})
 			if err != nil || len(podSpec.Items) != 0 {
-				return errors.Errorf("Liveness deployment is not deleted yet, err: %v", err)
+				return errors.Errorf("liveness deployment is not deleted yet, err: %v", err)
 			}
 			return nil
 		})
@@ -184,7 +181,7 @@ func DeleteLivenessService(experimentsDetails *experimentTypes.ExperimentDetails
 	if err := clients.KubeClient.CoreV1().Services(experimentsDetails.ChaoslibDetail.AppNS).Delete("cassandra-liveness-service-"+experimentsDetails.RunID, &metav1.DeleteOptions{
 		PropagationPolicy: &deletePolicy,
 	}); err != nil {
-		return errors.Errorf("Fail to delete liveness service, err: %v", err)
+		return errors.Errorf("fail to delete liveness service, err: %v", err)
 	}
 	return retry.
 		Times(uint(experimentsDetails.ChaoslibDetail.Timeout / experimentsDetails.ChaoslibDetail.Delay)).
@@ -192,7 +189,7 @@ func DeleteLivenessService(experimentsDetails *experimentTypes.ExperimentDetails
 		Try(func(attempt uint) error {
 			svc, err := clients.KubeClient.CoreV1().Services(experimentsDetails.ChaoslibDetail.AppNS).List(metav1.ListOptions{LabelSelector: "name=cassandra-liveness-service-" + experimentsDetails.RunID})
 			if err != nil || len(svc.Items) != 0 {
-				return errors.Errorf("Liveness service is not deleted yet, err: %v", err)
+				return errors.Errorf("liveness service is not deleted yet, err: %v", err)
 			}
 			return nil
 		})
@@ -336,7 +333,7 @@ func CreateLivenessPod(experimentsDetails *experimentTypes.ExperimentDetails, cl
 // CreateLivenessService will create Cassandra liveness service
 func CreateLivenessService(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) error {
 	// Create resource object
-	livenessSvc := &corev1.Service{
+	livenessSvc := &apiv1.Service{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Service",
 			APIVersion: "v1",
@@ -347,11 +344,11 @@ func CreateLivenessService(experimentsDetails *experimentTypes.ExperimentDetails
 				"name": "cassandra-liveness-service-" + experimentsDetails.RunID,
 			},
 		},
-		Spec: corev1.ServiceSpec{
-			Ports: []corev1.ServicePort{
+		Spec: apiv1.ServiceSpec{
+			Ports: []apiv1.ServicePort{
 				{
 					Name:     "liveness",
-					Protocol: corev1.Protocol("TCP"),
+					Protocol: apiv1.Protocol("TCP"),
 					Port:     int32(experimentsDetails.LivenessServicePort),
 				},
 			},

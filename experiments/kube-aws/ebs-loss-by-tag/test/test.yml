@@ -13,7 +13,7 @@ spec:
       labels:
         app: litmus-experiment
     spec:
-      serviceAccountName: ebs-loss-sa
+      serviceAccountName: ebs-loss-by-tag-sa
       containers:
       - name: gotest
         image: busybox
@@ -31,20 +31,17 @@ spec:
             value: 'deployment'
 
           - name: TOTAL_CHAOS_DURATION
-            value: '60'
+            value: '30'
+
+          - name: CHOAS_INTERVAL
+            value: '30'            
 
           - name: LIB
             value: 'litmus'
 
-          - name: EC2_INSTANCE_ID
+          - name: EBS_VOLUME_TAG
             value: ''
-
-          - name: EBS_VOL_ID
-            value: ''
-
-          - name: DEVICE_NAME
-            value: '/dev/sdf'
-
+            
           - name: CHAOS_NAMESPACE
             value: 'default'
 

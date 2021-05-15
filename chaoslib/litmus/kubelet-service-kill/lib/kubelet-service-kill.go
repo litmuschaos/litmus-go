@@ -48,35 +48,21 @@ func PrepareKubeletKill(experimentsDetails *experimentTypes.ExperimentDetails, c
 	}
 
 	if experimentsDetails.EngineName != "" {
-		// Get Chaos Pod Annotation
-		experimentsDetails.Annotations, err = common.GetChaosPodAnnotation(experimentsDetails.ChaosPodName, experimentsDetails.ChaosNamespace, clients)
-		if err != nil {
-			return errors.Errorf("unable to get annotations, err: %v", err)
-		}
-		// Get Resource Requirements
-		experimentsDetails.Resources, err = common.GetChaosPodResourceRequirements(experimentsDetails.ChaosPodName, experimentsDetails.ExperimentName, experimentsDetails.ChaosNamespace, clients)
-		if err != nil {
-			return errors.Errorf("Unable to get resource requirements, err: %v", err)
-		}
-		// Get ImagePullSecrets
-		experimentsDetails.ImagePullSecrets, err = common.GetImagePullSecrets(experimentsDetails.ChaosPodName, experimentsDetails.ChaosNamespace, clients)
-		if err != nil {
-			return errors.Errorf("Unable to get imagePullSecrets, err: %v", err)
+		if err := setHelperData(experimentsDetails, clients); err != nil {
+			return err
 		}
 	}
 
 	// Creating the helper pod to perform node memory hog
-	err = CreateHelperPod(experimentsDetails, clients, experimentsDetails.TargetNode)
-	if err != nil {
-		return errors.Errorf("Unable to create the helper pod, err: %v", err)
+	if err = createHelperPod(experimentsDetails, clients, experimentsDetails.TargetNode); err != nil {
+		return errors.Errorf("unable to create the helper pod, err: %v", err)
 	}
 
 	appLabel := "name=" + experimentsDetails.ExperimentName + "-helper-" + experimentsDetails.RunID
 
 	//Checking the status of helper pod
 	log.Info("[Status]: Checking the status of the helper pod")
-	err = status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, appLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
-	if err != nil {
+	if err = status.CheckHelperStatus(experimentsDetails.ChaosNamespace, appLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
 		common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-helper-"+experimentsDetails.RunID, appLabel, chaosDetails, clients)
 		return errors.Errorf("helper pod is not in running state, err: %v", err)
 	}
@@ -91,8 +77,7 @@ func PrepareKubeletKill(experimentsDetails *experimentTypes.ExperimentDetails, c
 
 	// Checking for the node to be in not-ready state
 	log.Info("[Status]: Check for the node to be in NotReady state")
-	err = status.CheckNodeNotReadyState(experimentsDetails.TargetNode, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
-	if err != nil {
+	if err = status.CheckNodeNotReadyState(experimentsDetails.TargetNode, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
 		common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-helper-"+experimentsDetails.RunID, appLabel, chaosDetails, clients)
 		return errors.Errorf("application node is not in NotReady state, err: %v", err)
 	}
@@ -108,17 +93,15 @@ func PrepareKubeletKill(experimentsDetails *experimentTypes.ExperimentDetails, c
 
 	// Checking the status of target nodes
 	log.Info("[Status]: Getting the status of target nodes")
-	err = status.CheckNodeStatus(experimentsDetails.TargetNode, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
-	if err != nil {
+	if err = status.CheckNodeStatus(experimentsDetails.TargetNode, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
 		common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-helper-"+experimentsDetails.RunID, appLabel, chaosDetails, clients)
 		log.Warnf("Target nodes are not in the ready state, you may need to manually recover the node, err: %v", err)
 	}
 
 	//Deleting the helper pod
 	log.Info("[Cleanup]: Deleting the helper pod")
-	err = common.DeletePod(experimentsDetails.ExperimentName+"-helper-"+experimentsDetails.RunID, appLabel, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients)
-	if err != nil {
-		return errors.Errorf("Unable to delete the helper pod, err: %v", err)
+	if err = common.DeletePod(experimentsDetails.ExperimentName+"-helper-"+experimentsDetails.RunID, appLabel, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients); err != nil {
+		return errors.Errorf("unable to delete the helper pod, err: %v", err)
 	}
 
 	//Waiting for the ramp time after chaos injection
@@ -129,8 +112,8 @@ func PrepareKubeletKill(experimentsDetails *experimentTypes.ExperimentDetails, c
 	return nil
 }
 
-// CreateHelperPod derive the attributes for helper pod and create the helper pod
-func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, appNodeName string) error {
+// createHelperPod derive the attributes for helper pod and create the helper pod
+func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, appNodeName string) error {
 
 	privileged := true
 	helperPod := &apiv1.Pod{
@@ -201,4 +184,26 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 
 	_, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Create(helperPod)
 	return err
+}
+
+// setHelperData derive the data from experiment pod and sets into experimentDetails struct
+// which can be used to create helper pod
+func setHelperData(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) error {
+	// Get Chaos Pod Annotation
+	var err error
+	experimentsDetails.Annotations, err = common.GetChaosPodAnnotation(experimentsDetails.ChaosPodName, experimentsDetails.ChaosNamespace, clients)
+	if err != nil {
+		return errors.Errorf("unable to get annotations, err: %v", err)
+	}
+	// Get Resource Requirements
+	experimentsDetails.Resources, err = common.GetChaosPodResourceRequirements(experimentsDetails.ChaosPodName, experimentsDetails.ExperimentName, experimentsDetails.ChaosNamespace, clients)
+	if err != nil {
+		return errors.Errorf("unable to get resource requirements, err: %v", err)
+	}
+	// Get ImagePullSecrets
+	experimentsDetails.ImagePullSecrets, err = common.GetImagePullSecrets(experimentsDetails.ChaosPodName, experimentsDetails.ChaosNamespace, clients)
+	if err != nil {
+		return errors.Errorf("unable to get imagePullSecrets, err: %v", err)
+	}
+	return nil
 }
