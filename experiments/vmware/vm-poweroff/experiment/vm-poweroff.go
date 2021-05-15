@@ -12,11 +12,11 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	experimentEnv "github.com/litmuschaos/litmus-go/pkg/vmware/vm-poweroff/environment"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/vmware/vm-poweroff/types"
-	//"github.com/pkg/errors"
+
 	"github.com/sirupsen/logrus"
 )
 
-// Experiment contains steps to inject chaos
+// VMPoweroff contains steps to inject vm-power-off chaos
 func VMPoweroff(clients clients.ClientSets) {
 
 	var err error
@@ -63,7 +63,7 @@ func VMPoweroff(clients clients.ClientSets) {
 
 	//DISPLAY THE INSTANCE INFORMATION
 	log.InfoWithValues("[Info]: The Instance information is as follows", logrus.Fields{
-		"VM_INSTANCE_MOID": experimentsDetails.AppVmMoid,
+		"VM_INSTANCE_MOID": experimentsDetails.AppVMMoid,
 		"Ramp Time":        experimentsDetails.RampTime,
 	})
 
