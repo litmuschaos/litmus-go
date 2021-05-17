@@ -43,7 +43,7 @@ func EC2Stop(instanceID, region string) error {
 		}
 	}
 
-	log.InfoWithValues("Stopping an ec2 instance:", logrus.Fields{
+	log.InfoWithValues("Stopping ec2 instance:", logrus.Fields{
 		"CurrentState":  *result.StoppingInstances[0].CurrentState.Name,
 		"PreviousState": *result.StoppingInstances[0].PreviousState.Name,
 		"InstanceId":    *result.StoppingInstances[0].InstanceId,
@@ -95,7 +95,7 @@ func EC2Start(instanceID, region string) error {
 func WaitForEC2Down(timeout, delay int, managedNodegroup, region, instanceID string) error {
 
 	log.Info("[Status]: Checking EC2 instance status")
-	err := retry.
+	return retry.
 		Times(uint(timeout / delay)).
 		Wait(time.Duration(delay) * time.Second).
 		Try(func(attempt uint) error {
@@ -111,17 +111,13 @@ func WaitForEC2Down(timeout, delay int, managedNodegroup, region, instanceID str
 			log.Infof("The instance state is %v", instanceState)
 			return nil
 		})
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
 //WaitForEC2Up will wait for the ec2 instance to get in running state
 func WaitForEC2Up(timeout, delay int, managedNodegroup, region, instanceID string) error {
 
 	log.Info("[Status]: Checking EC2 instance status")
-	err := retry.
+	return retry.
 		Times(uint(timeout / delay)).
 		Wait(time.Duration(delay) * time.Second).
 		Try(func(attempt uint) error {
@@ -137,10 +133,7 @@ func WaitForEC2Up(timeout, delay int, managedNodegroup, region, instanceID strin
 			log.Infof("The instance state is %v", instanceState)
 			return nil
 		})
-	if err != nil {
-		return err
-	}
-	return nil
+
 }
 
 //GetInstanceList will filter out the target instance under chaos using tag filters or the instance list provided.
@@ -160,7 +153,7 @@ func GetInstanceList(instanceTag, region string) ([]string, error) {
 
 		params := &ec2.DescribeInstancesInput{
 			Filters: []*ec2.Filter{
-				&ec2.Filter{
+				{
 					Name: aws.String("tag:" + instanceTag[0]),
 					Values: []*string{
 						aws.String(instanceTag[1]),
