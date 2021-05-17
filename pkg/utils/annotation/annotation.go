@@ -37,7 +37,7 @@ func IsParentAnnotated(clients clients.ClientSets, parentName string, chaosDetai
 		if ds.ObjectMeta.Annotations[chaosDetails.AppDetail.AnnotationKey] == chaosDetails.AppDetail.AnnotationValue {
 			return true, nil
 		}
-	case "deploymentconfig", "deploymentconfigs":
+	case "deploymentconfig":
 		gvrdc := schema.GroupVersionResource{
 			Group:    "apps.openshift.io",
 			Version:  "v1",
@@ -51,7 +51,7 @@ func IsParentAnnotated(clients clients.ClientSets, parentName string, chaosDetai
 		if annotations[chaosDetails.AppDetail.AnnotationKey] == chaosDetails.AppDetail.AnnotationValue {
 			return true, nil
 		}
-	case "rollout", "rollouts":
+	case "rollout":
 		gvrro := schema.GroupVersionResource{
 			Group:    "argoproj.io",
 			Version:  "v1alpha1",

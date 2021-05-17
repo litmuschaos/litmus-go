@@ -29,6 +29,7 @@ type ExperimentDetails struct {
 	PodsAffectedPerc              int
 	Annotations                   map[string]string
 	TargetHostNames               string
+	SpoofMap                      string
 	MatchScheme                   string
 	ChaosType                     string
 	ContainerRuntime              string

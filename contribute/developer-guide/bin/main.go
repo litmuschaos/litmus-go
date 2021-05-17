@@ -57,6 +57,8 @@ func main() {
 
 	experiment.Flags().StringVarP(&filePath, "file", "f", "", "path of the attribute.yaml manifest")
 	chart.Flags().StringVarP(&filePath, "file", "f", "", "path of the attribute.yaml manifest")
+	chart.MarkFlagRequired("file")
+	experiment.MarkFlagRequired("file")
 
 	var rootCmd = &cobra.Command{Use: "litmus-sdk"}
 	generate.AddCommand(experiment)

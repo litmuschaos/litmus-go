@@ -35,8 +35,8 @@ func ChaosResult(chaosDetails *types.ChaosDetails, clients clients.ClientSets, r
 		Wait(2 * time.Second).
 		Try(func(attempt uint) error {
 			result, err := clients.LitmusClient.ChaosResults(chaosDetails.ChaosNamespace).List(metav1.ListOptions{LabelSelector: "name=" + resultDetails.Name})
-			if err != nil {
-				return errors.Errorf("Unable to find the chaosresult with matching labels, err: %v", err)
+			if err != nil && len(result.Items) == 0 {
+				return errors.Errorf("unable to find the chaosresult with matching labels, err: %v", err)
 			}
 			resultList = result
 			return nil
@@ -64,20 +64,16 @@ func ChaosResult(chaosDetails *types.ChaosDetails, clients clients.ClientSets, r
 		return InitializeChaosResult(chaosDetails, clients, resultDetails, experimentLabel)
 	}
 
-	for _, result := range resultList.Items {
-
-		// the chaos-result is already present with matching labels
-		// it will patch the new parameters in the same chaos-result
-		if state == "SOT" {
-			updateHistory(&result)
-			return PatchChaosResult(&result, clients, chaosDetails, resultDetails, experimentLabel)
-		}
-
-		// it will patch the chaos-result in the end of experiment
-		resultDetails.Phase = "Completed"
-		return PatchChaosResult(&result, clients, chaosDetails, resultDetails, experimentLabel)
+	// the chaos-result is already present with matching labels
+	// it will patch the new parameters in the same chaos-result
+	if state == "SOT" {
+		updateHistory(&resultList.Items[0])
+		return PatchChaosResult(&resultList.Items[0], clients, chaosDetails, resultDetails, experimentLabel)
 	}
-	return nil
+
+	// it will patch the chaos-result in the end of experiment
+	resultDetails.Phase = "Completed"
+	return PatchChaosResult(&resultList.Items[0], clients, chaosDetails, resultDetails, experimentLabel)
 }
 
 //InitializeChaosResult create the chaos result

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"html/template"
-	"os"
 	"strings"
 
 	"github.com/kyokomi/emoji"
@@ -24,7 +23,7 @@ var err error
 func RunProbes(chaosDetails *types.ChaosDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, phase string, eventsDetails *types.EventDetails) error {
 
 	// get the probes details from the chaosengine
-	probes, err := GetProbesFromEngine(chaosDetails, clients)
+	probes, err := getProbesFromEngine(chaosDetails, clients)
 	if err != nil {
 		return err
 	}
@@ -38,22 +37,22 @@ func RunProbes(chaosDetails *types.ChaosDetails, clients clients.ClientSets, res
 			switch strings.ToLower(probe.Type) {
 			case "k8sprobe":
 				// it contains steps to prepare the k8s probe
-				if err = PrepareK8sProbe(probe, resultDetails, clients, phase, eventsDetails, chaosDetails); err != nil {
+				if err = prepareK8sProbe(probe, resultDetails, clients, phase, eventsDetails, chaosDetails); err != nil {
 					probeError = append(probeError, err)
 				}
 			case "cmdprobe":
 				// it contains steps to prepare cmd probe
-				if err = PrepareCmdProbe(probe, clients, chaosDetails, resultDetails, phase, eventsDetails); err != nil {
+				if err = prepareCmdProbe(probe, clients, chaosDetails, resultDetails, phase, eventsDetails); err != nil {
 					probeError = append(probeError, err)
 				}
 			case "httpprobe":
 				// it contains steps to prepare http probe
-				if err = PrepareHTTPProbe(probe, clients, chaosDetails, resultDetails, phase, eventsDetails); err != nil {
+				if err = prepareHTTPProbe(probe, clients, chaosDetails, resultDetails, phase, eventsDetails); err != nil {
 					probeError = append(probeError, err)
 				}
 			case "promprobe":
 				// it contains steps to prepare prom probe
-				if err = PreparePromProbe(probe, clients, chaosDetails, resultDetails, phase, eventsDetails); err != nil {
+				if err = preparePromProbe(probe, clients, chaosDetails, resultDetails, phase, eventsDetails); err != nil {
 					probeError = append(probeError, err)
 				}
 			default:
@@ -68,16 +67,16 @@ func RunProbes(chaosDetails *types.ChaosDetails, clients clients.ClientSets, res
 	return nil
 }
 
-//SetProbeVerdict mark the verdict of the probe in the chaosresult as passed
+//setProbeVerdict mark the verdict of the probe in the chaosresult as passed
 // on the basis of phase(pre/post chaos)
-func SetProbeVerdict(resultDetails *types.ResultDetails, verdict, probeName, probeType, mode, phase string) {
+func setProbeVerdict(resultDetails *types.ResultDetails, verdict, probeName, probeType, mode, phase string) {
 
 	for index, probe := range resultDetails.ProbeDetails {
 		if probe.Name == probeName && probe.Type == probeType {
-			switch mode {
-			case "SOT", "EOT", "Edge":
+			switch strings.ToLower(mode) {
+			case "sot", "edge", "eot":
 				resultDetails.ProbeDetails[index].Status[phase] = verdict + emoji.Sprint(" :thumbsup:")
-			case "Continuous", "OnChaos":
+			case "continuous", "onchaos":
 				resultDetails.ProbeDetails[index].Status[mode] = verdict + emoji.Sprint(" :thumbsup:")
 			}
 		}
@@ -95,8 +94,8 @@ func SetProbeVerdictAfterFailure(resultDetails *types.ResultDetails) {
 	}
 }
 
-// GetProbesFromEngine fetch the details of the probes from the chaosengines
-func GetProbesFromEngine(chaosDetails *types.ChaosDetails, clients clients.ClientSets) ([]v1alpha1.ProbeAttributes, error) {
+// getProbesFromEngine fetch the details of the probes from the chaosengines
+func getProbesFromEngine(chaosDetails *types.ChaosDetails, clients clients.ClientSets) ([]v1alpha1.ProbeAttributes, error) {
 
 	var Probes []v1alpha1.ProbeAttributes
 
@@ -124,7 +123,7 @@ func InitializeProbesInChaosResultDetails(chaosDetails *types.ChaosDetails, clie
 
 	probeDetails := []types.ProbeDetails{}
 	// get the probes from the chaosengine
-	probes, err := GetProbesFromEngine(chaosDetails, clients)
+	probes, err := getProbesFromEngine(chaosDetails, clients)
 	if err != nil {
 		return err
 	}
@@ -135,7 +134,7 @@ func InitializeProbesInChaosResultDetails(chaosDetails *types.ChaosDetails, clie
 		tempProbe.Name = probe.Name
 		tempProbe.Type = probe.Type
 		tempProbe.RunCount = 0
-		SetProbeInitialStatus(&tempProbe, probe.Mode)
+		setProbeInitialStatus(&tempProbe, probe.Mode)
 		probeDetails = append(probeDetails, tempProbe)
 	}
 
@@ -155,36 +154,36 @@ func getAndIncrementRunCount(resultDetails *types.ResultDetails, probeName strin
 	return 0
 }
 
-//SetProbeInitialStatus sets the initial status inside chaosresult
-func SetProbeInitialStatus(probeDetails *types.ProbeDetails, mode string) {
-	switch mode {
-	case "SOT":
+//setProbeInitialStatus sets the initial status inside chaosresult
+func setProbeInitialStatus(probeDetails *types.ProbeDetails, mode string) {
+	switch strings.ToLower(mode) {
+	case "sot":
 		probeDetails.Status = map[string]string{
 			"PreChaos": "Awaited",
 		}
-	case "EOT":
+	case "eot":
 		probeDetails.Status = map[string]string{
 			"PostChaos": "Awaited",
 		}
-	case "Edge":
+	case "edge":
 		probeDetails.Status = map[string]string{
 			"PreChaos":  "Awaited",
 			"PostChaos": "Awaited",
 		}
-	case "Continuous":
+	case "continuous":
 		probeDetails.Status = map[string]string{
 			"Continuous": "Awaited",
 		}
-	case "OnChaos":
+	case "onchaos":
 		probeDetails.Status = map[string]string{
 			"OnChaos": "Awaited",
 		}
 	}
 }
 
-//GetRunIDFromProbe return the run_id for the dedicated probe
+//getRunIDFromProbe return the run_id for the dedicated probe
 // which will used in the continuous cmd probe, run_id is used as suffix in the external pod name
-func GetRunIDFromProbe(resultDetails *types.ResultDetails, probeName, probeType string) string {
+func getRunIDFromProbe(resultDetails *types.ResultDetails, probeName, probeType string) string {
 
 	for _, probe := range resultDetails.ProbeDetails {
 		if probe.Name == probeName && probe.Type == probeType {
@@ -194,9 +193,9 @@ func GetRunIDFromProbe(resultDetails *types.ResultDetails, probeName, probeType 
 	return ""
 }
 
-//SetRunIDForProbe set the run_id for the dedicated probe.
+//setRunIDForProbe set the run_id for the dedicated probe.
 // which will used in the continuous cmd probe, run_id is used as suffix in the external pod name
-func SetRunIDForProbe(resultDetails *types.ResultDetails, probeName, probeType, runid string) {
+func setRunIDForProbe(resultDetails *types.ResultDetails, probeName, probeType, runid string) {
 
 	for index, probe := range resultDetails.ProbeDetails {
 		if probe.Name == probeName && probe.Type == probeType {
@@ -206,8 +205,8 @@ func SetRunIDForProbe(resultDetails *types.ResultDetails, probeName, probeType, 
 	}
 }
 
-// MarkedVerdictInEnd add the probe status in the chaosresult
-func MarkedVerdictInEnd(err error, resultDetails *types.ResultDetails, probeName, mode, probeType, phase string) error {
+// markedVerdictInEnd add the probe status in the chaosresult
+func markedVerdictInEnd(err error, resultDetails *types.ResultDetails, probeName, mode, probeType, phase string) error {
 	// failing the probe, if the success condition doesn't met after the retry & timeout combinations
 	if err != nil {
 		log.ErrorWithValues("[Probe]: "+probeName+" probe has been Failed "+emoji.Sprint(":cry:"), logrus.Fields{
@@ -221,12 +220,12 @@ func MarkedVerdictInEnd(err error, resultDetails *types.ResultDetails, probeName
 
 	// counting the passed probes count to generate the score and mark the verdict as passed
 	// for edge, probe is marked as Passed if passed in both pre/post chaos checks
-	switch mode {
-	case "Edge", "Continuous":
+	switch strings.ToLower(mode) {
+	case "edge", "continuous":
 		if phase != "PreChaos" {
 			resultDetails.PassedProbeCount++
 		}
-	case "OnChaos":
+	case "onchaos":
 		if phase != "DuringChaos" {
 			resultDetails.PassedProbeCount++
 		}
@@ -239,12 +238,12 @@ func MarkedVerdictInEnd(err error, resultDetails *types.ResultDetails, probeName
 		"ProbeInstance": phase,
 		"ProbeStatus":   "Passed",
 	})
-	SetProbeVerdict(resultDetails, "Passed", probeName, probeType, mode, phase)
+	setProbeVerdict(resultDetails, "Passed", probeName, probeType, mode, phase)
 	return nil
 }
 
 //CheckForErrorInContinuousProbe check for the error in the continuous probes
-func CheckForErrorInContinuousProbe(resultDetails *types.ResultDetails, probeName string) error {
+func checkForErrorInContinuousProbe(resultDetails *types.ResultDetails, probeName string) error {
 
 	for index, probe := range resultDetails.ProbeDetails {
 		if probe.Name == probeName {
@@ -256,7 +255,7 @@ func CheckForErrorInContinuousProbe(resultDetails *types.ResultDetails, probeNam
 
 // ParseCommand parse the templated command and replace the templated value by actual value
 // if command doesn't have template, it will return the same command
-func ParseCommand(templatedCommand string, resultDetails *types.ResultDetails) (string, error) {
+func parseCommand(templatedCommand string, resultDetails *types.ResultDetails) (string, error) {
 
 	register := resultDetails.ProbeArtifacts
 
@@ -269,13 +268,4 @@ func ParseCommand(templatedCommand string, resultDetails *types.ResultDetails) (
 	}
 
 	return out.String(), nil
-}
-
-// Getenv fetch the env and set the default value, if any
-func Getenv(key string, defaultValue string) string {
-	value := os.Getenv(key)
-	if value == "" {
-		value = defaultValue
-	}
-	return value
 }
