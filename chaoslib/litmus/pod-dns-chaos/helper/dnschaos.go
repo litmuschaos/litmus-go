@@ -185,6 +185,7 @@ func getENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.ChaosPodName = common.Getenv("POD_NAME", "")
 	experimentDetails.ContainerRuntime = common.Getenv("CONTAINER_RUNTIME", "")
 	experimentDetails.TargetHostNames = common.Getenv("TARGET_HOSTNAMES", "")
+	experimentDetails.SpoofMap = common.Getenv("SPOOF_MAP", "")
 	experimentDetails.MatchScheme = common.Getenv("MATCH_SCHEME", "exact")
 	experimentDetails.ChaosType = common.Getenv("CHAOS_TYPE", "error")
 	experimentDetails.SocketPath = common.Getenv("SOCKET_PATH", "")
