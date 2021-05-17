@@ -1,0 +1,89 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: litmus-experiment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: litmus-experiment
+  template:
+    metadata:
+      labels: 
+        app: litmus-experiment
+    spec:
+      serviceAccountName: pod-dns-error-sa
+      containers:
+      - name: gotest
+        image: busybox 
+        command: 
+          - sleep
+          - "3600"
+        env:
+          - name: APP_NAMESPACE
+            value: 'default'
+
+          - name: APP_LABEL
+            value: 'run=nginx'
+
+          - name: TARGET_CONTAINER
+            value: 'nginx'
+
+          # provide application kind
+          - name: APP_KIND
+            value: 'deployment'
+
+          # list of the target hostnames or kewywords eg. '["litmuschaos","chaosnative.io"]' . If empty all hostnames are targets
+          - name: TARGET_HOSTNAMES
+            value: ''
+
+          # can be either exact or substring, determines whether the dns query has to match exactly with one of the targets or can have any of the targets as substring
+          - name: MATCH_SCHEME
+            value: 'exact'
+
+          # in sec
+          - name: TOTAL_CHAOS_DURATION
+            value: '60'
+
+          - name: LIB
+            value: 'litmus'
+
+          - name: TARGET_PODS
+            value: ''
+
+          - name: LIB_IMAGE
+            value: 'litmuschaos/go-runner:ci'
+
+          - name: CHAOS_NAMESPACE
+            value: 'default'
+
+            ## Period to wait before/after injection of chaos
+          - name: RAMP_TIME
+            value: ''
+
+          ## percentage of total pods to target
+          - name: PODS_AFFECTED_PERC
+            value: ''
+
+          # provide the name of container runtime
+          # it supports docker, containerd, crio
+          # default to docker
+          - name: CONTAINER_RUNTIME
+            value: 'docker'
+
+          # provide the container runtime path
+          - name: SOCKET_PATH
+            value: '/var/run/docker.sock'
+
+          - name: CHAOS_SERVICE_ACCOUNT
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.serviceAccountName
+
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+
+

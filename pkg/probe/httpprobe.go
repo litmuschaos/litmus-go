@@ -23,33 +23,33 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// PrepareHTTPProbe contains the steps to prepare the http probe
+// prepareHTTPProbe contains the steps to prepare the http probe
 // http probe can be used to add the probe which will send a request to given url and match the status code
-func PrepareHTTPProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, phase string, eventsDetails *types.EventDetails) error {
+func prepareHTTPProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, phase string, eventsDetails *types.EventDetails) error {
 
-	switch phase {
-	case "PreChaos":
-		if err := PreChaosHTTPProbe(probe, resultDetails, clients, chaosDetails); err != nil {
+	switch strings.ToLower(phase) {
+	case "prechaos":
+		if err := preChaosHTTPProbe(probe, resultDetails, clients, chaosDetails); err != nil {
 			return err
 		}
-	case "PostChaos":
-		if err := PostChaosHTTPProbe(probe, resultDetails, clients, chaosDetails); err != nil {
+	case "postchaos":
+		if err := postChaosHTTPProbe(probe, resultDetails, clients, chaosDetails); err != nil {
 			return err
 		}
-	case "DuringChaos":
-		OnChaosHTTPProbe(probe, resultDetails, clients, chaosDetails)
+	case "duringchaos":
+		onChaosHTTPProbe(probe, resultDetails, clients, chaosDetails)
 	default:
 		return errors.Errorf("phase '%s' not supported in the http probe", phase)
 	}
 	return nil
 }
 
-// TriggerHTTPProbe run the http probe command
-func TriggerHTTPProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails) error {
+// triggerHTTPProbe run the http probe command
+func triggerHTTPProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails) error {
 
 	// It parse the templated url and return normal string
 	// if command doesn't have template, it will return the same command
-	probe.HTTPProbeInputs.URL, err = ParseCommand(probe.HTTPProbeInputs.URL, resultDetails)
+	probe.HTTPProbeInputs.URL, err = parseCommand(probe.HTTPProbeInputs.URL, resultDetails)
 	if err != nil {
 		return err
 	}
@@ -197,8 +197,8 @@ func getHTTPBody(httpBody v1alpha1.PostMethod) (string, error) {
 	return out.String(), nil
 }
 
-// TriggerContinuousHTTPProbe trigger the continuous http probes
-func TriggerContinuousHTTPProbe(probe v1alpha1.ProbeAttributes, chaosresult *types.ResultDetails) {
+// triggerContinuousHTTPProbe trigger the continuous http probes
+func triggerContinuousHTTPProbe(probe v1alpha1.ProbeAttributes, chaosresult *types.ResultDetails) {
 
 	// waiting for initial delay
 	if probe.RunProperties.InitialDelaySeconds != 0 {
@@ -210,7 +210,7 @@ func TriggerContinuousHTTPProbe(probe v1alpha1.ProbeAttributes, chaosresult *typ
 	// it marked the error for the probes, if any
 loop:
 	for {
-		err = TriggerHTTPProbe(probe, chaosresult)
+		err = triggerHTTPProbe(probe, chaosresult)
 		// record the error inside the probeDetails, we are maintaining a dedicated variable for the err, inside probeDetails
 		if err != nil {
 			for index := range chaosresult.ProbeDetails {
@@ -226,8 +226,8 @@ loop:
 	}
 }
 
-//PreChaosHTTPProbe trigger the http probe for prechaos phase
-func PreChaosHTTPProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
+//preChaosHTTPProbe trigger the http probe for prechaos phase
+func preChaosHTTPProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
 
 	switch probe.Mode {
 	case "SOT", "Edge":
@@ -247,11 +247,11 @@ func PreChaosHTTPProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resu
 			time.Sleep(time.Duration(probe.RunProperties.InitialDelaySeconds) * time.Second)
 		}
 		// trigger the http probe
-		err = TriggerHTTPProbe(probe, resultDetails)
+		err = triggerHTTPProbe(probe, resultDetails)
 
 		// failing the probe, if the success condition doesn't met after the retry & timeout combinations
 		// it will update the status of all the unrun probes as well
-		if err = MarkedVerdictInEnd(err, resultDetails, probe.Name, probe.Mode, probe.Type, "PreChaos"); err != nil {
+		if err = markedVerdictInEnd(err, resultDetails, probe.Name, probe.Mode, probe.Type, "PreChaos"); err != nil {
 			return err
 		}
 	case "Continuous":
@@ -264,13 +264,13 @@ func PreChaosHTTPProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resu
 			"Mode":           probe.Mode,
 			"Phase":          "PreChaos",
 		})
-		go TriggerContinuousHTTPProbe(probe, resultDetails)
+		go triggerContinuousHTTPProbe(probe, resultDetails)
 	}
 	return nil
 }
 
-//PostChaosHTTPProbe trigger the http probe for postchaos phase
-func PostChaosHTTPProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
+//postChaosHTTPProbe trigger the http probe for postchaos phase
+func postChaosHTTPProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
 
 	switch probe.Mode {
 	case "EOT", "Edge":
@@ -291,26 +291,26 @@ func PostChaosHTTPProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Res
 		}
 
 		// trigger the http probe
-		err = TriggerHTTPProbe(probe, resultDetails)
+		err = triggerHTTPProbe(probe, resultDetails)
 
 		// failing the probe, if the success condition doesn't met after the retry & timeout combinations
 		// it will update the status of all the unrun probes as well
-		if err = MarkedVerdictInEnd(err, resultDetails, probe.Name, probe.Mode, probe.Type, "PostChaos"); err != nil {
+		if err = markedVerdictInEnd(err, resultDetails, probe.Name, probe.Mode, probe.Type, "PostChaos"); err != nil {
 			return err
 		}
 	case "Continuous", "OnChaos":
 		// it will check for the error, It will detect the error if any error encountered in probe during chaos
-		err = CheckForErrorInContinuousProbe(resultDetails, probe.Name)
+		err = checkForErrorInContinuousProbe(resultDetails, probe.Name)
 		// failing the probe, if the success condition doesn't met after the retry & timeout combinations
-		if err = MarkedVerdictInEnd(err, resultDetails, probe.Name, probe.Mode, probe.Type, "PostChaos"); err != nil {
+		if err = markedVerdictInEnd(err, resultDetails, probe.Name, probe.Mode, probe.Type, "PostChaos"); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-// TriggerOnChaosHTTPProbe trigger the onchaos http probes
-func TriggerOnChaosHTTPProbe(probe v1alpha1.ProbeAttributes, chaosresult *types.ResultDetails, duration int) {
+// triggerOnChaosHTTPProbe trigger the onchaos http probes
+func triggerOnChaosHTTPProbe(probe v1alpha1.ProbeAttributes, chaosresult *types.ResultDetails, duration int) {
 
 	// waiting for initial delay
 	if probe.RunProperties.InitialDelaySeconds != 0 {
@@ -333,7 +333,7 @@ loop:
 			endTime = nil
 			break loop
 		default:
-			err = TriggerHTTPProbe(probe, chaosresult)
+			err = triggerHTTPProbe(probe, chaosresult)
 			// record the error inside the probeDetails, we are maintaining a dedicated variable for the err, inside probeDetails
 			if err != nil {
 				for index := range chaosresult.ProbeDetails {
@@ -350,8 +350,8 @@ loop:
 	}
 }
 
-//OnChaosHTTPProbe trigger the http probe for DuringChaos phase
-func OnChaosHTTPProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) {
+//onChaosHTTPProbe trigger the http probe for DuringChaos phase
+func onChaosHTTPProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) {
 
 	switch probe.Mode {
 	case "OnChaos":
@@ -364,6 +364,6 @@ func OnChaosHTTPProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 			"Mode":           probe.Mode,
 			"Phase":          "DuringChaos",
 		})
-		go TriggerOnChaosHTTPProbe(probe, resultDetails, chaosDetails.ChaosDuration)
+		go triggerOnChaosHTTPProbe(probe, resultDetails, chaosDetails.ChaosDuration)
 	}
 }
