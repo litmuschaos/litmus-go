@@ -1,6 +1,7 @@
 package aws
 
 import (
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -108,4 +109,41 @@ func getActiveNodeCount(clients clients.ClientSets) (int, error) {
 	log.Infof("[Info]: Total number active nodes are: %v", nodeCount)
 
 	return nodeCount, nil
+}
+
+//InstanceStatusCheckByID is used to check the instance status of all the instance under chaos.
+func InstanceStatusCheckByID(instanceID, region string) error {
+
+	instanceIDList := strings.Split(instanceID, ",")
+	if len(instanceIDList) == 0 {
+		return errors.Errorf("no instance id found to terminate")
+	}
+	log.Infof("[Info]: The instances under chaos(IUC) are: %v", instanceIDList)
+	return InstanceStatusCheck(instanceIDList, region)
+}
+
+//InstanceStatusCheckByTag is used to check the instance status of all the instance under chaos.
+func InstanceStatusCheckByTag(instanceTag, region string) error {
+
+	instanceIDList, err := GetInstanceList(instanceTag, region)
+	if err != nil {
+		return err
+	}
+	log.Infof("[Info]: The instances under chaos(IUC) are: %v", instanceIDList)
+	return InstanceStatusCheck(instanceIDList, region)
+}
+
+//InstanceStatusCheck is used to check the instance status of the instances
+func InstanceStatusCheck(targetInstanceIDList []string, region string) error {
+
+	for _, id := range targetInstanceIDList {
+		instanceState, err := GetEC2InstanceStatus(id, region)
+		if err != nil {
+			return err
+		}
+		if instanceState != "running" {
+			return errors.Errorf("failed to get the ec2 instance '%v' in running sate, current state: %v", id, instanceState)
+		}
+	}
+	return nil
 }

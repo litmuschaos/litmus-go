@@ -294,7 +294,7 @@ func CheckHelperStatus(appNs, appLabel string, timeout, delay int, clients clien
 				case "running", "succeeded":
 					log.Infof("%v helper pod is in %v state", pod.Name, podStatus)
 				default:
-					return errors.Errorf("%v pod is %v state", pod.Name, podStatus)
+					return errors.Errorf("%v pod is in %v state", pod.Name, podStatus)
 				}
 				for _, container := range pod.Status.ContainerStatuses {
 					if container.State.Terminated != nil && container.State.Terminated.Reason != "Completed" {
