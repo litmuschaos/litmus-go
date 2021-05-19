@@ -3,7 +3,7 @@ package environment
 import (
 	"strconv"
 
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-memory-hog/types"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-memory-hog-exec/types"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	clientTypes "k8s.io/apimachinery/pkg/types"
@@ -11,7 +11,7 @@ import (
 
 //GetENV fetches all the env variables from the runner pod
 func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
-	experimentDetails.ExperimentName = common.Getenv("EXPERIMENT_NAME", "pod-memory-hog")
+	experimentDetails.ExperimentName = common.Getenv("EXPERIMENT_NAME", "pod-memory-hog-exec")
 	experimentDetails.ChaosNamespace = common.Getenv("CHAOS_NAMESPACE", "litmus")
 	experimentDetails.EngineName = common.Getenv("CHAOSENGINE", "")
 	experimentDetails.ChaosDuration, _ = strconv.Atoi(common.Getenv("TOTAL_CHAOS_DURATION", "30"))

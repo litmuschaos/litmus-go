@@ -13,7 +13,7 @@ spec:
       labels:
         app: litmus-experiment
     spec:
-      serviceAccountName: pod-memory-hog-sa
+      serviceAccountName: pod-memory-hog-exec-sa
       containers:
       - name: gotest
         image: busybox

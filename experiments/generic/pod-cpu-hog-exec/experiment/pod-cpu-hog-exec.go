@@ -1,12 +1,12 @@
 package experiment
 
 import (
-	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/pod-cpu-hog/lib"
+	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/pod-cpu-hog-exec/lib"
 	pumbaLIB "github.com/litmuschaos/litmus-go/chaoslib/pumba/cpu-chaos/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
-	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/pod-cpu-hog/environment"
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-cpu-hog/types"
+	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/pod-cpu-hog-exec/environment"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-cpu-hog-exec/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/result"
@@ -16,8 +16,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// PodCPUHog inject the pod-cpu-hog chaos
-func PodCPUHog(clients clients.ClientSets) {
+// PodCPUHogExec inject the pod-cpu-hog-exec chaos
+func PodCPUHogExec(clients clients.ClientSets) {
 
 	experimentsDetails := experimentTypes.ExperimentDetails{}
 	resultDetails := types.ResultDetails{}
@@ -46,7 +46,7 @@ func PodCPUHog(clients clients.ClientSets) {
 	log.Infof("[PreReq]: Updating the chaos result of %v experiment (SOT)", experimentsDetails.ExperimentName)
 	if err := result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT"); err != nil {
 		log.Errorf("Unable to Create the Chaos Result, err: %v", err)
-		failStep := "Updating the chaos result of pod-cpu-hog experiment (SOT)"
+		failStep := "Updating the chaos result of pod-cpu-hog-exec experiment (SOT)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -102,7 +102,7 @@ func PodCPUHog(clients clients.ClientSets) {
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
-	// Including the litmus lib for pod-cpu-hog
+	// Including the litmus lib for pod-cpu-hog-exec
 	switch experimentsDetails.ChaosLib {
 	case "litmus":
 		if err := litmusLIB.PrepareCPUstress(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
