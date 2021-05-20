@@ -31,7 +31,7 @@ import (
 )
 
 var (
-	cgroupSubsys = []string{"cpu", "memory", "systemd", "net_cls",
+	cgroupSubsystemList = []string{"cpu", "memory", "systemd", "net_cls",
 		"net_prio", "freezer", "blkio", "perf_event", "devices",
 		"cpuset", "cpuacct", "pids", "hugetlb"}
 )
@@ -164,6 +164,7 @@ func prepareStressChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 	case <-timeout:
 		// the stress process gets timeout before completion
 		log.Infof("[Output] Stress output: %v", buf.String())
+		log.Info("[Cleaup]: Kill the stress process")
 		terminateProcess(cmd.Process.Pid)
 		return errors.Errorf("the stress process is timeout after %vs", experimentsDetails.ChaosDuration+10)
 	case err := <-done:
@@ -177,19 +178,19 @@ func prepareStressChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 			}
 			return errors.Errorf("error process exited accidentally", err)
 		}
+		log.Info("[Info]: Chaos injection completed")
+		terminateProcess(cmd.Process.Pid)
 	}
 	return nil
 }
 
 //terminateProcess will remove the stress process from the target container after chaos completion
 func terminateProcess(pid int) error {
-	p, err := os.FindProcess(int(pid))
+	process, err := os.FindProcess(pid)
 	if err != nil {
 		return errors.Errorf("unreachable path, err: %v", err)
 	}
-
-	err = p.Signal(syscall.SIGTERM)
-	if err != nil && err.Error() != "os: process already finished" {
+	if err = process.Signal(syscall.SIGTERM); err != nil && err.Error() != "os: process already finished" {
 		return errors.Errorf("error while killing process", err)
 	}
 	log.Info("[Info]: Stress process removed sucessfully")
@@ -344,20 +345,21 @@ func getPID(experimentDetails *experimentTypes.ExperimentDetails, containerID st
 }
 
 func pidPath(pid int) cgroups.Path {
-	p := fmt.Sprintf("/proc/%d/cgroup", pid)
-	paths, err := parseCgroupFile(p)
+	processPath := "/proc/" + strconv.Itoa(pid) + "/cgroup"
+	paths, err := parseCgroupFile(processPath)
 	if err != nil {
-		return errorPath(errors.Wrapf(err, "parse cgroup file %s", p))
+		return getErrorPath(errors.Wrapf(err, "parse cgroup file %s", processPath))
 	}
-	return existingPath(paths, pid, "")
+	return getExistingPath(paths, pid, "")
 }
+
 func parseCgroupFile(path string) (map[string]string, error) {
-	f, err := os.Open(path)
+	file, err := os.Open(path)
 	if err != nil {
 		return nil, errors.Errorf("unable to parse cgroup file: %v", err)
 	}
-	defer f.Close()
-	return parseCgroupFromReader(f)
+	defer file.Close()
+	return parseCgroupFromReader(file)
 }
 
 func parseCgroupFromReader(r io.Reader) (map[string]string, error) {
@@ -386,22 +388,21 @@ func parseCgroupFromReader(r io.Reader) (map[string]string, error) {
 	return cgroups, nil
 }
 
-func errorPath(err error) cgroups.Path {
+func getErrorPath(err error) cgroups.Path {
 	return func(_ cgroups.Name) (string, error) {
 		return "", err
 	}
 }
 
-func existingPath(paths map[string]string, pid int, suffix string) cgroups.Path {
-	// localize the paths based on the root mount dest for nested cgroups
+func getExistingPath(paths map[string]string, pid int, suffix string) cgroups.Path {
 	for n, p := range paths {
-		dest, err := getCgroupDestination(pid, string(n))
+		dest, err := getCgroupDestination(pid, n)
 		if err != nil {
-			return errorPath(err)
+			return getErrorPath(err)
 		}
 		rel, err := filepath.Rel(dest, p)
 		if err != nil {
-			return errorPath(err)
+			return getErrorPath(err)
 		}
 		if rel == "." {
 			rel = dest
@@ -423,14 +424,13 @@ func existingPath(paths map[string]string, pid int, suffix string) cgroups.Path 
 }
 
 func getCgroupDestination(pid int, subsystem string) (string, error) {
-	// use the process's mount info
-	p := fmt.Sprintf("/proc/%d/mountinfo", pid)
-	f, err := os.Open(p)
+	mountinfoPath := fmt.Sprintf("/proc/%d/mountinfo", pid)
+	file, err := os.Open(mountinfoPath)
 	if err != nil {
 		return "", err
 	}
-	defer f.Close()
-	s := bufio.NewScanner(f)
+	defer file.Close()
+	s := bufio.NewScanner(file)
 	for s.Scan() {
 		fields := strings.Fields(s.Text())
 		for _, opt := range strings.Split(fields[len(fields)-1], ",") {
@@ -442,22 +442,21 @@ func getCgroupDestination(pid int, subsystem string) (string, error) {
 	if err := s.Err(); err != nil {
 		return "", err
 	}
-	return "", fmt.Errorf("never found desct for %v ", subsystem)
+	return "", errors.Errorf("never found desct for %v ", subsystem)
 }
 
-// findValidCgroup ...
 func findValidCgroup(path cgroups.Path, target string) (string, error) {
-	for _, subsys := range cgroupSubsys {
-		p, err := path(cgroups.Name(subsys))
+	for _, subsystem := range cgroupSubsystemList {
+		path, err := path(cgroups.Name(subsystem))
 		if err != nil {
-			log.Errorf("fail to retrieve the cgroup path, subsystem: %v, target: %v, err: %v", subsys, target, err)
+			log.Errorf("fail to retrieve the cgroup path, subsystem: %v, target: %v, err: %v", subsystem, target, err)
 			continue
 		}
-		if strings.Contains(p, target) {
-			return p, nil
+		if strings.Contains(path, target) {
+			return path, nil
 		}
 	}
-	return "", fmt.Errorf("never found valid cgroup for %s", target)
+	return "", errors.Errorf("never found valid cgroup for %s", target)
 }
 
 //parsePIDFromJSON extract the pid from the json output
