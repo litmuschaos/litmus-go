@@ -23,11 +23,13 @@ import (
 	nodeTaint "github.com/litmuschaos/litmus-go/experiments/generic/node-taint/experiment"
 	podAutoscaler "github.com/litmuschaos/litmus-go/experiments/generic/pod-autoscaler/experiment"
 	podCPUHogExec "github.com/litmuschaos/litmus-go/experiments/generic/pod-cpu-hog-exec/experiment"
+	podCPUHog "github.com/litmuschaos/litmus-go/experiments/generic/pod-cpu-hog/experiment"
 	podDelete "github.com/litmuschaos/litmus-go/experiments/generic/pod-delete/experiment"
 	podDNSError "github.com/litmuschaos/litmus-go/experiments/generic/pod-dns-error/experiment"
 	podDNSSpoof "github.com/litmuschaos/litmus-go/experiments/generic/pod-dns-spoof/experiment"
 	podIOStress "github.com/litmuschaos/litmus-go/experiments/generic/pod-io-stress/experiment"
 	podMemoryHogExec "github.com/litmuschaos/litmus-go/experiments/generic/pod-memory-hog-exec/experiment"
+	podMemoryHog "github.com/litmuschaos/litmus-go/experiments/generic/pod-memory-hog/experiment"
 	podNetworkCorruption "github.com/litmuschaos/litmus-go/experiments/generic/pod-network-corruption/experiment"
 	podNetworkDuplication "github.com/litmuschaos/litmus-go/experiments/generic/pod-network-duplication/experiment"
 	podNetworkLatency "github.com/litmuschaos/litmus-go/experiments/generic/pod-network-latency/experiment"
@@ -106,6 +108,10 @@ func main() {
 		podNetworkLatency.PodNetworkLatency(clients)
 	case "pod-network-loss":
 		podNetworkLoss.PodNetworkLoss(clients)
+	case "pod-memory-hog":
+		podMemoryHog.PodMemoryHog(clients)
+	case "pod-cpu-hog":
+		podCPUHog.PodCPUHog(clients)
 	case "cassandra-pod-delete":
 		cassandraPodDelete.CasssandraPodDelete(clients)
 	case "ec2-terminate-by-id":

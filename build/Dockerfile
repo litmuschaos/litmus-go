@@ -54,6 +54,9 @@ RUN curl -L https://github.com/litmuschaos/test-tools/raw/master/custom/promql-c
 #Installing nsutil cli binaries
 RUN curl -L https://github.com/litmuschaos/test-tools/raw/master/custom/nsutil/nsutil --output /usr/local/bin/nsutil && chmod +x /usr/local/bin/nsutil
 
+#Installing pause cli binaries
+RUN curl -L https://github.com/uditgaurav/notes/releases/download/1.8.0/pause --output /usr/local/bin/pause && chmod +x /usr/local/bin/pause
+
 #Installing dns_interceptor cli binaries
 RUN curl -L https://github.com/litmuschaos/test-tools/raw/master/custom/dns_interceptor/dns_interceptor --output /usr/local/bin/dns_interceptor && chmod +x /usr/local/bin/dns_interceptor
 

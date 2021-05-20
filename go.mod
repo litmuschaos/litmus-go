@@ -4,13 +4,12 @@ go 1.13
 
 require (
 	github.com/aws/aws-sdk-go v1.36.27
+	github.com/containerd/cgroups v1.0.1
 	github.com/emicklei/go-restful v2.12.0+incompatible // indirect
 	github.com/go-openapi/spec v0.19.7 // indirect
 	github.com/go-openapi/swag v0.19.9 // indirect
-	github.com/google/go-cmp v0.5.4 // indirect
 	github.com/google/gofuzz v1.1.0 // indirect
 	github.com/imdario/mergo v0.3.9 // indirect
-	github.com/kr/pretty v0.2.0 // indirect
 	github.com/kyokomi/emoji v2.2.4+incompatible
 	github.com/litmuschaos/chaos-operator v0.0.0-20210325093226-50a357ad2256
 	github.com/mailru/easyjson v0.7.1 // indirect
@@ -19,7 +18,6 @@ require (
 	github.com/sirupsen/logrus v1.7.0
 	github.com/spf13/cobra v1.0.0
 	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d // indirect
-	golang.org/x/sys v0.0.0-20210119212857-b64e53b001e4 // indirect
 	golang.org/x/time v0.0.0-20200416051211-89c76fbcd5d1 // indirect
 	google.golang.org/appengine v1.6.6 // indirect
 	google.golang.org/protobuf v1.24.0 // indirect

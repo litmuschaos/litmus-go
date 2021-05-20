@@ -1,11 +1,12 @@
 package experiment
 
 import (
+	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/stress-chaos/lib"
 	pumbaLIB "github.com/litmuschaos/litmus-go/chaoslib/pumba/pod-io-stress/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
-	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/pod-io-stress/environment"
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-io-stress/types"
+	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/stress-chaos/environment"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/stress-chaos/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/result"
@@ -105,6 +106,13 @@ func PodIOStress(clients clients.ClientSets) {
 
 	// Including the litmus lib for pod-io-stress
 	switch experimentsDetails.ChaosLib {
+	case "litmus":
+		if err := litmusLIB.PrepareAndInjectStressChaos(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
+			log.Errorf("[Error]: Pod IO Stress failed, err: %v", err)
+			failStep := "failed in chaos injection phase"
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+			return
+		}
 	case "pumba":
 		if err := pumbaLIB.PreparePodIOStress(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
 			log.Errorf("[Error]: pod io stress chaos failed, err: %v", err)
