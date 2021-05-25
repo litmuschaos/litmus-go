@@ -69,7 +69,7 @@ func preChaosPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resu
 
 		// failing the probe, if the success condition doesn't met after the retry & timeout combinations
 		// it will update the status of all the unrun probes as well
-		if err = markedVerdictInEnd(err, resultDetails, probe.Name, probe.Mode, probe.Type, "PreChaos"); err != nil {
+		if err = markedVerdictInEnd(err, resultDetails, probe, "PreChaos"); err != nil {
 			return err
 		}
 
@@ -121,7 +121,7 @@ func postChaosPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Res
 
 		// failing the probe, if the success condition doesn't met after the retry & timeout combinations
 		// it will update the status of all the unrun probes as well
-		if err = markedVerdictInEnd(err, resultDetails, probe.Name, probe.Mode, probe.Type, "PostChaos"); err != nil {
+		if err = markedVerdictInEnd(err, resultDetails, probe, "PostChaos"); err != nil {
 			return err
 		}
 
@@ -131,7 +131,7 @@ func postChaosPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Res
 		err = checkForErrorInContinuousProbe(resultDetails, probe.Name)
 
 		// failing the probe, if the success condition doesn't met after the retry & timeout combinations
-		if err = markedVerdictInEnd(err, resultDetails, probe.Name, probe.Mode, probe.Type, "PostChaos"); err != nil {
+		if err = markedVerdictInEnd(err, resultDetails, probe, "PostChaos"); err != nil {
 			return err
 		}
 

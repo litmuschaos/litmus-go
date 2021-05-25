@@ -69,16 +69,17 @@ func RunProbes(chaosDetails *types.ChaosDetails, clients clients.ClientSets, res
 
 //setProbeVerdict mark the verdict of the probe in the chaosresult as passed
 // on the basis of phase(pre/post chaos)
-func setProbeVerdict(resultDetails *types.ResultDetails, verdict, probeName, probeType, mode, phase string) {
+func setProbeVerdict(resultDetails *types.ResultDetails, probe v1alpha1.ProbeAttributes, verdict, phase string) {
 
-	for index, probe := range resultDetails.ProbeDetails {
-		if probe.Name == probeName && probe.Type == probeType {
-			switch strings.ToLower(mode) {
+	for index, probes := range resultDetails.ProbeDetails {
+		if probes.Name == probe.Name && probes.Type == probe.Type {
+			switch strings.ToLower(probe.Mode) {
 			case "sot", "edge", "eot":
 				resultDetails.ProbeDetails[index].Status[phase] = verdict + emoji.Sprint(" :thumbsup:")
 			case "continuous", "onchaos":
-				resultDetails.ProbeDetails[index].Status[mode] = verdict + emoji.Sprint(" :thumbsup:")
+				resultDetails.ProbeDetails[index].Status[probe.Mode] = verdict + emoji.Sprint(" :thumbsup:")
 			}
+			resultDetails.ProbeDetails[index].Phase = verdict
 		}
 	}
 }
@@ -133,6 +134,7 @@ func InitializeProbesInChaosResultDetails(chaosDetails *types.ChaosDetails, clie
 		tempProbe := types.ProbeDetails{}
 		tempProbe.Name = probe.Name
 		tempProbe.Type = probe.Type
+		tempProbe.Phase = "N/A"
 		tempProbe.RunCount = 0
 		setProbeInitialStatus(&tempProbe, probe.Mode)
 		probeDetails = append(probeDetails, tempProbe)
@@ -206,40 +208,41 @@ func setRunIDForProbe(resultDetails *types.ResultDetails, probeName, probeType, 
 }
 
 // markedVerdictInEnd add the probe status in the chaosresult
-func markedVerdictInEnd(err error, resultDetails *types.ResultDetails, probeName, mode, probeType, phase string) error {
-	// failing the probe, if the success condition doesn't met after the retry & timeout combinations
+func markedVerdictInEnd(err error, resultDetails *types.ResultDetails, probe v1alpha1.ProbeAttributes, phase string) error {
+	probeVerdict := "Passed"
 	if err != nil {
-		log.ErrorWithValues("[Probe]: "+probeName+" probe has been Failed "+emoji.Sprint(":cry:"), logrus.Fields{
-			"ProbeName":     probeName,
-			"ProbeType":     probeType,
-			"ProbeInstance": phase,
-			"ProbeStatus":   "Failed",
-		})
-		return err
+		probeVerdict = "Failed"
 	}
 
-	// counting the passed probes count to generate the score and mark the verdict as passed
-	// for edge, probe is marked as Passed if passed in both pre/post chaos checks
-	switch strings.ToLower(mode) {
-	case "edge", "continuous":
-		if phase != "PreChaos" {
-			resultDetails.PassedProbeCount++
-		}
-	case "onchaos":
-		if phase != "DuringChaos" {
-			resultDetails.PassedProbeCount++
-		}
-	default:
-		resultDetails.PassedProbeCount++
-	}
-	log.InfoWithValues("[Probe]: "+probeName+" probe has been Passed "+emoji.Sprint(":smile:"), logrus.Fields{
-		"ProbeName":     probeName,
-		"ProbeType":     probeType,
+	log.InfoWithValues("[Probe]: "+probe.Name+" probe has been Failed "+probeVerdict+emoji.Sprint(" :cry:"), logrus.Fields{
+		"ProbeName":     probe.Name,
+		"ProbeType":     probe.Type,
 		"ProbeInstance": phase,
-		"ProbeStatus":   "Passed",
+		"ProbeStatus":   probeVerdict,
 	})
-	setProbeVerdict(resultDetails, "Passed", probeName, probeType, mode, phase)
-	return nil
+
+	if probeVerdict == "Passed" {
+		// counting the passed probes count to generate the score and mark the verdict as passed
+		// for edge, probe is marked as Passed if passed in both pre/post chaos checks
+		switch strings.ToLower(probe.Mode) {
+		case "edge", "continuous":
+			if phase != "PreChaos" {
+				resultDetails.PassedProbeCount++
+			}
+		case "onchaos":
+			if phase != "DuringChaos" {
+				resultDetails.PassedProbeCount++
+			}
+		default:
+			resultDetails.PassedProbeCount++
+		}
+	}
+
+	setProbeVerdict(resultDetails, probe, probeVerdict, phase)
+	if !probe.RunProperties.StopOnFailure {
+		return nil
+	}
+	return err
 }
 
 //CheckForErrorInContinuousProbe check for the error in the continuous probes
@@ -268,4 +271,26 @@ func parseCommand(templatedCommand string, resultDetails *types.ResultDetails) (
 	}
 
 	return out.String(), nil
+}
+
+// stopChaosEngine ...
+func stopChaosEngine(probe v1alpha1.ProbeAttributes, clients clients.ClientSets, chaosresult *types.ResultDetails, chaosDetails *types.ChaosDetails) error {
+	// update verdict
+	// it will check for the error, It will detect the error if any error encountered in probe during chaos
+	err = checkForErrorInContinuousProbe(chaosresult, probe.Name)
+	// failing the probe, if the success condition doesn't met after the retry & timeout combinations
+	if err = markedVerdictInEnd(err, chaosresult, probe, "PostChaos"); err != nil {
+		return err
+	}
+	//path engine to stop
+	engine, err := clients.LitmusClient.ChaosEngines(chaosDetails.ChaosNamespace).Get(chaosDetails.EngineName, v1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	engine.Spec.EngineState = v1alpha1.EngineStateStop
+	_, err = clients.LitmusClient.ChaosEngines(chaosDetails.ChaosNamespace).Update(engine)
+	if err != nil {
+		return err
+	}
+	return nil
 }

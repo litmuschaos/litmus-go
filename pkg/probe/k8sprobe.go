@@ -1,6 +1,7 @@
 package probe
 
 import (
+	"os"
 	"strings"
 	"time"
 
@@ -110,8 +111,8 @@ func triggerK8sProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets,
 }
 
 // triggerContinuousK8sProbe trigger the continuous k8s probes
-func triggerContinuousK8sProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets, chaosresult *types.ResultDetails) {
-
+func triggerContinuousK8sProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets, chaosresult *types.ResultDetails, chaosDetails *types.ChaosDetails) {
+	var isExperimentFailed bool
 	// waiting for initial delay
 	if probe.RunProperties.InitialDelaySeconds != 0 {
 		log.Infof("[Wait]: Waiting for %vs before probe execution", probe.RunProperties.InitialDelaySeconds)
@@ -129,12 +130,19 @@ loop:
 				if chaosresult.ProbeDetails[index].Name == probe.Name {
 					chaosresult.ProbeDetails[index].IsProbeFailedWithError = err
 					log.Errorf("the %v k8s probe has been Failed, err: %v", probe.Name, err)
+					isExperimentFailed = true
 					break loop
 				}
 			}
 		}
 		// waiting for the probe polling interval
 		time.Sleep(time.Duration(probe.RunProperties.ProbePollingInterval) * time.Second)
+	}
+	if isExperimentFailed {
+		if err := stopChaosEngine(probe, clients, chaosresult, chaosDetails); err != nil {
+			log.Errorf("err: %v, err")
+		}
+		os.Exit(0)
 	}
 }
 
@@ -194,7 +202,7 @@ func preChaosK8sProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 
 		// failing the probe, if the success condition doesn't met after the retry & timeout combinations
 		// it will update the status of all the unrun probes as well
-		if err = markedVerdictInEnd(err, resultDetails, probe.Name, probe.Mode, probe.Type, "PreChaos"); err != nil {
+		if err = markedVerdictInEnd(err, resultDetails, probe, "PreChaos"); err != nil {
 			return err
 		}
 	case "continuous":
@@ -207,7 +215,7 @@ func preChaosK8sProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 			"Mode":           probe.Mode,
 			"Phase":          "PreChaos",
 		})
-		go triggerContinuousK8sProbe(probe, clients, resultDetails)
+		go triggerContinuousK8sProbe(probe, clients, resultDetails, chaosDetails)
 	}
 	return nil
 }
@@ -236,14 +244,14 @@ func postChaosK8sProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resu
 
 		// failing the probe, if the success condition doesn't met after the retry & timeout combinations
 		// it will update the status of all the unrun probes as well
-		if err = markedVerdictInEnd(err, resultDetails, probe.Name, probe.Mode, probe.Type, "PostChaos"); err != nil {
+		if err = markedVerdictInEnd(err, resultDetails, probe, "PostChaos"); err != nil {
 			return err
 		}
 	case "continuous", "onchaos":
 		// it will check for the error, It will detect the error if any error encountered in probe during chaos
 		err = checkForErrorInContinuousProbe(resultDetails, probe.Name)
 		// failing the probe, if the success condition doesn't met after the retry & timeout combinations
-		if err = markedVerdictInEnd(err, resultDetails, probe.Name, probe.Mode, probe.Type, "PostChaos"); err != nil {
+		if err = markedVerdictInEnd(err, resultDetails, probe, "PostChaos"); err != nil {
 			return err
 		}
 	}
@@ -264,14 +272,16 @@ func onChaosK8sProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Result
 			"Mode":           probe.Mode,
 			"Phase":          "DuringChaos",
 		})
-		go triggerOnChaosK8sProbe(probe, clients, resultDetails, chaosDetails.ChaosDuration)
+		go triggerOnChaosK8sProbe(probe, clients, resultDetails, chaosDetails)
 	}
 
 }
 
 // triggerOnChaosK8sProbe trigger the onchaos k8s probes
-func triggerOnChaosK8sProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets, chaosresult *types.ResultDetails, duration int) {
+func triggerOnChaosK8sProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets, chaosresult *types.ResultDetails, chaosDetails *types.ChaosDetails) {
 
+	var isExperimentFailed bool
+	duration := chaosDetails.ChaosDuration
 	// waiting for initial delay
 	if probe.RunProperties.InitialDelaySeconds != 0 {
 		log.Infof("[Wait]: Waiting for %vs before probe execution", probe.RunProperties.InitialDelaySeconds)
@@ -300,6 +310,7 @@ loop:
 					if chaosresult.ProbeDetails[index].Name == probe.Name {
 						chaosresult.ProbeDetails[index].IsProbeFailedWithError = err
 						log.Errorf("The %v k8s probe has been Failed, err: %v", probe.Name, err)
+						isExperimentFailed = true
 						break loop
 					}
 				}
@@ -307,5 +318,11 @@ loop:
 			// waiting for the probe polling interval
 			time.Sleep(time.Duration(probe.RunProperties.ProbePollingInterval) * time.Second)
 		}
+	}
+	if isExperimentFailed {
+		if err := stopChaosEngine(probe, clients, chaosresult, chaosDetails); err != nil {
+			log.Errorf("err: %v, err")
+		}
+		os.Exit(0)
 	}
 }
