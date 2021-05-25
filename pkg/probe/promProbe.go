@@ -87,7 +87,7 @@ func preChaosPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resu
 		})
 
 		// trigger the continuous cmd probe
-		go triggerContinuousPromProbe(probe, resultDetails)
+		go triggerContinuousPromProbe(probe, clients, resultDetails, chaosDetails)
 	}
 
 	return nil
@@ -157,7 +157,7 @@ func onChaosPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 		})
 
 		// trigger the continuous prom probe
-		go triggerOnChaosPromProbe(probe, resultDetails, chaosDetails.ChaosDuration)
+		go triggerOnChaosPromProbe(probe, clients, resultDetails, chaosDetails)
 	}
 	return nil
 }
@@ -214,8 +214,9 @@ func triggerPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 }
 
 // triggerContinuousPromProbe trigger the continuous prometheus probe
-func triggerContinuousPromProbe(probe v1alpha1.ProbeAttributes, chaosresult *types.ResultDetails) {
+func triggerContinuousPromProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets, chaosresult *types.ResultDetails, chaosDetails *types.ChaosDetails) {
 
+	var isExperimentFailed bool
 	// waiting for initial delay
 	if probe.RunProperties.InitialDelaySeconds != 0 {
 		log.Infof("[Wait]: Waiting for %vs before probe execution", probe.RunProperties.InitialDelaySeconds)
@@ -233,6 +234,7 @@ loop:
 				if chaosresult.ProbeDetails[index].Name == probe.Name {
 					chaosresult.ProbeDetails[index].IsProbeFailedWithError = err
 					log.Errorf("The %v prom probe has been Failed, err: %v", probe.Name, err)
+					isExperimentFailed = true
 					break loop
 				}
 			}
@@ -240,11 +242,21 @@ loop:
 		// waiting for the probe polling interval
 		time.Sleep(time.Duration(probe.RunProperties.ProbePollingInterval) * time.Second)
 	}
+	// if experiment fails and stopOnfailure is provided as true then it will patch the chaosengine for abort
+	// if experiment fails but stopOnfailure is provided as false then it will continue the execution
+	// and failed the experiment in the end
+	if isExperimentFailed && probe.RunProperties.StopOnFailure {
+		if err := stopChaosEngine(probe, clients, chaosresult, chaosDetails); err != nil {
+			log.Errorf("unable to patch chaosengine to stop, err: %v", err)
+		}
+	}
 }
 
 // triggerOnChaosPromProbe trigger the onchaos prom probe
-func triggerOnChaosPromProbe(probe v1alpha1.ProbeAttributes, chaosresult *types.ResultDetails, duration int) {
+func triggerOnChaosPromProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets, chaosresult *types.ResultDetails, chaosDetails *types.ChaosDetails) {
 
+	var isExperimentFailed bool
+	duration := chaosDetails.ChaosDuration
 	// waiting for initial delay
 	if probe.RunProperties.InitialDelaySeconds != 0 {
 		log.Infof("[Wait]: Waiting for %vs before probe execution", probe.RunProperties.InitialDelaySeconds)
@@ -272,12 +284,21 @@ loop:
 					if chaosresult.ProbeDetails[index].Name == probe.Name {
 						chaosresult.ProbeDetails[index].IsProbeFailedWithError = err
 						log.Errorf("The %v prom probe has been Failed, err: %v", probe.Name, err)
+						isExperimentFailed = true
 						break loop
 					}
 				}
 			}
 			// waiting for the probe polling interval
 			time.Sleep(time.Duration(probe.RunProperties.ProbePollingInterval) * time.Second)
+		}
+	}
+	// if experiment fails and stopOnfailure is provided as true then it will patch the chaosengine for abort
+	// if experiment fails but stopOnfailure is provided as false then it will continue the execution
+	// and failed the experiment in the end
+	if isExperimentFailed && probe.RunProperties.StopOnFailure {
+		if err := stopChaosEngine(probe, clients, chaosresult, chaosDetails); err != nil {
+			log.Errorf("unable to patch chaosengine to stop, err: %v", err)
 		}
 	}
 }

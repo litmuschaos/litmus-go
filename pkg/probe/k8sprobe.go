@@ -1,7 +1,6 @@
 package probe
 
 import (
-	"os"
 	"strings"
 	"time"
 
@@ -138,11 +137,13 @@ loop:
 		// waiting for the probe polling interval
 		time.Sleep(time.Duration(probe.RunProperties.ProbePollingInterval) * time.Second)
 	}
-	if isExperimentFailed {
+	// if experiment fails and stopOnfailure is provided as true then it will patch the chaosengine for abort
+	// if experiment fails but stopOnfailure is provided as false then it will continue the execution
+	// and failed the experiment in the end
+	if isExperimentFailed && probe.RunProperties.StopOnFailure {
 		if err := stopChaosEngine(probe, clients, chaosresult, chaosDetails); err != nil {
-			log.Errorf("err: %v, err")
+			log.Errorf("unable to patch chaosengine to stop, err: %v", err)
 		}
-		os.Exit(0)
 	}
 }
 
@@ -319,10 +320,12 @@ loop:
 			time.Sleep(time.Duration(probe.RunProperties.ProbePollingInterval) * time.Second)
 		}
 	}
-	if isExperimentFailed {
+	// if experiment fails and stopOnfailure is provided as true then it will patch the chaosengine for abort
+	// if experiment fails but stopOnfailure is provided as false then it will continue the execution
+	// and failed the experiment in the end
+	if isExperimentFailed && probe.RunProperties.StopOnFailure {
 		if err := stopChaosEngine(probe, clients, chaosresult, chaosDetails); err != nil {
-			log.Errorf("err: %v, err")
+			log.Errorf("unable to patch chaosengine to stop, err: %v", err)
 		}
-		os.Exit(0)
 	}
 }

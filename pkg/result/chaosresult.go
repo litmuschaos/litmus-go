@@ -159,6 +159,7 @@ func PatchChaosResult(result *v1alpha1.ChaosResult, clients clients.ClientSets, 
 	switch strings.ToLower(resultDetails.Phase) {
 	case "completed":
 		if !isAllProbePassed {
+			resultDetails.Verdict = "Fail"
 			result.Status.ExperimentStatus.Verdict = "Fail"
 		}
 		switch strings.ToLower(resultDetails.Verdict) {

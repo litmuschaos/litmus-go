@@ -28,39 +28,31 @@ func RunProbes(chaosDetails *types.ChaosDetails, clients clients.ClientSets, res
 		return err
 	}
 
-	var probeError []error
+	for _, probe := range probes {
 
-	if probes != nil {
-
-		for _, probe := range probes {
-
-			switch strings.ToLower(probe.Type) {
-			case "k8sprobe":
-				// it contains steps to prepare the k8s probe
-				if err = prepareK8sProbe(probe, resultDetails, clients, phase, eventsDetails, chaosDetails); err != nil {
-					probeError = append(probeError, err)
-				}
-			case "cmdprobe":
-				// it contains steps to prepare cmd probe
-				if err = prepareCmdProbe(probe, clients, chaosDetails, resultDetails, phase, eventsDetails); err != nil {
-					probeError = append(probeError, err)
-				}
-			case "httpprobe":
-				// it contains steps to prepare http probe
-				if err = prepareHTTPProbe(probe, clients, chaosDetails, resultDetails, phase, eventsDetails); err != nil {
-					probeError = append(probeError, err)
-				}
-			case "promprobe":
-				// it contains steps to prepare prom probe
-				if err = preparePromProbe(probe, clients, chaosDetails, resultDetails, phase, eventsDetails); err != nil {
-					probeError = append(probeError, err)
-				}
-			default:
-				return errors.Errorf("No supported probe type found, type: %v", probe.Type)
+		switch strings.ToLower(probe.Type) {
+		case "k8sprobe":
+			// it contains steps to prepare the k8s probe
+			if err = prepareK8sProbe(probe, resultDetails, clients, phase, eventsDetails, chaosDetails); err != nil {
+				return errors.Errorf("probes failed, err: %v", err)
 			}
-		}
-		if len(probeError) != 0 {
-			return errors.Errorf("probes failed, err: %v", probeError)
+		case "cmdprobe":
+			// it contains steps to prepare cmd probe
+			if err = prepareCmdProbe(probe, clients, chaosDetails, resultDetails, phase, eventsDetails); err != nil {
+				return errors.Errorf("probes failed, err: %v", err)
+			}
+		case "httpprobe":
+			// it contains steps to prepare http probe
+			if err = prepareHTTPProbe(probe, clients, chaosDetails, resultDetails, phase, eventsDetails); err != nil {
+				return errors.Errorf("probes failed, err: %v", err)
+			}
+		case "promprobe":
+			// it contains steps to prepare prom probe
+			if err = preparePromProbe(probe, clients, chaosDetails, resultDetails, phase, eventsDetails); err != nil {
+				return errors.Errorf("probes failed, err: %v", err)
+			}
+		default:
+			return errors.Errorf("No supported probe type found, type: %v", probe.Type)
 		}
 	}
 
@@ -75,9 +67,17 @@ func setProbeVerdict(resultDetails *types.ResultDetails, probe v1alpha1.ProbeAtt
 		if probes.Name == probe.Name && probes.Type == probe.Type {
 			switch strings.ToLower(probe.Mode) {
 			case "sot", "edge", "eot":
-				resultDetails.ProbeDetails[index].Status[phase] = verdict + emoji.Sprint(" :thumbsup:")
+				if verdict == "Passed" {
+					resultDetails.ProbeDetails[index].Status[phase] = verdict + emoji.Sprint(" :thumbsup:")
+				} else {
+					resultDetails.ProbeDetails[index].Status[phase] = "Better Luck Next Time" + emoji.Sprint(" :thumbsdown:")
+				}
 			case "continuous", "onchaos":
-				resultDetails.ProbeDetails[index].Status[probe.Mode] = verdict + emoji.Sprint(" :thumbsup:")
+				if verdict == "Passed" {
+					resultDetails.ProbeDetails[index].Status[probe.Mode] = verdict + emoji.Sprint(" :thumbsup:")
+				} else {
+					resultDetails.ProbeDetails[index].Status[probe.Mode] = "Better Luck Next Time" + emoji.Sprint(" :thumbsdown:")
+				}
 			}
 			resultDetails.ProbeDetails[index].Phase = verdict
 		}
@@ -214,14 +214,14 @@ func markedVerdictInEnd(err error, resultDetails *types.ResultDetails, probe v1a
 		probeVerdict = "Failed"
 	}
 
-	log.InfoWithValues("[Probe]: "+probe.Name+" probe has been Failed "+probeVerdict+emoji.Sprint(" :cry:"), logrus.Fields{
-		"ProbeName":     probe.Name,
-		"ProbeType":     probe.Type,
-		"ProbeInstance": phase,
-		"ProbeStatus":   probeVerdict,
-	})
-
-	if probeVerdict == "Passed" {
+	switch probeVerdict {
+	case "Passed":
+		log.InfoWithValues("[Probe]: "+probe.Name+" probe has been Passed "+emoji.Sprint(":smile:"), logrus.Fields{
+			"ProbeName":     probe.Name,
+			"ProbeType":     probe.Type,
+			"ProbeInstance": phase,
+			"ProbeStatus":   probeVerdict,
+		})
 		// counting the passed probes count to generate the score and mark the verdict as passed
 		// for edge, probe is marked as Passed if passed in both pre/post chaos checks
 		switch strings.ToLower(probe.Mode) {
@@ -236,6 +236,13 @@ func markedVerdictInEnd(err error, resultDetails *types.ResultDetails, probe v1a
 		default:
 			resultDetails.PassedProbeCount++
 		}
+	default:
+		log.ErrorWithValues("[Probe]: "+probe.Name+" probe has been Failed "+emoji.Sprint(":cry:"), logrus.Fields{
+			"ProbeName":     probe.Name,
+			"ProbeType":     probe.Type,
+			"ProbeInstance": phase,
+			"ProbeStatus":   probeVerdict,
+		})
 	}
 
 	setProbeVerdict(resultDetails, probe, probeVerdict, phase)
@@ -273,24 +280,18 @@ func parseCommand(templatedCommand string, resultDetails *types.ResultDetails) (
 	return out.String(), nil
 }
 
-// stopChaosEngine ...
+// stopChaosEngine update the probe status and patch the chaosengine to stop state
 func stopChaosEngine(probe v1alpha1.ProbeAttributes, clients clients.ClientSets, chaosresult *types.ResultDetails, chaosDetails *types.ChaosDetails) error {
-	// update verdict
 	// it will check for the error, It will detect the error if any error encountered in probe during chaos
 	err = checkForErrorInContinuousProbe(chaosresult, probe.Name)
 	// failing the probe, if the success condition doesn't met after the retry & timeout combinations
-	if err = markedVerdictInEnd(err, chaosresult, probe, "PostChaos"); err != nil {
-		return err
-	}
-	//path engine to stop
+	markedVerdictInEnd(err, chaosresult, probe, "PostChaos")
+	//patch chaosengine's state to stop
 	engine, err := clients.LitmusClient.ChaosEngines(chaosDetails.ChaosNamespace).Get(chaosDetails.EngineName, v1.GetOptions{})
 	if err != nil {
 		return err
 	}
 	engine.Spec.EngineState = v1alpha1.EngineStateStop
 	_, err = clients.LitmusClient.ChaosEngines(chaosDetails.ChaosNamespace).Update(engine)
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
