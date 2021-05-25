@@ -24,7 +24,6 @@ type ExperimentDetails struct {
 	LIBImagePullPolicy  string
 	TargetContainer     string
 	SocketPath          string
-	Iterations          int
 	ChaosServiceAccount string
 	RunID               string
 	Timeout             int

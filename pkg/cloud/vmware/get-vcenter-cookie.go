@@ -7,9 +7,9 @@ import (
 	"net/http"
 
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/vmware/vm-poweroff/types"
-	"github.com/pkg/errors"
 )
 
+// Message contains attribute for message
 type Message struct {
 	MsgValue string `json:"value"`
 }
@@ -19,6 +19,9 @@ func GetVcenterSessionID(experimentsDetails *experimentTypes.ExperimentDetails) 
 
 	//Leverage Go's HTTP Post function to make request
 	req, err := http.NewRequest("POST", "https://"+experimentsDetails.VcenterServer+"/rest/com/vmware/cis/session", nil)
+	if err != nil {
+		return "", err
+	}
 	req.Header.Set("Content-Type", "application/json")
 	req.SetBasicAuth(experimentsDetails.VcenterUser, experimentsDetails.VcenterPass)
 	tr := &http.Transport{
@@ -29,11 +32,14 @@ func GetVcenterSessionID(experimentsDetails *experimentTypes.ExperimentDetails) 
 	resp, err := client.Do(req)
 	//Handle Error
 	if err != nil {
-		return "", errors.Errorf("%v", err)
+		return "", err
 	}
 	defer resp.Body.Close()
 	//Read the response body
 	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
 	var m Message
 	json.Unmarshal([]byte(body), &m)
 

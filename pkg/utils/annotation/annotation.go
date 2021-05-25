@@ -1,6 +1,8 @@
 package annotation
 
 import (
+	"strings"
+
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/types"
@@ -13,11 +15,11 @@ import (
 // IsPodParentAnnotated check whether the target pod's parent is annotated or not
 func IsPodParentAnnotated(clients clients.ClientSets, targetPod core_v1.Pod, chaosDetails *types.ChaosDetails) (bool, error) {
 
-	switch chaosDetails.AppDetail.Kind {
-	case "deployment", "deployments":
+	switch strings.ToLower(chaosDetails.AppDetail.Kind) {
+	case "deployment":
 		deployList, err := clients.KubeClient.AppsV1().Deployments(chaosDetails.AppDetail.Namespace).List(v1.ListOptions{LabelSelector: chaosDetails.AppDetail.Label})
 		if err != nil || len(deployList.Items) == 0 {
-			return false, errors.Errorf("No deployment found with matching label, err: %v", err)
+			return false, errors.Errorf("no deployment found with matching label, err: %v", err)
 		}
 		for _, deploy := range deployList.Items {
 			if deploy.ObjectMeta.Annotations[chaosDetails.AppDetail.AnnotationKey] == chaosDetails.AppDetail.AnnotationValue {
@@ -39,10 +41,10 @@ func IsPodParentAnnotated(clients clients.ClientSets, targetPod core_v1.Pod, cha
 				}
 			}
 		}
-	case "statefulset", "statefulsets":
+	case "statefulset":
 		stsList, err := clients.KubeClient.AppsV1().StatefulSets(chaosDetails.AppDetail.Namespace).List(v1.ListOptions{LabelSelector: chaosDetails.AppDetail.Label})
 		if err != nil || len(stsList.Items) == 0 {
-			return false, errors.Errorf("No statefulset found with matching label, err: %v", err)
+			return false, errors.Errorf("no statefulset found with matching label, err: %v", err)
 		}
 		for _, sts := range stsList.Items {
 			if sts.ObjectMeta.Annotations[chaosDetails.AppDetail.AnnotationKey] == chaosDetails.AppDetail.AnnotationValue {
@@ -55,10 +57,10 @@ func IsPodParentAnnotated(clients clients.ClientSets, targetPod core_v1.Pod, cha
 				}
 			}
 		}
-	case "daemonset", "daemonsets":
+	case "daemonset":
 		dsList, err := clients.KubeClient.AppsV1().DaemonSets(chaosDetails.AppDetail.Namespace).List(v1.ListOptions{LabelSelector: chaosDetails.AppDetail.Label})
 		if err != nil || len(dsList.Items) == 0 {
-			return false, errors.Errorf("No daemonset found with matching label, err: %v", err)
+			return false, errors.Errorf("no daemonset found with matching label, err: %v", err)
 		}
 		for _, ds := range dsList.Items {
 			if ds.ObjectMeta.Annotations[chaosDetails.AppDetail.AnnotationKey] == chaosDetails.AppDetail.AnnotationValue {
@@ -71,7 +73,7 @@ func IsPodParentAnnotated(clients clients.ClientSets, targetPod core_v1.Pod, cha
 				}
 			}
 		}
-	case "deploymentconfig", "deploymentconfigs":
+	case "deploymentconfig":
 		gvrdc := schema.GroupVersionResource{
 			Group:    "apps.openshift.io",
 			Version:  "v1",
@@ -79,7 +81,7 @@ func IsPodParentAnnotated(clients clients.ClientSets, targetPod core_v1.Pod, cha
 		}
 		deploymentConfigList, err := clients.DynamicClient.Resource(gvrdc).Namespace(chaosDetails.AppDetail.Namespace).List(v1.ListOptions{LabelSelector: chaosDetails.AppDetail.Label})
 		if err != nil || len(deploymentConfigList.Items) == 0 {
-			return false, errors.Errorf("No deploymentconfig found with matching labels, err: %v", err)
+			return false, errors.Errorf("no deploymentconfig found with matching labels, err: %v", err)
 		}
 		for _, dc := range deploymentConfigList.Items {
 			annotations := dc.GetAnnotations()
@@ -102,7 +104,7 @@ func IsPodParentAnnotated(clients clients.ClientSets, targetPod core_v1.Pod, cha
 				}
 			}
 		}
-	case "rollout", "rollouts":
+	case "rollout":
 		gvrro := schema.GroupVersionResource{
 			Group:    "argoproj.io",
 			Version:  "v1alpha1",
@@ -110,7 +112,7 @@ func IsPodParentAnnotated(clients clients.ClientSets, targetPod core_v1.Pod, cha
 		}
 		rolloutList, err := clients.DynamicClient.Resource(gvrro).Namespace(chaosDetails.AppDetail.Namespace).List(v1.ListOptions{LabelSelector: chaosDetails.AppDetail.Label})
 		if err != nil || len(rolloutList.Items) == 0 {
-			return false, errors.Errorf("No rollouts found with matching labels, err: %v", err)
+			return false, errors.Errorf("no rollouts found with matching labels, err: %v", err)
 		}
 		for _, ro := range rolloutList.Items {
 			annotations := ro.GetAnnotations()

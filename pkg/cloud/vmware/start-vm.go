@@ -2,15 +2,19 @@ package vmware
 
 import (
 	"crypto/tls"
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/vmware/vm-poweroff/types"
 	"net/http"
+
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/vmware/vm-poweroff/types"
 )
 
 //StartVM starts the VMWare VM
 func StartVM(experimentsDetails *experimentTypes.ExperimentDetails, cookie string) error {
 
 	//Leverage Go's HTTP Post function to make request
-	req, err := http.NewRequest("POST", "https://"+experimentsDetails.VcenterServer+"/rest/vcenter/vm/"+experimentsDetails.AppVmMoid+"/power/start", nil)
+	req, err := http.NewRequest("POST", "https://"+experimentsDetails.VcenterServer+"/rest/vcenter/vm/"+experimentsDetails.AppVMMoid+"/power/start", nil)
+	if err != nil {
+		return err
+	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Cookie", cookie)
 	tr := &http.Transport{

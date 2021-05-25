@@ -23,7 +23,7 @@ type ExperimentDetails struct {
 	ChaosPodName     string
 	Timeout          int
 	Delay            int
-	AppVmMoid        string
+	AppVMMoid        string
 	VcenterServer    string
 	VcenterUser      string
 	VcenterPass      string

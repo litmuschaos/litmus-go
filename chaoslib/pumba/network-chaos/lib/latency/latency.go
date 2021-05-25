@@ -9,20 +9,18 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/types"
 )
 
-var err error
-
 //PodNetworkLatencyChaos contains the steps to prepare and inject chaos
 func PodNetworkLatencyChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
-	args, err := GetContainerArguments(experimentsDetails)
+	args, err := getContainerArguments(experimentsDetails)
 	if err != nil {
 		return err
 	}
 	return network_chaos.PrepareAndInjectChaos(experimentsDetails, clients, resultDetails, eventsDetails, chaosDetails, args)
 }
 
-// GetContainerArguments derives the args for the pumba pod
-func GetContainerArguments(experimentsDetails *experimentTypes.ExperimentDetails) ([]string, error) {
+// getContainerArguments derives the args for the pumba pod
+func getContainerArguments(experimentsDetails *experimentTypes.ExperimentDetails) ([]string, error) {
 	baseArgs := []string{
 		"netem",
 		"--tc-image",
