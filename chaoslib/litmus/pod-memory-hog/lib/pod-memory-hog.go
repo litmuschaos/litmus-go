@@ -31,9 +31,9 @@ func StressMemory(MemoryConsumption int, containerName, podName, namespace strin
 
 	// It will contain all the pod & container details required for exec command
 	execCommandDetails := litmusexec.PodDetails{}
-	// The memory block size is 500M
-	// It will create a thread of dd process with each of size 500M
-	memoryConsumptionChunks := 500
+	// The memory block size is 100M
+	// It will create a thread of dd process with each of size 100M
+	memoryConsumptionChunks := 100
 	threads, memoryConsumptionRemainder := getMemoryConsumptionThreads(MemoryConsumption)
 
 	for i := 0; i < threads; i++ {
@@ -45,7 +45,7 @@ func StressMemory(MemoryConsumption int, containerName, podName, namespace strin
 		command := []string{"/bin/sh", "-c", ddCmd}
 
 		litmusexec.SetExecCommandAttributes(&execCommandDetails, podName, containerName, namespace)
-		_, err = litmusexec.Exec(&execCommandDetails, clients, command)
+		_, err := litmusexec.Exec(&execCommandDetails, clients, command)
 		stressErr <- err
 	}
 
@@ -56,12 +56,12 @@ func getMemoryConsumptionThreads(totalMemoryConsumption int) (numberOfMemoryBloc
 
 	switch true {
 
-	case totalMemoryConsumption < 500:
+	case totalMemoryConsumption < 100:
 		return 1, totalMemoryConsumption
 
 	default:
-		numberOfMemoryBlocks := totalMemoryConsumption / 500
-		memoryConsumptionRemainder := totalMemoryConsumption % 500
+		numberOfMemoryBlocks := totalMemoryConsumption / 100
+		memoryConsumptionRemainder := totalMemoryConsumption % 100
 		if memoryConsumptionRemainder != 0 {
 			numberOfMemoryBlocks++
 		}
