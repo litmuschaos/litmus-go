@@ -20,7 +20,7 @@ import (
 
 // prepareK8sProbe contains the steps to prepare the k8s probe
 // k8s probe can be used to add the probe which needs client-go for command execution, no extra binaries/command
-func prepareK8sProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails, clients clients.ClientSets, phase string, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+func prepareK8sProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails, clients clients.ClientSets, phase string, chaosDetails *types.ChaosDetails) error {
 	switch strings.ToLower(phase) {
 	case "prechaos":
 		if err := preChaosK8sProbe(probe, resultDetails, clients, chaosDetails); err != nil {

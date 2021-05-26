@@ -28,34 +28,38 @@ func RunProbes(chaosDetails *types.ChaosDetails, clients clients.ClientSets, res
 		return err
 	}
 
-	for _, probe := range probes {
-
-		switch strings.ToLower(probe.Type) {
-		case "k8sprobe":
-			// it contains steps to prepare the k8s probe
-			if err = prepareK8sProbe(probe, resultDetails, clients, phase, eventsDetails, chaosDetails); err != nil {
-				return errors.Errorf("probes failed, err: %v", err)
+	switch strings.ToLower(phase) {
+	//execute probes for the prechaos & duringchaos phase
+	case "prechaos", "duringchaos":
+		for _, probe := range probes {
+			if err := execute(probe, chaosDetails, clients, resultDetails, phase); err != nil {
+				return err
 			}
-		case "cmdprobe":
-			// it contains steps to prepare cmd probe
-			if err = prepareCmdProbe(probe, clients, chaosDetails, resultDetails, phase, eventsDetails); err != nil {
-				return errors.Errorf("probes failed, err: %v", err)
+		}
+	default:
+		// execute the probes for the postchaos phase
+		// it first evaluate the onchaos and continuous modes then it evaluates the other modes
+		// as onchaos and continuous probes are already completed
+		var probeError []error
+		for _, probe := range probes {
+			// evaluate continuous and onchaos probes
+			switch strings.ToLower(probe.Mode) {
+			case "onchaos", "continuous":
+				if err := execute(probe, chaosDetails, clients, resultDetails, phase); err != nil {
+					probeError = append(probeError, err)
+				}
 			}
-		case "httpprobe":
-			// it contains steps to prepare http probe
-			if err = prepareHTTPProbe(probe, clients, chaosDetails, resultDetails, phase, eventsDetails); err != nil {
-				return errors.Errorf("probes failed, err: %v", err)
+		}
+		if len(probeError) != 0 {
+			return errors.Errorf("probes failed, err: %v", probeError)
+		}
+		// executes the eot and edge modes
+		for _, probe := range probes {
+			if err := execute(probe, chaosDetails, clients, resultDetails, phase); err != nil {
+				return err
 			}
-		case "promprobe":
-			// it contains steps to prepare prom probe
-			if err = preparePromProbe(probe, clients, chaosDetails, resultDetails, phase, eventsDetails); err != nil {
-				return errors.Errorf("probes failed, err: %v", err)
-			}
-		default:
-			return errors.Errorf("No supported probe type found, type: %v", probe.Type)
 		}
 	}
-
 	return nil
 }
 
@@ -89,7 +93,7 @@ func SetProbeVerdictAfterFailure(resultDetails *types.ResultDetails) {
 	for index := range resultDetails.ProbeDetails {
 		for _, phase := range []string{"PreChaos", "PostChaos", "Continuous", "OnChaos"} {
 			if resultDetails.ProbeDetails[index].Status[phase] == "Awaited" {
-				resultDetails.ProbeDetails[index].Status[phase] = "Better Luck Next Time" + emoji.Sprint(" :thumbsdown:")
+				resultDetails.ProbeDetails[index].Status[phase] = "N/A" + emoji.Sprint(" :prohibited:")
 			}
 		}
 	}
@@ -294,4 +298,33 @@ func stopChaosEngine(probe v1alpha1.ProbeAttributes, clients clients.ClientSets,
 	engine.Spec.EngineState = v1alpha1.EngineStateStop
 	_, err = clients.LitmusClient.ChaosEngines(chaosDetails.ChaosNamespace).Update(engine)
 	return err
+}
+
+// execute contains steps to execute & evaluate probes in different modes at different phases
+func execute(probe v1alpha1.ProbeAttributes, chaosDetails *types.ChaosDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, phase string) error {
+	switch strings.ToLower(probe.Type) {
+	case "k8sprobe":
+		// it contains steps to prepare the k8s probe
+		if err = prepareK8sProbe(probe, resultDetails, clients, phase, chaosDetails); err != nil {
+			return errors.Errorf("probes failed, err: %v", err)
+		}
+	case "cmdprobe":
+		// it contains steps to prepare cmd probe
+		if err = prepareCmdProbe(probe, clients, chaosDetails, resultDetails, phase); err != nil {
+			return errors.Errorf("probes failed, err: %v", err)
+		}
+	case "httpprobe":
+		// it contains steps to prepare http probe
+		if err = prepareHTTPProbe(probe, clients, chaosDetails, resultDetails, phase); err != nil {
+			return errors.Errorf("probes failed, err: %v", err)
+		}
+	case "promprobe":
+		// it contains steps to prepare prom probe
+		if err = preparePromProbe(probe, clients, chaosDetails, resultDetails, phase); err != nil {
+			return errors.Errorf("probes failed, err: %v", err)
+		}
+	default:
+		return errors.Errorf("No supported probe type found, type: %v", probe.Type)
+	}
+	return nil
 }
