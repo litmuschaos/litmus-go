@@ -238,7 +238,7 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 					},
 					Args: []string{
 						"-c",
-						"./helper/network-chaos",
+						"./helpers -name network-chaos",
 					},
 					Resources: experimentsDetails.Resources,
 					Env:       getPodEnv(experimentsDetails, podName, args),
