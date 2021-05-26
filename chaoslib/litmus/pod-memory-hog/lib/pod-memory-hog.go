@@ -36,15 +36,15 @@ func StressMemory(MemoryConsumption int, containerName, podName, namespace strin
 	execCommandDetails := litmusexec.PodDetails{}
 	// The memory block size is 500M
 	// It will create a thread of dd process with each of size 500M
-	memoryToConsume := 500
-	iterations, extraMemory := getMemoryBlocks(MemoryConsumption)
+	memoryConsumptionChunks := 500
+	threads, memoryConsumptionRemainder := getMemoryConsumptionThreads(MemoryConsumption)
 
-	for i := 0; i < iterations; i++ {
+	for i := 0; i < threads; i++ {
 
-		if i == (iterations-1) && extraMemory != 0 {
-			memoryToConsume = extraMemory
+		if i == (threads-1) && memoryConsumptionRemainder != 0 {
+			memoryConsumptionChunks = memoryConsumptionRemainder
 		}
-		ddCmd := fmt.Sprintf("dd if=/dev/zero of=/dev/null bs=" + strconv.Itoa(memoryToConsume) + "M &")
+		ddCmd := fmt.Sprintf("dd if=/dev/zero of=/dev/null bs=" + strconv.Itoa(memoryConsumptionChunks) + "M &")
 		command := []string{"/bin/sh", "-c", ddCmd}
 
 		litmusexec.SetExecCommandAttributes(&execCommandDetails, podName, containerName, namespace)
@@ -54,8 +54,8 @@ func StressMemory(MemoryConsumption int, containerName, podName, namespace strin
 
 }
 
-//getMemoryBlocks will break the total memory into memory blocks of 2000M and return it
-func getMemoryBlocks(totalMemoryConsumption int) (numberOfMemoryBlocks, extraMemoryChunk int) {
+//getMemoryConsumptionThreads will break the total memory into memory blocks of 2000M and return it
+func getMemoryConsumptionThreads(totalMemoryConsumption int) (numberOfMemoryBlocks, memoryConsumptionRemainder int) {
 
 	switch true {
 
@@ -64,11 +64,11 @@ func getMemoryBlocks(totalMemoryConsumption int) (numberOfMemoryBlocks, extraMem
 
 	default:
 		numberOfMemoryBlocks := totalMemoryConsumption / 500
-		extraMemoryChunk := totalMemoryConsumption % 500
-		if extraMemoryChunk != 0 {
+		memoryConsumptionRemainder := totalMemoryConsumption % 500
+		if memoryConsumptionRemainder != 0 {
 			numberOfMemoryBlocks++
 		}
-		return numberOfMemoryBlocks, extraMemoryChunk
+		return numberOfMemoryBlocks, memoryConsumptionRemainder
 	}
 }
 
