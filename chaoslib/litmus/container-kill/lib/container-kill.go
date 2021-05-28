@@ -235,7 +235,7 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 					},
 					Args: []string{
 						"-c",
-						"./helper/container-killer",
+						"./helpers -name container-kill",
 					},
 					Resources: experimentsDetails.Resources,
 					Env:       getPodEnv(experimentsDetails, podName),
