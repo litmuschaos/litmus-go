@@ -22,7 +22,7 @@ jobs:
           make build-amd64
 
       #Install and configure a kind cluster
-      - name: Installing KinD Cluster cluster for the test
+      - name: Installing KinD cluster for the test
         uses: engineerd/setup-kind@v0.5.0
         with:
             version: "v0.7.0"
@@ -42,7 +42,7 @@ jobs:
       - name: Deploy a sample application for chaos injection
         run: |
           kubectl apply -f https://raw.githubusercontent.com/litmuschaos/chaos-ci-lib/master/app/nginx.yml
-          kubectl wait --for=condition=Ready pods --all --namespace default --timeout=60s
+          kubectl wait --for=condition=Ready pods --all --namespace default --timeout=90s
           
       - name: Setting up kubeconfig ENV for Github Chaos Action
         run: echo ::set-env name=KUBE_CONFIG_DATA::$(base64 -w 0 ~/.kube/config)
@@ -236,7 +236,7 @@ jobs:
           KUBECONFIG: /etc/rancher/k3s/k3s.yaml
         run: |
           curl -sfL https://get.k3s.io | sh -s - --docker --write-kubeconfig-mode 664
-          kubectl wait node --all --for condition=ready --timeout=60s
+          kubectl wait node --all --for condition=ready --timeout=90s
           kubectl get nodes
           
       - uses: actions/checkout@v2
@@ -281,7 +281,7 @@ jobs:
           KUBECONFIG: /etc/rancher/k3s/k3s.yaml
         run: |
           curl -sfL https://get.k3s.io | sh -s - --docker --write-kubeconfig-mode 664
-          kubectl wait node --all --for condition=ready --timeout=60s
+          kubectl wait node --all --for condition=ready --timeout=90s
           kubectl get nodes
 
       - uses: actions/checkout@v2
@@ -321,7 +321,7 @@ jobs:
           make build-amd64
 
       #Install and configure a kind cluster
-      - name: Installing KinD Cluster cluster for the test
+      - name: Installing KinD cluster for the test
         uses: engineerd/setup-kind@v0.5.0
         with:
             version: "v0.7.0"
