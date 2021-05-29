@@ -227,7 +227,7 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 					},
 					Args: []string{
 						"-c",
-						"./helper/disk-fill",
+						"./helpers -name disk-fill",
 					},
 					Resources: experimentsDetails.Resources,
 					Env:       getPodEnv(experimentsDetails, appName),
