@@ -15,4 +15,4 @@
 -   [ ] PR messages has upgrade related information
 -   [ ] Commit has unit tests
 -   [ ] Commit has integration tests
--   [ ] E2E run Required for the changges
+-   [ ] E2E run Required for the changes
