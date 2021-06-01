@@ -27,7 +27,7 @@ import (
 // cmd probe can be used to add the command probes
 // it can be of two types one: which need a source(an external image)
 // another: any inline command which can be run without source image, directly via go-runner image
-func prepareCmdProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, phase string, eventsDetails *types.EventDetails) error {
+func prepareCmdProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, phase string) error {
 
 	switch strings.ToLower(phase) {
 	case "prechaos":
@@ -193,8 +193,8 @@ func getRunID() string {
 }
 
 // triggerInlineContinuousCmdProbe trigger the inline continuous cmd probes
-func triggerInlineContinuousCmdProbe(probe v1alpha1.ProbeAttributes, chaosresult *types.ResultDetails) {
-
+func triggerInlineContinuousCmdProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets, chaosresult *types.ResultDetails, chaosDetails *types.ChaosDetails) {
+	var isExperimentFailed bool
 	// waiting for initial delay
 	if probe.RunProperties.InitialDelaySeconds != 0 {
 		log.Infof("[Wait]: Waiting for %vs before probe execution", probe.RunProperties.InitialDelaySeconds)
@@ -212,6 +212,7 @@ loop:
 				if chaosresult.ProbeDetails[index].Name == probe.Name {
 					chaosresult.ProbeDetails[index].IsProbeFailedWithError = err
 					log.Errorf("The %v cmd probe has been Failed, err: %v", probe.Name, err)
+					isExperimentFailed = true
 					break loop
 				}
 			}
@@ -219,11 +220,20 @@ loop:
 		// waiting for the probe polling interval
 		time.Sleep(time.Duration(probe.RunProperties.ProbePollingInterval) * time.Second)
 	}
+	// if experiment fails and stopOnfailure is provided as true then it will patch the chaosengine for abort
+	// if experiment fails but stopOnfailure is provided as false then it will continue the execution
+	// and failed the experiment in the end
+	if isExperimentFailed && probe.RunProperties.StopOnFailure {
+		if err := stopChaosEngine(probe, clients, chaosresult, chaosDetails); err != nil {
+			log.Errorf("unable to patch chaosengine to stop, err: %v", err)
+		}
+	}
 }
 
 // triggerInlineOnChaosCmdProbe trigger the inline onchaos cmd probes
-func triggerInlineOnChaosCmdProbe(probe v1alpha1.ProbeAttributes, chaosresult *types.ResultDetails, duration int) {
-
+func triggerInlineOnChaosCmdProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets, chaosresult *types.ResultDetails, chaosDetails *types.ChaosDetails) {
+	var isExperimentFailed bool
+	duration := chaosDetails.ChaosDuration
 	// waiting for initial delay
 	if probe.RunProperties.InitialDelaySeconds != 0 {
 		log.Infof("[Wait]: Waiting for %vs before probe execution", probe.RunProperties.InitialDelaySeconds)
@@ -251,6 +261,7 @@ loop:
 					if chaosresult.ProbeDetails[index].Name == probe.Name {
 						chaosresult.ProbeDetails[index].IsProbeFailedWithError = err
 						log.Errorf("The %v cmd probe has been Failed, err: %v", probe.Name, err)
+						isExperimentFailed = true
 						break loop
 					}
 				}
@@ -259,11 +270,21 @@ loop:
 			time.Sleep(time.Duration(probe.RunProperties.ProbePollingInterval) * time.Second)
 		}
 	}
+	// if experiment fails and stopOnfailure is provided as true then it will patch the chaosengine for abort
+	// if experiment fails but stopOnfailure is provided as false then it will continue the execution
+	// and failed the experiment in the end
+	if isExperimentFailed && probe.RunProperties.StopOnFailure {
+		if err := stopChaosEngine(probe, clients, chaosresult, chaosDetails); err != nil {
+			log.Errorf("unable to patch chaosengine to stop, err: %v", err)
+		}
+	}
 }
 
 // triggerSourceOnChaosCmdProbe trigger the onchaos cmd probes having need some external source image
-func triggerSourceOnChaosCmdProbe(probe v1alpha1.ProbeAttributes, execCommandDetails litmusexec.PodDetails, clients clients.ClientSets, chaosresult *types.ResultDetails, duration int) {
+func triggerSourceOnChaosCmdProbe(probe v1alpha1.ProbeAttributes, execCommandDetails litmusexec.PodDetails, clients clients.ClientSets, chaosresult *types.ResultDetails, chaosDetails *types.ChaosDetails) {
 
+	var isExperimentFailed bool
+	duration := chaosDetails.ChaosDuration
 	// waiting for initial delay
 	if probe.RunProperties.InitialDelaySeconds != 0 {
 		log.Infof("[Wait]: Waiting for %vs before probe execution", probe.RunProperties.InitialDelaySeconds)
@@ -291,6 +312,7 @@ loop:
 					if chaosresult.ProbeDetails[index].Name == probe.Name {
 						chaosresult.ProbeDetails[index].IsProbeFailedWithError = err
 						log.Errorf("The %v cmd probe has been Failed, err: %v", probe.Name, err)
+						isExperimentFailed = true
 						break loop
 					}
 				}
@@ -299,11 +321,21 @@ loop:
 			time.Sleep(time.Duration(probe.RunProperties.ProbePollingInterval) * time.Second)
 		}
 	}
+	// if experiment fails and stopOnfailure is provided as true then it will patch the chaosengine for abort
+	// if experiment fails but stopOnfailure is provided as false then it will continue the execution
+	// and failed the experiment in the end
+	if isExperimentFailed && probe.RunProperties.StopOnFailure {
+		if err := stopChaosEngine(probe, clients, chaosresult, chaosDetails); err != nil {
+			log.Errorf("unable to patch chaosengine to stop, err: %v", err)
+		}
+
+	}
 }
 
 // triggerSourceContinuousCmdProbe trigger the continuous cmd probes having need some external source image
-func triggerSourceContinuousCmdProbe(probe v1alpha1.ProbeAttributes, execCommandDetails litmusexec.PodDetails, clients clients.ClientSets, chaosresult *types.ResultDetails) {
+func triggerSourceContinuousCmdProbe(probe v1alpha1.ProbeAttributes, execCommandDetails litmusexec.PodDetails, clients clients.ClientSets, chaosresult *types.ResultDetails, chaosDetails *types.ChaosDetails) {
 
+	var isExperimentFailed bool
 	// waiting for initial delay
 	if probe.RunProperties.InitialDelaySeconds != 0 {
 		log.Infof("[Wait]: Waiting for %vs before probe execution", probe.RunProperties.InitialDelaySeconds)
@@ -321,12 +353,21 @@ loop:
 				if chaosresult.ProbeDetails[index].Name == probe.Name {
 					chaosresult.ProbeDetails[index].IsProbeFailedWithError = err
 					log.Errorf("The %v cmd probe has been Failed, err: %v", probe.Name, err)
+					isExperimentFailed = true
 					break loop
 				}
 			}
 		}
 		// waiting for the probe polling interval
 		time.Sleep(time.Duration(probe.RunProperties.ProbePollingInterval) * time.Second)
+	}
+	// if experiment fails and stopOnfailure is provided as true then it will patch the chaosengine for abort
+	// if experiment fails but stopOnfailure is provided as false then it will continue the execution
+	// and failed the experiment in the end
+	if isExperimentFailed && probe.RunProperties.StopOnFailure {
+		if err := stopChaosEngine(probe, clients, chaosresult, chaosDetails); err != nil {
+			log.Errorf("unable to patch chaosengine to stop, err: %v", err)
+		}
 	}
 }
 
@@ -387,7 +428,7 @@ func preChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 
 			// failing the probe, if the success condition doesn't met after the retry & timeout combinations
 			// it will update the status of all the unrun probes as well
-			if err := markedVerdictInEnd(err, resultDetails, probe.Name, probe.Mode, probe.Type, "PreChaos"); err != nil {
+			if err := markedVerdictInEnd(err, resultDetails, probe, "PreChaos"); err != nil {
 				return err
 			}
 		} else {
@@ -402,7 +443,7 @@ func preChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 
 			// failing the probe, if the success condition doesn't met after the retry & timeout combinations
 			// it will update the status of all the unrun probes as well
-			if err = markedVerdictInEnd(err, resultDetails, probe.Name, probe.Mode, probe.Type, "PreChaos"); err != nil {
+			if err = markedVerdictInEnd(err, resultDetails, probe, "PreChaos"); err != nil {
 				return err
 			}
 
@@ -428,7 +469,7 @@ func preChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 			"Phase":          "PreChaos",
 		})
 		if probe.CmdProbeInputs.Source == "inline" {
-			go triggerInlineContinuousCmdProbe(probe, resultDetails)
+			go triggerInlineContinuousCmdProbe(probe, clients, resultDetails, chaosDetails)
 		} else {
 
 			execCommandDetails, err := createHelperPod(probe, resultDetails, clients, chaosDetails, probe.CmdProbeInputs.Source)
@@ -437,7 +478,7 @@ func preChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 			}
 
 			// trigger the continuous cmd probe
-			go triggerSourceContinuousCmdProbe(probe, execCommandDetails, clients, resultDetails)
+			go triggerSourceContinuousCmdProbe(probe, execCommandDetails, clients, resultDetails, chaosDetails)
 		}
 
 	}
@@ -473,7 +514,7 @@ func postChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resu
 
 			// failing the probe, if the success condition doesn't met after the retry & timeout combinations
 			// it will update the status of all the unrun probes as well
-			if err = markedVerdictInEnd(err, resultDetails, probe.Name, probe.Mode, probe.Type, "PostChaos"); err != nil {
+			if err = markedVerdictInEnd(err, resultDetails, probe, "PostChaos"); err != nil {
 				return err
 			}
 		} else {
@@ -488,7 +529,7 @@ func postChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resu
 
 			// failing the probe, if the success condition doesn't met after the retry & timeout combinations
 			// it will update the status of all the unrun probes as well
-			if err = markedVerdictInEnd(err, resultDetails, probe.Name, probe.Mode, probe.Type, "PostChaos"); err != nil {
+			if err = markedVerdictInEnd(err, resultDetails, probe, "PostChaos"); err != nil {
 				return err
 			}
 
@@ -505,7 +546,7 @@ func postChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resu
 			// it will check for the error, It will detect the error if any error encountered in probe during chaos
 			err = checkForErrorInContinuousProbe(resultDetails, probe.Name)
 			// failing the probe, if the success condition doesn't met after the retry & timeout combinations
-			if err = markedVerdictInEnd(err, resultDetails, probe.Name, probe.Mode, probe.Type, "PostChaos"); err != nil {
+			if err = markedVerdictInEnd(err, resultDetails, probe, "PostChaos"); err != nil {
 				return err
 			}
 		} else {
@@ -513,7 +554,7 @@ func postChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resu
 			err = checkForErrorInContinuousProbe(resultDetails, probe.Name)
 
 			// failing the probe, if the success condition doesn't met after the retry & timeout combinations
-			if err = markedVerdictInEnd(err, resultDetails, probe.Name, probe.Mode, probe.Type, "PostChaos"); err != nil {
+			if err = markedVerdictInEnd(err, resultDetails, probe, "PostChaos"); err != nil {
 				return err
 			}
 			// get runId
@@ -545,16 +586,15 @@ func onChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Result
 			"Phase":          "DuringChaos",
 		})
 		if probe.CmdProbeInputs.Source == "inline" {
-			go triggerInlineOnChaosCmdProbe(probe, resultDetails, chaosDetails.ChaosDuration)
+			go triggerInlineOnChaosCmdProbe(probe, clients, resultDetails, chaosDetails)
 		} else {
 
 			execCommandDetails, err := createHelperPod(probe, resultDetails, clients, chaosDetails, probe.CmdProbeInputs.Source)
 			if err != nil {
 				return err
 			}
-
 			// trigger the continuous cmd probe
-			go triggerSourceOnChaosCmdProbe(probe, execCommandDetails, clients, resultDetails, chaosDetails.ChaosDuration)
+			go triggerSourceOnChaosCmdProbe(probe, execCommandDetails, clients, resultDetails, chaosDetails)
 		}
 
 	}
