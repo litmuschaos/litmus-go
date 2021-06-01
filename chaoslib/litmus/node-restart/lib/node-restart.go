@@ -18,7 +18,7 @@ import (
 	apiv1 "k8s.io/api/core/v1"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
+	corev1 "k8s.io/kubernetes/pkg/apis/core"
 )
 
 var err error
@@ -162,7 +162,7 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 							{
 								MatchFields: []apiv1.NodeSelectorRequirement{
 									{
-										Key:      schedulerapi.NodeFieldSelectorKeyNodeName,
+										Key:      corev1.ObjectNameField,
 										Operator: apiv1.NodeSelectorOpNotIn,
 										Values:   []string{experimentsDetails.TargetNode},
 									},
