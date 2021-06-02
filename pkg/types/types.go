@@ -49,6 +49,7 @@ type RegisterDetails struct {
 // ProbeDetails is for collecting all the probe details
 type ProbeDetails struct {
 	Name                   string
+	Phase                  string
 	Type                   string
 	Status                 map[string]string
 	IsProbeFailedWithError error

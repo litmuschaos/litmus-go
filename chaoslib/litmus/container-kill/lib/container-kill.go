@@ -235,7 +235,7 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 					},
 					Args: []string{
 						"-c",
-						"./helper/container-killer",
+						"./helpers -name container-kill",
 					},
 					Resources: experimentsDetails.Resources,
 					Env:       getPodEnv(experimentsDetails, podName),
@@ -260,30 +260,21 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 // getPodEnv derive all the env required for the helper pod
 func getPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, podName string) []apiv1.EnvVar {
 
-	var envVar []apiv1.EnvVar
-	ENVList := map[string]string{
-		"APP_NS":               experimentsDetails.AppNS,
-		"APP_POD":              podName,
-		"APP_CONTAINER":        experimentsDetails.TargetContainer,
-		"TOTAL_CHAOS_DURATION": strconv.Itoa(experimentsDetails.ChaosDuration),
-		"CHAOS_NAMESPACE":      experimentsDetails.ChaosNamespace,
-		"CHAOS_ENGINE":         experimentsDetails.EngineName,
-		"CHAOS_UID":            string(experimentsDetails.ChaosUID),
-		"CHAOS_INTERVAL":       strconv.Itoa(experimentsDetails.ChaosInterval),
-		"SOCKET_PATH":          experimentsDetails.SocketPath,
-		"CONTAINER_RUNTIME":    experimentsDetails.ContainerRuntime,
-		"SIGNAL":               experimentsDetails.Signal,
-	}
-	for key, value := range ENVList {
-		var perEnv apiv1.EnvVar
-		perEnv.Name = key
-		perEnv.Value = value
-		envVar = append(envVar, perEnv)
-	}
-	// Getting experiment pod name from downward API
-	experimentPodName := common.GetValueFromDownwardAPI("v1", "metadata.name")
-	envVar = append(envVar, apiv1.EnvVar{Name: "POD_NAME", ValueFrom: &experimentPodName})
-	return envVar
+	var envDetails common.ENVDetails
+	envDetails.SetEnv("APP_NS", experimentsDetails.AppNS).
+		SetEnv("APP_POD", podName).
+		SetEnv("APP_CONTAINER", experimentsDetails.TargetContainer).
+		SetEnv("TOTAL_CHAOS_DURATION", strconv.Itoa(experimentsDetails.ChaosDuration)).
+		SetEnv("CHAOS_NAMESPACE", experimentsDetails.ChaosNamespace).
+		SetEnv("CHAOS_ENGINE", experimentsDetails.EngineName).
+		SetEnv("CHAOS_UID", string(experimentsDetails.ChaosUID)).
+		SetEnv("CHAOS_INTERVAL", strconv.Itoa(experimentsDetails.ChaosInterval)).
+		SetEnv("SOCKET_PATH", experimentsDetails.SocketPath).
+		SetEnv("CONTAINER_RUNTIME", experimentsDetails.ContainerRuntime).
+		SetEnv("SIGNAL", experimentsDetails.Signal).
+		SetEnvFromDownwardAPI("v1", "metadata.name")
+
+	return envDetails.ENV
 }
 
 // setHelperData derive the data from experiment pod and sets into experimentDetails struct

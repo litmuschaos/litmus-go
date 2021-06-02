@@ -1,4 +1,4 @@
-package main
+package helper
 
 import (
 	"fmt"
@@ -27,10 +27,10 @@ var (
 	abort, injectAbort chan os.Signal
 )
 
-func main() {
+// Helper injects the dns chaos
+func Helper(clients clients.ClientSets) {
 
 	experimentsDetails := experimentTypes.ExperimentDetails{}
-	client := clients.ClientSets{}
 	eventsDetails := types.EventDetails{}
 	chaosDetails := types.ChaosDetails{}
 	resultDetails := types.ResultDetails{}
@@ -43,11 +43,6 @@ func main() {
 	// Catch and relay certain signal(s) to abort channel.
 	signal.Notify(abort, os.Interrupt, syscall.SIGTERM)
 
-	//Getting kubeConfig and Generate ClientSets
-	if err := client.GenerateClientSetFromKubeConfig(); err != nil {
-		log.Fatalf("Unable to Get the kubeconfig, err: %v", err)
-	}
-
 	//Fetching all the ENV passed for the helper pod
 	log.Info("[PreReq]: Getting the ENV variables")
 	getENV(&experimentsDetails)
@@ -59,9 +54,9 @@ func main() {
 	types.SetResultAttributes(&resultDetails, chaosDetails)
 
 	// Set the chaos result uid
-	result.SetResultUID(&resultDetails, client, &chaosDetails)
+	result.SetResultUID(&resultDetails, clients, &chaosDetails)
 
-	if err := preparePodDNSChaos(&experimentsDetails, client, &eventsDetails, &chaosDetails, &resultDetails); err != nil {
+	if err := preparePodDNSChaos(&experimentsDetails, clients, &eventsDetails, &chaosDetails, &resultDetails); err != nil {
 		log.Fatalf("helper pod failed, err: %v", err)
 	}
 
