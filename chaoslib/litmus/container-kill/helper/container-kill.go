@@ -1,4 +1,4 @@
-package main
+package helper
 
 import (
 	"bytes"
@@ -20,17 +20,12 @@ import (
 	clientTypes "k8s.io/apimachinery/pkg/types"
 )
 
-func main() {
+// Helper injects the container-kill chaos
+func Helper(clients clients.ClientSets) {
 
 	experimentsDetails := experimentTypes.ExperimentDetails{}
-	clients := clients.ClientSets{}
 	eventsDetails := types.EventDetails{}
 	chaosDetails := types.ChaosDetails{}
-
-	//Getting kubeConfig and Generate ClientSets
-	if err := clients.GenerateClientSetFromKubeConfig(); err != nil {
-		log.Fatalf("Unable to Get the kubeconfig, err: %v", err)
-	}
 
 	//Fetching all the ENV passed in the helper pod
 	log.Info("[PreReq]: Getting the ENV variables")

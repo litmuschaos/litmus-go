@@ -578,8 +578,8 @@ github.com/libopenstorage/openstorage v1.0.0/go.mod h1:Sp1sIObHjat1BeXhfMqLZ14wn
 github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de/go.mod h1:zAbeS9B/r2mtpb6U+EI2rYA5OAXxsYw6wTamcNW+zcE=
 github.com/lithammer/dedent v1.1.0 h1:VNzHMVCBNG1j0fh3OrsFRkVUwStdDArbgBWoPAffktY=
 github.com/lithammer/dedent v1.1.0/go.mod h1:jrXYCQtgg0nJiN+StA2KgR7w6CiQNv9Fd/Z9BP0jIOc=
-github.com/litmuschaos/chaos-operator v0.0.0-20210427130225-719c08eb082a h1:YqpecbNOq66TkeAuDxtZX2PdD4q4ovc1BsRoGnUPYF8=
-github.com/litmuschaos/chaos-operator v0.0.0-20210427130225-719c08eb082a/go.mod h1:QMjfAVIfwcpj/P1jikyz5+C5vWICiUXsFZMR7Ihnzro=
+github.com/litmuschaos/chaos-operator v0.0.0-20210601045805-bab1c1c4b082 h1:EVd89U+VeKgapeKl78Ly0hW+Os/vN3yoY6+8gLu3kVE=
+github.com/litmuschaos/chaos-operator v0.0.0-20210601045805-bab1c1c4b082/go.mod h1:QMjfAVIfwcpj/P1jikyz5+C5vWICiUXsFZMR7Ihnzro=
 github.com/litmuschaos/elves v0.0.0-20201107015738-552d74669e3c/go.mod h1:DsbHGNUq/78NZozWVVI9Q6eBei4I+JjlkkD5aibJ3MQ=
 github.com/logrusorgru/aurora v0.0.0-20181002194514-a7b3b318ed4e/go.mod h1:7rIyQOR62GCctdiQpZ/zOJlFyk6y+94wXzv6RNZgaR4=
 github.com/lpabon/godbc v0.1.1/go.mod h1:Jo9QV0cf3U6jZABgiJ2skINAXb9j8m51r07g4KI92ZA=
