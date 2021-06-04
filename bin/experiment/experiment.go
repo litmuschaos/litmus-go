@@ -35,6 +35,7 @@ import (
 	kafkaBrokerPodFailure "github.com/litmuschaos/litmus-go/experiments/kafka/kafka-broker-pod-failure/experiment"
 	ebsLossByID "github.com/litmuschaos/litmus-go/experiments/kube-aws/ebs-loss-by-id/experiment"
 	ebsLossByTag "github.com/litmuschaos/litmus-go/experiments/kube-aws/ebs-loss-by-tag/experiment"
+	ec2CPUStress "github.com/litmuschaos/litmus-go/experiments/kube-aws/ec2-cpu-stress/experiment"
 	ec2TerminateByID "github.com/litmuschaos/litmus-go/experiments/kube-aws/ec2-terminate-by-id/experiment"
 	ec2TerminateByTag "github.com/litmuschaos/litmus-go/experiments/kube-aws/ec2-terminate-by-tag/experiment"
 	vmpoweroff "github.com/litmuschaos/litmus-go/experiments/vmware/vm-poweroff/experiment"
@@ -108,6 +109,8 @@ func main() {
 		podNetworkLoss.PodNetworkLoss(clients)
 	case "cassandra-pod-delete":
 		cassandraPodDelete.CasssandraPodDelete(clients)
+	case "ec2-cpu-stress":
+		ec2CPUStress.Ec2CPUStress(clients)
 	case "ec2-terminate-by-id":
 		ec2TerminateByID.EC2TerminateByID(clients)
 	case "ec2-terminate-by-tag":
