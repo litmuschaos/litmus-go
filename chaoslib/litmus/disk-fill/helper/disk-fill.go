@@ -1,4 +1,4 @@
-package main
+package helper
 
 import (
 	"fmt"
@@ -27,10 +27,10 @@ import (
 
 var inject, abort chan os.Signal
 
-func main() {
+// Helper injects the disk-fill chaos
+func Helper(clients clients.ClientSets) {
 
 	experimentsDetails := experimentTypes.ExperimentDetails{}
-	clients := clients.ClientSets{}
 	eventsDetails := types.EventDetails{}
 	chaosDetails := types.ChaosDetails{}
 	resultDetails := types.ResultDetails{}
@@ -44,11 +44,6 @@ func main() {
 	abort = make(chan os.Signal, 1)
 	// Catch and relay certain signal(s) to abort channel.
 	signal.Notify(abort, os.Interrupt, syscall.SIGTERM)
-
-	//Getting kubeConfig and Generate ClientSets
-	if err := clients.GenerateClientSetFromKubeConfig(); err != nil {
-		log.Fatalf("Unable to Get the kubeconfig, err: %v", err)
-	}
 
 	//Fetching all the ENV passed in the helper pod
 	log.Info("[PreReq]: Getting the ENV variables")

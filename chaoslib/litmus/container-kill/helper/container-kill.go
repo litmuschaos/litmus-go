@@ -1,4 +1,4 @@
-package main
+package helper
 
 import (
 	"bytes"
@@ -20,17 +20,12 @@ import (
 	clientTypes "k8s.io/apimachinery/pkg/types"
 )
 
-func main() {
+// Helper injects the container-kill chaos
+func Helper(clients clients.ClientSets) {
 
 	experimentsDetails := experimentTypes.ExperimentDetails{}
-	clients := clients.ClientSets{}
 	eventsDetails := types.EventDetails{}
 	chaosDetails := types.ChaosDetails{}
-
-	//Getting kubeConfig and Generate ClientSets
-	if err := clients.GenerateClientSetFromKubeConfig(); err != nil {
-		log.Fatalf("Unable to Get the kubeconfig, err: %v", err)
-	}
 
 	//Fetching all the ENV passed in the helper pod
 	log.Info("[PreReq]: Getting the ENV variables")
@@ -171,8 +166,8 @@ func verifyRestartCount(experimentsDetails *experimentTypes.ExperimentDetails, p
 
 	restartCountAfter := 0
 	return retry.
-		Times(90).
-		Wait(1 * time.Second).
+		Times(uint(experimentsDetails.Timeout / experimentsDetails.Delay)).
+		Wait(time.Duration(experimentsDetails.Delay) * time.Second).
 		Try(func(attempt uint) error {
 			pod, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Get(podName, v1.GetOptions{})
 			if err != nil {
@@ -207,4 +202,6 @@ func getENV(experimentDetails *experimentTypes.ExperimentDetails, name string) {
 	experimentDetails.SocketPath = common.Getenv("SOCKET_PATH", "")
 	experimentDetails.ContainerRuntime = common.Getenv("CONTAINER_RUNTIME", "")
 	experimentDetails.Signal = common.Getenv("SIGNAL", "SIGKILL")
+	experimentDetails.Delay, _ = strconv.Atoi(common.Getenv("STATUS_CHECK_DELAY", "2"))
+	experimentDetails.Timeout, _ = strconv.Atoi(common.Getenv("STATUS_CHECK_TIMEOUT", "180"))
 }
