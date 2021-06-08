@@ -5,10 +5,9 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/litmuschaos/litmus-go/pkg/log"
+	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -18,10 +17,7 @@ import (
 func EC2Stop(instanceID, region string) error {
 
 	// Load session from shared config
-	sess := session.Must(session.NewSessionWithOptions(session.Options{
-		SharedConfigState: session.SharedConfigEnable,
-		Config:            aws.Config{Region: aws.String(region)},
-	}))
+	sess := common.GetAWSSession(region)
 
 	// Create new EC2 client
 	ec2Svc := ec2.New(sess)
@@ -33,14 +29,7 @@ func EC2Stop(instanceID, region string) error {
 	}
 	result, err := ec2Svc.StopInstances(input)
 	if err != nil {
-		if aerr, ok := err.(awserr.Error); ok {
-			switch aerr.Code() {
-			default:
-				return errors.Errorf(aerr.Error())
-			}
-		} else {
-			return errors.Errorf(err.Error())
-		}
+		return common.CheckAWSError(err)
 	}
 
 	log.InfoWithValues("Stopping ec2 instance:", logrus.Fields{
@@ -55,11 +44,7 @@ func EC2Stop(instanceID, region string) error {
 // EC2Start will stop an aws ec2 instance
 func EC2Start(instanceID, region string) error {
 
-	// Load session from shared config
-	sess := session.Must(session.NewSessionWithOptions(session.Options{
-		SharedConfigState: session.SharedConfigEnable,
-		Config:            aws.Config{Region: aws.String(region)},
-	}))
+	sess := common.GetAWSSession(region)
 
 	// Create new EC2 client
 	ec2Svc := ec2.New(sess)
@@ -72,14 +57,7 @@ func EC2Start(instanceID, region string) error {
 
 	result, err := ec2Svc.StartInstances(input)
 	if err != nil {
-		if aerr, ok := err.(awserr.Error); ok {
-			switch aerr.Code() {
-			default:
-				return errors.Errorf(aerr.Error())
-			}
-		} else {
-			return errors.Errorf(err.Error())
-		}
+		return common.CheckAWSError(err)
 	}
 
 	log.InfoWithValues("Starting ec2 instance:", logrus.Fields{
@@ -146,10 +124,7 @@ func GetInstanceList(instanceTag, region string) ([]string, error) {
 
 	default:
 		instanceTag := strings.Split(instanceTag, ":")
-		sess := session.Must(session.NewSessionWithOptions(session.Options{
-			SharedConfigState: session.SharedConfigEnable,
-			Config:            aws.Config{Region: aws.String(region)},
-		}))
+		sess := common.GetAWSSession(region)
 
 		params := &ec2.DescribeInstancesInput{
 			Filters: []*ec2.Filter{

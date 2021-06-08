@@ -4,12 +4,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/status"
+	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
 	"github.com/pkg/errors"
 	apiv1 "k8s.io/api/core/v1"
@@ -21,10 +20,7 @@ func GetEC2InstanceStatus(instanceID, region string) (string, error) {
 
 	var err error
 	// Load session from shared config
-	sess := session.Must(session.NewSessionWithOptions(session.Options{
-		SharedConfigState: session.SharedConfigEnable,
-		Config:            aws.Config{Region: aws.String(region)},
-	}))
+	sess := common.GetAWSSession(region)
 
 	// Create new EC2 client
 	ec2Svc := ec2.New(sess)

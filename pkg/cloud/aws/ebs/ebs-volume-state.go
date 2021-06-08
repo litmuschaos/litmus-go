@@ -4,12 +4,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/kube-aws/ebs-loss/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
+	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -65,10 +63,7 @@ func WaitForVolumeAttachment(ebsVolumeID, ec2InstanceID, region string, delay, t
 func GetEBSStatus(ebsVolumeID, ec2InstanceID, region string) (string, error) {
 
 	// Load session from shared config
-	sess := session.Must(session.NewSessionWithOptions(session.Options{
-		SharedConfigState: session.SharedConfigEnable,
-		Config:            aws.Config{Region: aws.String(region)},
-	}))
+	sess := common.GetAWSSession(region)
 
 	// Create new EC2 client
 	ec2Svc := ec2.New(sess)
@@ -77,14 +72,7 @@ func GetEBSStatus(ebsVolumeID, ec2InstanceID, region string) (string, error) {
 	// Call to get detailed information on each instance
 	result, err := ec2Svc.DescribeVolumes(input)
 	if err != nil {
-		if aerr, ok := err.(awserr.Error); ok {
-			switch aerr.Code() {
-			default:
-				return "", errors.Errorf(aerr.Error())
-			}
-		} else {
-			return "", errors.Errorf(err.Error())
-		}
+		return "", common.CheckAWSError(err)
 	}
 
 	for _, volumeDetails := range result.Volumes {

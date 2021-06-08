@@ -5,15 +5,15 @@ import (
 
 	clientTypes "k8s.io/apimachinery/pkg/types"
 
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/kube-aws/ec2-cpu-stress/types"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/aws-ssm/aws-ssm-chaos/types"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 )
 
 //GetENV fetches all the env variables from the runner pod
-func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
-	experimentDetails.ExperimentName = common.Getenv("EXPERIMENT_NAME", "ec2-terminate-by-id")
-	experimentDetails.ChaosNamespace = common.Getenv("CHAOS_NAMESPACE", "litmus")
+func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string) {
+	experimentDetails.ExperimentName = common.Getenv("EXPERIMENT_NAME", "")
+	experimentDetails.ChaosNamespace = common.Getenv("CHAOS_NAMESPACE", "default")
 	experimentDetails.EngineName = common.Getenv("CHAOSENGINE", "")
 	experimentDetails.AppNS = common.Getenv("APP_NAMESPACE", "")
 	experimentDetails.AppLabel = common.Getenv("APP_LABEL", "")
@@ -28,11 +28,23 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.ChaosPodName = common.Getenv("POD_NAME", "")
 	experimentDetails.Delay, _ = strconv.Atoi(common.Getenv("STATUS_CHECK_DELAY", "2"))
 	experimentDetails.Timeout, _ = strconv.Atoi(common.Getenv("STATUS_CHECK_TIMEOUT", "180"))
-	experimentDetails.Ec2InstanceID = common.Getenv("EC2_INSTANCE_ID", "i-0ab4a042614ecc644")
+	experimentDetails.DocumentName = common.Getenv("DOCUMENT_NAME", "LitmusChaos-AWS-SSM-Doc")
+	experimentDetails.DocumentType = common.Getenv("DOCUMENT_TYPE", "Command")
+	experimentDetails.DocumentFormat = common.Getenv("DOCUMENT_FORMAT", "YAML")
+	experimentDetails.DocumentPath = common.Getenv("DOCUMENT_PATH", "pkg/utils/ssm-docs/LitmusChaos-AWS-SSM-Docs.yml")
+	experimentDetails.EC2InstanceID = common.Getenv("EC2_INSTANCE_ID", "i-0043151174f2bbefb,i-07faff1f023c77185")
 	experimentDetails.Region = common.Getenv("REGION", "us-west-2")
-	experimentDetails.ManagedNodegroup = common.Getenv("MANAGED_NODEGROUP", "disable")
-	experimentDetails.Sequence = common.Getenv("SEQUENCE", "serial")
+	experimentDetails.Cpu, _ = strconv.Atoi(common.Getenv("CPU", "1"))
+	experimentDetails.NumberOfWorkers, _ = strconv.Atoi(common.Getenv("NUMBER_OF_WORKERS", "1"))
+	experimentDetails.MemoryPercentage, _ = strconv.Atoi(common.Getenv("MEMORY_PERCENTAGE", "1"))
+	experimentDetails.InstallDependencies = common.Getenv("INSTALL_DEPENDENCIES", "True")
+	experimentDetails.Sequence = common.Getenv("SEQUENCE", "parallel")
+
 	experimentDetails.TargetContainer = common.Getenv("TARGET_CONTAINER", "")
+	if expName == "aws-ssm-chaos-by-tag" {
+		experimentDetails.EC2InstanceTag = common.Getenv("EC2_INSTANCE_TAG", "team:devops")
+		experimentDetails.InstanceAffectedPerc, _ = strconv.Atoi(common.Getenv("INSTANCE_AFFECTED_PERC", "100"))
+	}
 }
 
 //InitialiseChaosVariables initialise all the global variables

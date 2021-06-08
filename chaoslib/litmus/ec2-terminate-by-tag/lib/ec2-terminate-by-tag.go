@@ -8,7 +8,7 @@ import (
 	"time"
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
-	awslib "github.com/litmuschaos/litmus-go/pkg/cloud/aws"
+	awslib "github.com/litmuschaos/litmus-go/pkg/cloud/aws/ec2"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/kube-aws/ec2-terminate-by-tag/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"

@@ -4,11 +4,10 @@ import (
 	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/kube-aws/ebs-loss/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
+	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -17,10 +16,7 @@ import (
 func EBSVolumeDetach(ebsVolumeID, region string) error {
 
 	// Load session from shared config
-	sess := session.Must(session.NewSessionWithOptions(session.Options{
-		SharedConfigState: session.SharedConfigEnable,
-		Config:            aws.Config{Region: aws.String(region)},
-	}))
+	sess := common.GetAWSSession(region)
 
 	// Create new EC2 client
 	ec2Svc := ec2.New(sess)
@@ -30,14 +26,7 @@ func EBSVolumeDetach(ebsVolumeID, region string) error {
 
 	result, err := ec2Svc.DetachVolume(input)
 	if err != nil {
-		if aerr, ok := err.(awserr.Error); ok {
-			switch aerr.Code() {
-			default:
-				return errors.Errorf(aerr.Error())
-			}
-		} else {
-			return errors.Errorf(err.Error())
-		}
+		return common.CheckAWSError(err)
 	}
 
 	log.InfoWithValues("Detaching ebs having:", logrus.Fields{
@@ -54,10 +43,7 @@ func EBSVolumeDetach(ebsVolumeID, region string) error {
 func EBSVolumeAttach(ebsVolumeID, ec2InstanceID, deviceName, region string) error {
 
 	// Load session from shared config
-	sess := session.Must(session.NewSessionWithOptions(session.Options{
-		SharedConfigState: session.SharedConfigEnable,
-		Config:            aws.Config{Region: aws.String(region)},
-	}))
+	sess := common.GetAWSSession(region)
 
 	// Create new EC2 client
 	ec2Svc := ec2.New(sess)
@@ -71,14 +57,7 @@ func EBSVolumeAttach(ebsVolumeID, ec2InstanceID, deviceName, region string) erro
 
 	result, err := ec2Svc.AttachVolume(input)
 	if err != nil {
-		if aerr, ok := err.(awserr.Error); ok {
-			switch aerr.Code() {
-			default:
-				return errors.Errorf(aerr.Error())
-			}
-		} else {
-			return errors.Errorf(err.Error())
-		}
+		return common.CheckAWSError(err)
 	}
 
 	log.InfoWithValues("Attaching ebs having:", logrus.Fields{
@@ -93,10 +72,7 @@ func EBSVolumeAttach(ebsVolumeID, ec2InstanceID, deviceName, region string) erro
 //SetTargetVolumeIDs will filter out the volume under chaos
 func SetTargetVolumeIDs(experimentsDetails *experimentTypes.ExperimentDetails) error {
 
-	sess := session.Must(session.NewSessionWithOptions(session.Options{
-		SharedConfigState: session.SharedConfigEnable,
-		Config:            aws.Config{Region: aws.String(experimentsDetails.Region)},
-	}))
+	sess := common.GetAWSSession(experimentsDetails.Region)
 
 	params := getVolumeFilter(experimentsDetails.VolumeTag)
 	ec2Svc := ec2.New(sess)
@@ -125,10 +101,7 @@ func SetTargetVolumeIDs(experimentsDetails *experimentTypes.ExperimentDetails) e
 //GetVolumeAttachmentDetails will give the attachment information of the ebs volume
 func GetVolumeAttachmentDetails(volumeID, volumeTag, region string) (string, string, error) {
 
-	sess := session.Must(session.NewSessionWithOptions(session.Options{
-		SharedConfigState: session.SharedConfigEnable,
-		Config:            aws.Config{Region: aws.String(region)},
-	}))
+	sess := common.GetAWSSession(region)
 
 	ec2Svc := ec2.New(sess)
 	param := getVolumeFilter(volumeTag)
