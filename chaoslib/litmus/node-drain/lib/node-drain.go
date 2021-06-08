@@ -134,8 +134,8 @@ func drainNode(experimentsDetails *experimentTypes.ExperimentDetails, clients cl
 		}
 
 		return retry.
-			Times(90).
-			Wait(1 * time.Second).
+			Times(uint(experimentsDetails.Timeout / experimentsDetails.Delay)).
+			Wait(time.Duration(experimentsDetails.Delay) * time.Second).
 			Try(func(attempt uint) error {
 				nodeSpec, err := clients.KubeClient.CoreV1().Nodes().Get(experimentsDetails.TargetNode, v1.GetOptions{})
 				if err != nil {
@@ -165,8 +165,8 @@ func uncordonNode(experimentsDetails *experimentTypes.ExperimentDetails, clients
 	}
 
 	return retry.
-		Times(90).
-		Wait(1 * time.Second).
+		Times(uint(experimentsDetails.Timeout / experimentsDetails.Delay)).
+		Wait(time.Duration(experimentsDetails.Delay) * time.Second).
 		Try(func(attempt uint) error {
 			nodeSpec, err := clients.KubeClient.CoreV1().Nodes().Get(experimentsDetails.TargetNode, v1.GetOptions{})
 			if err != nil {

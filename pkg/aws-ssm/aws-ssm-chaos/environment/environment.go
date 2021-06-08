@@ -13,7 +13,7 @@ import (
 //GetENV fetches all the env variables from the runner pod
 func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string) {
 	experimentDetails.ExperimentName = common.Getenv("EXPERIMENT_NAME", "")
-	experimentDetails.ChaosNamespace = common.Getenv("CHAOS_NAMESPACE", "default")
+	experimentDetails.ChaosNamespace = common.Getenv("CHAOS_NAMESPACE", "litmus")
 	experimentDetails.EngineName = common.Getenv("CHAOSENGINE", "")
 	experimentDetails.AppNS = common.Getenv("APP_NAMESPACE", "")
 	experimentDetails.AppLabel = common.Getenv("APP_LABEL", "")
@@ -32,18 +32,18 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string
 	experimentDetails.DocumentType = common.Getenv("DOCUMENT_TYPE", "Command")
 	experimentDetails.DocumentFormat = common.Getenv("DOCUMENT_FORMAT", "YAML")
 	experimentDetails.DocumentPath = common.Getenv("DOCUMENT_PATH", "pkg/utils/ssm-docs/LitmusChaos-AWS-SSM-Docs.yml")
-	experimentDetails.EC2InstanceID = common.Getenv("EC2_INSTANCE_ID", "i-0043151174f2bbefb,i-07faff1f023c77185")
-	experimentDetails.Region = common.Getenv("REGION", "us-west-2")
+	experimentDetails.EC2InstanceID = common.Getenv("EC2_INSTANCE_ID", "")
+	experimentDetails.Region = common.Getenv("REGION", "")
 	experimentDetails.Cpu, _ = strconv.Atoi(common.Getenv("CPU", "1"))
 	experimentDetails.NumberOfWorkers, _ = strconv.Atoi(common.Getenv("NUMBER_OF_WORKERS", "1"))
-	experimentDetails.MemoryPercentage, _ = strconv.Atoi(common.Getenv("MEMORY_PERCENTAGE", "1"))
+	experimentDetails.MemoryPercentage, _ = strconv.Atoi(common.Getenv("MEMORY_PERCENTAGE", "80"))
 	experimentDetails.InstallDependencies = common.Getenv("INSTALL_DEPENDENCIES", "True")
 	experimentDetails.Sequence = common.Getenv("SEQUENCE", "parallel")
 
 	experimentDetails.TargetContainer = common.Getenv("TARGET_CONTAINER", "")
 	if expName == "aws-ssm-chaos-by-tag" {
-		experimentDetails.EC2InstanceTag = common.Getenv("EC2_INSTANCE_TAG", "team:devops")
-		experimentDetails.InstanceAffectedPerc, _ = strconv.Atoi(common.Getenv("INSTANCE_AFFECTED_PERC", "100"))
+		experimentDetails.EC2InstanceTag = common.Getenv("EC2_INSTANCE_TAG", "")
+		experimentDetails.InstanceAffectedPerc, _ = strconv.Atoi(common.Getenv("INSTANCE_AFFECTED_PERC", "0"))
 	}
 }
 

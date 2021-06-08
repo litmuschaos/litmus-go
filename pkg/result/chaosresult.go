@@ -74,7 +74,7 @@ func ChaosResult(chaosDetails *types.ChaosDetails, clients clients.ClientSets, r
 //InitializeChaosResult create the chaos result
 func InitializeChaosResult(chaosDetails *types.ChaosDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, chaosResultLabel map[string]string) error {
 
-	probeStatus := GetProbeStatus(resultDetails)
+	_, probeStatus := GetProbeStatus(resultDetails)
 	chaosResult := &v1alpha1.ChaosResult{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      resultDetails.Name,
@@ -127,7 +127,8 @@ func InitializeChaosResult(chaosDetails *types.ChaosDetails, clients clients.Cli
 }
 
 //GetProbeStatus fetch status of all probes
-func GetProbeStatus(resultDetails *types.ResultDetails) []v1alpha1.ProbeStatus {
+func GetProbeStatus(resultDetails *types.ResultDetails) (bool, []v1alpha1.ProbeStatus) {
+	isAllProbePassed := true
 
 	probeStatus := []v1alpha1.ProbeStatus{}
 	for _, probe := range resultDetails.ProbeDetails {
@@ -136,23 +137,31 @@ func GetProbeStatus(resultDetails *types.ResultDetails) []v1alpha1.ProbeStatus {
 		probes.Type = probe.Type
 		probes.Status = probe.Status
 		probeStatus = append(probeStatus, probes)
+		if probe.Phase == "Failed" {
+			isAllProbePassed = false
+		}
 	}
-	return probeStatus
+	return isAllProbePassed, probeStatus
 }
 
 //PatchChaosResult Update the chaos result
 func PatchChaosResult(result *v1alpha1.ChaosResult, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, chaosResultLabel map[string]string) error {
 
+	var isAllProbePassed bool
 	result.Status.ExperimentStatus.Phase = resultDetails.Phase
-	result.Status.ExperimentStatus.Verdict = resultDetails.Verdict
 	result.Spec.InstanceID = chaosDetails.InstanceID
 	result.Status.ExperimentStatus.FailStep = resultDetails.FailStep
 	// for existing chaos result resource it will patch the label
 	result.ObjectMeta.Labels = chaosResultLabel
-	result.Status.ProbeStatus = GetProbeStatus(resultDetails)
+	isAllProbePassed, result.Status.ProbeStatus = GetProbeStatus(resultDetails)
+	result.Status.ExperimentStatus.Verdict = resultDetails.Verdict
 
 	switch strings.ToLower(resultDetails.Phase) {
 	case "completed":
+		if !isAllProbePassed {
+			resultDetails.Verdict = "Fail"
+			result.Status.ExperimentStatus.Verdict = "Fail"
+		}
 		switch strings.ToLower(resultDetails.Verdict) {
 		case "pass":
 			result.Status.ExperimentStatus.ProbeSuccessPercentage = "100"
