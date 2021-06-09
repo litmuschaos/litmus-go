@@ -82,102 +82,111 @@ func Helper(clients clients.ClientSets) {
 //prepareStressChaos contains the chaos preparation and injection steps
 func prepareStressChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails) error {
 
-	containerID, err := getContainerID(experimentsDetails, clients)
-	if err != nil {
-		return err
-	}
-	// extract out the pid of the target container
-	targetPID, err := getPID(experimentsDetails, containerID)
-	if err != nil {
-		return err
-	}
-
-	// record the event inside chaosengine
-	if experimentsDetails.EngineName != "" {
-		msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on application pod"
-		types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
-		events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
-	}
-
-	//get the pid path and check cgroup
-	path := pidPath(int(targetPID))
-	cgroup, err := findValidCgroup(path, containerID)
-	if err != nil {
-		return errors.Errorf("fail to get cgroup, err: %v", err)
-	}
-
-	// load the existing cgroup
-	control, err := cgroups.Load(cgroups.V1, cgroups.StaticPath(cgroup))
-	if err != nil {
-		return errors.Errorf("fail to load the cgroup, err: %v", err)
-	}
-
-	// get stressors list format
-	stressorList := prepareStressor(experimentsDetails)
-	if len(stressorList) == 0 {
-		return errors.Errorf("fail to prepare stressor for %v experiment", experimentsDetails.ExperimentName)
-	}
-	stressors := strings.Join(stressorList, " ")
-	stressCommand := "pause nsutil -t " + strconv.Itoa(targetPID) + " -p -- " + stressors
-	log.Infof("[Info]: starting process: %v", stressCommand)
-
-	// launch the stress-ng process on the target container in paused mode
-	cmd := exec.Command("/bin/bash", "-c", stressCommand)
-	var buf bytes.Buffer
-	cmd.Stdout = &buf
-	err = cmd.Start()
-	if err != nil {
-		return errors.Errorf("fail to start the stress process %v, err: %v", stressCommand, err)
-	}
-
-	// watching for the abort signal and revert the chaos if an abort signal is received
-	go abortWatcher(cmd.Process.Pid)
-
-	// add the stress process to the cgroup of target container
-	if err = control.Add(cgroups.Process{Pid: cmd.Process.Pid}); err != nil {
-		if killErr := cmd.Process.Kill(); killErr != nil {
-			return errors.Errorf("stressors failed killing %v process, err: %v", cmd.Process.Pid, killErr)
-		}
-		return errors.Errorf("fail to add the stress process into target container cgroup, err: %v", err)
-	}
-
-	log.Info("[Info]: Sending signal to resume the stress process")
-	// wait for the process to start before sending the resume signal
-	time.Sleep(700 * time.Millisecond)
-
-	// remove pause and resume or start the stress process
-	if err := cmd.Process.Signal(syscall.SIGCONT); err != nil {
-		return errors.Errorf("fail to remove pause and start the stress process: %v", err)
-	}
-
-	log.Info("[Wait]: Waiting for chaos completion")
-	// channel to check the completion of the stress process
-	done := make(chan error)
-	go func() { done <- cmd.Wait() }()
-
-	// check the timeout for the command
-	timeout := time.After((time.Duration(experimentsDetails.ChaosDuration) + 10) * time.Second)
-
 	select {
-	case <-timeout:
-		// the stress process gets timeout before completion
-		log.Infof("[Timeout] Stress output: %v", buf.String())
-		log.Info("[Cleaup]: Kill the stress process")
-		terminateProcess(cmd.Process.Pid)
-		return errors.Errorf("the stress process is timeout after %vs", experimentsDetails.ChaosDuration+10)
-	case err := <-done:
+	case <-inject:
+		// stopping the chaos execution, if abort signal recieved
+		os.Exit(1)
+	default:
+
+		containerID, err := getContainerID(experimentsDetails, clients)
 		if err != nil {
-			err, ok := err.(*exec.ExitError)
-			if ok {
-				status := err.Sys().(syscall.WaitStatus)
-				if status.Signaled() && status.Signal() == syscall.SIGTERM {
-					return errors.Errorf("process stopped with SIGTERM signal")
-				}
-			}
-			return errors.Errorf("error process exited accidentally", err)
+			return err
 		}
-		log.Info("[Info]: Chaos injection completed")
-		terminateProcess(cmd.Process.Pid)
+		// extract out the pid of the target container
+		targetPID, err := getPID(experimentsDetails, containerID)
+		if err != nil {
+			return err
+		}
+
+		// record the event inside chaosengine
+		if experimentsDetails.EngineName != "" {
+			msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on application pod"
+			types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
+			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
+		}
+
+		//get the pid path and check cgroup
+		path := pidPath(int(targetPID))
+		cgroup, err := findValidCgroup(path, containerID)
+		if err != nil {
+			return errors.Errorf("fail to get cgroup, err: %v", err)
+		}
+
+		// load the existing cgroup
+		control, err := cgroups.Load(cgroups.V1, cgroups.StaticPath(cgroup))
+		if err != nil {
+			return errors.Errorf("fail to load the cgroup, err: %v", err)
+		}
+
+		// get stressors in list format
+		stressorList := prepareStressor(experimentsDetails)
+		if len(stressorList) == 0 {
+			return errors.Errorf("fail to prepare stressor for %v experiment", experimentsDetails.ExperimentName)
+		}
+		stressors := strings.Join(stressorList, " ")
+		stressCommand := "pause nsutil -t " + strconv.Itoa(targetPID) + " -p -- " + stressors
+		log.Infof("[Info]: starting process: %v", stressCommand)
+
+		// launch the stress-ng process on the target container in paused mode
+		cmd := exec.Command("/bin/bash", "-c", stressCommand)
+		var buf bytes.Buffer
+		cmd.Stdout = &buf
+		err = cmd.Start()
+		if err != nil {
+			return errors.Errorf("fail to start the stress process %v, err: %v", stressCommand, err)
+		}
+
+		// watching for the abort signal and revert the chaos if an abort signal is received
+		go abortWatcher(cmd.Process.Pid)
+
+		// add the stress process to the cgroup of target container
+		if err = control.Add(cgroups.Process{Pid: cmd.Process.Pid}); err != nil {
+			if killErr := cmd.Process.Kill(); killErr != nil {
+				return errors.Errorf("stressors failed killing %v process, err: %v", cmd.Process.Pid, killErr)
+			}
+			return errors.Errorf("fail to add the stress process into target container cgroup, err: %v", err)
+		}
+
+		log.Info("[Info]: Sending signal to resume the stress process")
+		// wait for the process to start before sending the resume signal
+		// TODO: need a dynamic way to check the start of the process
+		time.Sleep(700 * time.Millisecond)
+
+		// remove pause and resume or start the stress process
+		if err := cmd.Process.Signal(syscall.SIGCONT); err != nil {
+			return errors.Errorf("fail to remove pause and start the stress process: %v", err)
+		}
+
+		log.Info("[Wait]: Waiting for chaos completion")
+		// channel to check the completion of the stress process
+		done := make(chan error)
+		go func() { done <- cmd.Wait() }()
+
+		// check the timeout for the command
+		// Note: timeout will occur when process didn't complete even after 10s of chaos duration
+		timeout := time.After((time.Duration(experimentsDetails.ChaosDuration) + 10) * time.Second)
+
+		select {
+		case <-timeout:
+			// the stress process gets timeout before completion
+			log.Infof("[Timeout] Stress output: %v", buf.String())
+			log.Info("[Cleaup]: Killing the stress process")
+			terminateProcess(cmd.Process.Pid)
+			return errors.Errorf("the stress process is timeout after %vs", experimentsDetails.ChaosDuration+10)
+		case err := <-done:
+			if err != nil {
+				err, ok := err.(*exec.ExitError)
+				if ok {
+					status := err.Sys().(syscall.WaitStatus)
+					if status.Signaled() && status.Signal() == syscall.SIGTERM {
+						return errors.Errorf("process stopped with SIGTERM signal")
+					}
+				}
+				return errors.Errorf("error process exited accidentally", err)
+			}
+			log.Info("[Info]: Chaos injection completed")
+			terminateProcess(cmd.Process.Pid)
+		}
 	}
 	return nil
 }

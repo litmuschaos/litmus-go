@@ -228,7 +228,7 @@ loop:
 	return nil
 }
 
-//PrepareMemoryExecStress contains the steps for prepration before chaos
+//PrepareMemoryExecStress contains the chaos prepration and injection steps
 func PrepareMemoryExecStress(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	//Waiting for the ramp time before chaos injection

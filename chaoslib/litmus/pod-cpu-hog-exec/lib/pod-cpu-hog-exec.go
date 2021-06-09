@@ -224,7 +224,7 @@ loop:
 	return nil
 }
 
-//PrepareCPUExecStress contains the steps for prepration before chaos
+//PrepareCPUExecStress contains the chaos prepration and injection steps
 func PrepareCPUExecStress(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	//Waiting for the ramp time before chaos injection

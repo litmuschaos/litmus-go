@@ -136,7 +136,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 	return nil
 }
 
-// injectChaosInParallelMode inject the network chaos in all target application in parallel mode (all at once)
+// injectChaosInParallelMode inject the stress chaos in all target application in parallel mode (all at once)
 func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
 
 	labelSuffix := common.GetRunID()
@@ -148,7 +148,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		}
 	}
 
-	// creating the helper pod to perform network chaos
+	// creating the helper pod to perform stress chaos
 	for _, pod := range targetPodList.Items {
 
 		log.InfoWithValues("[Info]: Details of application under chaos injection", logrus.Fields{
