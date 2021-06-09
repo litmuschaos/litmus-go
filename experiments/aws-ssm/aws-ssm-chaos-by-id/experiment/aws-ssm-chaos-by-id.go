@@ -55,6 +55,11 @@ func AWSSSMChaosByID(clients clients.ClientSets) {
 	// Set the chaos result uid
 	result.SetResultUID(&resultDetails, clients, &chaosDetails)
 
+	// generating the event in chaosresult to marked the verdict as awaited
+	msg := "experiment: " + experimentsDetails.ExperimentName + ", Result: Awaited"
+	types.SetResultEventAttributes(&eventsDetails, types.AwaitedVerdict, msg, "Normal", &resultDetails)
+	events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosResult")
+
 	// Calling AbortWatcher go routine, it will continuously watch for the abort signal and generate the required events and result
 	go common.AbortWatcherWithoutExit(experimentsDetails.ExperimentName, clients, &resultDetails, &chaosDetails, &eventsDetails)
 
@@ -66,9 +71,6 @@ func AWSSSMChaosByID(clients clients.ClientSets) {
 		"Instance ID":          experimentsDetails.EC2InstanceID,
 		"Sequence":             experimentsDetails.Sequence,
 	})
-
-	// Calling AbortWatcher go routine, it will continuously watch for the abort signal and generate the required events and result
-	go common.AbortWatcherWithoutExit(experimentsDetails.ExperimentName, clients, &resultDetails, &chaosDetails, &eventsDetails)
 
 	//PRE-CHAOS APPLICATION STATUS CHECK
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (pre-chaos)")
@@ -89,11 +91,6 @@ func AWSSSMChaosByID(clients clients.ClientSets) {
 			return
 		}
 	}
-
-	// generating the event in chaosresult to marked the verdict as awaited
-	msg := "experiment: " + experimentsDetails.ExperimentName + ", Result: Awaited"
-	types.SetResultEventAttributes(&eventsDetails, types.AwaitedVerdict, msg, "Normal", &resultDetails)
-	events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosResult")
 
 	if experimentsDetails.EngineName != "" {
 		// marking AUT as running, as we already checked the status of application under test
@@ -134,7 +131,7 @@ func AWSSSMChaosByID(clients clients.ClientSets) {
 	}
 	log.Info("[Status]: EC2 instance is in running state")
 
-	// Including the litmus lib for ec2-terminate
+	// Including the litmus lib for aws-ssm-chaos-by-id
 	switch experimentsDetails.ChaosLib {
 	case "litmus":
 		if err := litmusLIB.PrepareAWSSSMChaosByID(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {

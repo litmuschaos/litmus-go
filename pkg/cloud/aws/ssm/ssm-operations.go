@@ -6,19 +6,18 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/aws-ssm/aws-ssm-chaos/types"
-	ec2 "github.com/litmuschaos/litmus-go/pkg/cloud/aws/ec2"
-	"github.com/sirupsen/logrus"
-
 	"github.com/aws/aws-sdk-go/service/ssm"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/aws-ssm/aws-ssm-chaos/types"
+	"github.com/litmuschaos/litmus-go/pkg/cloud/aws/common"
+	ec2 "github.com/litmuschaos/litmus-go/pkg/cloud/aws/ec2"
 	"github.com/litmuschaos/litmus-go/pkg/log"
-	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 const (
-	DefaultSSMDocsDirectory = "pkg/utils/ssm-docs/LitmusChaos-AWS-SSM-Docs.yml"
+	DefaultSSMDocsDirectory = "pkg/cloud/aws/common/ssm-docs/LitmusChaos-AWS-SSM-Docs.yml"
 )
 
 // SendSSMCommand will create and add the ssm document in aws service monitoring docs.
@@ -117,8 +116,8 @@ func getSSMCommandStatus(commandID, EC2InstanceID, region string) (string, error
 func CheckInstanceInformation(experimentsDetails *experimentTypes.ExperimentDetails) error {
 
 	var instanceIDList []string
-	switch experimentsDetails.EC2InstanceID != "" {
-	case true:
+	switch {
+	case experimentsDetails.EC2InstanceID != "":
 		instanceIDList = strings.Split(experimentsDetails.EC2InstanceID, ",")
 	default:
 		if err := CheckTargetInstanceStatus(experimentsDetails); err != nil {
@@ -151,8 +150,8 @@ func CheckInstanceInformation(experimentsDetails *experimentTypes.ExperimentDeta
 	return nil
 }
 
-//CancleCommand will cancle the ssm command
-func CancleCommand(commandIDs, region string) error {
+//CancelCommand will cancel the ssm command
+func CancelCommand(commandIDs, region string) error {
 	sesh := common.GetAWSSession(region)
 	ssmClient := ssm.New(sesh)
 	_, err := ssmClient.CancelCommand(&ssm.CancelCommandInput{

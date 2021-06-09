@@ -53,7 +53,7 @@ func PrepareAWSSSMChaosByID(experimentsDetails *experimentTypes.ExperimentDetail
 	//get the instance id or list of instance ids
 	instanceIDList := strings.Split(experimentsDetails.EC2InstanceID, ",")
 	if len(instanceIDList) == 0 {
-		return errors.Errorf("no instance id found to terminate")
+		return errors.Errorf("no instance id found for chaos injection")
 	}
 
 	switch strings.ToLower(experimentsDetails.Sequence) {

@@ -152,10 +152,10 @@ func AbortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, abort c
 	<-abort
 
 	log.Info("[Abort]: Chaos Revert Started")
-	switch len(experimentsDetails.CommandIDs) != 0 {
-	case true:
+	switch {
+	case len(experimentsDetails.CommandIDs) != 0:
 		for _, commandId := range experimentsDetails.CommandIDs {
-			if err := ssm.CancleCommand(commandId, experimentsDetails.Region); err != nil {
+			if err := ssm.CancelCommand(commandId, experimentsDetails.Region); err != nil {
 				log.Errorf("[Abort]: fail to cancle command, recovery failed, err: %v", err)
 			}
 		}

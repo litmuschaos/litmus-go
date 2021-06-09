@@ -49,7 +49,7 @@ func PrepareAWSSSMChaosByTag(experimentsDetails *experimentTypes.ExperimentDetai
 	log.Infof("[Chaos]:Number of Instance targeted: %v", len(instanceIDList))
 
 	if len(instanceIDList) == 0 {
-		return errors.Errorf("no instance id found to terminate")
+		return errors.Errorf("no instance id found for chaos injection")
 	}
 
 	switch strings.ToLower(experimentsDetails.Sequence) {

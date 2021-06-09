@@ -31,19 +31,20 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string
 	experimentDetails.DocumentName = common.Getenv("DOCUMENT_NAME", "LitmusChaos-AWS-SSM-Doc")
 	experimentDetails.DocumentType = common.Getenv("DOCUMENT_TYPE", "Command")
 	experimentDetails.DocumentFormat = common.Getenv("DOCUMENT_FORMAT", "YAML")
-	experimentDetails.DocumentPath = common.Getenv("DOCUMENT_PATH", "pkg/utils/ssm-docs/LitmusChaos-AWS-SSM-Docs.yml")
-	experimentDetails.EC2InstanceID = common.Getenv("EC2_INSTANCE_ID", "")
+	experimentDetails.DocumentPath = common.Getenv("DOCUMENT_PATH", "pkg/cloud/aws/common/ssm-docs/LitmusChaos-AWS-SSM-Docs.yml")
 	experimentDetails.Region = common.Getenv("REGION", "")
 	experimentDetails.Cpu, _ = strconv.Atoi(common.Getenv("CPU", "1"))
 	experimentDetails.NumberOfWorkers, _ = strconv.Atoi(common.Getenv("NUMBER_OF_WORKERS", "1"))
 	experimentDetails.MemoryPercentage, _ = strconv.Atoi(common.Getenv("MEMORY_PERCENTAGE", "80"))
 	experimentDetails.InstallDependencies = common.Getenv("INSTALL_DEPENDENCIES", "True")
 	experimentDetails.Sequence = common.Getenv("SEQUENCE", "parallel")
-
 	experimentDetails.TargetContainer = common.Getenv("TARGET_CONTAINER", "")
-	if expName == "aws-ssm-chaos-by-tag" {
+	switch expName {
+	case "aws-ssm-chaos-by-tag":
 		experimentDetails.EC2InstanceTag = common.Getenv("EC2_INSTANCE_TAG", "")
 		experimentDetails.InstanceAffectedPerc, _ = strconv.Atoi(common.Getenv("INSTANCE_AFFECTED_PERC", "0"))
+	case "aws-ssm-chaos-by-id":
+		experimentDetails.EC2InstanceID = common.Getenv("EC2_INSTANCE_ID", "")
 	}
 }
 

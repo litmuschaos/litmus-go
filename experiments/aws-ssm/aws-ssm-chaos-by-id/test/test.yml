@@ -13,7 +13,7 @@ spec:
       labels:
         app: litmus-experiment
     spec:
-      serviceAccountName: ec2-terminate-by-id-sa
+      serviceAccountName: aws-ssm-chaos-by-id-sa
       containers:
       - name: gotest
         image: busybox
