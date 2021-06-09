@@ -91,7 +91,7 @@ func AbortWatcherWithoutExit(expname string, clients clients.ClientSets, resultD
 	events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 
 	// generating summary event in chaosresult
-	types.SetResultEventAttributes(eventsDetails, types.Summary, msg, "Warning", resultDetails)
+	types.SetResultEventAttributes(eventsDetails, types.AbortVerdict, msg, "Warning", resultDetails)
 	events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosResult")
 }
 

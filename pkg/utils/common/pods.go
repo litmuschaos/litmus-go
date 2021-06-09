@@ -224,13 +224,13 @@ func GetTargetPodsWhenTargetPodsENVSet(targetPods string, clients clients.Client
 func SetTargets(target, chaosStatus, kind string, chaosDetails *types.ChaosDetails) {
 
 	for i := range chaosDetails.Targets {
-		if chaosDetails.Targets[i].Target == target {
+		if chaosDetails.Targets[i].Name == target {
 			chaosDetails.Targets[i].ChaosStatus = chaosStatus
 			return
 		}
 	}
 	newTarget := v1alpha1.TargetDetails{
-		Target:      target,
+		Name:      target,
 		Kind:        kind,
 		ChaosStatus: chaosStatus,
 	}
