@@ -44,7 +44,6 @@ func PrepareAWSSSMChaosByTag(experimentsDetails *experimentTypes.ExperimentDetai
 
 	// watching for the abort signal and revert the chaos
 	go lib.AbortWatcher(experimentsDetails, abort)
-
 	instanceIDList := common.FilterBasedOnPercentage(experimentsDetails.InstanceAffectedPerc, experimentsDetails.TargetInstanceIDList)
 	log.Infof("[Chaos]:Number of Instance targeted: %v", len(instanceIDList))
 

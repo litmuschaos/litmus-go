@@ -42,7 +42,7 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 
 				//Sending AWS SSM command
 				log.Info("[Chaos]: Starting the ssm command")
-				ec2IDList := strings.Split(ec2ID, ",")
+				ec2IDList := strings.Fields(ec2ID)
 				commandId, err := ssm.SendSSMCommand(experimentsDetails, ec2IDList)
 				if err != nil {
 					return errors.Errorf("fail to send ssm command, err: %v", err)
@@ -81,7 +81,7 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 	return nil
 }
 
-// InjectChaosInParallelMode will inject the ec2 instance termination in parallel mode that is all at once
+// InjectChaosInParallelMode will inject the aws ssm chaos in parallel mode that is all at once
 func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, instanceIDList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, inject chan os.Signal) error {
 
 	select {
