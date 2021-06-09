@@ -228,8 +228,8 @@ loop:
 	return nil
 }
 
-//PrepareMemoryStress contains the steps for prepration before chaos
-func PrepareMemoryStress(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+//PrepareMemoryExecStress contains the steps for prepration before chaos
+func PrepareMemoryExecStress(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	//Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {

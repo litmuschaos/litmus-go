@@ -2,6 +2,7 @@ package lib
 
 import (
 	"strconv"
+	"strings"
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/stress-chaos/types"
@@ -63,20 +64,24 @@ func PrepareAndInjectStressChaos(experimentsDetails *experimentTypes.ExperimentD
 		}
 	}
 
-	if experimentsDetails.Sequence == "serial" {
-		if err = InjectChaosInSerialMode(experimentsDetails, targetPodList, clients, chaosDetails, resultDetails, eventsDetails); err != nil {
+	switch strings.ToLower(experimentsDetails.Sequence) {
+	case "serial":
+		if err = injectChaosInSerialMode(experimentsDetails, targetPodList, clients, chaosDetails, resultDetails, eventsDetails); err != nil {
 			return err
 		}
-	} else {
-		if err = InjectChaosInParallelMode(experimentsDetails, targetPodList, clients, chaosDetails, resultDetails, eventsDetails); err != nil {
+	case "parallel":
+		if err = injectChaosInParallelMode(experimentsDetails, targetPodList, clients, chaosDetails, resultDetails, eventsDetails); err != nil {
 			return err
 		}
+	default:
+		return errors.Errorf("%v sequence is not supported", experimentsDetails.Sequence)
 	}
+
 	return nil
 }
 
-// InjectChaosInSerialMode inject the network chaos in all target application serially (one by one)
-func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
+// injectChaosInSerialMode inject the stress chaos in all target application serially (one by one)
+func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
 
 	labelSuffix := common.GetRunID()
 
@@ -114,7 +119,7 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		// Wait till the completion of the helper pod
 		// set an upper limit for the waiting time
 		log.Info("[Wait]: waiting till the completion of the helper pod")
-		podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, appLabel, clients, experimentsDetails.ChaosDuration+60, experimentsDetails.ExperimentName)
+		podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, appLabel, clients, experimentsDetails.ChaosDuration+experimentsDetails.Timeout, experimentsDetails.ExperimentName)
 		if err != nil || podStatus == "Failed" {
 			common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-helper-"+runID, appLabel, chaosDetails, clients)
 			return errors.Errorf("helper pod failed due to, err: %v", err)
@@ -131,8 +136,8 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 	return nil
 }
 
-// InjectChaosInParallelMode inject the network chaos in all target application in parallel mode (all at once)
-func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
+// injectChaosInParallelMode inject the network chaos in all target application in parallel mode (all at once)
+func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
 
 	labelSuffix := common.GetRunID()
 
@@ -171,7 +176,7 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 	// Wait till the completion of the helper pod
 	// set an upper limit for the waiting time
 	log.Info("[Wait]: waiting till the completion of the helper pod")
-	podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, appLabel, clients, experimentsDetails.ChaosDuration+60, experimentsDetails.ExperimentName)
+	podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, appLabel, clients, experimentsDetails.ChaosDuration+experimentsDetails.Timeout, experimentsDetails.ExperimentName)
 	if err != nil || podStatus == "Failed" {
 		common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
 		return errors.Errorf("helper pod failed due to, err: %v", err)
@@ -243,7 +248,7 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 					},
 					Args: []string{
 						"-c",
-						"./helper/stress-chaos",
+						"./helpers -name stress-chaos",
 					},
 					Resources: experimentsDetails.Resources,
 					Env:       getPodEnv(experimentsDetails, podName),
@@ -283,42 +288,26 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 // getPodEnv derive all the env required for the helper pod
 func getPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, podName string) []apiv1.EnvVar {
 
-	var envVar []apiv1.EnvVar
-	ENVList := map[string]string{
-		"APP_NS":                            experimentsDetails.AppNS,
-		"APP_POD":                           podName,
-		"APP_CONTAINER":                     experimentsDetails.TargetContainer,
-		"TOTAL_CHAOS_DURATION":              strconv.Itoa(experimentsDetails.ChaosDuration),
-		"CHAOS_NAMESPACE":                   experimentsDetails.ChaosNamespace,
-		"CHAOS_ENGINE":                      experimentsDetails.EngineName,
-		"CHAOS_UID":                         string(experimentsDetails.ChaosUID),
-		"CONTAINER_RUNTIME":                 experimentsDetails.ContainerRuntime,
-		"EXPERIMENT_NAME":                   experimentsDetails.ExperimentName,
-		"SOCKET_PATH":                       experimentsDetails.SocketPath,
-		"CPU_CORES":                         strconv.Itoa(experimentsDetails.CPUcores),
-		"FILESYSTEM_UTILIZATION_PERCENTAGE": strconv.Itoa(experimentsDetails.FilesystemUtilizationPercentage),
-		"FILESYSTEM_UTILIZATION_BYTES":      strconv.Itoa(experimentsDetails.FilesystemUtilizationBytes),
-		"NUMBER_OF_WORKERS":                 strconv.Itoa(experimentsDetails.NumberOfWorkers),
-		"MEMORY_CONSUMPTION":                strconv.Itoa(experimentsDetails.MemoryConsumption),
-		"VOLUME_MOUNT_PATH":                 experimentsDetails.VolumeMountPath,
-	}
-	for key, value := range ENVList {
-		var perEnv apiv1.EnvVar
-		perEnv.Name = key
-		perEnv.Value = value
-		envVar = append(envVar, perEnv)
-	}
-	// Getting experiment pod name from downward API
-	experimentPodName := common.GetValueFromDownwardAPI("v1", "metadata.name")
-	var downwardEnv apiv1.EnvVar
-	downwardEnv.Name = "POD_NAME"
-	downwardEnv.ValueFrom = &experimentPodName
-	envVar = append(envVar, downwardEnv)
+	var envDetails common.ENVDetails
+	envDetails.SetEnv("APP_NS", experimentsDetails.AppNS).
+		SetEnv("APP_POD", podName).
+		SetEnv("APP_CONTAINER", experimentsDetails.TargetContainer).
+		SetEnv("TOTAL_CHAOS_DURATION", strconv.Itoa(experimentsDetails.ChaosDuration)).
+		SetEnv("CHAOS_NAMESPACE", experimentsDetails.ChaosNamespace).
+		SetEnv("CHAOS_ENGINE", experimentsDetails.EngineName).
+		SetEnv("CHAOS_UID", string(experimentsDetails.ChaosUID)).
+		SetEnv("CONTAINER_RUNTIME", experimentsDetails.ContainerRuntime).
+		SetEnv("EXPERIMENT_NAME", experimentsDetails.ExperimentName).
+		SetEnv("SOCKET_PATH", experimentsDetails.SocketPath).
+		SetEnv("CPU_CORES", strconv.Itoa(experimentsDetails.CPUcores)).
+		SetEnv("FILESYSTEM_UTILIZATION_PERCENTAGE", strconv.Itoa(experimentsDetails.FilesystemUtilizationPercentage)).
+		SetEnv("FILESYSTEM_UTILIZATION_BYTES", strconv.Itoa(experimentsDetails.FilesystemUtilizationBytes)).
+		SetEnv("NUMBER_OF_WORKERS", strconv.Itoa(experimentsDetails.NumberOfWorkers)).
+		SetEnv("MEMORY_CONSUMPTION", strconv.Itoa(experimentsDetails.MemoryConsumption)).
+		SetEnv("VOLUME_MOUNT_PATH", experimentsDetails.VolumeMountPath).
+		SetEnvFromDownwardAPI("v1", "metadata.name")
 
-	return envVar
-}
-func ptrint64(p int64) *int64 {
-	return &p
+	return envDetails.ENV
 }
 
 // setHelperData derive the data from experiment pod and sets into experimentDetails struct
@@ -341,4 +330,7 @@ func setHelperData(experimentsDetails *experimentTypes.ExperimentDetails, client
 		return errors.Errorf("unable to get imagePullSecrets, err: %v", err)
 	}
 	return nil
+}
+func ptrint64(p int64) *int64 {
+	return &p
 }

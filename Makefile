@@ -12,17 +12,19 @@ DOCKER_REPO ?= litmuschaos
 DOCKER_IMAGE ?= go-runner
 DOCKER_TAG ?= ci
 
-PACKAGES = $(shell go list ./... | grep -v '/vendor/')
-
-.PHONY: all
-all: deps gotasks build push trivy-check build-amd64 push-amd64
-
 .PHONY: help
 help:
 	@echo ""
 	@echo "Usage:-"
-	@echo "\tmake all   -- [default] builds the litmus containers"
+	@echo "\tmake deps          -- sets up dependencies for image build"
+	@echo "\tmake build         -- builds the litmus-go binary & docker multi-arch image"
+	@echo "\tmake push          -- pushes the litmus-go multi-arch image"
+	@echo "\tmake build-amd64   -- builds the litmus-go binary & docker amd64 image"
+	@echo "\tmake push-amd64    -- pushes the litmus-go amd64 image"
 	@echo ""
+
+.PHONY: all
+all: deps gotasks build push trivy-check
 
 .PHONY: deps
 deps: _build_check_docker
@@ -39,26 +41,7 @@ _build_check_docker:
 		fi;
 
 .PHONY: gotasks
-gotasks: format lint unused-package-check
-
-.PHONY: format
-format:
-	@echo "------------------"
-	@echo "--> Running go fmt"
-	@echo "------------------"
-	@go fmt $(PACKAGES)
-
-.PHONY: lint
-lint:
-	@echo "------------------"
-	@echo "--> Running golint"
-	@echo "------------------"
-	@go get -u golang.org/x/lint/golint
-	@golint $(PACKAGES)
-	@echo "------------------"
-	@echo "--> Running go vet"
-	@echo "------------------"
-	@go vet $(PACKAGES)
+gotasks: unused-package-check
 
 .PHONY: unused-package-check
 unused-package-check:

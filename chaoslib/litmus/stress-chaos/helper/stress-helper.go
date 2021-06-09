@@ -1,4 +1,4 @@
-package main
+package helper
 
 import (
 	"bufio"
@@ -24,12 +24,14 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
+	pidTypes "github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientTypes "k8s.io/apimachinery/pkg/types"
 )
 
+//list of cgroups in a container
 var (
 	cgroupSubsystemList = []string{"cpu", "memory", "systemd", "net_cls",
 		"net_prio", "freezer", "blkio", "perf_event", "devices",
@@ -41,10 +43,10 @@ var (
 	inject, abort chan os.Signal
 )
 
-func main() {
+// Helper injects the stress chaos
+func Helper(clients clients.ClientSets) {
 
 	experimentsDetails := experimentTypes.ExperimentDetails{}
-	clients := clients.ClientSets{}
 	eventsDetails := types.EventDetails{}
 	chaosDetails := types.ChaosDetails{}
 	resultDetails := types.ResultDetails{}
@@ -58,11 +60,6 @@ func main() {
 	abort = make(chan os.Signal, 1)
 	// Catch and relay certain signal(s) to abort channel.
 	signal.Notify(abort, os.Interrupt, syscall.SIGTERM)
-
-	//Getting kubeConfig and Generate ClientSets
-	if err := clients.GenerateClientSetFromKubeConfig(); err != nil {
-		log.Fatalf("Unable to Get the kubeconfig, err: %v", err)
-	}
 
 	// Intialise the chaos attributes
 	experimentEnv.InitialiseChaosVariables(&chaosDetails, &experimentsDetails)
@@ -102,6 +99,7 @@ func prepareStressChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 		events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 	}
 
+	//get the pid path and check cgroup
 	path := pidPath(int(targetPID))
 	cgroup, err := findValidCgroup(path, containerID)
 	if err != nil {
@@ -135,7 +133,7 @@ func prepareStressChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 	// watching for the abort signal and revert the chaos if an abort signal is received
 	go abortWatcher(cmd.Process.Pid)
 
-	// add the stress process to the cgroup of target continer
+	// add the stress process to the cgroup of target container
 	if err = control.Add(cgroups.Process{Pid: cmd.Process.Pid}); err != nil {
 		if killErr := cmd.Process.Kill(); killErr != nil {
 			return errors.Errorf("stressors failed killing %v process, err: %v", cmd.Process.Pid, killErr)
@@ -153,7 +151,7 @@ func prepareStressChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 	}
 
 	log.Info("[Wait]: Waiting for chaos completion")
-	// channel to check the completion of the command
+	// channel to check the completion of the stress process
 	done := make(chan error)
 	go func() { done <- cmd.Wait() }()
 
@@ -163,7 +161,7 @@ func prepareStressChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 	select {
 	case <-timeout:
 		// the stress process gets timeout before completion
-		log.Infof("[Output] Stress output: %v", buf.String())
+		log.Infof("[Timeout] Stress output: %v", buf.String())
 		log.Info("[Cleaup]: Kill the stress process")
 		terminateProcess(cmd.Process.Pid)
 		return errors.Errorf("the stress process is timeout after %vs", experimentsDetails.ChaosDuration+10)
@@ -344,6 +342,7 @@ func getPID(experimentDetails *experimentTypes.ExperimentDetails, containerID st
 	return PID, nil
 }
 
+//pidPath will get the pid path of the container
 func pidPath(pid int) cgroups.Path {
 	processPath := "/proc/" + strconv.Itoa(pid) + "/cgroup"
 	paths, err := parseCgroupFile(processPath)
@@ -353,6 +352,7 @@ func pidPath(pid int) cgroups.Path {
 	return getExistingPath(paths, pid, "")
 }
 
+//parseCgroupFile will read and verify the cgroup file entry of a container
 func parseCgroupFile(path string) (map[string]string, error) {
 	file, err := os.Open(path)
 	if err != nil {
@@ -388,12 +388,7 @@ func parseCgroupFromReader(r io.Reader) (map[string]string, error) {
 	return cgroups, nil
 }
 
-func getErrorPath(err error) cgroups.Path {
-	return func(_ cgroups.Name) (string, error) {
-		return "", err
-	}
-}
-
+//getExistingPath will be used to get the existing valid cgroup path
 func getExistingPath(paths map[string]string, pid int, suffix string) cgroups.Path {
 	for n, p := range paths {
 		dest, err := getCgroupDestination(pid, n)
@@ -423,6 +418,13 @@ func getExistingPath(paths map[string]string, pid int, suffix string) cgroups.Pa
 	}
 }
 
+//getErrorPath will give the invalid cgroup path
+func getErrorPath(err error) cgroups.Path {
+	return func(_ cgroups.Name) (string, error) {
+		return "", err
+	}
+}
+
 func getCgroupDestination(pid int, subsystem string) (string, error) {
 	mountinfoPath := fmt.Sprintf("/proc/%d/mountinfo", pid)
 	file, err := os.Open(mountinfoPath)
@@ -445,6 +447,7 @@ func getCgroupDestination(pid int, subsystem string) (string, error) {
 	return "", errors.Errorf("never found desct for %v ", subsystem)
 }
 
+//findValidCgroup will be used to get a valid cgroup path
 func findValidCgroup(path cgroups.Path, target string) (string, error) {
 	for _, subsystem := range cgroupSubsystemList {
 		path, err := path(cgroups.Name(subsystem))
@@ -467,26 +470,26 @@ func parsePIDFromJSON(j []byte, runtime string) (int, error) {
 	switch runtime {
 	case "docker":
 		// in docker, pid is present inside state.pid attribute of inspect output
-		var resp []DockerInspectResponse
+		var resp []pidTypes.DockerInspectResponse
 		if err := json.Unmarshal(j, &resp); err != nil {
 			return 0, err
 		}
 		pid = resp[0].State.PID
 	case "containerd":
-		var resp CrictlInspectResponse
+		var resp pidTypes.CrictlInspectResponse
 		if err := json.Unmarshal(j, &resp); err != nil {
 			return 0, err
 		}
 		pid = resp.Info.PID
 
 	case "crio":
-		var info InfoDetails
+		var info pidTypes.InfoDetails
 		if err := json.Unmarshal(j, &info); err != nil {
 			return 0, err
 		}
 		pid = info.PID
 		if pid == 0 {
-			var resp CrictlInspectResponse
+			var resp pidTypes.CrictlInspectResponse
 			if err := json.Unmarshal(j, &resp); err != nil {
 				return 0, err
 			}
@@ -530,8 +533,8 @@ func abortWatcher(targetPID int) {
 	for {
 		select {
 		case <-abort:
+			log.Info("[Abort]: Chaos Revert Started")
 			log.Info("[Chaos]: Killing process started because of terminated signal received")
-			log.Info("Chaos Revert Started")
 			// retry thrice for the chaos revert
 			retry := 3
 			for retry > 0 {
@@ -541,47 +544,8 @@ func abortWatcher(targetPID int) {
 				retry--
 				time.Sleep(1 * time.Second)
 			}
-			log.Info("Chaos Revert Completed")
+			log.Info("[Abort]: Chaos Revert Completed")
 			os.Exit(1)
 		}
 	}
-}
-
-// CrictlInspectResponse JSON representation of crictl inspect command output
-// in crio, pid is present inside pid attribute of inspect output
-// in containerd, pid is present inside `info.pid` of inspect output
-type CrictlInspectResponse struct {
-	Info InfoDetails `json:"info"`
-}
-
-// InfoDetails JSON representation of crictl inspect command output
-type InfoDetails struct {
-	RuntimeSpec RuntimeDetails `json:"runtimeSpec"`
-	PID         int            `json:"pid"`
-}
-
-// RuntimeDetails contains runtime details
-type RuntimeDetails struct {
-	Linux LinuxAttributes `json:"linux"`
-}
-
-// LinuxAttributes contains all the linux attributes
-type LinuxAttributes struct {
-	Namespaces []Namespace `json:"namespaces"`
-}
-
-// Namespace contains linux namespace details
-type Namespace struct {
-	Type string `json:"type"`
-	Path string `json:"path"`
-}
-
-// DockerInspectResponse JSON representation of docker inspect command output
-type DockerInspectResponse struct {
-	State StateDetails `json:"state"`
-}
-
-// StateDetails JSON representation of docker inspect command output
-type StateDetails struct {
-	PID int `json:"pid"`
 }

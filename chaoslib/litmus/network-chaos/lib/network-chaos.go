@@ -123,7 +123,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		// Wait till the completion of the helper pod
 		// set an upper limit for the waiting time
 		log.Info("[Wait]: waiting till the completion of the helper pod")
-		podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, appLabel, clients, experimentsDetails.ChaosDuration+60, experimentsDetails.ExperimentName)
+		podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, appLabel, clients, experimentsDetails.ChaosDuration+experimentsDetails.Timeout, experimentsDetails.ExperimentName)
 		if err != nil || podStatus == "Failed" {
 			common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-helper-"+runID, appLabel, chaosDetails, clients)
 			return errors.Errorf("helper pod failed due to, err: %v", err)
@@ -177,7 +177,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 	// Wait till the completion of the helper pod
 	// set an upper limit for the waiting time
 	log.Info("[Wait]: waiting till the completion of the helper pod")
-	podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, appLabel, clients, experimentsDetails.ChaosDuration+60, experimentsDetails.ExperimentName)
+	podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, appLabel, clients, experimentsDetails.ChaosDuration+experimentsDetails.Timeout, experimentsDetails.ExperimentName)
 	if err != nil || podStatus == "Failed" {
 		common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
 		return errors.Errorf("helper pod failed due to, err: %v", err)
@@ -238,7 +238,7 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 					},
 					Args: []string{
 						"-c",
-						"./helper/network-chaos",
+						"./helpers -name network-chaos",
 					},
 					Resources: experimentsDetails.Resources,
 					Env:       getPodEnv(experimentsDetails, podName, args),
@@ -270,33 +270,23 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 // getPodEnv derive all the env required for the helper pod
 func getPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, podName, args string) []apiv1.EnvVar {
 
-	var envVar []apiv1.EnvVar
-	ENVList := map[string]string{
-		"APP_NS":               experimentsDetails.AppNS,
-		"APP_POD":              podName,
-		"APP_CONTAINER":        experimentsDetails.TargetContainer,
-		"TOTAL_CHAOS_DURATION": strconv.Itoa(experimentsDetails.ChaosDuration),
-		"CHAOS_NAMESPACE":      experimentsDetails.ChaosNamespace,
-		"CHAOS_ENGINE":         experimentsDetails.EngineName,
-		"CHAOS_UID":            string(experimentsDetails.ChaosUID),
-		"CONTAINER_RUNTIME":    experimentsDetails.ContainerRuntime,
-		"NETEM_COMMAND":        args,
-		"NETWORK_INTERFACE":    experimentsDetails.NetworkInterface,
-		"EXPERIMENT_NAME":      experimentsDetails.ExperimentName,
-		"SOCKET_PATH":          experimentsDetails.SocketPath,
-		"DESTINATION_IPS":      experimentsDetails.DestinationIPs,
-	}
-	for key, value := range ENVList {
-		var perEnv apiv1.EnvVar
-		perEnv.Name = key
-		perEnv.Value = value
-		envVar = append(envVar, perEnv)
-	}
-	// Getting experiment pod name from downward API
-	experimentPodName := common.GetValueFromDownwardAPI("v1", "metadata.name")
-	envVar = append(envVar, apiv1.EnvVar{Name: "POD_NAME", ValueFrom: &experimentPodName})
+	var envDetails common.ENVDetails
+	envDetails.SetEnv("APP_NS", experimentsDetails.AppNS).
+		SetEnv("APP_POD", podName).
+		SetEnv("APP_CONTAINER", experimentsDetails.TargetContainer).
+		SetEnv("TOTAL_CHAOS_DURATION", strconv.Itoa(experimentsDetails.ChaosDuration)).
+		SetEnv("CHAOS_NAMESPACE", experimentsDetails.ChaosNamespace).
+		SetEnv("CHAOS_ENGINE", experimentsDetails.EngineName).
+		SetEnv("CHAOS_UID", string(experimentsDetails.ChaosUID)).
+		SetEnv("CONTAINER_RUNTIME", experimentsDetails.ContainerRuntime).
+		SetEnv("NETEM_COMMAND", args).
+		SetEnv("NETWORK_INTERFACE", experimentsDetails.NetworkInterface).
+		SetEnv("EXPERIMENT_NAME", experimentsDetails.ExperimentName).
+		SetEnv("SOCKET_PATH", experimentsDetails.SocketPath).
+		SetEnv("DESTINATION_IPS", experimentsDetails.DestinationIPs).
+		SetEnvFromDownwardAPI("v1", "metadata.name")
 
-	return envVar
+	return envDetails.ENV
 }
 
 // GetTargetIps return the comma separated target ips
