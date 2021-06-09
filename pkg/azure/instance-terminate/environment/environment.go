@@ -8,6 +8,7 @@ import (
 
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/azure/instance-terminate/types"
 	"github.com/litmuschaos/litmus-go/pkg/types"
+	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 )
 
 //GetENV fetches all the env variables from the runner pod
@@ -20,6 +21,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.AppKind = Getenv("APP_KIND", "")
 	experimentDetails.AuxiliaryAppInfo = Getenv("AUXILIARY_APPINFO", "")
 	experimentDetails.ChaosDuration, _ = strconv.Atoi(Getenv("TOTAL_CHAOS_DURATION", "30"))
+	experimentDetails.ChaosInterval, _ = strconv.Atoi(common.Getenv("CHAOS_INTERVAL", "30"))
 	experimentDetails.RampTime, _ = strconv.Atoi(Getenv("RAMP_TIME", "0"))
 	experimentDetails.ChaosLib = Getenv("LIB", "litmus")
 	experimentDetails.ChaosUID = clientTypes.UID(Getenv("CHAOS_UID", ""))
@@ -29,6 +31,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.Timeout, _ = strconv.Atoi(Getenv("STATUS_CHECK_TIMEOUT", "180"))
 	experimentDetails.AzureInstanceName = Getenv("AZURE_INSTANCE_NAME", "")
 	experimentDetails.ResourceGroup = Getenv("RESOURCE_GROUP", "")
+	experimentDetails.Sequence = common.Getenv("SEQUENCE", "parallel")
 }
 
 // Getenv fetch the env and set the default value, if any

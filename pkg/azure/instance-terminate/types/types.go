@@ -15,6 +15,7 @@ type ExperimentDetails struct {
 	AuxiliaryAppInfo   string
 	ChaosLib           string
 	ChaosDuration      int
+	ChaosInterval	   int
 	ChaosUID           clientTypes.UID
 	InstanceID         string
 	ChaosNamespace     string
@@ -25,4 +26,5 @@ type ExperimentDetails struct {
 	ResourceGroup      string
 	SubscriptionID     string
 	LIBImagePullPolicy string
+	Sequence		   string
 }

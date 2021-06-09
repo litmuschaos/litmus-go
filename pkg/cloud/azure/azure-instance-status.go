@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"os"
+	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/profiles/latest/compute/mgmt/compute"
 	"github.com/Azure/go-autorest/autorest/azure"
@@ -14,10 +15,10 @@ import (
 	"github.com/pkg/errors"
 )
 
-//GetAzureInstanceStatus will verify and give the ec2 instance details along with ebs volume idetails.
-func GetAzureInstanceStatus(experimentsDetails *experimentTypes.ExperimentDetails) (string, error) {
+//GetAzureInstanceStatus will verify the azure instance state details
+func GetAzureInstanceStatus(subscriptionID, resourceGroup, azureInstanceName string) (string, error) {
 
-	vmClient := compute.NewVirtualMachinesClient(experimentsDetails.SubscriptionID)
+	vmClient := compute.NewVirtualMachinesClient(subscriptionID)
 
 	authorizer, err := auth.NewAuthorizerFromFile(azure.PublicCloud.ResourceManagerEndpoint)
 	if err == nil {
@@ -26,7 +27,7 @@ func GetAzureInstanceStatus(experimentsDetails *experimentTypes.ExperimentDetail
 		return "", errors.Errorf("fail to setup authorization, err: %v", err)
 	}
 
-	instanceDetails, err := vmClient.InstanceView(context.TODO(), experimentsDetails.ResourceGroup, experimentsDetails.AzureInstanceName)
+	instanceDetails, err := vmClient.InstanceView(context.TODO(), resourceGroup, azureInstanceName)
 	if err != nil {
 		return "", errors.Errorf("fail to get the instance to check status, err: %v", err)
 	}
@@ -39,7 +40,7 @@ func GetAzureInstanceStatus(experimentsDetails *experimentTypes.ExperimentDetail
 	for i, instance := range *instanceDetails.Statuses {
 		// For VM status only
 		if i == 1 {
-			log.Infof("[Status]: The instance %v state is: '%s'", experimentsDetails.AzureInstanceName, *instance.DisplayStatus)
+			log.Infof("[Status]: The instance %v state is: '%s'", azureInstanceName, *instance.DisplayStatus)
 			return *instance.DisplayStatus, nil
 		}
 	}
@@ -69,6 +70,32 @@ func SetupSubsciptionID(experimentsDetails *experimentTypes.ExperimentDetails) e
 		experimentsDetails.SubscriptionID = id
 	} else {
 		return errors.Errorf("The auth file does not have a subscriptionId field")
+	}
+	return nil
+}
+
+// InstanceStatusCheckByName is used to check the instance status of all the instance under chaos
+func InstanceStatusCheckByName(experimentDetails *experimentTypes.ExperimentDetails) error {
+
+	instanceNameList := strings.Split(experimentDetails.AzureInstanceName, ",")
+	if len(instanceNameList) == 0 {
+		return errors.Errorf("no instance found to terminate")
+	}
+	log.Infof("[Info]: The instance under chaos(IUC) are: %v", instanceNameList)
+	return InstanceStatusCheck(instanceNameList, experimentDetails.SubscriptionID, experimentDetails.ResourceGroup)
+}
+
+// InstanceStatusCheckByName is used to check the instance status of given list of instances
+func InstanceStatusCheck(targetInstanceNameList []string, subscriptionID, resourceGroup string) error {
+
+	for _, vmName := range targetInstanceNameList {
+		instanceState, err := GetAzureInstanceStatus(subscriptionID, resourceGroup, vmName)
+		if err != nil {
+			return err
+		}
+		if instanceState != "VM running" {
+			return errors.Errorf("failed to get the azure instance '%v' in running state, current state: %v", vmName, instanceState)
+		}
 	}
 	return nil
 }

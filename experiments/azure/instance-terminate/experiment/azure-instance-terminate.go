@@ -12,6 +12,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
+	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/sirupsen/logrus"
 )
 
@@ -54,6 +55,9 @@ func InstanceTerminate(clients clients.ClientSets) {
 	// Set the chaos result uid
 	result.SetResultUID(&resultDetails, clients, &chaosDetails)
 
+	// Calling AbortWatcher go routine, it will continuously watch for the abort signal and generate the required events and result
+	go common.AbortWatcherWithoutExit(experimentsDetails.ExperimentName, clients, &resultDetails, &chaosDetails, &eventsDetails)
+
 	//DISPLAY THE APP INFORMATION
 	log.InfoWithValues("The application information is as follows", logrus.Fields{
 		"Namespace":      experimentsDetails.AppNS,
@@ -61,6 +65,9 @@ func InstanceTerminate(clients clients.ClientSets) {
 		"Chaos Duration": experimentsDetails.ChaosDuration,
 		"Ramp Time":      experimentsDetails.RampTime,
 	})
+
+	// Calling AbortWatcher go routine, it will continuously watch for the abort signal and generate the required events and result
+	go common.AbortWatcherWithoutExit(experimentsDetails.ExperimentName, clients, &resultDetails, &chaosDetails, &eventsDetails)
 
 	//PRE-CHAOS APPLICATION STATUS CHECK
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (pre-chaos)")
@@ -84,6 +91,7 @@ func InstanceTerminate(clients clients.ClientSets) {
 		}
 	}
 
+	// Setting up Azure Subscription ID
 	if err = azureStatus.SetupSubsciptionID(&experimentsDetails); err != nil {
 		log.Errorf("fail to get the subscription id, err: %v", err)
 		failStep := "Getting the subscription ID for authentication"
@@ -120,16 +128,9 @@ func InstanceTerminate(clients clients.ClientSets) {
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
-	//Verify the azure target instance is running (pre chaos)
-	instanceState, err := azureStatus.GetAzureInstanceStatus(&experimentsDetails)
-	if err != nil {
+	//Verify the azure target instance is running (pre-chaos)
+	if err := azureStatus.InstanceStatusCheckByName(&experimentsDetails); err != nil {
 		log.Errorf("failed to get the azure instance status, err: %v", err)
-		failStep := "Verify the azure instance status (pre-chaos)"
-		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-		return
-	}
-	if instanceState != "VM running" {
-		log.Errorf("failed to get the azure instance status as running")
 		failStep := "Verify the azure instance status (pre-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
@@ -137,33 +138,27 @@ func InstanceTerminate(clients clients.ClientSets) {
 	log.Info("[Status]: Azure instance is in running state (pre-chaos)")
 
 	// Including the litmus lib for azure instance termination
-	if experimentsDetails.ChaosLib == "litmus" {
-		err = litmusLIB.InjectAzureInstanceTerminate(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
-		if err != nil {
+	switch experimentDetails.ChaosLib {
+	case "litmus":
+		if err = litmusLIB.PrepareAzureTerminateByID(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
 			log.Errorf("Chaos injection failed, err: %v", err)
 			failStep := "failed in chaos injection phase"
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}
-		log.Info("[Confirmation]: Azure instance terminate chaos has been injected successfully")
-		resultDetails.Verdict = "Pass"
-	} else {
+	default:
 		log.Error("[Invalid]: Please Provide the correct LIB")
 		failStep := "no match found for specified lib"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
 
+	log.Info("[Confirmation]: Azure instance terminate chaos has been injected successfully")
+	resultDetails.Verdict = "Pass"
+
 	//Verify the azure instance is running (post chaos)
-	instanceState, err = azureStatus.GetAzureInstanceStatus(&experimentsDetails)
-	if err != nil {
+	if err = azureStatus.InstanceStatusCheckByName(&experimentsDetails); err != nil {
 		log.Errorf("failed to get the azure instance status, err: %v", err)
-		failStep := "Verify the azure instance status (post-chaos)"
-		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-		return
-	}
-	if instanceState != "VM running" {
-		log.Errorf("failed to get the azure instance status as running")
 		failStep := "Verify the azure instance status (post-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
@@ -172,8 +167,7 @@ func InstanceTerminate(clients clients.ClientSets) {
 
 	//POST-CHAOS APPLICATION STATUS CHECK
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (post-chaos)")
-	err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
-	if err != nil {
+	if err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
 		log.Errorf("Application status check failed, err: %v", err)
 		failStep := "Verify that the AUT (Application Under Test) is running (post-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
@@ -183,8 +177,7 @@ func InstanceTerminate(clients clients.ClientSets) {
 	//POST-CHAOS AUXILIARY APPLICATION STATUS CHECK
 	if experimentsDetails.AuxiliaryAppInfo != "" {
 		log.Info("[Status]: Verify that the Auxiliary Applications are running (post-chaos)")
-		err = status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
-		if err != nil {
+		if err = status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
 			log.Errorf("Auxiliary Application status check failed, err: %v", err)
 			failStep := "Verify that the Auxiliary Applications are running (post-chaos)"
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)

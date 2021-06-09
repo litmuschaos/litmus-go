@@ -13,7 +13,7 @@ spec:
       labels:
         app: litmus-experiment
     spec:
-      serviceAccountName: azure-instance-terminate-sa
+      serviceAccountName: azure-terminate-by-id-sa
       containers:
       - name: gotest
         image: busybox
@@ -25,13 +25,13 @@ spec:
             value: 'litmus'
 
           - name: AZURE_INSTANCE_NAME
-            value: ''
-
-          - name: RESOURCE_GROUP
-            value: ''
+            value: 'azure-instance-delete'
 
           - name: CHAOS_NAMESPACE
             value: 'default'
+
+          - name: RESOURCE_GROUP
+            value: 'akash-litmus-test'
 
           - name: RAMP_TIME
             value: ''
@@ -40,7 +40,7 @@ spec:
             valueFrom:
               fieldRef:
                 fieldPath: metadata.name
-                
+
           secrets:
             - name: cloud-secret
               mountPath: /tmp/                 
