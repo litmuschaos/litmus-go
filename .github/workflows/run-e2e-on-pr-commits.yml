@@ -1,7 +1,7 @@
 name: E2E
 on:
   pull_request:
-    branches: [azure]
+    branches: [master]
     types: [edited, opened, synchronize, reopened]
     paths-ignore:
       - '**.md'
@@ -37,7 +37,7 @@ jobs:
 
       - name: Load image on the nodes of the cluster
         run: |
-          kind load docker-image --name=kind litmuschaos/go-runner:azure
+          kind load docker-image --name=kind litmuschaos/go-runner:ci
 
       - name: Deploy a sample application for chaos injection
         run: |
@@ -60,7 +60,7 @@ jobs:
         env:
           EXPERIMENT_NAME: pod-delete
           EXPERIMENT_IMAGE: litmuschaos/go-runner
-          EXPERIMENT_IMAGE_TAG: azure
+          EXPERIMENT_IMAGE_TAG: ci
           IMAGE_PULL_POLICY: IfNotPresent
           JOB_CLEANUP_POLICY: delete 
 
@@ -70,7 +70,7 @@ jobs:
         env:
           EXPERIMENT_NAME: container-kill
           EXPERIMENT_IMAGE: litmuschaos/go-runner
-          EXPERIMENT_IMAGE_TAG: azure
+          EXPERIMENT_IMAGE_TAG: ci
           IMAGE_PULL_POLICY: IfNotPresent
           JOB_CLEANUP_POLICY: delete 
           CONTAINER_RUNTIME: containerd
@@ -81,7 +81,7 @@ jobs:
         env:
           EXPERIMENT_NAME: node-cpu-hog
           EXPERIMENT_IMAGE: litmuschaos/go-runner
-          EXPERIMENT_IMAGE_TAG: azure
+          EXPERIMENT_IMAGE_TAG: ci
           IMAGE_PULL_POLICY: IfNotPresent
           JOB_CLEANUP_POLICY: delete 
           
@@ -92,7 +92,7 @@ jobs:
         env:
           EXPERIMENT_NAME: node-memory-hog
           EXPERIMENT_IMAGE: litmuschaos/go-runner
-          EXPERIMENT_IMAGE_TAG: azure
+          EXPERIMENT_IMAGE_TAG: ci
           IMAGE_PULL_POLICY: IfNotPresent
           JOB_CLEANUP_POLICY: delete        
           
@@ -102,7 +102,7 @@ jobs:
         env:
           EXPERIMENT_NAME: pod-cpu-hog
           EXPERIMENT_IMAGE: litmuschaos/go-runner
-          EXPERIMENT_IMAGE_TAG: azure
+          EXPERIMENT_IMAGE_TAG: ci
           IMAGE_PULL_POLICY: IfNotPresent
           JOB_CLEANUP_POLICY: delete       
           TARGET_CONTAINER: nginx
@@ -115,7 +115,7 @@ jobs:
         env:
           EXPERIMENT_NAME: pod-memory-hog
           EXPERIMENT_IMAGE: litmuschaos/go-runner
-          EXPERIMENT_IMAGE_TAG: azure
+          EXPERIMENT_IMAGE_TAG: ci
           IMAGE_PULL_POLICY: IfNotPresent
           JOB_CLEANUP_POLICY: delete       
           TARGET_CONTAINER: nginx
@@ -128,7 +128,7 @@ jobs:
         env:
           EXPERIMENT_NAME: pod-network-corruption
           EXPERIMENT_IMAGE: litmuschaos/go-runner
-          EXPERIMENT_IMAGE_TAG: azure
+          EXPERIMENT_IMAGE_TAG: ci
           IMAGE_PULL_POLICY: IfNotPresent
           JOB_CLEANUP_POLICY: delete       
           TARGET_CONTAINER: nginx
@@ -142,7 +142,7 @@ jobs:
         env:
           EXPERIMENT_NAME: pod-network-duplication
           EXPERIMENT_IMAGE: litmuschaos/go-runner
-          EXPERIMENT_IMAGE_TAG: azure
+          EXPERIMENT_IMAGE_TAG: ci
           IMAGE_PULL_POLICY: IfNotPresent
           JOB_CLEANUP_POLICY: delete       
           TARGET_CONTAINER: nginx
@@ -156,7 +156,7 @@ jobs:
         env:
           EXPERIMENT_NAME: pod-network-latency
           EXPERIMENT_IMAGE: litmuschaos/go-runner
-          EXPERIMENT_IMAGE_TAG: azure
+          EXPERIMENT_IMAGE_TAG: ci
           IMAGE_PULL_POLICY: IfNotPresent
           JOB_CLEANUP_POLICY: delete         
           TARGET_CONTAINER: nginx
@@ -171,7 +171,7 @@ jobs:
         env:
           EXPERIMENT_NAME: pod-network-loss
           EXPERIMENT_IMAGE: litmuschaos/go-runner
-          EXPERIMENT_IMAGE_TAG: azure
+          EXPERIMENT_IMAGE_TAG: ci
           IMAGE_PULL_POLICY: IfNotPresent
           JOB_CLEANUP_POLICY: delete       
           TARGET_CONTAINER: nginx
@@ -186,7 +186,7 @@ jobs:
         env:
           EXPERIMENT_NAME: pod-autoscaler
           EXPERIMENT_IMAGE: litmuschaos/go-runner
-          EXPERIMENT_IMAGE_TAG: azure
+          EXPERIMENT_IMAGE_TAG: ci
           IMAGE_PULL_POLICY: IfNotPresent
           JOB_CLEANUP_POLICY: delete      
           TOTAL_CHAOS_DURATION: 60       
@@ -197,7 +197,7 @@ jobs:
         env:
           EXPERIMENT_NAME: node-io-stress
           EXPERIMENT_IMAGE: litmuschaos/go-runner
-          EXPERIMENT_IMAGE_TAG: azure
+          EXPERIMENT_IMAGE_TAG: ci
           IMAGE_PULL_POLICY: IfNotPresent
           JOB_CLEANUP_POLICY: delete       
           TOTAL_CHAOS_DURATION: 120
