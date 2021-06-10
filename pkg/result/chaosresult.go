@@ -72,7 +72,7 @@ func ChaosResult(chaosDetails *types.ChaosDetails, clients clients.ClientSets, r
 	}
 
 	// it will patch the chaos-result in the end of experiment
-	resultDetails.Phase = "Completed"
+	resultDetails.Phase = v1alpha1.ResultPhaseCompleted
 	return PatchChaosResult(&resultList.Items[0], clients, chaosDetails, resultDetails, experimentLabel)
 }
 
@@ -169,13 +169,13 @@ func PatchChaosResult(result *v1alpha1.ChaosResult, clients clients.ClientSets, 
 	isAllProbePassed, result.Status.ProbeStatus = GetProbeStatus(resultDetails)
 	result.Status.ExperimentStatus.Verdict = resultDetails.Verdict
 
-	switch strings.ToLower(resultDetails.Phase) {
+	switch strings.ToLower(string(resultDetails.Phase)) {
 	case "completed":
 		if !isAllProbePassed {
 			resultDetails.Verdict = "Fail"
 			result.Status.ExperimentStatus.Verdict = "Fail"
 		}
-		switch strings.ToLower(resultDetails.Verdict) {
+		switch strings.ToLower(string(resultDetails.Verdict)) {
 		case "pass":
 			result.Status.ExperimentStatus.ProbeSuccessPercentage = "100"
 			result.Status.History.PassedRuns++
@@ -235,7 +235,7 @@ func RecordAfterFailure(chaosDetails *types.ChaosDetails, resultDetails *types.R
 	ChaosResult(chaosDetails, clients, resultDetails, "EOT")
 
 	// add the summary event in chaos result
-	msg := "experiment: " + chaosDetails.ExperimentName + ", Result: " + resultDetails.Verdict
+	msg := "experiment: " + chaosDetails.ExperimentName + ", Result: " + string(resultDetails.Verdict)
 	types.SetResultEventAttributes(eventsDetails, types.FailVerdict, msg, "Warning", resultDetails)
 	events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosResult")
 
@@ -288,7 +288,7 @@ func GetChaosStatus(resultDetails *types.ResultDetails, chaosDetails *types.Chao
 			kind := strings.TrimSpace(strings.Split(k, "/")[0])
 			name := strings.TrimSpace(strings.Split(k, "/")[1])
 			target := v1alpha1.TargetDetails{
-				Target:      name,
+				Name:        name,
 				Kind:        kind,
 				ChaosStatus: v,
 			}

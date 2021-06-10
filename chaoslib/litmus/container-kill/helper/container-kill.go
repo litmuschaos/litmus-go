@@ -174,8 +174,8 @@ func verifyRestartCount(experimentsDetails *experimentTypes.ExperimentDetails, p
 
 	restartCountAfter := 0
 	return retry.
-		Times(90).
-		Wait(1 * time.Second).
+		Times(uint(experimentsDetails.Timeout / experimentsDetails.Delay)).
+		Wait(time.Duration(experimentsDetails.Delay) * time.Second).
 		Try(func(attempt uint) error {
 			pod, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Get(podName, v1.GetOptions{})
 			if err != nil {
@@ -210,4 +210,6 @@ func getENV(experimentDetails *experimentTypes.ExperimentDetails, name string) {
 	experimentDetails.SocketPath = common.Getenv("SOCKET_PATH", "")
 	experimentDetails.ContainerRuntime = common.Getenv("CONTAINER_RUNTIME", "")
 	experimentDetails.Signal = common.Getenv("SIGNAL", "SIGKILL")
+	experimentDetails.Delay, _ = strconv.Atoi(common.Getenv("STATUS_CHECK_DELAY", "2"))
+	experimentDetails.Timeout, _ = strconv.Atoi(common.Getenv("STATUS_CHECK_TIMEOUT", "180"))
 }
