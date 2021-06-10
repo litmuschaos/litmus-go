@@ -40,7 +40,7 @@ func GetEC2InstanceStatus(instanceID, region string) (string, error) {
 			}
 		}
 	}
-	return "", errors.Errorf("failed to get the status of ec2 instance with instanceID %v", region)
+	return "", errors.Errorf("failed to get the status of ec2 instance with instanceID %v", instanceID)
 
 }
 

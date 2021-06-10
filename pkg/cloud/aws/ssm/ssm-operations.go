@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	DefaultSSMDocsDirectory = "pkg/cloud/aws/common/ssm-docs/LitmusChaos-AWS-SSM-Docs.yml"
+	DefaultSSMDocsDirectory = "LitmusChaos-AWS-SSM-Docs.yml"
 )
 
 // SendSSMCommand will create and add the ssm document in aws service monitoring docs.
