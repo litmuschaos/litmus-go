@@ -3,6 +3,7 @@ package experiment
 import (
 	"strings"
 
+	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
 	kafkaPodDelete "github.com/litmuschaos/litmus-go/chaoslib/litmus/kafka-broker-pod-failure/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
@@ -136,7 +137,7 @@ func KafkaBrokerPodFailure(clients clients.ClientSets) {
 	}
 
 	log.Infof("[Confirmation]: %v chaos has been injected successfully", experimentsDetails.ExperimentName)
-	resultDetails.Verdict = "Pass"
+	resultDetails.Verdict = v1alpha1.ResultVerdictPassed
 
 	// POST-CHAOS KAFKA CLUSTER HEALTH CHECK
 	log.Info("[Status]: Verify that the Kafka cluster is healthy(post-chaos)")
@@ -198,7 +199,7 @@ func KafkaBrokerPodFailure(clients clients.ClientSets) {
 	}
 
 	// generating the event in chaosresult to marked the verdict as pass/fail
-	msg = "experiment: " + experimentsDetails.ChaoslibDetail.ExperimentName + ", Result: " + resultDetails.Verdict
+	msg = "experiment: " + experimentsDetails.ChaoslibDetail.ExperimentName + ", Result: " + string(resultDetails.Verdict)
 	reason := types.PassVerdict
 	eventType := "Normal"
 	if resultDetails.Verdict != "Pass" {
@@ -210,7 +211,7 @@ func KafkaBrokerPodFailure(clients clients.ClientSets) {
 	events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosResult")
 
 	if experimentsDetails.ChaoslibDetail.EngineName != "" {
-		msg := experimentsDetails.ChaoslibDetail.ExperimentName + " experiment has been " + resultDetails.Verdict + "ed"
+		msg := experimentsDetails.ChaoslibDetail.ExperimentName + " experiment has been " + string(resultDetails.Verdict) + "ed"
 		types.SetEngineEventAttributes(&eventsDetails, types.Summary, msg, "Normal", &chaosDetails)
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
