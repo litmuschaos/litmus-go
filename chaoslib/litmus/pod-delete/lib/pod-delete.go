@@ -1,28 +1,25 @@
 package lib
 
 import (
+	"strconv"
+	"strings"
 	"time"
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-delete/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
-	"github.com/litmuschaos/litmus-go/pkg/math"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-var err error
-
 //PreparePodDelete contains the prepration steps before chaos injection
 func PreparePodDelete(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-
-	//Getting the iteration count for the pod deletion
-	GetIterations(experimentsDetails)
 
 	//Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
@@ -30,14 +27,17 @@ func PreparePodDelete(experimentsDetails *experimentTypes.ExperimentDetails, cli
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 
-	if experimentsDetails.Sequence == "serial" {
-		if err = InjectChaosInSerialMode(experimentsDetails, clients, chaosDetails, eventsDetails, resultDetails); err != nil {
+	switch strings.ToLower(experimentsDetails.Sequence) {
+	case "serial":
+		if err := injectChaosInSerialMode(experimentsDetails, clients, chaosDetails, eventsDetails, resultDetails); err != nil {
 			return err
 		}
-	} else {
-		if err = InjectChaosInParallelMode(experimentsDetails, clients, chaosDetails, eventsDetails, resultDetails); err != nil {
+	case "parallel":
+		if err := injectChaosInParallelMode(experimentsDetails, clients, chaosDetails, eventsDetails, resultDetails); err != nil {
 			return err
 		}
+	default:
+		return errors.Errorf("%v sequence is not supported", experimentsDetails.Sequence)
 	}
 
 	//Waiting for the ramp time after chaos injection
@@ -48,8 +48,8 @@ func PreparePodDelete(experimentsDetails *experimentTypes.ExperimentDetails, cli
 	return nil
 }
 
-// InjectChaosInSerialMode delete the target application pods serial mode(one by one)
-func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, eventsDetails *types.EventDetails, resultDetails *types.ResultDetails) error {
+// injectChaosInSerialMode delete the target application pods serial mode(one by one)
+func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, eventsDetails *types.EventDetails, resultDetails *types.ResultDetails) error {
 
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
@@ -60,12 +60,15 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 
 	GracePeriod := int64(0)
 	//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
-	ChaosStartTimeStamp := time.Now().Unix()
+	ChaosStartTimeStamp := time.Now()
+	duration := int(time.Since(ChaosStartTimeStamp).Seconds())
 
-	for count := 0; count < experimentsDetails.Iterations; count++ {
-
+	for duration < experimentsDetails.ChaosDuration {
 		// Get the target pod details for the chaos execution
 		// if the target pod is not defined it will derive the random target pod list using pod affected percentage
+		if experimentsDetails.TargetPods == "" && chaosDetails.AppDetail.Label == "" {
+			return errors.Errorf("please provide one of the appLabel or TARGET_PODS")
+		}
 		targetPodList, err := common.GetPodList(experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, clients, chaosDetails)
 		if err != nil {
 			return err
@@ -89,7 +92,7 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 			log.InfoWithValues("[Info]: Killing the following pods", logrus.Fields{
 				"PodName": pod.Name})
 
-			if experimentsDetails.Force == true {
+			if experimentsDetails.Force {
 				err = clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Delete(pod.Name, &v1.DeleteOptions{GracePeriodSeconds: &GracePeriod})
 			} else {
 				err = clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Delete(pod.Name, &v1.DeleteOptions{})
@@ -98,10 +101,18 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 				return err
 			}
 
-			//Waiting for the chaos interval after chaos injection
-			if experimentsDetails.ChaosInterval != 0 {
-				log.Infof("[Wait]: Wait for the chaos interval %vs", experimentsDetails.ChaosInterval)
-				common.WaitForDuration(experimentsDetails.ChaosInterval)
+			switch chaosDetails.Randomness {
+			case true:
+				if err := common.RandomInterval(experimentsDetails.ChaosInterval); err != nil {
+					return err
+				}
+			default:
+				//Waiting for the chaos interval after chaos injection
+				if experimentsDetails.ChaosInterval != "" {
+					log.Infof("[Wait]: Wait for the chaos interval %vs", experimentsDetails.ChaosInterval)
+					waitTime, _ := strconv.Atoi(experimentsDetails.ChaosInterval)
+					common.WaitForDuration(waitTime)
+				}
 			}
 
 			//Verify the status of pod after the chaos injection
@@ -110,17 +121,7 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 				return err
 			}
 
-			//ChaosCurrentTimeStamp contains the current timestamp
-			ChaosCurrentTimeStamp := time.Now().Unix()
-
-			//ChaosDiffTimeStamp contains the difference of current timestamp and start timestamp
-			//It will helpful to track the total chaos duration
-			chaosDiffTimeStamp := ChaosCurrentTimeStamp - ChaosStartTimeStamp
-
-			if int(chaosDiffTimeStamp) >= experimentsDetails.ChaosDuration {
-				log.Infof("[Chaos]: Time is up for experiment: %v", experimentsDetails.ExperimentName)
-				break
-			}
+			duration = int(time.Since(ChaosStartTimeStamp).Seconds())
 		}
 
 	}
@@ -130,8 +131,8 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 
 }
 
-// InjectChaosInParallelMode delete the target application pods in parallel mode (all at once)
-func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, eventsDetails *types.EventDetails, resultDetails *types.ResultDetails) error {
+// injectChaosInParallelMode delete the target application pods in parallel mode (all at once)
+func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, eventsDetails *types.EventDetails, resultDetails *types.ResultDetails) error {
 
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
@@ -142,12 +143,15 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 
 	GracePeriod := int64(0)
 	//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
-	ChaosStartTimeStamp := time.Now().Unix()
+	ChaosStartTimeStamp := time.Now()
+	duration := int(time.Since(ChaosStartTimeStamp).Seconds())
 
-	for count := 0; count < experimentsDetails.Iterations; count++ {
-
+	for duration < experimentsDetails.ChaosDuration {
 		// Get the target pod details for the chaos execution
 		// if the target pod is not defined it will derive the random target pod list using pod affected percentage
+		if experimentsDetails.TargetPods == "" && chaosDetails.AppDetail.Label == "" {
+			return errors.Errorf("please provide one of the appLabel or TARGET_PODS")
+		}
 		targetPodList, err := common.GetPodList(experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, clients, chaosDetails)
 		if err != nil {
 			return err
@@ -171,7 +175,7 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 			log.InfoWithValues("[Info]: Killing the following pods", logrus.Fields{
 				"PodName": pod.Name})
 
-			if experimentsDetails.Force == true {
+			if experimentsDetails.Force {
 				err = clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Delete(pod.Name, &v1.DeleteOptions{GracePeriodSeconds: &GracePeriod})
 			} else {
 				err = clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Delete(pod.Name, &v1.DeleteOptions{})
@@ -181,90 +185,18 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 			}
 		}
 
-		//Waiting for the chaos interval after chaos injection
-		if experimentsDetails.ChaosInterval != 0 {
-			log.Infof("[Wait]: Wait for the chaos interval %vs", experimentsDetails.ChaosInterval)
-			common.WaitForDuration(experimentsDetails.ChaosInterval)
-		}
-
-		//Verify the status of pod after the chaos injection
-		log.Info("[Status]: Verification for the recreation of application pod")
-		if err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
-			return err
-		}
-
-		//ChaosCurrentTimeStamp contains the current timestamp
-		ChaosCurrentTimeStamp := time.Now().Unix()
-
-		//ChaosDiffTimeStamp contains the difference of current timestamp and start timestamp
-		//It will helpful to track the total chaos duration
-		chaosDiffTimeStamp := ChaosCurrentTimeStamp - ChaosStartTimeStamp
-
-		if int(chaosDiffTimeStamp) >= experimentsDetails.ChaosDuration {
-			log.Infof("[Chaos]: Time is up for experiment: %v", experimentsDetails.ExperimentName)
-			break
-		}
-	}
-
-	log.Infof("[Completion]: %v chaos is done", experimentsDetails.ExperimentName)
-
-	return nil
-}
-
-//GetIterations derive the iterations value from given parameters
-func GetIterations(experimentsDetails *experimentTypes.ExperimentDetails) {
-	var Iterations int
-	if experimentsDetails.ChaosInterval != 0 {
-		Iterations = experimentsDetails.ChaosDuration / experimentsDetails.ChaosInterval
-	} else {
-		Iterations = 0
-	}
-	experimentsDetails.Iterations = math.Maximum(Iterations, 1)
-
-}
-
-//PodDeleteChaos deletes the random single/multiple pods
-func PodDeleteChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails) error {
-
-	GracePeriod := int64(0)
-	//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
-	ChaosStartTimeStamp := time.Now().Unix()
-
-	for count := 0; count < experimentsDetails.Iterations; count++ {
-
-		// Get the target pod details for the chaos execution
-		// if the target pod is not defined it will derive the random target pod list using pod affected percentage
-		targetPodList, err := common.GetPodList(experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, clients, chaosDetails)
-		if err != nil {
-			return err
-		}
-
-		if experimentsDetails.EngineName != "" {
-			msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on application pod"
-			types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
-			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
-		}
-
-		//Deleting the application pod
-		for _, pod := range targetPodList.Items {
-
-			log.InfoWithValues("[Info]: Killing the following pods", logrus.Fields{
-				"PodName": pod.Name})
-
-			if experimentsDetails.Force == true {
-				err = clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Delete(pod.Name, &v1.DeleteOptions{GracePeriodSeconds: &GracePeriod})
-			} else {
-				err = clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Delete(pod.Name, &v1.DeleteOptions{})
-			}
-			if err != nil {
+		switch chaosDetails.Randomness {
+		case true:
+			if err := common.RandomInterval(experimentsDetails.ChaosInterval); err != nil {
 				return err
 			}
-		}
-
-		//Waiting for the chaos interval after chaos injection
-		if experimentsDetails.ChaosInterval != 0 {
-			log.Infof("[Wait]: Wait for the chaos interval %vs", experimentsDetails.ChaosInterval)
-			common.WaitForDuration(experimentsDetails.ChaosInterval)
+		default:
+			//Waiting for the chaos interval after chaos injection
+			if experimentsDetails.ChaosInterval != "" {
+				log.Infof("[Wait]: Wait for the chaos interval %vs", experimentsDetails.ChaosInterval)
+				waitTime, _ := strconv.Atoi(experimentsDetails.ChaosInterval)
+				common.WaitForDuration(waitTime)
+			}
 		}
 
 		//Verify the status of pod after the chaos injection
@@ -272,20 +204,9 @@ func PodDeleteChaos(experimentsDetails *experimentTypes.ExperimentDetails, clien
 		if err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
 			return err
 		}
-
-		//ChaosCurrentTimeStamp contains the current timestamp
-		ChaosCurrentTimeStamp := time.Now().Unix()
-
-		//ChaosDiffTimeStamp contains the difference of current timestamp and start timestamp
-		//It will helpful to track the total chaos duration
-		chaosDiffTimeStamp := ChaosCurrentTimeStamp - ChaosStartTimeStamp
-
-		if int(chaosDiffTimeStamp) >= experimentsDetails.ChaosDuration {
-			log.Infof("[Chaos]: Time is up for experiment: %v", experimentsDetails.ExperimentName)
-			break
-		}
-
+		duration = int(time.Since(ChaosStartTimeStamp).Seconds())
 	}
+
 	log.Infof("[Completion]: %v chaos is done", experimentsDetails.ExperimentName)
 
 	return nil

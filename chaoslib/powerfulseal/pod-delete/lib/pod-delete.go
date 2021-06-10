@@ -103,7 +103,7 @@ func GetServiceAccount(experimentsDetails *experimentTypes.ExperimentDetails, cl
 // CreateConfigMap creates a configmap for the powerfulseal deployment
 func CreateConfigMap(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, runID string) error {
 
-	data := make(map[string]string, 0)
+	data := map[string]string{}
 
 	// It will store all the details inside a string in well formated way
 	policy := GetConfigMapData(experimentsDetails)
@@ -128,9 +128,10 @@ func CreateConfigMap(experimentsDetails *experimentTypes.ExperimentDetails, clie
 // GetConfigMapData generates the configmap data for the powerfulseal deployments in desired format format
 func GetConfigMapData(experimentsDetails *experimentTypes.ExperimentDetails) string {
 
+	waitTime, _ := strconv.Atoi(experimentsDetails.ChaosInterval)
 	policy := "config:" + "\n" +
 		"  minSecondsBetweenRuns: 1" + "\n" +
-		"  maxSecondsBetweenRuns: " + strconv.Itoa(experimentsDetails.ChaosInterval) + "\n" +
+		"  maxSecondsBetweenRuns: " + strconv.Itoa(waitTime) + "\n" +
 		"podScenarios:" + "\n" +
 		"  - name: \"delete random pods in application namespace\"" + "\n" +
 		"    match:" + "\n" +

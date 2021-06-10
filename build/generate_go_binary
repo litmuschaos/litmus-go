@@ -1,8 +1,4 @@
-# Buiding go binaries for container_kill helper
-go build -o build/_output/${GOARCH}/helper/container-killer ./chaoslib/litmus/container-kill/helper
-# Buiding go binaries for network_chaos helper
-go build -o build/_output/${GOARCH}/helper/network-chaos ./chaoslib/litmus/network-chaos/helper
-# Buiding go binaries for disk_fill helper
-go build -o build/_output/${GOARCH}/helper/disk-fill ./chaoslib/litmus/disk-fill/helper
+# Building go binaries for all helpers
+go build -o build/_output/${GOARCH}/helpers ./bin/helper
 # Building go binaries for all experiments
-go build -o build/_output/${GOARCH}/experiments ./bin
+go build -o build/_output/${GOARCH}/experiments ./bin/experiment

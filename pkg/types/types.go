@@ -1,6 +1,7 @@
 package types
 
 import (
+	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
 	clientTypes "k8s.io/apimachinery/pkg/types"
 )
 
@@ -19,16 +20,16 @@ const (
 	PassVerdict string = "Pass"
 	// FailVerdict marked the verdict as failed in the end of experiment
 	FailVerdict string = "Fail"
-	// StoppedVerdict marked the verdict as stopped in the end of experiment
-	StoppedVerdict string = "Stopped"
+	// AbortVerdict marked the verdict as abort when experiment aborted
+	AbortVerdict string = "Abort"
 )
 
 // ResultDetails is for collecting all the chaos-result-related details
 type ResultDetails struct {
 	Name             string
-	Verdict          string
+	Verdict          v1alpha1.ResultVerdict
 	FailStep         string
-	Phase            string
+	Phase            v1alpha1.ResultPhase
 	ResultUID        clientTypes.UID
 	ProbeDetails     []ProbeDetails
 	PassedProbeCount int
@@ -48,10 +49,12 @@ type RegisterDetails struct {
 // ProbeDetails is for collecting all the probe details
 type ProbeDetails struct {
 	Name                   string
+	Phase                  string
 	Type                   string
 	Status                 map[string]string
 	IsProbeFailedWithError error
 	RunID                  string
+	RunCount               int
 }
 
 // EventDetails is for collecting all the events-related details
@@ -77,6 +80,7 @@ type ChaosDetails struct {
 	ChaosDuration        int
 	JobCleanupPolicy     string
 	ProbeImagePullPolicy string
+	Randomness           bool
 }
 
 // AppDetails contains all the application related envs
@@ -108,7 +112,7 @@ func SetResultAttributes(resultDetails *ResultDetails, chaosDetails ChaosDetails
 }
 
 //SetResultAfterCompletion set all the chaos result ENV in the EOT
-func SetResultAfterCompletion(resultDetails *ResultDetails, verdict, phase, failStep string) {
+func SetResultAfterCompletion(resultDetails *ResultDetails, verdict v1alpha1.ResultVerdict, phase v1alpha1.ResultPhase, failStep string) {
 	resultDetails.Verdict = verdict
 	resultDetails.Phase = phase
 	resultDetails.FailStep = failStep

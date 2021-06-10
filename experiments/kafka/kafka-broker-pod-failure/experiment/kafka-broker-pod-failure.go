@@ -3,6 +3,7 @@ package experiment
 import (
 	"strings"
 
+	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
 	kafkaPodDelete "github.com/litmuschaos/litmus-go/chaoslib/litmus/kafka-broker-pod-failure/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
@@ -20,7 +21,6 @@ import (
 // KafkaBrokerPodFailure derive and kill the kafka broker leader
 func KafkaBrokerPodFailure(clients clients.ClientSets) {
 
-	var err error
 	experimentsDetails := experimentTypes.ExperimentDetails{}
 	resultDetails := types.ResultDetails{}
 	eventsDetails := types.EventDetails{}
@@ -38,15 +38,15 @@ func KafkaBrokerPodFailure(clients clients.ClientSets) {
 
 	if experimentsDetails.ChaoslibDetail.EngineName != "" {
 		// Intialise the probe details. Bail out upon error, as we haven't entered exp business logic yet
-		if err = probe.InitializeProbesInChaosResultDetails(&chaosDetails, clients, &resultDetails); err != nil {
-			log.Fatalf("Unable to initialize the probes, err: %v", err)
+		if err := probe.InitializeProbesInChaosResultDetails(&chaosDetails, clients, &resultDetails); err != nil {
+			log.Errorf("Unable to initialize the probes, err: %v", err)
+			return
 		}
 	}
 
 	//Updating the chaos result in the beginning of experiment
 	log.Infof("[PreReq]: Updating the chaos result of %v experiment (SOT)", experimentsDetails.ChaoslibDetail.ExperimentName)
-	err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT")
-	if err != nil {
+	if err := result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT"); err != nil {
 		log.Errorf("Unable to Create the Chaos Result, err: %v", err)
 		failStep := "Updating the chaos result of kafka-broker-pod-failure experiment (SOT)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
@@ -71,8 +71,7 @@ func KafkaBrokerPodFailure(clients clients.ClientSets) {
 	// PRE-CHAOS APPLICATION STATUS CHECK
 	// KAFKA CLUSTER HEALTH CHECK
 	log.Info("[Status]: Verify that the Kafka cluster is healthy(pre-chaos)")
-	err = kafka.ClusterHealthCheck(&experimentsDetails, clients)
-	if err != nil {
+	if err := kafka.ClusterHealthCheck(&experimentsDetails, clients); err != nil {
 		log.Errorf("Cluster health check failed, err: %v", err)
 		failStep := "Verify that the Kafka cluster is healthy(pre-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
@@ -85,8 +84,7 @@ func KafkaBrokerPodFailure(clients clients.ClientSets) {
 		// run the probes in the pre-chaos check
 		if len(resultDetails.ProbeDetails) != 0 {
 
-			err = probe.RunProbes(&chaosDetails, clients, &resultDetails, "PreChaos", &eventsDetails)
-			if err != nil {
+			if err := probe.RunProbes(&chaosDetails, clients, &resultDetails, "PreChaos", &eventsDetails); err != nil {
 				log.Errorf("Probes Failed, err: %v", err)
 				failStep := "Failed while running probes"
 				msg := "AUT: Running, Probes: Unsuccessful"
@@ -123,40 +121,40 @@ func KafkaBrokerPodFailure(clients clients.ClientSets) {
 	kafka.DisplayKafkaBroker(&experimentsDetails)
 
 	// Including the litmus lib for kafka-broker-pod-failure
-	if experimentsDetails.ChaoslibDetail.ChaosLib == "litmus" {
-		err = kafkaPodDelete.PreparePodDelete(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails)
-		if err != nil {
+	switch experimentsDetails.ChaoslibDetail.ChaosLib {
+	case "litmus":
+		if err := kafkaPodDelete.PreparePodDelete(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
 			log.Errorf("Chaos injection failed, err: %v", err)
 			failStep := "Including the litmus lib for kafka-broker-pod-failure"
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}
-		log.Info("[Confirmation]: The application pod has been deleted successfully")
-		resultDetails.Verdict = "Pass"
-	} else {
+	default:
 		log.Error("[Invalid]: Please Provide the correct LIB")
 		failStep := "Including the litmus lib for kafka-broker-pod-failure"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
 
+	log.Infof("[Confirmation]: %v chaos has been injected successfully", experimentsDetails.ExperimentName)
+	resultDetails.Verdict = v1alpha1.ResultVerdictPassed
+
 	// POST-CHAOS KAFKA CLUSTER HEALTH CHECK
 	log.Info("[Status]: Verify that the Kafka cluster is healthy(post-chaos)")
-	err = kafka.ClusterHealthCheck(&experimentsDetails, clients)
-	if err != nil {
+	if err := kafka.ClusterHealthCheck(&experimentsDetails, clients); err != nil {
 		log.Errorf("Cluster health check failed, err: %v", err)
 		failStep := "Verify that the Kafka cluster is healthy(post-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
+
 	if experimentsDetails.ChaoslibDetail.EngineName != "" {
 		// marking AUT as running, as we already checked the status of application under test
 		msg := "AUT: Running"
 
 		// run the probes in the post-chaos check
 		if len(resultDetails.ProbeDetails) != 0 {
-			err = probe.RunProbes(&chaosDetails, clients, &resultDetails, "PostChaos", &eventsDetails)
-			if err != nil {
+			if err := probe.RunProbes(&chaosDetails, clients, &resultDetails, "PostChaos", &eventsDetails); err != nil {
 				log.Errorf("Probe Failed, err: %v", err)
 				failStep := "Failed while running probes"
 				msg := "AUT: Running, Probes: Unsuccessful"
@@ -177,7 +175,7 @@ func KafkaBrokerPodFailure(clients clients.ClientSets) {
 	switch strings.ToLower(experimentsDetails.KafkaLivenessStream) {
 	case "enabled":
 		log.Info("[Status]: Verify that the Kafka liveness pod is running(post-chaos)")
-		if err = status.CheckApplicationStatus(experimentsDetails.ChaoslibDetail.AppNS, "name=kafka-liveness-"+experimentsDetails.RunID, experimentsDetails.ChaoslibDetail.Timeout, experimentsDetails.ChaoslibDetail.Delay, clients); err != nil {
+		if err := status.CheckApplicationStatus(experimentsDetails.ChaoslibDetail.AppNS, "name=kafka-liveness-"+experimentsDetails.RunID, experimentsDetails.ChaoslibDetail.Timeout, experimentsDetails.ChaoslibDetail.Delay, clients); err != nil {
 			log.Errorf("Application liveness status check failed, err: %v", err)
 			failStep := "Verify that the liveness pod is running (post-chaos)"
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
@@ -195,13 +193,13 @@ func KafkaBrokerPodFailure(clients clients.ClientSets) {
 
 	//Updating the chaosResult in the end of experiment
 	log.Info("[The End]: Updating the chaos result of kafka pod delete experiment (EOT)")
-	err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
-	if err != nil {
+	if err := result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT"); err != nil {
 		log.Errorf("Unable to Update the Chaos Result, err: %v", err)
+		return
 	}
 
 	// generating the event in chaosresult to marked the verdict as pass/fail
-	msg = "experiment: " + experimentsDetails.ChaoslibDetail.ExperimentName + ", Result: " + resultDetails.Verdict
+	msg = "experiment: " + experimentsDetails.ChaoslibDetail.ExperimentName + ", Result: " + string(resultDetails.Verdict)
 	reason := types.PassVerdict
 	eventType := "Normal"
 	if resultDetails.Verdict != "Pass" {
@@ -213,7 +211,7 @@ func KafkaBrokerPodFailure(clients clients.ClientSets) {
 	events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosResult")
 
 	if experimentsDetails.ChaoslibDetail.EngineName != "" {
-		msg := experimentsDetails.ChaoslibDetail.ExperimentName + " experiment has been " + resultDetails.Verdict + "ed"
+		msg := experimentsDetails.ChaoslibDetail.ExperimentName + " experiment has been " + string(resultDetails.Verdict) + "ed"
 		types.SetEngineEventAttributes(&eventsDetails, types.Summary, msg, "Normal", &chaosDetails)
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}

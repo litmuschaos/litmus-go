@@ -2,6 +2,7 @@ package lib
 
 import (
 	"strconv"
+	"strings"
 	"time"
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
@@ -21,8 +22,12 @@ import (
 
 //PrepareContainerKill contains the prepration steps before chaos injection
 func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+
 	// Get the target pod details for the chaos execution
 	// if the target pod is not defined it will derive the random target pod list using pod affected percentage
+	if experimentsDetails.TargetPods == "" && chaosDetails.AppDetail.Label == "" {
+		return errors.Errorf("please provide one of the appLabel or TARGET_PODS")
+	}
 	targetPodList, err := common.GetPodList(experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, clients, chaosDetails)
 	if err != nil {
 		return err
@@ -42,27 +47,15 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 
 	//Get the target container name of the application pod
 	if experimentsDetails.TargetContainer == "" {
-		experimentsDetails.TargetContainer, err = GetTargetContainer(experimentsDetails, targetPodList.Items[0].Name, clients)
+		experimentsDetails.TargetContainer, err = common.GetTargetContainer(experimentsDetails.AppNS, targetPodList.Items[0].Name, clients)
 		if err != nil {
-			return errors.Errorf("Unable to get the target container name, err: %v", err)
+			return errors.Errorf("unable to get the target container name, err: %v", err)
 		}
 	}
 
 	if experimentsDetails.EngineName != "" {
-		// Get Chaos Pod Annotation
-		experimentsDetails.Annotations, err = common.GetChaosPodAnnotation(experimentsDetails.ChaosPodName, experimentsDetails.ChaosNamespace, clients)
-		if err != nil {
-			return errors.Errorf("unable to get annotations, err: %v", err)
-		}
-		// Get Resource Requirements
-		experimentsDetails.Resources, err = common.GetChaosPodResourceRequirements(experimentsDetails.ChaosPodName, experimentsDetails.ExperimentName, experimentsDetails.ChaosNamespace, clients)
-		if err != nil {
-			return errors.Errorf("Unable to get resource requirements, err: %v", err)
-		}
-		// Get ImagePullSecrets
-		experimentsDetails.ImagePullSecrets, err = common.GetImagePullSecrets(experimentsDetails.ChaosPodName, experimentsDetails.ChaosNamespace, clients)
-		if err != nil {
-			return errors.Errorf("Unable to get imagePullSecrets, err: %v", err)
+		if err := setHelperData(experimentsDetails, clients); err != nil {
+			return err
 		}
 	}
 
@@ -72,14 +65,17 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 		events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 	}
 
-	if experimentsDetails.Sequence == "serial" {
-		if err = InjectChaosInSerialMode(experimentsDetails, targetPodList, clients, chaosDetails, resultDetails, eventsDetails); err != nil {
+	switch strings.ToLower(experimentsDetails.Sequence) {
+	case "serial":
+		if err = injectChaosInSerialMode(experimentsDetails, targetPodList, clients, chaosDetails, resultDetails, eventsDetails); err != nil {
 			return err
 		}
-	} else {
-		if err = InjectChaosInParallelMode(experimentsDetails, targetPodList, clients, chaosDetails, resultDetails, eventsDetails); err != nil {
+	case "parallel":
+		if err = injectChaosInParallelMode(experimentsDetails, targetPodList, clients, chaosDetails, resultDetails, eventsDetails); err != nil {
 			return err
 		}
+	default:
+		return errors.Errorf("%v sequence is not supported", experimentsDetails.Sequence)
 	}
 
 	//Waiting for the ramp time after chaos injection
@@ -90,8 +86,8 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 	return nil
 }
 
-// InjectChaosInSerialMode kill the container of all target application serially (one by one)
-func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
+// injectChaosInSerialMode kill the container of all target application serially (one by one)
+func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
 
 	labelSuffix := common.GetRunID()
 
@@ -106,7 +102,7 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 	for _, pod := range targetPodList.Items {
 
 		//GetRestartCount return the restart count of target container
-		restartCountBefore := GetRestartCount(pod, experimentsDetails.TargetContainer)
+		restartCountBefore := getRestartCount(pod, experimentsDetails.TargetContainer)
 		log.Infof("restartCount of target container before chaos injection: %v", restartCountBefore)
 
 		runID := common.GetRunID()
@@ -117,18 +113,16 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 			"Target Container": experimentsDetails.TargetContainer,
 		})
 
-		err := CreateHelperPod(experimentsDetails, clients, pod.Name, pod.Spec.NodeName, runID, labelSuffix)
-		if err != nil {
-			return errors.Errorf("Unable to create the helper pod, err: %v", err)
+		if err := createHelperPod(experimentsDetails, clients, pod.Name, pod.Spec.NodeName, runID, labelSuffix); err != nil {
+			return errors.Errorf("unable to create the helper pod, err: %v", err)
 		}
 
-		appLabel := "name=" + experimentsDetails.ExperimentName + "-" + runID
+		appLabel := "name=" + experimentsDetails.ExperimentName + "-helper-" + runID
 
 		//checking the status of the helper pod, wait till the pod comes to running state else fail the experiment
 		log.Info("[Status]: Checking the status of the helper pod")
-		err = status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, appLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
-		if err != nil {
-			common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-"+runID, appLabel, chaosDetails, clients)
+		if err := status.CheckHelperStatus(experimentsDetails.ChaosNamespace, appLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
+			common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-helper-"+runID, appLabel, chaosDetails, clients)
 			return errors.Errorf("helper pod is not in running state, err: %v", err)
 		}
 
@@ -136,28 +130,26 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		common.WaitForDuration(experimentsDetails.ChaosDuration)
 
 		// It will verify that the restart count of container should increase after chaos injection
-		err = VerifyRestartCount(experimentsDetails, pod, clients, restartCountBefore)
-		if err != nil {
-			common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-"+runID, appLabel, chaosDetails, clients)
-			return errors.Errorf("Target container is not restarted, err: %v", err)
+		if err := verifyRestartCount(experimentsDetails, pod, clients, restartCountBefore); err != nil {
+			common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-helper-"+runID, appLabel, chaosDetails, clients)
+			return errors.Errorf("target container is not restarted, err: %v", err)
 		}
 
 		//Deleting the helper pod
 		log.Info("[Cleanup]: Deleting the helper pod")
-		err = common.DeletePod(experimentsDetails.ExperimentName+"-"+runID, appLabel, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients)
-		if err != nil {
-			return errors.Errorf("Unable to delete the helper pod, err: %v", err)
+		if err := common.DeletePod(experimentsDetails.ExperimentName+"-helper-"+runID, appLabel, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients); err != nil {
+			return errors.Errorf("unable to delete the helper pod, err: %v", err)
 		}
 	}
 
 	return nil
 }
 
-// InjectChaosInParallelMode kill the container of all target application in parallel mode (all at once)
-func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
+// injectChaosInParallelMode kill the container of all target application in parallel mode (all at once)
+func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
 
 	//GetRestartCount return the restart count of target container
-	restartCountBefore := GetRestartCountAll(targetPodList, experimentsDetails.TargetContainer)
+	restartCountBefore := getRestartCountAll(targetPodList, experimentsDetails.TargetContainer)
 	log.Infof("restartCount of target containers before chaos injection: %v", restartCountBefore)
 
 	labelSuffix := common.GetRunID()
@@ -180,9 +172,8 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 			"Target Container": experimentsDetails.TargetContainer,
 		})
 
-		err := CreateHelperPod(experimentsDetails, clients, pod.Name, pod.Spec.NodeName, runID, labelSuffix)
-		if err != nil {
-			return errors.Errorf("Unable to create the helper pod, err: %v", err)
+		if err := createHelperPod(experimentsDetails, clients, pod.Name, pod.Spec.NodeName, runID, labelSuffix); err != nil {
+			return errors.Errorf("unable to create the helper pod, err: %v", err)
 		}
 	}
 
@@ -190,8 +181,7 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 
 	//checking the status of the helper pod, wait till the pod comes to running state else fail the experiment
 	log.Info("[Status]: Checking the status of the helper pod")
-	err := status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, appLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
-	if err != nil {
+	if err := status.CheckHelperStatus(experimentsDetails.ChaosNamespace, appLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
 		common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
 		return errors.Errorf("helper pod is not in running state, err: %v", err)
 	}
@@ -200,35 +190,22 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 	common.WaitForDuration(experimentsDetails.ChaosDuration)
 
 	// It will verify that the restart count of container should increase after chaos injection
-	err = VerifyRestartCountAll(experimentsDetails, targetPodList, clients, restartCountBefore)
-	if err != nil {
+	if err := verifyRestartCountAll(experimentsDetails, targetPodList, clients, restartCountBefore); err != nil {
 		common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
-		return errors.Errorf("Target container is not restarted , err: %v", err)
+		return errors.Errorf("target container is not restarted , err: %v", err)
 	}
 
 	//Deleting the helper pod
 	log.Info("[Cleanup]: Deleting the helper pod")
-	err = common.DeleteAllPod(appLabel, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients)
-	if err != nil {
-		return errors.Errorf("Unable to delete the helper pod, err: %v", err)
+	if err := common.DeleteAllPod(appLabel, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients); err != nil {
+		return errors.Errorf("unable to delete the helper pod, err: %v", err)
 	}
 
 	return nil
 }
 
-//GetTargetContainer will fetch the container name from application pod
-//This container will be used as target container
-func GetTargetContainer(experimentsDetails *experimentTypes.ExperimentDetails, appName string, clients clients.ClientSets) (string, error) {
-	pod, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Get(appName, v1.GetOptions{})
-	if err != nil {
-		return "", err
-	}
-
-	return pod.Spec.Containers[0].Name, nil
-}
-
-//GetRestartCount return the restart count of target container
-func GetRestartCount(targetPod apiv1.Pod, containerName string) int {
+//getRestartCount return the restart count of target container
+func getRestartCount(targetPod apiv1.Pod, containerName string) int {
 	restartCount := 0
 	for _, container := range targetPod.Status.ContainerStatuses {
 		if container.Name == containerName {
@@ -239,21 +216,19 @@ func GetRestartCount(targetPod apiv1.Pod, containerName string) int {
 	return restartCount
 }
 
-//GetRestartCountAll return the restart count of all target container
-func GetRestartCountAll(targetPodList apiv1.PodList, containerName string) []int {
+//getRestartCountAll return the restart count of all target container
+func getRestartCountAll(targetPodList apiv1.PodList, containerName string) []int {
 	restartCount := []int{}
 	for _, pod := range targetPodList.Items {
-
-		restartCount = append(restartCount, GetRestartCount(pod, containerName))
-
+		restartCount = append(restartCount, getRestartCount(pod, containerName))
 	}
 
 	return restartCount
 }
 
-//VerifyRestartCount verify the restart count of target container that it is restarted or not after chaos injection
+//verifyRestartCount verify the restart count of target container that it is restarted or not after chaos injection
 // the restart count of container should increase after chaos injection
-func VerifyRestartCount(experimentsDetails *experimentTypes.ExperimentDetails, pod apiv1.Pod, clients clients.ClientSets, restartCountBefore int) error {
+func verifyRestartCount(experimentsDetails *experimentTypes.ExperimentDetails, pod apiv1.Pod, clients clients.ClientSets, restartCountBefore int) error {
 
 	restartCountAfter := 0
 	err := retry.
@@ -279,38 +254,37 @@ func VerifyRestartCount(experimentsDetails *experimentTypes.ExperimentDetails, p
 
 	// it will fail if restart count won't increase
 	if restartCountAfter <= restartCountBefore {
-		return errors.Errorf("Target container is not restarted")
+		return errors.Errorf("target container is not restarted")
 	}
 
 	log.Infof("restartCount of target container after chaos injection: %v", restartCountAfter)
 
 	return nil
-
 }
 
-//VerifyRestartCountAll verify the restart count of all the target container that it is restarted or not after chaos injection
+//verifyRestartCountAll verify the restart count of all the target container that it is restarted or not after chaos injection
 // the restart count of container should increase after chaos injection
-func VerifyRestartCountAll(experimentsDetails *experimentTypes.ExperimentDetails, podList apiv1.PodList, clients clients.ClientSets, restartCountBefore []int) error {
+func verifyRestartCountAll(experimentsDetails *experimentTypes.ExperimentDetails, podList apiv1.PodList, clients clients.ClientSets, restartCountBefore []int) error {
 
 	for index, pod := range podList.Items {
 
-		if err := VerifyRestartCount(experimentsDetails, pod, clients, restartCountBefore[index]); err != nil {
+		if err := verifyRestartCount(experimentsDetails, pod, clients, restartCountBefore[index]); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-// CreateHelperPod derive the attributes for helper pod and create the helper pod
-func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, appName, appNodeName, runID, labelSuffix string) error {
+// createHelperPod derive the attributes for helper pod and create the helper pod
+func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, appName, appNodeName, runID, labelSuffix string) error {
 
 	helperPod := &apiv1.Pod{
 		ObjectMeta: v1.ObjectMeta{
-			Name:      experimentsDetails.ExperimentName + "-" + runID,
+			Name:      experimentsDetails.ExperimentName + "-helper-" + runID,
 			Namespace: experimentsDetails.ChaosNamespace,
 			Labels: map[string]string{
 				"app":                       experimentsDetails.ExperimentName + "-helper-" + labelSuffix,
-				"name":                      experimentsDetails.ExperimentName + "-" + runID,
+				"name":                      experimentsDetails.ExperimentName + "-helper-" + runID,
 				"chaosUID":                  string(experimentsDetails.ChaosUID),
 				"app.kubernetes.io/part-of": "litmus",
 			},
@@ -379,4 +353,26 @@ func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 
 	_, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Create(helperPod)
 	return err
+}
+
+// setHelperData derive the data from experiment pod and sets into experimentDetails struct
+// which can be used to create helper pod
+func setHelperData(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) error {
+	// Get Chaos Pod Annotation
+	var err error
+	experimentsDetails.Annotations, err = common.GetChaosPodAnnotation(experimentsDetails.ChaosPodName, experimentsDetails.ChaosNamespace, clients)
+	if err != nil {
+		return errors.Errorf("unable to get annotations, err: %v", err)
+	}
+	// Get Resource Requirements
+	experimentsDetails.Resources, err = common.GetChaosPodResourceRequirements(experimentsDetails.ChaosPodName, experimentsDetails.ExperimentName, experimentsDetails.ChaosNamespace, clients)
+	if err != nil {
+		return errors.Errorf("unable to get resource requirements, err: %v", err)
+	}
+	// Get ImagePullSecrets
+	experimentsDetails.ImagePullSecrets, err = common.GetImagePullSecrets(experimentsDetails.ChaosPodName, experimentsDetails.ChaosNamespace, clients)
+	if err != nil {
+		return errors.Errorf("unable to get imagePullSecrets, err: %v", err)
+	}
+	return nil
 }

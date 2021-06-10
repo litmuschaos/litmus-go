@@ -2,7 +2,6 @@ package lib
 
 import (
 	"bytes"
-	"fmt"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -15,7 +14,6 @@ import (
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/node-drain/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
-	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
@@ -24,10 +22,23 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-var err error
+var (
+	err           error
+	inject, abort chan os.Signal
+)
 
 //PrepareNodeDrain contains the prepration steps before chaos injection
 func PrepareNodeDrain(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+
+	// inject channel is used to transmit signal notifications.
+	inject = make(chan os.Signal, 1)
+	// Catch and relay certain signal(s) to inject channel.
+	signal.Notify(inject, os.Interrupt, syscall.SIGTERM)
+
+	// abort channel is used to transmit signal notifications.
+	abort = make(chan os.Signal, 1)
+	// Catch and relay certain signal(s) to abort channel.
+	signal.Notify(abort, os.Interrupt, syscall.SIGTERM)
 
 	//Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
@@ -37,7 +48,7 @@ func PrepareNodeDrain(experimentsDetails *experimentTypes.ExperimentDetails, cli
 
 	if experimentsDetails.TargetNode == "" {
 		//Select node for kubelet-service-kill
-		experimentsDetails.TargetNode, err = common.GetNodeName(experimentsDetails.AppNS, experimentsDetails.AppLabel, clients)
+		experimentsDetails.TargetNode, err = common.GetNodeName(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.NodeLabel, clients)
 		if err != nil {
 			return err
 		}
@@ -56,80 +67,42 @@ func PrepareNodeDrain(experimentsDetails *experimentTypes.ExperimentDetails, cli
 		}
 	}
 
+	// watching for the abort signal and revert the chaos
+	go abortWatcher(experimentsDetails, clients, resultDetails, chaosDetails, eventsDetails)
+
 	// Drain the application node
-	err := DrainNode(experimentsDetails, clients)
-	if err != nil {
+	if err := drainNode(experimentsDetails, clients); err != nil {
 		return err
 	}
 
 	// Verify the status of AUT after reschedule
 	log.Info("[Status]: Verify the status of AUT after reschedule")
-	err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
-	if err != nil {
-		return errors.Errorf("Application status check failed, err: %v", err)
+	if err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
+		return errors.Errorf("application status check failed, err: %v", err)
 	}
 
 	// Verify the status of Auxiliary Applications after reschedule
 	if experimentsDetails.AuxiliaryAppInfo != "" {
 		log.Info("[Status]: Verify that the Auxiliary Applications are running")
-		err = status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
-		if err != nil {
-			return errors.Errorf("Auxiliary Applications status check failed, err: %v", err)
+		if err = status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
+			return errors.Errorf("auxiliary Applications status check failed, err: %v", err)
 		}
 	}
-
-	var endTime <-chan time.Time
-	timeDelay := time.Duration(experimentsDetails.ChaosDuration) * time.Second
 
 	log.Infof("[Chaos]: Waiting for %vs", experimentsDetails.ChaosDuration)
 
-	// signChan channel is used to transmit signal notifications.
-	signChan := make(chan os.Signal, 1)
-	// Catch and relay certain signal(s) to signChan channel.
-	signal.Notify(signChan, os.Interrupt, syscall.SIGTERM, syscall.SIGKILL)
+	common.WaitForDuration(experimentsDetails.ChaosDuration)
 
-loop:
-	for {
-		endTime = time.After(timeDelay)
-		select {
-		case <-signChan:
-			log.Info("[Chaos]: Killing process started because of terminated signal received")
-			// updating the chaosresult after stopped
-			failStep := "Node Drain injection stopped!"
-			types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep)
-			result.ChaosResult(chaosDetails, clients, resultDetails, "EOT")
-
-			// generating summary event in chaosengine
-			msg := experimentsDetails.ExperimentName + " experiment has been aborted"
-			types.SetEngineEventAttributes(eventsDetails, types.Summary, msg, "Warning", chaosDetails)
-			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
-
-			// generating summary event in chaosresult
-			types.SetResultEventAttributes(eventsDetails, types.StoppedVerdict, msg, "Warning", resultDetails)
-			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosResult")
-
-			if err = UncordonNode(experimentsDetails, clients); err != nil {
-				log.Errorf("unable to uncordon node, err :%v", err)
-
-			}
-			os.Exit(1)
-		case <-endTime:
-			log.Infof("[Chaos]: Time is up for experiment: %v", experimentsDetails.ExperimentName)
-			endTime = nil
-			break loop
-		}
-	}
+	log.Info("[Chaos]: Stopping the experiment")
 
 	// Uncordon the application node
-	err = UncordonNode(experimentsDetails, clients)
-	if err != nil {
+	if err := uncordonNode(experimentsDetails, clients); err != nil {
 		return err
 	}
 
 	// Checking the status of target nodes
 	log.Info("[Status]: Getting the status of target nodes")
-	err = status.CheckNodeStatus(experimentsDetails.TargetNode, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
-	if err != nil {
+	if err = status.CheckNodeStatus(experimentsDetails.TargetNode, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
 		log.Warnf("Target nodes are not in the ready state, you may need to manually recover the node, err: %v", err)
 	}
 
@@ -141,37 +114,44 @@ loop:
 	return nil
 }
 
-// DrainNode drain the application node
-func DrainNode(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) error {
+// drainNode drain the application node
+func drainNode(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) error {
 
-	log.Infof("[Inject]: Draining the %v node", experimentsDetails.TargetNode)
+	select {
+	case <-inject:
+		// stopping the chaos execution, if abort signal recieved
+		os.Exit(0)
+	default:
+		log.Infof("[Inject]: Draining the %v node", experimentsDetails.TargetNode)
 
-	command := exec.Command("kubectl", "drain", experimentsDetails.TargetNode, "--ignore-daemonsets", "--delete-local-data", "--force", "--timeout", strconv.Itoa(experimentsDetails.ChaosDuration)+"s")
-	var out, stderr bytes.Buffer
-	command.Stdout = &out
-	command.Stderr = &stderr
-	if err := command.Run(); err != nil {
-		log.Infof("Error String: %v", stderr.String())
-		return fmt.Errorf("Unable to drain the %v node, err: %v", experimentsDetails.TargetNode, err)
+		command := exec.Command("kubectl", "drain", experimentsDetails.TargetNode, "--ignore-daemonsets", "--delete-local-data", "--force", "--timeout", strconv.Itoa(experimentsDetails.ChaosDuration)+"s")
+		var out, stderr bytes.Buffer
+		command.Stdout = &out
+		command.Stderr = &stderr
+		if err := command.Run(); err != nil {
+			log.Infof("Error String: %v", stderr.String())
+			return errors.Errorf("Unable to drain the %v node, err: %v", experimentsDetails.TargetNode, err)
+		}
+
+		return retry.
+			Times(uint(experimentsDetails.Timeout / experimentsDetails.Delay)).
+			Wait(time.Duration(experimentsDetails.Delay) * time.Second).
+			Try(func(attempt uint) error {
+				nodeSpec, err := clients.KubeClient.CoreV1().Nodes().Get(experimentsDetails.TargetNode, v1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				if !nodeSpec.Spec.Unschedulable {
+					return errors.Errorf("%v node is not in unschedulable state", experimentsDetails.TargetNode)
+				}
+				return nil
+			})
 	}
-
-	return retry.
-		Times(90).
-		Wait(1 * time.Second).
-		Try(func(attempt uint) error {
-			nodeSpec, err := clients.KubeClient.CoreV1().Nodes().Get(experimentsDetails.TargetNode, v1.GetOptions{})
-			if err != nil {
-				return err
-			}
-			if !nodeSpec.Spec.Unschedulable {
-				return errors.Errorf("%v node is not in unschedulable state", experimentsDetails.TargetNode)
-			}
-			return nil
-		})
+	return nil
 }
 
-// UncordonNode uncordon the application node
-func UncordonNode(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) error {
+// uncordonNode uncordon the application node
+func uncordonNode(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) error {
 
 	log.Infof("[Recover]: Uncordon the %v node", experimentsDetails.TargetNode)
 
@@ -181,12 +161,12 @@ func UncordonNode(experimentsDetails *experimentTypes.ExperimentDetails, clients
 	command.Stderr = &stderr
 	if err := command.Run(); err != nil {
 		log.Infof("Error String: %v", stderr.String())
-		return fmt.Errorf("Unable to uncordon the %v node, err: %v", experimentsDetails.TargetNode, err)
+		return errors.Errorf("unable to uncordon the %v node, err: %v", experimentsDetails.TargetNode, err)
 	}
 
 	return retry.
-		Times(90).
-		Wait(1 * time.Second).
+		Times(uint(experimentsDetails.Timeout / experimentsDetails.Delay)).
+		Wait(time.Duration(experimentsDetails.Delay) * time.Second).
 		Try(func(attempt uint) error {
 			nodeSpec, err := clients.KubeClient.CoreV1().Nodes().Get(experimentsDetails.TargetNode, v1.GetOptions{})
 			if err != nil {
@@ -197,4 +177,24 @@ func UncordonNode(experimentsDetails *experimentTypes.ExperimentDetails, clients
 			}
 			return nil
 		})
+}
+
+// abortWatcher continuosly watch for the abort signals
+func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, chaosDetails *types.ChaosDetails, eventsDetails *types.EventDetails) {
+	// waiting till the abort signal recieved
+	<-abort
+
+	log.Info("[Chaos]: Killing process started because of terminated signal received")
+	log.Info("Chaos Revert Started")
+	// retry thrice for the chaos revert
+	retry := 3
+	for retry > 0 {
+		if err := uncordonNode(experimentsDetails, clients); err != nil {
+			log.Errorf("Unable to uncordon the node, err: %v", err)
+		}
+		retry--
+		time.Sleep(1 * time.Second)
+	}
+	log.Info("Chaos Revert Completed")
+	os.Exit(0)
 }

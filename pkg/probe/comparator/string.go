@@ -17,7 +17,9 @@ func (model Model) CompareString() error {
 	obj := String{}
 	obj.setValues(reflect.ValueOf(model.a).String(), reflect.ValueOf(model.b).String())
 
-	log.Infof("[Probe]: {Actual value: %v}, {Expected value: %v}, {Operator: %v}", obj.a, obj.b, model.operator)
+	if model.rc == 1 {
+		log.Infof("[Probe]: {Actual value: %v}, {Expected value: %v}, {Operator: %v}", obj.a, obj.b, model.operator)
+	}
 
 	switch model.operator {
 	case "equal", "Equal":
@@ -35,7 +37,7 @@ func (model Model) CompareString() error {
 	case "matches", "Matches":
 		re, err := regexp.Compile(obj.b)
 		if err != nil {
-			return fmt.Errorf("The probe regex '%s' is not a valid expression", obj.b)
+			return fmt.Errorf("the probe regex '%s' is not a valid expression", obj.b)
 		}
 		if !obj.isMatched(re) {
 			return fmt.Errorf("{actual value: %v} is not matched with {expected regex: %v}", obj.a, obj.b)

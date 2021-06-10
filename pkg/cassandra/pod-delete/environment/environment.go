@@ -1,12 +1,12 @@
 package environment
 
 import (
-	"os"
 	"strconv"
 
 	cassandraTypes "github.com/litmuschaos/litmus-go/pkg/cassandra/pod-delete/types"
 	exp "github.com/litmuschaos/litmus-go/pkg/generic/pod-delete/types"
 	"github.com/litmuschaos/litmus-go/pkg/types"
+	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	clientTypes "k8s.io/apimachinery/pkg/types"
 )
 
@@ -15,49 +15,40 @@ func GetENV(cassandraDetails *cassandraTypes.ExperimentDetails) {
 
 	var ChaoslibDetail exp.ExperimentDetails
 
-	ChaoslibDetail.ExperimentName = Getenv("EXPERIMENT_NAME", "cassandra-pod-delete")
-	ChaoslibDetail.ChaosNamespace = Getenv("CHAOS_NAMESPACE", "litmus")
-	ChaoslibDetail.EngineName = Getenv("CHAOSENGINE", "")
-	ChaoslibDetail.ChaosDuration, _ = strconv.Atoi(Getenv("TOTAL_CHAOS_DURATION", "30"))
-	ChaoslibDetail.ChaosInterval, _ = strconv.Atoi(Getenv("CHAOS_INTERVAL", "10"))
-	ChaoslibDetail.RampTime, _ = strconv.Atoi(Getenv("RAMP_TIME", "0"))
-	ChaoslibDetail.ChaosLib = Getenv("LIB", "litmus")
-	ChaoslibDetail.ChaosServiceAccount = Getenv("CHAOS_SERVICE_ACCOUNT", "")
-	ChaoslibDetail.AppNS = Getenv("APP_NAMESPACE", "")
-	ChaoslibDetail.AppLabel = Getenv("APP_LABEL", "")
-	ChaoslibDetail.AppKind = Getenv("APP_KIND", "")
-	ChaoslibDetail.ChaosUID = clientTypes.UID(Getenv("CHAOS_UID", ""))
-	ChaoslibDetail.InstanceID = Getenv("INSTANCE_ID", "")
-	ChaoslibDetail.ChaosPodName = Getenv("POD_NAME", "")
-	ChaoslibDetail.TargetContainer = Getenv("TARGET_CONTAINER", "")
-	ChaoslibDetail.Force, _ = strconv.ParseBool(Getenv("FORCE", "false"))
-	ChaoslibDetail.Delay, _ = strconv.Atoi(Getenv("STATUS_CHECK_DELAY", "2"))
-	ChaoslibDetail.Timeout, _ = strconv.Atoi(Getenv("STATUS_CHECK_TIMEOUT", "180"))
-	ChaoslibDetail.PodsAffectedPerc, _ = strconv.Atoi(Getenv("PODS_AFFECTED_PERC", "0"))
+	ChaoslibDetail.ExperimentName = common.Getenv("EXPERIMENT_NAME", "cassandra-pod-delete")
+	ChaoslibDetail.ChaosNamespace = common.Getenv("CHAOS_NAMESPACE", "litmus")
+	ChaoslibDetail.EngineName = common.Getenv("CHAOSENGINE", "")
+	ChaoslibDetail.ChaosDuration, _ = strconv.Atoi(common.Getenv("TOTAL_CHAOS_DURATION", "30"))
+	ChaoslibDetail.ChaosInterval = common.Getenv("CHAOS_INTERVAL", "10")
+	ChaoslibDetail.RampTime, _ = strconv.Atoi(common.Getenv("RAMP_TIME", "0"))
+	ChaoslibDetail.ChaosLib = common.Getenv("LIB", "litmus")
+	ChaoslibDetail.ChaosServiceAccount = common.Getenv("CHAOS_SERVICE_ACCOUNT", "")
+	ChaoslibDetail.AppNS = common.Getenv("APP_NAMESPACE", "")
+	ChaoslibDetail.AppLabel = common.Getenv("APP_LABEL", "")
+	ChaoslibDetail.AppKind = common.Getenv("APP_KIND", "")
+	ChaoslibDetail.ChaosUID = clientTypes.UID(common.Getenv("CHAOS_UID", ""))
+	ChaoslibDetail.InstanceID = common.Getenv("INSTANCE_ID", "")
+	ChaoslibDetail.ChaosPodName = common.Getenv("POD_NAME", "")
+	ChaoslibDetail.TargetContainer = common.Getenv("TARGET_CONTAINER", "")
+	ChaoslibDetail.Force, _ = strconv.ParseBool(common.Getenv("FORCE", "false"))
+	ChaoslibDetail.Delay, _ = strconv.Atoi(common.Getenv("STATUS_CHECK_DELAY", "2"))
+	ChaoslibDetail.Timeout, _ = strconv.Atoi(common.Getenv("STATUS_CHECK_TIMEOUT", "180"))
+	ChaoslibDetail.PodsAffectedPerc, _ = strconv.Atoi(common.Getenv("PODS_AFFECTED_PERC", "0"))
 	cassandraDetails.ChaoslibDetail = &ChaoslibDetail
-	cassandraDetails.CassandraServiceName = Getenv("CASSANDRA_SVC_NAME", "")
-	cassandraDetails.KeySpaceReplicaFactor = Getenv("KEYSPACE_REPLICATION_FACTOR", "")
-	cassandraDetails.CassandraPort, _ = strconv.Atoi(Getenv("CASSANDRA_PORT", "9042"))
-	cassandraDetails.LivenessServicePort, _ = strconv.Atoi(Getenv("LIVENESS_SVC_PORT", "8088"))
-	cassandraDetails.CassandraLivenessImage = Getenv("CASSANDRA_LIVENESS_IMAGE", "litmuschaos/cassandra-client:latest")
-	cassandraDetails.CassandraLivenessCheck = Getenv("CASSANDRA_LIVENESS_CHECK", "")
-	cassandraDetails.RunID = Getenv("RunID", "")
-}
-
-// Getenv fetch the env and set the default value, if any
-func Getenv(key string, defaultValue string) string {
-	value := os.Getenv(key)
-	if value == "" {
-		value = defaultValue
-	}
-	return value
+	cassandraDetails.CassandraServiceName = common.Getenv("CASSANDRA_SVC_NAME", "")
+	cassandraDetails.KeySpaceReplicaFactor = common.Getenv("KEYSPACE_REPLICATION_FACTOR", "")
+	cassandraDetails.CassandraPort, _ = strconv.Atoi(common.Getenv("CASSANDRA_PORT", "9042"))
+	cassandraDetails.LivenessServicePort, _ = strconv.Atoi(common.Getenv("LIVENESS_SVC_PORT", "8088"))
+	cassandraDetails.CassandraLivenessImage = common.Getenv("CASSANDRA_LIVENESS_IMAGE", "litmuschaos/cassandra-client:latest")
+	cassandraDetails.CassandraLivenessCheck = common.Getenv("CASSANDRA_LIVENESS_CHECK", "")
+	cassandraDetails.RunID = common.Getenv("RunID", "")
 }
 
 //InitialiseChaosVariables initialise all the global variables
 func InitialiseChaosVariables(chaosDetails *types.ChaosDetails, cassandraDetails *cassandraTypes.ExperimentDetails) {
 	appDetails := types.AppDetails{}
-	appDetails.AnnotationCheck, _ = strconv.ParseBool(Getenv("ANNOTATION_CHECK", "false"))
-	appDetails.AnnotationKey = Getenv("ANNOTATION_KEY", "litmuschaos.io/chaos")
+	appDetails.AnnotationCheck, _ = strconv.ParseBool(common.Getenv("ANNOTATION_CHECK", "false"))
+	appDetails.AnnotationKey = common.Getenv("ANNOTATION_KEY", "litmuschaos.io/chaos")
 	appDetails.AnnotationValue = "true"
 	appDetails.Kind = cassandraDetails.ChaoslibDetail.AppKind
 	appDetails.Label = cassandraDetails.ChaoslibDetail.AppLabel
@@ -73,4 +64,5 @@ func InitialiseChaosVariables(chaosDetails *types.ChaosDetails, cassandraDetails
 	chaosDetails.Delay = cassandraDetails.ChaoslibDetail.Delay
 	chaosDetails.AppDetail = appDetails
 	chaosDetails.ProbeImagePullPolicy = cassandraDetails.ChaoslibDetail.LIBImagePullPolicy
+	chaosDetails.Randomness, _ = strconv.ParseBool(common.Getenv("RANDOMNESS", "false"))
 }

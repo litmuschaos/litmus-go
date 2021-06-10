@@ -9,7 +9,7 @@ type ExperimentDetails struct {
 	ExperimentName      string
 	EngineName          string
 	ChaosDuration       int
-	ChaosInterval       int
+	ChaosInterval       string
 	RampTime            int
 	Force               bool
 	ChaosLib            string
@@ -21,7 +21,6 @@ type ExperimentDetails struct {
 	InstanceID          string
 	ChaosNamespace      string
 	ChaosPodName        string
-	Iterations          int
 	Timeout             int
 	Delay               int
 	TargetPods          string

@@ -1,4 +1,4 @@
-package main
+package helper
 
 import (
 	"fmt"
@@ -17,6 +17,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/types"
+	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -24,22 +25,29 @@ import (
 	clientTypes "k8s.io/apimachinery/pkg/types"
 )
 
-func main() {
+var inject, abort chan os.Signal
+
+// Helper injects the disk-fill chaos
+func Helper(clients clients.ClientSets) {
 
 	experimentsDetails := experimentTypes.ExperimentDetails{}
-	clients := clients.ClientSets{}
 	eventsDetails := types.EventDetails{}
 	chaosDetails := types.ChaosDetails{}
 	resultDetails := types.ResultDetails{}
 
-	//Getting kubeConfig and Generate ClientSets
-	if err := clients.GenerateClientSetFromKubeConfig(); err != nil {
-		log.Fatalf("Unable to Get the kubeconfig, err: %v", err)
-	}
+	// inject channel is used to transmit signal notifications.
+	inject = make(chan os.Signal, 1)
+	// Catch and relay certain signal(s) to inject channel.
+	signal.Notify(inject, os.Interrupt, syscall.SIGTERM)
+
+	// abort channel is used to transmit signal notifications.
+	abort = make(chan os.Signal, 1)
+	// Catch and relay certain signal(s) to abort channel.
+	signal.Notify(abort, os.Interrupt, syscall.SIGTERM)
 
 	//Fetching all the ENV passed in the helper pod
 	log.Info("[PreReq]: Getting the ENV variables")
-	GetENV(&experimentsDetails, "disk-fill")
+	getENV(&experimentsDetails, "disk-fill")
 
 	// Intialise the chaos attributes
 	experimentEnv.InitialiseChaosVariables(&chaosDetails, &experimentsDetails)
@@ -50,18 +58,16 @@ func main() {
 	// Set the chaos result uid
 	result.SetResultUID(&resultDetails, clients, &chaosDetails)
 
-	err := DiskFill(&experimentsDetails, clients, &eventsDetails, &chaosDetails, &resultDetails)
-	if err != nil {
+	if err := diskFill(&experimentsDetails, clients, &eventsDetails, &chaosDetails, &resultDetails); err != nil {
 		log.Fatalf("helper pod failed, err: %v", err)
 	}
-
 }
 
-//DiskFill contains steps to inject disk-fill chaos
-func DiskFill(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails) error {
+//diskFill contains steps to inject disk-fill chaos
+func diskFill(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails) error {
 
 	// Derive the container id of the target container
-	containerID, err := GetContainerID(experimentsDetails, clients)
+	containerID, err := common.GetContainerID(experimentsDetails.AppNS, experimentsDetails.TargetPods, experimentsDetails.TargetContainer, clients)
 	if err != nil {
 		return err
 	}
@@ -77,30 +83,30 @@ func DiskFill(experimentsDetails *experimentTypes.ExperimentDetails, clients cli
 	ephemeralStorageDetails := string(out)
 
 	// filtering out the used ephemeral storage from the output of du command
-	usedEphemeralStorageSize, err := FilterUsedEphemeralStorage(ephemeralStorageDetails)
+	usedEphemeralStorageSize, err := filterUsedEphemeralStorage(ephemeralStorageDetails)
 	if err != nil {
-		return errors.Errorf("Unable to filter used ephemeral storage size, err: %v", err)
+		return errors.Errorf("unable to filter used ephemeral storage size, err: %v", err)
 	}
 	log.Infof("used ephemeral storage space: %vKB", strconv.Itoa(usedEphemeralStorageSize))
 
 	// GetEphemeralStorageAttributes derive the ephemeral storage attributes from the target container
-	ephemeralStorageLimit, err := GetEphemeralStorageAttributes(experimentsDetails, clients)
+	ephemeralStorageLimit, err := getEphemeralStorageAttributes(experimentsDetails, clients)
 	if err != nil {
 		return err
 	}
 
 	if ephemeralStorageLimit == 0 && experimentsDetails.EphemeralStorageMebibytes == 0 {
-		return errors.Errorf("Either provide ephemeral storage limit inside target container or define EPHEMERAL_STORAGE_MEBIBYTES ENV")
+		return errors.Errorf("either provide ephemeral storage limit inside target container or define EPHEMERAL_STORAGE_MEBIBYTES ENV")
 	}
 
 	// deriving the ephemeral storage size to be filled
-	sizeTobeFilled := GetSizeToBeFilled(experimentsDetails, usedEphemeralStorageSize, int(ephemeralStorageLimit))
+	sizeTobeFilled := getSizeToBeFilled(experimentsDetails, usedEphemeralStorageSize, int(ephemeralStorageLimit))
 
 	log.InfoWithValues("[Info]: Details of application under chaos injection", logrus.Fields{
-		"PodName":               experimentsDetails.TargetPods,
-		"ContainerName":         experimentsDetails.TargetContainer,
+		"PodName":                   experimentsDetails.TargetPods,
+		"ContainerName":             experimentsDetails.TargetContainer,
 		"ephemeralStorageLimit(KB)": ephemeralStorageLimit,
-		"ContainerID":           containerID,
+		"ContainerID":               containerID,
 	})
 
 	log.Infof("ephemeral storage size to be filled: %vKB", strconv.Itoa(sizeTobeFilled))
@@ -112,64 +118,27 @@ func DiskFill(experimentsDetails *experimentTypes.ExperimentDetails, clients cli
 		events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 	}
 
+	// watching for the abort signal and revert the chaos
+	go abortWatcher(experimentsDetails, clients, containerID)
+
 	if sizeTobeFilled > 0 {
 
-		var endTime <-chan time.Time
-		timeDelay := time.Duration(experimentsDetails.ChaosDuration) * time.Second
-
-		// Creating files to fill the required ephemeral storage size of block size of 4K
-		dd := fmt.Sprintf("sudo dd if=/dev/urandom of=/diskfill/%v/diskfill bs=4K count=%v", containerID, strconv.Itoa(sizeTobeFilled/4))
-		cmd := exec.Command("/bin/bash", "-c", dd)
-		out, err := cmd.CombinedOutput()
-		if err != nil {
+		if err := fillDisk(containerID, sizeTobeFilled, experimentsDetails.DataBlockSize); err != nil {
 			log.Error(string(out))
 			return err
 		}
 
 		log.Infof("[Chaos]: Waiting for %vs", experimentsDetails.ChaosDuration)
 
-		// signChan channel is used to transmit signal notifications.
-		signChan := make(chan os.Signal, 1)
-		// Catch and relay certain signal(s) to signChan channel.
-		signal.Notify(signChan, os.Interrupt, syscall.SIGTERM, syscall.SIGKILL)
+		common.WaitForDuration(experimentsDetails.ChaosDuration)
 
-	loop:
-		for {
-			endTime = time.After(timeDelay)
-			select {
-			case <-signChan:
-				log.Info("[Chaos]: Killing process started because of terminated signal received")
-				// updating the chaosresult after stopped
-				failStep := "Disk Fill Chaos injection stopped!"
-				types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep)
-				result.ChaosResult(chaosDetails, clients, resultDetails, "EOT")
-
-				// generating summary event in chaosengine
-				msg := experimentsDetails.ExperimentName + " experiment has been aborted"
-				types.SetEngineEventAttributes(eventsDetails, types.Summary, msg, "Warning", chaosDetails)
-				events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
-
-				// generating summary event in chaosresult
-				types.SetResultEventAttributes(eventsDetails, types.StoppedVerdict, msg, "Warning", resultDetails)
-				events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosResult")
-
-				err = Remedy(experimentsDetails, clients, containerID)
-				if err != nil {
-					return errors.Errorf("Unable to perform remedy operation due to %v", err)
-				}
-				os.Exit(1)
-			case <-endTime:
-				log.Infof("[Chaos]: Time is up for experiment: %v", experimentsDetails.ExperimentName)
-				endTime = nil
-				break loop
-			}
-		}
+		log.Info("[Chaos]: Stopping the experiment")
 
 		// It will delete the target pod if target pod is evicted
 		// if target pod is still running then it will delete all the files, which was created earlier during chaos execution
-		err = Remedy(experimentsDetails, clients, containerID)
+		err = remedy(experimentsDetails, clients, containerID)
 		if err != nil {
-			return errors.Errorf("Unable to perform remedy operation due to %v", err)
+			return errors.Errorf("unable to perform remedy operation, err: %v", err)
 		}
 	} else {
 		log.Warn("No required free space found!, It's Housefull")
@@ -177,11 +146,29 @@ func DiskFill(experimentsDetails *experimentTypes.ExperimentDetails, clients cli
 	return nil
 }
 
-// GetEphemeralStorageAttributes derive the ephemeral storage attributes from the target pod
-func GetEphemeralStorageAttributes(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) (int64, error) {
+// fillDisk fill the ephemeral disk by creating files
+func fillDisk(containerID string, sizeTobeFilled, bs int) error {
+
+	select {
+	case <-inject:
+		// stopping the chaos execution, if abort signal recieved
+		os.Exit(1)
+	default:
+		// Creating files to fill the required ephemeral storage size of block size of 4K
+		log.Infof("[Fill]: Filling ephemeral storage, size: %vKB", sizeTobeFilled)
+		dd := fmt.Sprintf("sudo dd if=/dev/urandom of=/diskfill/%v/diskfill bs=%vK count=%v", containerID, bs, strconv.Itoa(sizeTobeFilled/bs))
+		log.Infof("dd: {%v}", dd)
+		cmd := exec.Command("/bin/bash", "-c", dd)
+		_, err := cmd.CombinedOutput()
+		return err
+	}
+	return nil
+}
+
+// getEphemeralStorageAttributes derive the ephemeral storage attributes from the target pod
+func getEphemeralStorageAttributes(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) (int64, error) {
 
 	pod, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Get(experimentsDetails.TargetPods, v1.GetOptions{})
-
 	if err != nil {
 		return 0, err
 	}
@@ -201,32 +188,8 @@ func GetEphemeralStorageAttributes(experimentsDetails *experimentTypes.Experimen
 	return ephemeralStorageLimit, nil
 }
 
-// GetContainerID derive the container id of the target container
-func GetContainerID(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) (string, error) {
-	pod, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Get(experimentsDetails.TargetPods, v1.GetOptions{})
-
-	if err != nil {
-		return "", err
-	}
-
-	var containerID string
-	containers := pod.Status.ContainerStatuses
-
-	// filtering out the container id from the details of containers inside containerStatuses of the given pod
-	// container id is present in the form of <runtime>://<container-id>
-	for _, container := range containers {
-		if container.Name == experimentsDetails.TargetContainer {
-			containerID = strings.Split(container.ContainerID, "//")[1]
-			break
-		}
-	}
-
-	return containerID, nil
-
-}
-
-// FilterUsedEphemeralStorage filter out the used ephemeral storage from the given string
-func FilterUsedEphemeralStorage(ephemeralStorageDetails string) (int, error) {
+// filterUsedEphemeralStorage filter out the used ephemeral storage from the given string
+func filterUsedEphemeralStorage(ephemeralStorageDetails string) (int, error) {
 
 	// Filtering out the ephemeral storage size from the output of du command
 	// It contains details of all subdirectories of target container
@@ -236,11 +199,10 @@ func FilterUsedEphemeralStorage(ephemeralStorageDetails string) (int, error) {
 	// type casting string to interger
 	ephemeralStorageSize, err := strconv.Atoi(ephemeralStorageAllDiskFill)
 	return ephemeralStorageSize, err
-
 }
 
-// GetSizeToBeFilled generate the ephemeral storage size need to be filled
-func GetSizeToBeFilled(experimentsDetails *experimentTypes.ExperimentDetails, usedEphemeralStorageSize int, ephemeralStorageLimit int) int {
+// getSizeToBeFilled generate the ephemeral storage size need to be filled
+func getSizeToBeFilled(experimentsDetails *experimentTypes.ExperimentDetails, usedEphemeralStorageSize int, ephemeralStorageLimit int) int {
 	var requirementToBeFill int
 
 	switch ephemeralStorageLimit {
@@ -255,9 +217,9 @@ func GetSizeToBeFilled(experimentsDetails *experimentTypes.ExperimentDetails, us
 	return needToBeFilled
 }
 
-// Remedy will delete the target pod if target pod is evicted
+// remedy will delete the target pod if target pod is evicted
 // if target pod is still running then it will delete the files, which was created during chaos execution
-func Remedy(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, containerID string) error {
+func remedy(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, containerID string) error {
 	pod, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Get(experimentsDetails.TargetPods, v1.GetOptions{})
 	if err != nil {
 		return err
@@ -265,11 +227,11 @@ func Remedy(experimentsDetails *experimentTypes.ExperimentDetails, clients clien
 	// Deleting the pod as pod is already evicted
 	podReason := pod.Status.Reason
 	if podReason == "Evicted" {
+		log.Warn("Target pod is evicted, deleting the pod")
 		if err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Delete(experimentsDetails.TargetPods, &v1.DeleteOptions{}); err != nil {
 			return err
 		}
 	} else {
-
 		// deleting the files after chaos execution
 		rm := fmt.Sprintf("sudo rm -rf /diskfill/%v/diskfill", containerID)
 		cmd := exec.Command("/bin/bash", "-c", rm)
@@ -282,26 +244,38 @@ func Remedy(experimentsDetails *experimentTypes.ExperimentDetails, clients clien
 	return nil
 }
 
-//GetENV fetches all the env variables from the runner pod
-func GetENV(experimentDetails *experimentTypes.ExperimentDetails, name string) {
+//getENV fetches all the env variables from the runner pod
+func getENV(experimentDetails *experimentTypes.ExperimentDetails, name string) {
 	experimentDetails.ExperimentName = name
-	experimentDetails.AppNS = Getenv("APP_NS", "")
-	experimentDetails.TargetContainer = Getenv("APP_CONTAINER", "")
-	experimentDetails.TargetPods = Getenv("APP_POD", "")
-	experimentDetails.ChaosDuration, _ = strconv.Atoi(Getenv("TOTAL_CHAOS_DURATION", "30"))
-	experimentDetails.ChaosNamespace = Getenv("CHAOS_NAMESPACE", "litmus")
-	experimentDetails.EngineName = Getenv("CHAOS_ENGINE", "")
-	experimentDetails.ChaosUID = clientTypes.UID(Getenv("CHAOS_UID", ""))
-	experimentDetails.ChaosPodName = Getenv("POD_NAME", "")
-	experimentDetails.FillPercentage, _ = strconv.Atoi(Getenv("FILL_PERCENTAGE", ""))
-	experimentDetails.EphemeralStorageMebibytes, _ = strconv.Atoi(Getenv("EPHEMERAL_STORAGE_MEBIBYTES", ""))
+	experimentDetails.AppNS = common.Getenv("APP_NS", "")
+	experimentDetails.TargetContainer = common.Getenv("APP_CONTAINER", "")
+	experimentDetails.TargetPods = common.Getenv("APP_POD", "")
+	experimentDetails.ChaosDuration, _ = strconv.Atoi(common.Getenv("TOTAL_CHAOS_DURATION", "30"))
+	experimentDetails.ChaosNamespace = common.Getenv("CHAOS_NAMESPACE", "litmus")
+	experimentDetails.EngineName = common.Getenv("CHAOS_ENGINE", "")
+	experimentDetails.ChaosUID = clientTypes.UID(common.Getenv("CHAOS_UID", ""))
+	experimentDetails.ChaosPodName = common.Getenv("POD_NAME", "")
+	experimentDetails.FillPercentage, _ = strconv.Atoi(common.Getenv("FILL_PERCENTAGE", ""))
+	experimentDetails.EphemeralStorageMebibytes, _ = strconv.Atoi(common.Getenv("EPHEMERAL_STORAGE_MEBIBYTES", ""))
+	experimentDetails.DataBlockSize, _ = strconv.Atoi(common.Getenv("DATA_BLOCK_SIZE", "256"))
 }
 
-// Getenv fetch the env and set the default value, if any
-func Getenv(key string, defaultValue string) string {
-	value := os.Getenv(key)
-	if value == "" {
-		value = defaultValue
+// abortWatcher continuosly watch for the abort signals
+func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, containerID string) {
+	// waiting till the abort signal recieved
+	<-abort
+
+	log.Info("[Chaos]: Killing process started because of terminated signal received")
+	log.Info("Chaos Revert Started")
+	// retry thrice for the chaos revert
+	retry := 3
+	for retry > 0 {
+		if err := remedy(experimentsDetails, clients, containerID); err != nil {
+			log.Errorf("unable to perform remedy operation, err: %v", err)
+		}
+		retry--
+		time.Sleep(1 * time.Second)
 	}
-	return value
+	log.Info("Chaos Revert Completed")
+	os.Exit(1)
 }

@@ -1,7 +1,6 @@
 package lib
 
 import (
-	"fmt"
 	"os"
 	"os/signal"
 	"strings"
@@ -13,7 +12,6 @@ import (
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/node-taint/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
-	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
@@ -22,10 +20,23 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-var err error
+var (
+	err           error
+	inject, abort chan os.Signal
+)
 
 //PrepareNodeTaint contains the prepration steps before chaos injection
 func PrepareNodeTaint(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+
+	// inject channel is used to transmit signal notifications.
+	inject = make(chan os.Signal, 1)
+	// Catch and relay certain signal(s) to inject channel.
+	signal.Notify(inject, os.Interrupt, syscall.SIGTERM)
+
+	// abort channel is used to transmit signal notifications.
+	abort = make(chan os.Signal, 1)
+	// Catch and relay certain signal(s) to abort channel.
+	signal.Notify(abort, os.Interrupt, syscall.SIGTERM)
 
 	//Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
@@ -35,7 +46,7 @@ func PrepareNodeTaint(experimentsDetails *experimentTypes.ExperimentDetails, cli
 
 	if experimentsDetails.TargetNode == "" {
 		//Select node for kubelet-service-kill
-		experimentsDetails.TargetNode, err = common.GetNodeName(experimentsDetails.AppNS, experimentsDetails.AppLabel, clients)
+		experimentsDetails.TargetNode, err = common.GetNodeName(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.NodeLabel, clients)
 		if err != nil {
 			return err
 		}
@@ -54,80 +65,42 @@ func PrepareNodeTaint(experimentsDetails *experimentTypes.ExperimentDetails, cli
 		}
 	}
 
+	// watching for the abort signal and revert the chaos
+	go abortWatcher(experimentsDetails, clients, resultDetails, chaosDetails, eventsDetails)
+
 	// taint the application node
-	err := TaintNode(experimentsDetails, clients)
-	if err != nil {
+	if err := taintNode(experimentsDetails, clients); err != nil {
 		return err
 	}
 
 	// Verify the status of AUT after reschedule
 	log.Info("[Status]: Verify the status of AUT after reschedule")
-	err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
-	if err != nil {
-		return errors.Errorf("Application status check failed, err: %v", err)
+	if err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
+		return errors.Errorf("application status check failed, err: %v", err)
 	}
 
 	// Verify the status of Auxiliary Applications after reschedule
 	if experimentsDetails.AuxiliaryAppInfo != "" {
 		log.Info("[Status]: Verify that the Auxiliary Applications are running")
-		err = status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
-		if err != nil {
-			return errors.Errorf("Auxiliary Applications status check failed, err: %v", err)
+		if err = status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
+			return errors.Errorf("auxiliary Applications status check failed, err: %v", err)
 		}
 	}
-
-	var endTime <-chan time.Time
-	timeDelay := time.Duration(experimentsDetails.ChaosDuration) * time.Second
 
 	log.Infof("[Chaos]: Waiting for %vs", experimentsDetails.ChaosDuration)
 
-	// signChan channel is used to transmit signal notifications.
-	signChan := make(chan os.Signal, 1)
-	// Catch and relay certain signal(s) to signChan channel.
-	signal.Notify(signChan, os.Interrupt, syscall.SIGTERM, syscall.SIGKILL)
+	common.WaitForDuration(experimentsDetails.ChaosDuration)
 
-loop:
-	for {
-		endTime = time.After(timeDelay)
-		select {
-		case <-signChan:
-			log.Info("[Chaos]: Killing process started because of terminated signal received")
-			// updating the chaosresult after stopped
-			failStep := "Node Taint injection stopped!"
-			types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep)
-			result.ChaosResult(chaosDetails, clients, resultDetails, "EOT")
-
-			// generating summary event in chaosengine
-			msg := experimentsDetails.ExperimentName + " experiment has been aborted"
-			types.SetEngineEventAttributes(eventsDetails, types.Summary, msg, "Warning", chaosDetails)
-			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
-
-			// generating summary event in chaosresult
-			types.SetResultEventAttributes(eventsDetails, types.StoppedVerdict, msg, "Warning", resultDetails)
-			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosResult")
-
-			if err = RemoveTaintFromNode(experimentsDetails, clients); err != nil {
-				log.Errorf("unable to remove taint from the node, err :%v", err)
-
-			}
-			os.Exit(1)
-		case <-endTime:
-			log.Infof("[Chaos]: Time is up for experiment: %v", experimentsDetails.ExperimentName)
-			endTime = nil
-			break loop
-		}
-	}
+	log.Info("[Chaos]: Stopping the experiment")
 
 	// remove taint from the application node
-	err = RemoveTaintFromNode(experimentsDetails, clients)
-	if err != nil {
+	if err := removeTaintFromNode(experimentsDetails, clients); err != nil {
 		return err
 	}
 
 	// Checking the status of target nodes
 	log.Info("[Status]: Getting the status of target nodes")
-	err = status.CheckNodeStatus(experimentsDetails.TargetNode, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
-	if err != nil {
+	if err = status.CheckNodeStatus(experimentsDetails.TargetNode, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
 		log.Warnf("Target nodes are not in the ready state, you may need to manually recover the node, err: %v", err)
 	}
 
@@ -139,13 +112,13 @@ loop:
 	return nil
 }
 
-// TaintNode taint the application node
-func TaintNode(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) error {
+// taintNode taint the application node
+func taintNode(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) error {
 
 	// get the taint labels & effect
-	TaintKey, TaintValue, TaintEffect := GetTaintDetails(experimentsDetails)
+	taintKey, taintValue, taintEffect := getTaintDetails(experimentsDetails)
 
-	log.Infof("Add %v taints to the %v node", TaintKey+"="+TaintValue+":"+TaintEffect, experimentsDetails.TargetNode)
+	log.Infof("Add %v taints to the %v node", taintKey+"="+taintValue+":"+taintEffect, experimentsDetails.TargetNode)
 
 	// get the node details
 	node, err := clients.KubeClient.CoreV1().Nodes().Get(experimentsDetails.TargetNode, v1.GetOptions{})
@@ -156,35 +129,41 @@ func TaintNode(experimentsDetails *experimentTypes.ExperimentDetails, clients cl
 	// check if the taint already exists
 	tainted := false
 	for _, taint := range node.Spec.Taints {
-		if taint.Key == TaintKey {
+		if taint.Key == taintKey {
 			tainted = true
 			break
 		}
 	}
 
-	if !tainted {
-		node.Spec.Taints = append(node.Spec.Taints, apiv1.Taint{
-			Key:    TaintKey,
-			Value:  TaintValue,
-			Effect: apiv1.TaintEffect(TaintEffect),
-		})
+	select {
+	case <-inject:
+		// stopping the chaos execution, if abort signal recieved
+		os.Exit(0)
+	default:
+		if !tainted {
+			node.Spec.Taints = append(node.Spec.Taints, apiv1.Taint{
+				Key:    taintKey,
+				Value:  taintValue,
+				Effect: apiv1.TaintEffect(taintEffect),
+			})
 
-		updatedNodeWithTaint, err := clients.KubeClient.CoreV1().Nodes().Update(node)
-		if err != nil || updatedNodeWithTaint == nil {
-			return fmt.Errorf("failed to update %v node after adding taints, err: %v", experimentsDetails.TargetNode, err)
+			updatedNodeWithTaint, err := clients.KubeClient.CoreV1().Nodes().Update(node)
+			if err != nil || updatedNodeWithTaint == nil {
+				return errors.Errorf("failed to update %v node after adding taints, err: %v", experimentsDetails.TargetNode, err)
+			}
 		}
-	}
 
-	log.Infof("Successfully added taint in %v node", experimentsDetails.TargetNode)
+		log.Infof("Successfully added taint in %v node", experimentsDetails.TargetNode)
+	}
 	return nil
 }
 
 // RemoveTaintFromNode remove the taint from the application node
-func RemoveTaintFromNode(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) error {
+func removeTaintFromNode(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) error {
 
 	// Get the taint key
-	TaintLabel := strings.Split(experimentsDetails.Taints, ":")
-	TaintKey := strings.Split(TaintLabel[0], "=")[0]
+	taintLabel := strings.Split(experimentsDetails.Taints, ":")
+	taintKey := strings.Split(taintLabel[0], "=")[0]
 
 	// get the node details
 	node, err := clients.KubeClient.CoreV1().Nodes().Get(experimentsDetails.TargetNode, v1.GetOptions{})
@@ -195,7 +174,7 @@ func RemoveTaintFromNode(experimentsDetails *experimentTypes.ExperimentDetails, 
 	// check if the taint already exists
 	tainted := false
 	for _, taint := range node.Spec.Taints {
-		if taint.Key == TaintKey {
+		if taint.Key == taintKey {
 			tainted = true
 			break
 		}
@@ -205,14 +184,14 @@ func RemoveTaintFromNode(experimentsDetails *experimentTypes.ExperimentDetails, 
 		var Newtaints []apiv1.Taint
 		// remove all the taints with matching key
 		for _, taint := range node.Spec.Taints {
-			if taint.Key != TaintKey {
+			if taint.Key != taintKey {
 				Newtaints = append(Newtaints, taint)
 			}
 		}
 		node.Spec.Taints = Newtaints
 		updatedNodeWithTaint, err := clients.KubeClient.CoreV1().Nodes().Update(node)
 		if err != nil || updatedNodeWithTaint == nil {
-			return fmt.Errorf("failed to update %v node after removing taints, err: %v", experimentsDetails.TargetNode, err)
+			return errors.Errorf("failed to update %v node after removing taints, err: %v", experimentsDetails.TargetNode, err)
 		}
 	}
 
@@ -221,25 +200,44 @@ func RemoveTaintFromNode(experimentsDetails *experimentTypes.ExperimentDetails, 
 }
 
 // GetTaintDetails return the key, value and effect for the taint
-func GetTaintDetails(experimentsDetails *experimentTypes.ExperimentDetails) (string, string, string) {
-	TaintValue := "node-taint"
-	TaintEffect := string(apiv1.TaintEffectNoExecute)
+func getTaintDetails(experimentsDetails *experimentTypes.ExperimentDetails) (string, string, string) {
+	taintValue := "node-taint"
+	taintEffect := string(apiv1.TaintEffectNoExecute)
 
-	Taints := strings.Split(experimentsDetails.Taints, ":")
-	TaintLabel := strings.Split(Taints[0], "=")
-	TaintKey := TaintLabel[0]
+	taints := strings.Split(experimentsDetails.Taints, ":")
+	taintLabel := strings.Split(taints[0], "=")
+	taintKey := taintLabel[0]
 
 	// It will set the value for taint label from `TAINT` env, if provided
 	// otherwise it will use the `node-taint` value as default value.
-	if len(TaintLabel) >= 2 {
-		TaintValue = TaintLabel[1]
+	if len(taintLabel) >= 2 {
+		taintValue = taintLabel[1]
 	}
 	// It will set the value for taint effect from `TAINT` env, if provided
 	// otherwise it will use `NoExecute` value as default value.
-	if len(Taints) >= 2 {
-		TaintEffect = Taints[1]
+	if len(taints) >= 2 {
+		taintEffect = taints[1]
 	}
 
-	return TaintKey, TaintValue, TaintEffect
+	return taintKey, taintValue, taintEffect
+}
 
+// abortWatcher continuosly watch for the abort signals
+func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, chaosDetails *types.ChaosDetails, eventsDetails *types.EventDetails) {
+	// waiting till the abort signal recieved
+	<-abort
+
+	log.Info("[Chaos]: Killing process started because of terminated signal received")
+	log.Info("Chaos Revert Started")
+	// retry thrice for the chaos revert
+	retry := 3
+	for retry > 0 {
+		if err := removeTaintFromNode(experimentsDetails, clients); err != nil {
+			log.Errorf("Unable to untaint node, err: %v", err)
+		}
+		retry--
+		time.Sleep(1 * time.Second)
+	}
+	log.Info("Chaos Revert Completed")
+	os.Exit(0)
 }

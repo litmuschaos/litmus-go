@@ -21,6 +21,7 @@ type ExperimentDetails struct {
 	ChaosPodName                string
 	MemoryConsumptionPercentage int
 	MemoryConsumptionMebibytes  int
+	NumberOfWorkers             int
 	RunID                       string
 	LIBImage                    string
 	LIBImagePullPolicy          string
@@ -34,4 +35,5 @@ type ExperimentDetails struct {
 	Resources                   corev1.ResourceRequirements
 	ImagePullSecrets            []corev1.LocalObjectReference
 	TargetContainer             string
+	NodeLabel                   string
 }

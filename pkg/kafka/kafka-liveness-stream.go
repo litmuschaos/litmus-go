@@ -19,6 +19,7 @@ import (
 // and derive the kafka topic leader(candidate for the deletion)
 func LivenessStream(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) (string, error) {
 	var ordinality string
+	var err error
 
 	// Generate a random string as suffix to topic name
 	log.Info("[Liveness]: Set the kafka topic name")
@@ -26,14 +27,13 @@ func LivenessStream(experimentsDetails *experimentTypes.ExperimentDetails, clien
 	KafkaTopicName := "topic-" + experimentsDetails.RunID
 
 	log.Info("[Liveness]: Creating the kafka liveness pod")
-	err := CreateLivenessPod(experimentsDetails, KafkaTopicName, clients)
-	if err != nil {
+	if err := CreateLivenessPod(experimentsDetails, KafkaTopicName, clients); err != nil {
 		return "", err
 	}
 
 	log.Info("[Liveness]: Confirm that the kafka liveness pod is running")
 	if err := status.CheckApplicationStatus(experimentsDetails.KafkaNamespace, "name=kafka-liveness-"+experimentsDetails.RunID, experimentsDetails.ChaoslibDetail.Timeout, experimentsDetails.ChaoslibDetail.Delay, clients); err != nil {
-		return "", errors.Errorf("Liveness pod status check failed, err: %v", err)
+		return "", errors.Errorf("liveness pod status check failed, err: %v", err)
 	}
 
 	log.Info("[Liveness]: Obtain the leader broker ordinality for the topic (partition) created by kafka-liveness")
@@ -44,7 +44,7 @@ func LivenessStream(experimentsDetails *experimentTypes.ExperimentDetails, clien
 		litmusexec.SetExecCommandAttributes(&execCommandDetails, "kafka-liveness-"+experimentsDetails.RunID, "kafka-consumer", experimentsDetails.KafkaNamespace)
 		ordinality, err = litmusexec.Exec(&execCommandDetails, clients, command)
 		if err != nil {
-			return "", errors.Errorf("Unable to get ordinality details, err: %v", err)
+			return "", errors.Errorf("unable to get ordinality details, err: %v", err)
 		}
 	} else {
 		// It will contains all the pod & container details required for exec command
@@ -54,7 +54,7 @@ func LivenessStream(experimentsDetails *experimentTypes.ExperimentDetails, clien
 		litmusexec.SetExecCommandAttributes(&execCommandDetails, "kafka-liveness-"+experimentsDetails.RunID, "kafka-consumer", experimentsDetails.KafkaNamespace)
 		ordinality, err = litmusexec.Exec(&execCommandDetails, clients, command)
 		if err != nil {
-			return "", errors.Errorf("Unable to get ordinality details, err: %v", err)
+			return "", errors.Errorf("unable to get ordinality details, err: %v", err)
 		}
 	}
 
@@ -70,7 +70,7 @@ func LivenessStream(experimentsDetails *experimentTypes.ExperimentDetails, clien
 		}
 	}
 
-	return "", errors.Errorf("No kafka pod found with %v ordinality", ordinality)
+	return "", errors.Errorf("no kafka pod found with %v ordinality", ordinality)
 }
 
 // CreateLivenessPod creates the kafka liveness pod
@@ -184,7 +184,7 @@ func CreateLivenessPod(experimentsDetails *experimentTypes.ExperimentDetails, Ka
 
 	_, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.KafkaNamespace).Create(LivenessPod)
 	if err != nil {
-		return errors.Errorf("Unable to create Liveness pod, err: %v", err)
+		return errors.Errorf("unable to create Liveness pod, err: %v", err)
 	}
 	return nil
 }

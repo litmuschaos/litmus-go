@@ -18,13 +18,14 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-var err error
-
 //PrepareAndInjectChaos contains the prepration and chaos injection steps
 func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, args []string) error {
 
 	// Get the target pod details for the chaos execution
 	// if the target pod is not defined it will derive the random target pod list using pod affected percentage
+	if experimentsDetails.TargetPods == "" && chaosDetails.AppDetail.Label == "" {
+		return errors.Errorf("please provide one of the appLabel or TARGET_PODS")
+	}
 	targetPodList, err := common.GetPodList(experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, clients, chaosDetails)
 	if err != nil {
 		return err
@@ -43,20 +44,8 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 	}
 
 	if experimentsDetails.EngineName != "" {
-		// Get Chaos Pod Annotation
-		experimentsDetails.Annotations, err = common.GetChaosPodAnnotation(experimentsDetails.ChaosPodName, experimentsDetails.ChaosNamespace, clients)
-		if err != nil {
-			return errors.Errorf("unable to get annotations, err: %v", err)
-		}
-		// Get Resource Requirements
-		experimentsDetails.Resources, err = common.GetChaosPodResourceRequirements(experimentsDetails.ChaosPodName, experimentsDetails.ExperimentName, experimentsDetails.ChaosNamespace, clients)
-		if err != nil {
-			return errors.Errorf("Unable to get resource requirements, err: %v", err)
-		}
-		// Get ImagePullSecrets
-		experimentsDetails.ImagePullSecrets, err = common.GetImagePullSecrets(experimentsDetails.ChaosPodName, experimentsDetails.ChaosNamespace, clients)
-		if err != nil {
-			return errors.Errorf("Unable to get imagePullSecrets, err: %v", err)
+		if err := setHelperData(experimentsDetails, clients); err != nil {
+			return err
 		}
 	}
 
@@ -66,14 +55,17 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 		events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 	}
 
-	if experimentsDetails.Sequence == "serial" {
-		if err = InjectChaosInSerialMode(experimentsDetails, targetPodList, clients, chaosDetails, args, resultDetails, eventsDetails); err != nil {
+	switch strings.ToLower(experimentsDetails.Sequence) {
+	case "serial":
+		if err = injectChaosInSerialMode(experimentsDetails, targetPodList, clients, chaosDetails, args, resultDetails, eventsDetails); err != nil {
 			return err
 		}
-	} else {
-		if err = InjectChaosInParallelMode(experimentsDetails, targetPodList, clients, chaosDetails, args, resultDetails, eventsDetails); err != nil {
+	case "parallel":
+		if err = injectChaosInParallelMode(experimentsDetails, targetPodList, clients, chaosDetails, args, resultDetails, eventsDetails); err != nil {
 			return err
 		}
+	default:
+		return errors.Errorf("%v sequence is not supported", experimentsDetails.Sequence)
 	}
 
 	//Waiting for the ramp time after chaos injection
@@ -84,8 +76,8 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 	return nil
 }
 
-// InjectChaosInSerialMode stress the cpu of all target application serially (one by one)
-func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, args []string, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
+// injectChaosInSerialMode stress the cpu of all target application serially (one by one)
+func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, args []string, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
 
 	labelSuffix := common.GetRunID()
 
@@ -110,42 +102,39 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		// without extending/concatenating the args var itself
 		argsWithRegex := append(args, "re2:k8s_POD_"+pod.Name+"_"+experimentsDetails.AppNS)
 		log.Infof("Arguments for running %v are %v", experimentsDetails.ExperimentName, argsWithRegex)
-		err = CreateHelperPod(experimentsDetails, clients, pod.Spec.NodeName, runID, argsWithRegex, labelSuffix)
-		if err != nil {
-			return errors.Errorf("Unable to create the helper pod, err: %v", err)
+		if err := createHelperPod(experimentsDetails, clients, pod.Spec.NodeName, runID, argsWithRegex, labelSuffix); err != nil {
+			return errors.Errorf("unable to create the helper pod, err: %v", err)
 		}
 
-		appLabel := "name=" + experimentsDetails.ExperimentName + "-" + runID
+		appLabel := "name=" + experimentsDetails.ExperimentName + "-helper-" + runID
 
 		//checking the status of the helper pod, wait till the pod comes to running state else fail the experiment
 		log.Info("[Status]: Checking the status of the helper pod")
-		err = status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, appLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
-		if err != nil {
-			common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-"+runID, appLabel, chaosDetails, clients)
+		if err := status.CheckHelperStatus(experimentsDetails.ChaosNamespace, appLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
+			common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-helper-"+runID, appLabel, chaosDetails, clients)
 			return errors.Errorf("helper pod is not in running state, err: %v", err)
 		}
 
 		// Wait till the completion of helper pod
-		log.Infof("[Wait]: Waiting for %vs till the completion of the helper pod", experimentsDetails.ChaosDuration)
-		podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, appLabel, clients, experimentsDetails.ChaosDuration+30, chaosDetails.ExperimentName)
+		log.Info("[Wait]: Waiting till the completion of the helper pod")
+		podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, appLabel, clients, experimentsDetails.ChaosDuration+experimentsDetails.Timeout, chaosDetails.ExperimentName)
 		if err != nil || podStatus == "Failed" {
-			common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-"+runID, appLabel, chaosDetails, clients)
+			common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-helper-"+runID, appLabel, chaosDetails, clients)
 			return errors.Errorf("helper pod failed, err: %v", err)
 		}
 
 		//Deleting the helper pod
 		log.Info("[Cleanup]: Deleting the helper pod")
-		err = common.DeletePod(experimentsDetails.ExperimentName+"-"+runID, appLabel, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients)
-		if err != nil {
-			return errors.Errorf("Unable to delete the helper pod, err: %v", err)
+		if err := common.DeletePod(experimentsDetails.ExperimentName+"-helper-"+runID, appLabel, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients); err != nil {
+			return errors.Errorf("unable to delete the helper pod, err: %v", err)
 		}
 	}
 
 	return nil
 }
 
-// InjectChaosInParallelMode kill the container of all target application in parallel mode (all at once)
-func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, args []string, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
+// injectChaosInParallelMode kill the container of all target application in parallel mode (all at once)
+func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, args []string, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
 
 	labelSuffix := common.GetRunID()
 
@@ -170,9 +159,8 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		// without extending/concatenating the args var itself
 		argsWithRegex := append(args, "re2:k8s_POD_"+pod.Name+"_"+experimentsDetails.AppNS)
 		log.Infof("Arguments for running %v are %v", experimentsDetails.ExperimentName, argsWithRegex)
-		err = CreateHelperPod(experimentsDetails, clients, pod.Spec.NodeName, runID, argsWithRegex, labelSuffix)
-		if err != nil {
-			return errors.Errorf("Unable to create the helper pod, err: %v", err)
+		if err := createHelperPod(experimentsDetails, clients, pod.Spec.NodeName, runID, argsWithRegex, labelSuffix); err != nil {
+			return errors.Errorf("unable to create the helper pod, err: %v", err)
 		}
 	}
 
@@ -180,15 +168,14 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 
 	//checking the status of the helper pod, wait till the pod comes to running state else fail the experiment
 	log.Info("[Status]: Checking the status of the helper pod")
-	err = status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, appLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
-	if err != nil {
+	if err := status.CheckHelperStatus(experimentsDetails.ChaosNamespace, appLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
 		common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
 		return errors.Errorf("helper pod is not in running state, err: %v", err)
 	}
 
 	// Wait till the completion of helper pod
-	log.Infof("[Wait]: Waiting for %vs till the completion of the helper pod", experimentsDetails.ChaosDuration)
-	podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, appLabel, clients, experimentsDetails.ChaosDuration+30, chaosDetails.ExperimentName)
+	log.Info("[Wait]: Waiting till the completion of the helper pod")
+	podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, appLabel, clients, experimentsDetails.ChaosDuration+experimentsDetails.Timeout, chaosDetails.ExperimentName)
 	if err != nil || podStatus == "Failed" {
 		common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
 		return errors.Errorf("helper pod failed, err: %v", err)
@@ -196,24 +183,23 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 
 	//Deleting the helper pod
 	log.Info("[Cleanup]: Deleting the helper pod")
-	err = common.DeleteAllPod(appLabel, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients)
-	if err != nil {
-		return errors.Errorf("Unable to delete the helper pod, err: %v", err)
+	if err := common.DeleteAllPod(appLabel, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients); err != nil {
+		return errors.Errorf("unable to delete the helper pod, err: %v", err)
 	}
 
 	return nil
 }
 
-// CreateHelperPod derive the attributes for helper pod and create the helper pod
-func CreateHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, appNodeName, runID string, args []string, labelSuffix string) error {
+// createHelperPod derive the attributes for helper pod and create the helper pod
+func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, appNodeName, runID string, args []string, labelSuffix string) error {
 
 	helperPod := &apiv1.Pod{
 		ObjectMeta: v1.ObjectMeta{
-			Name:      experimentsDetails.ExperimentName + "-" + runID,
+			Name:      experimentsDetails.ExperimentName + "-helper-" + runID,
 			Namespace: experimentsDetails.ChaosNamespace,
 			Labels: map[string]string{
 				"app":                       experimentsDetails.ExperimentName + "-helper-" + labelSuffix,
-				"name":                      experimentsDetails.ExperimentName + "-" + runID,
+				"name":                      experimentsDetails.ExperimentName + "-helper-" + runID,
 				"chaosUID":                  string(experimentsDetails.ChaosUID),
 				"app.kubernetes.io/part-of": "litmus",
 			},
@@ -292,4 +278,26 @@ func AddTargetIpsArgs(targetIPs, targetHosts string, args []string) ([]string, e
 		args = append(args, "--target", strings.TrimSpace(ips[i]))
 	}
 	return args, nil
+}
+
+// setHelperData derive the data from experiment pod and sets into experimentDetails struct
+// which can be used to create helper pod
+func setHelperData(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) error {
+	// Get Chaos Pod Annotation
+	var err error
+	experimentsDetails.Annotations, err = common.GetChaosPodAnnotation(experimentsDetails.ChaosPodName, experimentsDetails.ChaosNamespace, clients)
+	if err != nil {
+		return errors.Errorf("unable to get annotations, err: %v", err)
+	}
+	// Get Resource Requirements
+	experimentsDetails.Resources, err = common.GetChaosPodResourceRequirements(experimentsDetails.ChaosPodName, experimentsDetails.ExperimentName, experimentsDetails.ChaosNamespace, clients)
+	if err != nil {
+		return errors.Errorf("unable to get resource requirements, err: %v", err)
+	}
+	// Get ImagePullSecrets
+	experimentsDetails.ImagePullSecrets, err = common.GetImagePullSecrets(experimentsDetails.ChaosPodName, experimentsDetails.ChaosNamespace, clients)
+	if err != nil {
+		return errors.Errorf("unable to get imagePullSecrets, err: %v", err)
+	}
+	return nil
 }

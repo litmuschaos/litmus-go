@@ -10,7 +10,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/profiles/latest/compute/mgmt/compute"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/azure/auth"
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/azure/instance-terminate/types"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/azure/instance-stop/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/pkg/errors"
 )
@@ -75,14 +75,13 @@ func SetupSubsciptionID(experimentsDetails *experimentTypes.ExperimentDetails) e
 }
 
 // InstanceStatusCheckByName is used to check the instance status of all the instance under chaos
-func InstanceStatusCheckByName(experimentDetails *experimentTypes.ExperimentDetails) error {
-
-	instanceNameList := strings.Split(experimentDetails.AzureInstanceName, ",")
+func InstanceStatusCheckByName(experimentsDetails *experimentTypes.ExperimentDetails) error {
+	instanceNameList := strings.Split(experimentsDetails.AzureInstanceName, ",")
 	if len(instanceNameList) == 0 {
 		return errors.Errorf("no instance found to terminate")
 	}
 	log.Infof("[Info]: The instance under chaos(IUC) are: %v", instanceNameList)
-	return InstanceStatusCheck(instanceNameList, experimentDetails.SubscriptionID, experimentDetails.ResourceGroup)
+	return InstanceStatusCheck(instanceNameList, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup)
 }
 
 // InstanceStatusCheckByName is used to check the instance status of given list of instances
