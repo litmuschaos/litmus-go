@@ -1,6 +1,8 @@
 package annotation
 
 import (
+	"strings"
+
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/pkg/errors"
@@ -12,7 +14,7 @@ import (
 // IsParentAnnotated check whether the target pod's parent is annotated or not
 func IsParentAnnotated(clients clients.ClientSets, parentName string, chaosDetails *types.ChaosDetails) (bool, error) {
 
-	switch chaosDetails.AppDetail.Kind {
+	switch strings.ToLower(chaosDetails.AppDetail.Kind) {
 	case "deployment", "deployments":
 		deploy, err := clients.KubeClient.AppsV1().Deployments(chaosDetails.AppDetail.Namespace).Get(parentName, v1.GetOptions{})
 		if err != nil {
