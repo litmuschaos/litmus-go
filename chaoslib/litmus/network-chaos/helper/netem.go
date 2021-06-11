@@ -91,10 +91,14 @@ func preparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetail
 	}
 
 	// watching for the abort signal and revert the chaos
-	go abortWatcher(targetPID)
+	go abortWatcher(targetPID, resultDetails.Name, chaosDetails.ChaosNamespace, experimentsDetails.TargetPods)
 
 	// injecting network chaos inside target container
 	if err = injectChaos(experimentsDetails, targetPID); err != nil {
+		return err
+	}
+
+	if err = result.AnnotateChaosResult(resultDetails.Name, chaosDetails.ChaosNamespace, "injected", "pod", experimentsDetails.TargetPods); err != nil {
 		return err
 	}
 
@@ -106,6 +110,10 @@ func preparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetail
 
 	// cleaning the netem process after chaos injection
 	if err = killnetem(targetPID); err != nil {
+		return err
+	}
+
+	if err = result.AnnotateChaosResult(resultDetails.Name, chaosDetails.ChaosNamespace, "reverted", "pod", experimentsDetails.TargetPods); err != nil {
 		return err
 	}
 
@@ -263,7 +271,7 @@ func getENV(experimentDetails *experimentTypes.ExperimentDetails) {
 }
 
 // abortWatcher continuosly watch for the abort signals
-func abortWatcher(targetPID int) {
+func abortWatcher(targetPID int, resultName, chaosNS, targetPodName string) {
 
 	<-abort
 	log.Info("[Chaos]: Killing process started because of terminated signal received")
@@ -276,6 +284,9 @@ func abortWatcher(targetPID int) {
 		}
 		retry--
 		time.Sleep(1 * time.Second)
+	}
+	if err = result.AnnotateChaosResult(resultName, chaosNS, "reverted", "pod", targetPodName); err != nil {
+		log.Errorf("unable to annotate the chaosresult, err :%v", err)
 	}
 	log.Info("Chaos Revert Completed")
 	os.Exit(1)
