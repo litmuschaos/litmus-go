@@ -1,5 +1,9 @@
 package types
 
+const (
+	IconPath string = "/contribute/developer-guide/icons/k8s.png"
+)
+
 // Experiment contains details of all the attributes, which is needed for the new experiments generations
 type Experiment struct {
 	//Name is the name of new chaos experiment
@@ -21,6 +25,8 @@ type Experiment struct {
 	// It contains the keywords or hashtag for the chaos experiment
 	// which can better define that chaos experiment
 	Keywords []string `json:"keywords"`
+	// It contains the supported platforms for the chaos experiment
+	Platforms []string `json:"platforms"`
 	// Scope define the scope of chaos experiment
 	// whether it is namespaced or cluster scoped
 	Scope string `json:"scope"`

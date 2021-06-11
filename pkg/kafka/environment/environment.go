@@ -78,4 +78,5 @@ func InitialiseChaosVariables(chaosDetails *types.ChaosDetails, kafkaDetails *ka
 	chaosDetails.AppDetail = appDetails
 	chaosDetails.ProbeImagePullPolicy = kafkaDetails.ChaoslibDetail.LIBImagePullPolicy
 	chaosDetails.Randomness, _ = strconv.ParseBool(common.Getenv("RANDOMNESS", "false"))
+	chaosDetails.ParentsResources = []string{}
 }

@@ -18,7 +18,6 @@ import (
 	"github.com/openebs/maya/pkg/util/retry"
 	"github.com/pkg/errors"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -34,7 +33,7 @@ func ChaosResult(chaosDetails *types.ChaosDetails, clients clients.ClientSets, r
 		Times(90).
 		Wait(2 * time.Second).
 		Try(func(attempt uint) error {
-			result, err := clients.LitmusClient.ChaosResults(chaosDetails.ChaosNamespace).List(metav1.ListOptions{LabelSelector: "name=" + resultDetails.Name})
+			result, err := clients.LitmusClient.ChaosResults(chaosDetails.ChaosNamespace).List(v1.ListOptions{LabelSelector: "name=" + resultDetails.Name})
 			if err != nil && len(result.Items) == 0 {
 				return errors.Errorf("unable to find the chaosresult with matching labels, err: %v", err)
 			}
@@ -50,7 +49,7 @@ func ChaosResult(chaosDetails *types.ChaosDetails, clients clients.ClientSets, r
 	// skipping the derivation of labels from chaos pod, if phase is stopped
 	if chaosDetails.EngineName != "" && resultDetails.Phase != "Stopped" {
 		// Getting chaos pod label and passing it in chaos result
-		chaosPod, err := clients.KubeClient.CoreV1().Pods(chaosDetails.ChaosNamespace).Get(chaosDetails.ChaosPodName, metav1.GetOptions{})
+		chaosPod, err := clients.KubeClient.CoreV1().Pods(chaosDetails.ChaosNamespace).Get(chaosDetails.ChaosPodName, v1.GetOptions{})
 		if err != nil {
 			return errors.Errorf("failed to find chaos pod with name: %v, err: %v", chaosDetails.ChaosPodName, err)
 		}
@@ -81,7 +80,7 @@ func InitializeChaosResult(chaosDetails *types.ChaosDetails, clients clients.Cli
 
 	_, probeStatus := GetProbeStatus(resultDetails)
 	chaosResult := &v1alpha1.ChaosResult{
-		ObjectMeta: metav1.ObjectMeta{
+		ObjectMeta: v1.ObjectMeta{
 			Name:      resultDetails.Name,
 			Namespace: chaosDetails.ChaosNamespace,
 			Labels:    chaosResultLabel,
@@ -116,7 +115,7 @@ func InitializeChaosResult(chaosDetails *types.ChaosDetails, clients clients.Cli
 	// in his cluster, which was created earlier with older release/version of litmus.
 	// it will override the params and add the labels to it so that it will work as desired.
 	if k8serrors.IsAlreadyExists(err) {
-		chaosResult, err = clients.LitmusClient.ChaosResults(chaosDetails.ChaosNamespace).Get(resultDetails.Name, metav1.GetOptions{})
+		chaosResult, err = clients.LitmusClient.ChaosResults(chaosDetails.ChaosNamespace).Get(resultDetails.Name, v1.GetOptions{})
 		if err != nil {
 			return errors.Errorf("Unable to find the chaosresult with name %v, err: %v", resultDetails.Name, err)
 		}
@@ -217,7 +216,7 @@ func PatchChaosResult(result *v1alpha1.ChaosResult, clients clients.ClientSets, 
 // SetResultUID sets the ResultUID into the ResultDetails structure
 func SetResultUID(resultDetails *types.ResultDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
 
-	result, err := clients.LitmusClient.ChaosResults(chaosDetails.ChaosNamespace).Get(resultDetails.Name, metav1.GetOptions{})
+	result, err := clients.LitmusClient.ChaosResults(chaosDetails.ChaosNamespace).Get(resultDetails.Name, v1.GetOptions{})
 
 	if err != nil {
 		return err
@@ -261,6 +260,7 @@ func updateHistory(result *v1alpha1.ChaosResult) {
 }
 
 // AnnotateChaosResult annotate the chaosResult for the chaos status
+// using kubectl cli to annotate the chaosresult as it will automatically handle the race condition in case of multiple helpers
 func AnnotateChaosResult(resultName, namespace, status, kind, name string) error {
 	command := exec.Command("kubectl", "annotate", "chaosresult", resultName, "-n", namespace, kind+"/"+name+"="+status, "--overwrite")
 	var out, stderr bytes.Buffer
