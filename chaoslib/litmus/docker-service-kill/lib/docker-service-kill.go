@@ -17,8 +17,8 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// PrepareDockerKill contains prepration steps before chaos injection
-func PrepareDockerKill(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+// PrepareDockerServiceKill contains prepration steps before chaos injection
+func PrepareDockerServiceKill(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	var err error
 	if experimentsDetails.TargetNode == "" {
@@ -53,7 +53,7 @@ func PrepareDockerKill(experimentsDetails *experimentTypes.ExperimentDetails, cl
 		}
 	}
 
-	// Creating the helper pod to perform node memory hog
+	// Creating the helper pod to perform docker-service-kill
 	if err = createHelperPod(experimentsDetails, clients, experimentsDetails.TargetNode); err != nil {
 		return errors.Errorf("unable to create the helper pod, err: %v", err)
 	}

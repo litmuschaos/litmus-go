@@ -126,7 +126,7 @@ func DockerServiceKill(clients clients.ClientSets) {
 	// Including the litmus lib for docker-service-kill
 	switch experimentsDetails.ChaosLib {
 	case "litmus":
-		if err := litmusLIB.PrepareDockerKill(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
+		if err := litmusLIB.PrepareDockerServiceKill(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
 			failStep := "failed in chaos injection phase"
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			log.Errorf("Chaos injection failed, err: %v", err)
