@@ -97,6 +97,7 @@ func InitializeChaosResult(chaosDetails *types.ChaosDetails, clients clients.Cli
 				PassedRuns:  0,
 				FailedRuns:  0,
 				StoppedRuns: 0,
+				Targets:     []v1alpha1.TargetDetails{},
 			},
 		},
 	}
@@ -153,6 +154,7 @@ func PatchChaosResult(result *v1alpha1.ChaosResult, clients clients.ClientSets, 
 	result.Status.ExperimentStatus.FailStep = resultDetails.FailStep
 	// for existing chaos result resource it will patch the label
 	result.ObjectMeta.Labels = chaosResultLabel
+	result.Status.History.Targets = chaosDetails.Targets
 	isAllProbePassed, result.Status.ProbeStatus = GetProbeStatus(resultDetails)
 	result.Status.ExperimentStatus.Verdict = resultDetails.Verdict
 
@@ -241,6 +243,7 @@ func updateHistory(result *v1alpha1.ChaosResult) {
 			PassedRuns:  0,
 			FailedRuns:  0,
 			StoppedRuns: 0,
+			Targets:     []v1alpha1.TargetDetails{},
 		}
 		result.Status.History = history
 	}
