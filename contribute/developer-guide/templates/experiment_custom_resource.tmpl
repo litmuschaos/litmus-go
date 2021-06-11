@@ -5,6 +5,11 @@ description:
 kind: ChaosExperiment
 metadata:
   name: {{ .Name }}
+  labels:
+    name: {{ .Name }}
+    app.kubernetes.io/part-of: litmus
+    app.kubernetes.io/component: chaosexperiment
+    app.kubernetes.io/version: latest
 spec:
   definition:
     scope: {{ .Scope }}
@@ -24,6 +29,7 @@ spec:
         {{- end}}
       {{- end}}
     image: "litmuschaos/go-runner:latest"
+    imagePullPolicy: Always
     args:
     - -c
     - ./experiments -name {{ .Name }}
@@ -44,4 +50,7 @@ spec:
       value: ''
       
     labels:
-      experiment: {{ .Name }} 
+      name: {{ .Name }}
+      app.kubernetes.io/part-of: litmus
+      app.kubernetes.io/component: experiment-job
+      app.kubernetes.io/version: latest 
