@@ -86,8 +86,8 @@ scaffolded files consist of placeholders which can then be filled as desired.
         - "deletecollection"
   maturity: "alpha"
   maintainers:
-    - name: "ksatchit"
-      email: "ksatchit@chaosnative.com"
+    - name: "ispeakc0de"
+      email: "shubham@chaosnative.com" 
   provider:
     name: "ChaosNative"
   minkubernetesversion: "1.12.0"
