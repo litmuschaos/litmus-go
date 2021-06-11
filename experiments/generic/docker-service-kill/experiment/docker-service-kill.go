@@ -61,7 +61,7 @@ func DockerServiceKill(clients clients.ClientSets) {
 
 	//DISPLAY THE APP INFORMATION
 	log.InfoWithValues("[Info]: The application information is as follows", logrus.Fields{
-		"Namespace":   experimentsDetails.AppNS,
+		"App Namespace":   experimentsDetails.AppNS,
 		"App Label":   experimentsDetails.AppLabel,
 		"Node Label":  experimentsDetails.NodeLabel,
 		"Target Node": experimentsDetails.TargetNode,
@@ -133,9 +133,9 @@ func DockerServiceKill(clients clients.ClientSets) {
 			return
 		}
 	default:
-		failStep := "lib and container-runtime combination not supported!"
+		log.Error("[Invalid]: Please Provide the correct LIB")
+		failStep := "no match found for specified lib"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-		log.Error("lib and container-runtime combination not supported, provide the correct value of lib & container-runtime")
 		return
 	}
 

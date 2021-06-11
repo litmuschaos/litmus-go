@@ -52,7 +52,7 @@ metadata:
     name: docker-service-kill-sa
 roleRef:
   apiGroup: rbac.authorization.k8s.io
-  kind: Role
+  kind: ClusterRole
   name: docker-service-kill-sa
 subjects:
   - kind: ServiceAccount
