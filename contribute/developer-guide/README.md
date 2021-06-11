@@ -44,27 +44,35 @@ scaffolded files consist of placeholders which can then be filled as desired.
   $ cat attributes.yaml 
   
   ---
-  name: "sample-pod-delete"
+  name: "sample-exec-chaos"
   version: "0.1.0"
   category: "sample-category"
-  repository: "https://github.com/litmuschaos/litmus-go/tree/master/sample-category/pod-delete"
+  repository: "https://github.com/litmuschaos/litmus-go/tree/master/sample-category/sample-exec-chaos"
   community: "https://kubernetes.slack.com/messages/CNXNB0ZTN"
-  description: "kills nginx pods in a random manner"
+  description: "it execs inside target pods to run the chaos inject commands, waits for the chaos duration and reverts the chaos"
   keywords:
     - "pods"
     - "kubernetes"
     - "sample-category"
-    - "nginx"
+    - "exec"
+  platforms:
+    - Minikube
   scope: "Namespaced"
   auxiliaryappcheck: false
   permissions:
     - apigroups:
         - ""
         - "batch"
+        - "apps"
         - "litmuschaos.io"
       resources:
         - "jobs"
         - "pods"
+        - "pods/log"
+        - "events"
+        - "deployments"
+        - "replicasets"
+        - "pods/exec"
         - "chaosengines"
         - "chaosexperiments"
         - "chaosresults"
@@ -72,15 +80,16 @@ scaffolded files consist of placeholders which can then be filled as desired.
         - "create"
         - "list"
         - "get"
-        - "update"
         - "patch"
+        - "update"
         - "delete"
+        - "deletecollection"
   maturity: "alpha"
   maintainers:
-    - name: "ksatchit"
-      email: "ksatchit@mayadata.io"
+    - name: "ispeakc0de"
+      email: "shubham@chaosnative.com" 
   provider:
-    name: "Mayadata"
+    name: "ChaosNative"
   minkubernetesversion: "1.12.0"
   references:
     - name: Documentation
@@ -89,19 +98,23 @@ scaffolded files consist of placeholders which can then be filled as desired.
   ```
 
 - Run the following command to generate the necessary artifacts for submitting the `sample-category` chaos chart with 
-  `sample-pod-delete` experiment.
+  `sample-exec-chaos` experiment.
 
   ```
   $ ./litmus-sdk generate <generate-type> -f=attributes.yaml
   ```
 
   **Note**: Replace the `<generate-type>` placeholder with the appropriate value based on the usecase: 
-  - `chart`: Just the chaos-chart metadata, i.e., chartserviceversion yaml 
-  - `experiment`: Chaos experiment artifacts belonging to a an existing OR new chart. 
+  - `experiment`: Chaos experiment artifacts belonging to an existing OR new experiment.
+  - `chart`: Just the chaos-chart metadata, i.e., chartserviceversion.yaml
+      - Provide the type of chart in the `-t` flag. It supports the following values:
+           - `category`: It creates the chart metadata for the category i.e chartserviceversion, package manifests
+           - `experiment`: It creates the chart for the experiment i.e chartserviceversion, engine, rbac, experiment manifests
+           - `all`: it creates both category and experiment charts (default type)
 
-  - provide the path of the attribute.yaml manifest in the `-f` flag. 
+  - Provide the path of the attribute.yaml manifest in the `-f` flag.
 
-  View the generated files in `/experiments/chaos-category` folder.
+  View the generated files in `/experiments/<chaos-category>` folder.
 
   ```
   $ cd /experiments
@@ -109,34 +122,45 @@ scaffolded files consist of placeholders which can then be filled as desired.
   $ ls -ltr
 
   total 8
-  drwxr-xr-x 3 shubham shubham 4096 May 15 12:02 generic/
-  drwxr-xr-x 3 shubham shubham 4096 May 15 13:26 sample-category/
+  drwxr-xr-x 3 shubham shubham 4096 June 10 12:02 generic/
+  drwxr-xr-x 3 shubham shubham 4096 June 10 13:26 sample-category/
 
 
   $ ls -ltr sample-category/
 
+  total 4
+  drwxr-xr-x 5 shubham shubham 4096 June 10 13:26 sample-exec-chaos/
+
+  $ ls -ltr sample-category/sample-exec-chaos/
+
   total 12
-  -rw-r--r-- 1 shubham shubham   41 May 15 13:26 sample-category.package.yaml
-  -rw-r--r-- 1 shubham shubham  734 May 15 13:26 sample-category.chartserviceversion.yaml
-  drwxr-xr-x 2 shubham shubham 4096 May 15 13:26 sample-pod-delete/
+  drwxr-xr-x 3 shubham shubham 4096 Jun 10 22:41 charts/
+  drwxr-xr-x 2 shubham shubham 4096 Jun 10 22:41 test/
+  drwxr-xr-x 2 shubham shubham 4096 Jun 10 22:41 experiment/
 
-  $ ls -ltr sample-category/pod-delete
-
-  total 28
-  -rw-r--r-- 1 shubham shubham  791 May 15 13:26 rbac.yaml
-  -rw-r--r-- 1 shubham shubham  734 May 15 13:26 sample-pod-delete.chartserviceversion.yaml
-  -rw-r--r-- 1 shubham shubham  792 May 15 13:26 experiment.yaml
-  drwxr-xr-x 2 shubham shubham 4096 May 15 13:26 test
-  -rw-r--r-- 1 shubham shubham 4533 May 15 13:26 sample-pod-delete.go
-  -rw-r--r-- 1 shubham shubham  813 May 15 13:26 engine.yaml
-  
-  $ ls -ltr sample-category/sample-pod-delete/test
+  $ ls -ltr sample-category/sample-exec-chaos/test
 
   total 4
-  -rw-r--r-- 1 shubham shubham  1039 May 15 13:26 test.yaml
+  -rw-r--r-- 1 shubham shubham  1039 June 10 13:26 test.yaml
+
+  $ ls -ltr sample-category/sample-exec-chaos/experiment
+
+  total 12 
+  -rw-r--r-- 1 shubham shubham 8893 Jun 10 22:41 sample-exec-chaos.go
+
+  $ ls -ltr sample-category/sample-exec-chaos/charts
+
+  total 28
+  -rw-r--r-- 1 shubham shubham  152 Jun 10 22:41 sample-category.package.yaml
+  -rw-r--r-- 1 shubham shubham  869 Jun 10 22:41 sample-category.chartserviceversion.yaml
+  -rw-r--r-- 1 shubham shubham  999 Jun 10 22:41 sample-exec-chaos.chartserviceversion.yaml
+  -rw-r--r-- 1 shubham shubham 1534 Jun 10 22:41 experiment.yaml
+  -rw-r--r-- 1 shubham shubham 1209 Jun 10 22:41 rbac.yaml
+  -rw-r--r-- 1 shubham shubham  735 Jun 10 22:41 engine.yaml
+  drwxr-xr-x 2 shubham shubham 4096 Jun 10 22:41 icons/
   ```
  
-- Proceed with construction of business logic inside the `sample-pod-delete.go` file, by making
+- Proceed with construction of business logic inside the `sample-exec-chaos.go` file, by making
   the appropriate modifications listed below to achieve the desired effect: 
 
   - variables 
@@ -144,7 +168,7 @@ scaffolded files consist of placeholders which can then be filled as desired.
   - helper utils in either [pkg](/pkg/) or new [base chaos libraries](/chaoslib) 
 
 
-- The chaoslib is created at `chaoslib/litmus/sample-pod-delete/lib/sample-pod-delete.go` path. It contains some pre-defined steps which runs the `ChaosInject` command (explicitly provided as an ENV var in the experiment CR). Which will induce chaos in the target application. It will wait for the given chaos duration and finally runs the `ChaosKill` command (also provided as an ENV var) for cleanup purposes. Update this chaoslib to achieve the desired effect based on the use-case or reuse the other existing chaoslib.
+- The chaoslib is created at `chaoslib/litmus/sample-exec-chaos/lib/sample-exec-chaos.go` path. It contains some pre-defined steps which runs the `ChaosInject` command (explicitly provided as an ENV var in the experiment CR). Which will induce chaos in the target application. It will wait for the given chaos duration and finally runs the `ChaosKill` command (also provided as an ENV var) for cleanup purposes. Update this chaoslib to achieve the desired effect based on the use-case or reuse the other existing chaoslib.
 
 - Create an experiment README explaining, briefly, the *what*, *why* & *how* of the experiment to aid users of this experiment. 
 
