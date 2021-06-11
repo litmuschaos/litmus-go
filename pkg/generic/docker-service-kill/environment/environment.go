@@ -36,7 +36,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 
 //InitialiseChaosVariables initialise all the global variables
 func InitialiseChaosVariables(chaosDetails *types.ChaosDetails, experimentDetails *experimentTypes.ExperimentDetails) {
-	
+
 	chaosDetails.ChaosNamespace = experimentDetails.ChaosNamespace
 	chaosDetails.ChaosPodName = experimentDetails.ChaosPodName
 	chaosDetails.ChaosUID = experimentDetails.ChaosUID
