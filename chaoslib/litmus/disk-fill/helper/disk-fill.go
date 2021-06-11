@@ -119,12 +119,16 @@ func diskFill(experimentsDetails *experimentTypes.ExperimentDetails, clients cli
 	}
 
 	// watching for the abort signal and revert the chaos
-	go abortWatcher(experimentsDetails, clients, containerID)
+	go abortWatcher(experimentsDetails, clients, containerID, resultDetails.Name)
 
 	if sizeTobeFilled > 0 {
 
 		if err := fillDisk(containerID, sizeTobeFilled, experimentsDetails.DataBlockSize); err != nil {
 			log.Error(string(out))
+			return err
+		}
+
+		if err = result.AnnotateChaosResult(resultDetails.Name, chaosDetails.ChaosNamespace, "injected", "pod", experimentsDetails.TargetPods); err != nil {
 			return err
 		}
 
@@ -139,6 +143,9 @@ func diskFill(experimentsDetails *experimentTypes.ExperimentDetails, clients cli
 		err = remedy(experimentsDetails, clients, containerID)
 		if err != nil {
 			return errors.Errorf("unable to perform remedy operation, err: %v", err)
+		}
+		if err = result.AnnotateChaosResult(resultDetails.Name, chaosDetails.ChaosNamespace, "reverted", "pod", experimentsDetails.TargetPods); err != nil {
+			return err
 		}
 	} else {
 		log.Warn("No required free space found!, It's Housefull")
@@ -261,7 +268,7 @@ func getENV(experimentDetails *experimentTypes.ExperimentDetails, name string) {
 }
 
 // abortWatcher continuosly watch for the abort signals
-func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, containerID string) {
+func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, containerID, resultName string) {
 	// waiting till the abort signal recieved
 	<-abort
 
@@ -275,6 +282,9 @@ func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, clients
 		}
 		retry--
 		time.Sleep(1 * time.Second)
+	}
+	if err := result.AnnotateChaosResult(resultName, experimentsDetails.ChaosNamespace, "reverted", "pod", experimentsDetails.TargetPods); err != nil {
+		log.Errorf("unable to annotate the chaosresult, err :%v", err)
 	}
 	log.Info("Chaos Revert Completed")
 	os.Exit(1)
