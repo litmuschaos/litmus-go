@@ -23,6 +23,7 @@ type ExperimentDetails struct {
 	ChaosPodName                    string
 	RunID                           string
 	TargetContainer                 string
+	StressImage                     string
 	Timeout                         int
 	Delay                           int
 	TargetPods                      string

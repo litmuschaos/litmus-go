@@ -27,7 +27,6 @@ import (
 	pidTypes "github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientTypes "k8s.io/apimachinery/pkg/types"
 )
 
@@ -41,6 +40,10 @@ var (
 var (
 	err           error
 	inject, abort chan os.Signal
+)
+
+const (
+	ProcessAlreadyFinished = "os: process already finished"
 )
 
 // Helper injects the stress chaos
@@ -88,7 +91,7 @@ func prepareStressChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 		os.Exit(1)
 	default:
 
-		containerID, err := getContainerID(experimentsDetails, clients)
+		containerID, err := common.GetContainerID(experimentsDetails.AppNS, experimentsDetails.TargetPods, experimentsDetails.TargetContainer, clients)
 		if err != nil {
 			return err
 		}
@@ -106,7 +109,7 @@ func prepareStressChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 		}
 
 		//get the pid path and check cgroup
-		path := pidPath(int(targetPID))
+		path := pidPath(targetPID)
 		cgroup, err := findValidCgroup(path, containerID)
 		if err != nil {
 			return errors.Errorf("fail to get cgroup, err: %v", err)
@@ -170,7 +173,7 @@ func prepareStressChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 		case <-timeout:
 			// the stress process gets timeout before completion
 			log.Infof("[Timeout] Stress output: %v", buf.String())
-			log.Info("[Cleaup]: Killing the stress process")
+			log.Info("[Cleanup]: Killing the stress process")
 			terminateProcess(cmd.Process.Pid)
 			return errors.Errorf("the stress process is timeout after %vs", experimentsDetails.ChaosDuration+10)
 		case err := <-done:
@@ -197,7 +200,7 @@ func terminateProcess(pid int) error {
 	if err != nil {
 		return errors.Errorf("unreachable path, err: %v", err)
 	}
-	if err = process.Signal(syscall.SIGTERM); err != nil && err.Error() != "os: process already finished" {
+	if err = process.Signal(syscall.SIGTERM); err != nil && err.Error() != ProcessAlreadyFinished {
 		return errors.Errorf("error while killing process", err)
 	}
 	log.Info("[Info]: Stress process removed sucessfully")
@@ -221,7 +224,6 @@ func prepareStressor(experimentDetails *experimentTypes.ExperimentDetails) []str
 			"Timeout":  experimentDetails.ChaosDuration,
 		})
 		stressArgs = append(stressArgs, "--cpu "+strconv.Itoa(experimentDetails.CPUcores))
-		return stressArgs
 
 	case "pod-memory-hog":
 
@@ -231,7 +233,6 @@ func prepareStressor(experimentDetails *experimentTypes.ExperimentDetails) []str
 			"Timeout":            experimentDetails.ChaosDuration,
 		})
 		stressArgs = append(stressArgs, "--vm "+strconv.Itoa(experimentDetails.NumberOfWorkers)+" --vm-bytes "+strconv.Itoa(experimentDetails.MemoryConsumption)+"M")
-		return stressArgs
 
 	case "pod-io-stress":
 		var hddbytes string
@@ -262,48 +263,11 @@ func prepareStressor(experimentDetails *experimentTypes.ExperimentDetails) []str
 		} else {
 			stressArgs = append(stressArgs, "--cpu 1 --io "+strconv.Itoa(experimentDetails.NumberOfWorkers)+" --hdd "+strconv.Itoa(experimentDetails.NumberOfWorkers)+" --hdd-bytes "+hddbytes+" --temp-path "+experimentDetails.VolumeMountPath)
 		}
-		return stressArgs
 
 	default:
 		log.Fatalf("stressor for %v experiment is not suported", experimentDetails.ExperimentName)
 	}
-	return nil
-}
-
-//getContainerID extract out the container id of the target container
-func getContainerID(experimentDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) (string, error) {
-
-	var containerID string
-	switch strings.ToLower(experimentDetails.ContainerRuntime) {
-	case "docker":
-		host := "unix://" + experimentDetails.SocketPath
-		// deriving the container id of the target container
-		cmd := "sudo docker --host " + host + " ps | grep k8s_" + experimentDetails.TargetContainer + "_" + experimentDetails.TargetPods + "_" + experimentDetails.AppNS + " | awk '{print $1}'"
-		out, err := exec.Command("/bin/sh", "-c", cmd).CombinedOutput()
-		if err != nil {
-			log.Error(fmt.Sprintf("[docker]: Failed to run docker ps command: %s", string(out)))
-			return "", err
-		}
-		containerID = strings.TrimSpace(string(out))
-	case "containerd", "crio":
-		pod, err := clients.KubeClient.CoreV1().Pods(experimentDetails.AppNS).Get(experimentDetails.TargetPods, v1.GetOptions{})
-		if err != nil {
-			return "", err
-		}
-		// filtering out the container id from the details of containers inside containerStatuses of the given pod
-		// container id is present in the form of <runtime>://<container-id>
-		for _, container := range pod.Status.ContainerStatuses {
-			if container.Name == experimentDetails.TargetContainer {
-				containerID = strings.Split(container.ContainerID, "//")[1]
-				break
-			}
-		}
-	default:
-		return "", errors.Errorf("%v container runtime not suported", experimentDetails.ContainerRuntime)
-	}
-	log.Infof("containerid: %v", containerID)
-
-	return containerID, nil
+	return stressArgs
 }
 
 //getPID extract out the PID of the target container
@@ -371,6 +335,7 @@ func parseCgroupFile(path string) (map[string]string, error) {
 	return parseCgroupFromReader(file)
 }
 
+//parseCgroupFromReader will parse the cgroup file from the reader
 func parseCgroupFromReader(r io.Reader) (map[string]string, error) {
 	var (
 		cgroups = make(map[string]string)
@@ -434,6 +399,7 @@ func getErrorPath(err error) cgroups.Path {
 	}
 }
 
+//getCgroupDestination will validate the subsystem with the mountpath in container mountinfo file.
 func getCgroupDestination(pid int, subsystem string) (string, error) {
 	mountinfoPath := fmt.Sprintf("/proc/%d/mountinfo", pid)
 	file, err := os.Open(mountinfoPath)
@@ -453,7 +419,7 @@ func getCgroupDestination(pid int, subsystem string) (string, error) {
 	if err := s.Err(); err != nil {
 		return "", err
 	}
-	return "", errors.Errorf("never found desct for %v ", subsystem)
+	return "", errors.Errorf("no destination found for %v ", subsystem)
 }
 
 //findValidCgroup will be used to get a valid cgroup path
@@ -474,8 +440,6 @@ func findValidCgroup(path cgroups.Path, target string) (string, error) {
 //parsePIDFromJSON extract the pid from the json output
 func parsePIDFromJSON(j []byte, runtime string) (int, error) {
 	var pid int
-	// namespaces are present inside `info.runtimeSpec.linux.namespaces` of inspect output
-	// linux namespace of type network contains pid, in the form of `/proc/<pid>/ns/net`
 	switch runtime {
 	case "docker":
 		// in docker, pid is present inside state.pid attribute of inspect output

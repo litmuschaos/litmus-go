@@ -3,7 +3,6 @@ package experiment
 import (
 	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
 	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/pod-cpu-hog-exec/lib"
-	pumbaLIB "github.com/litmuschaos/litmus-go/chaoslib/pumba/cpu-chaos/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/pod-cpu-hog-exec/environment"
@@ -107,13 +106,6 @@ func PodCPUHogExec(clients clients.ClientSets) {
 	switch experimentsDetails.ChaosLib {
 	case "litmus":
 		if err := litmusLIB.PrepareCPUExecStress(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
-			log.Errorf("[Error]: CPU hog failed, err: %v", err)
-			failStep := "failed in chaos injection phase"
-			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-			return
-		}
-	case "pumba":
-		if err := pumbaLIB.PreparePodCPUHog(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
 			log.Errorf("[Error]: CPU hog failed, err: %v", err)
 			failStep := "failed in chaos injection phase"
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
