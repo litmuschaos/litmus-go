@@ -1,41 +1,50 @@
 ---
-name: "sample-pod-delete"
+name: "sample-exec-chaos"
 version: "0.1.0"
 category: "sample-category"
-repository: "https://github.com/litmuschaos/litmus-go/tree/master/sample-category/pod-delete"
+repository: "https://github.com/litmuschaos/litmus-go/tree/master/sample-category/sample-exec-chaos"
 community: "https://kubernetes.slack.com/messages/CNXNB0ZTN"
-description: "kills nginx pods in a random manner"
+description: "it execs inside target pods to run the chaos inject commands, waits for the chaos duration and reverts the chaos"
 keywords:
   - "pods"
   - "kubernetes"
   - "sample-category"
-  - "nginx"
+  - "exec"
+platforms:
+  - Minikube
 scope: "Namespaced"
 auxiliaryappcheck: false
 permissions:
   - apigroups:
       - ""
       - "batch"
+      - "apps"
       - "litmuschaos.io"
     resources:
       - "jobs"
       - "pods"
+      - "pods/log"
+      - "events"
+      - "deployments"
+      - "replicasets"
+      - "pods/exec"
       - "chaosengines"
       - "chaosexperiments"
       - "chaosresults"
     verbs:
-      - "create"
-      - "list"
-      - "get"
-      - "update"
-      - "patch"
-      - "delete"
+       - "create"
+       - "list"
+       - "get"
+       - "patch"
+       - "update"
+       - "delete"
+       - "deletecollection"
 maturity: "alpha"
 maintainers:
-  - name: "ksatchit"
-    email: "ksatchit@mayadata.io"
+  - name: "ispeakc0de"
+    email: "shubham@chaosnative.com"
 provider:
-  name: "Mayadata"
+  name: "ChaosNative"
 minkubernetesversion: "1.12.0"
 references:
   - name: Documentation

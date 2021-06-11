@@ -13,15 +13,22 @@ spec:
   {{- range .Keywords }} 
     - "{{ . }}"
   {{- end}}
-  maturity: {{ .Maturity }} 
-  minKubeVersion: {{ .MinKubernetesVersion }} 
-  provider: 
-    name: {{ .Provider.Name }}
+  platforms:
+  {{- range .Platforms }} 
+    - "{{ . }}"
+  {{- end}}
+  maturity: {{ .Maturity }}
   maintainers: 
   {{- range .Maintainers }} 
     - name: {{ .Name }} 
       email: {{ .Email }}
-  {{- end }}
+  {{- end }} 
+  minKubeVersion: {{ .MinKubernetesVersion }} 
+  provider: 
+    name: {{ .Provider.Name }}
+  labels:
+    app.kubernetes.io/component: chartserviceversion
+    app.kubernetes.io/version: latest
   links:
   {{- range .References }} 
     - name: {{ .Name }} 
@@ -30,3 +37,4 @@ spec:
   icon:
     - url: 
       mediatype: ""
+  chaosexpcrdlink: https://raw.githubusercontent.com/litmuschaos/chaos-charts/master/charts/{{ .Category }}/{{ .Name }}/experiment.yaml
