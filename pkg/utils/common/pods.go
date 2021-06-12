@@ -230,7 +230,7 @@ func SetTargets(target, chaosStatus, kind string, chaosDetails *types.ChaosDetai
 		}
 	}
 	newTarget := v1alpha1.TargetDetails{
-		Name: target,
+		Name:        target,
 		Kind:        kind,
 		ChaosStatus: chaosStatus,
 	}

@@ -71,7 +71,7 @@ func PrepareNodeDrain(experimentsDetails *experimentTypes.ExperimentDetails, cli
 	go abortWatcher(experimentsDetails, clients, resultDetails, chaosDetails, eventsDetails)
 
 	// Drain the application node
-	if err := drainNode(experimentsDetails, clients); err != nil {
+	if err := drainNode(experimentsDetails, clients, chaosDetails); err != nil {
 		return err
 	}
 
@@ -96,7 +96,7 @@ func PrepareNodeDrain(experimentsDetails *experimentTypes.ExperimentDetails, cli
 	log.Info("[Chaos]: Stopping the experiment")
 
 	// Uncordon the application node
-	if err := uncordonNode(experimentsDetails, clients); err != nil {
+	if err := uncordonNode(experimentsDetails, clients, chaosDetails); err != nil {
 		return err
 	}
 
@@ -115,7 +115,7 @@ func PrepareNodeDrain(experimentsDetails *experimentTypes.ExperimentDetails, cli
 }
 
 // drainNode drain the application node
-func drainNode(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) error {
+func drainNode(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
 
 	select {
 	case <-inject:
@@ -132,6 +132,8 @@ func drainNode(experimentsDetails *experimentTypes.ExperimentDetails, clients cl
 			log.Infof("Error String: %v", stderr.String())
 			return errors.Errorf("Unable to drain the %v node, err: %v", experimentsDetails.TargetNode, err)
 		}
+
+		common.SetTargets(experimentsDetails.TargetNode, "injected", "node", chaosDetails)
 
 		return retry.
 			Times(uint(experimentsDetails.Timeout / experimentsDetails.Delay)).
@@ -151,7 +153,7 @@ func drainNode(experimentsDetails *experimentTypes.ExperimentDetails, clients cl
 }
 
 // uncordonNode uncordon the application node
-func uncordonNode(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) error {
+func uncordonNode(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
 
 	log.Infof("[Recover]: Uncordon the %v node", experimentsDetails.TargetNode)
 
@@ -163,6 +165,8 @@ func uncordonNode(experimentsDetails *experimentTypes.ExperimentDetails, clients
 		log.Infof("Error String: %v", stderr.String())
 		return errors.Errorf("unable to uncordon the %v node, err: %v", experimentsDetails.TargetNode, err)
 	}
+
+	common.SetTargets(experimentsDetails.TargetNode, "reverted", "node", chaosDetails)
 
 	return retry.
 		Times(uint(experimentsDetails.Timeout / experimentsDetails.Delay)).
@@ -189,7 +193,7 @@ func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, clients
 	// retry thrice for the chaos revert
 	retry := 3
 	for retry > 0 {
-		if err := uncordonNode(experimentsDetails, clients); err != nil {
+		if err := uncordonNode(experimentsDetails, clients, chaosDetails); err != nil {
 			log.Errorf("Unable to uncordon the node, err: %v", err)
 		}
 		retry--
