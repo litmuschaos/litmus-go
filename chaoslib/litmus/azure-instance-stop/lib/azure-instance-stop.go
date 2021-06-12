@@ -23,7 +23,8 @@ var (
 	inject, abort chan os.Signal
 )
 
-func PrepareAzureTerminateByID(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+// PrepareAzureStop will initialize instanceNameList and start chaos injection based on sequence method selected
+func PrepareAzureStop(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	// inject channel is used to transmit signal notifications
 	inject = make(chan os.Signal, 1)
@@ -40,10 +41,10 @@ func PrepareAzureTerminateByID(experimentsDetails *experimentTypes.ExperimentDet
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 
-	//  get the instance id or list of instance ids
+	//  get the instance name or list of instance names
 	instanceNameList := strings.Split(experimentsDetails.AzureInstanceName, ",")
 	if len(instanceNameList) == 0 {
-		return errors.Errorf("no instance id found to terminate")
+		return errors.Errorf("no instance name found to stop")
 	}
 
 	// watching for the abort signal and revert the chaos

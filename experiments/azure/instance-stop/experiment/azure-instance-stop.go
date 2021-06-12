@@ -1,6 +1,7 @@
 package experiment
 
 import (
+	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
 	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/azure-instance-stop/lib"
 	experimentEnv "github.com/litmuschaos/litmus-go/pkg/azure/instance-stop/environment"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/azure/instance-stop/types"
@@ -16,7 +17,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// InstanceStop inject the azure instance termination chaos
+// InstanceStop inject the azure instance stop chaos
 func InstanceStop(clients clients.ClientSets) {
 
 	var err error
@@ -64,10 +65,9 @@ func InstanceStop(clients clients.ClientSets) {
 		"Label":          experimentsDetails.AppLabel,
 		"Chaos Duration": experimentsDetails.ChaosDuration,
 		"Ramp Time":      experimentsDetails.RampTime,
+		"Resource Group": experimentsDetails.ResourceGroup,
+		"Instance Name":  experimentsDetails.AzureInstanceName,
 	})
-
-	// Calling AbortWatcher go routine, it will continuously watch for the abort signal and generate the required events and result
-	go common.AbortWatcherWithoutExit(experimentsDetails.ExperimentName, clients, &resultDetails, &chaosDetails, &eventsDetails)
 
 	//PRE-CHAOS APPLICATION STATUS CHECK
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (pre-chaos)")
@@ -92,7 +92,7 @@ func InstanceStop(clients clients.ClientSets) {
 	}
 
 	// Setting up Azure Subscription ID
-	if err = azureStatus.SetupSubsciptionID(&experimentsDetails); err != nil {
+	if err = azureStatus.SetupSubscriptionID(&experimentsDetails); err != nil {
 		log.Errorf("fail to get the subscription id, err: %v", err)
 		failStep := "Getting the subscription ID for authentication"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
@@ -137,10 +137,10 @@ func InstanceStop(clients clients.ClientSets) {
 	}
 	log.Info("[Status]: Azure instance(s) is in running state (pre-chaos)")
 
-	// Including the litmus lib for azure instance termination
+	// Including the litmus lib for azure instance stopping
 	switch experimentsDetails.ChaosLib {
 	case "litmus":
-		if err = litmusLIB.PrepareAzureTerminateByID(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
+		if err = litmusLIB.PrepareAzureStop(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
 			log.Errorf("Chaos injection failed, err: %v", err)
 			failStep := "failed in chaos injection phase"
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
@@ -154,7 +154,7 @@ func InstanceStop(clients clients.ClientSets) {
 	}
 
 	log.Info("[Confirmation]: Azure instance stop chaos has been injected successfully")
-	resultDetails.Verdict = "Pass"
+	resultDetails.Verdict = v1alpha1.ResultVerdictPassed
 
 	//Verify the azure instance is running (post chaos)
 	if err = azureStatus.InstanceStatusCheckByName(&experimentsDetails); err != nil {
