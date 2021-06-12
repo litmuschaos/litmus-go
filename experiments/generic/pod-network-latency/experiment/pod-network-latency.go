@@ -105,7 +105,6 @@ func PodNetworkLatency(clients clients.ClientSets) {
 	// Including the pumba lib for pod-network-latency
 	switch {
 	case experimentsDetails.ChaosLib == "pumba" && experimentsDetails.ContainerRuntime == "docker":
-
 		if err := pumbaLIB.PodNetworkLatencyChaos(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
 			log.Errorf("Chaos injection failed, err: %v", err)
 			failStep := "failed in chaos injection phase"

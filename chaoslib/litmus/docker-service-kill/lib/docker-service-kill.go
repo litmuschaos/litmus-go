@@ -5,7 +5,7 @@ import (
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/kubelet-service-kill/types"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/docker-service-kill/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/status"
@@ -17,12 +17,12 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// PrepareKubeletKill contains prepration steps before chaos injection
-func PrepareKubeletKill(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+// PrepareDockerServiceKill contains prepration steps before chaos injection
+func PrepareDockerServiceKill(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	var err error
 	if experimentsDetails.TargetNode == "" {
-		//Select node for kubelet-service-kill
+		//Select node for docker-service-kill
 		experimentsDetails.TargetNode, err = common.GetNodeName(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.NodeLabel, clients)
 		if err != nil {
 			return err
@@ -53,7 +53,7 @@ func PrepareKubeletKill(experimentsDetails *experimentTypes.ExperimentDetails, c
 		}
 	}
 
-	// Creating the helper pod to perform node memory hog
+	// Creating the helper pod to perform docker-service-kill
 	if err = createHelperPod(experimentsDetails, clients, experimentsDetails.TargetNode); err != nil {
 		return errors.Errorf("unable to create the helper pod, err: %v", err)
 	}
@@ -66,8 +66,6 @@ func PrepareKubeletKill(experimentsDetails *experimentTypes.ExperimentDetails, c
 		common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-helper-"+experimentsDetails.RunID, appLabel, chaosDetails, clients)
 		return errors.Errorf("helper pod is not in running state, err: %v", err)
 	}
-
-	common.SetTargets(experimentsDetails.TargetNode, "targeted", "node", chaosDetails)
 
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
@@ -162,7 +160,7 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 					},
 					Args: []string{
 						"-c",
-						"sleep 10 && systemctl stop kubelet && sleep " + strconv.Itoa(experimentsDetails.ChaosDuration) + " && systemctl start kubelet",
+						"sleep 10 && systemctl stop docker && sleep " + strconv.Itoa(experimentsDetails.ChaosDuration) + " && systemctl start docker",
 					},
 					Resources: experimentsDetails.Resources,
 					VolumeMounts: []apiv1.VolumeMount{
