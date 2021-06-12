@@ -74,6 +74,10 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 			return err
 		}
 
+		for _, target := range chaosDetails.ParentsResources {
+			common.SetTargets(target, "targeted", chaosDetails.AppDetail.Kind, chaosDetails)
+		}
+
 		if experimentsDetails.ChaoslibDetail.EngineName != "" {
 			msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on application pod"
 			types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
@@ -146,6 +150,10 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		targetPodList, err := common.GetPodList(experimentsDetails.KafkaBroker, experimentsDetails.ChaoslibDetail.PodsAffectedPerc, clients, chaosDetails)
 		if err != nil {
 			return err
+		}
+
+		for _, target := range chaosDetails.ParentsResources {
+			common.SetTargets(target, "targeted", chaosDetails.AppDetail.Kind, chaosDetails)
 		}
 
 		if experimentsDetails.ChaoslibDetail.EngineName != "" {

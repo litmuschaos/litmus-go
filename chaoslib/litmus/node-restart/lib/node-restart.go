@@ -95,6 +95,8 @@ func PrepareNodeRestart(experimentsDetails *experimentTypes.ExperimentDetails, c
 		return errors.Errorf("helper pod is not in running state, err: %v", err)
 	}
 
+	common.SetTargets(experimentsDetails.TargetNode, "targeted", "node", chaosDetails)
+
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
 		if err = probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {

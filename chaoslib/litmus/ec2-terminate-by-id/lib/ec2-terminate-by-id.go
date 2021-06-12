@@ -49,7 +49,7 @@ func PrepareEC2TerminateByID(experimentsDetails *experimentTypes.ExperimentDetai
 	}
 
 	// watching for the abort signal and revert the chaos
-	go abortWatcher(experimentsDetails, instanceIDList)
+	go abortWatcher(experimentsDetails, instanceIDList, chaosDetails)
 
 	switch strings.ToLower(experimentsDetails.Sequence) {
 	case "serial":
@@ -103,6 +103,8 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 					return errors.Errorf("ec2 instance failed to stop, err: %v", err)
 				}
 
+				common.SetTargets(id, "injected", "EC2", chaosDetails)
+
 				//Wait for ec2 instance to completely stop
 				log.Infof("[Wait]: Wait for EC2 instance '%v' to get in stopped state", id)
 				if err := awslib.WaitForEC2Down(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.ManagedNodegroup, experimentsDetails.Region, id); err != nil {
@@ -133,6 +135,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 						return errors.Errorf("unable to start the ec2 instance, err: %v", err)
 					}
 				}
+				common.SetTargets(id, "reverted", "EC2", chaosDetails)
 			}
 			duration = int(time.Since(ChaosStartTimeStamp).Seconds())
 		}
@@ -169,6 +172,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 				if err := awslib.EC2Stop(id, experimentsDetails.Region); err != nil {
 					return errors.Errorf("ec2 instance failed to stop, err: %v", err)
 				}
+				common.SetTargets(id, "injected", "EC2", chaosDetails)
 			}
 
 			for _, id := range instanceIDList {
@@ -177,6 +181,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 				if err := awslib.WaitForEC2Down(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.ManagedNodegroup, experimentsDetails.Region, id); err != nil {
 					return errors.Errorf("unable to stop the ec2 instance, err: %v", err)
 				}
+				common.SetTargets(id, "reverted", "EC2 Instance ID", chaosDetails)
 			}
 
 			// run the probes during chaos
@@ -203,11 +208,13 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 				for _, id := range instanceIDList {
 					//Wait for ec2 instance to get in running state
 					log.Infof("[Wait]: Wait for EC2 instance '%v' to get in running state", id)
-					experimentsDetails.Ec2InstanceID = id
 					if err := awslib.WaitForEC2Up(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.ManagedNodegroup, experimentsDetails.Region, id); err != nil {
 						return errors.Errorf("unable to start the ec2 instance, err: %v", err)
 					}
 				}
+			}
+			for _, id := range instanceIDList {
+				common.SetTargets(id, "reverted", "EC2", chaosDetails)
 			}
 			duration = int(time.Since(ChaosStartTimeStamp).Seconds())
 		}
@@ -216,7 +223,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 }
 
 // watching for the abort signal and revert the chaos
-func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, instanceIDList []string) {
+func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, instanceIDList []string, chaosDetails *types.ChaosDetails) {
 
 	<-abort
 
@@ -239,6 +246,7 @@ func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, instanc
 				log.Errorf("ec2 instance failed to start when an abort signal is received, err: %v", err)
 			}
 		}
+		common.SetTargets(id, "reverted", "EC2", chaosDetails)
 	}
 	log.Info("[Abort]: Chaos Revert Completed")
 	os.Exit(1)
