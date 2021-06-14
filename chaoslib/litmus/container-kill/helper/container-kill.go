@@ -11,6 +11,7 @@ import (
 	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/container-kill/environment"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/container-kill/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
+	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/openebs/maya/pkg/util/retry"
@@ -26,6 +27,7 @@ func Helper(clients clients.ClientSets) {
 	experimentsDetails := experimentTypes.ExperimentDetails{}
 	eventsDetails := types.EventDetails{}
 	chaosDetails := types.ChaosDetails{}
+	resultDetails := types.ResultDetails{}
 
 	//Fetching all the ENV passed in the helper pod
 	log.Info("[PreReq]: Getting the ENV variables")
@@ -34,7 +36,10 @@ func Helper(clients clients.ClientSets) {
 	// Intialise the chaos attributes
 	experimentEnv.InitialiseChaosVariables(&chaosDetails, &experimentsDetails)
 
-	err := killContainer(&experimentsDetails, clients, &eventsDetails, &chaosDetails)
+	// Intialise Chaos Result Parameters
+	types.SetResultAttributes(&resultDetails, chaosDetails)
+
+	err := killContainer(&experimentsDetails, clients, &eventsDetails, &chaosDetails, &resultDetails)
 	if err != nil {
 		log.Fatalf("helper pod failed, err: %v", err)
 	}
@@ -43,7 +48,7 @@ func Helper(clients clients.ClientSets) {
 // killContainer kill the random application container
 // it will kill the container till the chaos duration
 // the execution will stop after timestamp passes the given chaos duration
-func killContainer(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+func killContainer(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails) error {
 
 	//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
 	ChaosStartTimeStamp := time.Now()
@@ -108,6 +113,9 @@ func killContainer(experimentsDetails *experimentTypes.ExperimentDetails, client
 			return err
 		}
 		duration = int(time.Since(ChaosStartTimeStamp).Seconds())
+	}
+	if err := result.AnnotateChaosResult(resultDetails.Name, chaosDetails.ChaosNamespace, "targeted", "pod", experimentsDetails.TargetPods); err != nil {
+		return err
 	}
 	log.Infof("[Completion]: %v chaos has been completed", experimentsDetails.ExperimentName)
 	return nil

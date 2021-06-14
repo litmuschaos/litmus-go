@@ -3,6 +3,7 @@ package environment
 import (
 	"strconv"
 
+	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-memory-hog/types"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
@@ -58,4 +59,6 @@ func InitialiseChaosVariables(chaosDetails *types.ChaosDetails, experimentDetail
 	chaosDetails.Delay = experimentDetails.Delay
 	chaosDetails.AppDetail = appDetails
 	chaosDetails.ProbeImagePullPolicy = experimentDetails.LIBImagePullPolicy
+	chaosDetails.ParentsResources = []string{}
+	chaosDetails.Targets = []v1alpha1.TargetDetails{}
 }

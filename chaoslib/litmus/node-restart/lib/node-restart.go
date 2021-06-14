@@ -16,7 +16,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	apiv1 "k8s.io/api/core/v1"
-
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	corev1 "k8s.io/kubernetes/pkg/apis/core"
 )
@@ -95,6 +94,8 @@ func PrepareNodeRestart(experimentsDetails *experimentTypes.ExperimentDetails, c
 		common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-helper-"+experimentsDetails.RunID, appLabel, chaosDetails, clients)
 		return errors.Errorf("helper pod is not in running state, err: %v", err)
 	}
+
+	common.SetTargets(experimentsDetails.TargetNode, "targeted", "node", chaosDetails)
 
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {

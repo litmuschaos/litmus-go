@@ -113,6 +113,8 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 			return errors.Errorf("helper pod is not in running state, err: %v", err)
 		}
 
+		common.SetTargets(appNode, "targeted", "node", chaosDetails)
+
 		// Wait till the completion of helper pod
 		log.Info("[Wait]: Waiting till the completion of the helper pod")
 		podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, appLabel, clients, experimentsDetails.ChaosDuration+experimentsDetails.Timeout, experimentsDetails.ExperimentName)
@@ -185,6 +187,10 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 	if err := status.CheckHelperStatus(experimentsDetails.ChaosNamespace, appLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
 		common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
 		return errors.Errorf("helper pod is not in running state, err: %v", err)
+	}
+
+	for _, appNode := range targetNodeList {
+		common.SetTargets(appNode, "targeted", "node", chaosDetails)
 	}
 
 	// Wait till the completion of helper pod

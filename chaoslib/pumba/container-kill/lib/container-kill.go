@@ -117,6 +117,8 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 			return errors.Errorf("unable to create the helper pod, err: %v", err)
 		}
 
+		common.SetTargets(pod.Name, "targeted", "pod", chaosDetails)
+
 		appLabel := "name=" + experimentsDetails.ExperimentName + "-helper-" + runID
 
 		//checking the status of the helper pod, wait till the pod comes to running state else fail the experiment
@@ -175,6 +177,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		if err := createHelperPod(experimentsDetails, clients, pod.Name, pod.Spec.NodeName, runID, labelSuffix); err != nil {
 			return errors.Errorf("unable to create the helper pod, err: %v", err)
 		}
+		common.SetTargets(pod.Name, "targeted", "pod", chaosDetails)
 	}
 
 	appLabel := "app=" + experimentsDetails.ExperimentName + "-helper-" + labelSuffix

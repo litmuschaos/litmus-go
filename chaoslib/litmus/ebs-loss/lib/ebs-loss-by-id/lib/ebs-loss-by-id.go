@@ -51,7 +51,7 @@ func PrepareEBSLossByID(experimentsDetails *experimentTypes.ExperimentDetails, c
 			return errors.Errorf("no volume id found to detach")
 		}
 		// watching for the abort signal and revert the chaos
-		go ebsloss.AbortWatcher(experimentsDetails, volumeIDList, abort)
+		go ebsloss.AbortWatcher(experimentsDetails, volumeIDList, abort, chaosDetails)
 
 		switch strings.ToLower(experimentsDetails.Sequence) {
 		case "serial":
