@@ -38,19 +38,9 @@ func GetAzureInstanceStatus(subscriptionID, resourceGroup, azureInstanceName str
 		return "", errors.Errorf("fail to get the instatus vm status")
 	}
 
-	for i, instance := range *instanceDetails.Statuses {
-		// For VM status only
-		if i == 1 {
-			log.Infof("[Status]: The instance %v state is: '%s'", azureInstanceName, *instance.DisplayStatus)
-			return *instance.DisplayStatus, nil
-		}
-	}
-	return "", nil
-
 	// To print VM status
-	// TODO: Decide on using the method for display after discussion
-	// log.Infof("[Status]: The instance %v state is: '%s'", azureInstanceName, *(*instanceDetails.Statuses)[1].DisplayStatus)
-	// return *(*instanceDetails.Statuses)[1].DisplayStatus, nil
+	log.Infof("[Status]: The instance %v state is: '%s'", azureInstanceName, *(*instanceDetails.Statuses)[1].DisplayStatus)
+	return *(*instanceDetails.Statuses)[1].DisplayStatus, nil
 }
 
 // SetupSubsciptionID fetch the subscription id from the auth file and export it in experiment struct variable
