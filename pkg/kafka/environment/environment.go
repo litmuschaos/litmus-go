@@ -3,6 +3,7 @@ package environment
 import (
 	"strconv"
 
+	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
 	exp "github.com/litmuschaos/litmus-go/pkg/generic/pod-delete/types"
 	kafkaTypes "github.com/litmuschaos/litmus-go/pkg/kafka/types"
 	"github.com/litmuschaos/litmus-go/pkg/types"
@@ -78,4 +79,6 @@ func InitialiseChaosVariables(chaosDetails *types.ChaosDetails, kafkaDetails *ka
 	chaosDetails.AppDetail = appDetails
 	chaosDetails.ProbeImagePullPolicy = kafkaDetails.ChaoslibDetail.LIBImagePullPolicy
 	chaosDetails.Randomness, _ = strconv.ParseBool(common.Getenv("RANDOMNESS", "false"))
+	chaosDetails.ParentsResources = []string{}
+	chaosDetails.Targets = []v1alpha1.TargetDetails{}
 }

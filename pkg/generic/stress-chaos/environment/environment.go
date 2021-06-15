@@ -3,6 +3,7 @@ package environment
 import (
 	"strconv"
 
+	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/stress-chaos/types"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
@@ -74,4 +75,6 @@ func InitialiseChaosVariables(chaosDetails *types.ChaosDetails, experimentDetail
 	chaosDetails.AppDetail = appDetails
 	chaosDetails.JobCleanupPolicy = common.Getenv("JOB_CLEANUP_POLICY", "retain")
 	chaosDetails.ProbeImagePullPolicy = experimentDetails.LIBImagePullPolicy
+	chaosDetails.ParentsResources = []string{}
+	chaosDetails.Targets = []v1alpha1.TargetDetails{}
 }

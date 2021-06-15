@@ -14,6 +14,7 @@ import (
 	cassandraPodDelete "github.com/litmuschaos/litmus-go/experiments/cassandra/pod-delete/experiment"
 	containerKill "github.com/litmuschaos/litmus-go/experiments/generic/container-kill/experiment"
 	diskFill "github.com/litmuschaos/litmus-go/experiments/generic/disk-fill/experiment"
+	dockerServiceKill "github.com/litmuschaos/litmus-go/experiments/generic/docker-service-kill/experiment"
 	kubeletServiceKill "github.com/litmuschaos/litmus-go/experiments/generic/kubelet-service-kill/experiment"
 	nodeCPUHog "github.com/litmuschaos/litmus-go/experiments/generic/node-cpu-hog/experiment"
 	nodeDrain "github.com/litmuschaos/litmus-go/experiments/generic/node-drain/experiment"
@@ -80,6 +81,8 @@ func main() {
 		kafkaBrokerPodFailure.KafkaBrokerPodFailure(clients)
 	case "kubelet-service-kill":
 		kubeletServiceKill.KubeletServiceKill(clients)
+	case "docker-service-kill":
+		dockerServiceKill.DockerServiceKill(clients)
 	case "node-cpu-hog":
 		nodeCPUHog.NodeCPUHog(clients)
 	case "node-drain":
