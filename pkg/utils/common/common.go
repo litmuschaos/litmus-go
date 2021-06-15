@@ -19,6 +19,11 @@ import (
 	apiv1 "k8s.io/api/core/v1"
 )
 
+// ENVDetails contains the ENV details
+type ENVDetails struct {
+	ENV []apiv1.EnvVar
+}
+
 //WaitForDuration waits for the given time duration (in seconds)
 func WaitForDuration(duration int) {
 	time.Sleep(time.Duration(duration) * time.Second)
@@ -86,7 +91,7 @@ func AbortWatcherWithoutExit(expname string, clients clients.ClientSets, resultD
 	events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 
 	// generating summary event in chaosresult
-	types.SetResultEventAttributes(eventsDetails, types.Summary, msg, "Warning", resultDetails)
+	types.SetResultEventAttributes(eventsDetails, types.AbortVerdict, msg, "Warning", resultDetails)
 	events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosResult")
 }
 
@@ -97,17 +102,6 @@ func GetIterations(duration, interval int) int {
 		iterations = duration / interval
 	}
 	return math.Maximum(iterations, 1)
-}
-
-// GetValueFromDownwardAPI returns the value from downwardApi
-func GetValueFromDownwardAPI(apiVersion string, fieldPath string) apiv1.EnvVarSource {
-	downwardENV := apiv1.EnvVarSource{
-		FieldRef: &apiv1.ObjectFieldSelector{
-			APIVersion: apiVersion,
-			FieldPath:  fieldPath,
-		},
-	}
-	return downwardENV
 }
 
 // Getenv fetch the env and set the default value, if any
@@ -134,4 +128,39 @@ func FilterBasedOnPercentage(percentage int, list []string) []string {
 		index = (index + 1) % len(list)
 	}
 	return finalList
+}
+
+// SetEnv sets the env inside envDetails struct
+func (envDetails *ENVDetails) SetEnv(key, value string) *ENVDetails {
+	if value != "" {
+		envDetails.ENV = append(envDetails.ENV, apiv1.EnvVar{
+			Name:  key,
+			Value: value,
+		})
+	}
+	return envDetails
+}
+
+// SetEnvFromDownwardAPI sets the downapi env in envDetails struct
+func (envDetails *ENVDetails) SetEnvFromDownwardAPI(apiVersion string, fieldPath string) *ENVDetails {
+	if apiVersion != "" && fieldPath != "" {
+		// Getting experiment pod name from downward API
+		experimentPodName := getEnvSource(apiVersion, fieldPath)
+		envDetails.ENV = append(envDetails.ENV, apiv1.EnvVar{
+			Name:      "POD_NAME",
+			ValueFrom: &experimentPodName,
+		})
+	}
+	return envDetails
+}
+
+// getEnvSource return the env source for the given apiVersion & fieldPath
+func getEnvSource(apiVersion string, fieldPath string) apiv1.EnvVarSource {
+	downwardENV := apiv1.EnvVarSource{
+		FieldRef: &apiv1.ObjectFieldSelector{
+			APIVersion: apiVersion,
+			FieldPath:  fieldPath,
+		},
+	}
+	return downwardENV
 }

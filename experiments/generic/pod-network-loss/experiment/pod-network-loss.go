@@ -1,6 +1,7 @@
 package experiment
 
 import (
+	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
 	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/network-chaos/lib/loss"
 	pumbaLIB "github.com/litmuschaos/litmus-go/chaoslib/pumba/network-chaos/lib/loss"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
@@ -104,9 +105,6 @@ func PodNetworkLoss(clients clients.ClientSets) {
 	// Including the pumba lib for pod-network-loss
 	switch {
 	case experimentsDetails.ChaosLib == "pumba" && experimentsDetails.ContainerRuntime == "docker":
-		// Calling AbortWatcher go routine, it will continuously watch for the abort signal for the entire chaos duration and generate the required events and result
-		// It is being invoked here, as opposed to within the chaoslib, as these experiments do not need additional recovery/chaos revert steps like in case of network experiments
-		go common.AbortWatcher(experimentsDetails.ExperimentName, clients, &resultDetails, &chaosDetails, &eventsDetails)
 		if err := pumbaLIB.PodNetworkLossChaos(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
 			log.Errorf("Chaos injection failed, err: %v", err)
 			failStep := "failed in chaos injection phase"
@@ -128,7 +126,7 @@ func PodNetworkLoss(clients clients.ClientSets) {
 	}
 
 	log.Infof("[Confirmation]: %v chaos has been injected successfully", experimentsDetails.ExperimentName)
-	resultDetails.Verdict = "Pass"
+	resultDetails.Verdict = v1alpha1.ResultVerdictPassed
 
 	//POST-CHAOS APPLICATION STATUS CHECK
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (post-chaos)")
@@ -170,7 +168,7 @@ func PodNetworkLoss(clients clients.ClientSets) {
 	}
 
 	// generating the event in chaosresult to marked the verdict as pass/fail
-	msg = "experiment: " + experimentsDetails.ExperimentName + ", Result: " + resultDetails.Verdict
+	msg = "experiment: " + experimentsDetails.ExperimentName + ", Result: " + string(resultDetails.Verdict)
 	reason := types.PassVerdict
 	eventType := "Normal"
 	if resultDetails.Verdict != "Pass" {
@@ -181,7 +179,7 @@ func PodNetworkLoss(clients clients.ClientSets) {
 	events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosResult")
 
 	if experimentsDetails.EngineName != "" {
-		msg := experimentsDetails.ExperimentName + " experiment has been " + resultDetails.Verdict + "ed"
+		msg := experimentsDetails.ExperimentName + " experiment has been " + string(resultDetails.Verdict) + "ed"
 		types.SetEngineEventAttributes(&eventsDetails, types.Summary, msg, "Normal", &chaosDetails)
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}

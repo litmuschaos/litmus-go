@@ -49,7 +49,7 @@ func PrepareEBSLossByTag(experimentsDetails *experimentTypes.ExperimentDetails, 
 		log.Infof("[Chaos]:Number of volumes targeted: %v", len(targetEBSVolumeIDList))
 
 		// watching for the abort signal and revert the chaos
-		go ebsloss.AbortWatcher(experimentsDetails, targetEBSVolumeIDList, abort)
+		go ebsloss.AbortWatcher(experimentsDetails, targetEBSVolumeIDList, abort, chaosDetails)
 
 		switch strings.ToLower(experimentsDetails.Sequence) {
 		case "serial":

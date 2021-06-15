@@ -3,6 +3,7 @@ package environment
 import (
 	"strconv"
 
+	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
 	exp "github.com/litmuschaos/litmus-go/pkg/generic/pod-delete/types"
 	kafkaTypes "github.com/litmuschaos/litmus-go/pkg/kafka/types"
 	"github.com/litmuschaos/litmus-go/pkg/types"
@@ -30,6 +31,8 @@ func GetENV(kafkaDetails *kafkaTypes.ExperimentDetails) {
 	ChaoslibDetail.ChaosUID = clientTypes.UID(common.Getenv("CHAOS_UID", ""))
 	ChaoslibDetail.InstanceID = common.Getenv("INSTANCE_ID", "")
 	ChaoslibDetail.ChaosPodName = common.Getenv("POD_NAME", "")
+	ChaoslibDetail.Sequence = common.Getenv("SEQUENCE", "parallel")
+	ChaoslibDetail.PodsAffectedPerc, _ = strconv.Atoi(common.Getenv("PODS_AFFECTED_PERC", "0"))
 	ChaoslibDetail.Force, _ = strconv.ParseBool(common.Getenv("FORCE", "true"))
 	ChaoslibDetail.Delay, _ = strconv.Atoi(common.Getenv("STATUS_CHECK_DELAY", "2"))
 	ChaoslibDetail.Timeout, _ = strconv.Atoi(common.Getenv("STATUS_CHECK_TIMEOUT", "180"))
@@ -76,4 +79,6 @@ func InitialiseChaosVariables(chaosDetails *types.ChaosDetails, kafkaDetails *ka
 	chaosDetails.AppDetail = appDetails
 	chaosDetails.ProbeImagePullPolicy = kafkaDetails.ChaoslibDetail.LIBImagePullPolicy
 	chaosDetails.Randomness, _ = strconv.ParseBool(common.Getenv("RANDOMNESS", "false"))
+	chaosDetails.ParentsResources = []string{}
+	chaosDetails.Targets = []v1alpha1.TargetDetails{}
 }

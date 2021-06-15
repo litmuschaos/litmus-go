@@ -1,4 +1,4 @@
-package main
+package helper
 
 import (
 	"bytes"
@@ -11,6 +11,7 @@ import (
 	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/container-kill/environment"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/container-kill/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
+	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/openebs/maya/pkg/util/retry"
@@ -20,17 +21,13 @@ import (
 	clientTypes "k8s.io/apimachinery/pkg/types"
 )
 
-func main() {
+// Helper injects the container-kill chaos
+func Helper(clients clients.ClientSets) {
 
 	experimentsDetails := experimentTypes.ExperimentDetails{}
-	clients := clients.ClientSets{}
 	eventsDetails := types.EventDetails{}
 	chaosDetails := types.ChaosDetails{}
-
-	//Getting kubeConfig and Generate ClientSets
-	if err := clients.GenerateClientSetFromKubeConfig(); err != nil {
-		log.Fatalf("Unable to Get the kubeconfig, err: %v", err)
-	}
+	resultDetails := types.ResultDetails{}
 
 	//Fetching all the ENV passed in the helper pod
 	log.Info("[PreReq]: Getting the ENV variables")
@@ -39,7 +36,10 @@ func main() {
 	// Intialise the chaos attributes
 	experimentEnv.InitialiseChaosVariables(&chaosDetails, &experimentsDetails)
 
-	err := killContainer(&experimentsDetails, clients, &eventsDetails, &chaosDetails)
+	// Intialise Chaos Result Parameters
+	types.SetResultAttributes(&resultDetails, chaosDetails)
+
+	err := killContainer(&experimentsDetails, clients, &eventsDetails, &chaosDetails, &resultDetails)
 	if err != nil {
 		log.Fatalf("helper pod failed, err: %v", err)
 	}
@@ -48,7 +48,7 @@ func main() {
 // killContainer kill the random application container
 // it will kill the container till the chaos duration
 // the execution will stop after timestamp passes the given chaos duration
-func killContainer(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+func killContainer(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails) error {
 
 	//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
 	ChaosStartTimeStamp := time.Now()
@@ -114,6 +114,9 @@ func killContainer(experimentsDetails *experimentTypes.ExperimentDetails, client
 		}
 		duration = int(time.Since(ChaosStartTimeStamp).Seconds())
 	}
+	if err := result.AnnotateChaosResult(resultDetails.Name, chaosDetails.ChaosNamespace, "targeted", "pod", experimentsDetails.TargetPods); err != nil {
+		return err
+	}
 	log.Infof("[Completion]: %v chaos has been completed", experimentsDetails.ExperimentName)
 	return nil
 }
@@ -171,8 +174,8 @@ func verifyRestartCount(experimentsDetails *experimentTypes.ExperimentDetails, p
 
 	restartCountAfter := 0
 	return retry.
-		Times(90).
-		Wait(1 * time.Second).
+		Times(uint(experimentsDetails.Timeout / experimentsDetails.Delay)).
+		Wait(time.Duration(experimentsDetails.Delay) * time.Second).
 		Try(func(attempt uint) error {
 			pod, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Get(podName, v1.GetOptions{})
 			if err != nil {
@@ -207,4 +210,6 @@ func getENV(experimentDetails *experimentTypes.ExperimentDetails, name string) {
 	experimentDetails.SocketPath = common.Getenv("SOCKET_PATH", "")
 	experimentDetails.ContainerRuntime = common.Getenv("CONTAINER_RUNTIME", "")
 	experimentDetails.Signal = common.Getenv("SIGNAL", "SIGKILL")
+	experimentDetails.Delay, _ = strconv.Atoi(common.Getenv("STATUS_CHECK_DELAY", "2"))
+	experimentDetails.Timeout, _ = strconv.Atoi(common.Getenv("STATUS_CHECK_TIMEOUT", "180"))
 }

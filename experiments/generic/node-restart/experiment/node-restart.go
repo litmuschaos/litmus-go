@@ -1,6 +1,7 @@
 package experiment
 
 import (
+	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
 	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/node-restart/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
@@ -126,7 +127,7 @@ func NodeRestart(clients clients.ClientSets) {
 	}
 
 	log.Infof("[Confirmation]: %v chaos has been injected successfully", experimentsDetails.ExperimentName)
-	resultDetails.Verdict = "Pass"
+	resultDetails.Verdict = v1alpha1.ResultVerdictPassed
 
 	//POST-CHAOS APPLICATION STATUS CHECK
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (post-chaos)")
@@ -178,12 +179,12 @@ func NodeRestart(clients clients.ClientSets) {
 		return
 	}
 	if experimentsDetails.EngineName != "" {
-		msg := experimentsDetails.ExperimentName + " experiment has been " + resultDetails.Verdict + "ed"
+		msg := experimentsDetails.ExperimentName + " experiment has been " + string(resultDetails.Verdict) + "ed"
 		types.SetEngineEventAttributes(&eventsDetails, types.Summary, msg, "Normal", &chaosDetails)
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
-	msg := experimentsDetails.ExperimentName + " experiment has been " + resultDetails.Verdict + "ed"
+	msg := experimentsDetails.ExperimentName + " experiment has been " + string(resultDetails.Verdict) + "ed"
 	types.SetResultEventAttributes(&eventsDetails, types.Summary, msg, "Normal", &resultDetails)
 	events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosResult")
 }

@@ -1,4 +1,4 @@
-package main
+package helper
 
 import (
 	"fmt"
@@ -32,10 +32,10 @@ var (
 	inject, abort chan os.Signal
 )
 
-func main() {
+// Helper injects the network chaos
+func Helper(clients clients.ClientSets) {
 
 	experimentsDetails := experimentTypes.ExperimentDetails{}
-	clients := clients.ClientSets{}
 	eventsDetails := types.EventDetails{}
 	chaosDetails := types.ChaosDetails{}
 	resultDetails := types.ResultDetails{}
@@ -49,11 +49,6 @@ func main() {
 	abort = make(chan os.Signal, 1)
 	// Catch and relay certain signal(s) to abort channel.
 	signal.Notify(abort, os.Interrupt, syscall.SIGTERM)
-
-	//Getting kubeConfig and Generate ClientSets
-	if err := clients.GenerateClientSetFromKubeConfig(); err != nil {
-		log.Fatalf("Unable to Get the kubeconfig, err: %v", err)
-	}
 
 	//Fetching all the ENV passed for the helper pod
 	log.Info("[PreReq]: Getting the ENV variables")
@@ -96,10 +91,14 @@ func preparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetail
 	}
 
 	// watching for the abort signal and revert the chaos
-	go abortWatcher(targetPID)
+	go abortWatcher(targetPID, resultDetails.Name, chaosDetails.ChaosNamespace, experimentsDetails.TargetPods)
 
 	// injecting network chaos inside target container
 	if err = injectChaos(experimentsDetails, targetPID); err != nil {
+		return err
+	}
+
+	if err = result.AnnotateChaosResult(resultDetails.Name, chaosDetails.ChaosNamespace, "injected", "pod", experimentsDetails.TargetPods); err != nil {
 		return err
 	}
 
@@ -111,6 +110,10 @@ func preparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetail
 
 	// cleaning the netem process after chaos injection
 	if err = killnetem(targetPID); err != nil {
+		return err
+	}
+
+	if err = result.AnnotateChaosResult(resultDetails.Name, chaosDetails.ChaosNamespace, "reverted", "pod", experimentsDetails.TargetPods); err != nil {
 		return err
 	}
 
@@ -268,7 +271,7 @@ func getENV(experimentDetails *experimentTypes.ExperimentDetails) {
 }
 
 // abortWatcher continuosly watch for the abort signals
-func abortWatcher(targetPID int) {
+func abortWatcher(targetPID int, resultName, chaosNS, targetPodName string) {
 
 	<-abort
 	log.Info("[Chaos]: Killing process started because of terminated signal received")
@@ -281,6 +284,9 @@ func abortWatcher(targetPID int) {
 		}
 		retry--
 		time.Sleep(1 * time.Second)
+	}
+	if err = result.AnnotateChaosResult(resultName, chaosNS, "reverted", "pod", targetPodName); err != nil {
+		log.Errorf("unable to annotate the chaosresult, err :%v", err)
 	}
 	log.Info("Chaos Revert Completed")
 	os.Exit(1)

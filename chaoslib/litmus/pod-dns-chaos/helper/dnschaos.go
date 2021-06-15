@@ -1,4 +1,4 @@
-package main
+package helper
 
 import (
 	"fmt"
@@ -27,10 +27,10 @@ var (
 	abort, injectAbort chan os.Signal
 )
 
-func main() {
+// Helper injects the dns chaos
+func Helper(clients clients.ClientSets) {
 
 	experimentsDetails := experimentTypes.ExperimentDetails{}
-	client := clients.ClientSets{}
 	eventsDetails := types.EventDetails{}
 	chaosDetails := types.ChaosDetails{}
 	resultDetails := types.ResultDetails{}
@@ -43,11 +43,6 @@ func main() {
 	// Catch and relay certain signal(s) to abort channel.
 	signal.Notify(abort, os.Interrupt, syscall.SIGTERM)
 
-	//Getting kubeConfig and Generate ClientSets
-	if err := client.GenerateClientSetFromKubeConfig(); err != nil {
-		log.Fatalf("Unable to Get the kubeconfig, err: %v", err)
-	}
-
 	//Fetching all the ENV passed for the helper pod
 	log.Info("[PreReq]: Getting the ENV variables")
 	getENV(&experimentsDetails)
@@ -59,9 +54,9 @@ func main() {
 	types.SetResultAttributes(&resultDetails, chaosDetails)
 
 	// Set the chaos result uid
-	result.SetResultUID(&resultDetails, client, &chaosDetails)
+	result.SetResultUID(&resultDetails, clients, &chaosDetails)
 
-	if err := preparePodDNSChaos(&experimentsDetails, client, &eventsDetails, &chaosDetails, &resultDetails); err != nil {
+	if err := preparePodDNSChaos(&experimentsDetails, clients, &eventsDetails, &chaosDetails, &resultDetails); err != nil {
 		log.Fatalf("helper pod failed, err: %v", err)
 	}
 
@@ -107,6 +102,10 @@ func preparePodDNSChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 		}
 	}()
 
+	if err = result.AnnotateChaosResult(resultDetails.Name, chaosDetails.ChaosNamespace, "injected", "pod", experimentsDetails.TargetPods); err != nil {
+		return err
+	}
+
 	timeChan := time.Tick(time.Duration(experimentsDetails.ChaosDuration) * time.Second)
 	log.Infof("[Chaos]: Waiting for %vs", experimentsDetails.ChaosDuration)
 
@@ -139,6 +138,9 @@ func preparePodDNSChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 		}
 		retry--
 		time.Sleep(1 * time.Second)
+	}
+	if err = result.AnnotateChaosResult(resultDetails.Name, chaosDetails.ChaosNamespace, "reverted", "pod", experimentsDetails.TargetPods); err != nil {
+		return err
 	}
 	log.Info("Chaos Revert Completed")
 	return nil
@@ -185,6 +187,7 @@ func getENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.ChaosPodName = common.Getenv("POD_NAME", "")
 	experimentDetails.ContainerRuntime = common.Getenv("CONTAINER_RUNTIME", "")
 	experimentDetails.TargetHostNames = common.Getenv("TARGET_HOSTNAMES", "")
+	experimentDetails.SpoofMap = common.Getenv("SPOOF_MAP", "")
 	experimentDetails.MatchScheme = common.Getenv("MATCH_SCHEME", "exact")
 	experimentDetails.ChaosType = common.Getenv("CHAOS_TYPE", "error")
 	experimentDetails.SocketPath = common.Getenv("SOCKET_PATH", "")
