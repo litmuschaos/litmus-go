@@ -25,12 +25,14 @@ import (
 	nodeRestart "github.com/litmuschaos/litmus-go/experiments/generic/node-restart/experiment"
 	nodeTaint "github.com/litmuschaos/litmus-go/experiments/generic/node-taint/experiment"
 	podAutoscaler "github.com/litmuschaos/litmus-go/experiments/generic/pod-autoscaler/experiment"
+	podCPUHogExec "github.com/litmuschaos/litmus-go/experiments/generic/pod-cpu-hog-exec/experiment"
 	podCPUHog "github.com/litmuschaos/litmus-go/experiments/generic/pod-cpu-hog/experiment"
 	podDelete "github.com/litmuschaos/litmus-go/experiments/generic/pod-delete/experiment"
 	podDNSError "github.com/litmuschaos/litmus-go/experiments/generic/pod-dns-error/experiment"
 	podDNSSpoof "github.com/litmuschaos/litmus-go/experiments/generic/pod-dns-spoof/experiment"
 	podFioStress "github.com/litmuschaos/litmus-go/experiments/generic/pod-fio-stress/experiment"
 	podIOStress "github.com/litmuschaos/litmus-go/experiments/generic/pod-io-stress/experiment"
+	podMemoryHogExec "github.com/litmuschaos/litmus-go/experiments/generic/pod-memory-hog-exec/experiment"
 	podMemoryHog "github.com/litmuschaos/litmus-go/experiments/generic/pod-memory-hog/experiment"
 	podNetworkCorruption "github.com/litmuschaos/litmus-go/experiments/generic/pod-network-corruption/experiment"
 	podNetworkDuplication "github.com/litmuschaos/litmus-go/experiments/generic/pod-network-duplication/experiment"
@@ -96,14 +98,14 @@ func main() {
 		nodeTaint.NodeTaint(clients)
 	case "pod-autoscaler":
 		podAutoscaler.PodAutoscaler(clients)
-	case "pod-cpu-hog":
-		podCPUHog.PodCPUHog(clients)
+	case "pod-cpu-hog-exec":
+		podCPUHogExec.PodCPUHogExec(clients)
 	case "pod-delete":
 		podDelete.PodDelete(clients)
 	case "pod-io-stress":
 		podIOStress.PodIOStress(clients)
-	case "pod-memory-hog":
-		podMemoryHog.PodMemoryHog(clients)
+	case "pod-memory-hog-exec":
+		podMemoryHogExec.PodMemoryHogExec(clients)
 	case "pod-network-corruption":
 		podNetworkCorruption.PodNetworkCorruption(clients)
 	case "pod-network-duplication":
@@ -112,6 +114,10 @@ func main() {
 		podNetworkLatency.PodNetworkLatency(clients)
 	case "pod-network-loss":
 		podNetworkLoss.PodNetworkLoss(clients)
+	case "pod-memory-hog":
+		podMemoryHog.PodMemoryHog(clients)
+	case "pod-cpu-hog":
+		podCPUHog.PodCPUHog(clients)
 	case "cassandra-pod-delete":
 		cassandraPodDelete.CasssandraPodDelete(clients)
 	case "aws-ssm-chaos-by-id":

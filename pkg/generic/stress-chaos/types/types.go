@@ -10,6 +10,8 @@ type ExperimentDetails struct {
 	ExperimentName                  string
 	EngineName                      string
 	ChaosDuration                   int
+	LIBImage                        string
+	LIBImagePullPolicy              string
 	RampTime                        int
 	ChaosLib                        string
 	AppNS                           string
@@ -19,20 +21,25 @@ type ExperimentDetails struct {
 	InstanceID                      string
 	ChaosNamespace                  string
 	ChaosPodName                    string
+	RunID                           string
+	TargetContainer                 string
+	StressImage                     string
 	Timeout                         int
 	Delay                           int
 	TargetPods                      string
+	PodsAffectedPerc                int
+	Annotations                     map[string]string
+	ContainerRuntime                string
+	ChaosServiceAccount             string
+	SocketPath                      string
+	Sequence                        string
+	Resources                       corev1.ResourceRequirements
+	ImagePullSecrets                []corev1.LocalObjectReference
+	TerminationGracePeriodSeconds   int
+	CPUcores                        int
 	FilesystemUtilizationPercentage int
 	FilesystemUtilizationBytes      int
 	NumberOfWorkers                 int
-	Annotations                     map[string]string
-	LIBImage                        string
-	LIBImagePullPolicy              string
-	PodsAffectedPerc                int
-	Sequence                        string
+	MemoryConsumption               int
 	VolumeMountPath                 string
-	SocketPath                      string
-	Resources                       corev1.ResourceRequirements
-	ImagePullSecrets                []corev1.LocalObjectReference
-	TargetContainer                 string
 }
