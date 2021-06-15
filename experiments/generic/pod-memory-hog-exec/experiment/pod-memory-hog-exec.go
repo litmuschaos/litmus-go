@@ -2,12 +2,11 @@ package experiment
 
 import (
 	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
-	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/stress-chaos/lib"
-	pumbaLIB "github.com/litmuschaos/litmus-go/chaoslib/pumba/pod-io-stress/lib"
+	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/pod-memory-hog-exec/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
-	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/stress-chaos/environment"
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/stress-chaos/types"
+	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/pod-memory-hog-exec/environment"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-memory-hog-exec/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/result"
@@ -17,8 +16,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// PodIOStress inject the pod-io-stress chaos
-func PodIOStress(clients clients.ClientSets) {
+// PodMemoryHogExec inject the pod-memory-hog-exec chaos
+func PodMemoryHogExec(clients clients.ClientSets) {
 
 	experimentsDetails := experimentTypes.ExperimentDetails{}
 	resultDetails := types.ResultDetails{}
@@ -27,7 +26,7 @@ func PodIOStress(clients clients.ClientSets) {
 
 	//Fetching all the ENV passed from the runner pod
 	log.Infof("[PreReq]: Getting the ENV for the %v experiment", experimentsDetails.ExperimentName)
-	experimentEnv.GetENV(&experimentsDetails, "pod-io-stress")
+	experimentEnv.GetENV(&experimentsDetails)
 
 	// Intialise the chaos attributes
 	experimentEnv.InitialiseChaosVariables(&chaosDetails, &experimentsDetails)
@@ -47,7 +46,7 @@ func PodIOStress(clients clients.ClientSets) {
 	log.Infof("[PreReq]: Updating the chaos result of %v experiment (SOT)", experimentsDetails.ExperimentName)
 	if err := result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT"); err != nil {
 		log.Errorf("Unable to Create the Chaos Result, err: %v", err)
-		failStep := "Updating the chaos result of " + experimentsDetails.ExperimentName + " experiment (SOT)"
+		failStep := "Updating the chaos result of pod-memory-hog-exec experiment (SOT)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -62,21 +61,20 @@ func PodIOStress(clients clients.ClientSets) {
 
 	//DISPLAY THE APP INFORMATION
 	log.InfoWithValues("The application information is as follows", logrus.Fields{
-		"Namespace":                       experimentsDetails.AppNS,
-		"Label":                           experimentsDetails.AppLabel,
-		"Chaos Duration":                  experimentsDetails.ChaosDuration,
-		"Ramp Time":                       experimentsDetails.RampTime,
-		"FilesystemUtilizationPercentage": experimentsDetails.FilesystemUtilizationPercentage,
-		"NumberOfWorkers":                 experimentsDetails.NumberOfWorkers,
+		"Namespace":          experimentsDetails.AppNS,
+		"Label":              experimentsDetails.AppLabel,
+		"Chaos Duration":     experimentsDetails.ChaosDuration,
+		"Ramp Time":          experimentsDetails.RampTime,
+		"Memory Consumption": experimentsDetails.MemoryConsumption,
 	})
 
 	// Calling AbortWatcher go routine, it will continuously watch for the abort signal and generate the required events and result
-	go common.AbortWatcher(experimentsDetails.ExperimentName, clients, &resultDetails, &chaosDetails, &eventsDetails)
+	go common.AbortWatcherWithoutExit(experimentsDetails.ExperimentName, clients, &resultDetails, &chaosDetails, &eventsDetails)
 
 	//PRE-CHAOS APPLICATION STATUS CHECK
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (pre-chaos)")
 	if err := status.AUTStatusCheck(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.TargetContainer, experimentsDetails.Timeout, experimentsDetails.Delay, clients, &chaosDetails); err != nil {
-		log.Errorf("Application status check failed, err: %v", err)
+		log.Errorf("Application status check failed,, err: %v", err)
 		failStep := "Verify that the AUT (Application Under Test) is running (pre-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
@@ -105,18 +103,11 @@ func PodIOStress(clients clients.ClientSets) {
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
-	// Including the litmus lib for pod-io-stress
+	// Including the litmus lib for pod-memory-hog-exec
 	switch experimentsDetails.ChaosLib {
 	case "litmus":
-		if err := litmusLIB.PrepareAndInjectStressChaos(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
-			log.Errorf("[Error]: Pod IO Stress failed, err: %v", err)
-			failStep := "failed in chaos injection phase"
-			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-			return
-		}
-	case "pumba":
-		if err := pumbaLIB.PreparePodIOStress(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
-			log.Errorf("[Error]: pod io stress chaos failed, err: %v", err)
+		if err := litmusLIB.PrepareMemoryExecStress(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
+			log.Errorf("[Error]: pod memory hog failed, err: %v", err)
 			failStep := "failed in chaos injection phase"
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
