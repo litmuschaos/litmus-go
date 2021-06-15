@@ -1,0 +1,51 @@
+---
+name: "vm-instance-stop"
+version: "0.1.0"
+category: "gcp"
+repository: "https://github.com/litmuschaos/litmus-go/tree/master/gcp/vm-instance-stop"
+community: "https://kubernetes.slack.com/messages/CNXNB0ZTN"
+description: "stops GCP VM instances before restarting them, post the chaos duration"
+keywords:
+  - "vm-instances"
+  - "kubernetes"
+  - "gcp"
+  - "exec"
+platforms:
+  - GKE
+scope: "Namespaced"
+auxiliaryappcheck: false
+permissions:
+  - apigroups:
+      - ""
+      - "batch"
+      - "apps"
+      - "litmuschaos.io"
+    resources:
+      - "jobs"
+      - "pods"
+      - "pods/log"
+      - "events"
+      - "deployments"
+      - "replicasets"
+      - "pods/exec"
+      - "chaosengines"
+      - "chaosexperiments"
+      - "chaosresults"
+    verbs:
+       - "create"
+       - "list"
+       - "get"
+       - "patch"
+       - "update"
+       - "delete"
+       - "deletecollection"
+maturity: "alpha"
+maintainers:
+  - name: "neelanjan00"
+    email: "neelanjan@chaosnative.com"
+provider:
+  name: "ChaosNative"
+minkubernetesversion: "1.12.0"
+references:
+  - name: Documentation
+    url: "https://docs.litmuschaos.io/docs/getstarted/"
