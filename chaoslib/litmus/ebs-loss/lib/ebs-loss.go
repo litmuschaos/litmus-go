@@ -5,7 +5,7 @@ import (
 	"time"
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
-	ebs "github.com/litmuschaos/litmus-go/pkg/cloud/aws"
+	ebs "github.com/litmuschaos/litmus-go/pkg/cloud/aws/ebs"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/kube-aws/ebs-loss/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
