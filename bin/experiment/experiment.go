@@ -11,6 +11,8 @@ import (
 	// _ "k8s.io/client-go/plugin/pkg/client/auth/oidc"
 	// _ "k8s.io/client-go/plugin/pkg/client/auth/openstack"
 
+	awsSSMChaosByID "github.com/litmuschaos/litmus-go/experiments/aws-ssm/aws-ssm-chaos-by-id/experiment"
+	awsSSMChaosByTag "github.com/litmuschaos/litmus-go/experiments/aws-ssm/aws-ssm-chaos-by-tag/experiment"
 	cassandraPodDelete "github.com/litmuschaos/litmus-go/experiments/cassandra/pod-delete/experiment"
 	containerKill "github.com/litmuschaos/litmus-go/experiments/generic/container-kill/experiment"
 	diskFill "github.com/litmuschaos/litmus-go/experiments/generic/disk-fill/experiment"
@@ -111,6 +113,10 @@ func main() {
 		podNetworkLoss.PodNetworkLoss(clients)
 	case "cassandra-pod-delete":
 		cassandraPodDelete.CasssandraPodDelete(clients)
+	case "aws-ssm-chaos-by-id":
+		awsSSMChaosByID.AWSSSMChaosByID(clients)
+	case "aws-ssm-chaos-by-tag":
+		awsSSMChaosByTag.AWSSSMChaosByTag(clients)
 	case "ec2-terminate-by-id":
 		ec2TerminateByID.EC2TerminateByID(clients)
 	case "ec2-terminate-by-tag":

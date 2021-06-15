@@ -33,7 +33,7 @@ RUN set -ex && \
      /usr/glibc-compat/sbin/ldconfig /lib /usr/glibc-compat/lib
 
 # Change default shell from ash to bash
-RUN sed -i -e "s/bin\/ash/bin\/bash/" /etc/passwd     
+RUN sed -i -e "s/bin\/ash/bin\/bash/" /etc/passwd   
 
 #Installing Kubectl
 ENV KUBE_LATEST_VERSION="v1.18.0"
@@ -61,6 +61,7 @@ COPY --from=docker:19.03 /usr/local/bin/docker /usr/local/bin/
 
 #Copying Necessary Files
 COPY ./build/_output/${TARGETARCH} ./litmus
+COPY ./pkg/cloud/aws/common/ssm-docs/LitmusChaos-AWS-SSM-Docs.yml ./litmus/LitmusChaos-AWS-SSM-Docs.yml
 
 #add new user
 RUN adduser -D -S $USER \

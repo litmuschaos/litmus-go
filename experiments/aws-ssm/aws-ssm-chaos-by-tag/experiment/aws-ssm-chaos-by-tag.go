@@ -2,12 +2,13 @@ package experiment
 
 import (
 	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
-	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/ebs-loss/lib/ebs-loss-by-tag/lib"
+	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/aws-ssm-chaos/lib/ssm"
+	experimentEnv "github.com/litmuschaos/litmus-go/pkg/aws-ssm/aws-ssm-chaos/environment"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/aws-ssm/aws-ssm-chaos/types"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
-	aws "github.com/litmuschaos/litmus-go/pkg/cloud/aws/ebs"
+	ec2 "github.com/litmuschaos/litmus-go/pkg/cloud/aws/ec2"
+	"github.com/litmuschaos/litmus-go/pkg/cloud/aws/ssm"
 	"github.com/litmuschaos/litmus-go/pkg/events"
-	experimentEnv "github.com/litmuschaos/litmus-go/pkg/kube-aws/ebs-loss/environment"
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/kube-aws/ebs-loss/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/result"
@@ -17,8 +18,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// EBSLossByTag inject the ebs volume loss chaos
-func EBSLossByTag(clients clients.ClientSets) {
+// AWSSSMChaosByTag inject the ssm chaos on ec2 instance
+func AWSSSMChaosByTag(clients clients.ClientSets) {
 
 	experimentsDetails := experimentTypes.ExperimentDetails{}
 	resultDetails := types.ResultDetails{}
@@ -27,7 +28,7 @@ func EBSLossByTag(clients clients.ClientSets) {
 
 	//Fetching all the ENV passed from the runner pod
 	log.Infof("[PreReq]: Getting the ENV for the %v experiment", experimentsDetails.ExperimentName)
-	experimentEnv.GetENV(&experimentsDetails)
+	experimentEnv.GetENV(&experimentsDetails, "aws-ssm-chaos-by-tag")
 
 	// Intialise the chaos attributes
 	experimentEnv.InitialiseChaosVariables(&chaosDetails, &experimentsDetails)
@@ -38,7 +39,7 @@ func EBSLossByTag(clients clients.ClientSets) {
 	if experimentsDetails.EngineName != "" {
 		// Intialise the probe details. Bail out upon error, as we haven't entered exp business logic yet
 		if err := probe.InitializeProbesInChaosResultDetails(&chaosDetails, clients, &resultDetails); err != nil {
-			log.Errorf("unable to initialize the probes, err: %v", err)
+			log.Errorf("Unable to initialize the probes, err: %v", err)
 			return
 		}
 	}
@@ -46,8 +47,8 @@ func EBSLossByTag(clients clients.ClientSets) {
 	//Updating the chaos result in the beginning of experiment
 	log.Infof("[PreReq]: Updating the chaos result of %v experiment (SOT)", experimentsDetails.ExperimentName)
 	if err := result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT"); err != nil {
-		log.Errorf("unable to Create the Chaos Result, err: %v", err)
-		failStep := "Updating the chaos result of ebs-loss experiment (SOT)"
+		log.Errorf("Unable to Create the Chaos Result, err: %v", err)
+		failStep := "Updating the chaos result of ec2 terminate experiment (SOT)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -60,21 +61,16 @@ func EBSLossByTag(clients clients.ClientSets) {
 	types.SetResultEventAttributes(&eventsDetails, types.AwaitedVerdict, msg, "Normal", &resultDetails)
 	events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosResult")
 
-	//DISPLAY THE APP INFORMATION
-	log.InfoWithValues("The application information is as follows", logrus.Fields{
-		"App Namespace": experimentsDetails.AppNS,
-		"AppLabel":      experimentsDetails.AppLabel,
-		"Ramp Time":     experimentsDetails.RampTime,
-	})
-
 	// Calling AbortWatcher go routine, it will continuously watch for the abort signal and generate the required events and result
 	go common.AbortWatcherWithoutExit(experimentsDetails.ExperimentName, clients, &resultDetails, &chaosDetails, &eventsDetails)
 
-	//DISPLAY THE VOLUME INFORMATION
-	log.InfoWithValues("The volume information is as follows", logrus.Fields{
-		"Volume Tag": experimentsDetails.VolumeTag,
-		"Region":     experimentsDetails.Region,
-		"Ramp Time":  experimentsDetails.RampTime,
+	//DISPLAY THE INSTANCE INFORMATION
+	log.InfoWithValues("The instance information is as follows", logrus.Fields{
+		"Total Chaos Duration": experimentsDetails.ChaosDuration,
+		"Chaos Namespace":      experimentsDetails.ChaosNamespace,
+		"Ramp Time":            experimentsDetails.RampTime,
+		"EC2 Instance Tag":     experimentsDetails.EC2InstanceTag,
+		"Sequence":             experimentsDetails.Sequence,
 	})
 
 	//PRE-CHAOS APPLICATION STATUS CHECK
@@ -86,11 +82,21 @@ func EBSLossByTag(clients clients.ClientSets) {
 		return
 	}
 
-	//selecting the target volumes (pre chaos)
-	//if no volumes found in attached state then this check will fail
-	if err := aws.SetTargetVolumeIDs(&experimentsDetails); err != nil {
-		log.Errorf("failed to set the volumes under chaos, err: %v", err)
-		failStep := "Select the target EBS volumes from tag (pre-chaos)"
+	//PRE-CHAOS AUXILIARY APPLICATION STATUS CHECK
+	if experimentsDetails.AuxiliaryAppInfo != "" {
+		log.Info("[Status]: Verify that the Auxiliary Applications are running (pre-chaos)")
+		if err := status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
+			log.Errorf("Auxiliary Application status check failed, err: %v", err)
+			failStep := "Verify that the Auxiliary Applications are running (pre-chaos)"
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+			return
+		}
+	}
+
+	//Verify that the instance should have permission to perform ssm api calls
+	if err := ssm.CheckInstanceInformation(&experimentsDetails); err != nil {
+		log.Errorf("target instance status check failed, err: %v", err)
+		failStep := "Verify the AWS ec2 instance status (pre-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -118,24 +124,20 @@ func EBSLossByTag(clients clients.ClientSets) {
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
-	//PRE-CHAOS AUXILIARY APPLICATION STATUS CHECK
-	if experimentsDetails.AuxiliaryAppInfo != "" {
-		log.Info("[Status]: Verify that the Auxiliary Applications are running (pre-chaos)")
-		if err := status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
-			log.Errorf("Auxiliary Application status check failed, err: %v", err)
-			failStep := "Verify that the Auxiliary Applications are running (pre-chaos)"
-			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-			return
-		}
-	}
-
-	// Including the litmus lib for ebs-loss
+	// Including the litmus lib for aws-ssm-chaos-by-tag
 	switch experimentsDetails.ChaosLib {
 	case "litmus":
-		if err := litmusLIB.PrepareEBSLossByTag(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
+		if err := litmusLIB.PrepareAWSSSMChaosByTag(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
 			log.Errorf("Chaos injection failed, err: %v", err)
 			failStep := "failed in chaos injection phase"
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+			//Delete the ssm document on the given aws service monitoring docs
+			if experimentsDetails.IsDocsUploaded {
+				log.Info("[Recovery]: Delete the uploaded aws ssm docs")
+				if err := ssm.SSMDeleteDocument(experimentsDetails.DocumentName, experimentsDetails.Region); err != nil {
+					log.Errorf("fail to delete ssm doc, err: %v", err)
+				}
+			}
 			return
 		}
 	default:
@@ -147,6 +149,15 @@ func EBSLossByTag(clients clients.ClientSets) {
 
 	log.Infof("[Confirmation]: %v chaos has been injected successfully", experimentsDetails.ExperimentName)
 	resultDetails.Verdict = v1alpha1.ResultVerdictPassed
+
+	//Verify the aws ec2 instance is running (post chaos)
+	if err := ec2.InstanceStatusCheckByTag(experimentsDetails.EC2InstanceTag, experimentsDetails.Region); err != nil {
+		log.Errorf("failed to get the ec2 instance status, err: %v", err)
+		failStep := "Verify the AWS ec2 instance status (post-chaos)"
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+		return
+	}
+	log.Info("[Status]: EC2 instance is in running state (post chaos)")
 
 	//POST-CHAOS APPLICATION STATUS CHECK
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (post-chaos)")
@@ -166,14 +177,6 @@ func EBSLossByTag(clients clients.ClientSets) {
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}
-	}
-
-	//Verify the aws ec2 instance is attached to ebs volume
-	if err := aws.PostChaosVolumeStatusCheck(&experimentsDetails); err != nil {
-		log.Errorf("failed to verify the ebs volume is attached to an instance, err: %v", err)
-		failStep := "Verify the ebs volume is attached to an instance (post-chaos)"
-		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-		return
 	}
 
 	if experimentsDetails.EngineName != "" {
@@ -202,7 +205,7 @@ func EBSLossByTag(clients clients.ClientSets) {
 	//Updating the chaosResult in the end of experiment
 	log.Infof("[The End]: Updating the chaos result of %v experiment (EOT)", experimentsDetails.ExperimentName)
 	if err := result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT"); err != nil {
-		log.Errorf("unable to Update the Chaos Result, err: %v", err)
+		log.Errorf("Unable to Update the Chaos Result, err:  %v", err)
 		return
 	}
 
