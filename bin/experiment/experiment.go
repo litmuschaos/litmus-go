@@ -26,6 +26,7 @@ import (
 	podDelete "github.com/litmuschaos/litmus-go/experiments/generic/pod-delete/experiment"
 	podDNSError "github.com/litmuschaos/litmus-go/experiments/generic/pod-dns-error/experiment"
 	podDNSSpoof "github.com/litmuschaos/litmus-go/experiments/generic/pod-dns-spoof/experiment"
+	podFioStress "github.com/litmuschaos/litmus-go/experiments/generic/pod-fio-stress/experiment"
 	podIOStress "github.com/litmuschaos/litmus-go/experiments/generic/pod-io-stress/experiment"
 	podMemoryHog "github.com/litmuschaos/litmus-go/experiments/generic/pod-memory-hog/experiment"
 	podNetworkCorruption "github.com/litmuschaos/litmus-go/experiments/generic/pod-network-corruption/experiment"
@@ -124,6 +125,8 @@ func main() {
 		podDNSSpoof.PodDNSSpoof(clients)
 	case "vm-poweroff":
 		vmpoweroff.VMPoweroff(clients)
+	case "pod-fio-stress":
+		podFioStress.PodFioStress(clients)
 
 	default:
 		log.Errorf("Unsupported -name %v, please provide the correct value of -name args", *experimentName)
