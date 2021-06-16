@@ -22,6 +22,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.ChaosDuration, _ = strconv.Atoi(common.Getenv("TOTAL_CHAOS_DURATION", "30"))
 	experimentDetails.ChaosInterval, _ = strconv.Atoi(common.Getenv("CHAOS_INTERVAL", "10"))
 	experimentDetails.RampTime, _ = strconv.Atoi(common.Getenv("RAMP_TIME", "0"))
+	experimentDetails.AuxiliaryAppInfo = common.Getenv("AUXILIARY_APPINFO", "")
 	experimentDetails.ChaosLib = common.Getenv("LIB", "litmus")
 	experimentDetails.AppNS = common.Getenv("APP_NAMESPACE", "")
 	experimentDetails.AppLabel = common.Getenv("APP_LABEL", "")

@@ -13,6 +13,7 @@ type ExperimentDetails struct {
 	RampTime           int
 	ChaosLib           string
 	AppNS              string
+	AuxiliaryAppInfo   string
 	AppLabel           string
 	AppKind            string
 	ChaosUID           clientTypes.UID
