@@ -23,8 +23,8 @@ var (
 	inject, abort chan os.Signal
 )
 
-//PrepareVMTerminateByName contains the prepration and injection steps for the experiment
-func PrepareVMTerminateByName(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+//PrepareVMStop contains the prepration and injection steps for the experiment
+func PrepareVMStop(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	// inject channel is used to transmit signal notifications.
 	inject = make(chan os.Signal, 1)
