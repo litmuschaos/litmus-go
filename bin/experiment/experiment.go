@@ -12,6 +12,7 @@ import (
 	// _ "k8s.io/client-go/plugin/pkg/client/auth/openstack"
 
 	cassandraPodDelete "github.com/litmuschaos/litmus-go/experiments/cassandra/pod-delete/experiment"
+	vmInstanceStop "github.com/litmuschaos/litmus-go/experiments/gcp/vm-instance-stop/experiment"
 	containerKill "github.com/litmuschaos/litmus-go/experiments/generic/container-kill/experiment"
 	diskFill "github.com/litmuschaos/litmus-go/experiments/generic/disk-fill/experiment"
 	dockerServiceKill "github.com/litmuschaos/litmus-go/experiments/generic/docker-service-kill/experiment"
@@ -127,6 +128,8 @@ func main() {
 		podDNSSpoof.PodDNSSpoof(clients)
 	case "vm-poweroff":
 		vmpoweroff.VMPoweroff(clients)
+	case "vm-instance-stop":
+		vmInstanceStop.VMInstanceStop(clients)
 
 	default:
 		log.Errorf("Unsupported -name %v, please provide the correct value of -name args", *experimentName)
