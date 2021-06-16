@@ -100,23 +100,23 @@ func getActiveNodeCount(clients clients.ClientSets) (int, error) {
 }
 
 //InstanceStatusCheckByName is used to check the status of all the VM instances under chaos
-func InstanceStatusCheckByName(instanceNames string, gcpProjectId string, regions string) error {
+func InstanceStatusCheckByName(instanceNames string, gcpProjectId string, instanceZones string) error {
 	instanceNamesList := strings.Split(instanceNames, ",")
-	regionsList := strings.Split(regions, ",")
+	instanceZonesList := strings.Split(instanceZones, ",")
 	if len(instanceNamesList) == 0 {
 		return errors.Errorf("No instance name found to stop")
 	}
-	if len(instanceNamesList) != len(regionsList) {
+	if len(instanceNamesList) != len(instanceZonesList) {
 		return errors.Errorf("The number of instance names and the number of regions is not equal")
 	}
 	log.Infof("[Info]: The instances under chaos(IUC) are: %v", instanceNamesList)
-	return InstanceStatusCheck(instanceNamesList, gcpProjectId, regionsList)
+	return InstanceStatusCheck(instanceNamesList, gcpProjectId, instanceZonesList)
 }
 
 //InstanceStatusCheck is used to check whether all VM instances under chaos are running or not
-func InstanceStatusCheck(instanceNamesList []string, gcpProjectId string, regionsList []string) error {
+func InstanceStatusCheck(instanceNamesList []string, gcpProjectId string, instanceZonesList []string) error {
 	for i := range instanceNamesList {
-		instanceState, err := GetVMInstanceStatus(instanceNamesList[i], gcpProjectId, regionsList[i])
+		instanceState, err := GetVMInstanceStatus(instanceNamesList[i], gcpProjectId, instanceZonesList[i])
 		if err != nil {
 			return err
 		}
