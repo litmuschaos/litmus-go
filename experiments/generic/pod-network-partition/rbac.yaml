@@ -15,9 +15,21 @@ metadata:
   labels:
     name: pod-network-partition-sa
 rules:
-- apiGroups: ["","litmuschaos.io","batch","apps"]
-  resources: ["pods","jobs","pods/exec","pods/log","events","chaosengines","chaosexperiments","chaosresults"]
+- apiGroups: [""]
+  resources: ["pods","events"]
   verbs: ["create","list","get","patch","update","delete","deletecollection"]
+- apiGroups: [""]
+  resources: ["pods/exec","pods/log"]
+  verbs: ["list","get","create"]
+- apiGroups: ["batch"]
+  resources: ["jobs"]
+  verbs: ["create","list","get","delete","deletecollection"]
+- apiGroups: ["networking.k8s.io"]
+  resources: ["networkpolicies"]
+  verbs: ["create","delete","list","get"]
+- apiGroups: ["litmuschaos.io"]
+  resources: ["chaosengines","chaosexperiments","chaosresults"]
+  verbs: ["create","list","get","patch","update"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
