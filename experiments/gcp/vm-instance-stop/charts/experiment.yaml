@@ -12,20 +12,18 @@ metadata:
     app.kubernetes.io/version: latest
 spec:
   definition:
-    scope: Namespaced
+    scope: Cluster
     permissions:
       - apiGroups: 
           - "" 
           - "batch" 
-          - "apps" 
           - "litmuschaos.io"
         resources: 
           - "jobs" 
           - "pods" 
           - "pods/log" 
           - "events" 
-          - "deployments" 
-          - "replicasets" 
+          - "secrets" 
           - "pods/exec" 
           - "chaosengines" 
           - "chaosexperiments" 
@@ -53,10 +51,36 @@ spec:
     - name: CHAOS_INTERVAL
       value: ''
 
+    # parallel or serial; determines how the VM instances are terminated, all at once or one at a time  
+    - name: SEQUENCE
+      value: 'parallel'
+
+    # provide the LIB
+    # only litmus supported
     - name: LIB
+      value: 'litmus'
+
+    # period to wait before and after injection of chaos in sec
+    - name: RAMP_TIME
       value: ''
 
-    - name: RAMP_TIME
+    # enable or disable; shall be enabled if the target instance is a part of self-managed nodegroup.
+    - name: MANAGED_NODEGROUP
+      value: 'disable'
+    
+    # Instance name of the target vm instance(s)
+    # Multiple instance names can be provided as comma separated values ex: instance1,instance2
+    - name: VM_INSTANCE_NAME
+      value: ''
+    
+    # GCP project ID to which the vm instances belong
+    - name: GCP_PROJECT_ID
+      value: ''
+
+    # Instance zone(s) of the target vm instance(s)
+    # If more than one instance is targetted, provide zone for each in the order of their 
+    # respective instance name in VM_INSTANCE_NAME as comma separated values ex: zone1,zone2
+    - name: INSTANCE_ZONE
       value: ''
       
     labels:
@@ -64,3 +88,6 @@ spec:
       app.kubernetes.io/part-of: litmus
       app.kubernetes.io/component: experiment-job
       app.kubernetes.io/version: latest 
+    secrets:
+      name: cloud-secret
+      mountPath: /tmp

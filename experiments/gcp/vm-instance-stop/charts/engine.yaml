@@ -2,18 +2,12 @@ apiVersion: litmuschaos.io/v1alpha1
 kind: ChaosEngine
 metadata:
   name: nginx-chaos
+  namespace: default
 spec:
-  appinfo:
-    appns: 'default'
-    applabel: 'app=nginx'
-    appkind: 'deployment'
-  # It can be active/stop
+  # jobCleanUpPolicy can be delete/retain
+  jobCleanUpPolicy: 'retain'
   engineState: 'active'
-  #ex. values: ns1:name=percona,ns2:run=nginx
-  auxiliaryAppInfo: ''
   chaosServiceAccount: vm-instance-stop-sa
-  # It can be delete/retain
-  jobCleanUpPolicy: 'delete'
   experiments:
     - name: vm-instance-stop
       spec:
@@ -26,4 +20,16 @@ spec:
             # set chaos interval (in sec) as desired
             - name: CHAOS_INTERVAL
               value: '10'
+            
+            # Instance ID of the target ec2 instance
+            # Multiple IDs can also be provided as comma separated values ex: id1,id2
+            - name: EC2_INSTANCE_ID
+              value: ''
               
+            # provide the region name of the instance
+            - name: REGION
+              value: ''
+
+            # enable it if the target instance is a part of self-managed nodegroup.
+            - name: MANAGED_NODEGROUP
+              value: 'disable'
