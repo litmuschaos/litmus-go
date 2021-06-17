@@ -90,4 +90,4 @@ spec:
       app.kubernetes.io/version: latest 
     secrets:
       name: cloud-secret
-      mountPath: /tmp
+      mountPath: /tmp/
