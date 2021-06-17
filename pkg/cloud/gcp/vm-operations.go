@@ -17,8 +17,14 @@ func VMInstanceStop(instanceName string, gcpProjectID string, instanceZone strin
 	// create an empty context
 	ctx := context.Background()
 
+	// get service account credentials json
+	json, err := GetServiceAccountJSONFromSecret()
+	if err != nil {
+		return errors.Errorf(err.Error())
+	}
+
 	// create a new GCP Compute Service client using the GCP service account credentials
-	computeService, err := compute.NewService(ctx, option.WithCredentialsFile("./service_account.json"))
+	computeService, err := compute.NewService(ctx, option.WithCredentialsJSON(json))
 	if err != nil {
 		return errors.Errorf(err.Error())
 	}
@@ -42,8 +48,14 @@ func VMInstanceStart(instanceName string, gcpProjectID string, instanceZone stri
 	// create an empty context
 	ctx := context.Background()
 
+	// get service account credentials json
+	json, err := GetServiceAccountJSONFromSecret()
+	if err != nil {
+		return errors.Errorf(err.Error())
+	}
+
 	// create a new GCP Compute Service client using the GCP service account credentials
-	computeService, err := compute.NewService(ctx, option.WithCredentialsFile("./service_account.json"))
+	computeService, err := compute.NewService(ctx, option.WithCredentialsJSON(json))
 	if err != nil {
 		return errors.Errorf(err.Error())
 	}

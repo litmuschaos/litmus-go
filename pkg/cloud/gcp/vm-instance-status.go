@@ -23,8 +23,14 @@ func GetVMInstanceStatus(instanceName string, gcpProjectID string, instanceZone 
 	// create an empty context
 	ctx := context.Background()
 
+	// get service account credentials json
+	json, err := GetServiceAccountJSONFromSecret()
+	if err != nil {
+		return "", err
+	}
+
 	// create a new GCP Compute Service client using the GCP service account credentials
-	computeService, err := compute.NewService(ctx, option.WithCredentialsFile("./service_account.json"))
+	computeService, err := compute.NewService(ctx, option.WithCredentialsJSON(json))
 	if err != nil {
 		return "", err
 	}
