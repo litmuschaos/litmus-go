@@ -48,7 +48,7 @@ func GetServiceAccountJSONFromSecret() ([]byte, error) {
 	}
 
 	jsonString := fmt.Sprintf(`{
-		"type": "%s", 
+		"type": "%s",
 		"project_id": "%s",
 		"private_key_id": "%s",
 		"private_key": "%s",
@@ -58,9 +58,17 @@ func GetServiceAccountJSONFromSecret() ([]byte, error) {
 		"token_uri": "%s",
 		"auth_provider_x509_cert_url": "%s",
 		"client_x509_cert_url": "%s"
-		}`, string(gcpType), string(gcpProjectID), string(gcpPrivateKeyID), string(gcpPrivateKey),
-		string(gcpClientEmail), string(gcpClientID), string(gcpAuthURI), string(gcpTokenURI),
-		string(gcpAuthCertURL), string(gcpClientCertURL))
+		}`, string(gcpType)[:len(string(gcpType))-1],
+		string(gcpProjectID)[:len(string(gcpProjectID))-1],
+		string(gcpPrivateKeyID)[:len(string(gcpPrivateKeyID))-1],
+		string(gcpPrivateKey)[:len(string(gcpPrivateKey))-1],
+		string(gcpClientEmail)[:len(string(gcpClientEmail))-1],
+		string(gcpClientID)[:len(string(gcpClientID))-1],
+		string(gcpAuthURI)[:len(string(gcpAuthURI))-1],
+		string(gcpTokenURI)[:len(string(gcpTokenURI))-1],
+		string(gcpAuthCertURL)[:len(string(gcpAuthCertURL))-1],
+		string(gcpClientCertURL)[:len(string(gcpClientCertURL))-1],
+	)
 
 	return []byte(jsonString), nil
 }

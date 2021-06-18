@@ -27,8 +27,8 @@ func VMInstanceStop(clients clients.ClientSets) {
 	chaosDetails := types.ChaosDetails{}
 
 	//Fetching all the ENV passed from the runner pod
-	log.Infof("[PreReq]: Getting the ENV for the %v experiment", experimentsDetails.ExperimentName)
 	experimentEnv.GetENV(&experimentsDetails)
+	log.Infof("[PreReq]: Procured the ENV for the %v experiment", experimentsDetails.ExperimentName)
 
 	// Intialise the chaos attributes
 	experimentEnv.InitialiseChaosVariables(&chaosDetails, &experimentsDetails)
