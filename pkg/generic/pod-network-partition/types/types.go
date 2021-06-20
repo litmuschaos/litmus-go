@@ -25,4 +25,7 @@ type ExperimentDetails struct {
 	DestinationHosts   string
 	DestinationIPs     string
 	PolicyTypes        string
+	PodSelector        string
+	NamespaceSelector  string
+	PORTS              string
 }

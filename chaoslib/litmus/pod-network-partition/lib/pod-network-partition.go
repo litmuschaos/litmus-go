@@ -14,6 +14,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	networkv1 "k8s.io/api/networking/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -62,6 +63,16 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 	if err := np.getNetworkPolicyDetails(experimentsDetails); err != nil {
 		return err
 	}
+
+	//DISPLAY THE NETWORK POLICY DETAILS
+	log.InfoWithValues("The Network policy details are as follows", logrus.Fields{
+		"Target Label":      np.TargetPodLabels,
+		"Policy Type":       np.PolicyType,
+		"PodSelector":       np.PodSelector,
+		"NamespaceSelector": np.NamespaceSelector,
+		"Destination IPs":   np.ExceptIPs,
+		"Ports":             np.Ports,
+	})
 
 	// watching for the abort signal and revert the chaos
 	go abortWatcher(experimentsDetails, clients, chaosDetails, resultDetails, targetPodList, runID)
@@ -127,30 +138,8 @@ func createNetworkPolicy(experimentsDetails *experimentTypes.ExperimentDetails, 
 				MatchLabels: networkPolicy.TargetPodLabels,
 			},
 			PolicyTypes: networkPolicy.PolicyType,
-			Egress: []networkv1.NetworkPolicyEgressRule{
-				{
-					To: []networkv1.NetworkPolicyPeer{
-						{
-							IPBlock: &networkv1.IPBlock{
-								CIDR:   networkPolicy.CIDR,
-								Except: networkPolicy.ExceptIPs,
-							},
-						},
-					},
-				},
-			},
-			Ingress: []networkv1.NetworkPolicyIngressRule{
-				{
-					From: []networkv1.NetworkPolicyPeer{
-						{
-							IPBlock: &networkv1.IPBlock{
-								CIDR:   networkPolicy.CIDR,
-								Except: networkPolicy.ExceptIPs,
-							},
-						},
-					},
-				},
-			},
+			Egress:      networkPolicy.Egress,
+			Ingress:     networkPolicy.Ingress,
 		},
 	}
 

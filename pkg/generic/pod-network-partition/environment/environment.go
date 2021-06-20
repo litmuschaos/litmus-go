@@ -32,6 +32,9 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.DestinationHosts = common.Getenv("DESTINATION_HOSTS", "")
 	experimentDetails.LIBImagePullPolicy = common.Getenv("LIB_IMAGE_PULL_POLICY", "Always")
 	experimentDetails.PolicyTypes = common.Getenv("POLICY_TYPES", "all")
+	experimentDetails.PodSelector = common.Getenv("POD_SELECTOR", "")
+	experimentDetails.NamespaceSelector = common.Getenv("NAMESPACE_SELECTOR", "")
+	experimentDetails.PORTS = common.Getenv("PORTS", "")
 }
 
 //InitialiseChaosVariables initialise all the global variables
