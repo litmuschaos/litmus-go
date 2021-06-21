@@ -89,5 +89,5 @@ spec:
       app.kubernetes.io/component: experiment-job
       app.kubernetes.io/version: latest 
     secrets:
-      name: cloud-secret
+    - name: cloud-secret
       mountPath: /tmp/
