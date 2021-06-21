@@ -31,7 +31,7 @@ func stressStorage(experimentDetails *experimentTypes.ExperimentDetails, podName
 	// It will contain all the pod & container details required for exec command
 	execCommandDetails := litmusexec.PodDetails{}
 	fioCmd := fmt.Sprintf("fio --name=testchaos --ioengine=%v --iodepth=%v --rw=%v --bs=%v --size=%vM --numjobs=%v", experimentDetails.IOEngine, experimentDetails.IODepth, experimentDetails.ReadWrite, experimentDetails.BlockSize, experimentDetails.Size, experimentDetails.NumJobs)
-	if experimentDetails.GroupReporting == true {
+	if experimentDetails.GroupReporting {
 		fioCmd += " --group_reporting"
 	}
 	log.Infof("Running the command:\n%v", fioCmd)
