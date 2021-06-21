@@ -11,9 +11,6 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 )
 
-// STEPS TO GETENV OF YOUR CHOICE HERE
-// ADDED FOR FEW MANDATORY FIELD
-
 //GetENV fetches all the env variables from the runner pod
 func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.ExperimentName = common.Getenv("EXPERIMENT_NAME", "")
