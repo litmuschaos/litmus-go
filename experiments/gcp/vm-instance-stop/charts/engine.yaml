@@ -1,7 +1,7 @@
 apiVersion: litmuschaos.io/v1alpha1
 kind: ChaosEngine
 metadata:
-  name: nginx-chaos
+  name: gcp-vm-chaos
   namespace: default
 spec:
   engineState: 'active'
