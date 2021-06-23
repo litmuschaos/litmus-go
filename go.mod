@@ -3,6 +3,9 @@ module github.com/litmuschaos/litmus-go
 go 1.13
 
 require (
+	github.com/Azure/azure-sdk-for-go v35.0.0+incompatible
+	github.com/Azure/go-autorest/autorest v0.11.17
+	github.com/Azure/go-autorest/autorest/azure/auth v0.5.7
 	github.com/aws/aws-sdk-go v1.38.59
 	github.com/containerd/cgroups v1.0.1
 	github.com/emicklei/go-restful v2.12.0+incompatible // indirect
