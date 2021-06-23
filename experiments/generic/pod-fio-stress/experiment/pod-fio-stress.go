@@ -1,6 +1,7 @@
 package experiment
 
 import (
+	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
 	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/pod-fio-stress/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
@@ -65,8 +66,8 @@ func PodFioStress(clients clients.ClientSets) {
 		"Ramp Time": experimentsDetails.RampTime,
 	})
 
-	// Calling AbortWatcher go routine, it will continuously watch for the abort signal and generate the required events and result
-	go common.AbortWatcher(experimentsDetails.ExperimentName, clients, &resultDetails, &chaosDetails, &eventsDetails)
+	// Calling AbortWatcherWithoutExit go routine, it will continuously watch for the abort signal and generate the required events and result
+	go common.AbortWatcherWithoutExit(experimentsDetails.ExperimentName, clients, &resultDetails, &chaosDetails, &eventsDetails)
 
 	//PRE-CHAOS APPLICATION STATUS CHECK
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (pre-chaos)")
@@ -110,11 +111,14 @@ func PodFioStress(clients clients.ClientSets) {
 			return
 		}
 	default:
-		failStep := "lib and container-runtime combination not supported!"
+		failStep := "lib not supported!"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-		log.Error("lib and container-runtime combination not supported, provide the correct value of lib & container-runtime")
+		log.Error("lib not supported, provide the correct value of lib")
 		return
 	}
+
+	log.Infof("[Confirmation]: %v chaos has been injected successfully", experimentsDetails.ExperimentName)
+	resultDetails.Verdict = v1alpha1.ResultVerdictPassed
 
 	//POST-CHAOS APPLICATION STATUS CHECK
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (post-chaos)")

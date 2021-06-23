@@ -35,18 +35,11 @@ spec:
 
           - name: TOTAL_CHAOS_DURATION
             value: '120'
-
-          # provide auxiliary application details - namespace and labels of the applications
-          # sample input is - "ns1:app=percona,ns2:name=nginx"
-          - name: AUXILIARY_APPINFO
-            value: 'default:app=nginx'
           
           ## Period to wait before injection of chaos in sec
           - name: RAMP_TIME
             value: ''
 
-          ## env var that describes the library used to execute the chaos
-          ## default: litmus. Supported values: litmus, powerfulseal, chaoskube
           - name: LIB
             value: 'litmus'
 

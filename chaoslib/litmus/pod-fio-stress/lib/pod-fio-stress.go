@@ -43,6 +43,7 @@ func stressStorage(experimentDetails *experimentTypes.ExperimentDetails, podName
 	stressErr <- err
 }
 
+//experimentExecution function orchestrates the experiment by calling the StressStorage function, of every container, of every pod that is targeted
 func experimentExecution(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	// Get the target pod details for the chaos execution
@@ -186,6 +187,17 @@ loop:
 	for {
 		endTime = time.After(timeDelay)
 		select {
+		case err := <-stressErr:
+			// skipping the execution, if recieved any error other than 137, while executing stress command and marked result as fail
+			// it will ignore the error code 137(oom kill), it will skip further execution and marked the result as pass
+			// oom kill occurs if stor to be stressed exceed than the resource limit for the target container
+			if err != nil {
+				if strings.Contains(err.Error(), "137") {
+					log.Warn("Chaos process OOM killed")
+					return nil
+				}
+				return err
+			}
 		case <-signChan:
 			log.Info("[Chaos]: Revert Started")
 			if err := killStressParallel(experimentsDetails.TargetContainer, targetPodList, experimentsDetails.AppNS, experimentsDetails.ChaosKillCmd, clients); err != nil {
