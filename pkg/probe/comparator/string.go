@@ -24,7 +24,7 @@ func (model Model) CompareString() error {
 	switch model.operator {
 	case "equal", "Equal":
 		if !obj.isEqual() {
-			return fmt.Errorf("{actual value: %v} is not greater equal to {expected value: %v}", obj.a, obj.b)
+			return fmt.Errorf("{actual value: %v} is not equal to {expected value: %v}", obj.a, obj.b)
 		}
 	case "notEqual", "NotEqual":
 		if !obj.isNotEqual() {
@@ -45,7 +45,7 @@ func (model Model) CompareString() error {
 	case "notMatches", "NotMatches":
 		re, err := regexp.Compile(obj.b)
 		if err != nil {
-			return fmt.Errorf("The probe regex '%s' is not a valid expression", obj.b)
+			return fmt.Errorf("the probe regex '%s' is not a valid expression", obj.b)
 		}
 		if obj.isMatched(re) {
 			return fmt.Errorf("{actual value: %v} is not NotMatched with {expected regex: %v}", obj.a, obj.b)
@@ -97,10 +97,7 @@ func (s *String) isContains() bool {
 
 // isMatched check for the first value should follow the given regex
 func (s *String) isMatched(re *regexp.Regexp) bool {
-	if re.MatchString(s.a) {
-		return true
-	}
-	return false
+	return re.MatchString(s.a)
 }
 
 // isOneOf check for the string should be present inside given list
