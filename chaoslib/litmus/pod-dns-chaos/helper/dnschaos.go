@@ -180,7 +180,7 @@ func getENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.AppNS = common.Getenv("APP_NS", "")
 	experimentDetails.TargetContainer = common.Getenv("APP_CONTAINER", "")
 	experimentDetails.TargetPods = common.Getenv("APP_POD", "")
-	experimentDetails.ChaosDuration, _ = strconv.Atoi(common.Getenv("CHAOS_DURATION", "30"))
+	experimentDetails.ChaosDuration, _ = strconv.Atoi(common.Getenv("TOTAL_CHAOS_DURATION", "60"))
 	experimentDetails.ChaosNamespace = common.Getenv("CHAOS_NAMESPACE", "litmus")
 	experimentDetails.EngineName = common.Getenv("CHAOS_ENGINE", "")
 	experimentDetails.ChaosUID = clientTypes.UID(common.Getenv("CHAOS_UID", ""))

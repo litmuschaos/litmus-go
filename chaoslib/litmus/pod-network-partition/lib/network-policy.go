@@ -5,7 +5,6 @@ import (
 
 	network_chaos "github.com/litmuschaos/litmus-go/chaoslib/litmus/network-chaos/lib"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-network-partition/types"
-	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v2"
 	corev1 "k8s.io/api/core/v1"
@@ -50,12 +49,12 @@ func (np *NetworkPolicy) getNetworkPolicyDetails(experimentsDetails *experimentT
 		setNamespaceSelector(experimentsDetails.NamespaceSelector)
 
 	// sets the ports for the traffic control
-	if _, err := np.setPort(experimentsDetails.PORTS); err != nil {
+	if err := np.setPort(experimentsDetails.PORTS); err != nil {
 		return err
 	}
 
 	// sets the destination ips for which the traffic should be blocked
-	if _, err := np.setExceptIPs(experimentsDetails); err != nil {
+	if err := np.setExceptIPs(experimentsDetails); err != nil {
 		return err
 	}
 
@@ -136,12 +135,12 @@ func (np *NetworkPolicy) setNamespaceSelector(nsLabel string) *NetworkPolicy {
 }
 
 // setPort sets all the protocols and ports
-func (np *NetworkPolicy) setPort(p string) (*NetworkPolicy, error) {
+func (np *NetworkPolicy) setPort(p string) error {
 	ports := []networkv1.NetworkPolicyPort{}
 	var port Port
 	// unmarshal the protocols and ports from the env
 	if err := yaml.Unmarshal([]byte(strings.TrimSpace(parseCommand(p))), &port); err != nil {
-		return nil, errors.Errorf("Unable to unmarshal, err: %v", err)
+		return errors.Errorf("Unable to unmarshal, err: %v", err)
 	}
 
 	// sets all the tcp ports
@@ -160,12 +159,11 @@ func (np *NetworkPolicy) setPort(p string) (*NetworkPolicy, error) {
 	}
 
 	np.Ports = ports
-	return np, nil
+	return nil
 }
 
 // getPort return the port details
 func getPort(port int32, protocol corev1.Protocol) networkv1.NetworkPolicyPort {
-	log.Infof("port: %v", port)
 	networkPorts := networkv1.NetworkPolicyPort{
 		Protocol: &protocol,
 		Port: &intstr.IntOrString{
@@ -178,11 +176,11 @@ func getPort(port int32, protocol corev1.Protocol) networkv1.NetworkPolicyPort {
 
 // setExceptIPs sets all the destination ips
 // for which traffic should be blocked
-func (np *NetworkPolicy) setExceptIPs(experimentsDetails *experimentTypes.ExperimentDetails) (*NetworkPolicy, error) {
+func (np *NetworkPolicy) setExceptIPs(experimentsDetails *experimentTypes.ExperimentDetails) error {
 	// get all the target ips
 	destinationIPs, err := network_chaos.GetTargetIps(experimentsDetails.DestinationIPs, experimentsDetails.DestinationHosts)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	ips := strings.Split(destinationIPs, ",")
@@ -200,7 +198,7 @@ func (np *NetworkPolicy) setExceptIPs(experimentsDetails *experimentTypes.Experi
 		}
 	}
 	np.ExceptIPs = uniqueIps
-	return np, nil
+	return nil
 }
 
 // setIngressRules sets the ingress traffic rules

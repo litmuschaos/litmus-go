@@ -9,6 +9,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-network-partition/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
+	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
@@ -37,6 +38,10 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 	// Catch and relay certain signal(s) to abort channel.
 	signal.Notify(abort, os.Interrupt, syscall.SIGTERM)
 
+	// validate the appLabels
+	if chaosDetails.AppDetail.Label == "" {
+		return errors.Errorf("please provide the appLabel")
+	}
 	// Get the target pod details for the chaos execution
 	targetPodList, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).List(v1.ListOptions{LabelSelector: experimentsDetails.AppLabel})
 	if err != nil {
@@ -76,6 +81,13 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 
 	// watching for the abort signal and revert the chaos
 	go abortWatcher(experimentsDetails, clients, chaosDetails, resultDetails, targetPodList, runID)
+
+	// run the probes during chaos
+	if len(resultDetails.ProbeDetails) != 0 {
+		if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+			return err
+		}
+	}
 
 	select {
 	case <-inject:
