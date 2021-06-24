@@ -26,13 +26,10 @@ type ExperimentDetails struct {
 	Delay              int
 	TargetPods         string
 	ChaosKillCmd       string
-	LIBImage           string
 	LIBImagePullPolicy string
-	StressImage        string
 	Annotations        map[string]string
 	TargetContainer    string
 	Sequence           string
-	SocketPath         string
 	Resources          corev1.ResourceRequirements
 	ImagePullSecrets   []corev1.LocalObjectReference
 }

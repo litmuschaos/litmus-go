@@ -31,12 +31,9 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.Timeout, _ = strconv.Atoi(common.Getenv("STATUS_CHECK_TIMEOUT", "180"))
 	experimentDetails.TargetPods = common.Getenv("TARGET_PODS", "")
 	experimentDetails.ChaosKillCmd = common.Getenv("CHAOS_KILL_COMMAND", "kill $(find /proc -name exe -lname '*/dd' 2>&1 | grep -v 'Permission denied' | awk -F/ '{print $(NF-1)}' |  head -n 1)")
-	experimentDetails.LIBImage = common.Getenv("LIB_IMAGE", "litmuschaos/go-runner:latest")
 	experimentDetails.LIBImagePullPolicy = common.Getenv("LIB_IMAGE_PULL_POLICY", "Always")
-	experimentDetails.StressImage = common.Getenv("STRESS_IMAGE", "alexeiled/stress-ng:latest-ubuntu")
 	experimentDetails.TargetContainer = common.Getenv("TARGET_CONTAINER", "")
 	experimentDetails.Sequence = common.Getenv("SEQUENCE", "parallel")
-	experimentDetails.SocketPath = common.Getenv("SOCKET_PATH", "/var/run/docker.sock")
 }
 
 //InitialiseChaosVariables initialise all the global variables
