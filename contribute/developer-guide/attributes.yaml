@@ -1,18 +1,18 @@
 ---
-name: "vm-instance-stop"
+name: "vm-disk-loss"
 version: "0.1.0"
 category: "gcp"
-repository: "https://github.com/litmuschaos/litmus-go/tree/master/gcp/vm-instance-stop"
+repository: "https://github.com/litmuschaos/litmus-go/tree/master/gcp/vm-disk-loss"
 community: "https://kubernetes.slack.com/messages/CNXNB0ZTN"
-description: "stops GCP VM instances before restarting them, post the chaos duration"
+description: "causes loss of a non-boot storage disk from a node or VM instance for a specified duration of time"
 keywords:
-  - "vm-instances"
+  - "pods"
   - "kubernetes"
   - "gcp"
   - "exec"
 platforms:
-  - GKE
-scope: "Namespaced"
+  - Minikube
+scope: "Clustered"
 auxiliaryappcheck: false
 permissions:
   - apigroups:
