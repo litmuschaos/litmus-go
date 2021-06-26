@@ -1,6 +1,8 @@
 package gcp
 
 import (
+	"strings"
+
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -9,6 +11,7 @@ import (
 	"google.golang.org/api/option"
 )
 
+// DiskVolumeDetach will detach a disk volume from a VM instance
 func DiskVolumeDetach(instanceName string, gcpProjectID string, instanceZone string, deviceName string) error {
 
 	// create an empty context
@@ -39,6 +42,7 @@ func DiskVolumeDetach(instanceName string, gcpProjectID string, instanceZone str
 	return nil
 }
 
+// DiskVolumeAttach will attach a disk volume to a VM instance
 func DiskVolumeAttach(instanceName string, gcpProjectID string, instanceZone string, deviceName string, diskName string) error {
 
 	// create an empty context
@@ -77,4 +81,34 @@ func DiskVolumeAttach(instanceName string, gcpProjectID string, instanceZone str
 	})
 
 	return nil
+}
+
+//GetVolumeAttachmentDetails returns the name of the VM instance attached to a disk volume
+func GetVolumeAttachmentDetails(gcpProjectID string, instanceZone string, diskName string) (string, error) {
+
+	// create an empty context
+	ctx := context.Background()
+
+	json, err := GetServiceAccountJSONFromSecret()
+	if err != nil {
+		return "", errors.Errorf(err.Error())
+	}
+
+	// create a new GCP Compute Service client using the GCP service account credentials
+	computeService, err := compute.NewService(ctx, option.WithCredentialsJSON(json))
+	if err != nil {
+		return "", errors.Errorf(err.Error())
+	}
+
+	diskDetails, err := computeService.Disks.Get(gcpProjectID, instanceZone, diskName).Context(ctx).Do()
+	if err != nil {
+		return "", errors.Errorf(err.Error())
+	}
+
+	// diskDetails.Users[0] is a URL that links to the user of the disk (attached instance) in the form: projects/project/zones/zone/instances/instance
+	// hence we split the URL string via the '/' delimiter and get the string in the last index position to get the instance name
+	splitUserURL := strings.Split(diskDetails.Users[0], "/")
+	attachedInstanceName := splitUserURL[len(splitUserURL)-1]
+
+	return attachedInstanceName, nil
 }
