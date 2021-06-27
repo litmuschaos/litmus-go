@@ -23,8 +23,8 @@ var (
 	inject, abort chan os.Signal
 )
 
-//PrepareDiskVolumeLossByName contains the prepration and injection steps for the experiment
-func PrepareDiskVolumeLossByName(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+//PrepareDiskVolumeLoss contains the prepration and injection steps for the experiment
+func PrepareDiskVolumeLoss(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	// inject channel is used to transmit signal notifications.
 	inject = make(chan os.Signal, 1)

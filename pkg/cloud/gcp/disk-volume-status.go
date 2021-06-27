@@ -111,8 +111,8 @@ func GetDiskVolumeState(diskName string, gcpProjectID string, instanceName strin
 	return "detached", nil
 }
 
-//DiskVolumeStateCheckByName will check the attachment state of the given volume
-func DiskVolumeStateCheckByName(gcpProjectID string, zones string, diskNames string) error {
+//DiskVolumeStateCheck will check the attachment state of the given volume
+func DiskVolumeStateCheck(gcpProjectID string, zones string, diskNames string) error {
 
 	diskNamesList := strings.Split(diskNames, ",")
 	if len(diskNamesList) == 0 {
