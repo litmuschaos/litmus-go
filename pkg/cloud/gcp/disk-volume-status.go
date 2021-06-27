@@ -14,7 +14,7 @@ import (
 )
 
 // WaitForVolumeDetachment will wait for the disk volume to completely detach from a VM instance
-func WaitForVolumeDetachment(diskName string, gcpProjectID string, instanceName string, instanceZone string, delay int, timeout int) error {
+func WaitForVolumeDetachment(diskName string, gcpProjectID string, instanceName string, zone string, delay int, timeout int) error {
 
 	log.Info("[Status]: Checking disk volume status for detachment")
 	return retry.
@@ -22,7 +22,7 @@ func WaitForVolumeDetachment(diskName string, gcpProjectID string, instanceName 
 		Wait(time.Duration(delay) * time.Second).
 		Try(func(attempt uint) error {
 
-			volumeState, err := GetDiskVolumeState(diskName, gcpProjectID, instanceName, instanceZone)
+			volumeState, err := GetDiskVolumeState(diskName, gcpProjectID, instanceName, zone)
 			if err != nil {
 				return errors.Errorf("failed to get the volume state")
 			}
@@ -38,7 +38,7 @@ func WaitForVolumeDetachment(diskName string, gcpProjectID string, instanceName 
 }
 
 // WaitForVolumeAttachment will wait for the disk volume to get attached to a VM instance
-func WaitForVolumeAttachment(diskName string, gcpProjectID string, instanceName string, instanceZone string, delay int, timeout int) error {
+func WaitForVolumeAttachment(diskName string, gcpProjectID string, instanceName string, zone string, delay int, timeout int) error {
 
 	log.Info("[Status]: Checking disk volume status for attachment")
 	return retry.
@@ -46,7 +46,7 @@ func WaitForVolumeAttachment(diskName string, gcpProjectID string, instanceName 
 		Wait(time.Duration(delay) * time.Second).
 		Try(func(attempt uint) error {
 
-			volumeState, err := GetDiskVolumeState(diskName, gcpProjectID, instanceName, instanceZone)
+			volumeState, err := GetDiskVolumeState(diskName, gcpProjectID, instanceName, zone)
 			if err != nil {
 				return errors.Errorf("failed to get the volume status")
 			}
