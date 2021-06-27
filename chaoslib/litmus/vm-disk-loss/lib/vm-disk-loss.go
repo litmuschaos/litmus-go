@@ -138,10 +138,9 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 			case "attached":
 				log.Info("[Skip]: The disk volume is already attached")
 			default:
-				//Attaching the disk volume from the instance
+				//Attaching the disk volume to the instance
 				log.Info("[Chaos]: Attaching the disk volume back to the instance")
-
-				if err = gcp.DiskVolumeDetach(instanceName, experimentsDetails.GCPProjectID, diskZonesList[i], deviceNamesList[i]); err != nil {
+				if err = gcp.DiskVolumeAttach(instanceName, experimentsDetails.GCPProjectID, diskZonesList[i], deviceNamesList[i], targetDiskVolumeNamesList[i]); err != nil {
 					return errors.Errorf("disk attachment failed, err: %v", err)
 				}
 
@@ -225,7 +224,7 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		for i := range targetDiskVolumeNamesList {
 
 			//Getting the disk volume attachment status
-			diskState, err := gcp.GetVolumeAttachmentDetails(experimentsDetails.GCPProjectID, diskZonesList[i], targetDiskVolumeNamesList[i])
+			diskState, err := gcp.GetDiskVolumeState(targetDiskVolumeNamesList[i], experimentsDetails.GCPProjectID, instanceNamesList[i], diskZonesList[i])
 			if err != nil {
 				return errors.Errorf("failed to get the disk status, err: %v", err)
 			}
@@ -236,7 +235,7 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 			default:
 				//Attaching the disk volume to the instance
 				log.Info("[Chaos]: Attaching the disk volume to the instance")
-				if err = gcp.DiskVolumeDetach(instanceNamesList[i], experimentsDetails.GCPProjectID, diskZonesList[i], deviceNamesList[i]); err != nil {
+				if err = gcp.DiskVolumeAttach(instanceNamesList[i], experimentsDetails.GCPProjectID, diskZonesList[i], deviceNamesList[i], targetDiskVolumeNamesList[i]); err != nil {
 					return errors.Errorf("disk attachment failed, err: %v", err)
 				}
 

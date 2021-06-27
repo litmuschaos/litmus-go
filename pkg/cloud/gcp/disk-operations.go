@@ -33,7 +33,7 @@ func DiskVolumeDetach(instanceName string, gcpProjectID string, zone string, dev
 		return errors.Errorf(err.Error())
 	}
 
-	log.InfoWithValues("Detaching ebs having:", logrus.Fields{
+	log.InfoWithValues("Detaching disk having:", logrus.Fields{
 		"Device":       deviceName,
 		"InstanceName": instanceName,
 		"Status":       response.Status,
@@ -74,7 +74,7 @@ func DiskVolumeAttach(instanceName string, gcpProjectID string, zone string, dev
 		return errors.Errorf(err.Error())
 	}
 
-	log.InfoWithValues("Attaching ebs having:", logrus.Fields{
+	log.InfoWithValues("Attaching disk having:", logrus.Fields{
 		"Device":       deviceName,
 		"InstanceName": instanceName,
 		"Status":       response.Status,
@@ -105,10 +105,14 @@ func GetVolumeAttachmentDetails(gcpProjectID string, zone string, diskName strin
 		return "", errors.Errorf(err.Error())
 	}
 
-	// diskDetails.Users[0] is the URL that links to the user of the disk (attached instance) in the form: projects/project/zones/zone/instances/instance
-	// hence we split the URL string via the '/' delimiter and get the string in the last index position to get the instance name
-	splitUserURL := strings.Split(diskDetails.Users[0], "/")
-	attachedInstanceName := splitUserURL[len(splitUserURL)-1]
+	if len(diskDetails.Users) > 0 {
+		// diskDetails.Users[0] is the URL that links to the user of the disk (attached instance) in the form: projects/project/zones/zone/instances/instance
+		// hence we split the URL string via the '/' delimiter and get the string in the last index position to get the instance name
+		splitUserURL := strings.Split(diskDetails.Users[0], "/")
+		attachedInstanceName := splitUserURL[len(splitUserURL)-1]
 
-	return attachedInstanceName, nil
+		return attachedInstanceName, nil
+	}
+
+	return "", errors.Errorf("disk not attached to any instance")
 }
