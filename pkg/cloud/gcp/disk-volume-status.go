@@ -145,7 +145,7 @@ func DiskVolumeStateCheckByName(gcpProjectID string, zones string, diskNames str
 }
 
 //CheckDiskVolumeDetachmentInitialisation will check the start of volume detachment process
-func CheckDiskVolumeDetachmentInitialisation(gcpProjectID string, diskNames []string, instanceNames []string, zones []string) error {
+func CheckDiskVolumeDetachmentInitialisation(gcpProjectID string, diskNamesList []string, instanceNamesList []string, zones []string) error {
 
 	timeout := 3
 	delay := 1
@@ -154,13 +154,13 @@ func CheckDiskVolumeDetachmentInitialisation(gcpProjectID string, diskNames []st
 		Wait(time.Duration(delay) * time.Second).
 		Try(func(attempt uint) error {
 
-			for i := range diskNames {
-				currentVolumeState, err := GetDiskVolumeState(diskNames[i], gcpProjectID, instanceNames[i], zones[i])
+			for i := range diskNamesList {
+				currentVolumeState, err := GetDiskVolumeState(diskNamesList[i], gcpProjectID, instanceNamesList[i], zones[i])
 				if err != nil {
 					return errors.Errorf("failed to get the volume status")
 				}
 				if currentVolumeState == "attached" {
-					return errors.Errorf("the volume detachment has not started yet for volume %v", diskNames[i])
+					return errors.Errorf("the volume detachment has not started yet for volume %v", diskNamesList[i])
 				}
 			}
 			return nil
