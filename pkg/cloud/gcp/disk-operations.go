@@ -12,7 +12,7 @@ import (
 )
 
 // DiskVolumeDetach will detach a disk volume from a VM instance
-func DiskVolumeDetach(instanceName string, gcpProjectID string, instanceZone string, deviceName string) error {
+func DiskVolumeDetach(instanceName string, gcpProjectID string, zone string, deviceName string) error {
 
 	// create an empty context
 	ctx := context.Background()
@@ -28,7 +28,7 @@ func DiskVolumeDetach(instanceName string, gcpProjectID string, instanceZone str
 		return errors.Errorf(err.Error())
 	}
 
-	response, err := computeService.Instances.DetachDisk(gcpProjectID, instanceZone, instanceName, deviceName).Context(ctx).Do()
+	response, err := computeService.Instances.DetachDisk(gcpProjectID, zone, instanceName, deviceName).Context(ctx).Do()
 	if err != nil {
 		return errors.Errorf(err.Error())
 	}
@@ -43,7 +43,7 @@ func DiskVolumeDetach(instanceName string, gcpProjectID string, instanceZone str
 }
 
 // DiskVolumeAttach will attach a disk volume to a VM instance
-func DiskVolumeAttach(instanceName string, gcpProjectID string, instanceZone string, deviceName string, diskName string) error {
+func DiskVolumeAttach(instanceName string, gcpProjectID string, zone string, deviceName string, diskName string) error {
 
 	// create an empty context
 	ctx := context.Background()
@@ -59,7 +59,7 @@ func DiskVolumeAttach(instanceName string, gcpProjectID string, instanceZone str
 		return errors.Errorf(err.Error())
 	}
 
-	diskDetails, err := computeService.Disks.Get(gcpProjectID, instanceZone, diskName).Context(ctx).Do()
+	diskDetails, err := computeService.Disks.Get(gcpProjectID, zone, diskName).Context(ctx).Do()
 	if err != nil {
 		return errors.Errorf(err.Error())
 	}
@@ -69,7 +69,7 @@ func DiskVolumeAttach(instanceName string, gcpProjectID string, instanceZone str
 		Source:     diskDetails.SelfLink,
 	}
 
-	response, err := computeService.Instances.AttachDisk(gcpProjectID, instanceZone, instanceName, requestBody).Context(ctx).Do()
+	response, err := computeService.Instances.AttachDisk(gcpProjectID, zone, instanceName, requestBody).Context(ctx).Do()
 	if err != nil {
 		return errors.Errorf(err.Error())
 	}
@@ -84,7 +84,7 @@ func DiskVolumeAttach(instanceName string, gcpProjectID string, instanceZone str
 }
 
 //GetVolumeAttachmentDetails returns the name of the VM instance attached to a disk volume
-func GetVolumeAttachmentDetails(gcpProjectID string, instanceZone string, diskName string) (string, error) {
+func GetVolumeAttachmentDetails(gcpProjectID string, zone string, diskName string) (string, error) {
 
 	// create an empty context
 	ctx := context.Background()
@@ -100,7 +100,7 @@ func GetVolumeAttachmentDetails(gcpProjectID string, instanceZone string, diskNa
 		return "", errors.Errorf(err.Error())
 	}
 
-	diskDetails, err := computeService.Disks.Get(gcpProjectID, instanceZone, diskName).Context(ctx).Do()
+	diskDetails, err := computeService.Disks.Get(gcpProjectID, zone, diskName).Context(ctx).Do()
 	if err != nil {
 		return "", errors.Errorf(err.Error())
 	}

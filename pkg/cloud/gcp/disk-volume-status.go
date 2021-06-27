@@ -62,7 +62,7 @@ func WaitForVolumeAttachment(diskName string, gcpProjectID string, instanceName 
 }
 
 //GetDiskVolumeState will verify and give the VM instance details along with the disk volume details
-func GetDiskVolumeState(diskName string, gcpProjectID string, instanceName string, instanceZone string) (string, error) {
+func GetDiskVolumeState(diskName string, gcpProjectID string, instanceName string, zone string) (string, error) {
 
 	// create an empty context
 	ctx := context.Background()
@@ -78,7 +78,7 @@ func GetDiskVolumeState(diskName string, gcpProjectID string, instanceName strin
 		return "", errors.Errorf(err.Error())
 	}
 
-	diskDetails, err := computeService.Disks.Get(gcpProjectID, instanceZone, diskName).Context(ctx).Do()
+	diskDetails, err := computeService.Disks.Get(gcpProjectID, zone, diskName).Context(ctx).Do()
 	if err != nil {
 		return "", errors.Errorf(err.Error())
 	}
