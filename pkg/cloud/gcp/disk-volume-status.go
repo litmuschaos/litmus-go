@@ -21,6 +21,7 @@ func WaitForVolumeDetachment(diskName string, gcpProjectID string, instanceName 
 		Times(uint(timeout / delay)).
 		Wait(time.Duration(delay) * time.Second).
 		Try(func(attempt uint) error {
+
 			volumeState, err := GetDiskVolumeState(diskName, gcpProjectID, instanceName, instanceZone)
 			if err != nil {
 				return errors.Errorf("failed to get the volume state")
@@ -30,6 +31,7 @@ func WaitForVolumeDetachment(diskName string, gcpProjectID string, instanceName 
 				log.Infof("[Info]: The volume state is %v", volumeState)
 				return errors.Errorf("volume is not yet in detached state")
 			}
+
 			log.Infof("[Info]: The volume state is %v", volumeState)
 			return nil
 		})
@@ -48,10 +50,12 @@ func WaitForVolumeAttachment(diskName string, gcpProjectID string, instanceName 
 			if err != nil {
 				return errors.Errorf("failed to get the volume status")
 			}
+
 			if volumeState != "attached" {
 				log.Infof("[Info]: The volume state is %v", volumeState)
 				return errors.Errorf("volume is not yet in attached state")
 			}
+
 			log.Infof("[Info]: The volume state is %v", volumeState)
 			return nil
 		})
@@ -81,7 +85,7 @@ func GetDiskVolumeState(diskName string, gcpProjectID string, instanceName strin
 
 	for _, user := range diskDetails.Users {
 
-		// each 'user' is a URL that links to the users of the disk (attached instances) in the form: projects/project/zones/zone/instances/instance
+		// 'user' is a URL that links to the users of the disk (attached instances) in the form: projects/project/zones/zone/instances/instance
 		// hence we split the URL string via the '/' delimiter and get the string in the last index position to get the instance name
 		splitUserURL := strings.Split(user, "/")
 		attachedInstanceName := splitUserURL[len(splitUserURL)-1]
@@ -121,7 +125,7 @@ func DiskVolumeStateCheckByName(gcpProjectID string, zones string, diskNames str
 	}
 
 	if len(diskNamesList) != len(zonesList) {
-		return errors.Errorf("Unequal number of disk names and zones found")
+		return errors.Errorf("unequal number of disk names and zones found")
 	}
 
 	for i := range diskNamesList {
