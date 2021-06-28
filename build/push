@@ -20,15 +20,15 @@ fi
 IMAGEID=$( docker images -q ${REGISTRYNAME}/${REPONAME}/${IMGNAME}:${IMGTAG} )
 
 # Push image to docker hub
-echo "Pushing ${REPONAME}/${IMGNAME}:${IMGTAG} ..."; 
+echo "Pushing ${REGISTRYNAME}/${REPONAME}/${IMGNAME}:${IMGTAG} ..."; 
 docker buildx build --file build/Dockerfile --push --progress plane --platform linux/arm64,linux/amd64 --no-cache --tag ${REGISTRYNAME}/${REPONAME}/${IMGNAME}:${IMGTAG} .
 if [ ! -z "${RELEASE_TAG}" ] ; 
 then
   # Push with different tags if tagged as a release
   # When github is tagged with a release, then Travis will 
   # set the release tag in env RELEASE_TAG
-  echo "Pushing ${REPONAME}/${IMGNAME}:${RELEASE_TAG} ..."; 
+  echo "Pushing ${REGISTRYNAME}/${REPONAME}/${IMGNAME}:${RELEASE_TAG} ..."; 
   docker buildx build --file build/Dockerfile --push --progress plane --platform linux/arm64,linux/amd64 --no-cache --tag ${REGISTRYNAME}/${REPONAME}/${IMGNAME}:${RELEASE_TAG} .
-  echo "Pushing ${REPONAME}/${IMGNAME}:latest ..."; 
+  echo "Pushing ${REGISTRYNAME}/${REPONAME}/${IMGNAME}:latest ..."; 
   docker buildx build --file build/Dockerfile --push --progress plane --platform linux/arm64,linux/amd64 --no-cache --tag ${REGISTRYNAME}/${REPONAME}/${IMGNAME}:latest .
 fi;
