@@ -96,23 +96,17 @@ func GetParentName(clients clients.ClientSets, targetPod core_v1.Pod, chaosDetai
 // it extract the parent name from the owner references
 func getDeploymentName(clients clients.ClientSets, targetPod core_v1.Pod, chaosDetails *types.ChaosDetails) (string, error) {
 
-	deployList, err := clients.KubeClient.AppsV1().Deployments(chaosDetails.AppDetail.Namespace).List(v1.ListOptions{LabelSelector: chaosDetails.AppDetail.Label})
-	if err != nil || len(deployList.Items) == 0 {
-		return "", errors.Errorf("No deployment found with matching label, err: %v", err)
-	}
 	rsOwnerRef := targetPod.OwnerReferences
-	for _, deploy := range deployList.Items {
-		for _, own := range rsOwnerRef {
-			if own.Kind == "ReplicaSet" {
-				rs, err := clients.KubeClient.AppsV1().ReplicaSets(chaosDetails.AppDetail.Namespace).Get(own.Name, v1.GetOptions{})
-				if err != nil {
-					return "", err
-				}
-				ownerRef := rs.OwnerReferences
-				for _, own := range ownerRef {
-					if own.Kind == "Deployment" && own.Name == deploy.Name {
-						return deploy.Name, nil
-					}
+	for _, own := range rsOwnerRef {
+		if own.Kind == "ReplicaSet" {
+			rs, err := clients.KubeClient.AppsV1().ReplicaSets(chaosDetails.AppDetail.Namespace).Get(own.Name, v1.GetOptions{})
+			if err != nil {
+				return "", err
+			}
+			ownerRef := rs.OwnerReferences
+			for _, own := range ownerRef {
+				if own.Kind == "Deployment" {
+					return own.Name, nil
 				}
 			}
 		}
@@ -124,18 +118,13 @@ func getDeploymentName(clients clients.ClientSets, targetPod core_v1.Pod, chaosD
 // it extract the parent name from the owner references
 func getStatefulsetName(clients clients.ClientSets, targetPod core_v1.Pod, chaosDetails *types.ChaosDetails) (string, error) {
 
-	stsList, err := clients.KubeClient.AppsV1().StatefulSets(chaosDetails.AppDetail.Namespace).List(v1.ListOptions{LabelSelector: chaosDetails.AppDetail.Label})
-	if err != nil || len(stsList.Items) == 0 {
-		return "", errors.Errorf("No statefulset found with matching label, err: %v", err)
-	}
-	for _, sts := range stsList.Items {
-		ownerRef := targetPod.OwnerReferences
-		for _, own := range ownerRef {
-			if own.Kind == "StatefulSet" && own.Name == sts.Name {
-				return sts.Name, nil
-			}
+	ownerRef := targetPod.OwnerReferences
+	for _, own := range ownerRef {
+		if own.Kind == "StatefulSet" {
+			return own.Name, nil
 		}
 	}
+
 	return "", errors.Errorf("no statefulset found for %v pod", targetPod.Name)
 }
 
@@ -143,16 +132,10 @@ func getStatefulsetName(clients clients.ClientSets, targetPod core_v1.Pod, chaos
 // it extract the parent name from the owner references
 func getDaemonsetName(clients clients.ClientSets, targetPod core_v1.Pod, chaosDetails *types.ChaosDetails) (string, error) {
 
-	dsList, err := clients.KubeClient.AppsV1().DaemonSets(chaosDetails.AppDetail.Namespace).List(v1.ListOptions{LabelSelector: chaosDetails.AppDetail.Label})
-	if err != nil || len(dsList.Items) == 0 {
-		return "", errors.Errorf("No daemonset found with matching label, err: %v", err)
-	}
-	for _, ds := range dsList.Items {
-		ownerRef := targetPod.OwnerReferences
-		for _, own := range ownerRef {
-			if own.Kind == "DaemonSet" && own.Name == ds.Name {
-				return ds.Name, nil
-			}
+	ownerRef := targetPod.OwnerReferences
+	for _, own := range ownerRef {
+		if own.Kind == "DaemonSet" {
+			return own.Name, nil
 		}
 	}
 	return "", errors.Errorf("no daemonset found for %v pod", targetPod.Name)
@@ -162,28 +145,17 @@ func getDaemonsetName(clients clients.ClientSets, targetPod core_v1.Pod, chaosDe
 // it extract the parent name from the owner references
 func getDeploymentConfigName(clients clients.ClientSets, targetPod core_v1.Pod, chaosDetails *types.ChaosDetails) (string, error) {
 
-	gvrdc := schema.GroupVersionResource{
-		Group:    "apps.openshift.io",
-		Version:  "v1",
-		Resource: "deploymentconfigs",
-	}
-	deploymentConfigList, err := clients.DynamicClient.Resource(gvrdc).Namespace(chaosDetails.AppDetail.Namespace).List(v1.ListOptions{LabelSelector: chaosDetails.AppDetail.Label})
-	if err != nil || len(deploymentConfigList.Items) == 0 {
-		return "", errors.Errorf("No deploymentconfig found with matching labels, err: %v", err)
-	}
-	for _, dc := range deploymentConfigList.Items {
-		rcOwnerRef := targetPod.OwnerReferences
-		for _, own := range rcOwnerRef {
-			if own.Kind == "ReplicationController" {
-				rc, err := clients.KubeClient.CoreV1().ReplicationControllers(chaosDetails.AppDetail.Namespace).Get(own.Name, v1.GetOptions{})
-				if err != nil {
-					return "", err
-				}
-				ownerRef := rc.OwnerReferences
-				for _, own := range ownerRef {
-					if own.Kind == "DeploymentConfig" && own.Name == dc.GetName() {
-						return dc.GetName(), nil
-					}
+	rcOwnerRef := targetPod.OwnerReferences
+	for _, own := range rcOwnerRef {
+		if own.Kind == "ReplicationController" {
+			rc, err := clients.KubeClient.CoreV1().ReplicationControllers(chaosDetails.AppDetail.Namespace).Get(own.Name, v1.GetOptions{})
+			if err != nil {
+				return "", err
+			}
+			ownerRef := rc.OwnerReferences
+			for _, own := range ownerRef {
+				if own.Kind == "DeploymentConfig" {
+					return own.Name, nil
 				}
 			}
 		}
@@ -195,28 +167,17 @@ func getDeploymentConfigName(clients clients.ClientSets, targetPod core_v1.Pod, 
 // it extract the parent name from the owner references
 func getRolloutName(clients clients.ClientSets, targetPod core_v1.Pod, chaosDetails *types.ChaosDetails) (string, error) {
 
-	gvrro := schema.GroupVersionResource{
-		Group:    "argoproj.io",
-		Version:  "v1alpha1",
-		Resource: "rollouts",
-	}
-	rolloutList, err := clients.DynamicClient.Resource(gvrro).Namespace(chaosDetails.AppDetail.Namespace).List(v1.ListOptions{LabelSelector: chaosDetails.AppDetail.Label})
-	if err != nil || len(rolloutList.Items) == 0 {
-		return "", errors.Errorf("No rollouts found with matching labels, err: %v", err)
-	}
-	for _, ro := range rolloutList.Items {
-		rsOwnerRef := targetPod.OwnerReferences
-		for _, own := range rsOwnerRef {
-			if own.Kind == "ReplicaSet" {
-				rs, err := clients.KubeClient.AppsV1().ReplicaSets(chaosDetails.AppDetail.Namespace).Get(own.Name, v1.GetOptions{})
-				if err != nil {
-					return "", err
-				}
-				ownerRef := rs.OwnerReferences
-				for _, own := range ownerRef {
-					if own.Kind == "Rollout" && own.Name == ro.GetName() {
-						return ro.GetName(), nil
-					}
+	rsOwnerRef := targetPod.OwnerReferences
+	for _, own := range rsOwnerRef {
+		if own.Kind == "ReplicaSet" {
+			rs, err := clients.KubeClient.AppsV1().ReplicaSets(chaosDetails.AppDetail.Namespace).Get(own.Name, v1.GetOptions{})
+			if err != nil {
+				return "", err
+			}
+			ownerRef := rs.OwnerReferences
+			for _, own := range ownerRef {
+				if own.Kind == "Rollout" {
+					return own.Name, nil
 				}
 			}
 		}
