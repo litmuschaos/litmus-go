@@ -1,16 +1,11 @@
 apiVersion: litmuschaos.io/v1alpha1
 kind: ChaosEngine
 metadata:
-  name: nginx-chaos
+  name: gcp-disk-chaos
+  namespace: default
 spec:
-  appinfo:
-    appns: 'default'
-    applabel: 'app=nginx'
-    appkind: 'deployment'
   # It can be active/stop
   engineState: 'active'
-  #ex. values: ns1:name=percona,ns2:run=nginx
-  auxiliaryAppInfo: ''
   chaosServiceAccount: vm-disk-loss-sa
   # It can be delete/retain
   jobCleanUpPolicy: 'delete'
@@ -26,4 +21,19 @@ spec:
             # set chaos interval (in sec) as desired
             - name: CHAOS_INTERVAL
               value: '10'
+
+            # set the GCP project id
+            - name: GCP_PROJECT_ID
+              value: ''
+
+            # set the disk volume name(s)
+            - name: DISK_VOLUME_NAME
+              value: ''
               
+            # set the disk zone(s)
+            - name: DISK_ZONE
+              value: ''
+            
+            # set the device name(s)
+            - name: DEVICE_NAME
+              value: ''
