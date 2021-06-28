@@ -114,6 +114,10 @@ func GetDiskVolumeState(diskName string, gcpProjectID string, instanceName strin
 //DiskVolumeStateCheck will check the attachment state of the given volume
 func DiskVolumeStateCheck(gcpProjectID string, zones string, diskNames string, deviceNames string) error {
 
+	if gcpProjectID == "" {
+		return errors.Errorf("no gcp project id provided, please provide the project id")
+	}
+
 	diskNamesList := strings.Split(diskNames, ",")
 	if len(diskNamesList) == 0 {
 		return errors.Errorf("no disk name provided, please provide the name of the disk")
