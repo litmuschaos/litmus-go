@@ -18,8 +18,8 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.ExperimentName = common.Getenv("EXPERIMENT_NAME", "virtual-disk-loss")
 	experimentDetails.ChaosNamespace = common.Getenv("CHAOS_NAMESPACE", "litmus")
 	experimentDetails.EngineName = common.Getenv("CHAOSENGINE", "")
-	experimentDetails.ChaosDuration, _ = strconv.Atoi(common.Getenv("TOTAL_CHAOS_DURATION", "10"))
-	experimentDetails.ChaosInterval, _ = strconv.Atoi(common.Getenv("CHAOS_INTERVAL", "10"))
+	experimentDetails.ChaosDuration, _ = strconv.Atoi(common.Getenv("TOTAL_CHAOS_DURATION", "30"))
+	experimentDetails.ChaosInterval, _ = strconv.Atoi(common.Getenv("CHAOS_INTERVAL", "30"))
 	experimentDetails.RampTime, _ = strconv.Atoi(common.Getenv("RAMP_TIME", "0"))
 	experimentDetails.ChaosLib = common.Getenv("LIB", "litmus")
 	experimentDetails.AppNS = common.Getenv("APP_NAMESPACE", "")
@@ -30,10 +30,11 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.ChaosPodName = common.Getenv("POD_NAME", "")
 	experimentDetails.Delay, _ = strconv.Atoi(common.Getenv("STATUS_CHECK_DELAY", "2"))
 	experimentDetails.Timeout, _ = strconv.Atoi(common.Getenv("STATUS_CHECK_TIMEOUT", "180"))
-	experimentDetails.AzureInstanceName = common.Getenv("AZURE_INSTANCE_NAME", "test-instance")
-	experimentDetails.ResourceGroup = common.Getenv("RESOURCE_GROUP", "akash-litmus-test")
-	experimentDetails.VirtualDiskName = common.Getenv("VIRTUAL_DISK_NAME", "test-disk")
-	experimentDetails.SubscriptionID = common.Getenv("SUBSCRIPTION_ID", "5dbb4231-ac0f-4a65-b3a9-11c17725ab15")
+	experimentDetails.AzureInstanceName = common.Getenv("AZURE_INSTANCE_NAME", "")
+	experimentDetails.ResourceGroup = common.Getenv("RESOURCE_GROUP", "")
+	experimentDetails.VirtualDiskName = common.Getenv("VIRTUAL_DISK_NAME", "")
+	experimentDetails.SubscriptionID = common.Getenv("SUBSCRIPTION_ID", "")
+	experimentDetails.Sequence = common.Getenv("SEQUENCE", "parallel")
 }
 
 //InitialiseChaosVariables initialise all the global variables

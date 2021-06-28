@@ -29,4 +29,5 @@ type ExperimentDetails struct {
 	ResourceGroup      string
 	SubscriptionID     string
 	VirtualDiskName    string
+	Sequence           string
 }
