@@ -297,6 +297,6 @@ func GetChaosStatus(resultDetails *types.ResultDetails, chaosDetails *types.Chao
 		}
 	}
 
-	chaosDetails.Targets = targetList
+	chaosDetails.Targets = append(chaosDetails.Targets, targetList...)
 	return annotations, nil
 }
