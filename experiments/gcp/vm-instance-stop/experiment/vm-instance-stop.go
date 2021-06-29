@@ -75,7 +75,7 @@ func VMInstanceStop(clients clients.ClientSets) {
 	})
 
 	//PRE-CHAOS NODE STATUS CHECK
-	if experimentsDetails.ManagedNodegroup == "enable" {
+	if experimentsDetails.AutoScalingGroup == "enable" {
 		activeNodeCount, err = gcp.PreChaosNodeStatusCheck(experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 		if err != nil {
 			log.Errorf("Pre chaos node status check failed, err: %v", err)
@@ -157,7 +157,7 @@ func VMInstanceStop(clients clients.ClientSets) {
 	resultDetails.Verdict = v1alpha1.ResultVerdictPassed
 
 	// POST-CHAOS ACTIVE NODE COUNT TEST
-	if experimentsDetails.ManagedNodegroup == "enable" {
+	if experimentsDetails.AutoScalingGroup == "enable" {
 		if err = gcp.PostChaosActiveNodeCountCheck(activeNodeCount, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
 			log.Errorf("Post chaos active node count check failed, err: %v", err)
 			failStep := "Verify active number of nodes post chaos"
@@ -167,7 +167,7 @@ func VMInstanceStop(clients clients.ClientSets) {
 	}
 
 	//Verify the GCP VM instance is in RUNNING status (post chaos)
-	if experimentsDetails.ManagedNodegroup != "enable" {
+	if experimentsDetails.AutoScalingGroup != "enable" {
 		if err = gcp.InstanceStatusCheckByName(experimentsDetails.VMInstanceName, experimentsDetails.GCPProjectID, experimentsDetails.InstanceZone); err != nil {
 			log.Errorf("failed to get the vm instance status, err: %v", err)
 			failStep := "Verify the GCP VM instance status (post-chaos)"

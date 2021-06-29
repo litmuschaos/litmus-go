@@ -25,7 +25,7 @@ type ExperimentDetails struct {
 	VMInstanceName     string
 	GCPProjectID       string
 	InstanceZone       string
-	ManagedNodegroup   string
+	AutoScalingGroup   string
 	Sequence           string
 	TargetContainer    string
 	LIBImagePullPolicy string

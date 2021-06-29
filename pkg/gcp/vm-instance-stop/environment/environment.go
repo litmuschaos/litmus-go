@@ -33,7 +33,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.VMInstanceName = common.Getenv("VM_INSTANCE_NAMES", "")
 	experimentDetails.GCPProjectID = common.Getenv("GCP_PROJECT_ID", "")
 	experimentDetails.InstanceZone = common.Getenv("INSTANCE_ZONES", "")
-	experimentDetails.ManagedNodegroup = common.Getenv("MANAGED_NODEGROUP", "disable")
+	experimentDetails.AutoScalingGroup = common.Getenv("AUTO_SCALING_GROUP", "disable")
 	experimentDetails.Sequence = common.Getenv("SEQUENCE", "parallel")
 }
 
