@@ -174,8 +174,8 @@ func VMInstanceStop(clients clients.ClientSets) {
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}
-		log.Info("[Status]: VM instance is in running state (post chaos)")
 	}
+	log.Info("[Status]: VM instance is in running state (post chaos)")
 
 	//POST-CHAOS APPLICATION STATUS CHECK
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (post-chaos)")
