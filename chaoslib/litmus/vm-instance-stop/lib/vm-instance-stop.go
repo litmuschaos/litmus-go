@@ -45,7 +45,7 @@ func PrepareVMStop(experimentsDetails *experimentTypes.ExperimentDetails, client
 	// get the instance name or list of instance names
 	instanceNamesList := strings.Split(experimentsDetails.VMInstanceName, ",")
 	if len(instanceNamesList) == 0 {
-		return errors.Errorf("no instance name found to terminate")
+		return errors.Errorf("no instance name found to stop")
 	}
 
 	// get the zone name or list of corresponding zones for the instances
