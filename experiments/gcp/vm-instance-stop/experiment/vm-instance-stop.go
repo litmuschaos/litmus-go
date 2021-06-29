@@ -69,9 +69,6 @@ func VMInstanceStop(clients clients.ClientSets) {
 		"Sequence":        experimentsDetails.Sequence,
 	})
 
-	// Calling AbortWatcher go routine, it will continuously watch for the abort signal and generate the required events and result
-	go common.AbortWatcherWithoutExit(experimentsDetails.ExperimentName, clients, &resultDetails, &chaosDetails, &eventsDetails)
-
 	//PRE-CHAOS NODE STATUS CHECK
 	if experimentsDetails.ManagedNodegroup == "enable" {
 		activeNodeCount, err = gcp.PreChaosNodeStatusCheck(experimentsDetails.Timeout, experimentsDetails.Delay, clients)
