@@ -81,7 +81,7 @@ func PrepareVMStop(experimentsDetails *experimentTypes.ExperimentDetails, client
 	return nil
 }
 
-//injectChaosInSerialMode causes VM instance termination in serial mode i.e. one after the otherwill cause VM instance termination in serial mode i.e. one after the other
+//injectChaosInSerialMode stops VM instances in serial mode i.e. one after the other
 func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, instanceNamesList []string, instanceZonesList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	select {
@@ -152,7 +152,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 	return nil
 }
 
-// injectChaosInParallelMode causes VM instance termination in parallel mode i.e. all at once
+// injectChaosInParallelMode stops VM instances in parallel mode i.e. all at once
 func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, instanceNamesList []string, instanceZonesList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	select {
