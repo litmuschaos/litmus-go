@@ -50,6 +50,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string
 		experimentDetails.NumberOfWorkers, _ = strconv.Atoi(common.Getenv("NUMBER_OF_WORKERS", "4"))
 		experimentDetails.VolumeMountPath = common.Getenv("VOLUME_MOUNT_PATH", "")
 		experimentDetails.StressImage = common.Getenv("STRESS_IMAGE", "alexeiled/stress-ng:latest-ubuntu")
+		experimentDetails.CPUcores, _ = strconv.Atoi(common.Getenv("CPU_CORES", "0"))
 	}
 }
 
