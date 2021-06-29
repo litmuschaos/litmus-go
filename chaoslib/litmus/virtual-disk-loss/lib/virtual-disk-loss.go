@@ -13,6 +13,7 @@ import (
 	azureStatus "github.com/litmuschaos/litmus-go/pkg/cloud/azure"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	"github.com/litmuschaos/litmus-go/pkg/log"
+	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
@@ -103,28 +104,30 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 			return errors.Errorf("failed to detach disks, err: %v", err)
 		}
 
+		for _, diskName := range diskNameList {
+			common.SetTargets(diskName, "injected", "VirtualDisk", chaosDetails)
+		}
+
+		// run the probes during chaos
+		if len(resultDetails.ProbeDetails) != 0 {
+			if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+				return err
+			}
+		}
+
 		//Wait for chaos duration
 		log.Infof("[Wait]: Waiting for the chaos interval of %vs", experimentsDetails.ChaosInterval)
 		common.WaitForDuration(experimentsDetails.ChaosInterval)
 
-		// Getting the virutal disk attachment status
-		// diskState, err := azureStatus.GetDiskStatus(experimentsDetails.SubscriptionID, eventsDetails.ResourceGroup, diskName)
-		// if err != nil {
-		// 	return errors.Errorf("failed to get the ebs status, err: %v", err)
-		// }
-		diskState := "detached"
-
-		switch diskState {
-		case "attached":
-			log.Info("[Skip]: The Virtual Disk is already attached")
-		default:
-			//Attaching the virtual disks to the instance
-			log.Info("[Chaos]: Attaching the Virtual disks back to the instance")
-			if err = azureStatus.AttachDisk(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, experimentsDetails.AzureInstanceName, diskList); err != nil {
-				return errors.Errorf("ebs attachment failed, err: %v", err)
-			}
+		//Attaching the virtual disks to the instance
+		log.Info("[Chaos]: Attaching the Virtual disks back to the instance")
+		if err = azureStatus.AttachDisk(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, experimentsDetails.AzureInstanceName, diskList); err != nil {
+			return errors.Errorf("virtual disk attachment failed, err: %v", err)
 		}
-		// common.SetTargets(volumeID, "reverted", "EBS", chaosDetails)
+
+		for _, diskName := range diskNameList {
+			common.SetTargets(diskName, "reverted", "VirtualDisk", chaosDetails)
+		}
 		duration = int(time.Since(ChaosStartTimeStamp).Seconds())
 	}
 	return nil
@@ -144,11 +147,20 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 		}
 
-		for _, diskName := range diskNameList {
+		for i, diskName := range diskNameList {
 			// Detaching the virtual disks
 			log.Infof("[Chaos]: Detaching the Virtual %v from the instance", diskName)
 			if err = azureStatus.DetachDisk(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, experimentsDetails.AzureInstanceName, diskName); err != nil {
 				return errors.Errorf("failed to detach disks, err: %v", err)
+			}
+
+			common.SetTargets(diskName, "injected", "VirtualDisk", chaosDetails)
+
+			// run the probes during chaos
+			if len(resultDetails.ProbeDetails) != 0 && i == 0 {
+				if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+					return err
+				}
 			}
 
 			//Wait for chaos duration
@@ -173,9 +185,9 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 			default:
 				return errors.Errorf("Cannot attach disk, this is because the disk is either currently being created or the VM is not running, current disk state: %v", diskState)
 			}
+			common.SetTargets(diskName, "reverted", "VirtualDisk", chaosDetails)
 		}
 
-		// common.SetTargets(volumeID, "reverted", "EBS", chaosDetails)
 		duration = int(time.Since(ChaosStartTimeStamp).Seconds())
 	}
 	return nil
