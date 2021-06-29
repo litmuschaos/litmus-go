@@ -27,7 +27,6 @@ type ExperimentDetails struct {
 	InstanceZone       string
 	ManagedNodegroup   string
 	Sequence           string
-	ActiveNodes        int
 	TargetContainer    string
 	LIBImagePullPolicy string
 }
