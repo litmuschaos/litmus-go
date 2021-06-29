@@ -167,7 +167,7 @@ func prepareStressChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 
 		// check the timeout for the command
 		// Note: timeout will occur when process didn't complete even after 10s of chaos duration
-		timeout := time.After((time.Duration(experimentsDetails.ChaosDuration) + 10) * time.Second)
+		timeout := time.After((time.Duration(experimentsDetails.ChaosDuration) + 30) * time.Second)
 
 		select {
 		case <-timeout:
@@ -175,7 +175,7 @@ func prepareStressChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 			log.Infof("[Timeout] Stress output: %v", buf.String())
 			log.Info("[Cleanup]: Killing the stress process")
 			terminateProcess(cmd.Process.Pid)
-			return errors.Errorf("the stress process is timeout after %vs", experimentsDetails.ChaosDuration+10)
+			return errors.Errorf("the stress process is timeout after %vs", experimentsDetails.ChaosDuration+30)
 		case err := <-done:
 			if err != nil {
 				err, ok := err.(*exec.ExitError)
@@ -259,9 +259,12 @@ func prepareStressor(experimentDetails *experimentTypes.ExperimentDetails) []str
 			"Volume Mount Path": experimentDetails.VolumeMountPath,
 		})
 		if experimentDetails.VolumeMountPath == "" {
-			stressArgs = append(stressArgs, "--cpu 1 --io "+strconv.Itoa(experimentDetails.NumberOfWorkers)+" --hdd "+strconv.Itoa(experimentDetails.NumberOfWorkers)+" --hdd-bytes "+hddbytes)
+			stressArgs = append(stressArgs, "--io "+strconv.Itoa(experimentDetails.NumberOfWorkers)+" --hdd "+strconv.Itoa(experimentDetails.NumberOfWorkers)+" --hdd-bytes "+hddbytes)
 		} else {
-			stressArgs = append(stressArgs, "--cpu 1 --io "+strconv.Itoa(experimentDetails.NumberOfWorkers)+" --hdd "+strconv.Itoa(experimentDetails.NumberOfWorkers)+" --hdd-bytes "+hddbytes+" --temp-path "+experimentDetails.VolumeMountPath)
+			stressArgs = append(stressArgs, "--io "+strconv.Itoa(experimentDetails.NumberOfWorkers)+" --hdd "+strconv.Itoa(experimentDetails.NumberOfWorkers)+" --hdd-bytes "+hddbytes+" --temp-path "+experimentDetails.VolumeMountPath)
+		}
+		if experimentDetails.CPUcores != 0 {
+			stressArgs = append(stressArgs, "--cpu %v", strconv.Itoa(experimentDetails.CPUcores))
 		}
 
 	default:
@@ -484,7 +487,6 @@ func getENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.AppNS = common.Getenv("APP_NS", "")
 	experimentDetails.TargetContainer = common.Getenv("APP_CONTAINER", "")
 	experimentDetails.TargetPods = common.Getenv("APP_POD", "")
-	experimentDetails.AppLabel = common.Getenv("APP_LABEL", "")
 	experimentDetails.ChaosDuration, _ = strconv.Atoi(common.Getenv("TOTAL_CHAOS_DURATION", "30"))
 	experimentDetails.ChaosNamespace = common.Getenv("CHAOS_NAMESPACE", "litmus")
 	experimentDetails.EngineName = common.Getenv("CHAOS_ENGINE", "")
