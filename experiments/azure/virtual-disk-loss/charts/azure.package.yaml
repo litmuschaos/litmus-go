@@ -1,5 +1,0 @@
-packageName: azure
-experiments:
-  - name: virtual-disk-loss
-    CSV: virtual-disk-loss.chartserviceversion.yaml
-    desc: "virtual-disk-loss"

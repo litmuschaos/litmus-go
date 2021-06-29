@@ -18,6 +18,7 @@ type ExperimentDetails struct {
 	AppNS              string
 	AppLabel           string
 	AppKind            string
+	AuxiliaryAppInfo   string
 	ChaosUID           clientTypes.UID
 	InstanceID         string
 	ChaosNamespace     string

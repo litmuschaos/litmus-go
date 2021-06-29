@@ -15,6 +15,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
+	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
 	"github.com/pkg/errors"
 )
 
@@ -58,10 +59,7 @@ func PrepareChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients
 			return errors.Errorf("error fetching virtual disks")
 		}
 		// watching for the abort signal and revert the chaos
-		go abortWatcher(experimentsDetails, diskList)
-		// if err = InjectChaos(experimentsDetails, diskNameList, diskList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
-		// 	return err
-		// }
+		go abortWatcher(experimentsDetails, diskList, diskNameList)
 
 		switch strings.ToLower(experimentsDetails.Sequence) {
 		case "serial":
@@ -157,10 +155,10 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 			log.Infof("[Wait]: Waiting for the chaos interval of %vs", experimentsDetails.ChaosInterval)
 			common.WaitForDuration(experimentsDetails.ChaosInterval)
 
-			//Getting the virutal disk attachment status
+			//Getting the virtual disk status
 			diskState, err := azureStatus.GetDiskStatus(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, diskName)
 			if err != nil {
-				return errors.Errorf("failed to get the ebs status, err: %v", err)
+				return errors.Errorf("failed to get the virtual disk status, err: %v", err)
 			}
 
 			switch diskState {
@@ -184,33 +182,37 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 }
 
 // watching for the abort signal and revert the chaos
-func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, diskList *[]compute.DataDisk) {
+func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, diskList *[]compute.DataDisk, diskNameList []string) {
 	<-abort
 
 	log.Info("[Abort]: Chaos Revert Started")
-	// for _, vmName := range instanceNameList {
-	// 	instanceState, err := azureStatus.GetAzureInstanceStatus(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, vmName)
-	// 	if err != nil {
-	// 		log.Errorf("fail to get instance status when an abort signal is received, err: %v", err)
-	// 	}
-	// 	if instanceState != "VM running" {
-	// 		log.Info("[Abort]: Waiting for the Azure instance to get down")
-	// 		if err := azureStatus.WaitForAzureComputeDown(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, vmName); err != nil {
-	// 			log.Errorf("unable to wait till stop of the instance, err: %v", err)
-	// 		}
 
-	// 		log.Info("[Chaos]: Starting back the Azure instance")
-	// 		if err := azureStatus.AzureInstanceStart(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, vmName); err != nil {
-	// 			log.Errorf("unable to start the Azure instance, err: %v", err)
-	// 		}
+	// Checking if all disk detached properly
+	log.Info("[Abort]: Waiting for disk(s) to detach properly")
+	for _, diskName := range diskNameList {
+		//Getting the virtual disk status
+		retry.
+			Times(uint(experimentsDetails.Timeout / experimentsDetails.Delay)).
+			Wait(time.Duration(experimentsDetails.Delay) * time.Second).
+			Try(func(attempt uint) error {
+				diskState, err := azureStatus.GetDiskStatus(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, diskName)
+				if err != nil {
+					errors.Errorf("failed to get the disk status, err: %v", err)
+				}
+				if diskState != "Unattached" {
+					log.Infof("[Abort]: Disk is not yet detached properly, state: %v", diskState)
+					return errors.Errorf("Disk is not yet detached properly, state: %v", diskState)
+				}
+				log.Infof("[Abort]: Disk %v state: %v", diskName, diskState)
+				return nil
+			})
+	}
+	log.Info("[Abort]: Disk(s) detached properly")
 
-	// 		log.Info("[Abort]: Starting Azure instance as abort signal received")
-	// 		err := azureStatus.WaitForAzureComputeUp(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, vmName)
-	// 		if err != nil {
-	// 			log.Errorf("Azure instance failed to start when an abort signal is recieved, err: %v", err)
-	// 		}
-	// 	}
-	// }
+	log.Info("[Abort]: Attaching disk(s) as abort signal recieved")
+	if err := azureStatus.AttachDisk(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, experimentsDetails.AzureInstanceName, diskList); err != nil {
+		log.Errorf("unable to attach disk, err: %v", err)
+	}
 	log.Infof("[Abort]: Chaos Revert Completed")
 	os.Exit(1)
 }

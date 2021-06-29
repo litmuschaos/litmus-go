@@ -2,11 +2,15 @@ package azure
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"os"
 
 	"github.com/Azure/azure-sdk-for-go/profiles/latest/compute/mgmt/compute"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/azure/auth"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/azure/virtual-disk-loss/types"
 	"github.com/pkg/errors"
 )
 
@@ -36,7 +40,7 @@ func DetachDisk(subscriptionID, resourceGroup, azureInstanceName, diskName strin
 	}
 	// Detach
 	vm.VirtualMachineProperties.StorageProfile.DataDisks = &keepAttachedList
-	future, err := vmClient.CreateOrUpdate(context.Background(), resourceGroup, azureInstanceName, vm)
+	future, err := vmClient.CreateOrUpdate(context.TODO(), resourceGroup, azureInstanceName, vm)
 	if err != nil {
 		return errors.Errorf("cannot detach disk, err: %v", err)
 	}
@@ -74,13 +78,21 @@ func DetachDiskMultiple(subscriptionID, resourceGroup, azureInstanceName string,
 			keepAttachedList = append(keepAttachedList, disk)
 		}
 	}
-	// Detach
-	vm.VirtualMachineProperties.StorageProfile.DataDisks = &keepAttachedList
-	future, err := vmClient.CreateOrUpdate(context.Background(), resourceGroup, azureInstanceName, vm)
+
+	// Detach disk from VM properties
+	if len(keepAttachedList) < 1 {
+		vm.VirtualMachineProperties.StorageProfile.DataDisks = &[]compute.DataDisk{}
+	} else {
+		vm.VirtualMachineProperties.StorageProfile.DataDisks = &keepAttachedList
+	}
+
+	// Update VM properties
+	future, err := vmClient.CreateOrUpdate(context.TODO(), resourceGroup, azureInstanceName, vm)
 	if err != nil {
 		return errors.Errorf("cannot detach disk, err: %v", err)
 	}
 
+	// Wait for VM update to complete
 	err = future.WaitForCompletionRef(context.TODO(), vmClient.Client)
 	if err != nil {
 		fmt.Printf("cannot get the vm create or update future response, err: %v", err)
@@ -104,15 +116,17 @@ func AttachDisk(subscriptionID, resourceGroup, azureInstanceName string, diskLis
 		return errors.Errorf("fail get instance, err: %v", err)
 	}
 
-	// Attach
+	// Attach the disk to VM properties
 	vm.VirtualMachineProperties.StorageProfile.DataDisks = diskList
 
-	future, err := vmClient.CreateOrUpdate(context.Background(), resourceGroup, azureInstanceName, vm)
+	// Update the VM properties
+	future, err := vmClient.CreateOrUpdate(context.TODO(), resourceGroup, azureInstanceName, vm)
 	if err != nil {
 		fmt.Printf("cannot attach disk, err: %v", err)
 	}
 
-	err = future.WaitForCompletionRef(context.Background(), vmClient.Client)
+	// Wait for VM update to complete
+	err = future.WaitForCompletionRef(context.TODO(), vmClient.Client)
 	if err != nil {
 		fmt.Printf("cannot get the vm create or update future response, err: %v", err)
 	}
@@ -155,6 +169,32 @@ func GetDiskStatus(subscriptionID, resourceGroup, diskName string) (compute.Disk
 		return "", errors.Errorf("failed to get disk, err:%v", err)
 	}
 	return disk.DiskProperties.DiskState, nil
+}
+
+// SetupSubsciptionID fetch the subscription id from the auth file and export it in experiment struct variable
+func SetupSubscriptionID(experimentsDetails *experimentTypes.ExperimentDetails) error {
+
+	authFile, err := os.Open(os.Getenv("AZURE_AUTH_LOCATION"))
+	if err != nil {
+		return errors.Errorf("fail to open auth file, err: %v", err)
+	}
+
+	authFileContent, err := ioutil.ReadAll(authFile)
+	if err != nil {
+		return errors.Errorf("fail to read auth file, err: %v", err)
+	}
+
+	details := make(map[string]string)
+	if err := json.Unmarshal(authFileContent, &details); err != nil {
+		return errors.Errorf("fail to unmarshal file, err: %v", err)
+	}
+
+	if id, contains := details["subscriptionId"]; contains {
+		experimentsDetails.SubscriptionID = id
+	} else {
+		return errors.Errorf("The auth file does not have a subscriptionId field")
+	}
+	return nil
 }
 
 // stringInSlice will check and return whether a string is present inside a slice or not

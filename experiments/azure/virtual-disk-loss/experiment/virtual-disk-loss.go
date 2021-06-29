@@ -5,6 +5,7 @@ import (
 	experimentEnv "github.com/litmuschaos/litmus-go/pkg/azure/virtual-disk-loss/environment"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/azure/virtual-disk-loss/types"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
+	azureStatus "github.com/litmuschaos/litmus-go/pkg/cloud/azure"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
@@ -58,6 +59,9 @@ func VirtualDiskLoss(clients clients.ClientSets) {
 	types.SetResultEventAttributes(&eventsDetails, types.AwaitedVerdict, msg, "Normal", &resultDetails)
 	events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosResult")
 
+	// Calling AbortWatcher go routine, it will continuously watch for the abort signal and generate the required events and result
+	go common.AbortWatcherWithoutExit(experimentsDetails.ExperimentName, clients, &resultDetails, &chaosDetails, &eventsDetails)
+
 	//DISPLAY THE APP INFORMATION
 	log.InfoWithValues("[Info]: The application information is as follows", logrus.Fields{
 		"Namespace": experimentsDetails.AppNS,
@@ -65,8 +69,11 @@ func VirtualDiskLoss(clients clients.ClientSets) {
 		"Ramp Time": experimentsDetails.RampTime,
 	})
 
-	// Calling AbortWatcher go routine, it will continuously watch for the abort signal and generate the required events and result
-	go common.AbortWatcher(experimentsDetails.ExperimentName, clients, &resultDetails, &chaosDetails, &eventsDetails)
+	log.InfoWithValues("The volume information is as follows", logrus.Fields{
+		"Disk Names":     experimentsDetails.VirtualDiskName,
+		"Resource Group": experimentsDetails.ResourceGroup,
+		"Instance Name":  experimentsDetails.AzureInstanceName,
+	})
 
 	// ADD A PRE-CHAOS CHECK OF YOUR CHOICE HERE
 	// POD STATUS CHECKS FOR THE APPLICATION UNDER TEST AND AUXILIARY APPLICATIONS ARE ADDED BY DEFAULT
@@ -79,6 +86,30 @@ func VirtualDiskLoss(clients clients.ClientSets) {
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
+
+	//PRE-CHAOS AUXILIARY APPLICATION STATUS CHECK
+	if experimentsDetails.AuxiliaryAppInfo != "" {
+		log.Info("[Status]: Verify that the Auxiliary Applications are running (pre-chaos)")
+		if err := status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
+			log.Errorf("Auxiliary Application status check failed, err: %v", err)
+			failStep := "Verify that the Auxiliary Applications are running (pre-chaos)"
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+			return
+		}
+	}
+
+	// Setting up Azure Subscription ID
+	if err := azureStatus.SetupSubscriptionID(&experimentsDetails); err != nil {
+		log.Errorf("fail to get the subscription id, err: %v", err)
+		failStep := "Getting the subscription ID for authentication"
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+		return
+	}
+
+	// generating the event in chaosresult to marked the verdict as awaited
+	msg = "experiment: " + experimentsDetails.ExperimentName + ", Result: Awaited"
+	types.SetResultEventAttributes(&eventsDetails, types.AwaitedVerdict, msg, "Normal", &resultDetails)
+	events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosResult")
 
 	if experimentsDetails.EngineName != "" {
 		// marking AUT as running, as we already checked the status of application under test
