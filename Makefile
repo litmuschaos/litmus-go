@@ -18,7 +18,6 @@ help:
 	@echo ""
 	@echo "Usage:-"
 	@echo "\tmake deps          -- sets up dependencies for image build"
-	@echo "\tmake build         -- builds the litmus-go binary & docker multi-arch image"
 	@echo "\tmake push          -- pushes the litmus-go multi-arch image"
 	@echo "\tmake build-amd64   -- builds the litmus-go binary & docker amd64 image"
 	@echo "\tmake push-amd64    -- pushes the litmus-go amd64 image"
@@ -54,16 +53,6 @@ unused-package-check:
 		echo "go mod tidy checking failed!"; echo "$${tidy}"; echo; \
 	fi
 
-.PHONY: build
-build: experiment-build docker.buildx image-build
-
-.PHONY: experiment-build
-experiment-build:
-	@echo "------------------------------"
-	@echo "--> Build experiment go binary" 
-	@echo "------------------------------"
-	@./build/go-multiarch-build.sh build/generate_go_binary
-
 .PHONY: docker.buildx
 docker.buildx:
 	@echo "------------------------------"
@@ -75,20 +64,19 @@ docker.buildx:
 		docker buildx use multibuilder;\
 	fi
 
-.PHONY: image-build
-image-build:	
-	@echo "-------------------------"
-	@echo "--> Build go-runner image" 
-	@echo "-------------------------"
-	@docker buildx build --file build/Dockerfile --progress plane --platform linux/arm64,linux/amd64 --no-cache --tag $(DOCKER_REGISTRY)/$(DOCKER_REPO)/$(DOCKER_IMAGE):$(DOCKER_TAG) .
+.PHONY: push
+push: docker.buildx image-push
+
+image-push:
+	@echo "------------------------"
+	@echo "--> Push go-runner image" 
+	@echo "------------------------"
+	@echo "Pushing $(DOCKER_REPO)/$(DOCKER_IMAGE):$(DOCKER_TAG)"
+	@docker buildx build . --push --file build/Dockerfile --progress plane --platform linux/arm64,linux/amd64 --no-cache --tag $(DOCKER_REPO)/$(DOCKER_IMAGE):$(DOCKER_TAG)
+
 
 .PHONY: build-amd64
 build-amd64:
-
-	@echo "------------------------------"
-	@echo "--> Build experiment go binary" 
-	@echo "------------------------------"
-	@env GOOS=linux GOARCH=amd64 sh build/generate_go_binary
 	@echo "-------------------------"
 	@echo "--> Build go-runner image" 
 	@echo "-------------------------"
@@ -101,16 +89,7 @@ push-amd64:
 	@echo "--> Pushing image" 
 	@echo "------------------------------"
 	@sudo docker push $(DOCKER_REGISTRY)/$(DOCKER_REPO)/$(DOCKER_IMAGE):$(DOCKER_TAG)
-	
-.PHONY: push
-push: docker.buildx litmus-go-push
-
-litmus-go-push:
-	@echo "-------------------"
-	@echo "--> go-runner image" 
-	@echo "-------------------"
-	REGISTRYNAME="$(DOCKER_REGISTRY)" REPONAME="$(DOCKER_REPO)" IMGNAME="$(DOCKER_IMAGE)" IMGTAG="$(DOCKER_TAG)" ./build/push
-	
+		
 .PHONY: trivy-check
 trivy-check:
 

@@ -1,12 +1,27 @@
+FROM golang:1.14 AS builder
+
+ARG TARGETOS=linux
+ARG TARGETARCH
+
+ADD . /litmus-go
+WORKDIR /litmus-go
+
+RUN export GOOS=${TARGETOS} && \
+    export GOARCH=${TARGETARCH}
+
+RUN CGO_ENABLED=0 go build -o /output/experiments ./bin/experiment
+RUN CGO_ENABLED=0 go build -o /output/helpers ./bin/helper
+
+
 FROM alpine:3.13
 
 LABEL maintainer="LitmusChaos"
 
-ARG TARGETARCH
 ARG USER=litmus
 
 ENV GLIBC_REPO=https://github.com/sgerrand/alpine-pkg-glibc
 ENV GLIBC_VERSION=2.30-r0
+ARG TARGETARCH
 
 RUN rm -rf /var/lib/apt/lists/*
 
@@ -61,9 +76,9 @@ RUN curl -L https://github.com/litmuschaos/test-tools/releases/download/1.13.6/p
 RUN curl -L https://github.com/litmuschaos/test-tools/releases/download/1.13.6/dns_interceptor --output /usr/local/bin/dns_interceptor && chmod +x /usr/local/bin/dns_interceptor
 
 COPY --from=docker:19.03 /usr/local/bin/docker /usr/local/bin/
+COPY --from=builder /output/ /litmus
 
 #Copying Necessary Files
-COPY ./build/_output/${TARGETARCH} ./litmus
 COPY ./pkg/cloud/aws/common/ssm-docs/LitmusChaos-AWS-SSM-Docs.yml ./litmus/LitmusChaos-AWS-SSM-Docs.yml
 
 #add new user
@@ -72,5 +87,4 @@ RUN adduser -D -S $USER \
         && chmod 0440 /etc/sudoers.d/$USER
 
 USER $USER
-
 WORKDIR /litmus

@@ -1,4 +1,0 @@
-# Building go binaries for all helpers
-go build -o build/_output/${GOARCH}/helpers ./bin/helper
-# Building go binaries for all experiments
-go build -o build/_output/${GOARCH}/experiments ./bin/experiment
