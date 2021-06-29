@@ -103,7 +103,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 				events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 			}
 
-			//PowerOff the instance
+			//Stop the instance
 			for i := range instanceNamesList {
 
 				//Stopping the VM instance
