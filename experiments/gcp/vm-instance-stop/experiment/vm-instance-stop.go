@@ -17,6 +17,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// VMInstanceStop executes the experiment steps by injecting chaos into the specified vm instances
 func VMInstanceStop(clients clients.ClientSets) {
 	var err error
 	var activeNodeCount int
