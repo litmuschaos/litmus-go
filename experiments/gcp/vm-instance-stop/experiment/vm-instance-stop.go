@@ -17,6 +17,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// VMInstanceStop executes the experiment steps by injecting chaos into the specified vm instances
 func VMInstanceStop(clients clients.ClientSets) {
 	var err error
 	var activeNodeCount int
@@ -48,13 +49,18 @@ func VMInstanceStop(clients clients.ClientSets) {
 	log.Infof("[PreReq]: Updating the chaos result of %v experiment (SOT)", experimentsDetails.ExperimentName)
 	if err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT"); err != nil {
 		log.Errorf("Unable to Create the Chaos Result, err: %v", err)
-		failStep := "Updating the chaos result of VM instance terminate experiment (SOT)"
+		failStep := "Updating the chaos result of VM instance stop experiment (SOT)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
 
 	// Set the chaos result uid
 	result.SetResultUID(&resultDetails, clients, &chaosDetails)
+
+	// generating the event in chaosresult to marked the verdict as awaited
+	msg := "experiment: " + experimentsDetails.ExperimentName + ", Result: Awaited"
+	types.SetResultEventAttributes(&eventsDetails, types.AwaitedVerdict, msg, "Normal", &resultDetails)
+	events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosResult")
 
 	// Calling AbortWatcher go routine, it will continuously watch for the abort signal and generate the required events and result
 	go common.AbortWatcherWithoutExit(experimentsDetails.ExperimentName, clients, &resultDetails, &chaosDetails, &eventsDetails)
@@ -68,11 +74,8 @@ func VMInstanceStop(clients clients.ClientSets) {
 		"Sequence":        experimentsDetails.Sequence,
 	})
 
-	// Calling AbortWatcher go routine, it will continuously watch for the abort signal and generate the required events and result
-	go common.AbortWatcherWithoutExit(experimentsDetails.ExperimentName, clients, &resultDetails, &chaosDetails, &eventsDetails)
-
 	//PRE-CHAOS NODE STATUS CHECK
-	if experimentsDetails.ManagedNodegroup == "enable" {
+	if experimentsDetails.AutoScalingGroup == "enable" {
 		activeNodeCount, err = gcp.PreChaosNodeStatusCheck(experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 		if err != nil {
 			log.Errorf("Pre chaos node status check failed, err: %v", err)
@@ -101,11 +104,6 @@ func VMInstanceStop(clients clients.ClientSets) {
 			return
 		}
 	}
-
-	// generating the event in chaosresult to marked the verdict as awaited
-	msg := "experiment: " + experimentsDetails.ExperimentName + ", Result: Awaited"
-	types.SetResultEventAttributes(&eventsDetails, types.AwaitedVerdict, msg, "Normal", &resultDetails)
-	events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosResult")
 
 	if experimentsDetails.EngineName != "" {
 		// marking AUT as running, as we already checked the status of application under test
@@ -159,7 +157,7 @@ func VMInstanceStop(clients clients.ClientSets) {
 	resultDetails.Verdict = v1alpha1.ResultVerdictPassed
 
 	// POST-CHAOS ACTIVE NODE COUNT TEST
-	if experimentsDetails.ManagedNodegroup == "enable" {
+	if experimentsDetails.AutoScalingGroup == "enable" {
 		if err = gcp.PostChaosActiveNodeCountCheck(activeNodeCount, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
 			log.Errorf("Post chaos active node count check failed, err: %v", err)
 			failStep := "Verify active number of nodes post chaos"
@@ -169,15 +167,15 @@ func VMInstanceStop(clients clients.ClientSets) {
 	}
 
 	//Verify the GCP VM instance is in RUNNING status (post chaos)
-	if experimentsDetails.ManagedNodegroup != "enable" {
+	if experimentsDetails.AutoScalingGroup != "enable" {
 		if err = gcp.InstanceStatusCheckByName(experimentsDetails.VMInstanceName, experimentsDetails.GCPProjectID, experimentsDetails.InstanceZone); err != nil {
 			log.Errorf("failed to get the vm instance status, err: %v", err)
 			failStep := "Verify the GCP VM instance status (post-chaos)"
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}
-		log.Info("[Status]: VM instance is in running state (post chaos)")
 	}
+	log.Info("[Status]: VM instance is in running state (post chaos)")
 
 	//POST-CHAOS APPLICATION STATUS CHECK
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (post-chaos)")

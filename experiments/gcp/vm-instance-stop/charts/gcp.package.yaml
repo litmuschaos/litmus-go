@@ -1,5 +1,0 @@
-packageName: gcp
-experiments:
-  - name: vm-instance-stop
-    CSV: vm-instance-stop.chartserviceversion.yaml
-    desc: "vm-instance-stop"

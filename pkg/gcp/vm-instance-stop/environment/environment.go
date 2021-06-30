@@ -30,10 +30,10 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.Delay, _ = strconv.Atoi(common.Getenv("STATUS_CHECK_DELAY", "2"))
 	experimentDetails.Timeout, _ = strconv.Atoi(common.Getenv("STATUS_CHECK_TIMEOUT", "180"))
 	experimentDetails.TargetContainer = common.Getenv("TARGET_CONTAINER", "")
-	experimentDetails.VMInstanceName = common.Getenv("VM_INSTANCE_NAME", "")
+	experimentDetails.VMInstanceName = common.Getenv("VM_INSTANCE_NAMES", "")
 	experimentDetails.GCPProjectID = common.Getenv("GCP_PROJECT_ID", "")
-	experimentDetails.InstanceZone = common.Getenv("INSTANCE_ZONE", "")
-	experimentDetails.ManagedNodegroup = common.Getenv("MANAGED_NODEGROUP", "disable")
+	experimentDetails.InstanceZone = common.Getenv("INSTANCE_ZONES", "")
+	experimentDetails.AutoScalingGroup = common.Getenv("AUTO_SCALING_GROUP", "disable")
 	experimentDetails.Sequence = common.Getenv("SEQUENCE", "parallel")
 }
 

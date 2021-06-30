@@ -209,8 +209,6 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 		},
 		Spec: apiv1.PodSpec{
 			HostPID:                       true,
-			HostIPC:                       true,
-			HostNetwork:                   true,
 			TerminationGracePeriodSeconds: &terminationGracePeriodSeconds,
 			ImagePullSecrets:              experimentsDetails.ImagePullSecrets,
 			ServiceAccountName:            experimentsDetails.ChaosServiceAccount,
