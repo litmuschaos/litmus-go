@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/profiles/latest/compute/mgmt/compute"
 	"github.com/Azure/go-autorest/autorest/azure"
@@ -169,6 +170,25 @@ func GetDiskStatus(subscriptionID, resourceGroup, diskName string) (compute.Disk
 		return "", errors.Errorf("failed to get disk, err:%v", err)
 	}
 	return disk.DiskProperties.DiskState, nil
+}
+
+// CheckVirtualDiskWithInstance checks whether the given list of disk are attached to the provided VM instance
+func CheckVirtualDiskWithInstance(experimentsDetails experimentTypes.ExperimentDetails) error {
+	diskList, err := GetInstanceDiskList(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, experimentsDetails.AzureInstanceName)
+	if err != nil {
+		return errors.Errorf("failed to get disk status, err: %v", err)
+	}
+	diskNameList := strings.Split(experimentsDetails.VirtualDiskName, ",")
+	var diskListInstance []string
+	for _, disk := range *diskList {
+		diskListInstance = append(diskListInstance, *disk.Name)
+	}
+	for _, diskName := range diskNameList {
+		if !stringInSlice(diskName, diskListInstance) {
+			return errors.Errorf("'%v' is not attached to vm '%v' instance", diskName, experimentsDetails.AzureInstanceName)
+		}
+	}
+	return nil
 }
 
 // SetupSubsciptionID fetch the subscription id from the auth file and export it in experiment struct variable

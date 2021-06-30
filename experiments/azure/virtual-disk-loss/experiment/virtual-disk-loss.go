@@ -75,9 +75,6 @@ func VirtualDiskLoss(clients clients.ClientSets) {
 		"Instance Name":  experimentsDetails.AzureInstanceName,
 	})
 
-	// ADD A PRE-CHAOS CHECK OF YOUR CHOICE HERE
-	// POD STATUS CHECKS FOR THE APPLICATION UNDER TEST AND AUXILIARY APPLICATIONS ARE ADDED BY DEFAULT
-
 	//PRE-CHAOS APPLICATION STATUS CHECK
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (pre-chaos)")
 	if err := status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
@@ -102,6 +99,15 @@ func VirtualDiskLoss(clients clients.ClientSets) {
 	if err := azureStatus.SetupSubscriptionID(&experimentsDetails); err != nil {
 		log.Errorf("fail to get the subscription id, err: %v", err)
 		failStep := "Getting the subscription ID for authentication"
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+		return
+	}
+
+	// PRE-CHAOS VIRTUAL DISK STATUS CHECK
+	log.Info("[Status]: Verify that the virtual disk are attached to VM instance(pre-chaos)")
+	if err := azureStatus.CheckVirtualDiskWithInstance(experimentsDetails); err != nil {
+		log.Errorf("Virtual disk status check failed, err: %v", err)
+		failStep := "Verify that the virtual disk are attached to VM instance(pre-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
