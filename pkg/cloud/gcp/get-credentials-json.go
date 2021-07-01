@@ -89,7 +89,6 @@ func GetServiceAccountJSONFromSecret() ([]byte, error) {
 	}
 
 	credentials := GCPServiceAccountCredentials{gcpType, gcpProjectID, gcpPrivateKeyID, gcpPrivateKey, gcpClientEmail, gcpClientID, gcpAuthURI, gcpTokenURI, gcpAuthCertURL, gcpClientCertURL}
-
 	credentials.GCPPrivateKey = strings.Replace(credentials.GCPPrivateKey, "\\n", "\n", -1)
 
 	byteSliceJSONString, err := json.Marshal(credentials)
