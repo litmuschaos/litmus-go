@@ -49,7 +49,7 @@ func PrepareDiskVolumeLoss(experimentsDetails *experimentTypes.ExperimentDetails
 	default:
 
 		//get the volume id or list of instance ids
-		diskNamesList := strings.Split(experimentsDetails.DiskVolumeName, ",")
+		diskNamesList := strings.Split(experimentsDetails.DiskVolumeNames, ",")
 		if len(diskNamesList) == 0 {
 			return errors.Errorf("no volumes found to detach")
 		}
@@ -85,8 +85,8 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 	ChaosStartTimeStamp := time.Now()
 	duration := int(time.Since(ChaosStartTimeStamp).Seconds())
 
-	diskZonesList := strings.Split(experimentsDetails.DiskZone, ",")
-	deviceNamesList := strings.Split(experimentsDetails.DeviceName, ",")
+	diskZonesList := strings.Split(experimentsDetails.DiskZones, ",")
+	deviceNamesList := strings.Split(experimentsDetails.DeviceNames, ",")
 
 	for duration < experimentsDetails.ChaosDuration {
 
@@ -162,8 +162,8 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 
 	var instanceNamesList []string
 
-	diskZonesList := strings.Split(experimentsDetails.DiskZone, ",")
-	deviceNamesList := strings.Split(experimentsDetails.DeviceName, ",")
+	diskZonesList := strings.Split(experimentsDetails.DiskZones, ",")
+	deviceNamesList := strings.Split(experimentsDetails.DeviceNames, ",")
 
 	//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
 	ChaosStartTimeStamp := time.Now()
@@ -259,8 +259,8 @@ func AbortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, diskNam
 
 	log.Info("[Abort]: Chaos Revert Started")
 
-	diskZonesList := strings.Split(experimentsDetails.DiskZone, ",")
-	deviceNamesList := strings.Split(experimentsDetails.DeviceName, ",")
+	diskZonesList := strings.Split(experimentsDetails.DiskZones, ",")
+	deviceNamesList := strings.Split(experimentsDetails.DeviceNames, ",")
 
 	for i := range diskNamesList {
 		//Get volume attachment details

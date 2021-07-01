@@ -72,8 +72,8 @@ func VMDiskLoss(clients clients.ClientSets) {
 
 	//DISPLAY THE VOLUME INFORMATION
 	log.InfoWithValues("The volume information is as follows", logrus.Fields{
-		"Volume IDs": experimentsDetails.DiskVolumeName,
-		"Zones":      experimentsDetails.DiskZone,
+		"Volume IDs": experimentsDetails.DiskVolumeNames,
+		"Zones":      experimentsDetails.DiskZones,
 		"Ramp Time":  experimentsDetails.RampTime,
 	})
 
@@ -121,7 +121,7 @@ func VMDiskLoss(clients clients.ClientSets) {
 	}
 
 	//Verify the vm instance is attached to disk volume
-	if err := gcp.DiskVolumeStateCheck(experimentsDetails.GCPProjectID, experimentsDetails.DiskZone, experimentsDetails.DiskVolumeName, experimentsDetails.DeviceName); err != nil {
+	if err := gcp.DiskVolumeStateCheck(experimentsDetails.GCPProjectID, experimentsDetails.DiskZones, experimentsDetails.DiskVolumeNames, experimentsDetails.DeviceNames); err != nil {
 		log.Errorf("volume status check failed pre chaos, err: %v", err)
 		failStep := "Verify the disk volume is attached to am instance (pre-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
@@ -168,7 +168,7 @@ func VMDiskLoss(clients clients.ClientSets) {
 	}
 
 	//Verify the vm instance is attached to disk volume
-	if err := gcp.DiskVolumeStateCheck(experimentsDetails.GCPProjectID, experimentsDetails.DiskZone, experimentsDetails.DiskVolumeName, experimentsDetails.DeviceName); err != nil {
+	if err := gcp.DiskVolumeStateCheck(experimentsDetails.GCPProjectID, experimentsDetails.DiskZones, experimentsDetails.DiskVolumeNames, experimentsDetails.DeviceNames); err != nil {
 		log.Errorf("volume status check failed pre chaos, err: %v", err)
 		failStep := "Verify the disk volume is attached to am instance (post-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)

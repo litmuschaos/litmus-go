@@ -31,10 +31,10 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.TargetContainer = common.Getenv("TARGET_CONTAINER", "")
 	experimentDetails.VolumeAffectedPerc, _ = strconv.Atoi(common.Getenv("VOLUME_AFFECTED_PERC", "0"))
 	experimentDetails.GCPProjectID = common.Getenv("GCP_PROJECT_ID", "")
-	experimentDetails.DiskVolumeName = common.Getenv("DISK_VOLUME_NAME", "")
+	experimentDetails.DiskVolumeNames = common.Getenv("DISK_VOLUME_NAMES", "")
 	experimentDetails.Sequence = common.Getenv("SEQUENCE", "parallel")
-	experimentDetails.DiskZone = common.Getenv("DISK_ZONE", "")
-	experimentDetails.DeviceName = common.Getenv("DEVICE_NAME", "")
+	experimentDetails.DiskZones = common.Getenv("DISK_ZONES", "")
+	experimentDetails.DeviceNames = common.Getenv("DEVICE_NAMES", "")
 }
 
 //InitialiseChaosVariables initialises all the global variables

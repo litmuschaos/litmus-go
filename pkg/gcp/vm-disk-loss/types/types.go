@@ -28,8 +28,8 @@ type ExperimentDetails struct {
 	VolumeAffectedPerc       int
 	LIBImagePullPolicy       string
 	GCPProjectID             string
-	DiskVolumeName           string
-	DiskZone                 string
-	DeviceName               string
+	DiskVolumeNames          string
+	DiskZones                string
+	DeviceNames              string
 	TargetDiskVolumeNameList []string
 }
