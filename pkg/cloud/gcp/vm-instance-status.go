@@ -127,7 +127,7 @@ func InstanceStatusCheck(instanceNamesList []string, gcpProjectId string, instan
 			return err
 		}
 		if instanceState != "RUNNING" {
-			return errors.Errorf("failed to get the ec2 instance '%v' in running sate, current state: %v", instanceNamesList[i], instanceState)
+			return errors.Errorf("failed to get the vm instance '%v' in running sate, current state: %v", instanceNamesList[i], instanceState)
 		}
 	}
 	return nil
