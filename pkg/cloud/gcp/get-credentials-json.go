@@ -1,74 +1,101 @@
 package gcp
 
 import (
-	"fmt"
+	"encoding/json"
 	"io/ioutil"
+	"strings"
 )
 
+// GCPServiceAccountCredentials stores the service account credentials
+type GCPServiceAccountCredentials struct {
+	GCPType          string `json:"type"`
+	GCPProjectID     string `json:"project_id"`
+	GCPPrivateKeyID  string `json:"private_key_id"`
+	GCPPrivateKey    string `json:"private_key"`
+	GCPClientEmail   string `json:"client_email"`
+	GCPClientID      string `json:"client_id"`
+	GCPAuthURI       string `json:"auth_uri"`
+	GCPTokenURI      string `json:"token_uri"`
+	GCPAuthCertURL   string `json:"auth_provider_x509_cert_url"`
+	GCPClientCertURL string `json:"client_x509_cert_url"`
+}
+
+// getFileContent reads the file content at the given file path
+func getFileContent(filePath string) (string, error) {
+	fileContentByteSlice, err := ioutil.ReadFile(filePath)
+	if err != nil {
+		return "", err
+	}
+
+	fileContentString := string(fileContentByteSlice)
+
+	if fileContentString[len(fileContentString)-1] == '\n' {
+		fileContentString = fileContentString[:len(fileContentString)-1]
+	}
+
+	return fileContentString, nil
+}
+
+// GetServiceAccountJSONFromSecret fetches the secrets mounted as volume and returns the json credentials byte slice
 func GetServiceAccountJSONFromSecret() ([]byte, error) {
-	gcpType, err := ioutil.ReadFile("/tmp/type")
-	if err != nil {
-		return []byte{}, err
-	}
-	gcpProjectID, err := ioutil.ReadFile("/tmp/project_id")
-	if err != nil {
-		return []byte{}, err
-	}
-	gcpPrivateKeyID, err := ioutil.ReadFile("/tmp/private_key_id")
-	if err != nil {
-		return []byte{}, err
-	}
-	gcpPrivateKey, err := ioutil.ReadFile("/tmp/private_key")
-	if err != nil {
-		return []byte{}, err
-	}
-	gcpClientEmail, err := ioutil.ReadFile("/tmp/client_email")
-	if err != nil {
-		return []byte{}, err
-	}
-	gcpClientID, err := ioutil.ReadFile("/tmp/client_id")
-	if err != nil {
-		return []byte{}, err
-	}
-	gcpAuthURI, err := ioutil.ReadFile("/tmp/auth_uri")
-	if err != nil {
-		return []byte{}, err
-	}
-	gcpTokenURI, err := ioutil.ReadFile("/tmp/token_uri")
-	if err != nil {
-		return []byte{}, err
-	}
-	gcpAuthCertURL, err := ioutil.ReadFile("/tmp/auth_provider_x509_cert_url")
-	if err != nil {
-		return []byte{}, err
-	}
-	gcpClientCertURL, err := ioutil.ReadFile("/tmp/client_x509_cert_url")
+	gcpType, err := getFileContent("/tmp/type")
 	if err != nil {
 		return []byte{}, err
 	}
 
-	jsonString := fmt.Sprintf(`{
-		"type": "%s",
-		"project_id": "%s",
-		"private_key_id": "%s",
-		"private_key": "%s",
-		"client_email": "%s",
-		"client_id": "%s",
-		"auth_uri": "%s",
-		"token_uri": "%s",
-		"auth_provider_x509_cert_url": "%s",
-		"client_x509_cert_url": "%s"
-		}`, string(gcpType)[:len(string(gcpType))-1],
-		string(gcpProjectID)[:len(string(gcpProjectID))-1],
-		string(gcpPrivateKeyID)[:len(string(gcpPrivateKeyID))-1],
-		string(gcpPrivateKey)[:len(string(gcpPrivateKey))-1],
-		string(gcpClientEmail)[:len(string(gcpClientEmail))-1],
-		string(gcpClientID)[:len(string(gcpClientID))-1],
-		string(gcpAuthURI)[:len(string(gcpAuthURI))-1],
-		string(gcpTokenURI)[:len(string(gcpTokenURI))-1],
-		string(gcpAuthCertURL)[:len(string(gcpAuthCertURL))-1],
-		string(gcpClientCertURL)[:len(string(gcpClientCertURL))-1],
-	)
+	gcpProjectID, err := getFileContent("/tmp/project_id")
+	if err != nil {
+		return []byte{}, err
+	}
 
-	return []byte(jsonString), nil
+	gcpPrivateKeyID, err := getFileContent("/tmp/private_key_id")
+	if err != nil {
+		return []byte{}, err
+	}
+
+	gcpPrivateKey, err := getFileContent("/tmp/private_key")
+	if err != nil {
+		return []byte{}, err
+	}
+
+	gcpClientEmail, err := getFileContent("/tmp/client_email")
+	if err != nil {
+		return []byte{}, err
+	}
+
+	gcpClientID, err := getFileContent("/tmp/client_id")
+	if err != nil {
+		return []byte{}, err
+	}
+
+	gcpAuthURI, err := getFileContent("/tmp/auth_uri")
+	if err != nil {
+		return []byte{}, err
+	}
+
+	gcpTokenURI, err := getFileContent("/tmp/token_uri")
+	if err != nil {
+		return []byte{}, err
+	}
+
+	gcpAuthCertURL, err := getFileContent("/tmp/auth_provider_x509_cert_url")
+	if err != nil {
+		return []byte{}, err
+	}
+
+	gcpClientCertURL, err := getFileContent("/tmp/client_x509_cert_url")
+	if err != nil {
+		return []byte{}, err
+	}
+
+	credentials := GCPServiceAccountCredentials{gcpType, gcpProjectID, gcpPrivateKeyID, gcpPrivateKey, gcpClientEmail, gcpClientID, gcpAuthURI, gcpTokenURI, gcpAuthCertURL, gcpClientCertURL}
+
+	credentials.GCPPrivateKey = strings.Replace(credentials.GCPPrivateKey, "\\n", "\n", -1)
+
+	byteSliceJSONString, err := json.Marshal(credentials)
+	if err != nil {
+		return []byte{}, err
+	}
+
+	return byteSliceJSONString, nil
 }
