@@ -31,12 +31,9 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.Timeout, _ = strconv.Atoi(common.Getenv("STATUS_CHECK_TIMEOUT", "180"))
 	experimentDetails.TargetPods = common.Getenv("TARGET_PODS", "")
 	experimentDetails.ChaosInjectCmd = common.Getenv("CHAOS_INJECT_COMMAND", "md5sum /dev/zero")
-	experimentDetails.ChaosKillCmd = common.Getenv("CHAOS_KILL_COMMAND", "kill $(find /proc -name exe -lname '*/md5sum' 2>&1 | grep -v 'Permission denied' | awk -F/ '{print $(NF-1)}')")
-	experimentDetails.LIBImage = common.Getenv("LIB_IMAGE", "litmuschaos/go-runner:latest")
-	experimentDetails.LIBImagePullPolicy = common.Getenv("LIB_IMAGE_PULL_POLICY", "Always")
+	experimentDetails.ChaosKillCmd = common.Getenv("CHAOS_KILL_COMMAND", "killall md5sum")
 	experimentDetails.TargetContainer = common.Getenv("TARGET_CONTAINER", "")
 	experimentDetails.Sequence = common.Getenv("SEQUENCE", "parallel")
-	experimentDetails.SocketPath = common.Getenv("SOCKET_PATH", "/var/run/docker.sock")
 	experimentDetails.TerminationGracePeriodSeconds, _ = strconv.Atoi(common.Getenv("TERMINATION_GRACE_PERIOD_SECONDS", ""))
 }
 
