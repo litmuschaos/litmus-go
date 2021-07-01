@@ -23,7 +23,7 @@ spec:
         env:
           # provide application namespace
           - name: APP_NAMESPACE
-            value: ''
+            value: 'default'
 
           # provide application labels
           - name: APP_LABEL
@@ -34,7 +34,10 @@ spec:
             value: '' 
 
           - name: TOTAL_CHAOS_DURATION
-            value: ''
+            value: '30'
+
+          - name: CHAOS_INTERVAL
+            value: '10'
 
           # provide auxiliary application details - namespace and labels of the applications
           # sample input is - "ns1:app=percona,ns2:name=nginx"
@@ -43,15 +46,31 @@ spec:
           
           ## Period to wait before injection of chaos in sec
           - name: RAMP_TIME
-            value: ''
+            value: '0'
 
           ## env var that describes the library used to execute the chaos
           ## default: litmus. Supported values: litmus, powerfulseal, chaoskube
           - name: LIB
-            value: ''
+            value: 'litmus'
 
           # provide the chaos namespace
           - name: CHAOS_NAMESPACE
+            value: 'default'
+
+          # set the GCP project id
+          - name: GCP_PROJECT_ID
+            value: ''
+
+          # set the disk volume name(s) as comma seperated values for eg. volume1,volume2,...
+          - name: DISK_VOLUME_NAMES
+            value: ''
+                    
+          # set the disk zone(s) as comma seperated values in the corresponding order of DISK_VOLUME_NAME for eg. zone1,zone2,...
+          - name: DISK_ZONES
+            value: ''
+                  
+          # set the device name(s) as comma seperated values in the corresponding order of DISK_VOLUME_NAME for eg. device1,device2,...
+          - name: DEVICE_NAMES
             value: ''
         
           - name: POD_NAME
@@ -63,4 +82,7 @@ spec:
             valueFrom:
               fieldRef:
                 fieldPath: spec.serviceAccountName
+          secrets:
+            - name: cloud-secret
+              mountPath: /tmp/
 

@@ -45,17 +45,17 @@ spec:
     env:
 
     - name: TOTAL_CHAOS_DURATION
-      value: '' 
+      value: '30' 
 
     - name: CHAOS_INTERVAL
-      value: ''
+      value: '10'
 
     - name: LIB
       value: 'litmus'
     
     # Period to wait before and after injection of chaos in sec
     - name: RAMP_TIME
-      value: ''
+      value: '0'
 
     # parallel or serial; determines how chaos is injected
     - name: SEQUENCE
@@ -66,15 +66,15 @@ spec:
       value: ''
 
     # set the disk volume name(s) as comma seperated values for eg. volume1,volume2,...
-    - name: DISK_VOLUME_NAME
+    - name: DISK_VOLUME_NAMES
       value: ''
               
     # set the disk zone(s) as comma seperated values in the corresponding order of DISK_VOLUME_NAME for eg. zone1,zone2,...
-    - name: DISK_ZONE
+    - name: DISK_ZONES
       value: ''
             
     # set the device name(s) as comma seperated values in the corresponding order of DISK_VOLUME_NAME for eg. device1,device2,...
-    - name: DEVICE_NAME
+    - name: DEVICE_NAMES
       value: ''
       
     labels:

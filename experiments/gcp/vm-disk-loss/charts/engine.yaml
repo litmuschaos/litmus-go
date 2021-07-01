@@ -27,13 +27,13 @@ spec:
               value: ''
 
             # set the disk volume name(s)
-            - name: DISK_VOLUME_NAME
+            - name: DISK_VOLUME_NAMES
               value: ''
               
             # set the disk zone(s)
-            - name: DISK_ZONE
+            - name: DISK_ZONES
               value: ''
             
             # set the device name(s)
-            - name: DEVICE_NAME
+            - name: DEVICE_NAMES
               value: ''
