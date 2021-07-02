@@ -2,7 +2,7 @@ name: E2E
 on:
   pull_request:
     branches: [master]
-    types: [edited, opened, synchronize, reopened]
+    types: [opened, synchronize, reopened]
     paths-ignore:
       - '**.md'
       - '**.yml'
@@ -10,7 +10,7 @@ on:
 
 jobs:
   Helm_Install_Generic_Tests:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
     steps:
       
       - uses: actions/checkout@v2
@@ -18,8 +18,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}    
           
       - name: Generate go binary and build docker image
-        run: |
-          make build-amd64
+        run: make build-amd64
 
       #Install and configure a kind cluster
       - name: Installing KinD cluster for the test
@@ -31,13 +30,12 @@ jobs:
       - name: Configuring and testing the Installation
         run: |
           kubectl taint nodes kind-control-plane node-role.kubernetes.io/master-
-          kubectl cluster-info --context kind-kind
           kind get kubeconfig --internal >$HOME/.kube/config
-          kubectl get nodes            
+          kubectl cluster-info --context kind-kind
+          kubectl get nodes 
 
-      - name: Load image on the nodes of the cluster
-        run: |
-          kind load docker-image --name=kind litmuschaos/go-runner:ci
+      - name: Load docker image
+        run: /usr/local/bin/kind load docker-image litmuschaos/go-runner:ci
 
       - name: Deploy a sample application for chaos injection
         run: |
@@ -212,7 +210,6 @@ jobs:
         if: always()
         run: kind delete cluster
 
-
   Pod_Level_In_Serial_Mode:
     runs-on: ubuntu-latest
     steps:
@@ -229,7 +226,6 @@ jobs:
       - name: Generating Go binary and Building docker image
         run: |
           make build-amd64
-
       #Install and configure a kind cluster
       - name: Installing Prerequisites (K3S Cluster)
         env: 
@@ -253,7 +249,6 @@ jobs:
           make build-litmus
           make app-deploy
           make pod-affected-perc-ton-series
-
       - name: Deleting K3S cluster
         if: always()
         run: /usr/local/bin/k3s-uninstall.sh        
@@ -274,7 +269,6 @@ jobs:
       - name: Generating Go binary and Building docker image
         run: |
           make build-amd64
-
       #Install and configure a kind cluster
       - name: Installing Prerequisites (K3S Cluster)
         env: 
@@ -283,7 +277,6 @@ jobs:
           curl -sfL https://get.k3s.io | sh -s - --docker --write-kubeconfig-mode 664
           kubectl wait node --all --for condition=ready --timeout=90s
           kubectl get nodes
-
       - uses: actions/checkout@v2
         with:
           repository: 'litmuschaos/litmus-e2e'
@@ -298,11 +291,10 @@ jobs:
           make build-litmus
           make app-deploy
           make pod-affected-perc-ton-parallel
-
       - name: Deleting K3S cluster
         if: always()
         run: /usr/local/bin/k3s-uninstall.sh
-        
+
   Node_Level_Tests:
     runs-on: ubuntu-latest
     steps:    
@@ -320,19 +312,15 @@ jobs:
         run: |
           make build-amd64
 
-      #Install and configure a kind cluster
-      - name: Installing KinD cluster for the test
-        uses: engineerd/setup-kind@v0.5.0
-        with:
-            version: "v0.7.0"
-            config: "build/kind-cluster/kind-config.yaml"
-            
+      - name: Create KinD Cluster
+        run: kind create cluster --config build/kind-cluster/kind-config.yaml
+
       - name: Configuring and testing the Installation
         run: |
           kubectl taint nodes kind-control-plane node-role.kubernetes.io/master-
           kubectl cluster-info --context kind-kind
-          kind get kubeconfig --internal >$HOME/.kube/config
-          kubectl get nodes            
+          kubectl wait node --all --for condition=ready --timeout=90s
+          kubectl get nodes
 
       - name: Load image on the nodes of the cluster
         run: |
