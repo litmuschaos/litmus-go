@@ -3,7 +3,7 @@ package duplication
 import (
 	"strconv"
 
-	network_chaos "github.com/litmuschaos/litmus-go/chaoslib/litmus/network-chaos/lib"
+	network_chaos "github.com/litmuschaos/litmus-go/chaoslib/litmus/pod-network-chaos/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/network-chaos/types"
 	"github.com/litmuschaos/litmus-go/pkg/types"

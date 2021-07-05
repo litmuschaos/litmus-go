@@ -22,6 +22,8 @@ import (
 	nodeDrain "github.com/litmuschaos/litmus-go/experiments/generic/node-drain/experiment"
 	nodeIOStress "github.com/litmuschaos/litmus-go/experiments/generic/node-io-stress/experiment"
 	nodeMemoryHog "github.com/litmuschaos/litmus-go/experiments/generic/node-memory-hog/experiment"
+	nodeNetworkLatency "github.com/litmuschaos/litmus-go/experiments/generic/node-network-latency/experiment"
+	nodeNetworkLoss "github.com/litmuschaos/litmus-go/experiments/generic/node-network-loss/experiment"
 	nodeRestart "github.com/litmuschaos/litmus-go/experiments/generic/node-restart/experiment"
 	nodeTaint "github.com/litmuschaos/litmus-go/experiments/generic/node-taint/experiment"
 	podAutoscaler "github.com/litmuschaos/litmus-go/experiments/generic/pod-autoscaler/experiment"
@@ -113,6 +115,10 @@ func main() {
 		podNetworkLatency.PodNetworkLatency(clients)
 	case "pod-network-loss":
 		podNetworkLoss.PodNetworkLoss(clients)
+	case "node-network-latency":
+		nodeNetworkLatency.NodeNetworkLatency(clients)
+	case "node-network-loss":
+		nodeNetworkLoss.NodeNetworkLoss(clients)
 	case "pod-memory-hog":
 		podMemoryHog.PodMemoryHog(clients)
 	case "pod-cpu-hog":

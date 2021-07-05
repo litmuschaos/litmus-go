@@ -43,4 +43,8 @@ type ExperimentDetails struct {
 	Resources                          corev1.ResourceRequirements
 	ImagePullSecrets                   []corev1.LocalObjectReference
 	TerminationGracePeriodSeconds      int
+	// specific to node level experiment
+	AuxiliaryAppInfo string
+	NodeLabel        string
+	TargetNode       string
 }
