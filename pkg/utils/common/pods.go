@@ -159,10 +159,10 @@ func CheckForAvailibiltyOfPod(namespace, name string, clients clients.ClientSets
 	}
 	_, err := clients.KubeClient.CoreV1().Pods(namespace).Get(name, v1.GetOptions{})
 
-	if err != nil && !k8serrors.IsNotFound(err) {
-		return false, err
-	} else if err != nil && k8serrors.IsNotFound(err) {
+	if err != nil && k8serrors.IsNotFound(err) {
 		return false, nil
+	} else if err != nil {
+		return false, err
 	}
 	return true, nil
 }
@@ -170,17 +170,14 @@ func CheckForAvailibiltyOfPod(namespace, name string, clients clients.ClientSets
 //FilterNonChaosPods remove the chaos pods(operator, runner) for the podList
 // it filter when the applabels are not defined and it will select random pods from appns
 func FilterNonChaosPods(podList core_v1.PodList, chaosDetails *types.ChaosDetails) core_v1.PodList {
-	if chaosDetails.AppDetail.Label == "" {
-		nonChaosPods := core_v1.PodList{}
-		// ignore chaos pods
-		for index, pod := range podList.Items {
-			if !(pod.Labels["chaosUID"] == string(chaosDetails.ChaosUID) || pod.Labels["name"] == "chaos-operator") {
-				nonChaosPods.Items = append(nonChaosPods.Items, podList.Items[index])
-			}
+	nonChaosPods := core_v1.PodList{}
+	// ignore chaos pods
+	for index, pod := range podList.Items {
+		if pod.Labels["chaosUID"] == "" && pod.Labels["name"] != "chaos-operator" {
+			nonChaosPods.Items = append(nonChaosPods.Items, podList.Items[index])
 		}
-		return nonChaosPods
 	}
-	return podList
+	return nonChaosPods
 }
 
 // GetTargetPodsWhenTargetPodsENVSet derive the specific target pods, if TARGET_PODS env is set
