@@ -8,21 +8,24 @@
 IS_DOCKER_INSTALLED = $(shell which docker >> /dev/null 2>&1; echo $$?)
 
 # Docker info
+DOCKER_REGISTRY ?= docker.io
 DOCKER_REPO ?= litmuschaos
 DOCKER_IMAGE ?= go-runner
 DOCKER_TAG ?= ci
-
-PACKAGES = $(shell go list ./... | grep -v '/vendor/')
-
-.PHONY: all
-all: deps gotasks build push trivy-check build-amd64 push-amd64
 
 .PHONY: help
 help:
 	@echo ""
 	@echo "Usage:-"
-	@echo "\tmake all   -- [default] builds the litmus containers"
+	@echo "\tmake deps          -- sets up dependencies for image build"
+	@echo "\tmake build         -- builds the litmus-go binary & docker multi-arch image"
+	@echo "\tmake push          -- pushes the litmus-go multi-arch image"
+	@echo "\tmake build-amd64   -- builds the litmus-go binary & docker amd64 image"
+	@echo "\tmake push-amd64    -- pushes the litmus-go amd64 image"
 	@echo ""
+
+.PHONY: all
+all: deps gotasks build push trivy-check
 
 .PHONY: deps
 deps: _build_check_docker
@@ -39,26 +42,7 @@ _build_check_docker:
 		fi;
 
 .PHONY: gotasks
-gotasks: format lint unused-package-check
-
-.PHONY: format
-format:
-	@echo "------------------"
-	@echo "--> Running go fmt"
-	@echo "------------------"
-	@go fmt $(PACKAGES)
-
-.PHONY: lint
-lint:
-	@echo "------------------"
-	@echo "--> Running golint"
-	@echo "------------------"
-	@go get -u golang.org/x/lint/golint
-	@golint $(PACKAGES)
-	@echo "------------------"
-	@echo "--> Running go vet"
-	@echo "------------------"
-	@go vet $(PACKAGES)
+gotasks: unused-package-check
 
 .PHONY: unused-package-check
 unused-package-check:
@@ -96,7 +80,7 @@ image-build:
 	@echo "-------------------------"
 	@echo "--> Build go-runner image" 
 	@echo "-------------------------"
-	@docker buildx build --file build/Dockerfile --progress plane --platform linux/arm64,linux/amd64 --no-cache --tag $(DOCKER_REPO)/$(DOCKER_IMAGE):$(DOCKER_TAG) .
+	@docker buildx build --file build/Dockerfile --progress plane --platform linux/arm64,linux/amd64 --no-cache --tag $(DOCKER_REGISTRY)/$(DOCKER_REPO)/$(DOCKER_IMAGE):$(DOCKER_TAG) .
 
 .PHONY: build-amd64
 build-amd64:
@@ -108,7 +92,7 @@ build-amd64:
 	@echo "-------------------------"
 	@echo "--> Build go-runner image" 
 	@echo "-------------------------"
-	@sudo docker build --file build/Dockerfile --tag $(DOCKER_REPO)/$(DOCKER_IMAGE):$(DOCKER_TAG) . --build-arg TARGETARCH=amd64
+	@sudo docker build --file build/Dockerfile --tag $(DOCKER_REGISTRY)/$(DOCKER_REPO)/$(DOCKER_IMAGE):$(DOCKER_TAG) . --build-arg TARGETARCH=amd64
 
 .PHONY: push-amd64
 push-amd64:
@@ -116,7 +100,7 @@ push-amd64:
 	@echo "------------------------------"
 	@echo "--> Pushing image" 
 	@echo "------------------------------"
-	@sudo docker push $(DOCKER_REPO)/$(DOCKER_IMAGE):$(DOCKER_TAG)
+	@sudo docker push $(DOCKER_REGISTRY)/$(DOCKER_REPO)/$(DOCKER_IMAGE):$(DOCKER_TAG)
 	
 .PHONY: push
 push: docker.buildx litmus-go-push
@@ -125,7 +109,7 @@ litmus-go-push:
 	@echo "-------------------"
 	@echo "--> go-runner image" 
 	@echo "-------------------"
-	REPONAME="$(DOCKER_REPO)" IMGNAME="$(DOCKER_IMAGE)" IMGTAG="$(DOCKER_TAG)" ./build/push
+	REGISTRYNAME="$(DOCKER_REGISTRY)" REPONAME="$(DOCKER_REPO)" IMGNAME="$(DOCKER_IMAGE)" IMGTAG="$(DOCKER_TAG)" ./build/push
 	
 .PHONY: trivy-check
 trivy-check:
@@ -133,5 +117,5 @@ trivy-check:
 	@echo "------------------------"
 	@echo "---> Running Trivy Check"
 	@echo "------------------------"
-	@./trivy --exit-code 0 --severity HIGH --no-progress $(DOCKER_REPO)/$(DOCKER_IMAGE):$(DOCKER_TAG)
-	@./trivy --exit-code 0 --severity CRITICAL --no-progress $(DOCKER_REPO)/$(DOCKER_IMAGE):$(DOCKER_TAG)
+	@./trivy --exit-code 0 --severity HIGH --no-progress $(DOCKER_REGISTRY)/$(DOCKER_REPO)/$(DOCKER_IMAGE):$(DOCKER_TAG)
+	@./trivy --exit-code 0 --severity CRITICAL --no-progress $(DOCKER_REGISTRY)/$(DOCKER_REPO)/$(DOCKER_IMAGE):$(DOCKER_TAG)

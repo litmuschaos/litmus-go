@@ -5,7 +5,7 @@ import (
 	"time"
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
-	ebs "github.com/litmuschaos/litmus-go/pkg/cloud/aws"
+	ebs "github.com/litmuschaos/litmus-go/pkg/cloud/aws/ebs"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/kube-aws/ebs-loss/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
@@ -42,6 +42,8 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 			if err = ebs.EBSVolumeDetach(volumeID, experimentsDetails.Region); err != nil {
 				return errors.Errorf("ebs detachment failed, err: %v", err)
 			}
+
+			common.SetTargets(volumeID, "injected", "EBS", chaosDetails)
 
 			//Wait for ebs volume detachment
 			log.Infof("[Wait]: Wait for EBS volume detachment for volume %v", volumeID)
@@ -82,6 +84,7 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 					return errors.Errorf("unable to attach the ebs volume to the ec2 instance, err: %v", err)
 				}
 			}
+			common.SetTargets(volumeID, "reverted", "EBS", chaosDetails)
 		}
 		duration = int(time.Since(ChaosStartTimeStamp).Seconds())
 	}
@@ -121,6 +124,7 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 			if err := ebs.EBSVolumeDetach(volumeID, experimentsDetails.Region); err != nil {
 				return errors.Errorf("ebs detachment failed, err: %v", err)
 			}
+			common.SetTargets(volumeID, "injected", "EBS", chaosDetails)
 		}
 
 		log.Info("[Info]: Checking if the detachment process initiated")
@@ -171,6 +175,7 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 					return errors.Errorf("unable to attach the ebs volume to the ec2 instance, err: %v", err)
 				}
 			}
+			common.SetTargets(volumeID, "reverted", "EBS", chaosDetails)
 		}
 		duration = int(time.Since(ChaosStartTimeStamp).Seconds())
 	}
@@ -178,7 +183,7 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 }
 
 // AbortWatcher will watching for the abort signal and revert the chaos
-func AbortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, volumeIDList []string, abort chan os.Signal) {
+func AbortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, volumeIDList []string, abort chan os.Signal, chaosDetails *types.ChaosDetails) {
 
 	<-abort
 
@@ -210,6 +215,7 @@ func AbortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, volumeI
 				log.Errorf("ebs attachment failed when an abort signal is received, err: %v", err)
 			}
 		}
+		common.SetTargets(volumeID, "reverted", "EBS", chaosDetails)
 	}
 	log.Info("[Abort]: Chaos Revert Completed")
 	os.Exit(1)

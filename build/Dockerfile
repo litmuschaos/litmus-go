@@ -33,7 +33,7 @@ RUN set -ex && \
      /usr/glibc-compat/sbin/ldconfig /lib /usr/glibc-compat/lib
 
 # Change default shell from ash to bash
-RUN sed -i -e "s/bin\/ash/bin\/bash/" /etc/passwd     
+RUN sed -i -e "s/bin\/ash/bin\/bash/" /etc/passwd   
 
 #Installing Kubectl
 ENV KUBE_LATEST_VERSION="v1.18.0"
@@ -49,18 +49,22 @@ ENV PUMBA_VERSION="0.7.7"
 RUN curl -L https://github.com/alexei-led/pumba/releases/download/${PUMBA_VERSION}/pumba_linux_${TARGETARCH} --output /usr/local/bin/pumba && chmod +x /usr/local/bin/pumba
 
 #Installing promql cli binaries
-RUN curl -L https://github.com/litmuschaos/test-tools/raw/master/custom/promql-cli/promql-linux-${TARGETARCH} --output /usr/local/bin/promql && chmod +x /usr/local/bin/promql
+RUN curl -L https://github.com/litmuschaos/test-tools/releases/download/1.13.6/promql-linux-${TARGETARCH} --output /usr/local/bin/promql && chmod +x /usr/local/bin/promql
 
 #Installing nsutil cli binaries
-RUN curl -L https://github.com/litmuschaos/test-tools/raw/master/custom/nsutil/nsutil --output /usr/local/bin/nsutil && chmod +x /usr/local/bin/nsutil
+RUN curl -L https://github.com/litmuschaos/test-tools/releases/download/1.13.6/nsutil-linux-${TARGETARCH} --output /usr/local/bin/nsutil && chmod +x /usr/local/bin/nsutil
+
+#Installing pause cli binaries
+RUN curl -L https://github.com/litmuschaos/test-tools/releases/download/1.13.6/pause-linux-${TARGETARCH} --output /usr/local/bin/pause && chmod +x /usr/local/bin/pause
 
 #Installing dns_interceptor cli binaries
-RUN curl -L https://github.com/litmuschaos/test-tools/raw/master/custom/dns_interceptor/dns_interceptor --output /usr/local/bin/dns_interceptor && chmod +x /usr/local/bin/dns_interceptor
+RUN curl -L https://github.com/litmuschaos/test-tools/releases/download/1.13.6/dns_interceptor --output /usr/local/bin/dns_interceptor && chmod +x /usr/local/bin/dns_interceptor
 
 COPY --from=docker:19.03 /usr/local/bin/docker /usr/local/bin/
 
 #Copying Necessary Files
 COPY ./build/_output/${TARGETARCH} ./litmus
+COPY ./pkg/cloud/aws/common/ssm-docs/LitmusChaos-AWS-SSM-Docs.yml ./litmus/LitmusChaos-AWS-SSM-Docs.yml
 
 #add new user
 RUN adduser -D -S $USER \
