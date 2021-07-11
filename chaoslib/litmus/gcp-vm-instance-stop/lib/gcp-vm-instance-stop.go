@@ -129,7 +129,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 
 				// wait for the chaos interval
 				log.Infof("[Wait]: Waiting for chaos interval of %vs", experimentsDetails.ChaosInterval)
-				time.Sleep(time.Duration(experimentsDetails.ChaosInterval) * time.Second)
+				common.WaitForDuration(experimentsDetails.ChaosInterval)
 
 				// starting the VM instance
 				if experimentsDetails.AutoScalingGroup != "enable" {
@@ -204,7 +204,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 
 			// wait for chaos interval
 			log.Infof("[Wait]: Waiting for chaos interval of %vs", experimentsDetails.ChaosInterval)
-			time.Sleep(time.Duration(experimentsDetails.ChaosInterval) * time.Second)
+			common.WaitForDuration(experimentsDetails.ChaosInterval)
 
 			// starting the VM instance
 			if experimentsDetails.AutoScalingGroup != "enable" {
