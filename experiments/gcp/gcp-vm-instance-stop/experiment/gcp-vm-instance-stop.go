@@ -76,7 +76,7 @@ func VMInstanceStop(clients clients.ClientSets) {
 
 	//PRE-CHAOS NODE STATUS CHECK
 	if experimentsDetails.AutoScalingGroup == "enable" {
-		activeNodeCount, err = gcp.PreChaosNodeStatusCheck(experimentsDetails.Timeout, experimentsDetails.Delay, clients)
+		activeNodeCount, err = common.PreChaosNodeStatusCheck(experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 		if err != nil {
 			log.Errorf("Pre chaos node status check failed, err: %v", err)
 			failStep := "Verify that the NUT (Node Under Test) is running (pre-chaos)"
@@ -158,7 +158,7 @@ func VMInstanceStop(clients clients.ClientSets) {
 
 	// POST-CHAOS ACTIVE NODE COUNT TEST
 	if experimentsDetails.AutoScalingGroup == "enable" {
-		if err = gcp.PostChaosActiveNodeCountCheck(activeNodeCount, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
+		if err = common.PostChaosActiveNodeCountCheck(activeNodeCount, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
 			log.Errorf("Post chaos active node count check failed, err: %v", err)
 			failStep := "Verify active number of nodes post chaos"
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
