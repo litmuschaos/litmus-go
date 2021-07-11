@@ -37,6 +37,7 @@ import (
 	podNetworkDuplication "github.com/litmuschaos/litmus-go/experiments/generic/pod-network-duplication/experiment"
 	podNetworkLatency "github.com/litmuschaos/litmus-go/experiments/generic/pod-network-latency/experiment"
 	podNetworkLoss "github.com/litmuschaos/litmus-go/experiments/generic/pod-network-loss/experiment"
+	podNetworkPartition "github.com/litmuschaos/litmus-go/experiments/generic/pod-network-partition/experiment"
 	kafkaBrokerPodFailure "github.com/litmuschaos/litmus-go/experiments/kafka/kafka-broker-pod-failure/experiment"
 	ebsLossByID "github.com/litmuschaos/litmus-go/experiments/kube-aws/ebs-loss-by-id/experiment"
 	ebsLossByTag "github.com/litmuschaos/litmus-go/experiments/kube-aws/ebs-loss-by-tag/experiment"
@@ -113,6 +114,8 @@ func main() {
 		podNetworkLatency.PodNetworkLatency(clients)
 	case "pod-network-loss":
 		podNetworkLoss.PodNetworkLoss(clients)
+	case "pod-network-partition":
+		podNetworkPartition.PodNetworkPartition(clients)
 	case "pod-memory-hog":
 		podMemoryHog.PodMemoryHog(clients)
 	case "pod-cpu-hog":
@@ -139,7 +142,6 @@ func main() {
 		podDNSSpoof.PodDNSSpoof(clients)
 	case "vm-poweroff":
 		vmpoweroff.VMPoweroff(clients)
-
 	default:
 		log.Errorf("Unsupported -name %v, please provide the correct value of -name args", *experimentName)
 		return
