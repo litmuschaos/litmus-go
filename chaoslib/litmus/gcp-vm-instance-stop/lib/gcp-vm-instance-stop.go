@@ -193,8 +193,6 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 				if err := gcplib.WaitForVMInstanceDown(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.AutoScalingGroup, instanceNamesList[i], experimentsDetails.GCPProjectID, instanceZonesList[i]); err != nil {
 					return errors.Errorf("unable to stop the vm instance, err: %v", err)
 				}
-
-				common.SetTargets(instanceNamesList[i], "reverted", "VM Instance Name", chaosDetails)
 			}
 
 			// run the probes during chaos
@@ -224,6 +222,8 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 					if err := gcplib.WaitForVMInstanceUp(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.AutoScalingGroup, instanceNamesList[i], experimentsDetails.GCPProjectID, instanceZonesList[i]); err != nil {
 						return errors.Errorf("unable to start the vm instance, err: %v", err)
 					}
+
+					common.SetTargets(instanceNamesList[i], "reverted", "VM Instance Name", chaosDetails)
 				}
 			}
 
