@@ -2,9 +2,6 @@ package azure
 
 import (
 	"context"
-	"encoding/json"
-	"io/ioutil"
-	"os"
 	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/profiles/latest/compute/mgmt/compute"
@@ -211,32 +208,6 @@ func CheckVirtualDiskWithInstance(experimentsDetails experimentTypes.ExperimentD
 		if !stringInSlice(diskName, diskListInstance) {
 			return errors.Errorf("'%v' is not attached to vm '%v' instance", diskName, experimentsDetails.AzureInstanceName)
 		}
-	}
-	return nil
-}
-
-// SetupSubsciptionID fetch the subscription id from the auth file and export it in experiment struct variable
-func SetupSubscriptionID(experimentsDetails *experimentTypes.ExperimentDetails) error {
-
-	authFile, err := os.Open(os.Getenv("AZURE_AUTH_LOCATION"))
-	if err != nil {
-		return errors.Errorf("fail to open auth file, err: %v", err)
-	}
-
-	authFileContent, err := ioutil.ReadAll(authFile)
-	if err != nil {
-		return errors.Errorf("fail to read auth file, err: %v", err)
-	}
-
-	details := make(map[string]string)
-	if err := json.Unmarshal(authFileContent, &details); err != nil {
-		return errors.Errorf("fail to unmarshal file, err: %v", err)
-	}
-
-	if id, contains := details["subscriptionId"]; contains {
-		experimentsDetails.SubscriptionID = id
-	} else {
-		return errors.Errorf("The auth file does not have a subscriptionId field")
 	}
 	return nil
 }
