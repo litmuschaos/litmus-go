@@ -31,9 +31,9 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.ChaosPodName = common.Getenv("POD_NAME", "")
 	experimentDetails.Delay, _ = strconv.Atoi(common.Getenv("STATUS_CHECK_DELAY", "2"))
 	experimentDetails.Timeout, _ = strconv.Atoi(common.Getenv("STATUS_CHECK_TIMEOUT", "180"))
-	experimentDetails.AzureInstanceName = common.Getenv("AZURE_INSTANCE_NAME", "test-instance")
-	experimentDetails.ResourceGroup = common.Getenv("RESOURCE_GROUP", "akash-litmus-test")
-	experimentDetails.VirtualDiskName = common.Getenv("VIRTUAL_DISK_NAME", "test-disk")
+	experimentDetails.AzureInstanceName = common.Getenv("AZURE_INSTANCE_NAME", "")
+	experimentDetails.ResourceGroup = common.Getenv("RESOURCE_GROUP", "")
+	experimentDetails.VirtualDiskName = common.Getenv("VIRTUAL_DISK_NAME", "")
 	experimentDetails.SubscriptionID = common.Getenv("SUBSCRIPTION_ID", "")
 	experimentDetails.Sequence = common.Getenv("SEQUENCE", "parallel")
 }
