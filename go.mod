@@ -17,9 +17,9 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.7.0
 	github.com/spf13/cobra v1.0.0
-	golang.org/x/net v0.0.0-20210503060351-7fd8e65b6420 // indirect
+	golang.org/x/net v0.0.0-20210503060351-7fd8e65b6420
 	golang.org/x/time v0.0.0-20200416051211-89c76fbcd5d1 // indirect
-	google.golang.org/api v0.48.0 // indirect
+	google.golang.org/api v0.48.0
 	gopkg.in/yaml.v2 v2.2.8
 	k8s.io/api v0.17.3
 	k8s.io/apimachinery v0.17.3
