@@ -46,7 +46,7 @@ func AzureInstanceStart(timeout, delay int, subscriptionID, resourceGroup, azure
 	log.Info("[Info]: Starting back the instance to running state")
 	_, err = vmClient.Start(context.TODO(), resourceGroup, azureInstanceName)
 	if err != nil {
-		return errors.Errorf("fail to stop the %v instance, err: %v", azureInstanceName, err)
+		return errors.Errorf("fail to start the %v instance, err: %v", azureInstanceName, err)
 	}
 
 	return nil

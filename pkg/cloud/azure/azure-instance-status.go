@@ -74,7 +74,7 @@ func SetupSubscriptionID(experimentsDetails *experimentTypes.ExperimentDetails) 
 func InstanceStatusCheckByName(experimentsDetails *experimentTypes.ExperimentDetails) error {
 	instanceNameList := strings.Split(experimentsDetails.AzureInstanceName, ",")
 	if len(instanceNameList) == 0 {
-		return errors.Errorf("no instance found to terminate")
+		return errors.Errorf("no instance found to stop")
 	}
 	log.Infof("[Info]: The instance under chaos(IUC) are: %v", instanceNameList)
 	return InstanceStatusCheck(instanceNameList, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup)

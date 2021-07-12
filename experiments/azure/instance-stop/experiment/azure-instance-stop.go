@@ -17,8 +17,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// InstanceStop inject the azure instance stop chaos
-func InstanceStop(clients clients.ClientSets) {
+// AzureInstanceStop inject the azure instance stop chaos
+func AzureInstanceStop(clients clients.ClientSets) {
 
 	var err error
 	experimentsDetails := experimentTypes.ExperimentDetails{}
@@ -39,7 +39,7 @@ func InstanceStop(clients clients.ClientSets) {
 	if experimentsDetails.EngineName != "" {
 		// Intialise the probe details. Bail out upon error, as we haven't entered exp business logic yet
 		if err = probe.InitializeProbesInChaosResultDetails(&chaosDetails, clients, &resultDetails); err != nil {
-			log.Fatalf("Unable to initialize the probes, err: %v", err)
+			log.Errorf("Unable to initialize the probes, err: %v", err)
 		}
 	}
 
@@ -213,7 +213,7 @@ func InstanceStop(clients clients.ClientSets) {
 	log.Infof("[The End]: Updating the chaos result of %v experiment (EOT)", experimentsDetails.ExperimentName)
 	err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
 	if err != nil {
-		log.Fatalf("Unable to Update the Chaos Result, err:  %v", err)
+		log.Errorf("Unable to Update the Chaos Result, err:  %v", err)
 	}
 
 	// generating the event in chaosresult to marked the verdict as pass/fail

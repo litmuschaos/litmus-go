@@ -135,7 +135,7 @@ func main() {
 	case "node-restart":
 		nodeRestart.NodeRestart(clients)
 	case "azure-instance-stop":
-		azureInstanceStop.InstanceStop(clients)
+		azureInstanceStop.AzureInstanceStop(clients)
 	case "pod-dns-error":
 		podDNSError.PodDNSError(clients)
 	case "pod-dns-spoof":

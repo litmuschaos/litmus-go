@@ -104,7 +104,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 				// Wait for Azure instance to completely stop
 				log.Infof("[Wait]: Waiting for Azure instance '%v' to get in the stopped state", vmName)
 				if err := azureStatus.WaitForAzureComputeDown(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, vmName); err != nil {
-					return errors.Errorf("unable to stop the azure instance, err: %v", err)
+					return errors.Errorf("instance poweroff status check failed, err: %v", err)
 				}
 
 				// Run the probes during chaos
@@ -116,7 +116,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 
 				// Wait for Chaos interval
 				log.Infof("[Wait]: Waiting for chaos interval of %vs", experimentsDetails.ChaosInterval)
-				time.Sleep(time.Duration(experimentsDetails.ChaosInterval) * time.Second)
+				common.WaitForDuration(experimentsDetails.ChaosInterval)
 
 				// Starting the Azure instance
 				log.Info("[Chaos]: Starting back the Azure instance")
@@ -127,7 +127,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 				// Wait for Azure instance to get in running state
 				log.Infof("[Wait]: Waiting for Azure instance '%v' to get in the running state", vmName)
 				if err := azureStatus.WaitForAzureComputeUp(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, vmName); err != nil {
-					return errors.Errorf("unable to start the Azure instance, err: %v", err)
+					return errors.Errorf("instance power on status check failed, err: %v", err)
 				}
 			}
 			duration = int(time.Since(ChaosStartTimeStamp).Seconds())
@@ -170,7 +170,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 			for _, vmName := range instanceNameList {
 				log.Infof("[Wait]: Waiting for Azure instance '%v' to get in the stopped state", vmName)
 				if err := azureStatus.WaitForAzureComputeDown(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, vmName); err != nil {
-					return errors.Errorf("unable to stop the azure instance, err: %v", err)
+					return errors.Errorf("instance poweroff status check failed, err: %v", err)
 				}
 			}
 
@@ -183,7 +183,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 
 			// Wait for Chaos interval
 			log.Infof("[Wait]: Waiting for chaos interval of %vs", experimentsDetails.ChaosInterval)
-			time.Sleep(time.Duration(experimentsDetails.ChaosInterval) * time.Second)
+			common.WaitForDuration(experimentsDetails.ChaosInterval)
 
 			// Starting the Azure instance
 			for _, vmName := range instanceNameList {
@@ -225,7 +225,7 @@ func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, instanc
 
 			log.Info("[Chaos]: Starting back the Azure instance")
 			if err := azureStatus.AzureInstanceStart(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, vmName); err != nil {
-				log.Errorf("unable to start the Azure instance, err: %v", err)
+				log.Errorf("instance power on status check failed, err: %v", err)
 			}
 
 			log.Info("[Abort]: Starting Azure instance as abort signal received")
