@@ -1,0 +1,48 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: litmus-experiment
+spec:
+  replicas: 1
+  selector: 
+    matchLabels:
+      app: litmus-experiment
+  template:
+    metadata:
+      labels:
+        app: litmus-experiment
+    spec:
+      serviceAccountName: azure-instance-stop-sa
+      containers:
+      - name: gotest
+        image: busybox
+        command:
+          - sleep 
+          - "3600"
+        env:
+          - name: LIB
+            value: 'litmus'
+
+          - name: AZURE_INSTANCE_NAME
+            value: ''
+
+          - name: CHAOS_NAMESPACE
+            value: 'default'
+
+          - name: RESOURCE_GROUP
+            value: ''
+
+          - name: RAMP_TIME
+            value: ''
+          
+          - name: SEQUENCE
+            value: 'parallel'
+          
+          - name: CHAOS_INTERVAL
+            value: '30'
+
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
