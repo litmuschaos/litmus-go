@@ -117,7 +117,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 				//Wait for VM instance to completely stop
 				log.Infof("[Wait]: Wait for VM instance '%v' to get in stopped state", instanceNamesList[i])
 				if err := gcplib.WaitForVMInstanceDown(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.AutoScalingGroup, instanceNamesList[i], experimentsDetails.GCPProjectID, instanceZonesList[i]); err != nil {
-					return errors.Errorf("unable to stop the vm instance, err: %v", err)
+					return errors.Errorf("VM instance failed to fully shutdown, err: %v", err)
 				}
 
 				// run the probes during chaos
