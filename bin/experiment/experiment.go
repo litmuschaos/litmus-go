@@ -14,8 +14,8 @@ import (
 	awsSSMChaosByID "github.com/litmuschaos/litmus-go/experiments/aws-ssm/aws-ssm-chaos-by-id/experiment"
 	awsSSMChaosByTag "github.com/litmuschaos/litmus-go/experiments/aws-ssm/aws-ssm-chaos-by-tag/experiment"
 	cassandraPodDelete "github.com/litmuschaos/litmus-go/experiments/cassandra/pod-delete/experiment"
+	gcpVMInstanceStop "github.com/litmuschaos/litmus-go/experiments/gcp/gcp-vm-instance-stop/experiment"
 	vmDiskLoss "github.com/litmuschaos/litmus-go/experiments/gcp/vm-disk-loss/experiment"
-	vmInstanceStop "github.com/litmuschaos/litmus-go/experiments/gcp/vm-instance-stop/experiment"
 	containerKill "github.com/litmuschaos/litmus-go/experiments/generic/container-kill/experiment"
 	diskFill "github.com/litmuschaos/litmus-go/experiments/generic/disk-fill/experiment"
 	dockerServiceKill "github.com/litmuschaos/litmus-go/experiments/generic/docker-service-kill/experiment"
@@ -141,10 +141,10 @@ func main() {
 		podDNSSpoof.PodDNSSpoof(clients)
 	case "vm-poweroff":
 		vmpoweroff.VMPoweroff(clients)
-	case "vm-instance-stop":
-		vmInstanceStop.VMInstanceStop(clients)
 	case "vm-disk-loss":
 		vmDiskLoss.VMDiskLoss(clients)
+	case "gcp-vm-instance-stop":
+		gcpVMInstanceStop.VMInstanceStop(clients)
 
 	default:
 		log.Errorf("Unsupported -name %v, please provide the correct value of -name args", *experimentName)

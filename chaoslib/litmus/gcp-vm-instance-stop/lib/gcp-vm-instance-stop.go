@@ -10,7 +10,7 @@ import (
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	gcplib "github.com/litmuschaos/litmus-go/pkg/cloud/gcp"
 	"github.com/litmuschaos/litmus-go/pkg/events"
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/gcp/vm-instance-stop/types"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/gcp/gcp-vm-instance-stop/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/types"
@@ -117,7 +117,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 				//Wait for VM instance to completely stop
 				log.Infof("[Wait]: Wait for VM instance '%v' to get in stopped state", instanceNamesList[i])
 				if err := gcplib.WaitForVMInstanceDown(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.AutoScalingGroup, instanceNamesList[i], experimentsDetails.GCPProjectID, instanceZonesList[i]); err != nil {
-					return errors.Errorf("unable to stop the vm instance, err: %v", err)
+					return errors.Errorf("vm instance failed to fully shutdown, err: %v", err)
 				}
 
 				// run the probes during chaos
@@ -129,7 +129,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 
 				// wait for the chaos interval
 				log.Infof("[Wait]: Waiting for chaos interval of %vs", experimentsDetails.ChaosInterval)
-				time.Sleep(time.Duration(experimentsDetails.ChaosInterval) * time.Second)
+				common.WaitForDuration(experimentsDetails.ChaosInterval)
 
 				// starting the VM instance
 				if experimentsDetails.AutoScalingGroup != "enable" {
@@ -191,10 +191,8 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 				// wait for VM instance to completely stop
 				log.Infof("[Wait]: Wait for VM instance '%v' to get in stopped state", instanceNamesList[i])
 				if err := gcplib.WaitForVMInstanceDown(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.AutoScalingGroup, instanceNamesList[i], experimentsDetails.GCPProjectID, instanceZonesList[i]); err != nil {
-					return errors.Errorf("unable to stop the vm instance, err: %v", err)
+					return errors.Errorf("vm instance failed to fully shutdown, err: %v", err)
 				}
-
-				common.SetTargets(instanceNamesList[i], "reverted", "VM Instance Name", chaosDetails)
 			}
 
 			// run the probes during chaos
@@ -206,7 +204,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 
 			// wait for chaos interval
 			log.Infof("[Wait]: Waiting for chaos interval of %vs", experimentsDetails.ChaosInterval)
-			time.Sleep(time.Duration(experimentsDetails.ChaosInterval) * time.Second)
+			common.WaitForDuration(experimentsDetails.ChaosInterval)
 
 			// starting the VM instance
 			if experimentsDetails.AutoScalingGroup != "enable" {

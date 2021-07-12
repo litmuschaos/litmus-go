@@ -2,12 +2,12 @@ package experiment
 
 import (
 	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
-	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/vm-instance-stop/lib"
+	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/gcp-vm-instance-stop/lib"
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/cloud/gcp"
 	"github.com/litmuschaos/litmus-go/pkg/events"
-	experimentEnv "github.com/litmuschaos/litmus-go/pkg/gcp/vm-instance-stop/environment"
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/gcp/vm-instance-stop/types"
+	experimentEnv "github.com/litmuschaos/litmus-go/pkg/gcp/gcp-vm-instance-stop/environment"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/gcp/gcp-vm-instance-stop/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/result"
@@ -70,13 +70,13 @@ func VMInstanceStop(clients clients.ClientSets) {
 		"Chaos Duration":  experimentsDetails.ChaosDuration,
 		"Chaos Namespace": experimentsDetails.ChaosNamespace,
 		"Ramp Time":       experimentsDetails.RampTime,
-		"Instance Name":   experimentsDetails.VMInstanceName,
-		"Sequence":        experimentsDetails.Sequence,
+		"Instance Names":  experimentsDetails.VMInstanceName,
+		"Zones":           experimentsDetails.InstanceZone,
 	})
 
 	//PRE-CHAOS NODE STATUS CHECK
 	if experimentsDetails.AutoScalingGroup == "enable" {
-		activeNodeCount, err = gcp.PreChaosNodeStatusCheck(experimentsDetails.Timeout, experimentsDetails.Delay, clients)
+		activeNodeCount, err = common.PreChaosNodeStatusCheck(experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 		if err != nil {
 			log.Errorf("Pre chaos node status check failed, err: %v", err)
 			failStep := "Verify that the NUT (Node Under Test) is running (pre-chaos)"
@@ -158,7 +158,7 @@ func VMInstanceStop(clients clients.ClientSets) {
 
 	// POST-CHAOS ACTIVE NODE COUNT TEST
 	if experimentsDetails.AutoScalingGroup == "enable" {
-		if err = gcp.PostChaosActiveNodeCountCheck(activeNodeCount, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
+		if err = common.PostChaosActiveNodeCountCheck(activeNodeCount, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
 			log.Errorf("Post chaos active node count check failed, err: %v", err)
 			failStep := "Verify active number of nodes post chaos"
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
