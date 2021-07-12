@@ -25,6 +25,7 @@ var (
 	inject, abort chan os.Signal
 )
 
+//PrepareChaos contains the prepration and injection steps for the experiment
 func PrepareChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	// inject channel is used to transmit signal notifications.
@@ -50,25 +51,25 @@ func PrepareChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients
 	default:
 
 		//get the volume name  or list of volume names
-		diskNameList := strings.Split(experimentsDetails.VirtualDiskName, ",")
+		diskNameList := strings.Split(experimentsDetails.VirtualDiskNames, ",")
 		if len(diskNameList) == 0 {
 			return errors.Errorf("no volume names found to detach")
 		}
-		diskList, err := azureStatus.GetInstanceDiskList(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, experimentsDetails.AzureInstanceName)
+		attachedDisks, err := azureStatus.GetInstanceDiskList(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, experimentsDetails.AzureInstanceName)
 		if err != nil {
 			log.Errorf("err: %v", err)
 			return errors.Errorf("error fetching virtual disks")
 		}
 		// watching for the abort signal and revert the chaos
-		go abortWatcher(experimentsDetails, diskList, diskNameList)
+		go abortWatcher(experimentsDetails, attachedDisks, diskNameList, chaosDetails)
 
 		switch strings.ToLower(experimentsDetails.Sequence) {
 		case "serial":
-			if err = InjectChaosInSerialMode(experimentsDetails, diskNameList, diskList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+			if err = injectChaosInSerialMode(experimentsDetails, diskNameList, attachedDisks, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
 				return err
 			}
 		case "parallel":
-			if err = InjectChaosInParallelMode(experimentsDetails, diskNameList, diskList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+			if err = injectChaosInParallelMode(experimentsDetails, diskNameList, attachedDisks, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
 				return err
 			}
 		default:
@@ -84,7 +85,8 @@ func PrepareChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients
 	return nil
 }
 
-func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, diskNameList []string, diskList *[]compute.DataDisk, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+// injectChaosInParallelMode will inject the azure disk loss chaos in parallel mode that is all at once
+func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, diskNameList []string, diskList *[]compute.DataDisk, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
 	ChaosStartTimeStamp := time.Now()
@@ -99,8 +101,8 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		}
 
 		// Detaching the virtual disks
-		log.Info("[Chaos]: Detaching the Virtual disks from the instance")
-		if err = azureStatus.DetachDiskMultiple(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, experimentsDetails.AzureInstanceName, diskNameList); err != nil {
+		log.Info("[Chaos]: Detaching the virtual disks from the instance")
+		if err = azureStatus.DetachMultipleDisks(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, experimentsDetails.AzureInstanceName, diskNameList); err != nil {
 			return errors.Errorf("failed to detach disks, err: %v", err)
 		}
 
@@ -133,7 +135,8 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 	return nil
 }
 
-func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, diskNameList []string, diskList *[]compute.DataDisk, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+//injectChaosInSerialMode will inject the azure disk loss chaos in serial mode that is one after other
+func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, diskNameList []string, diskList *[]compute.DataDisk, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
 	ChaosStartTimeStamp := time.Now()
@@ -149,7 +152,7 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 
 		for i, diskName := range diskNameList {
 			// Detaching the virtual disks
-			log.Infof("[Chaos]: Detaching the Virtual %v from the instance", diskName)
+			log.Infof("[Chaos]: Detaching %v from the instance", diskName)
 			if err = azureStatus.DetachDisk(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, experimentsDetails.AzureInstanceName, diskName); err != nil {
 				return errors.Errorf("failed to detach disks, err: %v", err)
 			}
@@ -178,7 +181,7 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 				log.Info("[Skip]: The Virtual Disk is already attached")
 			case "Unattached":
 				//Attaching the virtual disks to the instance
-				log.Info("[Chaos]: Attaching the Virtual disk back to the instance")
+				log.Infof("[Chaos]: Attaching %v back to the instance", diskName)
 				if err = azureStatus.AttachDisk(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, experimentsDetails.AzureInstanceName, diskList); err != nil {
 					return errors.Errorf("disk attachment failed, err: %v", err)
 				}
@@ -193,8 +196,8 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 	return nil
 }
 
-// watching for the abort signal and revert the chaos
-func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, diskList *[]compute.DataDisk, diskNameList []string) {
+// abortWatcher will be watching for the abort signal and revert the chaos
+func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, diskList *[]compute.DataDisk, diskNameList []string, chaosDetails *types.ChaosDetails) {
 	<-abort
 
 	log.Info("[Abort]: Chaos Revert Started")
@@ -225,6 +228,11 @@ func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, diskLis
 	if err := azureStatus.AttachDisk(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, experimentsDetails.AzureInstanceName, diskList); err != nil {
 		log.Errorf("unable to attach disk, err: %v", err)
 	}
+
+	for _, diskName := range diskNameList {
+		common.SetTargets(diskName, "reverted", "VirtualDisk", chaosDetails)
+	}
+
 	log.Infof("[Abort]: Chaos Revert Completed")
 	os.Exit(1)
 }

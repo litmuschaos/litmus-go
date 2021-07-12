@@ -4,9 +4,6 @@ import (
 	clientTypes "k8s.io/apimachinery/pkg/types"
 )
 
-// ADD THE ATTRIBUTES OF YOUR CHOICE HERE
-// FEW MENDATORY ATTRIBUTES ARE ADDED BY DEFAULT
-
 // ExperimentDetails is for collecting all the experiment-related details
 type ExperimentDetails struct {
 	ExperimentName     string
@@ -29,6 +26,6 @@ type ExperimentDetails struct {
 	AzureInstanceName  string
 	ResourceGroup      string
 	SubscriptionID     string
-	VirtualDiskName    string
+	VirtualDiskNames   string
 	Sequence           string
 }

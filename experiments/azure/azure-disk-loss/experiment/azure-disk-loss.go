@@ -1,6 +1,7 @@
 package experiment
 
 import (
+	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
 	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/azure-disk-loss/lib"
 	experimentEnv "github.com/litmuschaos/litmus-go/pkg/azure/azure-disk-loss/environment"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/azure/azure-disk-loss/types"
@@ -70,7 +71,7 @@ func AzureDiskLoss(clients clients.ClientSets) {
 	})
 
 	log.InfoWithValues("The volume information is as follows", logrus.Fields{
-		"Disk Names":     experimentsDetails.VirtualDiskName,
+		"Disk Names":     experimentsDetails.VirtualDiskNames,
 		"Resource Group": experimentsDetails.ResourceGroup,
 		"Instance Name":  experimentsDetails.AzureInstanceName,
 	})
@@ -112,11 +113,6 @@ func AzureDiskLoss(clients clients.ClientSets) {
 		return
 	}
 
-	// generating the event in chaosresult to marked the verdict as awaited
-	msg = "experiment: " + experimentsDetails.ExperimentName + ", Result: Awaited"
-	types.SetResultEventAttributes(&eventsDetails, types.AwaitedVerdict, msg, "Normal", &resultDetails)
-	events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosResult")
-
 	if experimentsDetails.EngineName != "" {
 		// marking AUT as running, as we already checked the status of application under test
 		msg := "AUT: Running"
@@ -140,10 +136,6 @@ func AzureDiskLoss(clients clients.ClientSets) {
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
-	// INVOKE THE CHAOSLIB OF YOUR CHOICE HERE, WHICH WILL CONTAIN
-	// THE BUSINESS LOGIC OF THE ACTUAL CHAOS
-	// IT CAN BE A NEW CHAOSLIB YOU HAVE CREATED SPECIALLY FOR THIS EXPERIMENT OR ANY EXISTING ONE
-
 	// Including the litmus lib
 	switch experimentsDetails.ChaosLib {
 	case "litmus":
@@ -160,8 +152,8 @@ func AzureDiskLoss(clients clients.ClientSets) {
 		return
 	}
 
-	// ADD A POST-CHAOS CHECK OF YOUR CHOICE HERE
-	// POD STATUS CHECKS FOR THE APPLICATION UNDER TEST AND AUXILIARY APPLICATIONS ARE ADDED BY DEFAULT
+	log.Infof("[Confirmation]: %v chaos has been injected successfully", experimentsDetails.ExperimentName)
+	resultDetails.Verdict = v1alpha1.ResultVerdictPassed
 
 	//POST-CHAOS APPLICATION STATUS CHECK
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (post-chaos)")
