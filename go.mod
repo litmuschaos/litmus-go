@@ -1,6 +1,6 @@
 module github.com/litmuschaos/litmus-go
 
-go 1.13
+go 1.16
 
 require (
 	github.com/Azure/azure-sdk-for-go v35.0.0+incompatible
