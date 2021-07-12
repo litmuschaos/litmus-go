@@ -141,7 +141,7 @@ func main() {
 		podDNSSpoof.PodDNSSpoof(clients)
 	case "vm-poweroff":
 		vmpoweroff.VMPoweroff(clients)
-	case "vm-disk-loss":
+	case "gcp-vm-disk-loss":
 		gcpVMDiskLoss.VMDiskLoss(clients)
 	case "gcp-vm-instance-stop":
 		gcpVMInstanceStop.VMInstanceStop(clients)
