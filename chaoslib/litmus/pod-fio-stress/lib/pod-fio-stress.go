@@ -86,6 +86,7 @@ func experimentExecution(experimentsDetails *experimentTypes.ExperimentDetails, 
 	return nil
 }
 
+// injectChaosInSerialMode stressed the storage of all target application in serial mode (one by one)
 func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList corev1.PodList, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 	// creating err channel to recieve the error from the go routine
 	stressErr := make(chan error)
@@ -126,6 +127,17 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		for {
 			endTime = time.After(timeDelay)
 			select {
+			case err := <-stressErr:
+				// skipping the execution, if recieved any error other than 137, while executing stress command and marked result as fail
+				// it will ignore the error code 137(oom kill), it will skip further execution and marked the result as pass
+				// oom kill occurs if stor to be stressed exceed than the resource limit for the target container
+				if err != nil {
+					if strings.Contains(err.Error(), "137") {
+						log.Warn("Chaos process OOM killed")
+						return nil
+					}
+					return err
+				}
 			case <-signChan:
 				log.Info("[Chaos]: Revert Started")
 				if err := killStressSerial(experimentsDetails.TargetContainer, pod.Name, experimentsDetails.AppNS, experimentsDetails.ChaosKillCmd, clients); err != nil {
@@ -217,6 +229,7 @@ loop:
 	return nil
 }
 
+//PrepareChaos contains the chaos prepration and injection steps
 func PrepareChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	//Waiting for the ramp time before chaos injection
