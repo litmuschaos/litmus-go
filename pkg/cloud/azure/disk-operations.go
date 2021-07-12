@@ -11,7 +11,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/profiles/latest/compute/mgmt/compute"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/azure/auth"
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/azure/virtual-disk-loss/types"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/azure/azure-disk-loss/types"
 	"github.com/pkg/errors"
 )
 

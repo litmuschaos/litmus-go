@@ -13,7 +13,7 @@ spec:
       labels: 
         app: litmus-experiment
     spec:
-      serviceAccountName: virtual-disk-loss-sa
+      serviceAccountName: azure-disk-loss-sa
       containers:
       - name: gotest
         image: busybox 

@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute"
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/azure/virtual-disk-loss/types"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/azure/azure-disk-loss/types"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	azureStatus "github.com/litmuschaos/litmus-go/pkg/cloud/azure"
 	"github.com/litmuschaos/litmus-go/pkg/events"

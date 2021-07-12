@@ -7,7 +7,7 @@
 <th> Documentation Link </th>
 </tr>
 <tr>
- <td> Azure Virtual Disk Loss </td>
+ <td> Azure Disk Loss </td>
  <td> This experiment causes the detachment of an virtual disk from an instance for a certain chaos duration and reattach as after chaos interval. The experiment is very specific to the volume and instance to which it is added</td>
  <td>  <a href=""> Coming Soon </a> </td>
  </tr>

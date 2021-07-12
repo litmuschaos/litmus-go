@@ -5,7 +5,7 @@ import (
 
 	clientTypes "k8s.io/apimachinery/pkg/types"
 
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/azure/virtual-disk-loss/types"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/azure/azure-disk-loss/types"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 )
@@ -15,7 +15,7 @@ import (
 
 //GetENV fetches all the env variables from the runner pod
 func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
-	experimentDetails.ExperimentName = common.Getenv("EXPERIMENT_NAME", "virtual-disk-loss")
+	experimentDetails.ExperimentName = common.Getenv("EXPERIMENT_NAME", "azure-disk-loss")
 	experimentDetails.ChaosNamespace = common.Getenv("CHAOS_NAMESPACE", "litmus")
 	experimentDetails.EngineName = common.Getenv("CHAOSENGINE", "")
 	experimentDetails.ChaosDuration, _ = strconv.Atoi(common.Getenv("TOTAL_CHAOS_DURATION", "30"))
@@ -31,9 +31,9 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.ChaosPodName = common.Getenv("POD_NAME", "")
 	experimentDetails.Delay, _ = strconv.Atoi(common.Getenv("STATUS_CHECK_DELAY", "2"))
 	experimentDetails.Timeout, _ = strconv.Atoi(common.Getenv("STATUS_CHECK_TIMEOUT", "180"))
-	experimentDetails.AzureInstanceName = common.Getenv("AZURE_INSTANCE_NAME", "")
-	experimentDetails.ResourceGroup = common.Getenv("RESOURCE_GROUP", "")
-	experimentDetails.VirtualDiskName = common.Getenv("VIRTUAL_DISK_NAME", "")
+	experimentDetails.AzureInstanceName = common.Getenv("AZURE_INSTANCE_NAME", "test-instance")
+	experimentDetails.ResourceGroup = common.Getenv("RESOURCE_GROUP", "akash-litmus-test")
+	experimentDetails.VirtualDiskName = common.Getenv("VIRTUAL_DISK_NAME", "test-disk")
 	experimentDetails.SubscriptionID = common.Getenv("SUBSCRIPTION_ID", "")
 	experimentDetails.Sequence = common.Getenv("SEQUENCE", "parallel")
 }

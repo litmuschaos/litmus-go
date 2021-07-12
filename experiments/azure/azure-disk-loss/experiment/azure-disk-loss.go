@@ -1,9 +1,9 @@
 package experiment
 
 import (
-	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/virtual-disk-loss/lib"
-	experimentEnv "github.com/litmuschaos/litmus-go/pkg/azure/virtual-disk-loss/environment"
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/azure/virtual-disk-loss/types"
+	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/azure-disk-loss/lib"
+	experimentEnv "github.com/litmuschaos/litmus-go/pkg/azure/azure-disk-loss/environment"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/azure/azure-disk-loss/types"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	azureStatus "github.com/litmuschaos/litmus-go/pkg/cloud/azure"
 	"github.com/litmuschaos/litmus-go/pkg/events"
@@ -17,7 +17,7 @@ import (
 )
 
 // Experiment contains steps to inject chaos
-func VirtualDiskLoss(clients clients.ClientSets) {
+func AzureDiskLoss(clients clients.ClientSets) {
 
 	experimentsDetails := experimentTypes.ExperimentDetails{}
 	resultDetails := types.ResultDetails{}
