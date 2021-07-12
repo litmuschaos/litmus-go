@@ -6,7 +6,7 @@ import (
 	clientTypes "k8s.io/apimachinery/pkg/types"
 
 	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/gcp/vm-disk-loss/types"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/gcp/gcp-vm-disk-loss/types"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 )

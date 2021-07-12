@@ -14,8 +14,8 @@ import (
 	awsSSMChaosByID "github.com/litmuschaos/litmus-go/experiments/aws-ssm/aws-ssm-chaos-by-id/experiment"
 	awsSSMChaosByTag "github.com/litmuschaos/litmus-go/experiments/aws-ssm/aws-ssm-chaos-by-tag/experiment"
 	cassandraPodDelete "github.com/litmuschaos/litmus-go/experiments/cassandra/pod-delete/experiment"
+	gcpVMDiskLoss "github.com/litmuschaos/litmus-go/experiments/gcp/gcp-vm-disk-loss/experiment"
 	gcpVMInstanceStop "github.com/litmuschaos/litmus-go/experiments/gcp/gcp-vm-instance-stop/experiment"
-	vmDiskLoss "github.com/litmuschaos/litmus-go/experiments/gcp/vm-disk-loss/experiment"
 	containerKill "github.com/litmuschaos/litmus-go/experiments/generic/container-kill/experiment"
 	diskFill "github.com/litmuschaos/litmus-go/experiments/generic/disk-fill/experiment"
 	dockerServiceKill "github.com/litmuschaos/litmus-go/experiments/generic/docker-service-kill/experiment"
@@ -142,7 +142,7 @@ func main() {
 	case "vm-poweroff":
 		vmpoweroff.VMPoweroff(clients)
 	case "vm-disk-loss":
-		vmDiskLoss.VMDiskLoss(clients)
+		gcpVMDiskLoss.VMDiskLoss(clients)
 	case "gcp-vm-instance-stop":
 		gcpVMInstanceStop.VMInstanceStop(clients)
 

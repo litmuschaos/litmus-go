@@ -2,12 +2,12 @@ package experiment
 
 import (
 	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
-	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/vm-disk-loss/lib"
+	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/gcp-vm-disk-loss/lib"
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	gcp "github.com/litmuschaos/litmus-go/pkg/cloud/gcp"
 	"github.com/litmuschaos/litmus-go/pkg/events"
-	experimentEnv "github.com/litmuschaos/litmus-go/pkg/gcp/vm-disk-loss/environment"
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/gcp/vm-disk-loss/types"
+	experimentEnv "github.com/litmuschaos/litmus-go/pkg/gcp/gcp-vm-disk-loss/environment"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/gcp/gcp-vm-disk-loss/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/result"

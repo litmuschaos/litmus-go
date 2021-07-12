@@ -10,7 +10,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	gcp "github.com/litmuschaos/litmus-go/pkg/cloud/gcp"
 	"github.com/litmuschaos/litmus-go/pkg/events"
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/gcp/vm-disk-loss/types"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/gcp/gcp-vm-disk-loss/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/types"
