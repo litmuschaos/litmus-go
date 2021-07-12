@@ -70,8 +70,8 @@ func VMInstanceStop(clients clients.ClientSets) {
 		"Chaos Duration":  experimentsDetails.ChaosDuration,
 		"Chaos Namespace": experimentsDetails.ChaosNamespace,
 		"Ramp Time":       experimentsDetails.RampTime,
-		"Instance Name":   experimentsDetails.VMInstanceName,
-		"Sequence":        experimentsDetails.Sequence,
+		"Instance Names":  experimentsDetails.VMInstanceName,
+		"Zones":           experimentsDetails.InstanceZone,
 	})
 
 	//PRE-CHAOS NODE STATUS CHECK
