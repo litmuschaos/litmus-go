@@ -13,6 +13,7 @@ import (
 
 	awsSSMChaosByID "github.com/litmuschaos/litmus-go/experiments/aws-ssm/aws-ssm-chaos-by-id/experiment"
 	awsSSMChaosByTag "github.com/litmuschaos/litmus-go/experiments/aws-ssm/aws-ssm-chaos-by-tag/experiment"
+	azureInstanceStop "github.com/litmuschaos/litmus-go/experiments/azure/instance-stop/experiment"
 	cassandraPodDelete "github.com/litmuschaos/litmus-go/experiments/cassandra/pod-delete/experiment"
 	gcpVMInstanceStop "github.com/litmuschaos/litmus-go/experiments/gcp/gcp-vm-instance-stop/experiment"
 	containerKill "github.com/litmuschaos/litmus-go/experiments/generic/container-kill/experiment"
@@ -134,6 +135,8 @@ func main() {
 		ebsLossByTag.EBSLossByTag(clients)
 	case "node-restart":
 		nodeRestart.NodeRestart(clients)
+	case "azure-instance-stop":
+		azureInstanceStop.AzureInstanceStop(clients)
 	case "pod-dns-error":
 		podDNSError.PodDNSError(clients)
 	case "pod-dns-spoof":
