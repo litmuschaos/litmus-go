@@ -50,6 +50,28 @@ func PrepareDiskVolumeLoss(experimentsDetails *experimentTypes.ExperimentDetails
 		return errors.Errorf("no volumes found to detach")
 	}
 
+	//get the disk zones list
+	diskZonesList := strings.Split(experimentsDetails.DiskZones, ",")
+	if len(diskZonesList) == 0 {
+		return errors.Errorf("no zones found for corressponding instances")
+	}
+
+	if len(diskNamesList) != len(diskZonesList) {
+		return errors.Errorf("unequal number of disk names and zones received")
+	}
+
+	//prepare the instace names for the given disks
+	for i := range diskNamesList {
+
+		//Get volume attachment details
+		instanceName, err := gcp.GetVolumeAttachmentDetails(experimentsDetails.GCPProjectID, diskZonesList[i], diskNamesList[i])
+		if err != nil || instanceName == "" {
+			return errors.Errorf("failed to get the attachment info, err: %v", err)
+		}
+
+		instanceNamesList = append(instanceNamesList, instanceName)
+	}
+
 	select {
 	case <-inject:
 		// stopping the chaos execution, if abort signal recieved
@@ -100,17 +122,9 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		}
 		for i := range targetDiskVolumeNamesList {
 
-			//Get volume attachment details
-			instanceName, err := gcp.GetVolumeAttachmentDetails(experimentsDetails.GCPProjectID, diskZonesList[i], targetDiskVolumeNamesList[i])
-			if err != nil {
-				return errors.Errorf("fail to get the attachment info, err: %v", err)
-			}
-
-			instanceNamesList = append(instanceNamesList, instanceName)
-
 			//Detaching the disk volume from the instance
 			log.Info("[Chaos]: Detaching the disk volume from the instance")
-			if err = gcp.DiskVolumeDetach(instanceName, experimentsDetails.GCPProjectID, diskZonesList[i], deviceNamesList[i]); err != nil {
+			if err = gcp.DiskVolumeDetach(instanceNamesList[i], experimentsDetails.GCPProjectID, diskZonesList[i], deviceNamesList[i]); err != nil {
 				return errors.Errorf("disk detachment failed, err: %v", err)
 			}
 
@@ -118,7 +132,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 
 			//Wait for disk volume detachment
 			log.Infof("[Wait]: Wait for disk volume detachment for volume %v", targetDiskVolumeNamesList[i])
-			if err = gcp.WaitForVolumeDetachment(targetDiskVolumeNamesList[i], experimentsDetails.GCPProjectID, instanceName, diskZonesList[i], experimentsDetails.Delay, experimentsDetails.Timeout); err != nil {
+			if err = gcp.WaitForVolumeDetachment(targetDiskVolumeNamesList[i], experimentsDetails.GCPProjectID, instanceNamesList[i], diskZonesList[i], experimentsDetails.Delay, experimentsDetails.Timeout); err != nil {
 				return errors.Errorf("unable to detach the disk volume from the vm instance, err: %v", err)
 			}
 
@@ -134,7 +148,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 			common.WaitForDuration(experimentsDetails.ChaosInterval)
 
 			//Getting the disk volume attachment status
-			diskState, err := gcp.GetDiskVolumeState(targetDiskVolumeNamesList[i], experimentsDetails.GCPProjectID, instanceName, diskZonesList[i])
+			diskState, err := gcp.GetDiskVolumeState(targetDiskVolumeNamesList[i], experimentsDetails.GCPProjectID, instanceNamesList[i], diskZonesList[i])
 			if err != nil {
 				return errors.Errorf("failed to get the disk volume status, err: %v", err)
 			}
@@ -145,13 +159,13 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 			default:
 				//Attaching the disk volume to the instance
 				log.Info("[Chaos]: Attaching the disk volume back to the instance")
-				if err = gcp.DiskVolumeAttach(instanceName, experimentsDetails.GCPProjectID, diskZonesList[i], deviceNamesList[i], targetDiskVolumeNamesList[i]); err != nil {
+				if err = gcp.DiskVolumeAttach(instanceNamesList[i], experimentsDetails.GCPProjectID, diskZonesList[i], deviceNamesList[i], targetDiskVolumeNamesList[i]); err != nil {
 					return errors.Errorf("disk attachment failed, err: %v", err)
 				}
 
 				//Wait for disk volume attachment
 				log.Infof("[Wait]: Wait for disk volume attachment for %v volume", targetDiskVolumeNamesList[i])
-				if err = gcp.WaitForVolumeAttachment(targetDiskVolumeNamesList[i], experimentsDetails.GCPProjectID, instanceName, diskZonesList[i], experimentsDetails.Delay, experimentsDetails.Timeout); err != nil {
+				if err = gcp.WaitForVolumeAttachment(targetDiskVolumeNamesList[i], experimentsDetails.GCPProjectID, instanceNamesList[i], diskZonesList[i], experimentsDetails.Delay, experimentsDetails.Timeout); err != nil {
 					return errors.Errorf("unable to attach the disk volume to the vm instance, err: %v", err)
 				}
 			}
@@ -180,27 +194,19 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 		}
 
-		//prepare the instaceIDs and device name for all the given volume
 		for i := range targetDiskVolumeNamesList {
-			//Get volume attachment details
-			instanceName, err := gcp.GetVolumeAttachmentDetails(experimentsDetails.GCPProjectID, diskZonesList[i], targetDiskVolumeNamesList[i])
-			if err != nil || instanceName == "" {
-				return errors.Errorf("failed to get the attachment info, err: %v", err)
-			}
 
-			instanceNamesList = append(instanceNamesList, instanceName)
-		}
-
-		for i := range targetDiskVolumeNamesList {
 			//Detaching the disk volume from the instance
 			log.Info("[Chaos]: Detaching the disk volume from the instance")
 			if err = gcp.DiskVolumeDetach(instanceNamesList[i], experimentsDetails.GCPProjectID, diskZonesList[i], deviceNamesList[i]); err != nil {
 				return errors.Errorf("disk detachment failed, err: %v", err)
 			}
+
 			common.SetTargets(targetDiskVolumeNamesList[i], "injected", "DiskVolume", chaosDetails)
 		}
 
 		for i := range targetDiskVolumeNamesList {
+
 			//Wait for disk volume detachment
 			log.Infof("[Wait]: Wait for disk volume detachment for volume %v", targetDiskVolumeNamesList[i])
 			if err = gcp.WaitForVolumeDetachment(targetDiskVolumeNamesList[i], experimentsDetails.GCPProjectID, instanceNamesList[i], diskZonesList[i], experimentsDetails.Delay, experimentsDetails.Timeout); err != nil {
