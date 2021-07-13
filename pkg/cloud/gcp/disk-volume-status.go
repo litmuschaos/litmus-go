@@ -133,7 +133,7 @@ func DiskVolumeStateCheck(gcpProjectID string, zones string, diskNames string, d
 		return errors.Errorf("no device name provided, please provide the device name of the disk")
 	}
 
-	if len(diskNamesList) != len(zonesList) || len(zonesList) != len(deviceNamesList) || len(diskNamesList) != len(deviceNamesList) {
+	if len(diskNamesList) != len(zonesList) || len(zonesList) != len(deviceNamesList) {
 		return errors.Errorf("unequal number of disk names, zones, and device names found, please verify the input details")
 	}
 
