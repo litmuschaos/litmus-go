@@ -44,7 +44,7 @@ func PrepareDiskVolumeLoss(experimentsDetails *experimentTypes.ExperimentDetails
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 
-	//get the volume id or list of instance ids
+	//get the disk volume names list
 	diskNamesList := strings.Split(experimentsDetails.DiskVolumeNames, ",")
 	if len(diskNamesList) == 0 {
 		return errors.Errorf("no volumes found to detach")
