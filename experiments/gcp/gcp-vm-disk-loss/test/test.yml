@@ -13,7 +13,7 @@ spec:
       labels: 
         app: litmus-experiment
     spec:
-      serviceAccountName: vm-disk-loss-sa
+      serviceAccountName: gcp-vm-disk-loss-sa
       containers:
       - name: gotest
         image: busybox 
@@ -61,15 +61,20 @@ spec:
           - name: GCP_PROJECT_ID
             value: ''
 
-          # set the disk volume name(s) as comma seperated values for eg. volume1,volume2,...
+          # set the disk volume name(s) as comma seperated values 
+          # eg. volume1,volume2,...
           - name: DISK_VOLUME_NAMES
             value: ''
                     
-          # set the disk zone(s) as comma seperated values in the corresponding order of DISK_VOLUME_NAME for eg. zone1,zone2,...
+          # set the disk zone(s) as comma seperated values in the corresponding order 
+          # of DISK_VOLUME_NAME 
+          # eg. zone1,zone2,...
           - name: DISK_ZONES
             value: ''
                   
-          # set the device name(s) as comma seperated values in the corresponding order of DISK_VOLUME_NAME for eg. device1,device2,...
+          # set the device name(s) as comma seperated values in the corresponding order 
+          # of DISK_VOLUME_NAME 
+          # eg. device1,device2,...
           - name: DEVICE_NAMES
             value: ''
         
