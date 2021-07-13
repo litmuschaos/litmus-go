@@ -74,7 +74,6 @@ func VMDiskLoss(clients clients.ClientSets) {
 	log.InfoWithValues("The volume information is as follows", logrus.Fields{
 		"Volume IDs": experimentsDetails.DiskVolumeNames,
 		"Zones":      experimentsDetails.DiskZones,
-		"Ramp Time":  experimentsDetails.RampTime,
 	})
 
 	//PRE-CHAOS APPLICATION STATUS CHECK
