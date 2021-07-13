@@ -200,11 +200,6 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 			common.SetTargets(targetDiskVolumeNamesList[i], "injected", "DiskVolume", chaosDetails)
 		}
 
-		log.Info("[Info]: Checking if the detachment process initiated")
-		if err := gcp.CheckDiskVolumeDetachmentInitialisation(experimentsDetails.GCPProjectID, targetDiskVolumeNamesList, instanceNamesList, diskZonesList); err != nil {
-			return errors.Errorf("failed to initialise the detachment")
-		}
-
 		for i := range targetDiskVolumeNamesList {
 			//Wait for disk volume detachment
 			log.Infof("[Wait]: Wait for disk volume detachment for volume %v", targetDiskVolumeNamesList[i])
