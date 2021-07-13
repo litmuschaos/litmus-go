@@ -20,7 +20,6 @@ type ExperimentDetails struct {
 	ChaosNamespace           string
 	ChaosPodName             string
 	AuxiliaryAppInfo         string
-	RunID                    string
 	Timeout                  int
 	Delay                    int
 	Sequence                 string
