@@ -42,27 +42,28 @@ func PrepareDiskVolumeLoss(experimentsDetails *experimentTypes.ExperimentDetails
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 
+	//get the volume id or list of instance ids
+	diskNamesList := strings.Split(experimentsDetails.DiskVolumeNames, ",")
+	if len(diskNamesList) == 0 {
+		return errors.Errorf("no volumes found to detach")
+	}
+
 	select {
 	case <-inject:
 		// stopping the chaos execution, if abort signal recieved
 		os.Exit(0)
 	default:
 
-		//get the volume id or list of instance ids
-		diskNamesList := strings.Split(experimentsDetails.DiskVolumeNames, ",")
-		if len(diskNamesList) == 0 {
-			return errors.Errorf("no volumes found to detach")
-		}
 		// watching for the abort signal and revert the chaos
 		go AbortWatcher(experimentsDetails, diskNamesList, abort, chaosDetails)
 
 		switch strings.ToLower(experimentsDetails.Sequence) {
 		case "serial":
-			if err = InjectChaosInSerialMode(experimentsDetails, diskNamesList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+			if err = injectChaosInSerialMode(experimentsDetails, diskNamesList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
 				return err
 			}
 		case "parallel":
-			if err = InjectChaosInParallelMode(experimentsDetails, diskNamesList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+			if err = injectChaosInParallelMode(experimentsDetails, diskNamesList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
 				return err
 			}
 		default:
@@ -78,8 +79,8 @@ func PrepareDiskVolumeLoss(experimentsDetails *experimentTypes.ExperimentDetails
 	return nil
 }
 
-//InjectChaosInSerialMode will inject the disk loss chaos in serial mode which means one after the other
-func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, targetDiskVolumeNamesList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+//injectChaosInSerialMode will inject the disk loss chaos in serial mode which means one after the other
+func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, targetDiskVolumeNamesList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
 	ChaosStartTimeStamp := time.Now()
@@ -157,8 +158,8 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 	return nil
 }
 
-//InjectChaosInParallelMode will inject the disk loss chaos in parallel mode that means all at once
-func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, targetDiskVolumeNamesList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+//injectChaosInParallelMode will inject the disk loss chaos in parallel mode that means all at once
+func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, targetDiskVolumeNamesList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	var instanceNamesList []string
 
