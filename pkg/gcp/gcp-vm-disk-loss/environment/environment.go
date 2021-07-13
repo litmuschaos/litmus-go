@@ -29,7 +29,6 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.Delay, _ = strconv.Atoi(common.Getenv("STATUS_CHECK_DELAY", "2"))
 	experimentDetails.Timeout, _ = strconv.Atoi(common.Getenv("STATUS_CHECK_TIMEOUT", "180"))
 	experimentDetails.TargetContainer = common.Getenv("TARGET_CONTAINER", "")
-	experimentDetails.VolumeAffectedPerc, _ = strconv.Atoi(common.Getenv("VOLUME_AFFECTED_PERC", "0"))
 	experimentDetails.GCPProjectID = common.Getenv("GCP_PROJECT_ID", "")
 	experimentDetails.DiskVolumeNames = common.Getenv("DISK_VOLUME_NAMES", "")
 	experimentDetails.Sequence = common.Getenv("SEQUENCE", "parallel")
