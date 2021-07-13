@@ -14,7 +14,7 @@ import (
 )
 
 // WaitForVolumeDetachment will wait for the disk volume to completely detach from a VM instance
-func WaitForVolumeDetachment(diskName string, gcpProjectID string, instanceName string, zone string, delay int, timeout int) error {
+func WaitForVolumeDetachment(diskName, gcpProjectID, instanceName, zone string, delay, timeout int) error {
 
 	log.Info("[Status]: Checking disk volume status for detachment")
 	return retry.
@@ -38,7 +38,7 @@ func WaitForVolumeDetachment(diskName string, gcpProjectID string, instanceName 
 }
 
 // WaitForVolumeAttachment will wait for the disk volume to get attached to a VM instance
-func WaitForVolumeAttachment(diskName string, gcpProjectID string, instanceName string, zone string, delay int, timeout int) error {
+func WaitForVolumeAttachment(diskName, gcpProjectID, instanceName, zone string, delay, timeout int) error {
 
 	log.Info("[Status]: Checking disk volume status for attachment")
 	return retry.
@@ -62,7 +62,7 @@ func WaitForVolumeAttachment(diskName string, gcpProjectID string, instanceName 
 }
 
 //GetDiskVolumeState will verify and give the VM instance details along with the disk volume details
-func GetDiskVolumeState(diskName string, gcpProjectID string, instanceName string, zone string) (string, error) {
+func GetDiskVolumeState(diskName, gcpProjectID, instanceName, zone string) (string, error) {
 
 	// create an empty context
 	ctx := context.Background()
@@ -112,7 +112,7 @@ func GetDiskVolumeState(diskName string, gcpProjectID string, instanceName strin
 }
 
 //DiskVolumeStateCheck will check the attachment state of the given volume
-func DiskVolumeStateCheck(gcpProjectID string, zones string, diskNames string, deviceNames string) error {
+func DiskVolumeStateCheck(gcpProjectID, zones, diskNames, deviceNames string) error {
 
 	if gcpProjectID == "" {
 		return errors.Errorf("no gcp project id provided, please provide the project id")
