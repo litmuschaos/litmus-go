@@ -44,22 +44,23 @@ func PrepareChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 
+	//get the volume name  or list of volume names
+	diskNameList := strings.Split(experimentsDetails.VirtualDiskNames, ",")
+	if len(diskNameList) == 0 {
+		return errors.Errorf("no volume names found to detach")
+	}
+	attachedDisks, err := azureStatus.GetInstanceDiskList(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, experimentsDetails.AzureInstanceName)
+	if err != nil {
+		log.Errorf("err: %v", err)
+		return errors.Errorf("error fetching virtual disks")
+	}
+
 	select {
 	case <-inject:
 		// stopping the chaos execution, if abort signal recieved
 		os.Exit(0)
 	default:
 
-		//get the volume name  or list of volume names
-		diskNameList := strings.Split(experimentsDetails.VirtualDiskNames, ",")
-		if len(diskNameList) == 0 {
-			return errors.Errorf("no volume names found to detach")
-		}
-		attachedDisks, err := azureStatus.GetInstanceDiskList(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, experimentsDetails.AzureInstanceName)
-		if err != nil {
-			log.Errorf("err: %v", err)
-			return errors.Errorf("error fetching virtual disks")
-		}
 		// watching for the abort signal and revert the chaos
 		go abortWatcher(experimentsDetails, attachedDisks, diskNameList, chaosDetails)
 
