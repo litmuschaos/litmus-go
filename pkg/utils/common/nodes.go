@@ -8,6 +8,8 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/math"
+	"github.com/litmuschaos/litmus-go/pkg/status"
+	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
 	"github.com/pkg/errors"
 	apiv1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -78,4 +80,64 @@ func GetNodeName(namespace, labels, nodeLabel string, clients clients.ClientSets
 		randomIndex := rand.Intn(len(nodeList.Items))
 		return nodeList.Items[randomIndex].Name, nil
 	}
+}
+
+// PreChaosNodeStatusCheck fetches all the nodes in the cluster and checks their status, and fetches the total active nodes in the cluster, prior to the chaos experiment
+func PreChaosNodeStatusCheck(timeout, delay int, clients clients.ClientSets) (int, error) {
+	nodeList, err := clients.KubeClient.CoreV1().Nodes().List(v1.ListOptions{})
+	if err != nil {
+		return 0, errors.Errorf("fail to get the nodes, err: %v", err)
+	}
+	for _, node := range nodeList.Items {
+		if err = status.CheckNodeStatus(node.Name, timeout, delay, clients); err != nil {
+			log.Infof("[Info]: The cluster is unhealthy this might not work, due to %v", err)
+		}
+	}
+	activeNodeCount, err := getActiveNodeCount(clients)
+	if err != nil {
+		return 0, errors.Errorf("fail to get the total active node count pre chaos, err: %v", err)
+	}
+
+	return activeNodeCount, nil
+}
+
+// PostChaosActiveNodeCountCheck checks the number of active nodes post chaos and validates the number of healthy node count post chaos
+func PostChaosActiveNodeCountCheck(activeNodeCount, timeout, delay int, clients clients.ClientSets) error {
+	err := retry.
+		Times(uint(timeout / delay)).
+		Wait(time.Duration(delay) * time.Second).
+		Try(func(attempt uint) error {
+
+			activeNodes, err := getActiveNodeCount(clients)
+			if err != nil {
+				return errors.Errorf("fail to get the total active nodes, err: %v", err)
+			}
+			if activeNodeCount != activeNodes {
+				return errors.Errorf("fail to get equal active node post chaos")
+			}
+			return nil
+		})
+	return err
+}
+
+// getActiveNodeCount fetches the target node and total node count from the cluster
+func getActiveNodeCount(clients clients.ClientSets) (int, error) {
+	nodeList, err := clients.KubeClient.CoreV1().Nodes().List(v1.ListOptions{})
+	if err != nil {
+		return 0, errors.Errorf("fail to get the nodes, err: %v", err)
+	}
+
+	nodeCount := 0
+	for _, node := range nodeList.Items {
+
+		conditions := node.Status.Conditions
+		for _, condition := range conditions {
+			if condition.Type == apiv1.NodeReady && condition.Status == apiv1.ConditionTrue {
+				nodeCount++
+			}
+		}
+	}
+	log.Infof("[Info]: Total number active nodes are: %v", nodeCount)
+
+	return nodeCount, nil
 }
