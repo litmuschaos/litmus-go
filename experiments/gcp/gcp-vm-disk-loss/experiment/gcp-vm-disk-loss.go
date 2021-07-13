@@ -169,7 +169,7 @@ func VMDiskLoss(clients clients.ClientSets) {
 	//Verify the vm instance is attached to disk volume
 	if err := gcp.DiskVolumeStateCheck(experimentsDetails.GCPProjectID, experimentsDetails.DiskZones, experimentsDetails.DiskVolumeNames, experimentsDetails.DeviceNames); err != nil {
 		log.Errorf("volume status check failed post chaos, err: %v", err)
-		failStep := "Verify the disk volume is attached to am instance (post-chaos)"
+		failStep := "Verify the disk volume is attached to an instance (post-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
