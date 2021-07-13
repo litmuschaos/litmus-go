@@ -23,10 +23,10 @@ var (
 	inject, abort chan os.Signal
 )
 
-var instanceNamesList []string
-
 //PrepareDiskVolumeLoss contains the prepration and injection steps for the experiment
 func PrepareDiskVolumeLoss(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+
+	var instanceNamesList []string
 
 	// inject channel is used to transmit signal notifications.
 	inject = make(chan os.Signal, 1)
@@ -79,15 +79,15 @@ func PrepareDiskVolumeLoss(experimentsDetails *experimentTypes.ExperimentDetails
 	default:
 
 		// watching for the abort signal and revert the chaos
-		go AbortWatcher(experimentsDetails, diskNamesList, abort, chaosDetails)
+		go AbortWatcher(experimentsDetails, diskNamesList, instanceNamesList, abort, chaosDetails)
 
 		switch strings.ToLower(experimentsDetails.Sequence) {
 		case "serial":
-			if err = injectChaosInSerialMode(experimentsDetails, diskNamesList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+			if err = injectChaosInSerialMode(experimentsDetails, diskNamesList, instanceNamesList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
 				return err
 			}
 		case "parallel":
-			if err = injectChaosInParallelMode(experimentsDetails, diskNamesList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+			if err = injectChaosInParallelMode(experimentsDetails, diskNamesList, instanceNamesList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
 				return err
 			}
 		default:
@@ -104,7 +104,7 @@ func PrepareDiskVolumeLoss(experimentsDetails *experimentTypes.ExperimentDetails
 }
 
 //injectChaosInSerialMode will inject the disk loss chaos in serial mode which means one after the other
-func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, targetDiskVolumeNamesList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, targetDiskVolumeNamesList []string, instanceNamesList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
 	ChaosStartTimeStamp := time.Now()
@@ -177,7 +177,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 }
 
 //injectChaosInParallelMode will inject the disk loss chaos in parallel mode that means all at once
-func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, targetDiskVolumeNamesList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, targetDiskVolumeNamesList []string, instanceNamesList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	diskZonesList := strings.Split(experimentsDetails.DiskZones, ",")
 	deviceNamesList := strings.Split(experimentsDetails.DeviceNames, ",")
@@ -257,7 +257,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 }
 
 // AbortWatcher will watching for the abort signal and revert the chaos
-func AbortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, diskNamesList []string, abort chan os.Signal, chaosDetails *types.ChaosDetails) {
+func AbortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, diskNamesList []string, instanceNamesList []string, abort chan os.Signal, chaosDetails *types.ChaosDetails) {
 
 	<-abort
 
