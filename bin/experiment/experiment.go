@@ -34,6 +34,7 @@ import (
 	podDNSError "github.com/litmuschaos/litmus-go/experiments/generic/pod-dns-error/experiment"
 	podDNSSpoof "github.com/litmuschaos/litmus-go/experiments/generic/pod-dns-spoof/experiment"
 	podIOStress "github.com/litmuschaos/litmus-go/experiments/generic/pod-io-stress/experiment"
+	podFioStress "github.com/litmuschaos/litmus-go/experiments/generic/pod-fio-stress/experiment"
 	podMemoryHogExec "github.com/litmuschaos/litmus-go/experiments/generic/pod-memory-hog-exec/experiment"
 	podMemoryHog "github.com/litmuschaos/litmus-go/experiments/generic/pod-memory-hog/experiment"
 	podNetworkCorruption "github.com/litmuschaos/litmus-go/experiments/generic/pod-network-corruption/experiment"
@@ -146,6 +147,8 @@ func main() {
 		vmpoweroff.VMPoweroff(clients)
 	case "gcp-vm-disk-loss":
 		gcpVMDiskLoss.VMDiskLoss(clients)
+	case "pod-fio-stress":
+		podFioStress.PodFioStress(clients)
 	case "gcp-vm-instance-stop":
 		gcpVMInstanceStop.VMInstanceStop(clients)
 
