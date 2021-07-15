@@ -11,11 +11,10 @@ import (
 )
 
 //GetENV fetches all the env variables from the runner pod
-func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
+func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expScope string) {
 	experimentDetails.ExperimentName = common.Getenv("EXPERIMENT_NAME", "")
 	experimentDetails.ChaosNamespace = common.Getenv("CHAOS_NAMESPACE", "litmus")
 	experimentDetails.EngineName = common.Getenv("CHAOSENGINE", "")
-	experimentDetails.ChaosDuration, _ = strconv.Atoi(common.Getenv("TOTAL_CHAOS_DURATION", "60"))
 	experimentDetails.RampTime, _ = strconv.Atoi(common.Getenv("RAMP_TIME", "0"))
 	experimentDetails.ChaosLib = common.Getenv("LIB", "litmus")
 	experimentDetails.AppNS = common.Getenv("APP_NAMESPACE", "")
@@ -26,10 +25,6 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.LIBImage = common.Getenv("LIB_IMAGE", "litmuschaos/go-runner:latest")
 	experimentDetails.LIBImagePullPolicy = common.Getenv("LIB_IMAGE_PULL_POLICY", "Always")
 	experimentDetails.ChaosPodName = common.Getenv("POD_NAME", "")
-	experimentDetails.NetworkPacketDuplicationPercentage, _ = strconv.Atoi(common.Getenv("NETWORK_PACKET_DUPLICATION_PERCENTAGE", "100"))
-	experimentDetails.NetworkLatency, _ = strconv.Atoi(common.Getenv("NETWORK_LATENCY", "60000"))
-	experimentDetails.NetworkPacketLossPercentage, _ = strconv.Atoi(common.Getenv("NETWORK_PACKET_LOSS_PERCENTAGE", "100"))
-	experimentDetails.NetworkPacketCorruptionPercentage, _ = strconv.Atoi(common.Getenv("NETWORK_PACKET_CORRUPTION_PERCENTAGE", "100"))
 	experimentDetails.NetworkInterface = common.Getenv("NETWORK_INTERFACE", "eth0")
 	experimentDetails.TargetContainer = common.Getenv("TARGET_CONTAINER", "")
 	experimentDetails.TCImage = common.Getenv("TC_IMAGE", "gaiadocker/iproute2")
@@ -37,13 +32,31 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.Timeout, _ = strconv.Atoi(common.Getenv("STATUS_CHECK_TIMEOUT", "180"))
 	experimentDetails.TargetPods = common.Getenv("TARGET_PODS", "")
 	experimentDetails.PodsAffectedPerc, _ = strconv.Atoi(common.Getenv("PODS_AFFECTED_PERC", "0"))
-	experimentDetails.DestinationIPs = common.Getenv("DESTINATION_IPS", "")
-	experimentDetails.DestinationHosts = common.Getenv("DESTINATION_HOSTS", "")
 	experimentDetails.ContainerRuntime = common.Getenv("CONTAINER_RUNTIME", "docker")
 	experimentDetails.ChaosServiceAccount = common.Getenv("CHAOS_SERVICE_ACCOUNT", "")
 	experimentDetails.SocketPath = common.Getenv("SOCKET_PATH", "/var/run/docker.sock")
 	experimentDetails.Sequence = common.Getenv("SEQUENCE", "parallel")
 	experimentDetails.TerminationGracePeriodSeconds, _ = strconv.Atoi(common.Getenv("TERMINATION_GRACE_PERIOD_SECONDS", ""))
+
+	switch expScope {
+	case "pod":
+		experimentDetails.NetworkPacketDuplicationPercentage, _ = strconv.Atoi(common.Getenv("NETWORK_PACKET_DUPLICATION_PERCENTAGE", "100"))
+		experimentDetails.NetworkLatency, _ = strconv.Atoi(common.Getenv("NETWORK_LATENCY", "60000"))
+		experimentDetails.NetworkPacketLossPercentage, _ = strconv.Atoi(common.Getenv("NETWORK_PACKET_LOSS_PERCENTAGE", "100"))
+		experimentDetails.NetworkPacketCorruptionPercentage, _ = strconv.Atoi(common.Getenv("NETWORK_PACKET_CORRUPTION_PERCENTAGE", "100"))
+		experimentDetails.DestinationIPs = common.Getenv("DESTINATION_IPS", "")
+		experimentDetails.DestinationHosts = common.Getenv("DESTINATION_HOSTS", "")
+		experimentDetails.ChaosDuration, _ = strconv.Atoi(common.Getenv("TOTAL_CHAOS_DURATION", "60"))
+
+	case "node":
+		experimentDetails.NetworkLatency, _ = strconv.Atoi(common.Getenv("NETWORK_LATENCY", "60000"))
+		experimentDetails.NetworkPacketLossPercentage, _ = strconv.Atoi(common.Getenv("NETWORK_PACKET_LOSS_PERCENTAGE", "100"))
+		experimentDetails.TargetNode = common.Getenv("TARGET_NODE", "")
+		experimentDetails.NodeLabel = common.Getenv("NODE_LABEL", "")
+		experimentDetails.AuxiliaryAppInfo = common.Getenv("AUXILIARY_APPINFO", "")
+		experimentDetails.ChaosDuration, _ = strconv.Atoi(common.Getenv("TOTAL_CHAOS_DURATION", "120"))
+
+	}
 }
 
 //InitialiseChaosVariables initialise all the global variables

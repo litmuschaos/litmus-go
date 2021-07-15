@@ -13,7 +13,7 @@ import (
 
 	containerKill "github.com/litmuschaos/litmus-go/chaoslib/litmus/container-kill/helper"
 	diskFill "github.com/litmuschaos/litmus-go/chaoslib/litmus/disk-fill/helper"
-	networkChaos "github.com/litmuschaos/litmus-go/chaoslib/litmus/network-chaos/helper"
+	networkChaos "github.com/litmuschaos/litmus-go/chaoslib/litmus/pod-network-chaos/helper"
 	dnsChaos "github.com/litmuschaos/litmus-go/chaoslib/litmus/pod-dns-chaos/helper"
 	stressChaos "github.com/litmuschaos/litmus-go/chaoslib/litmus/stress-chaos/helper"
 

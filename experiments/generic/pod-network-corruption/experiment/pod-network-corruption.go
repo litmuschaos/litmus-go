@@ -2,7 +2,7 @@ package experiment
 
 import (
 	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
-	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/network-chaos/lib/corruption"
+	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/pod-network-chaos/lib/corruption"
 	pumbaLIB "github.com/litmuschaos/litmus-go/chaoslib/pumba/network-chaos/lib/corruption"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
@@ -27,7 +27,7 @@ func PodNetworkCorruption(clients clients.ClientSets) {
 
 	//Fetching all the ENV passed from the runner pod
 	log.Infof("[PreReq]: Getting the ENV for the %v experiment", experimentsDetails.ExperimentName)
-	experimentEnv.GetENV(&experimentsDetails)
+	experimentEnv.GetENV(&experimentsDetails, "pod")
 
 	// Intialise events Parameters
 	experimentEnv.InitialiseChaosVariables(&chaosDetails, &experimentsDetails)
