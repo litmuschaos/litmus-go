@@ -9,7 +9,7 @@ import (
 
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/azure/instance-stop/types"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
-	azureStatus "github.com/litmuschaos/litmus-go/pkg/cloud/azure"
+	azureStatus "github.com/litmuschaos/litmus-go/pkg/cloud/azure/instance"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"

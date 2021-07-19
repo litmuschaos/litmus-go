@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute"
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/azure/azure-disk-loss/types"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/azure/disk-loss/types"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
-	azureStatus "github.com/litmuschaos/litmus-go/pkg/cloud/azure"
+	azureStatus "github.com/litmuschaos/litmus-go/pkg/cloud/azure/disk"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
@@ -108,6 +108,13 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		}
 
 		for _, diskName := range diskNameList {
+			log.Infof("[Wait]: Waiting for Disk '%v' to detach", diskName)
+			if err := azureStatus.WaitForDiskToDetach(experimentsDetails, diskName); err != nil {
+				return errors.Errorf("disk attach check failed, err: %v", err)
+			}
+		}
+
+		for _, diskName := range diskNameList {
 			common.SetTargets(diskName, "injected", "VirtualDisk", chaosDetails)
 		}
 
@@ -126,6 +133,13 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		log.Info("[Chaos]: Attaching the Virtual disks back to the instance")
 		if err = azureStatus.AttachDisk(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, experimentsDetails.AzureInstanceName, diskList); err != nil {
 			return errors.Errorf("virtual disk attachment failed, err: %v", err)
+		}
+
+		for _, diskName := range diskNameList {
+			log.Infof("[Wait]: Waiting for Disk '%v' to attach", diskName)
+			if err := azureStatus.WaitForDiskToAttach(experimentsDetails, diskName); err != nil {
+				return errors.Errorf("disk attach check failed, err: %v", err)
+			}
 		}
 
 		for _, diskName := range diskNameList {
@@ -158,6 +172,11 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 				return errors.Errorf("failed to detach disks, err: %v", err)
 			}
 
+			log.Infof("[Wait]: Waiting for Disk '%v' to detach", diskName)
+			if err := azureStatus.WaitForDiskToDetach(experimentsDetails, diskName); err != nil {
+				return errors.Errorf("disk detach check failed, err: %v", err)
+			}
+
 			common.SetTargets(diskName, "injected", "VirtualDisk", chaosDetails)
 
 			// run the probes during chaos
@@ -171,24 +190,17 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 			log.Infof("[Wait]: Waiting for the chaos interval of %vs", experimentsDetails.ChaosInterval)
 			common.WaitForDuration(experimentsDetails.ChaosInterval)
 
-			//Getting the virtual disk status
-			diskState, err := azureStatus.GetDiskStatus(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, diskName)
-			if err != nil {
-				return errors.Errorf("failed to get the virtual disk status, err: %v", err)
+			//Attaching the virtual disks to the instance
+			log.Infof("[Chaos]: Attaching %v back to the instance", diskName)
+			if err = azureStatus.AttachDisk(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, experimentsDetails.AzureInstanceName, diskList); err != nil {
+				return errors.Errorf("disk attachment failed, err: %v", err)
 			}
 
-			switch diskState {
-			case "Attached":
-				log.Info("[Skip]: The Virtual Disk is already attached")
-			case "Unattached":
-				//Attaching the virtual disks to the instance
-				log.Infof("[Chaos]: Attaching %v back to the instance", diskName)
-				if err = azureStatus.AttachDisk(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, experimentsDetails.AzureInstanceName, diskList); err != nil {
-					return errors.Errorf("disk attachment failed, err: %v", err)
-				}
-			default:
-				return errors.Errorf("Cannot attach disk, this is because the disk is either currently being created or the VM is not running, current disk state: %v", diskState)
+			log.Infof("[Wait]: Waiting for Disk '%v' to attach", diskName)
+			if err := azureStatus.WaitForDiskToAttach(experimentsDetails, diskName); err != nil {
+				return errors.Errorf("disk attach check failed, err: %v", err)
 			}
+
 			common.SetTargets(diskName, "reverted", "VirtualDisk", chaosDetails)
 		}
 
@@ -203,32 +215,34 @@ func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, diskLis
 
 	log.Info("[Abort]: Chaos Revert Started")
 
-	// Checking if all disk detached properly
-	log.Info("[Abort]: Waiting for disk(s) to detach properly")
-	for _, diskName := range diskNameList {
-		//Getting the virtual disk status
-		retry.
-			Times(uint(experimentsDetails.Timeout / experimentsDetails.Delay)).
-			Wait(time.Duration(experimentsDetails.Delay) * time.Second).
-			Try(func(attempt uint) error {
-				diskState, err := azureStatus.GetDiskStatus(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, diskName)
-				if err != nil {
-					errors.Errorf("failed to get the disk status, err: %v", err)
-				}
-				if diskState != "Unattached" {
-					log.Infof("[Abort]: Disk is not yet detached properly, state: %v", diskState)
-					return errors.Errorf("Disk is not yet detached properly, state: %v", diskState)
-				}
-				log.Infof("[Abort]: Disk %v state: %v", diskName, diskState)
-				return nil
-			})
-	}
-	log.Info("[Abort]: Disk(s) detached properly")
+	// Attaching disks back to the instance
+	// log.Info("[Abort]: Waiting for disk(s) to detach properly")
+	// for _, diskName := range diskNameList {
+	// 	diskState, err := azureStatus.GetDiskStatus(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, diskName)
+	// 	if err != nil {
+	// 		errors.Errorf("failed to get the disk status, err: %v", err)
+	// 	}
+	// 	if diskState != "Attached" {
+
+	// 		for _, diskName := range diskNameList {
+	// 			azureStatus.WaitForDiskToDetach(experimentsDetails, diskName)
+	// 		}
+	// 	}
+	// }
+	// log.Info("[Abort]: Disk(s) detached properly")
 
 	log.Info("[Abort]: Attaching disk(s) as abort signal recieved")
-	if err := azureStatus.AttachDisk(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, experimentsDetails.AzureInstanceName, diskList); err != nil {
-		log.Errorf("unable to attach disk, err: %v", err)
-	}
+
+	retry.
+		Times(uint(experimentsDetails.Timeout / experimentsDetails.Delay)).
+		Wait(time.Duration(experimentsDetails.Delay) * time.Second).
+		Try(func(attempt uint) error {
+			if err := azureStatus.AttachDisk(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, experimentsDetails.AzureInstanceName, diskList); err != nil {
+				log.Infof("Waiting for detaching disks")
+				return errors.Errorf("Waiting for detaching disks, err: %v", err)
+			}
+			return nil
+		})
 
 	for _, diskName := range diskNameList {
 		common.SetTargets(diskName, "reverted", "VirtualDisk", chaosDetails)

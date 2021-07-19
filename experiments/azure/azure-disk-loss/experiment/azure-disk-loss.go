@@ -3,10 +3,11 @@ package experiment
 import (
 	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
 	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/azure-disk-loss/lib"
-	experimentEnv "github.com/litmuschaos/litmus-go/pkg/azure/azure-disk-loss/environment"
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/azure/azure-disk-loss/types"
+	experimentEnv "github.com/litmuschaos/litmus-go/pkg/azure/disk-loss/environment"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/azure/disk-loss/types"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
-	azureStatus "github.com/litmuschaos/litmus-go/pkg/cloud/azure"
+	azureCommon "github.com/litmuschaos/litmus-go/pkg/cloud/azure/common"
+	azureStatus "github.com/litmuschaos/litmus-go/pkg/cloud/azure/disk"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
@@ -20,6 +21,7 @@ import (
 // Experiment contains steps to inject chaos
 func AzureDiskLoss(clients clients.ClientSets) {
 
+	var err error
 	experimentsDetails := experimentTypes.ExperimentDetails{}
 	resultDetails := types.ResultDetails{}
 	eventsDetails := types.EventDetails{}
@@ -37,7 +39,7 @@ func AzureDiskLoss(clients clients.ClientSets) {
 
 	if experimentsDetails.EngineName != "" {
 		// Intialise the probe details. Bail out upon error, as we haven't entered exp business logic yet
-		if err := probe.InitializeProbesInChaosResultDetails(&chaosDetails, clients, &resultDetails); err != nil {
+		if err = probe.InitializeProbesInChaosResultDetails(&chaosDetails, clients, &resultDetails); err != nil {
 			log.Errorf("Unable to initialize the probes, err: %v", err)
 			return
 		}
@@ -45,7 +47,7 @@ func AzureDiskLoss(clients clients.ClientSets) {
 
 	//Updating the chaos result in the beginning of experiment
 	log.Infof("[PreReq]: Updating the chaos result of %v experiment (SOT)", experimentsDetails.ExperimentName)
-	if err := result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT"); err != nil {
+	if err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT"); err != nil {
 		log.Errorf("Unable to Create the Chaos Result, err: %v", err)
 		failStep := "Updating the chaos result of pod-delete experiment (SOT)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
@@ -78,7 +80,7 @@ func AzureDiskLoss(clients clients.ClientSets) {
 
 	//PRE-CHAOS APPLICATION STATUS CHECK
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (pre-chaos)")
-	if err := status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
+	if err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
 		log.Errorf("Application status check failed, err: %v", err)
 		failStep := "Verify that the AUT (Application Under Test) is running (pre-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
@@ -88,7 +90,7 @@ func AzureDiskLoss(clients clients.ClientSets) {
 	//PRE-CHAOS AUXILIARY APPLICATION STATUS CHECK
 	if experimentsDetails.AuxiliaryAppInfo != "" {
 		log.Info("[Status]: Verify that the Auxiliary Applications are running (pre-chaos)")
-		if err := status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
+		if err = status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
 			log.Errorf("Auxiliary Application status check failed, err: %v", err)
 			failStep := "Verify that the Auxiliary Applications are running (pre-chaos)"
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
@@ -97,7 +99,7 @@ func AzureDiskLoss(clients clients.ClientSets) {
 	}
 
 	// Setting up Azure Subscription ID
-	if err := azureStatus.SetupSubscriptionID(&experimentsDetails); err != nil {
+	if experimentsDetails.SubscriptionID, err = azureCommon.GetSubscriptionID(); err != nil {
 		log.Errorf("fail to get the subscription id, err: %v", err)
 		failStep := "Getting the subscription ID for authentication"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
@@ -106,7 +108,7 @@ func AzureDiskLoss(clients clients.ClientSets) {
 
 	// PRE-CHAOS VIRTUAL DISK STATUS CHECK
 	log.Info("[Status]: Verify that the virtual disk are attached to VM instance(pre-chaos)")
-	if err := azureStatus.CheckVirtualDiskWithInstance(experimentsDetails); err != nil {
+	if err = azureStatus.CheckVirtualDiskWithInstance(experimentsDetails); err != nil {
 		log.Errorf("Virtual disk status check failed, err: %v", err)
 		failStep := "Verify that the virtual disk are attached to VM instance(pre-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
@@ -139,16 +141,16 @@ func AzureDiskLoss(clients clients.ClientSets) {
 	// Including the litmus lib
 	switch experimentsDetails.ChaosLib {
 	case "litmus":
-		if err := litmusLIB.PrepareChaos(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
+		if err = litmusLIB.PrepareChaos(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
 			failStep := "failed in chaos injection phase"
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			log.Errorf("Chaos injection failed, err: %v", err)
 			return
 		}
 	default:
-		failStep := "lib and container-runtime combination not supported!"
+		log.Error("[Invalid]: Please Provide the correct LIB")
+		failStep := "no match found for specified lib"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-		log.Error("lib and container-runtime combination not supported, provide the correct value of lib & container-runtime")
 		return
 	}
 
@@ -157,7 +159,7 @@ func AzureDiskLoss(clients clients.ClientSets) {
 
 	//POST-CHAOS APPLICATION STATUS CHECK
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (post-chaos)")
-	if err := status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
+	if err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
 		log.Errorf("Application status check failed, err: %v", err)
 		failStep := "Verify that the AUT (Application Under Test) is running (post-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
@@ -170,7 +172,7 @@ func AzureDiskLoss(clients clients.ClientSets) {
 
 		// run the probes in the post-chaos check
 		if len(resultDetails.ProbeDetails) != 0 {
-			if err := probe.RunProbes(&chaosDetails, clients, &resultDetails, "PostChaos", &eventsDetails); err != nil {
+			if err = probe.RunProbes(&chaosDetails, clients, &resultDetails, "PostChaos", &eventsDetails); err != nil {
 				log.Errorf("Probes Failed, err: %v", err)
 				failStep := "Failed while running probes"
 				msg := "AUT: Running, Probes: Unsuccessful"
@@ -189,7 +191,7 @@ func AzureDiskLoss(clients clients.ClientSets) {
 
 	//Updating the chaosResult in the end of experiment
 	log.Infof("[The End]: Updating the chaos result of %v experiment (EOT)", experimentsDetails.ExperimentName)
-	if err := result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT"); err != nil {
+	if err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT"); err != nil {
 		log.Errorf("Unable to Update the Chaos Result, err: %v", err)
 		return
 	}

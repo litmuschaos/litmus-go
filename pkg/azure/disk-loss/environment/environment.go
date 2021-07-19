@@ -5,7 +5,7 @@ import (
 
 	clientTypes "k8s.io/apimachinery/pkg/types"
 
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/azure/azure-disk-loss/types"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/azure/disk-loss/types"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 )

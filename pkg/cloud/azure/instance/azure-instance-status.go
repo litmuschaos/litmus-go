@@ -2,9 +2,6 @@ package azure
 
 import (
 	"context"
-	"encoding/json"
-	"io/ioutil"
-	"os"
 	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/profiles/latest/compute/mgmt/compute"
@@ -41,33 +38,6 @@ func GetAzureInstanceStatus(subscriptionID, resourceGroup, azureInstanceName str
 	// To print VM status
 	log.Infof("[Status]: The instance %v state is: '%s'", azureInstanceName, *(*instanceDetails.Statuses)[1].DisplayStatus)
 	return *(*instanceDetails.Statuses)[1].DisplayStatus, nil
-}
-
-// SetupSubsciptionID fetch the subscription id from the auth file and export it in experiment struct variable
-func SetupSubscriptionID(experimentsDetails *experimentTypes.ExperimentDetails) error {
-
-	var err error
-	authFile, err := os.Open(os.Getenv("AZURE_AUTH_LOCATION"))
-	if err != nil {
-		return errors.Errorf("fail to open auth file, err: %v", err)
-	}
-
-	authFileContent, err := ioutil.ReadAll(authFile)
-	if err != nil {
-		return errors.Errorf("fail to read auth file, err: %v", err)
-	}
-
-	details := make(map[string]string)
-	if err := json.Unmarshal(authFileContent, &details); err != nil {
-		return errors.Errorf("fail to unmarshal file, err: %v", err)
-	}
-
-	if id, contains := details["subscriptionId"]; contains {
-		experimentsDetails.SubscriptionID = id
-	} else {
-		return errors.Errorf("The auth file does not have a subscriptionId field")
-	}
-	return nil
 }
 
 // InstanceStatusCheckByName is used to check the instance status of all the instance under chaos
