@@ -43,6 +43,34 @@ func GetAzureInstanceStatus(subscriptionID, resourceGroup, azureInstanceName str
 	return *(*instanceDetails.Statuses)[1].DisplayStatus, nil
 }
 
+//GetAzureScaleSetInstanceStatus will verify the azure instance state details in the scale set
+func GetAzureScaleSetInstanceStatus(subscriptionID, resourceGroup, virtualMachineScaleSetName, virtualMachineId string) (string, error) {
+
+	vmssClient := compute.NewVirtualMachineScaleSetVMsClient(subscriptionID)
+
+	authorizer, err := auth.NewAuthorizerFromFile(azure.PublicCloud.ResourceManagerEndpoint)
+	if err == nil {
+		vmssClient.Authorizer = authorizer
+	} else {
+		return "", errors.Errorf("fail to setup authorization, err: %v", err)
+	}
+
+	instanceDetails, err := vmssClient.GetInstanceView(context.TODO(), resourceGroup, virtualMachineScaleSetName, virtualMachineId)
+	if err != nil {
+		return "", errors.Errorf("fail to get the instance to check status, err: %v", err)
+	}
+	// The *instanceDetails.Statuses list contains the instance status details as shown below
+	// Item 1: Provisioning succeeded
+	// Item 2: VM running
+	if len(*instanceDetails.Statuses) < 2 {
+		return "", errors.Errorf("fail to get the instatus vm status")
+	}
+
+	// To print VM status
+	log.Infof("[Status]: The instance %v_%v state is: '%s'", virtualMachineScaleSetName, virtualMachineId, *(*instanceDetails.Statuses)[1].DisplayStatus)
+	return *(*instanceDetails.Statuses)[1].DisplayStatus, nil
+}
+
 // SetupSubsciptionID fetch the subscription id from the auth file and export it in experiment struct variable
 func SetupSubscriptionID(experimentsDetails *experimentTypes.ExperimentDetails) error {
 
@@ -74,10 +102,15 @@ func SetupSubscriptionID(experimentsDetails *experimentTypes.ExperimentDetails) 
 func InstanceStatusCheckByName(experimentsDetails *experimentTypes.ExperimentDetails) error {
 	instanceNameList := strings.Split(experimentsDetails.AzureInstanceName, ",")
 	if len(instanceNameList) == 0 {
-		return errors.Errorf("no instance found to stop")
+		return errors.Errorf("no instance found to check status")
 	}
 	log.Infof("[Info]: The instance under chaos(IUC) are: %v", instanceNameList)
-	return InstanceStatusCheck(instanceNameList, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup)
+	switch experimentsDetails.IsScaleSet {
+	case "true":
+		return ScaleSetInstanceStatusCheck(instanceNameList, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup)
+	default:
+		return InstanceStatusCheck(instanceNameList, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup)
+	}
 }
 
 // InstanceStatusCheckByName is used to check the instance status of given list of instances
@@ -93,4 +126,38 @@ func InstanceStatusCheck(targetInstanceNameList []string, subscriptionID, resour
 		}
 	}
 	return nil
+}
+
+// InstanceStatusCheckByName is used to check the instance status of given list of instances
+func ScaleSetInstanceStatusCheck(targetInstanceNameList []string, subscriptionID, resourceGroup string) error {
+
+	targetScaleSetList := GetScaleSetList(targetInstanceNameList)
+	for scaleSet, vmIds := range targetScaleSetList {
+		for _, vm := range vmIds {
+			instanceState, err := GetAzureScaleSetInstanceStatus(subscriptionID, resourceGroup, scaleSet, vm)
+			if err != nil {
+				return err
+			}
+			if instanceState != "VM running" {
+				return errors.Errorf("failed to get the azure instance '%v_%v' in running state, current state: %v", scaleSet, vm, instanceState)
+			}
+		}
+	}
+	return nil
+}
+
+func GetScaleSetList(instanceNameList []string) map[string][]string {
+	vmScaleSet := make(map[string][]string)
+
+	for _, scaleSet := range instanceNameList {
+		scaleSetAndInstanceId := strings.Split(scaleSet, "_")
+		vmScaleSet[scaleSetAndInstanceId[0]] = append(vmScaleSet[scaleSetAndInstanceId[0]], scaleSetAndInstanceId[1])
+	}
+
+	return vmScaleSet
+}
+
+func GetScaleSetNameAndInstanceId(instanceName string) (string, string) {
+	scaleSetAndInstanceId := strings.Split(instanceName, "_")
+	return scaleSetAndInstanceId[0], scaleSetAndInstanceId[1]
 }
