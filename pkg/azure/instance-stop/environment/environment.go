@@ -20,7 +20,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.AppKind = common.Getenv("APP_KIND", "")
 	experimentDetails.AuxiliaryAppInfo = common.Getenv("AUXILIARY_APPINFO", "")
 	experimentDetails.ChaosDuration, _ = strconv.Atoi(common.Getenv("TOTAL_CHAOS_DURATION", "30"))
-	experimentDetails.ChaosInterval, _ = strconv.Atoi(common.Getenv("CHAOS_INTERVAL", "10"))
+	experimentDetails.ChaosInterval, _ = strconv.Atoi(common.Getenv("CHAOS_INTERVAL", "30"))
 	experimentDetails.RampTime, _ = strconv.Atoi(common.Getenv("RAMP_TIME", "0"))
 	experimentDetails.ChaosLib = common.Getenv("LIB", "litmus")
 	experimentDetails.ChaosUID = clientTypes.UID(common.Getenv("CHAOS_UID", ""))
@@ -28,9 +28,9 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.ChaosPodName = common.Getenv("POD_NAME", "")
 	experimentDetails.Delay, _ = strconv.Atoi(common.Getenv("STATUS_CHECK_DELAY", "2"))
 	experimentDetails.Timeout, _ = strconv.Atoi(common.Getenv("STATUS_CHECK_TIMEOUT", "180"))
-	experimentDetails.AzureInstanceName = common.Getenv("AZURE_INSTANCE_NAME", "aks-agentpool-12981678-vmss_0,aks-agentpool-12981678-vmss_1")
-	experimentDetails.ResourceGroup = common.Getenv("RESOURCE_GROUP", "MC_litmus_test2_eastus2")
-	experimentDetails.IsScaleSet = common.Getenv("IS_SCALE_SET", "true")
+	experimentDetails.AzureInstanceName = common.Getenv("AZURE_INSTANCE_NAME", "")
+	experimentDetails.ResourceGroup = common.Getenv("RESOURCE_GROUP", "")
+	experimentDetails.IsScaleSet = common.Getenv("IS_SCALE_SET", "false")
 	experimentDetails.Sequence = common.Getenv("SEQUENCE", "parallel")
 }
 

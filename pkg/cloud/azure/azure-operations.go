@@ -116,7 +116,7 @@ func WaitForAzureComputeDown(timeout, delay int, isScaleSet, subscriptionID, res
 				return errors.Errorf("failed to get the instance status")
 			}
 			if instanceState != "VM stopped" {
-				log.Infof("The instance state is %v", instanceState)
+				// log.Infof("The instance state is %v", instanceState)
 				return errors.Errorf("instance is not yet in stopped state")
 			}
 			// log.Infof("The instance state is %v", instanceState)
@@ -147,7 +147,7 @@ func WaitForAzureComputeUp(timeout, delay int, isScaleSet, subscriptionID, resou
 				return errors.Errorf("failed to get instance status")
 			}
 			if instanceState != "VM running" {
-				log.Infof("The instance state is %v", instanceState)
+				// log.Infof("The instance state is %v", instanceState)
 				return errors.Errorf("instance is not yet in running state")
 			}
 			// log.Infof("The instance state is %v", instanceState)
