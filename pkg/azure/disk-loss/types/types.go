@@ -23,9 +23,10 @@ type ExperimentDetails struct {
 	Timeout            int
 	Delay              int
 	LIBImagePullPolicy string
-	AzureInstanceName  string
+	IsScaleSet         string
 	ResourceGroup      string
 	SubscriptionID     string
 	VirtualDiskNames   string
+	InstanceWithDisk   map[string][]string
 	Sequence           string
 }

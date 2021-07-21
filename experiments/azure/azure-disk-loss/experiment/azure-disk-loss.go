@@ -75,7 +75,6 @@ func AzureDiskLoss(clients clients.ClientSets) {
 	log.InfoWithValues("The volume information is as follows", logrus.Fields{
 		"Disk Names":     experimentsDetails.VirtualDiskNames,
 		"Resource Group": experimentsDetails.ResourceGroup,
-		"Instance Name":  experimentsDetails.AzureInstanceName,
 	})
 
 	//PRE-CHAOS APPLICATION STATUS CHECK

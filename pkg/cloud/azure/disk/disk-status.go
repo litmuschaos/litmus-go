@@ -2,18 +2,19 @@ package azure
 
 import (
 	"context"
+	"regexp"
 	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/profiles/latest/compute/mgmt/compute"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/azure/auth"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/azure/disk-loss/types"
-	"github.com/litmuschaos/litmus-go/pkg/cloud/azure/common"
+	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/pkg/errors"
 )
 
 // GetInstanceDiskList will fetch the disks attached to an instance
-func GetInstanceDiskList(subscriptionID, resourceGroup, azureInstanceName string) (*[]compute.DataDisk, error) {
+func GetInstanceDiskList(subscriptionID, resourceGroup, isScaleSet, azureInstanceName string) (*[]compute.DataDisk, error) {
 
 	// Setup and authorize vm client
 	vmClient := compute.NewVirtualMachinesClient(subscriptionID)
@@ -60,23 +61,56 @@ func GetDiskStatus(subscriptionID, resourceGroup, diskName string) (compute.Disk
 // CheckVirtualDiskWithInstance checks whether the given list of disk are attached to the provided VM instance
 func CheckVirtualDiskWithInstance(experimentsDetails experimentTypes.ExperimentDetails) error {
 
-	// Get the attached disks with the instance
-	diskList, err := GetInstanceDiskList(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, experimentsDetails.AzureInstanceName)
+	// Setup and authorize disk client
+	diskClient := compute.NewDisksClient(experimentsDetails.SubscriptionID)
+	authorizer, err := auth.NewAuthorizerFromFile(azure.PublicCloud.ResourceManagerEndpoint)
+
 	if err != nil {
-		return errors.Errorf("failed to get disk status, err: %v", err)
+		return errors.Errorf("fail to setup authorization, err: %v", err)
 	}
+	diskClient.Authorizer = authorizer
 
 	// Creating an array of the name of the attached disks
 	diskNameList := strings.Split(experimentsDetails.VirtualDiskNames, ",")
-	var diskListInstance []string
-	for _, disk := range *diskList {
-		diskListInstance = append(diskListInstance, *disk.Name)
-	}
-	// Checking whether the provided disk are attached to the instance
+
 	for _, diskName := range diskNameList {
-		if !common.StringInSlice(diskName, diskListInstance) {
-			return errors.Errorf("'%v' is not attached to vm '%v' instance", diskName, experimentsDetails.AzureInstanceName)
+		disk, err := diskClient.Get(context.Background(), experimentsDetails.ResourceGroup, diskName)
+		if err != nil {
+			return errors.Errorf("failed to get disk, err: %v", err)
+		}
+		if disk.ManagedBy == nil {
+			return errors.Errorf("disk %v not attached to any instance", diskName)
 		}
 	}
 	return nil
+}
+
+func GetInstanceNameForDisks(diskNameList []string, subscriptionID, resourceGroup string) (map[string][]string, error) {
+
+	// Setup and authorize disk client
+	diskClient := compute.NewDisksClient(subscriptionID)
+	authorizer, err := auth.NewAuthorizerFromFile(azure.PublicCloud.ResourceManagerEndpoint)
+
+	instanceNameWithDiskMap := make(map[string][]string)
+
+	if err != nil {
+		return instanceNameWithDiskMap, errors.Errorf("fail to setup authorization, err: %v", err)
+	}
+	diskClient.Authorizer = authorizer
+
+	instanceNameRegex := regexp.MustCompile(`virtualMachines/`)
+
+	for _, diskName := range diskNameList {
+		disk, err := diskClient.Get(context.TODO(), resourceGroup, diskName)
+		if err != nil {
+			return instanceNameWithDiskMap, nil
+		}
+		res := instanceNameRegex.FindStringIndex(*disk.ManagedBy)
+		i := res[1]
+		instanceName := (*disk.ManagedBy)[i:len(*disk.ManagedBy)]
+		instanceNameWithDiskMap[instanceName] = append(instanceNameWithDiskMap[instanceName], *disk.Name)
+	}
+
+	log.Infof("Disk with instance names: %v", instanceNameWithDiskMap)
+	return instanceNameWithDiskMap, nil
 }

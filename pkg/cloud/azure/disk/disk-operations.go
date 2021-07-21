@@ -14,52 +14,8 @@ import (
 	"github.com/pkg/errors"
 )
 
-// DetachDisk will detach the disk from the vm instance
-func DetachDisk(subscriptionID, resourceGroup, azureInstanceName, diskName string) error {
-
-	// Setup and authorize vm client
-	vmClient := compute.NewVirtualMachinesClient(subscriptionID)
-
-	authorizer, err := auth.NewAuthorizerFromFile(azure.PublicCloud.ResourceManagerEndpoint)
-
-	if err != nil {
-		return errors.Errorf("fail to setup authorization, err: %v", err)
-	}
-	vmClient.Authorizer = authorizer
-
-	// Fetch the vm instance
-	vm, err := vmClient.Get(context.TODO(), resourceGroup, azureInstanceName, compute.InstanceViewTypes("instanceView"))
-	if err != nil {
-		return errors.Errorf("fail get instance, err: %v", err)
-	}
-
-	// Create list of Disks that are not to be detached
-	var keepAttachedList []compute.DataDisk
-
-	for _, disk := range *vm.VirtualMachineProperties.StorageProfile.DataDisks {
-		if *disk.Name != diskName {
-			keepAttachedList = append(keepAttachedList, disk)
-		}
-	}
-
-	// Update the VM with the keepAttachedList to detach the specified disks
-	vm.VirtualMachineProperties.StorageProfile.DataDisks = &keepAttachedList
-	_, err = vmClient.CreateOrUpdate(context.TODO(), resourceGroup, azureInstanceName, vm)
-	if err != nil {
-		return errors.Errorf("cannot detach disk, err: %v", err)
-	}
-
-	// Wait for VM update to complete
-	// err = future.WaitForCompletionRef(context.TODO(), vmClient.Client)
-	// if err != nil {
-	// 	return errors.Errorf("cannot get the vm create or update future response, err: %v", err)
-	// }
-
-	return nil
-}
-
-// DetachMultipleDisks will detach the list of disk provided for the specific VM instance
-func DetachMultipleDisks(subscriptionID, resourceGroup, azureInstanceName string, diskNameList []string) error {
+// DetachDisks will detach the list of disk provided for the specific VM instance
+func DetachDisks(subscriptionID, resourceGroup, azureInstanceName string, diskNameList []string) error {
 
 	// Setup and authorize vm client
 	vmClient := compute.NewVirtualMachinesClient(subscriptionID)
@@ -98,12 +54,6 @@ func DetachMultipleDisks(subscriptionID, resourceGroup, azureInstanceName string
 	if err != nil {
 		return errors.Errorf("cannot detach disk, err: %v", err)
 	}
-
-	// Wait for VM update to complete
-	// err = future.WaitForCompletionRef(context.TODO(), vmClient.Client)
-	// if err != nil {
-	// 	return errors.Errorf("cannot get the vm create or update future response, err: %v", err)
-	// }
 
 	return nil
 }

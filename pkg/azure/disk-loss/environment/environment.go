@@ -28,7 +28,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.ChaosPodName = common.Getenv("POD_NAME", "")
 	experimentDetails.Delay, _ = strconv.Atoi(common.Getenv("STATUS_CHECK_DELAY", "2"))
 	experimentDetails.Timeout, _ = strconv.Atoi(common.Getenv("STATUS_CHECK_TIMEOUT", "180"))
-	experimentDetails.AzureInstanceName = common.Getenv("AZURE_INSTANCE_NAME", "")
+	experimentDetails.IsScaleSet = common.Getenv("IS_SCALE_SET", "false")
 	experimentDetails.ResourceGroup = common.Getenv("RESOURCE_GROUP", "")
 	experimentDetails.VirtualDiskNames = common.Getenv("VIRTUAL_DISK_NAMES", "")
 	experimentDetails.SubscriptionID = common.Getenv("SUBSCRIPTION_ID", "")
