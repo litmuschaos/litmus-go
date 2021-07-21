@@ -255,6 +255,7 @@ func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, instanc
 				log.Errorf("unable to wait till stop of the instance, err: %v", err)
 			}
 
+			log.Info("[Abort]: Starting Azure instance as abort signal received")
 			if experimentsDetails.IsScaleSet == "true" {
 				if err := azureStatus.AzureScaleSetInstanceStart(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, vmName); err != nil {
 					log.Errorf("unable to start the Azure instance, err: %v", err)
@@ -264,12 +265,12 @@ func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, instanc
 					log.Errorf("unable to start the Azure instance, err: %v", err)
 				}
 			}
+		}
 
-			log.Info("[Abort]: Starting Azure instance as abort signal received")
-			err := azureStatus.WaitForAzureComputeUp(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.IsScaleSet, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, vmName)
-			if err != nil {
-				log.Errorf("Azure instance failed to start when an abort signal is recieved, err: %v", err)
-			}
+		log.Info("[Abort]: Waiting for the Azure instance to start")
+		err := azureStatus.WaitForAzureComputeUp(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.IsScaleSet, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, vmName)
+		if err != nil {
+			log.Errorf("Azure instance failed to start when an abort signal is recieved, err: %v", err)
 		}
 	}
 	log.Infof("[Abort]: Chaos Revert Completed")

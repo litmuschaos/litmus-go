@@ -131,32 +131,20 @@ func InstanceStatusCheck(targetInstanceNameList []string, subscriptionID, resour
 // InstanceStatusCheckByName is used to check the instance status of given list of instances
 func ScaleSetInstanceStatusCheck(targetInstanceNameList []string, subscriptionID, resourceGroup string) error {
 
-	targetScaleSetList := GetScaleSetList(targetInstanceNameList)
-	for scaleSet, vmIds := range targetScaleSetList {
-		for _, vm := range vmIds {
-			instanceState, err := GetAzureScaleSetInstanceStatus(subscriptionID, resourceGroup, scaleSet, vm)
-			if err != nil {
-				return err
-			}
-			if instanceState != "VM running" {
-				return errors.Errorf("failed to get the azure instance '%v_%v' in running state, current state: %v", scaleSet, vm, instanceState)
-			}
+	for _, instanceName := range targetInstanceNameList {
+		scaleSet, vm := GetScaleSetNameAndInstanceId(instanceName)
+		instanceState, err := GetAzureScaleSetInstanceStatus(subscriptionID, resourceGroup, scaleSet, vm)
+		if err != nil {
+			return err
+		}
+		if instanceState != "VM running" {
+			return errors.Errorf("failed to get the azure instance '%v_%v' in running state, current state: %v", scaleSet, vm, instanceState)
 		}
 	}
 	return nil
 }
 
-func GetScaleSetList(instanceNameList []string) map[string][]string {
-	vmScaleSet := make(map[string][]string)
-
-	for _, scaleSet := range instanceNameList {
-		scaleSetAndInstanceId := strings.Split(scaleSet, "_")
-		vmScaleSet[scaleSetAndInstanceId[0]] = append(vmScaleSet[scaleSetAndInstanceId[0]], scaleSetAndInstanceId[1])
-	}
-
-	return vmScaleSet
-}
-
+// GetScaleSetNameAndInstanceId extracts the scale set name and VM id from the instance name
 func GetScaleSetNameAndInstanceId(instanceName string) (string, string) {
 	scaleSetAndInstanceId := strings.Split(instanceName, "_")
 	return scaleSetAndInstanceId[0], scaleSetAndInstanceId[1]
