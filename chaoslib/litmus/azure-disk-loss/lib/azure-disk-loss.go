@@ -115,7 +115,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		// Detaching the virtual disks
 		log.Info("[Chaos]: Detaching the virtual disks from the instances")
 		for instanceName, diskNameList := range instanceNamesWithDiskNames {
-			if err = azureStatus.DetachDisks(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, instanceName, diskNameList); err != nil {
+			if err = azureStatus.DetachDisks(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, instanceName, experimentsDetails.IsScaleSet, diskNameList); err != nil {
 				return errors.Errorf("failed to detach disks, err: %v", err)
 			}
 		}
@@ -147,7 +147,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		//Attaching the virtual disks to the instance
 		log.Info("[Chaos]: Attaching the Virtual disks back to the instances")
 		for instanceName, diskNameList := range attachedDisksWithInstance {
-			if err = azureStatus.AttachDisk(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, instanceName, diskNameList); err != nil {
+			if err = azureStatus.AttachDisk(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, instanceName, experimentsDetails.IsScaleSet, diskNameList); err != nil {
 				return errors.Errorf("virtual disk attachment failed, err: %v", err)
 			}
 		}
@@ -190,7 +190,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 				// Detaching the virtual disks
 				diskNameToList := []string{diskName}
 				log.Infof("[Chaos]: Detaching %v from the instance", diskName)
-				if err = azureStatus.DetachDisks(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, instanceName, diskNameToList); err != nil {
+				if err = azureStatus.DetachDisks(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, instanceName, experimentsDetails.IsScaleSet, diskNameToList); err != nil {
 					return errors.Errorf("failed to detach disks, err: %v", err)
 				}
 
@@ -214,7 +214,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 
 				//Attaching the virtual disks to the instance
 				log.Infof("[Chaos]: Attaching %v back to the instance", diskName)
-				if err = azureStatus.AttachDisk(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, instanceName, attachedDisksWithInstance[instanceName]); err != nil {
+				if err = azureStatus.AttachDisk(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, instanceName, experimentsDetails.IsScaleSet, attachedDisksWithInstance[instanceName]); err != nil {
 					return errors.Errorf("disk attachment failed, err: %v", err)
 				}
 
@@ -261,7 +261,7 @@ func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, attache
 			Times(uint(experimentsDetails.Timeout / experimentsDetails.Delay)).
 			Wait(time.Duration(experimentsDetails.Delay) * time.Second).
 			Try(func(attempt uint) error {
-				if err := azureStatus.AttachDisk(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, instanceName, diskList); err != nil {
+				if err := azureStatus.AttachDisk(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, instanceName, experimentsDetails.IsScaleSet, diskList); err != nil {
 					log.Infof("Waiting for detaching disks")
 					return errors.Errorf("Waiting for detaching disks, err: %v", err)
 				}
