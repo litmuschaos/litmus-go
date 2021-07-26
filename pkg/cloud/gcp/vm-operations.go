@@ -85,7 +85,7 @@ func WaitForVMInstanceDown(timeout int, delay int, managedNodegroup string, inst
 			if err != nil {
 				return errors.Errorf("failed to get the instance status")
 			}
-			if managedNodegroup != "enable" && instanceState != "TERMINATED" {
+			if instanceState != "TERMINATED" {
 				log.Infof("The instance state is %v", instanceState)
 				return errors.Errorf("instance is not yet in stopped state")
 			}
