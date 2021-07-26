@@ -20,7 +20,7 @@ import (
 // VMInstanceStop executes the experiment steps by injecting chaos into the specified vm instances
 func VMInstanceStop(clients clients.ClientSets) {
 	var err error
-	// var activeNodeCount int
+	var activeNodeCount int
 
 	experimentsDetails := experimentTypes.ExperimentDetails{}
 	resultDetails := types.ResultDetails{}
@@ -75,15 +75,15 @@ func VMInstanceStop(clients clients.ClientSets) {
 	})
 
 	//PRE-CHAOS NODE STATUS CHECK
-	// if experimentsDetails.AutoScalingGroup == "enable" {
-	// 	activeNodeCount, err = common.PreChaosNodeStatusCheck(experimentsDetails.Timeout, experimentsDetails.Delay, clients)
-	// 	if err != nil {
-	// 		log.Errorf("Pre chaos node status check failed, err: %v", err)
-	// 		failStep := "Verify that the NUT (Node Under Test) is running (pre-chaos)"
-	// 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-	// 		return
-	// 	}
-	// }
+	if experimentsDetails.AutoScalingGroup == "enable" {
+		activeNodeCount, err = common.PreChaosNodeStatusCheck(experimentsDetails.Timeout, experimentsDetails.Delay, clients)
+		if err != nil {
+			log.Errorf("Pre chaos node status check failed, err: %v", err)
+			failStep := "Verify that the NUT (Node Under Test) is running (pre-chaos)"
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+			return
+		}
+	}
 
 	//PRE-CHAOS APPLICATION STATUS CHECK
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (pre-chaos)")
@@ -157,24 +157,16 @@ func VMInstanceStop(clients clients.ClientSets) {
 	resultDetails.Verdict = v1alpha1.ResultVerdictPassed
 
 	// POST-CHAOS ACTIVE NODE COUNT TEST
-	// if experimentsDetails.AutoScalingGroup == "enable" {
-	// 	if err = common.PostChaosActiveNodeCountCheck(activeNodeCount, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
-	// 		log.Errorf("Post chaos active node count check failed, err: %v", err)
-	// 		failStep := "Verify active number of nodes post chaos"
-	// 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-	// 		return
-	// 	}
-	// }
+	if experimentsDetails.AutoScalingGroup == "enable" {
+		if err = common.PostChaosActiveNodeCountCheck(activeNodeCount, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
+			log.Errorf("Post chaos active node count check failed, err: %v", err)
+			failStep := "Verify active number of nodes post chaos"
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+			return
+		}
+	}
 
 	//Verify the GCP VM instance is in RUNNING status (post chaos)
-	// if experimentsDetails.AutoScalingGroup != "enable" {
-	// 	if err = gcp.InstanceStatusCheckByName(experimentsDetails.VMInstanceName, experimentsDetails.GCPProjectID, experimentsDetails.InstanceZone); err != nil {
-	// 		log.Errorf("failed to get the vm instance status, err: %v", err)
-	// 		failStep := "Verify the GCP VM instance status (post-chaos)"
-	// 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-	// 		return
-	// 	}
-	// }
 	if err = gcp.InstanceStatusCheckByName(experimentsDetails.Delay, experimentsDetails.Timeout, "post-chaos", experimentsDetails.VMInstanceName, experimentsDetails.GCPProjectID, experimentsDetails.InstanceZone); err != nil {
 		log.Errorf("failed to get the vm instance status, err: %v", err)
 		failStep := "Verify the GCP VM instance status (post-chaos)"
