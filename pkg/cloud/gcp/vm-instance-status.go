@@ -44,7 +44,7 @@ func InstanceStatusCheckByName(autoScalingGroup string, delay, timeout int, chec
 	instanceNamesList := strings.Split(instanceNames, ",")
 	instanceZonesList := strings.Split(instanceZones, ",")
 	if autoScalingGroup != "enable" && autoScalingGroup != "disable" {
-		return errors.Errorf("Invalid value for AUTO_SCALING_GROUP")
+		return errors.Errorf("Invalid value for AUTO_SCALING_GROUP: %v", autoScalingGroup)
 	}
 	if len(instanceNamesList) == 0 {
 		return errors.Errorf("No instance name found to stop")
