@@ -18,7 +18,9 @@ func injectChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients 
 	URL := fmt.Sprintf("https://%v/redfish/v1/Systems/System.Embedded.1/Actions/ComputerSystem.Reset", experimentsDetails.IPMIIP)
 	user := experimentsDetails.User
 	password := experimentsDetails.Password
-	redfishLib.RebootNode(URL, user, password)
+	if err := redfishLib.RebootNode(URL, user, password); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -31,7 +33,9 @@ func experimentExecution(experimentsDetails *experimentTypes.ExperimentDetails, 
 		events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 	}
 
-	injectChaos(experimentsDetails, clients)
+	if err := injectChaos(experimentsDetails, clients); err != nil {
+		return err
+	}
 
 	log.Infof("[Chaos]:Waiting for: %vs", experimentsDetails.ChaosDuration)
 	time.Sleep(30 * time.Second)

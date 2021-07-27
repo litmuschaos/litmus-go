@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -53,7 +54,7 @@ func GetNodeStatus(IP, user, password string) string {
 }
 
 //rebootNode triggers hard reset on the target baremetal node
-func RebootNode(URL, user, password string) {
+func RebootNode(URL, user, password string) error {
 	data := map[string]string{"ResetType": "ForceRestart"}
 	json_data, err := json.Marshal(data)
 	auth := user + ":" + password
@@ -65,7 +66,7 @@ func RebootNode(URL, user, password string) {
 	if err != nil {
 		msg := fmt.Sprintf("Error creating http request: %v", err)
 		log.Error(msg)
-		return
+		return errors.New(msg)
 	}
 	req.Header.Add("Authorization", "Basic "+encodedAuth)
 	req.Header.Add("Content-Type", "application/json")
@@ -78,7 +79,12 @@ func RebootNode(URL, user, password string) {
 	if err != nil {
 		msg := fmt.Sprintf("Error creating post request: %v", err)
 		log.Error(msg)
+		return errors.New(msg)
 	}
 	log.Infof(resp.Status)
+	if resp.StatusCode >= 400 && resp.StatusCode < 200 {
+		return errors.New("Failed to trigger node restart")
+	}
 	defer resp.Body.Close()
+	return nil
 }
