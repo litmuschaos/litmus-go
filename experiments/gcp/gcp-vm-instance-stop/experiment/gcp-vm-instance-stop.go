@@ -129,7 +129,7 @@ func VMInstanceStop(clients clients.ClientSets) {
 	}
 
 	//Verify that the GCP VM instance(s) is in RUNNING state (pre chaos)
-	if err = gcp.InstanceStatusCheckByName(experimentsDetails.Delay, experimentsDetails.Timeout, "pre-chaos", experimentsDetails.VMInstanceName, experimentsDetails.GCPProjectID, experimentsDetails.InstanceZone); err != nil {
+	if err = gcp.InstanceStatusCheckByName(experimentsDetails.AutoScalingGroup, experimentsDetails.Delay, experimentsDetails.Timeout, "pre-chaos", experimentsDetails.VMInstanceName, experimentsDetails.GCPProjectID, experimentsDetails.InstanceZone); err != nil {
 		log.Errorf("failed to get the vm instance status, err: %v", err)
 		failStep := "Verify the GCP VM instance status (pre-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
@@ -167,7 +167,7 @@ func VMInstanceStop(clients clients.ClientSets) {
 	}
 
 	//Verify the GCP VM instance is in RUNNING status (post chaos)
-	if err = gcp.InstanceStatusCheckByName(experimentsDetails.Delay, experimentsDetails.Timeout, "post-chaos", experimentsDetails.VMInstanceName, experimentsDetails.GCPProjectID, experimentsDetails.InstanceZone); err != nil {
+	if err = gcp.InstanceStatusCheckByName(experimentsDetails.AutoScalingGroup, experimentsDetails.Delay, experimentsDetails.Timeout, "post-chaos", experimentsDetails.VMInstanceName, experimentsDetails.GCPProjectID, experimentsDetails.InstanceZone); err != nil {
 		log.Errorf("failed to get the vm instance status, err: %v", err)
 		failStep := "Verify the GCP VM instance status (post-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)

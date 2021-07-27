@@ -40,9 +40,12 @@ func GetVMInstanceStatus(instanceName string, gcpProjectID string, instanceZone 
 }
 
 //InstanceStatusCheckByName is used to check the status of all the VM instances under chaos
-func InstanceStatusCheckByName(delay, timeout int, check string, instanceNames string, gcpProjectId string, instanceZones string) error {
+func InstanceStatusCheckByName(autoScalingGroup string, delay, timeout int, check string, instanceNames string, gcpProjectId string, instanceZones string) error {
 	instanceNamesList := strings.Split(instanceNames, ",")
 	instanceZonesList := strings.Split(instanceZones, ",")
+	if autoScalingGroup != "enable" && autoScalingGroup != "disable" {
+		return errors.Errorf("Invalid value for AUTO_SCALING_GROUP")
+	}
 	if len(instanceNamesList) == 0 {
 		return errors.Errorf("No instance name found to stop")
 	}
