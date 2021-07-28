@@ -27,6 +27,5 @@ type ExperimentDetails struct {
 	ResourceGroup      string
 	SubscriptionID     string
 	VirtualDiskNames   string
-	InstanceWithDisk   map[string][]string
 	Sequence           string
 }

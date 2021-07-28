@@ -105,12 +105,14 @@ func CheckVirtualDiskWithInstance(experimentsDetails experimentTypes.ExperimentD
 	return nil
 }
 
+// GetInstanceNameForDisks will extract the instance name from the disk properties
 func GetInstanceNameForDisks(diskNameList []string, subscriptionID, resourceGroup string) (map[string][]string, error) {
 
 	// Setup and authorize disk client
 	diskClient := compute.NewDisksClient(subscriptionID)
 	authorizer, err := auth.NewAuthorizerFromFile(azure.PublicCloud.ResourceManagerEndpoint)
 
+	// Creating a map to store the instance name with attached disk(s) name
 	instanceNameWithDiskMap := make(map[string][]string)
 
 	if err != nil {
@@ -118,6 +120,7 @@ func GetInstanceNameForDisks(diskNameList []string, subscriptionID, resourceGrou
 	}
 	diskClient.Authorizer = authorizer
 
+	// /subscriptionID/<subscriptionID>/resourceGroup/<resourceGroup>/providers/Microsoft.Compute/virtualMachines/instanceName
 	instanceNameRegex := regexp.MustCompile(`virtualMachines/`)
 
 	for _, diskName := range diskNameList {

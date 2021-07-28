@@ -18,9 +18,9 @@ import (
 // DetachDisks will detach the list of disk provided for the specific VM instance or scale set vm instance
 func DetachDisks(subscriptionID, resourceGroup, azureInstanceName, isScaleSet string, diskNameList []string) error {
 
-	// Setup and authorize vm client
-
+	// if the instance is of virtual machine scale set (aks node)
 	if isScaleSet == "true" {
+		// Setup and authorize vm client
 		vmssClient := compute.NewVirtualMachineScaleSetVMsClient(subscriptionID)
 		authorizer, err := auth.NewAuthorizerFromFile(azure.PublicCloud.ResourceManagerEndpoint)
 
@@ -44,7 +44,6 @@ func DetachDisks(subscriptionID, resourceGroup, azureInstanceName, isScaleSet st
 			}
 		}
 
-		// Update the VM with the keepAttachedList to detach the specified disks
 		if len(keepAttachedList) < 1 {
 			vm.VirtualMachineScaleSetVMProperties.StorageProfile.DataDisks = &[]compute.DataDisk{}
 		} else {
@@ -53,6 +52,7 @@ func DetachDisks(subscriptionID, resourceGroup, azureInstanceName, isScaleSet st
 
 		// Setting image reference to nil so that API doesn't update the image
 		vm.VirtualMachineScaleSetVMProperties.StorageProfile.ImageReference = nil
+
 		// Update the VM with the keepAttachedList to detach the specified disks
 		_, err = vmssClient.Update(context.TODO(), resourceGroup, scaleSetName, vmId, vm)
 		if err != nil {
@@ -61,6 +61,7 @@ func DetachDisks(subscriptionID, resourceGroup, azureInstanceName, isScaleSet st
 
 		return nil
 	} else {
+		// Setup and authorize vm client
 		vmClient := compute.NewVirtualMachinesClient(subscriptionID)
 		authorizer, err := auth.NewAuthorizerFromFile(azure.PublicCloud.ResourceManagerEndpoint)
 
@@ -123,6 +124,7 @@ func AttachDisk(subscriptionID, resourceGroup, azureInstanceName, isScaleSet str
 
 		// Setting image reference to nil so that API doesn't update the image
 		vm.VirtualMachineScaleSetVMProperties.StorageProfile.ImageReference = nil
+
 		// Update the VM properties
 		_, err = vmClient.Update(context.TODO(), resourceGroup, scaleSetName, vmId, vm)
 		if err != nil {
@@ -179,7 +181,6 @@ func WaitForDiskToAttach(experimentsDetails *types.ExperimentDetails, diskName s
 
 // WaitForDiskToDetach waits until the disks are detached
 func WaitForDiskToDetach(experimentsDetails *types.ExperimentDetails, diskName string) error {
-	//Getting the virtual disk status
 	retry.
 		Times(uint(experimentsDetails.Timeout / experimentsDetails.Delay)).
 		Wait(time.Duration(experimentsDetails.Delay) * time.Second).
@@ -192,7 +193,7 @@ func WaitForDiskToDetach(experimentsDetails *types.ExperimentDetails, diskName s
 				log.Infof("[Status]: Disk %v is not yet detached, state: %v", diskName, diskState)
 				return errors.Errorf("Disk is not yet detached, state: %v", diskState)
 			}
-			log.Infof("Disk %v detached", diskName)
+			log.Infof("[Status]: Disk %v is detached", diskName)
 			return nil
 		})
 	return nil

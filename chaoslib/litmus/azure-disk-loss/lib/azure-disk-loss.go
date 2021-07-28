@@ -45,7 +45,7 @@ func PrepareChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 
-	//get the volume name  or list of volume names
+	//get the disk name  or list of disk names
 	diskNameList := strings.Split(experimentsDetails.VirtualDiskNames, ",")
 	if len(diskNameList) == 0 {
 		return errors.Errorf("no volume names found to detach")
@@ -57,6 +57,7 @@ func PrepareChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients
 		return errors.Errorf("error fetching attached instances for disks")
 	}
 
+	// Get the instance name with attached disks
 	attachedDisksWithInstance := make(map[string]*[]compute.DataDisk)
 
 	for instanceName := range instanceNamesWithDiskNames {
@@ -120,6 +121,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 				return errors.Errorf("failed to detach disks, err: %v", err)
 			}
 		}
+		// Waiting for disk to be detached
 		for _, diskNameList := range instanceNamesWithDiskNames {
 			for _, diskName := range diskNameList {
 				log.Infof("[Wait]: Waiting for Disk '%v' to detach", diskName)
@@ -129,6 +131,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 			}
 		}
 
+		// Updating the result details
 		for _, diskNameList := range instanceNamesWithDiskNames {
 			for _, diskName := range diskNameList {
 				common.SetTargets(diskName, "injected", "VirtualDisk", chaosDetails)
@@ -152,6 +155,8 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 				return errors.Errorf("virtual disk attachment failed, err: %v", err)
 			}
 		}
+
+		// Wait for disk to be attached
 		for _, diskNameList := range instanceNamesWithDiskNames {
 			for _, diskName := range diskNameList {
 				log.Infof("[Wait]: Waiting for Disk '%v' to attach", diskName)
@@ -161,6 +166,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 			}
 		}
 
+		// Updating the result details
 		for _, diskNameList := range instanceNamesWithDiskNames {
 			for _, diskName := range diskNameList {
 				common.SetTargets(diskName, "reverted", "VirtualDisk", chaosDetails)
@@ -188,13 +194,16 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 
 		for instanceName, diskNameList := range instanceNamesWithDiskNames {
 			for i, diskName := range diskNameList {
-				// Detaching the virtual disks
+				// Converting diskName to list type because DetachDisks() accepts a list type
 				diskNameToList := []string{diskName}
+
+				// Detaching the virtual disks
 				log.Infof("[Chaos]: Detaching %v from the instance", diskName)
 				if err = azureStatus.DetachDisks(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, instanceName, experimentsDetails.IsScaleSet, diskNameToList); err != nil {
 					return errors.Errorf("failed to detach disks, err: %v", err)
 				}
 
+				// Waiting for disk to be detached
 				log.Infof("[Wait]: Waiting for Disk '%v' to detach", diskName)
 				if err := azureStatus.WaitForDiskToDetach(experimentsDetails, diskName); err != nil {
 					return errors.Errorf("disk detach check failed, err: %v", err)
@@ -219,6 +228,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 					return errors.Errorf("disk attachment failed, err: %v", err)
 				}
 
+				// Waiting for disk to be attached
 				log.Infof("[Wait]: Waiting for Disk '%v' to attach", diskName)
 				if err := azureStatus.WaitForDiskToAttach(experimentsDetails, diskName); err != nil {
 					return errors.Errorf("disk attach check failed, err: %v", err)
@@ -241,6 +251,7 @@ func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, attache
 	log.Info("[Abort]: Attaching disk(s) as abort signal recieved")
 
 	for instanceName, diskList := range attachedDisksWithInstance {
+		// Checking for provisioning state of the vm instances
 		retry.
 			Times(uint(experimentsDetails.Timeout / experimentsDetails.Delay)).
 			Wait(time.Duration(experimentsDetails.Delay) * time.Second).
