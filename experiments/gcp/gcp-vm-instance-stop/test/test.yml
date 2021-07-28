@@ -1,0 +1,50 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: litmus-experiment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: litmus-experiment
+  template:
+    metadata:
+      labels: 
+        app: litmus-experiment
+    spec:
+      serviceAccountName: gcp-vm-instance-stop-sa
+      containers:
+      - name: gotest
+        image: busybox 
+        command: 
+          - sleep
+          - "3600"
+        env:
+          - name: LIB
+            value: 'litmus'
+
+          - name: GCP_PROJECT_ID
+            value: ''
+
+          - name: VM_INSTANCE_NAMES
+            value: ''
+
+          - name: CHAOS_NAMESPACE
+            value: 'default'
+
+          - name: INSTANCE_ZONES
+            value: ''
+
+          - name: RAMP_TIME
+            value: '0'
+
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+
+          secrets:
+            - name: cloud-secret
+              mountPath: /tmp/
+
