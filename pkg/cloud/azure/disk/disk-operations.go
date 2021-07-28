@@ -171,7 +171,7 @@ func WaitForDiskToAttach(experimentsDetails *types.ExperimentDetails, diskName s
 				log.Infof("[Status]: Disk %v is not yet attached, state: %v", diskName, diskState)
 				return errors.Errorf("Disk is not yet attached, state: %v", diskState)
 			}
-			log.Infof("Disk %v attached", diskName)
+			log.Infof("[Status]: Disk %v is attached", diskName)
 			return nil
 		})
 	return nil

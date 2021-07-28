@@ -11,6 +11,7 @@ import (
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/azure/disk-loss/types"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	azureStatus "github.com/litmuschaos/litmus-go/pkg/cloud/azure/disk"
+	instanceStatus "github.com/litmuschaos/litmus-go/pkg/cloud/azure/instance"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
@@ -237,41 +238,36 @@ func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, attache
 
 	log.Info("[Abort]: Chaos Revert Started")
 
-	// Attaching disks back to the instance
-	// log.Info("[Abort]: Waiting for disk(s) to detach properly")
-	// for _, diskName := range diskNameList {
-	// 	diskState, err := azureStatus.GetDiskStatus(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, diskName)
-	// 	if err != nil {
-	// 		errors.Errorf("failed to get the disk status, err: %v", err)
-	// 	}
-	// 	if diskState != "Attached" {
-
-	// 		for _, diskName := range diskNameList {
-	// 			azureStatus.WaitForDiskToDetach(experimentsDetails, diskName)
-	// 		}
-	// 	}
-	// }
-	// log.Info("[Abort]: Disk(s) detached properly")
-
 	log.Info("[Abort]: Attaching disk(s) as abort signal recieved")
 
 	for instanceName, diskList := range attachedDisksWithInstance {
-
 		retry.
 			Times(uint(experimentsDetails.Timeout / experimentsDetails.Delay)).
 			Wait(time.Duration(experimentsDetails.Delay) * time.Second).
 			Try(func(attempt uint) error {
-				if err := azureStatus.AttachDisk(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, instanceName, experimentsDetails.IsScaleSet, diskList); err != nil {
-					log.Infof("Waiting for detaching disks")
-					return errors.Errorf("Waiting for detaching disks, err: %v", err)
+				status, err := instanceStatus.GetAzureInstanceProvisionStatus(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, instanceName, experimentsDetails.IsScaleSet)
+				if err != nil {
+					log.Errorf("Failed to get instance, err: %v", err)
+					return errors.Errorf("Failed to get instance, err: %v", err)
+				}
+				if status != "Provisioning succeeded" {
+					return errors.Errorf("instance is updating, waiting for instance to update")
 				}
 				return nil
 			})
-	}
-
-	for _, diskNameList := range instanceNamesWithDiskNames {
-		for _, diskName := range diskNameList {
-			common.SetTargets(diskName, "reverted", "VirtualDisk", chaosDetails)
+		log.Infof("[Abort]: Attaching disk(s) to instance: %v", instanceName)
+		for _, disk := range *diskList {
+			diskStatus, err := azureStatus.GetDiskStatus(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, *disk.Name)
+			if err != nil {
+				log.Errorf("Failed to get disk status, err: %v", err)
+			}
+			if diskStatus != "Attached" {
+				if err := azureStatus.AttachDisk(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, instanceName, experimentsDetails.IsScaleSet, diskList); err != nil {
+					log.Errorf("failed to attach disk '%v, manual revert required, err: %v", err)
+				} else {
+					common.SetTargets(*disk.Name, "reverted", "VirtualDisk", chaosDetails)
+				}
+			}
 		}
 	}
 

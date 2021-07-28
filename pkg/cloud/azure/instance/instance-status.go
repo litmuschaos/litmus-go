@@ -8,6 +8,7 @@ import (
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/azure/auth"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/azure/instance-stop/types"
+	azureStatus "github.com/litmuschaos/litmus-go/pkg/cloud/azure/disk"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/pkg/errors"
 )
@@ -63,4 +64,43 @@ func InstanceStatusCheck(targetInstanceNameList []string, subscriptionID, resour
 		}
 	}
 	return nil
+}
+
+//GetAzureInstanceProvisionStatus will check for the azure instance provision state details
+func GetAzureInstanceProvisionStatus(subscriptionID, resourceGroup, azureInstanceName, isScaleSet string) (string, error) {
+
+	if isScaleSet == "true" {
+		vmssClient := compute.NewVirtualMachineScaleSetVMsClient(subscriptionID)
+		authorizer, err := auth.NewAuthorizerFromFile(azure.PublicCloud.ResourceManagerEndpoint)
+		if err != nil {
+			return "", errors.Errorf("fail to setup authorization, err: %v", err)
+		}
+		vmssClient.Authorizer = authorizer
+		scaleSetName, vmId := azureStatus.GetScaleSetNameAndInstanceId(azureInstanceName)
+		vm, err := vmssClient.Get(context.TODO(), resourceGroup, scaleSetName, vmId, "instanceView")
+		if err != nil {
+			return "", errors.Errorf("fail to get the instance to check status, err: %v", err)
+		}
+		instanceDetails := vm.VirtualMachineScaleSetVMProperties.InstanceView
+		// To print VM provision status
+		log.Infof("[Status]: The instance %v provision state is: '%s'", azureInstanceName, *(*instanceDetails.Statuses)[0].DisplayStatus)
+		return *(*instanceDetails.Statuses)[0].DisplayStatus, nil
+	} else {
+
+		vmClient := compute.NewVirtualMachinesClient(subscriptionID)
+
+		authorizer, err := auth.NewAuthorizerFromFile(azure.PublicCloud.ResourceManagerEndpoint)
+		if err != nil {
+			return "", errors.Errorf("fail to setup authorization, err: %v", err)
+		}
+		vmClient.Authorizer = authorizer
+
+		instanceDetails, err := vmClient.InstanceView(context.TODO(), resourceGroup, azureInstanceName)
+		if err != nil {
+			return "", errors.Errorf("fail to get the instance to check status, err: %v", err)
+		}
+		// To print VM provision status
+		log.Infof("[Status]: The instance %v provision state is: '%s'", azureInstanceName, *(*instanceDetails.Statuses)[0].DisplayStatus)
+		return *(*instanceDetails.Statuses)[0].DisplayStatus, nil
+	}
 }
