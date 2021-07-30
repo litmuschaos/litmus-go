@@ -50,7 +50,7 @@ func PrepareChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients
 		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", experimentsDetails.RampTime)
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
-	//Starting the CPU stress experiment
+	//Starting the Redfish node restart experiment
 	if err := experimentExecution(experimentsDetails, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
 		return err
 	}
