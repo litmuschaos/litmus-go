@@ -14,6 +14,7 @@ import (
 	awsSSMChaosByID "github.com/litmuschaos/litmus-go/experiments/aws-ssm/aws-ssm-chaos-by-id/experiment"
 	awsSSMChaosByTag "github.com/litmuschaos/litmus-go/experiments/aws-ssm/aws-ssm-chaos-by-tag/experiment"
 	azureInstanceStop "github.com/litmuschaos/litmus-go/experiments/azure/instance-stop/experiment"
+	azureRunCommand "github.com/litmuschaos/litmus-go/experiments/azure/run-command/experiment"
 	cassandraPodDelete "github.com/litmuschaos/litmus-go/experiments/cassandra/pod-delete/experiment"
 	gcpVMDiskLoss "github.com/litmuschaos/litmus-go/experiments/gcp/gcp-vm-disk-loss/experiment"
 	gcpVMInstanceStop "github.com/litmuschaos/litmus-go/experiments/gcp/gcp-vm-instance-stop/experiment"
@@ -33,8 +34,8 @@ import (
 	podDelete "github.com/litmuschaos/litmus-go/experiments/generic/pod-delete/experiment"
 	podDNSError "github.com/litmuschaos/litmus-go/experiments/generic/pod-dns-error/experiment"
 	podDNSSpoof "github.com/litmuschaos/litmus-go/experiments/generic/pod-dns-spoof/experiment"
-	podIOStress "github.com/litmuschaos/litmus-go/experiments/generic/pod-io-stress/experiment"
 	podFioStress "github.com/litmuschaos/litmus-go/experiments/generic/pod-fio-stress/experiment"
+	podIOStress "github.com/litmuschaos/litmus-go/experiments/generic/pod-io-stress/experiment"
 	podMemoryHogExec "github.com/litmuschaos/litmus-go/experiments/generic/pod-memory-hog-exec/experiment"
 	podMemoryHog "github.com/litmuschaos/litmus-go/experiments/generic/pod-memory-hog/experiment"
 	podNetworkCorruption "github.com/litmuschaos/litmus-go/experiments/generic/pod-network-corruption/experiment"
@@ -139,6 +140,8 @@ func main() {
 		nodeRestart.NodeRestart(clients)
 	case "azure-instance-stop":
 		azureInstanceStop.AzureInstanceStop(clients)
+	case "azure-run-command":
+		azureRunCommand.AzureRunCommandExperiment(clients)
 	case "pod-dns-error":
 		podDNSError.PodDNSError(clients)
 	case "pod-dns-spoof":
