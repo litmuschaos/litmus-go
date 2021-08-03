@@ -12,7 +12,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-// AzureInstanceStop poweroff the target instance
+// AzureInstanceStop stops the target instance
 func AzureInstanceStop(timeout, delay int, subscriptionID, resourceGroup, azureInstanceName string) error {
 	vmClient := compute.NewVirtualMachinesClient(subscriptionID)
 
@@ -23,7 +23,7 @@ func AzureInstanceStop(timeout, delay int, subscriptionID, resourceGroup, azureI
 		return errors.Errorf("fail to setup authorization, err: %v")
 	}
 
-	log.Info("[Info]: Starting powerOff the instance")
+	log.Info("[Info]: Stopping the instance")
 	_, err = vmClient.PowerOff(context.TODO(), resourceGroup, azureInstanceName, &vmClient.SkipResourceProviderRegistration)
 	if err != nil {
 		return errors.Errorf("fail to stop the %v instance, err: %v", azureInstanceName, err)
@@ -53,7 +53,7 @@ func AzureInstanceStart(timeout, delay int, subscriptionID, resourceGroup, azure
 	return nil
 }
 
-// AzureScaleSetInstanceStop poweroff the target instance in the scale set
+// AzureScaleSetInstanceStop stops the target instance in the scale set
 func AzureScaleSetInstanceStop(timeout, delay int, subscriptionID, resourceGroup, azureInstanceName string) error {
 	vmssClient := compute.NewVirtualMachineScaleSetVMsClient(subscriptionID)
 
@@ -65,7 +65,7 @@ func AzureScaleSetInstanceStop(timeout, delay int, subscriptionID, resourceGroup
 	}
 	virtualMachineScaleSetName, virtualMachineId := GetScaleSetNameAndInstanceId(azureInstanceName)
 
-	log.Info("[Info]: Starting powerOff the instance")
+	log.Info("[Info]: Stopping the instance")
 	_, err = vmssClient.PowerOff(context.TODO(), resourceGroup, virtualMachineScaleSetName, virtualMachineId, &vmssClient.SkipResourceProviderRegistration)
 	if err != nil {
 		return errors.Errorf("fail to stop the %v_%v instance, err: %v", virtualMachineScaleSetName, virtualMachineId, err)

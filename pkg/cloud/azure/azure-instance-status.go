@@ -102,7 +102,7 @@ func SetupSubscriptionID(experimentsDetails *experimentTypes.ExperimentDetails) 
 func InstanceStatusCheckByName(experimentsDetails *experimentTypes.ExperimentDetails) error {
 	instanceNameList := strings.Split(experimentsDetails.AzureInstanceName, ",")
 	if len(instanceNameList) == 0 {
-		return errors.Errorf("no instance found to check status")
+		return errors.Errorf("no instance found to check the status")
 	}
 	log.Infof("[Info]: The instance under chaos(IUC) are: %v", instanceNameList)
 	switch experimentsDetails.IsScaleSet {
@@ -113,7 +113,7 @@ func InstanceStatusCheckByName(experimentsDetails *experimentTypes.ExperimentDet
 	}
 }
 
-// InstanceStatusCheckByName is used to check the instance status of given list of instances
+// InstanceStatusCheck is used to check the instance status of given list of instances
 func InstanceStatusCheck(targetInstanceNameList []string, subscriptionID, resourceGroup string) error {
 
 	for _, vmName := range targetInstanceNameList {
@@ -128,7 +128,7 @@ func InstanceStatusCheck(targetInstanceNameList []string, subscriptionID, resour
 	return nil
 }
 
-// InstanceStatusCheckByName is used to check the instance status of given list of instances
+// ScaleSetInstanceStatusCheck is used to check the instance status of given list of instances belonging to scale set
 func ScaleSetInstanceStatusCheck(targetInstanceNameList []string, subscriptionID, resourceGroup string) error {
 
 	for _, instanceName := range targetInstanceNameList {

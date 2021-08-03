@@ -103,7 +103,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 						return errors.Errorf("unable to start the Azure instance, err: %v", err)
 					}
 				} else {
-					if err := azureStatus.AzureInstanceStart(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, vmName); err != nil {
+					if err := azureStatus.AzureInstanceStop(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, vmName); err != nil {
 						return errors.Errorf("unable to start the Azure instance, err: %v", err)
 					}
 				}
@@ -270,7 +270,7 @@ func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, instanc
 		log.Info("[Abort]: Waiting for the Azure instance to start")
 		err := azureStatus.WaitForAzureComputeUp(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.IsScaleSet, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, vmName)
 		if err != nil {
-			log.Errorf("Azure instance failed to start when an abort signal is recieved, err: %v", err)
+			log.Errorf("Azure instance failed to start when an abort signal is received, err: %v", err)
 		}
 	}
 	log.Infof("[Abort]: Chaos Revert Completed")
