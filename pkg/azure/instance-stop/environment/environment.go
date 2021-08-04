@@ -30,7 +30,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.Timeout, _ = strconv.Atoi(common.Getenv("STATUS_CHECK_TIMEOUT", "180"))
 	experimentDetails.AzureInstanceName = common.Getenv("AZURE_INSTANCE_NAME", "")
 	experimentDetails.ResourceGroup = common.Getenv("RESOURCE_GROUP", "")
-	experimentDetails.IsScaleSet = common.Getenv("IS_SCALE_SET", "false")
+	experimentDetails.ScaleSet = common.Getenv("SCALE_SET", "disable")
 	experimentDetails.Sequence = common.Getenv("SEQUENCE", "parallel")
 }
 

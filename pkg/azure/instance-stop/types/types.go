@@ -25,7 +25,7 @@ type ExperimentDetails struct {
 	AzureInstanceName  string
 	ResourceGroup      string
 	SubscriptionID     string
-	IsScaleSet         string
+	ScaleSet           string
 	LIBImagePullPolicy string
 	Sequence           string
 }

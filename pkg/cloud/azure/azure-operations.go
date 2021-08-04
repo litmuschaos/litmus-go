@@ -96,7 +96,7 @@ func AzureScaleSetInstanceStart(timeout, delay int, subscriptionID, resourceGrou
 }
 
 //WaitForAzureComputeDown will wait for the azure compute instance to get in stopped state
-func WaitForAzureComputeDown(timeout, delay int, isScaleSet, subscriptionID, resourceGroup, azureInstanceName string) error {
+func WaitForAzureComputeDown(timeout, delay int, scaleSet, subscriptionID, resourceGroup, azureInstanceName string) error {
 
 	var instanceState string
 	var err error
@@ -106,7 +106,7 @@ func WaitForAzureComputeDown(timeout, delay int, isScaleSet, subscriptionID, res
 		Times(uint(timeout / delay)).
 		Wait(time.Duration(delay) * time.Second).
 		Try(func(attempt uint) error {
-			if isScaleSet == "true" {
+			if scaleSet == "enable" {
 				scaleSetName, vmId := GetScaleSetNameAndInstanceId(azureInstanceName)
 				instanceState, err = GetAzureScaleSetInstanceStatus(subscriptionID, resourceGroup, scaleSetName, vmId)
 			} else {
@@ -123,7 +123,7 @@ func WaitForAzureComputeDown(timeout, delay int, isScaleSet, subscriptionID, res
 }
 
 //WaitForAzureComputeUp will wait for the azure compute instance to get in running state
-func WaitForAzureComputeUp(timeout, delay int, isScaleSet, subscriptionID, resourceGroup, azureInstanceName string) error {
+func WaitForAzureComputeUp(timeout, delay int, scaleSet, subscriptionID, resourceGroup, azureInstanceName string) error {
 
 	var instanceState string
 	var err error
@@ -134,8 +134,8 @@ func WaitForAzureComputeUp(timeout, delay int, isScaleSet, subscriptionID, resou
 		Wait(time.Duration(delay) * time.Second).
 		Try(func(attempt uint) error {
 
-			switch isScaleSet {
-			case "true":
+			switch scaleSet {
+			case "enable":
 				scaleSetName, vmId := GetScaleSetNameAndInstanceId(azureInstanceName)
 				instanceState, err = GetAzureScaleSetInstanceStatus(subscriptionID, resourceGroup, scaleSetName, vmId)
 			default:

@@ -105,8 +105,8 @@ func InstanceStatusCheckByName(experimentsDetails *experimentTypes.ExperimentDet
 		return errors.Errorf("no instance found to check the status")
 	}
 	log.Infof("[Info]: The instance under chaos(IUC) are: %v", instanceNameList)
-	switch experimentsDetails.IsScaleSet {
-	case "true":
+	switch experimentsDetails.ScaleSet {
+	case "enable":
 		return ScaleSetInstanceStatusCheck(instanceNameList, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup)
 	default:
 		return InstanceStatusCheck(instanceNameList, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup)
