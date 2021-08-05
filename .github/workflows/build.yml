@@ -25,6 +25,18 @@ jobs:
           sudo apt-get update && sudo apt-get install golint
           make gotasks
 
+      - name: gofmt check
+        run: |
+          if [ "$(gofmt -s -l . | wc -l)" -ne 0 ]
+          then
+           echo "The following files were found to be not go formatted:"
+           gofmt -s -l .
+           exit 1
+          fi
+          
+      - name: golangci-lint
+        uses: reviewdog/action-golangci-lint@v1          
+
   build:
     needs: pre-checks
     runs-on: ubuntu-latest
