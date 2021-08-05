@@ -2,12 +2,12 @@ package experiment
 
 import (
 	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
-	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/ec2-terminate-by-tag/lib"
-	clients "github.com/litmuschaos/litmus-go/pkg/clients"
-	aws "github.com/litmuschaos/litmus-go/pkg/cloud/aws/ec2"
+	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/gcp-vm-instance-stop/lib"
+	"github.com/litmuschaos/litmus-go/pkg/clients"
+	"github.com/litmuschaos/litmus-go/pkg/cloud/gcp"
 	"github.com/litmuschaos/litmus-go/pkg/events"
-	experimentEnv "github.com/litmuschaos/litmus-go/pkg/kube-aws/ec2-terminate-by-tag/environment"
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/kube-aws/ec2-terminate-by-tag/types"
+	experimentEnv "github.com/litmuschaos/litmus-go/pkg/gcp/gcp-vm-instance-stop/environment"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/gcp/gcp-vm-instance-stop/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/result"
@@ -17,21 +17,19 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// EC2TerminateByTag inject the ebs volume loss chaos
-func EC2TerminateByTag(clients clients.ClientSets) {
+// VMInstanceStop executes the experiment steps by injecting chaos into the specified vm instances
+func VMInstanceStop(clients clients.ClientSets) {
+	var err error
+	var activeNodeCount int
 
-	var (
-		err             error
-		activeNodeCount int
-	)
 	experimentsDetails := experimentTypes.ExperimentDetails{}
 	resultDetails := types.ResultDetails{}
 	eventsDetails := types.EventDetails{}
 	chaosDetails := types.ChaosDetails{}
 
 	//Fetching all the ENV passed from the runner pod
-	log.Infof("[PreReq]: Getting the ENV for the %v experiment", experimentsDetails.ExperimentName)
 	experimentEnv.GetENV(&experimentsDetails)
+	log.Infof("[PreReq]: Procured the ENV for the %v experiment", experimentsDetails.ExperimentName)
 
 	// Intialise the chaos attributes
 	experimentEnv.InitialiseChaosVariables(&chaosDetails, &experimentsDetails)
@@ -51,7 +49,7 @@ func EC2TerminateByTag(clients clients.ClientSets) {
 	log.Infof("[PreReq]: Updating the chaos result of %v experiment (SOT)", experimentsDetails.ExperimentName)
 	if err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT"); err != nil {
 		log.Errorf("Unable to Create the Chaos Result, err: %v", err)
-		failStep := "Updating the chaos result of ec2 terminate experiment (SOT)"
+		failStep := "Updating the chaos result of VM instance stop experiment (SOT)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -64,21 +62,20 @@ func EC2TerminateByTag(clients clients.ClientSets) {
 	types.SetResultEventAttributes(&eventsDetails, types.AwaitedVerdict, msg, "Normal", &resultDetails)
 	events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosResult")
 
-	//DISPLAY THE INSTANCE INFORMATION
-	log.InfoWithValues("The instance information is as follows", logrus.Fields{
-		"Chaos Duration":               experimentsDetails.ChaosDuration,
-		"Chaos Namespace":              experimentsDetails.ChaosNamespace,
-		"Ramp Time":                    experimentsDetails.RampTime,
-		"Instance Tag":                 experimentsDetails.InstanceTag,
-		"Instance Affected Percentage": experimentsDetails.InstanceAffectedPerc,
-		"Sequence":                     experimentsDetails.Sequence,
-	})
-
 	// Calling AbortWatcher go routine, it will continuously watch for the abort signal and generate the required events and result
 	go common.AbortWatcherWithoutExit(experimentsDetails.ExperimentName, clients, &resultDetails, &chaosDetails, &eventsDetails)
 
+	//DISPLAY THE INSTANCE INFORMATION
+	log.InfoWithValues("The instance information is as follows", logrus.Fields{
+		"Chaos Duration":  experimentsDetails.ChaosDuration,
+		"Chaos Namespace": experimentsDetails.ChaosNamespace,
+		"Ramp Time":       experimentsDetails.RampTime,
+		"Instance Names":  experimentsDetails.VMInstanceName,
+		"Zones":           experimentsDetails.InstanceZone,
+	})
+
 	//PRE-CHAOS NODE STATUS CHECK
-	if experimentsDetails.ManagedNodegroup == "enable" {
+	if experimentsDetails.AutoScalingGroup == "enable" {
 		activeNodeCount, err = common.PreChaosNodeStatusCheck(experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 		if err != nil {
 			log.Errorf("Pre chaos node status check failed, err: %v", err)
@@ -131,18 +128,19 @@ func EC2TerminateByTag(clients clients.ClientSets) {
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
-	//selecting the target instance (pre chaos)
-	if err = litmusLIB.SetTargetInstance(&experimentsDetails); err != nil {
-		log.Errorf("failed to get the target ec2 instance, err: %v", err)
-		failStep := "Select the target AWS ec2 instance from tag (pre-chaos)"
+	//Verify that the GCP VM instance(s) is in RUNNING state (pre chaos)
+	if err = gcp.InstanceStatusCheckByName(experimentsDetails.VMInstanceName, experimentsDetails.GCPProjectID, experimentsDetails.InstanceZone); err != nil {
+		log.Errorf("failed to get the vm instance status, err: %v", err)
+		failStep := "Verify the GCP VM instance status (pre-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
+	log.Info("[Status]: VM instance is in running state")
 
-	// Including the litmus lib for ec2-terminate
+	// Including the litmus lib for GCP vm-instance-stop
 	switch experimentsDetails.ChaosLib {
 	case "litmus":
-		if err = litmusLIB.PrepareEC2TerminateByTag(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
+		if err = litmusLIB.PrepareVMStop(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
 			log.Errorf("Chaos injection failed, err: %v", err)
 			failStep := "failed in chaos injection phase"
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
@@ -159,7 +157,7 @@ func EC2TerminateByTag(clients clients.ClientSets) {
 	resultDetails.Verdict = v1alpha1.ResultVerdictPassed
 
 	// POST-CHAOS ACTIVE NODE COUNT TEST
-	if experimentsDetails.ManagedNodegroup == "enable" {
+	if experimentsDetails.AutoScalingGroup == "enable" {
 		if err = common.PostChaosActiveNodeCountCheck(activeNodeCount, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
 			log.Errorf("Post chaos active node count check failed, err: %v", err)
 			failStep := "Verify active number of nodes post chaos"
@@ -168,16 +166,16 @@ func EC2TerminateByTag(clients clients.ClientSets) {
 		}
 	}
 
-	//Verify the aws ec2 instance is running (post chaos)
-	if experimentsDetails.ManagedNodegroup != "enable" {
-		if err = aws.InstanceStatusCheck(experimentsDetails.TargetInstanceIDList, experimentsDetails.Region); err != nil {
-			log.Errorf("failed to get the ec2 instance status as running post chaos, err: %v", err)
-			failStep := "Verify the AWS ec2 instance status (post-chaos)"
+	//Verify the GCP VM instance is in RUNNING status (post chaos)
+	if experimentsDetails.AutoScalingGroup != "enable" {
+		if err = gcp.InstanceStatusCheckByName(experimentsDetails.VMInstanceName, experimentsDetails.GCPProjectID, experimentsDetails.InstanceZone); err != nil {
+			log.Errorf("failed to get the vm instance status, err: %v", err)
+			failStep := "Verify the GCP VM instance status (post-chaos)"
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}
-		log.Info("[Status]: EC2 instance is in running state (post chaos)")
 	}
+	log.Info("[Status]: VM instance is in running state (post chaos)")
 
 	//POST-CHAOS APPLICATION STATUS CHECK
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (post-chaos)")
@@ -245,5 +243,4 @@ func EC2TerminateByTag(clients clients.ClientSets) {
 		types.SetEngineEventAttributes(&eventsDetails, types.Summary, msg, "Normal", &chaosDetails)
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
-
 }
