@@ -12,13 +12,13 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/log"
 )
 
-// State helps get the power state of the node
+//State helps get the power state of the node
 type State struct {
 	PowerState string
 }
 
-// NodestatusCheck will check and return the status of the node.
-func GetNodeStatus(IP, user, password string) string {
+//GetNodeStatus will check and return the status of the node.
+func GetNodeStatus(IP, user, password string) (string, error) {
 	URL := fmt.Sprintf("https://%v/redfish/v1/Systems/System.Embedded.1/", IP)
 	auth := user + ":" + password
 	encodedAuth := base64.StdEncoding.EncodeToString([]byte(auth))
@@ -28,7 +28,7 @@ func GetNodeStatus(IP, user, password string) string {
 	if err != nil {
 		msg := fmt.Sprintf("Error creating http request: %v", err)
 		log.Error(msg)
-		return "Unknown"
+		return "", errors.New(fmt.Sprintf("fail to get the node status, err: %v", msg))
 	}
 	req.Header.Add("Authorization", "Basic "+encodedAuth)
 	req.Header.Add("Content-Type", "application/json")
@@ -45,22 +45,23 @@ func GetNodeStatus(IP, user, password string) string {
 	log.Infof(resp.Status)
 	if resp.StatusCode != 200 {
 		log.Error("Unable to get current state of the node")
-		return "Unknown"
+		return "", errors.New(fmt.Sprintf("fail to get the node status. Request failed with status: %v", resp.StatusCode))
 	}
 	defer resp.Body.Close()
 	power := new(State)
 	json.NewDecoder(resp.Body).Decode(power)
-	return power.PowerState
+	return power.PowerState, nil
 }
 
-//rebootNode triggers hard reset on the target baremetal node
+//RebootNode triggers hard reset on the target baremetal node
 func RebootNode(URL, user, password string) error {
 	data := map[string]string{"ResetType": "ForceRestart"}
 	json_data, err := json.Marshal(data)
 	auth := user + ":" + password
 	encodedAuth := base64.StdEncoding.EncodeToString([]byte(auth))
 	if err != nil {
-		log.Fatal(err.Error())
+		log.Error(err.Error())
+		return errors.New("Unable to encode the authentication credentials")
 	}
 	req, err := http.NewRequest("POST", URL, bytes.NewBuffer(json_data))
 	if err != nil {

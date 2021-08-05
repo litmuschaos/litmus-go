@@ -13,6 +13,7 @@ spec:
       labels: 
         app: litmus-experiment
     spec:
+    serviceAccountName: redfish-node-restart-sa
       containers:
       - name: gotest
         image: busybox 
@@ -25,9 +26,12 @@ spec:
             value: ''
 
           ## env var that describes the library used to execute the chaos
-          ## default: litmus. Supported values: litmus, powerfulseal, chaoskube
+          ## default: litmus.
           - name: LIB
             value: 'litmus'
+
+          - name: AUXILIARY_APPINFO
+            value: ''
 
           ## IPMI IP of the target node which
           ## Node should have redfish enabled
