@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"os"
+	"strings"
 
 	"github.com/pkg/errors"
 )
@@ -42,4 +43,10 @@ func GetSubscriptionID() (string, error) {
 	} else {
 		return "", errors.Errorf("The auth file does not have a subscriptionId field")
 	}
+}
+
+// GetScaleSetNameAndInstanceId extracts the scale set name and VM id from the instance name
+func GetScaleSetNameAndInstanceId(instanceName string) (string, string) {
+	scaleSetAndInstanceId := strings.Split(instanceName, "_")
+	return scaleSetAndInstanceId[0], scaleSetAndInstanceId[1]
 }

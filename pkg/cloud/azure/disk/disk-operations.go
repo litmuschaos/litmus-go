@@ -2,7 +2,6 @@ package azure
 
 import (
 	"context"
-	"strings"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/profiles/latest/compute/mgmt/compute"
@@ -16,10 +15,10 @@ import (
 )
 
 // DetachDisks will detach the list of disk provided for the specific VM instance or scale set vm instance
-func DetachDisks(subscriptionID, resourceGroup, azureInstanceName, isScaleSet string, diskNameList []string) error {
+func DetachDisks(subscriptionID, resourceGroup, azureInstanceName, scaleSet string, diskNameList []string) error {
 
-	// if the instance is of virtual machine scale set (aks node)
-	if isScaleSet == "true" {
+	// if the instance is virtual machine scale set (aks node)
+	if scaleSet == "enable" {
 		// Setup and authorize vm client
 		vmssClient := compute.NewVirtualMachineScaleSetVMsClient(subscriptionID)
 		authorizer, err := auth.NewAuthorizerFromFile(azure.PublicCloud.ResourceManagerEndpoint)
@@ -30,7 +29,7 @@ func DetachDisks(subscriptionID, resourceGroup, azureInstanceName, isScaleSet st
 		vmssClient.Authorizer = authorizer
 
 		// Fetch the vm instance
-		scaleSetName, vmId := GetScaleSetNameAndInstanceId(azureInstanceName)
+		scaleSetName, vmId := common.GetScaleSetNameAndInstanceId(azureInstanceName)
 		vm, err := vmssClient.Get(context.TODO(), resourceGroup, scaleSetName, vmId, compute.InstanceViewTypes("instanceView"))
 		if err != nil {
 			return errors.Errorf("fail get instance, err: %v", err)
@@ -101,10 +100,10 @@ func DetachDisks(subscriptionID, resourceGroup, azureInstanceName, isScaleSet st
 }
 
 // AttachDisk will attach the list of disk provided for the specific VM instance
-func AttachDisk(subscriptionID, resourceGroup, azureInstanceName, isScaleSet string, diskList *[]compute.DataDisk) error {
+func AttachDisk(subscriptionID, resourceGroup, azureInstanceName, scaleSet string, diskList *[]compute.DataDisk) error {
 
-	// if the instance is of virtual machine scale set (aks node)
-	if isScaleSet == "true" {
+	// if the instance is virtual machine scale set (aks node)
+	if scaleSet == "enable" {
 		// Setup and authorize vm client
 		vmClient := compute.NewVirtualMachineScaleSetVMsClient(subscriptionID)
 		authorizer, err := auth.NewAuthorizerFromFile(azure.PublicCloud.ResourceManagerEndpoint)
@@ -115,7 +114,7 @@ func AttachDisk(subscriptionID, resourceGroup, azureInstanceName, isScaleSet str
 		vmClient.Authorizer = authorizer
 
 		// Fetch the vm instance
-		scaleSetName, vmId := GetScaleSetNameAndInstanceId(azureInstanceName)
+		scaleSetName, vmId := common.GetScaleSetNameAndInstanceId(azureInstanceName)
 		vm, err := vmClient.Get(context.TODO(), resourceGroup, scaleSetName, vmId, compute.InstanceViewTypes("instanceView"))
 		if err != nil {
 			return errors.Errorf("fail get instance, err: %v", err)
@@ -160,7 +159,6 @@ func AttachDisk(subscriptionID, resourceGroup, azureInstanceName, isScaleSet str
 
 // WaitForDiskToAttach waits until the disks are attached
 func WaitForDiskToAttach(experimentsDetails *types.ExperimentDetails, diskName string) error {
-	//Getting the virtual disk status
 	retry.
 		Times(uint(experimentsDetails.Timeout / experimentsDetails.Delay)).
 		Wait(time.Duration(experimentsDetails.Delay) * time.Second).
@@ -197,10 +195,4 @@ func WaitForDiskToDetach(experimentsDetails *types.ExperimentDetails, diskName s
 			return nil
 		})
 	return nil
-}
-
-// GetScaleSetNameAndInstanceId extracts the scale set name and VM id from the instance name
-func GetScaleSetNameAndInstanceId(instanceName string) (string, string) {
-	scaleSetAndInstanceId := strings.Split(instanceName, "_")
-	return scaleSetAndInstanceId[0], scaleSetAndInstanceId[1]
 }

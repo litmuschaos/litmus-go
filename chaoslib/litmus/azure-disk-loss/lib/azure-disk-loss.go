@@ -10,7 +10,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/azure/disk-loss/types"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
-	azureStatus "github.com/litmuschaos/litmus-go/pkg/cloud/azure/disk"
+	diskStatus "github.com/litmuschaos/litmus-go/pkg/cloud/azure/disk"
 	instanceStatus "github.com/litmuschaos/litmus-go/pkg/cloud/azure/instance"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	"github.com/litmuschaos/litmus-go/pkg/log"
@@ -50,7 +50,7 @@ func PrepareChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients
 	if len(diskNameList) == 0 {
 		return errors.Errorf("no volume names found to detach")
 	}
-	instanceNamesWithDiskNames, err := azureStatus.GetInstanceNameForDisks(diskNameList, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup)
+	instanceNamesWithDiskNames, err := diskStatus.GetInstanceNameForDisks(diskNameList, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup)
 
 	if err != nil {
 		log.Errorf("error fetching attached instances for disks, err: %v", err)
@@ -61,7 +61,7 @@ func PrepareChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients
 	attachedDisksWithInstance := make(map[string]*[]compute.DataDisk)
 
 	for instanceName := range instanceNamesWithDiskNames {
-		attachedDisksWithInstance[instanceName], err = azureStatus.GetInstanceDiskList(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, experimentsDetails.IsScaleSet, instanceName)
+		attachedDisksWithInstance[instanceName], err = diskStatus.GetInstanceDiskList(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, experimentsDetails.ScaleSet, instanceName)
 		if err != nil {
 			log.Errorf("err: %v", err)
 			return errors.Errorf("error fetching virtual disks")
@@ -117,7 +117,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		// Detaching the virtual disks
 		log.Info("[Chaos]: Detaching the virtual disks from the instances")
 		for instanceName, diskNameList := range instanceNamesWithDiskNames {
-			if err = azureStatus.DetachDisks(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, instanceName, experimentsDetails.IsScaleSet, diskNameList); err != nil {
+			if err = diskStatus.DetachDisks(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, instanceName, experimentsDetails.ScaleSet, diskNameList); err != nil {
 				return errors.Errorf("failed to detach disks, err: %v", err)
 			}
 		}
@@ -125,7 +125,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		for _, diskNameList := range instanceNamesWithDiskNames {
 			for _, diskName := range diskNameList {
 				log.Infof("[Wait]: Waiting for Disk '%v' to detach", diskName)
-				if err := azureStatus.WaitForDiskToDetach(experimentsDetails, diskName); err != nil {
+				if err := diskStatus.WaitForDiskToDetach(experimentsDetails, diskName); err != nil {
 					return errors.Errorf("disk attach check failed, err: %v", err)
 				}
 			}
@@ -151,7 +151,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		//Attaching the virtual disks to the instance
 		log.Info("[Chaos]: Attaching the Virtual disks back to the instances")
 		for instanceName, diskNameList := range attachedDisksWithInstance {
-			if err = azureStatus.AttachDisk(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, instanceName, experimentsDetails.IsScaleSet, diskNameList); err != nil {
+			if err = diskStatus.AttachDisk(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, instanceName, experimentsDetails.ScaleSet, diskNameList); err != nil {
 				return errors.Errorf("virtual disk attachment failed, err: %v", err)
 			}
 		}
@@ -160,7 +160,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		for _, diskNameList := range instanceNamesWithDiskNames {
 			for _, diskName := range diskNameList {
 				log.Infof("[Wait]: Waiting for Disk '%v' to attach", diskName)
-				if err := azureStatus.WaitForDiskToAttach(experimentsDetails, diskName); err != nil {
+				if err := diskStatus.WaitForDiskToAttach(experimentsDetails, diskName); err != nil {
 					return errors.Errorf("disk attach check failed, err: %v", err)
 				}
 			}
@@ -199,13 +199,13 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 
 				// Detaching the virtual disks
 				log.Infof("[Chaos]: Detaching %v from the instance", diskName)
-				if err = azureStatus.DetachDisks(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, instanceName, experimentsDetails.IsScaleSet, diskNameToList); err != nil {
+				if err = diskStatus.DetachDisks(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, instanceName, experimentsDetails.ScaleSet, diskNameToList); err != nil {
 					return errors.Errorf("failed to detach disks, err: %v", err)
 				}
 
 				// Waiting for disk to be detached
 				log.Infof("[Wait]: Waiting for Disk '%v' to detach", diskName)
-				if err := azureStatus.WaitForDiskToDetach(experimentsDetails, diskName); err != nil {
+				if err := diskStatus.WaitForDiskToDetach(experimentsDetails, diskName); err != nil {
 					return errors.Errorf("disk detach check failed, err: %v", err)
 				}
 
@@ -224,13 +224,13 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 
 				//Attaching the virtual disks to the instance
 				log.Infof("[Chaos]: Attaching %v back to the instance", diskName)
-				if err = azureStatus.AttachDisk(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, instanceName, experimentsDetails.IsScaleSet, attachedDisksWithInstance[instanceName]); err != nil {
+				if err = diskStatus.AttachDisk(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, instanceName, experimentsDetails.ScaleSet, attachedDisksWithInstance[instanceName]); err != nil {
 					return errors.Errorf("disk attachment failed, err: %v", err)
 				}
 
 				// Waiting for disk to be attached
 				log.Infof("[Wait]: Waiting for Disk '%v' to attach", diskName)
-				if err := azureStatus.WaitForDiskToAttach(experimentsDetails, diskName); err != nil {
+				if err := diskStatus.WaitForDiskToAttach(experimentsDetails, diskName); err != nil {
 					return errors.Errorf("disk attach check failed, err: %v", err)
 				}
 
@@ -256,7 +256,7 @@ func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, attache
 			Times(uint(experimentsDetails.Timeout / experimentsDetails.Delay)).
 			Wait(time.Duration(experimentsDetails.Delay) * time.Second).
 			Try(func(attempt uint) error {
-				status, err := instanceStatus.GetAzureInstanceProvisionStatus(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, instanceName, experimentsDetails.IsScaleSet)
+				status, err := instanceStatus.GetAzureInstanceProvisionStatus(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, instanceName, experimentsDetails.ScaleSet)
 				if err != nil {
 					log.Errorf("Failed to get instance, err: %v", err)
 					return errors.Errorf("Failed to get instance, err: %v", err)
@@ -268,12 +268,12 @@ func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, attache
 			})
 		log.Infof("[Abort]: Attaching disk(s) to instance: %v", instanceName)
 		for _, disk := range *diskList {
-			diskStatus, err := azureStatus.GetDiskStatus(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, *disk.Name)
+			diskStatusString, err := diskStatus.GetDiskStatus(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, *disk.Name)
 			if err != nil {
 				log.Errorf("Failed to get disk status, err: %v", err)
 			}
-			if diskStatus != "Attached" {
-				if err := azureStatus.AttachDisk(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, instanceName, experimentsDetails.IsScaleSet, diskList); err != nil {
+			if diskStatusString != "Attached" {
+				if err := diskStatus.AttachDisk(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, instanceName, experimentsDetails.ScaleSet, diskList); err != nil {
 					log.Errorf("failed to attach disk '%v, manual revert required, err: %v", err)
 				} else {
 					common.SetTargets(*disk.Name, "reverted", "VirtualDisk", chaosDetails)

@@ -23,7 +23,7 @@ type ExperimentDetails struct {
 	Timeout            int
 	Delay              int
 	LIBImagePullPolicy string
-	IsScaleSet         string
+	ScaleSet           string
 	ResourceGroup      string
 	SubscriptionID     string
 	VirtualDiskNames   string

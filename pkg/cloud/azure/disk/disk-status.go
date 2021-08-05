@@ -8,16 +8,17 @@ import (
 	"github.com/Azure/azure-sdk-for-go/profiles/latest/compute/mgmt/compute"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/azure/auth"
+	"github.com/litmuschaos/litmus-go/pkg/cloud/azure/common"
+
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/azure/disk-loss/types"
-	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/pkg/errors"
 )
 
 // GetInstanceDiskList will fetch the disks attached to an instance
-func GetInstanceDiskList(subscriptionID, resourceGroup, isScaleSet, azureInstanceName string) (*[]compute.DataDisk, error) {
+func GetInstanceDiskList(subscriptionID, resourceGroup, scaleSet, azureInstanceName string) (*[]compute.DataDisk, error) {
 
 	// if the instance is of virtual machine scale set (aks node)
-	if isScaleSet == "true" {
+	if scaleSet == "enable" {
 		vmClient := compute.NewVirtualMachineScaleSetVMsClient(subscriptionID)
 		authorizer, err := auth.NewAuthorizerFromFile(azure.PublicCloud.ResourceManagerEndpoint)
 
@@ -27,7 +28,7 @@ func GetInstanceDiskList(subscriptionID, resourceGroup, isScaleSet, azureInstanc
 		vmClient.Authorizer = authorizer
 
 		// Fetch the vm instance
-		scaleSetName, vmId := GetScaleSetNameAndInstanceId(azureInstanceName)
+		scaleSetName, vmId := common.GetScaleSetNameAndInstanceId(azureInstanceName)
 		vm, err := vmClient.Get(context.TODO(), resourceGroup, scaleSetName, vmId, compute.InstanceViewTypes("instanceView"))
 		if err != nil {
 			return nil, errors.Errorf("fail get instance, err: %v", err)
@@ -96,7 +97,7 @@ func CheckVirtualDiskWithInstance(experimentsDetails experimentTypes.ExperimentD
 	for _, diskName := range diskNameList {
 		disk, err := diskClient.Get(context.Background(), experimentsDetails.ResourceGroup, diskName)
 		if err != nil {
-			return errors.Errorf("failed to get disk, err: %v", err)
+			return errors.Errorf("failed to get disk: %v, err: %v", diskName, err)
 		}
 		if disk.ManagedBy == nil {
 			return errors.Errorf("disk %v not attached to any instance", diskName)
@@ -120,6 +121,7 @@ func GetInstanceNameForDisks(diskNameList []string, subscriptionID, resourceGrou
 	}
 	diskClient.Authorizer = authorizer
 
+	// Using regex pattern match to extract instance name from disk.ManagedBy
 	// /subscriptionID/<subscriptionID>/resourceGroup/<resourceGroup>/providers/Microsoft.Compute/virtualMachines/instanceName
 	instanceNameRegex := regexp.MustCompile(`virtualMachines/`)
 
@@ -131,9 +133,8 @@ func GetInstanceNameForDisks(diskNameList []string, subscriptionID, resourceGrou
 		res := instanceNameRegex.FindStringIndex(*disk.ManagedBy)
 		i := res[1]
 		instanceName := (*disk.ManagedBy)[i:len(*disk.ManagedBy)]
-		instanceNameWithDiskMap[instanceName] = append(instanceNameWithDiskMap[instanceName], *disk.Name)
+		instanceNameWithDiskMap[instanceName] = append(instanceNameWithDiskMap[instanceName], strings.TrimSpace(*disk.Name))
 	}
 
-	log.Infof("Disk with instance names: %v", instanceNameWithDiskMap)
 	return instanceNameWithDiskMap, nil
 }

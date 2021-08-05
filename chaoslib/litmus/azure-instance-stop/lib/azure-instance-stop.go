@@ -9,6 +9,7 @@ import (
 
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/azure/instance-stop/types"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
+	azureCommon "github.com/litmuschaos/litmus-go/pkg/cloud/azure/common"
 	azureStatus "github.com/litmuschaos/litmus-go/pkg/cloud/azure/instance"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	"github.com/litmuschaos/litmus-go/pkg/log"
@@ -240,7 +241,7 @@ func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, instanc
 	log.Info("[Abort]: Chaos Revert Started")
 	for _, vmName := range instanceNameList {
 		if experimentsDetails.ScaleSet == "enable" {
-			scaleSetName, vmId := azureStatus.GetScaleSetNameAndInstanceId(vmName)
+			scaleSetName, vmId := azureCommon.GetScaleSetNameAndInstanceId(vmName)
 			instanceState, err = azureStatus.GetAzureScaleSetInstanceStatus(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, scaleSetName, vmId)
 		} else {
 			instanceState, err = azureStatus.GetAzureInstanceStatus(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, vmName)
