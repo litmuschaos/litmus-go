@@ -97,13 +97,19 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 
 				// Stopping the Azure instance
 				log.Infof("[Chaos]: Stopping the Azure instance: %v", vmName)
-				if err := azureStatus.AzureInstanceStop(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, vmName); err != nil {
-					return errors.Errorf("unable to stop azure instance, err: %v", err)
+				if experimentsDetails.ScaleSet == "enable" {
+					if err := azureStatus.AzureScaleSetInstanceStop(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, vmName); err != nil {
+						return errors.Errorf("unable to stop the Azure instance, err: %v", err)
+					}
+				} else {
+					if err := azureStatus.AzureInstanceStop(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, vmName); err != nil {
+						return errors.Errorf("unable to stop the Azure instance, err: %v", err)
+					}
 				}
 
 				// Wait for Azure instance to completely stop
 				log.Infof("[Wait]: Waiting for Azure instance '%v' to get in the stopped state", vmName)
-				if err := azureStatus.WaitForAzureComputeDown(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, vmName); err != nil {
+				if err := azureStatus.WaitForAzureComputeDown(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.ScaleSet, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, vmName); err != nil {
 					return errors.Errorf("instance poweroff status check failed, err: %v", err)
 				}
 
@@ -120,13 +126,19 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 
 				// Starting the Azure instance
 				log.Info("[Chaos]: Starting back the Azure instance")
-				if err := azureStatus.AzureInstanceStart(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, vmName); err != nil {
-					return errors.Errorf("unable to start the Azure instance, err: %v", err)
+				if experimentsDetails.ScaleSet == "enable" {
+					if err := azureStatus.AzureScaleSetInstanceStart(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, vmName); err != nil {
+						return errors.Errorf("unable to start the Azure instance, err: %v", err)
+					}
+				} else {
+					if err := azureStatus.AzureInstanceStart(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, vmName); err != nil {
+						return errors.Errorf("unable to start the Azure instance, err: %v", err)
+					}
 				}
 
 				// Wait for Azure instance to get in running state
 				log.Infof("[Wait]: Waiting for Azure instance '%v' to get in the running state", vmName)
-				if err := azureStatus.WaitForAzureComputeUp(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, vmName); err != nil {
+				if err := azureStatus.WaitForAzureComputeUp(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.ScaleSet, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, vmName); err != nil {
 					return errors.Errorf("instance power on status check failed, err: %v", err)
 				}
 			}
@@ -161,15 +173,21 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 			for _, vmName := range instanceNameList {
 				// Stopping the Azure instance
 				log.Infof("[Chaos]: Stopping the Azure instance: %v", vmName)
-				if err := azureStatus.AzureInstanceStop(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, vmName); err != nil {
-					return errors.Errorf("unable to stop azure instance, err: %v", err)
+				if experimentsDetails.ScaleSet == "enable" {
+					if err := azureStatus.AzureScaleSetInstanceStop(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, vmName); err != nil {
+						return errors.Errorf("unable to stop azure instance, err: %v", err)
+					}
+				} else {
+					if err := azureStatus.AzureInstanceStop(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, vmName); err != nil {
+						return errors.Errorf("unable to stop azure instance, err: %v", err)
+					}
 				}
 			}
 
 			// Wait for all Azure instances to completely stop
 			for _, vmName := range instanceNameList {
 				log.Infof("[Wait]: Waiting for Azure instance '%v' to get in the stopped state", vmName)
-				if err := azureStatus.WaitForAzureComputeDown(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, vmName); err != nil {
+				if err := azureStatus.WaitForAzureComputeDown(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.ScaleSet, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, vmName); err != nil {
 					return errors.Errorf("instance poweroff status check failed, err: %v", err)
 				}
 			}
@@ -188,16 +206,22 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 			// Starting the Azure instance
 			for _, vmName := range instanceNameList {
 				log.Infof("[Chaos]: Starting back the Azure instance: %v", vmName)
-				if err := azureStatus.AzureInstanceStart(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, vmName); err != nil {
-					return errors.Errorf("unable to start the Azure instance, err: %v", err)
+				if experimentsDetails.ScaleSet == "enable" {
+					if err := azureStatus.AzureScaleSetInstanceStart(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, vmName); err != nil {
+						return errors.Errorf("unable to start the Azure instance, err: %v", err)
+					}
+				} else {
+					if err := azureStatus.AzureInstanceStart(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, vmName); err != nil {
+						return errors.Errorf("unable to start the Azure instance, err: %v", err)
+					}
 				}
 			}
 
 			// Wait for Azure instance to get in running state
 			for _, vmName := range instanceNameList {
 				log.Infof("[Wait]: Waiting for Azure instance '%v' to get in the running state", vmName)
-				if err := azureStatus.WaitForAzureComputeUp(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, vmName); err != nil {
-					return errors.Errorf("unable to start the Azure instance, err: %v", err)
+				if err := azureStatus.WaitForAzureComputeUp(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.ScaleSet, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, vmName); err != nil {
+					return errors.Errorf("instance power on status check failed, err: %v", err)
 				}
 			}
 
@@ -211,28 +235,42 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, instanceNameList []string) {
 	<-abort
 
+	var instanceState string
+
 	log.Info("[Abort]: Chaos Revert Started")
 	for _, vmName := range instanceNameList {
-		instanceState, err := azureStatus.GetAzureInstanceStatus(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, vmName)
-		if err != nil {
-			log.Errorf("fail to get instance status when an abort signal is received, err: %v", err)
+		if experimentsDetails.ScaleSet == "enable" {
+			scaleSetName, vmId := azureStatus.GetScaleSetNameAndInstanceId(vmName)
+			instanceState, err = azureStatus.GetAzureScaleSetInstanceStatus(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, scaleSetName, vmId)
+		} else {
+			instanceState, err = azureStatus.GetAzureInstanceStatus(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, vmName)
 		}
-		if instanceState != "VM running" {
+		if err != nil {
+			log.Errorf("[Abort]: Fail to get instance status when an abort signal is received, err: %v", err)
+		}
+		if instanceState != "VM running" && instanceState != "VM starting" {
 			log.Info("[Abort]: Waiting for the Azure instance to get down")
-			if err := azureStatus.WaitForAzureComputeDown(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, vmName); err != nil {
-				log.Errorf("unable to wait till stop of the instance, err: %v", err)
-			}
-
-			log.Info("[Chaos]: Starting back the Azure instance")
-			if err := azureStatus.AzureInstanceStart(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, vmName); err != nil {
-				log.Errorf("instance power on status check failed, err: %v", err)
+			if err := azureStatus.WaitForAzureComputeDown(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.ScaleSet, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, vmName); err != nil {
+				log.Errorf("[Abort]: Instance power off status check failed, err: %v", err)
 			}
 
 			log.Info("[Abort]: Starting Azure instance as abort signal received")
-			err := azureStatus.WaitForAzureComputeUp(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, vmName)
-			if err != nil {
-				log.Errorf("Azure instance failed to start when an abort signal is recieved, err: %v", err)
+			if experimentsDetails.ScaleSet == "enable" {
+				if err := azureStatus.AzureScaleSetInstanceStart(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, vmName); err != nil {
+					log.Errorf("[Abort]: Unable to start the Azure instance, err: %v", err)
+				}
+			} else {
+				if err := azureStatus.AzureInstanceStart(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, vmName); err != nil {
+					log.Errorf("[Abort]: Unable to start the Azure instance, err: %v", err)
+				}
 			}
+		}
+
+		log.Info("[Abort]: Waiting for the Azure instance to start")
+		err := azureStatus.WaitForAzureComputeUp(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.ScaleSet, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, vmName)
+		if err != nil {
+			log.Errorf("[Abort]: Instance power on status check failed, err: %v", err)
+			log.Errorf("[Abort]: Azure instance %v failed to start after an abort signal is received", vmName)
 		}
 	}
 	log.Infof("[Abort]: Chaos Revert Completed")

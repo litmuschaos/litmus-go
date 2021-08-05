@@ -15,7 +15,7 @@ type ExperimentDetails struct {
 	AuxiliaryAppInfo   string
 	ChaosLib           string
 	ChaosDuration      int
-	ChaosInterval	   int
+	ChaosInterval      int
 	ChaosUID           clientTypes.UID
 	InstanceID         string
 	ChaosNamespace     string
@@ -25,6 +25,7 @@ type ExperimentDetails struct {
 	AzureInstanceName  string
 	ResourceGroup      string
 	SubscriptionID     string
+	ScaleSet           string
 	LIBImagePullPolicy string
-	Sequence		   string
+	Sequence           string
 }
