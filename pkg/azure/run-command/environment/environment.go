@@ -37,7 +37,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.IsScaleSet = common.Getenv("IS_SCALE_SET", "false")
 	experimentDetails.Sequence = common.Getenv("SEQUENCE", "parallel")
 	experimentDetails.ExperimentType = common.Getenv("EXPERIMENT_TYPE", "cpu-hog")
-	experimentDetails.InstallDependency = common.Getenv("INSTALL_DEPENDENCY", "true")
+	experimentDetails.InstallDependency = common.Getenv("INSTALL_DEPENDENCY", "True")
 	experimentDetails.OperatingSystem = common.Getenv("OPERATING_SYSTEM", "linux")
 	experimentDetails.CPUcores, _ = strconv.Atoi(common.Getenv("CPU_CORES", "1"))
 	experimentDetails.NumberOfWorkers, _ = strconv.Atoi(common.Getenv("NUMBER_OF_WORKERS", "1"))

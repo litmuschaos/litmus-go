@@ -11,6 +11,7 @@ import (
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/azure/auth"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/azure/instance-stop/types"
+	rcexperimentTypes "github.com/litmuschaos/litmus-go/pkg/azure/run-command/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/pkg/errors"
 )
@@ -91,6 +92,33 @@ func InstanceStatusCheck(targetInstanceNameList []string, subscriptionID, resour
 		if instanceState != "VM running" {
 			return errors.Errorf("failed to get the azure instance '%v' in running state, current state: %v", vmName, instanceState)
 		}
+	}
+	return nil
+}
+
+// RCSetupSubscriptionID fetch the subscription id from the auth file and export it in experiment struct variable
+func RCSetupSubscriptionID(experimentsDetails *rcexperimentTypes.ExperimentDetails) error {
+
+	var err error
+	authFile, err := os.Open(os.Getenv("AZURE_AUTH_LOCATION"))
+	if err != nil {
+		return errors.Errorf("fail to open auth file, err: %v", err)
+	}
+
+	authFileContent, err := ioutil.ReadAll(authFile)
+	if err != nil {
+		return errors.Errorf("fail to read auth file, err: %v", err)
+	}
+
+	details := make(map[string]string)
+	if err := json.Unmarshal(authFileContent, &details); err != nil {
+		return errors.Errorf("fail to unmarshal file, err: %v", err)
+	}
+
+	if id, contains := details["subscriptionId"]; contains {
+		experimentsDetails.SubscriptionID = id
+	} else {
+		return errors.Errorf("The auth file does not have a subscriptionId field")
 	}
 	return nil
 }

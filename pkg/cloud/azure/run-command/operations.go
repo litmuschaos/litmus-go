@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -61,10 +62,9 @@ func PerformRunCommand(experimentDetails *experimentTypes.ExperimentDetails, azu
 			return errors.Errorf("fail to setup authorization, err: %v", err)
 		}
 		vmClient.Authorizer = authorizer
-
 		future, err := vmClient.RunCommand(context.TODO(), experimentDetails.ResourceGroup, azureInstanceName, runCommandInput)
 		if err != nil {
-			return errors.Errorf("cannot detach disk, err: %v", err)
+			return errors.Errorf("failed to perform run command, err: %v", err)
 		}
 
 		err = future.WaitForCompletionRef(context.TODO(), vmClient.Client)
@@ -117,7 +117,8 @@ func PrepareRunCommandInput(experimentDetails *experimentTypes.ExperimentDetails
 	if parameters, err = prepareInputParameters(experimentDetails); err != nil {
 		return compute.RunCommandInput{}, errors.Errorf("failed to setup input parameters, err: %v", err)
 	}
-	script, err = readLines("/scripts/script.sh")
+	scriptPath, _ := filepath.Abs("pkg/azure/run-command/scripts/script.sh")
+	script, err = readLines(scriptPath)
 	if err != nil {
 		return compute.RunCommandInput{}, errors.Errorf("failed to read script, err: %v", err)
 	}
@@ -143,7 +144,7 @@ func prepareInputParameters(experimentDetails *experimentTypes.ExperimentDetails
 	parameters := []compute.RunCommandInputParameter{}
 
 	parameterName := []string{"InstallDependency", "Duration", "ExperimentName", "StressArgs", "AdditionalArgs"}
-	parameterValues := []string{experimentDetails.InstallDependency, strconv.Itoa(experimentDetails.ChaosDuration) + "s", experimentDetails.ExperimentType, "", ""}
+	parameterValues := []string{experimentDetails.InstallDependency, strconv.Itoa(experimentDetails.ChaosDuration), experimentDetails.ExperimentType, "", ""}
 
 	parameters = append(parameters, compute.RunCommandInputParameter{
 		Name:  &parameterName[0],
@@ -222,6 +223,11 @@ func prepareInputParameters(experimentDetails *experimentTypes.ExperimentDetails
 		return nil, errors.Errorf("stressor for experiment type: %v is not suported", experimentDetails.ExperimentName)
 	}
 
+	// Adding " to start and end of strings
+	parameterValues[3] = "\"" + parameterValues[3] + "\""
+	parameterValues[4] = "\"" + parameterValues[4] + "\""
+
+	// appending to parameters
 	parameters = append(parameters, compute.RunCommandInputParameter{
 		Name:  &parameterName[3],
 		Value: &parameterValues[3],

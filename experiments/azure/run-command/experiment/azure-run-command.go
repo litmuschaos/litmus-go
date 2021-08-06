@@ -5,6 +5,7 @@ import (
 	experimentEnv "github.com/litmuschaos/litmus-go/pkg/azure/run-command/environment"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/azure/run-command/types"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
+	azureStatus "github.com/litmuschaos/litmus-go/pkg/cloud/azure/instance"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
@@ -76,6 +77,13 @@ func AzureRunCommandExperiment(clients clients.ClientSets) {
 	if err := status.AUTStatusCheck(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.TargetContainer, experimentsDetails.Timeout, experimentsDetails.Delay, clients, &chaosDetails); err != nil {
 		log.Errorf("Application status check failed, err: %v", err)
 		failStep := "Verify that the AUT (Application Under Test) is running (pre-chaos)"
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+		return
+	}
+	// Setting up Azure Subscription ID
+	if err := azureStatus.RCSetupSubscriptionID(&experimentsDetails); err != nil {
+		log.Errorf("fail to get the subscription id, err: %v", err)
+		failStep := "Getting the subscription ID for authentication"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
