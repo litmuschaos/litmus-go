@@ -74,6 +74,8 @@ func KafkaBrokerPodFailure(clients clients.ClientSets) {
 	if err := kafka.ClusterHealthCheck(&experimentsDetails, clients); err != nil {
 		log.Errorf("Cluster health check failed, err: %v", err)
 		failStep := "Verify that the Kafka cluster is healthy(pre-chaos)"
+		types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, "AUT: Not Running", "Warning", &chaosDetails)
+		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -144,6 +146,8 @@ func KafkaBrokerPodFailure(clients clients.ClientSets) {
 	if err := kafka.ClusterHealthCheck(&experimentsDetails, clients); err != nil {
 		log.Errorf("Cluster health check failed, err: %v", err)
 		failStep := "Verify that the Kafka cluster is healthy(post-chaos)"
+		types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, "AUT: Not Running", "Warning", &chaosDetails)
+		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
