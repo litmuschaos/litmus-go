@@ -36,11 +36,6 @@ func stressCPU(experimentsDetails *experimentTypes.ExperimentDetails, podName st
 //experimentCPU function orchestrates the experiment by calling the StressCPU function for every core, of every container, of every pod that is targeted
 func experimentCPU(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
-	// Get the target pod details for the chaos execution
-	// if the target pod is not defined it will derive the random target pod list using pod affected percentage
-	if experimentsDetails.TargetPods == "" && chaosDetails.AppDetail.Label == "" {
-		return errors.Errorf("please provide one of the appLabel or TARGET_PODS")
-	}
 	targetPodList, err := common.GetPodList(experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, clients, chaosDetails)
 	if err != nil {
 		return err

@@ -12,6 +12,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
+	"github.com/litmuschaos/litmus-go/pkg/utils/annotation"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -64,11 +65,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 	duration := int(time.Since(ChaosStartTimeStamp).Seconds())
 
 	for duration < experimentsDetails.ChaosDuration {
-		// Get the target pod details for the chaos execution
-		// if the target pod is not defined it will derive the random target pod list using pod affected percentage
-		if experimentsDetails.TargetPods == "" && chaosDetails.AppDetail.Label == "" {
-			return errors.Errorf("please provide one of the appLabel or TARGET_PODS")
-		}
+
 		targetPodList, err := common.GetPodList(experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, clients, chaosDetails)
 		if err != nil {
 			return err
@@ -77,6 +74,11 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		podNames := []string{}
 		for _, pod := range targetPodList.Items {
 			podNames = append(podNames, pod.Name)
+			parentName, err := annotation.GetParentName(clients, pod, chaosDetails)
+			if err != nil {
+				return err
+			}
+			common.SetParentName(parentName, chaosDetails)
 		}
 		log.Infof("Target pods list: %v", podNames)
 
@@ -151,11 +153,6 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 	duration := int(time.Since(ChaosStartTimeStamp).Seconds())
 
 	for duration < experimentsDetails.ChaosDuration {
-		// Get the target pod details for the chaos execution
-		// if the target pod is not defined it will derive the random target pod list using pod affected percentage
-		if experimentsDetails.TargetPods == "" && chaosDetails.AppDetail.Label == "" {
-			return errors.Errorf("please provide one of the appLabel or TARGET_PODS")
-		}
 		targetPodList, err := common.GetPodList(experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, clients, chaosDetails)
 		if err != nil {
 			return err
@@ -164,6 +161,11 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		podNames := []string{}
 		for _, pod := range targetPodList.Items {
 			podNames = append(podNames, pod.Name)
+			parentName, err := annotation.GetParentName(clients, pod, chaosDetails)
+			if err != nil {
+				return err
+			}
+			common.SetParentName(parentName, chaosDetails)
 		}
 		log.Infof("Target pods list: %v", podNames)
 

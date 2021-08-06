@@ -12,6 +12,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
+	"github.com/litmuschaos/litmus-go/pkg/utils/annotation"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -72,6 +73,14 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		targetPodList, err := common.GetPodList(experimentsDetails.KafkaBroker, experimentsDetails.ChaoslibDetail.PodsAffectedPerc, clients, chaosDetails)
 		if err != nil {
 			return err
+		}
+
+		for _, pod := range targetPodList.Items {
+			parentName, err := annotation.GetParentName(clients, pod, chaosDetails)
+			if err != nil {
+				return err
+			}
+			common.SetParentName(parentName, chaosDetails)
 		}
 
 		for _, target := range chaosDetails.ParentsResources {
@@ -150,6 +159,14 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		targetPodList, err := common.GetPodList(experimentsDetails.KafkaBroker, experimentsDetails.ChaoslibDetail.PodsAffectedPerc, clients, chaosDetails)
 		if err != nil {
 			return err
+		}
+
+		for _, pod := range targetPodList.Items {
+			parentName, err := annotation.GetParentName(clients, pod, chaosDetails)
+			if err != nil {
+				return err
+			}
+			common.SetParentName(parentName, chaosDetails)
 		}
 
 		for _, target := range chaosDetails.ParentsResources {
