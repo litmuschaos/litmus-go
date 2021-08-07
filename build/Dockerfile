@@ -13,7 +13,7 @@ RUN CGO_ENABLED=0 go build -o /output/experiments ./bin/experiment
 RUN CGO_ENABLED=0 go build -o /output/helpers ./bin/helper
 
 
-FROM alpine:3.13
+FROM alpine:3
 
 LABEL maintainer="LitmusChaos"
 
