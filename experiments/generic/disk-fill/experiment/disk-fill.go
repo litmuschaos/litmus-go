@@ -70,12 +70,14 @@ func DiskFill(clients clients.ClientSets) {
 	go common.AbortWatcher(experimentsDetails.ExperimentName, clients, &resultDetails, &chaosDetails, &eventsDetails)
 
 	//PRE-CHAOS APPLICATION STATUS CHECK
-	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (pre-chaos)")
-	if err := status.AUTStatusCheck(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.TargetContainer, experimentsDetails.Timeout, experimentsDetails.Delay, clients, &chaosDetails); err != nil {
-		log.Errorf("Application status check failed, err: %v", err)
-		failStep := "Verify that the AUT (Application Under Test) is running (pre-chaos)"
-		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-		return
+	if chaosDetails.DefaultChecks {
+		log.Info("[Status]: Verify that the AUT (Application Under Test) is running (pre-chaos)")
+		if err := status.AUTStatusCheck(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.TargetContainer, experimentsDetails.Timeout, experimentsDetails.Delay, clients, &chaosDetails); err != nil {
+			log.Errorf("Application status check failed, err: %v", err)
+			failStep := "Verify that the AUT (Application Under Test) is running (pre-chaos)"
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+			return
+		}
 	}
 
 	//PRE-CHAOS AUXILIARY APPLICATION STATUS CHECK
@@ -91,7 +93,7 @@ func DiskFill(clients clients.ClientSets) {
 
 	if experimentsDetails.EngineName != "" {
 		// marking AUT as running, as we already checked the status of application under test
-		msg := "AUT: Running"
+		msg := common.GetStatusMessage(chaosDetails.DefaultChecks, "AUT: Running", "")
 
 		// run the probes in the pre-chaos check
 		if len(resultDetails.ProbeDetails) != 0 {
@@ -99,13 +101,13 @@ func DiskFill(clients clients.ClientSets) {
 			if err := probe.RunProbes(&chaosDetails, clients, &resultDetails, "PreChaos", &eventsDetails); err != nil {
 				log.Errorf("Probe Failed, err: %v", err)
 				failStep := "Failed while running probes"
-				msg := "AUT: Running, Probes: Unsuccessful"
+				msg = common.GetStatusMessage(chaosDetails.DefaultChecks, "AUT: Running", "Unsuccessful")
 				types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, msg, "Warning", &chaosDetails)
 				events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 				result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 				return
 			}
-			msg = "AUT: Running, Probes: Successful"
+			common.GetStatusMessage(chaosDetails.DefaultChecks, "AUT: Running", "Successful")
 		}
 		// generating the events for the pre-chaos check
 		types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, msg, "Normal", &chaosDetails)
@@ -132,12 +134,14 @@ func DiskFill(clients clients.ClientSets) {
 	resultDetails.Verdict = v1alpha1.ResultVerdictPassed
 
 	//POST-CHAOS APPLICATION STATUS CHECK
-	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (post-chaos)")
-	if err := status.AUTStatusCheck(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.TargetContainer, experimentsDetails.Timeout, experimentsDetails.Delay, clients, &chaosDetails); err != nil {
-		log.Errorf("Application status check failed, err: %v", err)
-		failStep := "Verify that the AUT (Application Under Test) is running (post-chaos)"
-		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-		return
+	if chaosDetails.DefaultChecks {
+		log.Info("[Status]: Verify that the AUT (Application Under Test) is running (post-chaos)")
+		if err := status.AUTStatusCheck(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.TargetContainer, experimentsDetails.Timeout, experimentsDetails.Delay, clients, &chaosDetails); err != nil {
+			log.Errorf("Application status check failed, err: %v", err)
+			failStep := "Verify that the AUT (Application Under Test) is running (post-chaos)"
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+			return
+		}
 	}
 
 	//POST-CHAOS AUXILIARY APPLICATION STATUS CHECK
@@ -153,20 +157,20 @@ func DiskFill(clients clients.ClientSets) {
 
 	if experimentsDetails.EngineName != "" {
 		// marking AUT as running, as we already checked the status of application under test
-		msg := "AUT: Running"
+		msg := common.GetStatusMessage(chaosDetails.DefaultChecks, "AUT: Running", "")
 
 		// run the probes in the post-chaos check
 		if len(resultDetails.ProbeDetails) != 0 {
 			if err := probe.RunProbes(&chaosDetails, clients, &resultDetails, "PostChaos", &eventsDetails); err != nil {
 				log.Errorf("Probes Failed, err: %v", err)
 				failStep := "Failed while running probes"
-				msg := "AUT: Running, Probes: Unsuccessful"
+				msg = common.GetStatusMessage(chaosDetails.DefaultChecks, "AUT: Running", "Unsuccessful")
 				types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, msg, "Warning", &chaosDetails)
 				events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 				result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 				return
 			}
-			msg = "AUT: Running, Probes: Successful"
+			common.GetStatusMessage(chaosDetails.DefaultChecks, "AUT: Running", "Successful")
 		}
 
 		// generating post chaos event

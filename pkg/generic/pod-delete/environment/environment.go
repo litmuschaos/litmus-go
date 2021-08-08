@@ -59,4 +59,5 @@ func InitialiseChaosVariables(chaosDetails *types.ChaosDetails, experimentDetail
 	chaosDetails.Randomness, _ = strconv.ParseBool(common.Getenv("RANDOMNESS", "false"))
 	chaosDetails.Targets = []v1alpha1.TargetDetails{}
 	chaosDetails.ParentsResources = []string{}
+	chaosDetails.DefaultChecks, _ = strconv.ParseBool(common.Getenv("DEFAULT_CHECKS", "true"))
 }

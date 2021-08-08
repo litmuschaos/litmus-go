@@ -15,6 +15,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
+	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/sirupsen/logrus"
 )
 
@@ -70,13 +71,16 @@ func KafkaBrokerPodFailure(clients clients.ClientSets) {
 
 	// PRE-CHAOS APPLICATION STATUS CHECK
 	// KAFKA CLUSTER HEALTH CHECK
-	log.Info("[Status]: Verify that the Kafka cluster is healthy(pre-chaos)")
-	if err := kafka.ClusterHealthCheck(&experimentsDetails, clients); err != nil {
-		log.Errorf("Cluster health check failed, err: %v", err)
-		failStep := "Verify that the Kafka cluster is healthy(pre-chaos)"
-		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-		return
+	if chaosDetails.DefaultChecks {
+		log.Info("[Status]: Verify that the Kafka cluster is healthy(pre-chaos)")
+		if err := kafka.ClusterHealthCheck(&experimentsDetails, clients); err != nil {
+			log.Errorf("Cluster health check failed, err: %v", err)
+			failStep := "Verify that the Kafka cluster is healthy(pre-chaos)"
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+			return
+		}
 	}
+
 	if experimentsDetails.ChaoslibDetail.EngineName != "" {
 		// marking AUT as running, as we already checked the status of application under test
 		msg := "AUT: Running"
@@ -140,30 +144,32 @@ func KafkaBrokerPodFailure(clients clients.ClientSets) {
 	resultDetails.Verdict = v1alpha1.ResultVerdictPassed
 
 	// POST-CHAOS KAFKA CLUSTER HEALTH CHECK
-	log.Info("[Status]: Verify that the Kafka cluster is healthy(post-chaos)")
-	if err := kafka.ClusterHealthCheck(&experimentsDetails, clients); err != nil {
-		log.Errorf("Cluster health check failed, err: %v", err)
-		failStep := "Verify that the Kafka cluster is healthy(post-chaos)"
-		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-		return
+	if chaosDetails.DefaultChecks {
+		log.Info("[Status]: Verify that the Kafka cluster is healthy(post-chaos)")
+		if err := kafka.ClusterHealthCheck(&experimentsDetails, clients); err != nil {
+			log.Errorf("Cluster health check failed, err: %v", err)
+			failStep := "Verify that the Kafka cluster is healthy(post-chaos)"
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+			return
+		}
 	}
 
 	if experimentsDetails.ChaoslibDetail.EngineName != "" {
 		// marking AUT as running, as we already checked the status of application under test
-		msg := "AUT: Running"
+		msg := common.GetStatusMessage(chaosDetails.DefaultChecks, "AUT: Running", "")
 
 		// run the probes in the post-chaos check
 		if len(resultDetails.ProbeDetails) != 0 {
 			if err := probe.RunProbes(&chaosDetails, clients, &resultDetails, "PostChaos", &eventsDetails); err != nil {
 				log.Errorf("Probe Failed, err: %v", err)
 				failStep := "Failed while running probes"
-				msg := "AUT: Running, Probes: Unsuccessful"
+				msg := common.GetStatusMessage(chaosDetails.DefaultChecks, "AUT: Running", "Unsuccessful")
 				types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, msg, "Warning", &chaosDetails)
 				events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 				result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 				return
 			}
-			msg = "AUT: Running, Probes: Successful"
+			msg = common.GetStatusMessage(chaosDetails.DefaultChecks, "AUT: Running", "Successful")
 		}
 
 		// generating post chaos event

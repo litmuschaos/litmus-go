@@ -76,17 +76,29 @@ func CasssandraPodDelete(clients clients.ClientSets) {
 	go common.AbortWatcher(experimentsDetails.ChaoslibDetail.ExperimentName, clients, &resultDetails, &chaosDetails, &eventsDetails)
 
 	//PRE-CHAOS APPLICATION STATUS CHECK
-	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (pre-chaos)")
-	if err = status.AUTStatusCheck(experimentsDetails.ChaoslibDetail.AppNS, experimentsDetails.ChaoslibDetail.AppLabel, experimentsDetails.ChaoslibDetail.TargetContainer, experimentsDetails.ChaoslibDetail.Timeout, experimentsDetails.ChaoslibDetail.Delay, clients, &chaosDetails); err != nil {
-		log.Errorf("Application status check failed, err: %v", err)
-		failStep := "Verify that the AUT (Application Under Test) is running (pre-chaos)"
-		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-		return
+	if chaosDetails.DefaultChecks {
+		log.Info("[Status]: Verify that the AUT (Application Under Test) is running (pre-chaos)")
+		if err = status.AUTStatusCheck(experimentsDetails.ChaoslibDetail.AppNS, experimentsDetails.ChaoslibDetail.AppLabel, experimentsDetails.ChaoslibDetail.TargetContainer, experimentsDetails.ChaoslibDetail.Timeout, experimentsDetails.ChaoslibDetail.Delay, clients, &chaosDetails); err != nil {
+			log.Errorf("Application status check failed, err: %v", err)
+			failStep := "Verify that the AUT (Application Under Test) is running (pre-chaos)"
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+			return
+		}
+
+		// Checking the load distribution on the ring (pre-chaos)
+		log.Info("[Status]: Checking the load distribution on the ring (pre-chaos)")
+		if err = cassandra.NodeToolStatusCheck(&experimentsDetails, clients); err != nil {
+			log.Errorf("[Status]: Chaos node tool status check failed, err: %v", err)
+			failStep := "Checking for load distribution on the ring(pre-chaos)"
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+			return
+		}
+
 	}
 
 	if experimentsDetails.ChaoslibDetail.EngineName != "" {
 		// marking AUT as running, as we already checked the status of application under test
-		msg := "AUT: Running"
+		msg := common.GetStatusMessage(chaosDetails.DefaultChecks, "AUT: Running", "")
 
 		// run the probes in the pre-chaos check
 		if len(resultDetails.ProbeDetails) != 0 {
@@ -94,26 +106,17 @@ func CasssandraPodDelete(clients clients.ClientSets) {
 			if err = probe.RunProbes(&chaosDetails, clients, &resultDetails, "PreChaos", &eventsDetails); err != nil {
 				log.Errorf("Probes Failed, err: %v", err)
 				failStep := "Failed while running probes"
-				msg := "AUT: Running, Probes: Unsuccessful"
+				msg = common.GetStatusMessage(chaosDetails.DefaultChecks, "AUT: Running", "Unsuccessful")
 				types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, msg, "Warning", &chaosDetails)
 				events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 				result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 				return
 			}
-			msg = "AUT: Running, Probes: Successful"
+			msg = common.GetStatusMessage(chaosDetails.DefaultChecks, "AUT: Running", "Successful")
 		}
 		// generating the events for the pre-chaos check
 		types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, msg, "Normal", &chaosDetails)
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
-	}
-
-	// Checking the load distribution on the ring (pre-chaos)
-	log.Info("[Status]: Checking the load distribution on the ring (pre-chaos)")
-	if err = cassandra.NodeToolStatusCheck(&experimentsDetails, clients); err != nil {
-		log.Errorf("[Status]: Chaos node tool status check failed, err: %v", err)
-		failStep := "Checking for load distribution on the ring(pre-chaos)"
-		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-		return
 	}
 
 	// Cassandra liveness check
@@ -150,43 +153,46 @@ func CasssandraPodDelete(clients clients.ClientSets) {
 	resultDetails.Verdict = v1alpha1.ResultVerdictPassed
 
 	//POST-CHAOS APPLICATION STATUS CHECK
-	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (post-chaos)")
-	if err = status.AUTStatusCheck(experimentsDetails.ChaoslibDetail.AppNS, experimentsDetails.ChaoslibDetail.AppLabel, experimentsDetails.ChaoslibDetail.TargetContainer, experimentsDetails.ChaoslibDetail.Timeout, experimentsDetails.ChaoslibDetail.Delay, clients, &chaosDetails); err != nil {
-		log.Errorf("Application status check failed, err: %v", err)
-		failStep := "Verify that the AUT (Application Under Test) is running (post-chaos)"
-		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-		return
+	if chaosDetails.DefaultChecks {
+		log.Info("[Status]: Verify that the AUT (Application Under Test) is running (post-chaos)")
+		if err = status.AUTStatusCheck(experimentsDetails.ChaoslibDetail.AppNS, experimentsDetails.ChaoslibDetail.AppLabel, experimentsDetails.ChaoslibDetail.TargetContainer, experimentsDetails.ChaoslibDetail.Timeout, experimentsDetails.ChaoslibDetail.Delay, clients, &chaosDetails); err != nil {
+			log.Errorf("Application status check failed, err: %v", err)
+			failStep := "Verify that the AUT (Application Under Test) is running (post-chaos)"
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+			return
+		}
+
+		// Checking the load distribution on the ring (post-chaos)
+		log.Info("[Status]: Checking the load distribution on the ring (post-chaos)")
+		if err = cassandra.NodeToolStatusCheck(&experimentsDetails, clients); err != nil {
+			log.Errorf("[Status]: Chaos node tool status check is failed, err: %v", err)
+			failStep := "Checking for load distribution on the ring(post-chaos)"
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+			return
+		}
 	}
+
 	if experimentsDetails.ChaoslibDetail.EngineName != "" {
 		// marking AUT as running, as we already checked the status of application under test
-		msg := "AUT: Running"
+		msg := common.GetStatusMessage(chaosDetails.DefaultChecks, "AUT: Running", "")
 
 		// run the probes in the post-chaos check
 		if len(resultDetails.ProbeDetails) != 0 {
 			if err = probe.RunProbes(&chaosDetails, clients, &resultDetails, "PostChaos", &eventsDetails); err != nil {
 				log.Errorf("Probes Failed, err: %v", err)
 				failStep := "Failed while running probes"
-				msg := "AUT: Running, Probes: Unsuccessful"
+				msg = common.GetStatusMessage(chaosDetails.DefaultChecks, "AUT: Running", "Unsuccessful")
 				types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, msg, "Warning", &chaosDetails)
 				events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 				result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 				return
 			}
-			msg = "AUT: Running, Probes: Successful"
+			msg = common.GetStatusMessage(chaosDetails.DefaultChecks, "AUT: Running", "Successful")
 		}
 
 		// generating post chaos event
 		types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, msg, "Normal", &chaosDetails)
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
-	}
-
-	// Checking the load distribution on the ring (post-chaos)
-	log.Info("[Status]: Checking the load distribution on the ring (post-chaos)")
-	if err = cassandra.NodeToolStatusCheck(&experimentsDetails, clients); err != nil {
-		log.Errorf("[Status]: Chaos node tool status check is failed, err: %v", err)
-		failStep := "Checking for load distribution on the ring(post-chaos)"
-		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-		return
 	}
 
 	// Cassandra statefulset liveness check (post-chaos)

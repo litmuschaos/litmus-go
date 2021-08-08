@@ -83,6 +83,7 @@ type ChaosDetails struct {
 	Randomness           bool
 	Targets              []v1alpha1.TargetDetails
 	ParentsResources     []string
+	DefaultChecks        bool
 }
 
 // AppDetails contains all the application related envs
