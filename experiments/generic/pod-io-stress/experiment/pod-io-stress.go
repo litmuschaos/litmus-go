@@ -30,7 +30,7 @@ func PodIOStress(clients clients.ClientSets) {
 	experimentEnv.GetENV(&experimentsDetails, "pod-io-stress")
 
 	// Intialise the chaos attributes
-	experimentEnv.InitialiseChaosVariables(&chaosDetails, &experimentsDetails)
+	types.InitialiseChaosVariables(&chaosDetails)
 
 	// Intialise Chaos Result Parameters
 	types.SetResultAttributes(&resultDetails, chaosDetails)

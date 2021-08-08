@@ -30,7 +30,7 @@ func EBSLossByTag(clients clients.ClientSets) {
 	experimentEnv.GetENV(&experimentsDetails)
 
 	// Intialise the chaos attributes
-	experimentEnv.InitialiseChaosVariables(&chaosDetails, &experimentsDetails)
+	types.InitialiseChaosVariables(&chaosDetails)
 
 	// Intialise Chaos Result Parameters
 	types.SetResultAttributes(&resultDetails, chaosDetails)

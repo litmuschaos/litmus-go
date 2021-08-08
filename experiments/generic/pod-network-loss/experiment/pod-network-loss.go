@@ -30,7 +30,7 @@ func PodNetworkLoss(clients clients.ClientSets) {
 	experimentEnv.GetENV(&experimentsDetails)
 
 	// Intialise events Parameters
-	experimentEnv.InitialiseChaosVariables(&chaosDetails, &experimentsDetails)
+	types.InitialiseChaosVariables(&chaosDetails)
 
 	// Intialise Chaos Result Parameters
 	types.SetResultAttributes(&resultDetails, chaosDetails)

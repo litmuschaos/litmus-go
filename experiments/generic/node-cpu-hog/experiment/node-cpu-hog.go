@@ -29,10 +29,10 @@ func NodeCPUHog(clients clients.ClientSets) {
 	experimentEnv.GetENV(&experimentsDetails)
 
 	// Intialise the chaos attributes
-	experimentEnv.InitialiseChaosVariables(&chaosDetails, &experimentsDetails)
+	types.InitialiseChaosVariables(&chaosDetails)
 
 	// Intialise Chaos Result Parameters
-	types.SetResultAttributes(&resultDetails, chaosDetails)
+	types.InitialiseChaosVariables(&chaosDetails)
 
 	if experimentsDetails.EngineName != "" {
 		// Intialise the probe details. Bail out upon error, as we haven't entered exp business logic yet

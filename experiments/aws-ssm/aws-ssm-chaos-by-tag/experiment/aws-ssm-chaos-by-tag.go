@@ -31,7 +31,7 @@ func AWSSSMChaosByTag(clients clients.ClientSets) {
 	experimentEnv.GetENV(&experimentsDetails, "aws-ssm-chaos-by-tag")
 
 	// Intialise the chaos attributes
-	experimentEnv.InitialiseChaosVariables(&chaosDetails, &experimentsDetails)
+	types.InitialiseChaosVariables(&chaosDetails)
 
 	// Intialise Chaos Result Parameters
 	types.SetResultAttributes(&resultDetails, chaosDetails)

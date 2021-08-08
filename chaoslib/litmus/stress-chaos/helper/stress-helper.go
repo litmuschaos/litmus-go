@@ -18,7 +18,6 @@ import (
 	"github.com/containerd/cgroups"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
-	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/stress-chaos/environment"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/stress-chaos/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/result"
@@ -69,7 +68,7 @@ func Helper(clients clients.ClientSets) {
 	getENV(&experimentsDetails)
 
 	// Intialise the chaos attributes
-	experimentEnv.InitialiseChaosVariables(&chaosDetails, &experimentsDetails)
+	types.InitialiseChaosVariables(&chaosDetails)
 
 	// Intialise Chaos Result Parameters
 	types.SetResultAttributes(&resultDetails, chaosDetails)
@@ -495,23 +494,23 @@ func parsePIDFromJSON(j []byte, runtime string) (int, error) {
 
 //getENV fetches all the env variables from the runner pod
 func getENV(experimentDetails *experimentTypes.ExperimentDetails) {
-	experimentDetails.ExperimentName = common.Getenv("EXPERIMENT_NAME", "")
-	experimentDetails.AppNS = common.Getenv("APP_NS", "")
-	experimentDetails.TargetContainer = common.Getenv("APP_CONTAINER", "")
-	experimentDetails.TargetPods = common.Getenv("APP_POD", "")
-	experimentDetails.ChaosDuration, _ = strconv.Atoi(common.Getenv("TOTAL_CHAOS_DURATION", "30"))
-	experimentDetails.ChaosNamespace = common.Getenv("CHAOS_NAMESPACE", "litmus")
-	experimentDetails.EngineName = common.Getenv("CHAOS_ENGINE", "")
-	experimentDetails.ChaosUID = clientTypes.UID(common.Getenv("CHAOS_UID", ""))
-	experimentDetails.ChaosPodName = common.Getenv("POD_NAME", "")
-	experimentDetails.ContainerRuntime = common.Getenv("CONTAINER_RUNTIME", "")
-	experimentDetails.SocketPath = common.Getenv("SOCKET_PATH", "")
-	experimentDetails.CPUcores, _ = strconv.Atoi(common.Getenv("CPU_CORES", ""))
-	experimentDetails.FilesystemUtilizationPercentage, _ = strconv.Atoi(common.Getenv("FILESYSTEM_UTILIZATION_PERCENTAGE", ""))
-	experimentDetails.FilesystemUtilizationBytes, _ = strconv.Atoi(common.Getenv("FILESYSTEM_UTILIZATION_BYTES", ""))
-	experimentDetails.NumberOfWorkers, _ = strconv.Atoi(common.Getenv("NUMBER_OF_WORKERS", ""))
-	experimentDetails.MemoryConsumption, _ = strconv.Atoi(common.Getenv("MEMORY_CONSUMPTION", ""))
-	experimentDetails.VolumeMountPath = common.Getenv("VOLUME_MOUNT_PATH", "")
+	experimentDetails.ExperimentName = types.Getenv("EXPERIMENT_NAME", "")
+	experimentDetails.AppNS = types.Getenv("APP_NS", "")
+	experimentDetails.TargetContainer = types.Getenv("APP_CONTAINER", "")
+	experimentDetails.TargetPods = types.Getenv("APP_POD", "")
+	experimentDetails.ChaosDuration, _ = strconv.Atoi(types.Getenv("TOTAL_CHAOS_DURATION", "30"))
+	experimentDetails.ChaosNamespace = types.Getenv("CHAOS_NAMESPACE", "litmus")
+	experimentDetails.EngineName = types.Getenv("CHAOS_ENGINE", "")
+	experimentDetails.ChaosUID = clientTypes.UID(types.Getenv("CHAOS_UID", ""))
+	experimentDetails.ChaosPodName = types.Getenv("POD_NAME", "")
+	experimentDetails.ContainerRuntime = types.Getenv("CONTAINER_RUNTIME", "")
+	experimentDetails.SocketPath = types.Getenv("SOCKET_PATH", "")
+	experimentDetails.CPUcores, _ = strconv.Atoi(types.Getenv("CPU_CORES", ""))
+	experimentDetails.FilesystemUtilizationPercentage, _ = strconv.Atoi(types.Getenv("FILESYSTEM_UTILIZATION_PERCENTAGE", ""))
+	experimentDetails.FilesystemUtilizationBytes, _ = strconv.Atoi(types.Getenv("FILESYSTEM_UTILIZATION_BYTES", ""))
+	experimentDetails.NumberOfWorkers, _ = strconv.Atoi(types.Getenv("NUMBER_OF_WORKERS", ""))
+	experimentDetails.MemoryConsumption, _ = strconv.Atoi(types.Getenv("MEMORY_CONSUMPTION", ""))
+	experimentDetails.VolumeMountPath = types.Getenv("VOLUME_MOUNT_PATH", "")
 }
 
 // abortWatcher continuosly watch for the abort signals

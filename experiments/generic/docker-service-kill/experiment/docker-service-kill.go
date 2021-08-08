@@ -29,7 +29,7 @@ func DockerServiceKill(clients clients.ClientSets) {
 	experimentEnv.GetENV(&experimentsDetails)
 
 	// Intialise the chaos attributes
-	experimentEnv.InitialiseChaosVariables(&chaosDetails, &experimentsDetails)
+	types.InitialiseChaosVariables(&chaosDetails)
 
 	// Intialise Chaos Result Parameters
 	types.SetResultAttributes(&resultDetails, chaosDetails)
@@ -61,11 +61,11 @@ func DockerServiceKill(clients clients.ClientSets) {
 
 	//DISPLAY THE APP INFORMATION
 	log.InfoWithValues("[Info]: The application information is as follows", logrus.Fields{
-		"App Namespace":   experimentsDetails.AppNS,
-		"App Label":   experimentsDetails.AppLabel,
-		"Node Label":  experimentsDetails.NodeLabel,
-		"Target Node": experimentsDetails.TargetNode,
-		"Ramp Time":   experimentsDetails.RampTime,
+		"App Namespace": experimentsDetails.AppNS,
+		"App Label":     experimentsDetails.AppLabel,
+		"Node Label":    experimentsDetails.NodeLabel,
+		"Target Node":   experimentsDetails.TargetNode,
+		"Ramp Time":     experimentsDetails.RampTime,
 	})
 
 	// Calling AbortWatcher go routine, it will continuously watch for the abort signal and generate the required events and result

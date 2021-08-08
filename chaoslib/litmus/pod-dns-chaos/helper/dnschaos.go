@@ -12,7 +12,6 @@ import (
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
-	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/pod-dns-chaos/environment"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-dns-chaos/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/result"
@@ -48,7 +47,7 @@ func Helper(clients clients.ClientSets) {
 	getENV(&experimentsDetails)
 
 	// Initialise the chaos attributes
-	experimentEnv.InitialiseChaosVariables(&chaosDetails, &experimentsDetails)
+	types.InitialiseChaosVariables(&chaosDetails)
 
 	// Initialise Chaos Result Parameters
 	types.SetResultAttributes(&resultDetails, chaosDetails)
@@ -176,19 +175,19 @@ func getContainerID(experimentDetails *experimentTypes.ExperimentDetails, client
 
 //getENV fetches all the env variables from the runner pod
 func getENV(experimentDetails *experimentTypes.ExperimentDetails) {
-	experimentDetails.ExperimentName = common.Getenv("EXPERIMENT_NAME", "")
-	experimentDetails.AppNS = common.Getenv("APP_NS", "")
-	experimentDetails.TargetContainer = common.Getenv("APP_CONTAINER", "")
-	experimentDetails.TargetPods = common.Getenv("APP_POD", "")
-	experimentDetails.ChaosDuration, _ = strconv.Atoi(common.Getenv("TOTAL_CHAOS_DURATION", "60"))
-	experimentDetails.ChaosNamespace = common.Getenv("CHAOS_NAMESPACE", "litmus")
-	experimentDetails.EngineName = common.Getenv("CHAOS_ENGINE", "")
-	experimentDetails.ChaosUID = clientTypes.UID(common.Getenv("CHAOS_UID", ""))
-	experimentDetails.ChaosPodName = common.Getenv("POD_NAME", "")
-	experimentDetails.ContainerRuntime = common.Getenv("CONTAINER_RUNTIME", "")
-	experimentDetails.TargetHostNames = common.Getenv("TARGET_HOSTNAMES", "")
-	experimentDetails.SpoofMap = common.Getenv("SPOOF_MAP", "")
-	experimentDetails.MatchScheme = common.Getenv("MATCH_SCHEME", "exact")
-	experimentDetails.ChaosType = common.Getenv("CHAOS_TYPE", "error")
-	experimentDetails.SocketPath = common.Getenv("SOCKET_PATH", "")
+	experimentDetails.ExperimentName = types.Getenv("EXPERIMENT_NAME", "")
+	experimentDetails.AppNS = types.Getenv("APP_NS", "")
+	experimentDetails.TargetContainer = types.Getenv("APP_CONTAINER", "")
+	experimentDetails.TargetPods = types.Getenv("APP_POD", "")
+	experimentDetails.ChaosDuration, _ = strconv.Atoi(types.Getenv("TOTAL_CHAOS_DURATION", "60"))
+	experimentDetails.ChaosNamespace = types.Getenv("CHAOS_NAMESPACE", "litmus")
+	experimentDetails.EngineName = types.Getenv("CHAOS_ENGINE", "")
+	experimentDetails.ChaosUID = clientTypes.UID(types.Getenv("CHAOS_UID", ""))
+	experimentDetails.ChaosPodName = types.Getenv("POD_NAME", "")
+	experimentDetails.ContainerRuntime = types.Getenv("CONTAINER_RUNTIME", "")
+	experimentDetails.TargetHostNames = types.Getenv("TARGET_HOSTNAMES", "")
+	experimentDetails.SpoofMap = types.Getenv("SPOOF_MAP", "")
+	experimentDetails.MatchScheme = types.Getenv("MATCH_SCHEME", "exact")
+	experimentDetails.ChaosType = types.Getenv("CHAOS_TYPE", "error")
+	experimentDetails.SocketPath = types.Getenv("SOCKET_PATH", "")
 }

@@ -104,15 +104,6 @@ func GetIterations(duration, interval int) int {
 	return math.Maximum(iterations, 1)
 }
 
-// Getenv fetch the env and set the default value, if any
-func Getenv(key string, defaultValue string) string {
-	value := os.Getenv(key)
-	if value == "" {
-		value = defaultValue
-	}
-	return value
-}
-
 //FilterBasedOnPercentage return the slice of list based on the the provided percentage
 func FilterBasedOnPercentage(percentage int, list []string) []string {
 
