@@ -100,18 +100,18 @@ func GetChaosPodResourceRequirements(podName, containerName, namespace string, c
 // VerifyExistanceOfPods check the availibility of list of pods
 func VerifyExistanceOfPods(namespace, pods string, clients clients.ClientSets) (bool, error) {
 
-	if pods == "" {
+	if strings.TrimSpace(pods) == "" {
 		return false, nil
 	}
 
-	podList := strings.Split(pods, ",")
+	podList := strings.Split(strings.TrimSpace(pods), ",")
 	for index := range podList {
 		isPodsAvailable, err := CheckForAvailibiltyOfPod(namespace, podList[index], clients)
 		if err != nil {
 			return false, err
 		}
 		if !isPodsAvailable {
-			return isPodsAvailable, nil
+			return isPodsAvailable, errors.Errorf("%v pod is not available in %v namespace", podList[index], namespace)
 		}
 	}
 	return true, nil
