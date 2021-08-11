@@ -279,7 +279,7 @@ func GetTargetPodsWhenTargetPodsENVNotSet(podAffPerc int, clients clients.Client
 		return filteredPods, errors.Errorf("No target pod found")
 	}
 
-	newPodListLength := math.Maximum(1, math.Adjustment(podAffPerc, len(filteredPods.Items)))
+	newPodListLength := math.Maximum(1, math.Adjustment(math.Minimum(podAffPerc, 100), len(filteredPods.Items)))
 	rand.Seed(time.Now().UnixNano())
 
 	// it will generate the random podlist
