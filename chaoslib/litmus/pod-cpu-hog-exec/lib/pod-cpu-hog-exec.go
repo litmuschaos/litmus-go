@@ -80,8 +80,6 @@ func experimentCPU(experimentsDetails *experimentTypes.ExperimentDetails, client
 
 // injectChaosInSerialMode stressed the cpu of all target application serially (one by one)
 func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList corev1.PodList, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	// creating err channel to recieve the error from the go routine
-	stressErr := make(chan error)
 
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
@@ -105,6 +103,9 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		os.Exit(0)
 	default:
 		for _, pod := range targetPodList.Items {
+
+			// creating err channel to recieve the error from the go routine
+			stressErr := make(chan error)
 
 			if experimentsDetails.EngineName != "" {
 				msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on " + pod.Name + " pod"
