@@ -110,15 +110,13 @@ func PodAutoscaler(clients clients.ClientSets) {
 		if err := litmusLIB.PreparePodAutoscaler(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
 			log.Errorf("Chaos injection failed, err: %v", err)
 			failStep := "failed in chaos injection phase"
-			types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
-			result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}
 	default:
 		log.Error("[Invalid]: Please Provide the correct LIB")
 		failStep := "no match found for specified lib"
-		types.SetResultAfterCompletion(&resultDetails, "Fail", "Completed", failStep)
-		result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT")
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
 
