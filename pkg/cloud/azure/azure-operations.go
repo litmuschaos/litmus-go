@@ -12,7 +12,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-// AzureInstanceStop poweroff the target instance
+// AzureInstanceStop stops the target instance
 func AzureInstanceStop(timeout, delay int, subscriptionID, resourceGroup, azureInstanceName string) error {
 	vmClient := compute.NewVirtualMachinesClient(subscriptionID)
 
@@ -23,7 +23,7 @@ func AzureInstanceStop(timeout, delay int, subscriptionID, resourceGroup, azureI
 		return errors.Errorf("fail to setup authorization, err: %v")
 	}
 
-	log.Info("[Info]: Starting powerOff the instance")
+	log.Info("[Info]: Stopping the instance")
 	_, err = vmClient.PowerOff(context.TODO(), resourceGroup, azureInstanceName, &vmClient.SkipResourceProviderRegistration)
 	if err != nil {
 		return errors.Errorf("fail to stop the %v instance, err: %v", azureInstanceName, err)
@@ -34,6 +34,7 @@ func AzureInstanceStop(timeout, delay int, subscriptionID, resourceGroup, azureI
 
 // AzureInstanceStart starts the target instance
 func AzureInstanceStart(timeout, delay int, subscriptionID, resourceGroup, azureInstanceName string) error {
+
 	vmClient := compute.NewVirtualMachinesClient(subscriptionID)
 
 	authorizer, err := auth.NewAuthorizerFromFile(azure.PublicCloud.ResourceManagerEndpoint)
@@ -52,30 +53,80 @@ func AzureInstanceStart(timeout, delay int, subscriptionID, resourceGroup, azure
 	return nil
 }
 
+// AzureScaleSetInstanceStop stops the target instance in the scale set
+func AzureScaleSetInstanceStop(timeout, delay int, subscriptionID, resourceGroup, azureInstanceName string) error {
+	vmssClient := compute.NewVirtualMachineScaleSetVMsClient(subscriptionID)
+
+	authorizer, err := auth.NewAuthorizerFromFile(azure.PublicCloud.ResourceManagerEndpoint)
+	if err == nil {
+		vmssClient.Authorizer = authorizer
+	} else {
+		return errors.Errorf("fail to setup authorization, err: %v")
+	}
+	virtualMachineScaleSetName, virtualMachineId := GetScaleSetNameAndInstanceId(azureInstanceName)
+
+	log.Info("[Info]: Stopping the instance")
+	_, err = vmssClient.PowerOff(context.TODO(), resourceGroup, virtualMachineScaleSetName, virtualMachineId, &vmssClient.SkipResourceProviderRegistration)
+	if err != nil {
+		return errors.Errorf("fail to stop the %v_%v instance, err: %v", virtualMachineScaleSetName, virtualMachineId, err)
+	}
+
+	return nil
+}
+
+// AzureScaleSetInstanceStart starts the target instance in the scale set
+func AzureScaleSetInstanceStart(timeout, delay int, subscriptionID, resourceGroup, azureInstanceName string) error {
+	vmssClient := compute.NewVirtualMachineScaleSetVMsClient(subscriptionID)
+
+	authorizer, err := auth.NewAuthorizerFromFile(azure.PublicCloud.ResourceManagerEndpoint)
+	if err == nil {
+		vmssClient.Authorizer = authorizer
+	} else {
+		return errors.Errorf("fail to setup authorization, err: %v")
+	}
+	virtualMachineScaleSetName, virtualMachineId := GetScaleSetNameAndInstanceId(azureInstanceName)
+
+	log.Info("[Info]: Starting back the instance to running state")
+	_, err = vmssClient.Start(context.TODO(), resourceGroup, virtualMachineScaleSetName, virtualMachineId)
+	if err != nil {
+		return errors.Errorf("fail to start the %v_%v instance, err: %v", virtualMachineScaleSetName, virtualMachineId, err)
+	}
+
+	return nil
+}
+
 //WaitForAzureComputeDown will wait for the azure compute instance to get in stopped state
-func WaitForAzureComputeDown(timeout, delay int, subscriptionID, resourceGroup, azureInstanceName string) error {
+func WaitForAzureComputeDown(timeout, delay int, scaleSet, subscriptionID, resourceGroup, azureInstanceName string) error {
+
+	var instanceState string
+	var err error
 
 	log.Info("[Status]: Checking Azure instance status")
 	return retry.
 		Times(uint(timeout / delay)).
 		Wait(time.Duration(delay) * time.Second).
 		Try(func(attempt uint) error {
-
-			instanceState, err := GetAzureInstanceStatus(subscriptionID, resourceGroup, azureInstanceName)
+			if scaleSet == "enable" {
+				scaleSetName, vmId := GetScaleSetNameAndInstanceId(azureInstanceName)
+				instanceState, err = GetAzureScaleSetInstanceStatus(subscriptionID, resourceGroup, scaleSetName, vmId)
+			} else {
+				instanceState, err = GetAzureInstanceStatus(subscriptionID, resourceGroup, azureInstanceName)
+			}
 			if err != nil {
 				return errors.Errorf("failed to get the instance status")
 			}
 			if instanceState != "VM stopped" {
-				log.Infof("The instance state is %v", instanceState)
 				return errors.Errorf("instance is not yet in stopped state")
 			}
-			log.Infof("The instance state is %v", instanceState)
 			return nil
 		})
 }
 
 //WaitForAzureComputeUp will wait for the azure compute instance to get in running state
-func WaitForAzureComputeUp(timeout, delay int, subscriptionID, resourceGroup, azureInstanceName string) error {
+func WaitForAzureComputeUp(timeout, delay int, scaleSet, subscriptionID, resourceGroup, azureInstanceName string) error {
+
+	var instanceState string
+	var err error
 
 	log.Info("[Status]: Checking Azure instance status")
 	return retry.
@@ -83,15 +134,19 @@ func WaitForAzureComputeUp(timeout, delay int, subscriptionID, resourceGroup, az
 		Wait(time.Duration(delay) * time.Second).
 		Try(func(attempt uint) error {
 
-			instanceState, err := GetAzureInstanceStatus(subscriptionID, resourceGroup, azureInstanceName)
+			switch scaleSet {
+			case "enable":
+				scaleSetName, vmId := GetScaleSetNameAndInstanceId(azureInstanceName)
+				instanceState, err = GetAzureScaleSetInstanceStatus(subscriptionID, resourceGroup, scaleSetName, vmId)
+			default:
+				instanceState, err = GetAzureInstanceStatus(subscriptionID, resourceGroup, azureInstanceName)
+			}
 			if err != nil {
 				return errors.Errorf("failed to get instance status")
 			}
 			if instanceState != "VM running" {
-				log.Infof("The instance state is %v", instanceState)
 				return errors.Errorf("instance is not yet in running state")
 			}
-			log.Infof("The instance state is %v", instanceState)
 			return nil
 		})
 }
