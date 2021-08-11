@@ -117,7 +117,7 @@ func CasssandraPodDelete(clients clients.ClientSets) {
 	}
 
 	// Cassandra liveness check
-	if experimentsDetails.CassandraLivenessCheck == "enabled" {
+	if experimentsDetails.CassandraLivenessCheck == "enable" {
 		ResourceVersionBefore, err = cassandra.LivenessCheck(&experimentsDetails, clients)
 		if err != nil {
 			log.Errorf("[Liveness]: Cassandra liveness check failed, err: %v", err)
@@ -127,7 +127,7 @@ func CasssandraPodDelete(clients clients.ClientSets) {
 		}
 		log.Info("[Confirmation]: The cassandra application liveness pod created successfully")
 	} else {
-		log.Warn("[Liveness]: Cassandra Liveness check skipped as it was not enabled")
+		log.Warn("[Liveness]: Cassandra Liveness check skipped as it was not enable")
 	}
 
 	// Including the litmus lib for cassandra-pod-delete
@@ -192,7 +192,7 @@ func CasssandraPodDelete(clients clients.ClientSets) {
 	// Cassandra statefulset liveness check (post-chaos)
 	log.Info("[Status]: Confirm that the cassandra liveness pod is running(post-chaos)")
 	// Checking the running status of cassandra liveness
-	if experimentsDetails.CassandraLivenessCheck == "enabled" {
+	if experimentsDetails.CassandraLivenessCheck == "enable" {
 		if err = status.CheckApplicationStatus(experimentsDetails.ChaoslibDetail.AppNS, "name=cassandra-liveness-deploy-"+experimentsDetails.RunID, experimentsDetails.ChaoslibDetail.Timeout, experimentsDetails.ChaoslibDetail.Delay, clients); err != nil {
 			log.Errorf("Liveness status check failed, err: %v", err)
 			failStep := "failed while checking the status of liveness pod"
