@@ -100,18 +100,18 @@ func GetChaosPodResourceRequirements(podName, containerName, namespace string, c
 // VerifyExistanceOfPods check the availibility of list of pods
 func VerifyExistanceOfPods(namespace, pods string, clients clients.ClientSets) (bool, error) {
 
-	if pods == "" {
+	if strings.TrimSpace(pods) == "" {
 		return false, nil
 	}
 
-	podList := strings.Split(pods, ",")
+	podList := strings.Split(strings.TrimSpace(pods), ",")
 	for index := range podList {
 		isPodsAvailable, err := CheckForAvailibiltyOfPod(namespace, podList[index], clients)
 		if err != nil {
 			return false, err
 		}
 		if !isPodsAvailable {
-			return isPodsAvailable, nil
+			return isPodsAvailable, errors.Errorf("%v pod is not available in %v namespace", podList[index], namespace)
 		}
 	}
 	return true, nil
@@ -279,7 +279,7 @@ func GetTargetPodsWhenTargetPodsENVNotSet(podAffPerc int, clients clients.Client
 		return filteredPods, errors.Errorf("No target pod found")
 	}
 
-	newPodListLength := math.Maximum(1, math.Adjustment(podAffPerc, len(filteredPods.Items)))
+	newPodListLength := math.Maximum(1, math.Adjustment(math.Minimum(podAffPerc, 100), len(filteredPods.Items)))
 	rand.Seed(time.Now().UnixNano())
 
 	// it will generate the random podlist
