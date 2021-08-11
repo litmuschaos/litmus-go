@@ -26,6 +26,8 @@ type ExperimentDetails struct {
 	Delay               int
 	LIBImagePullPolicy  string
 	TargetContainer     string
+	VolMount            string
+	HostNetwork         bool
 }
 
 // ApplicationUnderTest contains the name of the deployment object and the current replica count

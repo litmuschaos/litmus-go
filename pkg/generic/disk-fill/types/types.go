@@ -38,4 +38,6 @@ type ExperimentDetails struct {
 	EphemeralStorageMebibytes     int
 	TerminationGracePeriodSeconds int
 	DataBlockSize                 int
+	VolMount                      string
+	HostNetwork                   bool
 }

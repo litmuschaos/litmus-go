@@ -38,6 +38,20 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.EphemeralStorageMebibytes, _ = strconv.Atoi(common.Getenv("EPHEMERAL_STORAGE_MEBIBYTES", ""))
 	experimentDetails.TerminationGracePeriodSeconds, _ = strconv.Atoi(common.Getenv("TERMINATION_GRACE_PERIOD_SECONDS", ""))
 	experimentDetails.DataBlockSize, _ = strconv.Atoi(common.Getenv("DATA_BLOCK_SIZE", "256"))
+	experimentDetails.HostNetwork = Getenvbool("HOST_NETWORK", "false")
+	experimentDetails.VolMount = common.Getenv("VOL_MOUNT", "")
+}
+
+// Getenv fetch the env and set the default value for bool, if any
+func Getenvbool(key string, defaultValue string) bool {
+	value := os.Getenv(key)
+	var val bool
+	if value == "" || defaultValue == "false" {
+		val = false
+	} else {
+		val = true
+	}
+	return val
 }
 
 //InitialiseChaosVariables initialise all the global variables
@@ -62,4 +76,6 @@ func InitialiseChaosVariables(chaosDetails *types.ChaosDetails, experimentDetail
 	chaosDetails.JobCleanupPolicy = common.Getenv("JOB_CLEANUP_POLICY", "retain")
 	chaosDetails.ProbeImagePullPolicy = experimentDetails.LIBImagePullPolicy
 	chaosDetails.ParentsResources = []string{}
+	chaosDetails.HostNetwork = experimentDetails.HostNetwork
+	chaosDetails.VolMount = experimentDetails.VolMount
 }

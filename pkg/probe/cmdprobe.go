@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/rand"
 	"os/exec"
+	"strconv"
 	"strings"
 	"time"
 
@@ -126,8 +127,34 @@ func triggerSourceCmdProbe(probe v1alpha1.ProbeAttributes, execCommandDetails li
 		})
 }
 
-// createProbePod creates an external pod with source image for the cmd probe
-func createProbePod(clients clients.ClientSets, chaosDetails *types.ChaosDetails, runID, source string) error {
+// CreateProbePod creates an external pod with source image for the cmd probe
+func CreateProbePod(clients clients.ClientSets, chaosDetails *types.ChaosDetails, runID, source string) error {
+	var contvol []apiv1.VolumeMount
+	var vol []apiv1.Volume
+	if chaosDetails.VolMount != "" {
+		volmounts := strings.Split(chaosDetails.VolMount, ",")
+		for _, v := range volmounts {
+			counter := 0
+			volumePath := strings.Split(v, ":")
+			sourcePath := volumePath[0]
+			destPath := volumePath[1]
+			sourcePodVol := apiv1.Volume{
+				Name: "volumemount-" + strconv.Itoa(counter),
+				VolumeSource: apiv1.VolumeSource{
+					HostPath: &apiv1.HostPathVolumeSource{
+						Path: sourcePath,
+					},
+				},
+			}
+			vol = append(vol, sourcePodVol)
+			volumeMounts := apiv1.VolumeMount{
+				Name:      "volumemount" + strconv.Itoa(counter),
+				MountPath: destPath,
+			}
+			contvol = append(contvol, volumeMounts)
+			counter = counter + 1
+		}
+	}
 	cmdProbe := &apiv1.Pod{
 		ObjectMeta: v1.ObjectMeta{
 			Name:      chaosDetails.ExperimentName + "-probe-" + runID,
@@ -138,12 +165,15 @@ func createProbePod(clients clients.ClientSets, chaosDetails *types.ChaosDetails
 			},
 		},
 		Spec: apiv1.PodSpec{
-			RestartPolicy: apiv1.RestartPolicyNever,
+			RestartPolicy:      apiv1.RestartPolicyNever,
+			ServiceAccountName: "litmus",
+			HostNetwork:   chaosDetails.HostNetwork,
+			Volumes:  vol,
 			Containers: []apiv1.Container{
 				{
 					Name:            chaosDetails.ExperimentName + "-probe",
 					Image:           source,
-					ImagePullPolicy: apiv1.PullPolicy(chaosDetails.ProbeImagePullPolicy),
+					ImagePullPolicy: apiv1.PullAlways,
 					Command: []string{
 						"/bin/sh",
 					},
@@ -151,6 +181,7 @@ func createProbePod(clients clients.ClientSets, chaosDetails *types.ChaosDetails
 						"-c",
 						"sleep 10000",
 					},
+                                        VolumeMounts: contvol,
 				},
 			},
 		},

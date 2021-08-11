@@ -34,4 +34,6 @@ type ExperimentDetails struct {
 	ImagePullSecrets   []corev1.LocalObjectReference
 	TargetContainer    string
 	NodeLabel          string
+	VolMount           string
+	HostNetwork        bool
 }

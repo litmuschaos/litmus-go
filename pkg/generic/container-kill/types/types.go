@@ -36,4 +36,6 @@ type ExperimentDetails struct {
 	Resources           corev1.ResourceRequirements
 	Signal              string
 	ImagePullSecrets    []corev1.LocalObjectReference
+        HostNetwork         bool
+	VolMount            string
 }

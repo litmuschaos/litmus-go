@@ -28,4 +28,6 @@ type ExperimentDetails struct {
 	Sequence            string
 	LIBImagePullPolicy  string
 	TargetContainer     string
+	VolMount            string
+	HostNetwork         bool
 }

@@ -26,4 +26,6 @@ type ExperimentDetails struct {
 	LIBImagePullPolicy string
 	TargetContainer    string
 	NodeLabel          string
+	VolMount           string
+	HostNetwork        bool
 }

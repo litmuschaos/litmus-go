@@ -32,6 +32,20 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.LIBImagePullPolicy = common.Getenv("LIB_IMAGE_PULL_POLICY", "Always")
 	experimentDetails.TargetContainer = common.Getenv("TARGET_CONTAINER", "")
 	experimentDetails.NodeLabel = common.Getenv("NODE_LABEL", "")
+	experimentDetails.HostNetwork = Getenvbool("HOST_NETWORK", "false")
+	experimentDetails.VolMount = common.Getenv("VOL_MOUNT", "")
+}
+
+// Getenv fetch the env and set the default value for bool, if any
+func Getenvbool(key string, defaultValue string) bool {
+	value := os.Getenv(key)
+	var val bool
+	if value == "" || defaultValue == "false" {
+		val = false
+	} else {
+		val = true
+	}
+	return val
 }
 
 //InitialiseChaosVariables initialise all the global variables
@@ -47,4 +61,6 @@ func InitialiseChaosVariables(chaosDetails *types.ChaosDetails, experimentDetail
 	chaosDetails.Delay = experimentDetails.Delay
 	chaosDetails.JobCleanupPolicy = common.Getenv("JOB_CLEANUP_POLICY", "retain")
 	chaosDetails.ProbeImagePullPolicy = experimentDetails.LIBImagePullPolicy
+	chaosDetails.HostNetwork = experimentDetails.HostNetwork
+	chaosDetails.VolMount = experimentDetails.VolMount
 }

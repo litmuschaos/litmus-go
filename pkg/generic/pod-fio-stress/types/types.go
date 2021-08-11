@@ -35,4 +35,6 @@ type ExperimentDetails struct {
 	Size               string
 	NumJobs            int
 	GroupReporting     bool
+	HostNetwork        bool
+	VolMount           string
 }

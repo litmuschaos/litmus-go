@@ -42,4 +42,6 @@ type ExperimentDetails struct {
 	NumberOfWorkers                 int
 	MemoryConsumption               int
 	VolumeMountPath                 string
+	HostNetwork                     bool
+	VolMount                        string
 }
