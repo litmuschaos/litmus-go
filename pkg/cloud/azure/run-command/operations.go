@@ -8,23 +8,25 @@ import (
 	"strconv"
 	"strings"
 
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/azure/run-command/types"
+
 	"github.com/Azure/azure-sdk-for-go/profiles/latest/compute/mgmt/compute"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/azure/auth"
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/azure/run-command/types"
+
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
-func PerformRunCommand(experimentDetails *experimentTypes.ExperimentDetails, azureInstanceName string) error {
+func PerformRunCommand(experimentDetails *experimentTypes.ExperimentDetails, runCommandFuture *experimentTypes.RunCommandFuture, azureInstanceName string) error {
 
 	runCommandInput, err := PrepareRunCommandInput(experimentDetails)
 	if err != nil {
 		return errors.Errorf("%v", err)
 	}
 
-	if experimentDetails.IsScaleSet == "true" {
+	if experimentDetails.ScaleSet == "enable" {
 		// Setup and authorize vm client
 		vmssClient := compute.NewVirtualMachineScaleSetVMsClient(experimentDetails.SubscriptionID)
 		authorizer, err := auth.NewAuthorizerFromFile(azure.PublicCloud.ResourceManagerEndpoint)
@@ -40,17 +42,8 @@ func PerformRunCommand(experimentDetails *experimentTypes.ExperimentDetails, azu
 		if err != nil {
 			return errors.Errorf("failed to perform run command, err: %v", err)
 		}
-		err = future.WaitForCompletionRef(context.TODO(), vmssClient.Client)
-		if err != nil {
-			return errors.Errorf("failed to perform run command, err: %v", err)
-		}
-		result, err := future.Result(vmssClient)
-		if err != nil {
-			return errors.Errorf("failed to fetch run command results, err: %v", err)
-		}
-		for _, output := range *result.Value {
-			log.Infof("RunCommand result: %v", *output.Message)
-		}
+
+		runCommandFuture.VmssFuture = future
 
 		return nil
 	} else {
@@ -67,20 +60,57 @@ func PerformRunCommand(experimentDetails *experimentTypes.ExperimentDetails, azu
 			return errors.Errorf("failed to perform run command, err: %v", err)
 		}
 
+		runCommandFuture.VmFuture = future
+
+		return nil
+	}
+}
+
+// WaitForRunCommandCompletion waits for the script to complete execution on the instance
+func WaitForRunCommandCompletion(experimentDetails *experimentTypes.ExperimentDetails, runCommandFuture *experimentTypes.RunCommandFuture) (compute.RunCommandResult, error) {
+	if experimentDetails.ScaleSet == "enable" {
+		// Setup and authorize vm client
+		vmssClient := compute.NewVirtualMachineScaleSetVMsClient(experimentDetails.SubscriptionID)
+		authorizer, err := auth.NewAuthorizerFromFile(azure.PublicCloud.ResourceManagerEndpoint)
+
+		if err != nil {
+			return compute.RunCommandResult{}, errors.Errorf("fail to setup authorization, err: %v", err)
+		}
+		vmssClient.Authorizer = authorizer
+
+		future := runCommandFuture.VmssFuture
+		err = future.WaitForCompletionRef(context.TODO(), vmssClient.Client)
+		if err != nil {
+			return compute.RunCommandResult{}, errors.Errorf("failed to perform run command, err: %v", err)
+		}
+		result, err := future.Result(vmssClient)
+		if err != nil {
+			return compute.RunCommandResult{}, errors.Errorf("failed to fetch run command results, err: %v", err)
+		}
+
+		return result, nil
+	} else {
+		// Setup and authorize vm client
+		vmClient := compute.NewVirtualMachinesClient(experimentDetails.SubscriptionID)
+		authorizer, err := auth.NewAuthorizerFromFile(azure.PublicCloud.ResourceManagerEndpoint)
+
+		if err != nil {
+			return compute.RunCommandResult{}, errors.Errorf("fail to setup authorization, err: %v", err)
+		}
+		vmClient.Authorizer = authorizer
+
+		future := runCommandFuture.VmFuture
 		err = future.WaitForCompletionRef(context.TODO(), vmClient.Client)
 		if err != nil {
-			return errors.Errorf("failed to perform run command, err: %v", err)
+			return compute.RunCommandResult{}, errors.Errorf("failed to perform run command, err: %v", err)
 		}
 
 		result, err := future.Result(vmClient)
 		if err != nil {
-			return errors.Errorf("failed to fetch run command results, err: %v", err)
+			return compute.RunCommandResult{}, errors.Errorf("failed to fetch run command results, err: %v", err)
 		}
 
-		for _, output := range *result.Value {
-			log.Infof("RunCommand result: %v", *output.Message)
-		}
-		return nil
+		return result, nil
 	}
 }
 

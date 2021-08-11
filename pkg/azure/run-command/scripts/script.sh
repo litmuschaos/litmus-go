@@ -1,6 +1,6 @@
 #!/bin/bash
 if  [[ "${InstallDependency}" == True ]] ; then
-    if [[ "$( which stress-ng 2>/dev/null )" ]] ; then echo Dependency is already installed. ; exit ; fi
+    if [[ "$( which stress-ng 2>/dev/null )" ]] ; then echo Dependency is already installed. ; fi
     echo "Installing required dependencies"
     if [ -f  "/etc/system-release" ] ; then
         if cat /etc/system-release | grep -i 'Amazon Linux' ; then

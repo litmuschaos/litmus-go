@@ -82,6 +82,8 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 
 		for duration < experimentsDetails.ChaosDuration {
 
+			runCommandFutures := []experimentTypes.RunCommandFuture{}
+
 			log.Infof("[Info]: Target instanceName list, %v", instanceNameList)
 
 			if experimentsDetails.EngineName != "" {
@@ -90,13 +92,14 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 				events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 			}
 
-			// PowerOff the instances parallely
+			// Running scripts parallely
 			for _, vmName := range instanceNameList {
-				// Stopping the Azure instance
 				log.Infof("[Chaos]: Running script on the Azure instance: %v", vmName)
-				if err := azureStatus.PerformRunCommand(experimentsDetails, vmName); err != nil {
+				runCommandFuture := experimentTypes.RunCommandFuture{}
+				if err := azureStatus.PerformRunCommand(experimentsDetails, &runCommandFuture, vmName); err != nil {
 					return errors.Errorf("unable to run script on azure instance, err: %v", err)
 				}
+				runCommandFutures = append(runCommandFutures, runCommandFuture)
 			}
 
 			// Run probes during chaos
@@ -109,6 +112,15 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 			// Wait for Chaos interval
 			log.Infof("[Wait]: Waiting for chaos interval of %vs", experimentsDetails.ChaosInterval)
 			common.WaitForDuration(experimentsDetails.ChaosInterval)
+
+			for i, vmName := range instanceNameList {
+				log.Infof("[Wait]: Waiting for script execution completion on instance: %v", vmName)
+				result, err := azureStatus.WaitForRunCommandCompletion(experimentsDetails, &runCommandFutures[i])
+				if err != nil {
+					return errors.Errorf("%v", err)
+				}
+				azureStatus.GetRunCommandResult(&result)
+			}
 
 			duration = int(time.Since(ChaosStartTimeStamp).Seconds())
 		}

@@ -1,11 +1,9 @@
 package types
 
 import (
+	"github.com/Azure/azure-sdk-for-go/profiles/latest/compute/mgmt/compute"
 	clientTypes "k8s.io/apimachinery/pkg/types"
 )
-
-// ADD THE ATTRIBUTES OF YOUR CHOICE HERE
-// FEW MENDATORY ATTRIBUTES ARE ADDED BY DEFAULT
 
 // ExperimentDetails is for collecting all the experiment-related details
 type ExperimentDetails struct {
@@ -29,7 +27,7 @@ type ExperimentDetails struct {
 	AzureInstanceNames              string
 	ResourceGroup                   string
 	SubscriptionID                  string
-	IsScaleSet                      string
+	ScaleSet                        string
 	Sequence                        string
 	ExperimentType                  string
 	InstallDependency               string
@@ -40,4 +38,9 @@ type ExperimentDetails struct {
 	FilesystemUtilizationBytes      int
 	FilesystemUtilizationPercentage int
 	VolumeMountPath                 string
+}
+
+type RunCommandFuture struct {
+	VmssFuture compute.VirtualMachineScaleSetVMsRunCommandFuture
+	VmFuture   compute.VirtualMachinesRunCommandFuture
 }
