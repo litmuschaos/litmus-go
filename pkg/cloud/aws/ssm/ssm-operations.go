@@ -142,7 +142,7 @@ func CheckInstanceInformation(experimentsDetails *experimentTypes.ExperimentDeta
 				}
 			}
 			if !isInstanceFound {
-				return errors.Errorf("error: the instance %v might not have suitable permission or iam attached to it. use \"aws ssm describe-instance-information\" to check the available instances")
+				return errors.Errorf("error: the instance %v might not have suitable permission or iam attached to it. use \"aws ssm describe-instance-information\" to check the available instances", ec2ID)
 			}
 		}
 	}
