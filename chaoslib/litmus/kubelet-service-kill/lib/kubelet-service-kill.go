@@ -111,6 +111,8 @@ func PrepareKubeletKill(experimentsDetails *experimentTypes.ExperimentDetails, c
 func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, appNodeName string) error {
 
 	privileged := true
+	terminationGracePeriodSeconds := int64(experimentsDetails.TerminationGracePeriodSeconds)
+
 	helperPod := &apiv1.Pod{
 		ObjectMeta: v1.ObjectMeta{
 			Name:      experimentsDetails.ExperimentName + "-helper-" + experimentsDetails.RunID,
@@ -124,9 +126,10 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 			Annotations: experimentsDetails.Annotations,
 		},
 		Spec: apiv1.PodSpec{
-			RestartPolicy:    apiv1.RestartPolicyNever,
-			ImagePullSecrets: experimentsDetails.ImagePullSecrets,
-			NodeName:         appNodeName,
+			RestartPolicy:                 apiv1.RestartPolicyNever,
+			ImagePullSecrets:              experimentsDetails.ImagePullSecrets,
+			NodeName:                      appNodeName,
+			TerminationGracePeriodSeconds: &terminationGracePeriodSeconds,
 			Volumes: []apiv1.Volume{
 				{
 					Name: "bus",

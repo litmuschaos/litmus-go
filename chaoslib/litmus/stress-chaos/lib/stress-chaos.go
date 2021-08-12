@@ -214,6 +214,7 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 			ServiceAccountName:            experimentsDetails.ChaosServiceAccount,
 			RestartPolicy:                 apiv1.RestartPolicyNever,
 			NodeName:                      nodeName,
+
 			Volumes: []apiv1.Volume{
 				{
 					Name: "socket-path",
