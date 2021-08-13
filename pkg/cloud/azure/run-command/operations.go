@@ -21,7 +21,7 @@ import (
 
 func PerformRunCommand(experimentDetails *experimentTypes.ExperimentDetails, runCommandFuture *experimentTypes.RunCommandFuture, azureInstanceName string) error {
 
-	runCommandInput, err := PrepareRunCommandInput(experimentDetails)
+	runCommandInput, err := prepareRunCommandInput(experimentDetails)
 	if err != nil {
 		return errors.Errorf("%v", err)
 	}
@@ -137,22 +137,31 @@ func readLines(path string) ([]string, error) {
 	return lines, scanner.Err()
 }
 
-func PrepareRunCommandInput(experimentDetails *experimentTypes.ExperimentDetails) (compute.RunCommandInput, error) {
+// prepareRunCommandInput prepares the run command with the script, parameters and commandID
+func prepareRunCommandInput(experimentDetails *experimentTypes.ExperimentDetails) (compute.RunCommandInput, error) {
 
 	var err error
+	var scriptPath string
 	var commandId string
 	var script []string
 	var parameters []compute.RunCommandInputParameter
 
-	if parameters, err = prepareInputParameters(experimentDetails); err != nil {
-		return compute.RunCommandInput{}, errors.Errorf("failed to setup input parameters, err: %v", err)
+	// Checking if custom script path is provided or using the default if not
+	if strings.TrimSpace(experimentDetails.ScriptPath) != "" {
+		scriptPath, _ = filepath.Abs(experimentDetails.ScriptPath)
+	} else {
+		scriptPath, _ = filepath.Abs("pkg/azure/run-command/scripts/script.sh")
+		if parameters, err = prepareInputParameters(experimentDetails); err != nil {
+			return compute.RunCommandInput{}, errors.Errorf("failed to setup input parameters, err: %v", err)
+		}
 	}
-	scriptPath, _ := filepath.Abs("pkg/azure/run-command/scripts/script.sh")
+	// Reading script from the file path
 	script, err = readLines(scriptPath)
 	if err != nil {
 		return compute.RunCommandInput{}, errors.Errorf("failed to read script, err: %v", err)
 	}
 
+	// Setting up command id based on operating system of VM
 	if experimentDetails.OperatingSystem == "windows" {
 		commandId = "RunPowerShellScript"
 	} else {
@@ -175,22 +184,6 @@ func prepareInputParameters(experimentDetails *experimentTypes.ExperimentDetails
 
 	parameterName := []string{"InstallDependency", "Duration", "ExperimentName", "StressArgs", "AdditionalArgs"}
 	parameterValues := []string{experimentDetails.InstallDependency, strconv.Itoa(experimentDetails.ChaosDuration), experimentDetails.ExperimentType, "", ""}
-
-	parameters = append(parameters, compute.RunCommandInputParameter{
-		Name:  &parameterName[0],
-		Value: &parameterValues[0],
-	})
-	// Adding chaos duration to parameter list
-	parameters = append(parameters, compute.RunCommandInputParameter{
-		Name:  &parameterName[1],
-		Value: &parameterValues[1],
-	})
-
-	// Adding experiment type to parameter list
-	parameters = append(parameters, compute.RunCommandInputParameter{
-		Name:  &parameterName[2],
-		Value: &parameterValues[2],
-	})
 
 	// Adding experiment args to parameter list
 	switch experimentDetails.ExperimentType {
@@ -257,16 +250,13 @@ func prepareInputParameters(experimentDetails *experimentTypes.ExperimentDetails
 	parameterValues[3] = "\"" + parameterValues[3] + "\""
 	parameterValues[4] = "\"" + parameterValues[4] + "\""
 
-	// appending to parameters
-	parameters = append(parameters, compute.RunCommandInputParameter{
-		Name:  &parameterName[3],
-		Value: &parameterValues[3],
-	})
-
-	parameters = append(parameters, compute.RunCommandInputParameter{
-		Name:  &parameterName[4],
-		Value: &parameterValues[4],
-	})
+	// appending values to parameters
+	for i := range parameterValues {
+		parameters = append(parameters, compute.RunCommandInputParameter{
+			Name:  &parameterName[i],
+			Value: &parameterValues[i],
+		})
+	}
 
 	return parameters, nil
 }

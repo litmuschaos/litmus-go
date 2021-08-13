@@ -45,6 +45,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.FilesystemUtilizationBytes, _ = strconv.Atoi(common.Getenv("FILESYSTEM_UTILIZATION_BYTES", ""))
 	experimentDetails.FilesystemUtilizationPercentage, _ = strconv.Atoi(common.Getenv("FILESYSTEM_UTILIZATION_PERCENTAGE", "10"))
 	experimentDetails.VolumeMountPath = common.Getenv("VOLUMNE_MOUNT_PATH", "")
+	experimentDetails.ScriptPath = common.Getenv("SCRIPT_PATH", "")
 
 }
 

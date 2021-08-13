@@ -38,6 +38,7 @@ type ExperimentDetails struct {
 	FilesystemUtilizationBytes      int
 	FilesystemUtilizationPercentage int
 	VolumeMountPath                 string
+	ScriptPath                      string
 }
 
 type RunCommandFuture struct {
