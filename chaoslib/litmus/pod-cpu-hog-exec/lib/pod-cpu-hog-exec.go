@@ -21,6 +21,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
+var inject chan os.Signal
+
 // stressCPU Uses the REST API to exec into the target container of the target pod
 // The function will be constantly increasing the CPU utilisation until it reaches the maximum available or allowed number.
 // Using the TOTAL_CHAOS_DURATION we will need to specify for how long this experiment will last
@@ -73,8 +75,6 @@ func experimentCPU(experimentsDetails *experimentTypes.ExperimentDetails, client
 
 // injectChaosInSerialMode stressed the cpu of all target application serially (one by one)
 func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList corev1.PodList, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	// creating err channel to recieve the error from the go routine
-	stressErr := make(chan error)
 
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
@@ -83,70 +83,81 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		}
 	}
 
+	// signChan channel is used to transmit signal notifications.
+	signChan := make(chan os.Signal, 1)
+	// Catch and relay certain signal(s) to signChan channel.
+	signal.Notify(signChan, os.Interrupt, syscall.SIGTERM)
+
 	var endTime <-chan time.Time
 	timeDelay := time.Duration(experimentsDetails.ChaosDuration) * time.Second
 
-	for _, pod := range targetPodList.Items {
+	select {
+	case <-inject:
+		// stopping the chaos execution, if abort signal recieved
+		time.Sleep(10 * time.Second)
+		os.Exit(0)
+	default:
+		for _, pod := range targetPodList.Items {
 
-		if experimentsDetails.EngineName != "" {
-			msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on " + pod.Name + " pod"
-			types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
-			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
-		}
+			// creating err channel to recieve the error from the go routine
+			stressErr := make(chan error)
 
-		log.InfoWithValues("[Chaos]: The Target application details", logrus.Fields{
-			"Target Container": experimentsDetails.TargetContainer,
-			"Target Pod":       pod.Name,
-			"CPU CORE":         experimentsDetails.CPUcores,
-		})
-
-		for i := 0; i < experimentsDetails.CPUcores; i++ {
-			go stressCPU(experimentsDetails, pod.Name, clients, stressErr)
-		}
-
-		common.SetTargets(pod.Name, "injected", "pod", chaosDetails)
-
-		log.Infof("[Chaos]:Waiting for: %vs", experimentsDetails.ChaosDuration)
-
-		// signChan channel is used to transmit signal notifications.
-		signChan := make(chan os.Signal, 1)
-		// Catch and relay certain signal(s) to signChan channel.
-		signal.Notify(signChan, os.Interrupt, syscall.SIGTERM)
-	loop:
-		for {
-			endTime = time.After(timeDelay)
-			select {
-			case err := <-stressErr:
-				// skipping the execution, if recieved any error other than 137, while executing stress command and marked result as fail
-				// it will ignore the error code 137(oom kill), it will skip further execution and marked the result as pass
-				// oom kill occurs if memory to be stressed exceed than the resource limit for the target container
-				if err != nil {
-					if strings.Contains(err.Error(), "137") {
-						log.Warn("Chaos process OOM killed")
-						return nil
-					}
-					return err
-				}
-			case <-signChan:
-				log.Info("[Chaos]: Revert Started")
-				err := killStressCPUSerial(experimentsDetails, pod.Name, clients, chaosDetails)
-				if err != nil {
-					log.Errorf("Error in Kill stress after abortion, err: %v", err)
-				}
-				// updating the chaosresult after stopped
-				failStep := "Chaos injection stopped!"
-				types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep)
-				result.ChaosResult(chaosDetails, clients, resultDetails, "EOT")
-				log.Info("[Chaos]: Revert Completed")
-				os.Exit(1)
-			case <-endTime:
-				log.Infof("[Chaos]: Time is up for experiment: %v", experimentsDetails.ExperimentName)
-				endTime = nil
-				break loop
+			if experimentsDetails.EngineName != "" {
+				msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on " + pod.Name + " pod"
+				types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
+				events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 			}
-		}
-		if err := killStressCPUSerial(experimentsDetails, pod.Name, clients, chaosDetails); err != nil {
-			return err
+
+			log.InfoWithValues("[Chaos]: The Target application details", logrus.Fields{
+				"Target Container": experimentsDetails.TargetContainer,
+				"Target Pod":       pod.Name,
+				"CPU CORE":         experimentsDetails.CPUcores,
+			})
+
+			for i := 0; i < experimentsDetails.CPUcores; i++ {
+				go stressCPU(experimentsDetails, pod.Name, clients, stressErr)
+			}
+
+			common.SetTargets(pod.Name, "injected", "pod", chaosDetails)
+
+			log.Infof("[Chaos]:Waiting for: %vs", experimentsDetails.ChaosDuration)
+
+		loop:
+			for {
+				endTime = time.After(timeDelay)
+				select {
+				case err := <-stressErr:
+					// skipping the execution, if recieved any error other than 137, while executing stress command and marked result as fail
+					// it will ignore the error code 137(oom kill), it will skip further execution and marked the result as pass
+					// oom kill occurs if memory to be stressed exceed than the resource limit for the target container
+					if err != nil {
+						if strings.Contains(err.Error(), "137") {
+							log.Warn("Chaos process OOM killed")
+							return nil
+						}
+						return err
+					}
+				case <-signChan:
+					log.Info("[Chaos]: Revert Started")
+					err := killStressCPUSerial(experimentsDetails, pod.Name, clients, chaosDetails)
+					if err != nil {
+						log.Errorf("Error in Kill stress after abortion, err: %v", err)
+					}
+					// updating the chaosresult after stopped
+					failStep := "Chaos injection stopped!"
+					types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep)
+					result.ChaosResult(chaosDetails, clients, resultDetails, "EOT")
+					log.Info("[Chaos]: Revert Completed")
+					os.Exit(1)
+				case <-endTime:
+					log.Infof("[Chaos]: Time is up for experiment: %v", experimentsDetails.ExperimentName)
+					endTime = nil
+					break loop
+				}
+			}
+			if err := killStressCPUSerial(experimentsDetails, pod.Name, clients, chaosDetails); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -164,34 +175,42 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		}
 	}
 
-	var endTime <-chan time.Time
-	timeDelay := time.Duration(experimentsDetails.ChaosDuration) * time.Second
-
-	for _, pod := range targetPodList.Items {
-
-		if experimentsDetails.EngineName != "" {
-			msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on " + pod.Name + " pod"
-			types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
-			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
-		}
-
-		log.InfoWithValues("[Chaos]: The Target application details", logrus.Fields{
-			"Target Container": experimentsDetails.TargetContainer,
-			"Target Pod":       pod.Name,
-			"CPU CORE":         experimentsDetails.CPUcores,
-		})
-		for i := 0; i < experimentsDetails.CPUcores; i++ {
-			go stressCPU(experimentsDetails, pod.Name, clients, stressErr)
-		}
-		common.SetTargets(pod.Name, "injected", "pod", chaosDetails)
-	}
-
-	log.Infof("[Chaos]:Waiting for: %vs", experimentsDetails.ChaosDuration)
-
 	// signChan channel is used to transmit signal notifications.
 	signChan := make(chan os.Signal, 1)
 	// Catch and relay certain signal(s) to signChan channel.
 	signal.Notify(signChan, os.Interrupt, syscall.SIGTERM)
+
+	var endTime <-chan time.Time
+	timeDelay := time.Duration(experimentsDetails.ChaosDuration) * time.Second
+
+	select {
+	case <-inject:
+		// stopping the chaos execution, if abort signal recieved
+		time.Sleep(10 * time.Second)
+		os.Exit(0)
+	default:
+		for _, pod := range targetPodList.Items {
+
+			if experimentsDetails.EngineName != "" {
+				msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on " + pod.Name + " pod"
+				types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
+				events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
+			}
+
+			log.InfoWithValues("[Chaos]: The Target application details", logrus.Fields{
+				"Target Container": experimentsDetails.TargetContainer,
+				"Target Pod":       pod.Name,
+				"CPU CORE":         experimentsDetails.CPUcores,
+			})
+			for i := 0; i < experimentsDetails.CPUcores; i++ {
+				go stressCPU(experimentsDetails, pod.Name, clients, stressErr)
+			}
+			common.SetTargets(pod.Name, "injected", "pod", chaosDetails)
+		}
+	}
+
+	log.Infof("[Chaos]:Waiting for: %vs", experimentsDetails.ChaosDuration)
+
 loop:
 	for {
 		endTime = time.After(timeDelay)
@@ -233,6 +252,11 @@ loop:
 
 //PrepareCPUExecStress contains the chaos prepration and injection steps
 func PrepareCPUExecStress(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+
+	// inject channel is used to transmit signal notifications.
+	inject = make(chan os.Signal, 1)
+	// Catch and relay certain signal(s) to inject channel.
+	signal.Notify(inject, os.Interrupt, syscall.SIGTERM)
 
 	//Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {

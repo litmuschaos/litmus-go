@@ -58,12 +58,6 @@ func PrepareNodeRestart(experimentsDetails *experimentTypes.ExperimentDetails, c
 		"Target Node IP": experimentsDetails.TargetNodeIP,
 	})
 
-	// Checking the status of target node
-	log.Info("[Status]: Getting the status of target node")
-	if err = status.CheckNodeStatus(experimentsDetails.TargetNode, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
-		return errors.Errorf("target node is not in ready state, err: %v", err)
-	}
-
 	experimentsDetails.RunID = common.GetRunID()
 	appLabel := "name=" + experimentsDetails.ExperimentName + "-helper-" + experimentsDetails.RunID
 
@@ -111,13 +105,6 @@ func PrepareNodeRestart(experimentsDetails *experimentTypes.ExperimentDetails, c
 	if err != nil || podStatus == "Failed" {
 		common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-helper-"+experimentsDetails.RunID, appLabel, chaosDetails, clients)
 		return errors.Errorf("helper pod failed due to, err: %v", err)
-	}
-
-	// Checking the status of application node
-	log.Info("[Status]: Getting the status of application node")
-	if err = status.CheckNodeStatus(experimentsDetails.TargetNode, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
-		common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-helper-"+experimentsDetails.RunID, appLabel, chaosDetails, clients)
-		log.Warnf("Application node is not in the ready state, you may need to manually recover the node, err: %v", err)
 	}
 
 	//Deleting the helper pod

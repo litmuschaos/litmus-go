@@ -34,6 +34,7 @@ func GetENV(cassandraDetails *cassandraTypes.ExperimentDetails) {
 	ChaoslibDetail.Delay, _ = strconv.Atoi(common.Getenv("STATUS_CHECK_DELAY", "2"))
 	ChaoslibDetail.Timeout, _ = strconv.Atoi(common.Getenv("STATUS_CHECK_TIMEOUT", "180"))
 	ChaoslibDetail.PodsAffectedPerc, _ = strconv.Atoi(common.Getenv("PODS_AFFECTED_PERC", "0"))
+	ChaoslibDetail.Sequence = common.Getenv("SEQUENCE", "parallel")
 	cassandraDetails.ChaoslibDetail = &ChaoslibDetail
 	cassandraDetails.CassandraServiceName = common.Getenv("CASSANDRA_SVC_NAME", "")
 	cassandraDetails.KeySpaceReplicaFactor = common.Getenv("KEYSPACE_REPLICATION_FACTOR", "")

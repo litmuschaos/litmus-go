@@ -195,12 +195,12 @@ func GetTargetPodsWhenTargetPodsENVSet(targetPods string, clients clients.Client
 		if err != nil {
 			return core_v1.PodList{}, errors.Wrapf(err, "Failed to get %v pod in %v namespace", targetPodsList[index], chaosDetails.AppDetail.Namespace)
 		}
-		parentName, err := annotation.GetParentName(clients, *pod, chaosDetails)
-		if err != nil {
-			return core_v1.PodList{}, err
-		}
 		switch chaosDetails.AppDetail.AnnotationCheck {
 		case true:
+			parentName, err := annotation.GetParentName(clients, *pod, chaosDetails)
+			if err != nil {
+				return core_v1.PodList{}, err
+			}
 			isParentAnnotated, err := annotation.IsParentAnnotated(clients, parentName, chaosDetails)
 			if err != nil {
 				return core_v1.PodList{}, err
@@ -210,7 +210,6 @@ func GetTargetPodsWhenTargetPodsENVSet(targetPods string, clients clients.Client
 			}
 		}
 		realPods.Items = append(realPods.Items, *pod)
-		log.Infof("[Info]: chaos candidate of kind: %v, name: %v, namespace: %v", chaosDetails.AppDetail.Kind, parentName, chaosDetails.AppDetail.Namespace)
 	}
 	return realPods, nil
 }
@@ -273,7 +272,7 @@ func GetTargetPodsWhenTargetPodsENVNotSet(podAffPerc int, clients clients.Client
 		return filteredPods, errors.Errorf("No target pod found")
 	}
 
-	newPodListLength := math.Maximum(1, math.Adjustment(podAffPerc, len(filteredPods.Items)))
+	newPodListLength := math.Maximum(1, math.Adjustment(math.Minimum(podAffPerc, 100), len(filteredPods.Items)))
 	rand.Seed(time.Now().UnixNano())
 
 	// it will generate the random podlist
