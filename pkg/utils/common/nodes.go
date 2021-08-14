@@ -3,6 +3,7 @@ package common
 import (
 	"math/rand"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/litmuschaos/litmus-go/pkg/clients"
@@ -19,14 +20,14 @@ var err error
 
 //GetNodeList check for the availibilty of the application node for the chaos execution
 // if the application node is not defined it will derive the random target node list using node affected percentage
-func GetNodeList(nodeName, nodeLabel string, nodeAffPerc int, clients clients.ClientSets) ([]string, error) {
+func GetNodeList(nodeNames, nodeLabel string, nodeAffPerc int, clients clients.ClientSets) ([]string, error) {
 
 	var nodeList []string
 	var nodes *apiv1.NodeList
 
-	if nodeName != "" {
-		nodeList = append(nodeList, nodeName)
-		return nodeList, nil
+	if nodeNames != "" {
+		targetNodesList := strings.Split(nodeNames, ",")
+		return targetNodesList, nil
 	}
 
 	switch nodeLabel {

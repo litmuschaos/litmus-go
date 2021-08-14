@@ -20,7 +20,7 @@ func AzureInstanceStop(timeout, delay int, subscriptionID, resourceGroup, azureI
 	if err == nil {
 		vmClient.Authorizer = authorizer
 	} else {
-		return errors.Errorf("fail to setup authorization, err: %v")
+		return errors.Errorf("fail to setup authorization, err: %v", err)
 	}
 
 	log.Info("[Info]: Stopping the instance")
@@ -41,7 +41,7 @@ func AzureInstanceStart(timeout, delay int, subscriptionID, resourceGroup, azure
 	if err == nil {
 		vmClient.Authorizer = authorizer
 	} else {
-		return errors.Errorf("fail to setup authorization, err: %v")
+		return errors.Errorf("fail to setup authorization, err: %v", err)
 	}
 
 	log.Info("[Info]: Starting back the instance to running state")
