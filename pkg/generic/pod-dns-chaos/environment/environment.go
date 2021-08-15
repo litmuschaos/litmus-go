@@ -55,20 +55,8 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expType DNSCha
 		experimentDetails.SpoofMap = common.Getenv("SPOOF_MAP", "")
 		experimentDetails.ChaosType = common.Getenv("CHAOS_TYPE", "spoof")
 	}
-	experimentDetails.HostNetwork = Getenvbool("HOST_NETWORK", "false")
+	experimentDetails.HostNetwork = strconv.ParseBool(Getenv("HOST_NETWORK", "false"))
 	experimentDetails.VolMount = common.Getenv("VOL_MOUNT", "")
-}
-
-// Getenv fetch the env and set the default value for bool, if any
-func Getenvbool(key string, defaultValue string) bool {
-	value := os.Getenv(key)
-	var val bool
-	if value == "" || defaultValue == "false" {
-		val = false
-	} else {
-		val = true
-	}
-	return val
 }
 
 //InitialiseChaosVariables initialise all the global variables
