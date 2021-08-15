@@ -83,7 +83,7 @@ type ChaosDetails struct {
 	Randomness           bool
 	Targets              []v1alpha1.TargetDetails
 	ParentsResources     []string
-        VolMount             string
+      VolMount             string
 	HostNetwork          bool
 }
 
