@@ -133,6 +133,27 @@ func CreateProbePod(clients clients.ClientSets, chaosDetails *types.ChaosDetails
 	var vol []apiv1.Volume
 	if chaosDetails.VolMount != "" {
 		volmounts := strings.Split(chaosDetails.VolMount, ",")
+		if len(volmounts) == 0 {
+			counter := 0
+			volumePath := strings.Split(chaosDetails.VolMount, ":")
+			sourcePath := volumePath[0]
+			destPath := volumePath[1]
+			sourcePodVol := apiv1.Volume{
+				Name: "volumemount-" + strconv.Itoa(counter),
+				VolumeSource: apiv1.VolumeSource{
+					HostPath: &apiv1.HostPathVolumeSource{
+						Path: sourcePath,
+					},
+				},
+			}
+			vol = append(vol, sourcePodVol)
+			volumeMounts := apiv1.VolumeMount{
+				Name:      "volumemount" + strconv.Itoa(counter),
+				MountPath: destPath,
+			}
+			contvol = append(contvol, volumeMounts)
+			counter = counter + 1
+	        }else {
 		for _, v := range volmounts {
 			counter := 0
 			volumePath := strings.Split(v, ":")
@@ -154,6 +175,7 @@ func CreateProbePod(clients clients.ClientSets, chaosDetails *types.ChaosDetails
 			contvol = append(contvol, volumeMounts)
 			counter = counter + 1
 		}
+	    }
 	}
 	cmdProbe := &apiv1.Pod{
 		ObjectMeta: v1.ObjectMeta{
