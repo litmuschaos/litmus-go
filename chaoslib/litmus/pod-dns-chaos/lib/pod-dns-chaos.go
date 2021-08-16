@@ -125,7 +125,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 
 		//Deleting all the helper pod for pod-dns chaos
 		log.Info("[Cleanup]: Deleting the the helper pod")
-		if err = common.DeletePod(experimentsDetails.ExperimentName+"-"+runID, appLabel, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients); err != nil {
+		if err = common.DeletePod(experimentsDetails.ExperimentName+"-helper-"+runID, appLabel, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients); err != nil {
 			return errors.Errorf("Unable to delete the helper pods, err: %v", err)
 		}
 	}
