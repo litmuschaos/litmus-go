@@ -7,7 +7,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute"
+	"github.com/Azure/azure-sdk-for-go/profiles/latest/compute/mgmt/compute"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/azure/disk-loss/types"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	diskStatus "github.com/litmuschaos/litmus-go/pkg/cloud/azure/disk"
