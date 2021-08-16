@@ -250,7 +250,7 @@ func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, attache
 
 	for instanceName, diskList := range attachedDisksWithInstance {
 		// Checking for provisioning state of the vm instances
-		retry.
+		err = retry.
 			Times(uint(experimentsDetails.Timeout / experimentsDetails.Delay)).
 			Wait(time.Duration(experimentsDetails.Delay) * time.Second).
 			Try(func(attempt uint) error {
@@ -259,10 +259,13 @@ func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, attache
 					return errors.Errorf("Failed to get instance, err: %v", err)
 				}
 				if status != "Provisioning succeeded" {
-					return errors.Errorf("instance is updating, waiting for instance to update")
+					return errors.Errorf("instance is updating, waiting for instance to finish update")
 				}
 				return nil
 			})
+		if err != nil {
+			log.Errorf("[Error]: Instance is still in 'updating' state after timeout, re-attach might fail")
+		}
 		log.Infof("[Abort]: Attaching disk(s) to instance: %v", instanceName)
 		for _, disk := range *diskList {
 			diskStatusString, err := diskStatus.GetDiskStatus(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, *disk.Name)
