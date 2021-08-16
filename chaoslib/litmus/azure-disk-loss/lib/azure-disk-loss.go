@@ -53,7 +53,6 @@ func PrepareChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients
 	instanceNamesWithDiskNames, err := diskStatus.GetInstanceNameForDisks(diskNameList, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup)
 
 	if err != nil {
-		log.Errorf("error fetching attached instances for disks, err: %v", err)
 		return errors.Errorf("error fetching attached instances for disks")
 	}
 
@@ -63,7 +62,6 @@ func PrepareChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients
 	for instanceName := range instanceNamesWithDiskNames {
 		attachedDisksWithInstance[instanceName], err = diskStatus.GetInstanceDiskList(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, experimentsDetails.ScaleSet, instanceName)
 		if err != nil {
-			log.Errorf("err: %v", err)
 			return errors.Errorf("error fetching virtual disks")
 		}
 	}
@@ -134,7 +132,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		// Updating the result details
 		for _, diskNameList := range instanceNamesWithDiskNames {
 			for _, diskName := range diskNameList {
-				common.SetTargets(diskName, "injected", "VirtualDisk", chaosDetails)
+				common.SetTargets(diskName, "detached", "VirtualDisk", chaosDetails)
 			}
 		}
 		// run the probes during chaos
@@ -169,7 +167,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		// Updating the result details
 		for _, diskNameList := range instanceNamesWithDiskNames {
 			for _, diskName := range diskNameList {
-				common.SetTargets(diskName, "reverted", "VirtualDisk", chaosDetails)
+				common.SetTargets(diskName, "re-attached", "VirtualDisk", chaosDetails)
 			}
 		}
 		duration = int(time.Since(ChaosStartTimeStamp).Seconds())
@@ -209,7 +207,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 					return errors.Errorf("disk detach check failed, err: %v", err)
 				}
 
-				common.SetTargets(diskName, "injected", "VirtualDisk", chaosDetails)
+				common.SetTargets(diskName, "detached", "VirtualDisk", chaosDetails)
 
 				// run the probes during chaos
 				if len(resultDetails.ProbeDetails) != 0 && i == 0 {
@@ -234,7 +232,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 					return errors.Errorf("disk attach check failed, err: %v", err)
 				}
 
-				common.SetTargets(diskName, "reverted", "VirtualDisk", chaosDetails)
+				common.SetTargets(diskName, "re-attached", "VirtualDisk", chaosDetails)
 			}
 		}
 		duration = int(time.Since(ChaosStartTimeStamp).Seconds())
@@ -258,7 +256,6 @@ func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, attache
 			Try(func(attempt uint) error {
 				status, err := instanceStatus.GetAzureInstanceProvisionStatus(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, instanceName, experimentsDetails.ScaleSet)
 				if err != nil {
-					log.Errorf("Failed to get instance, err: %v", err)
 					return errors.Errorf("Failed to get instance, err: %v", err)
 				}
 				if status != "Provisioning succeeded" {
@@ -276,7 +273,7 @@ func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, attache
 				if err := diskStatus.AttachDisk(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, instanceName, experimentsDetails.ScaleSet, diskList); err != nil {
 					log.Errorf("failed to attach disk '%v, manual revert required, err: %v", err)
 				} else {
-					common.SetTargets(*disk.Name, "reverted", "VirtualDisk", chaosDetails)
+					common.SetTargets(*disk.Name, "re-attached", "VirtualDisk", chaosDetails)
 				}
 			}
 		}

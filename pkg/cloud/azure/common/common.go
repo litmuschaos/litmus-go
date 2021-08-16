@@ -9,7 +9,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-// stringInSlice will check and return whether a string is present inside a slice or not
+// StringInSlice will check and return whether a string is present inside a slice or not
 func StringInSlice(a string, list []string) bool {
 	for _, b := range list {
 		if b == a {
@@ -19,7 +19,7 @@ func StringInSlice(a string, list []string) bool {
 	return false
 }
 
-// SetupSubsciptionID fetch the subscription id from the auth file and export it in experiment struct variable
+// GetSubscriptionID fetch the subscription id from the auth file and export it in experiment struct variable
 func GetSubscriptionID() (string, error) {
 
 	var err error

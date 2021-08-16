@@ -159,40 +159,38 @@ func AttachDisk(subscriptionID, resourceGroup, azureInstanceName, scaleSet strin
 
 // WaitForDiskToAttach waits until the disks are attached
 func WaitForDiskToAttach(experimentsDetails *types.ExperimentDetails, diskName string) error {
-	retry.
+	return retry.
 		Times(uint(experimentsDetails.Timeout / experimentsDetails.Delay)).
 		Wait(time.Duration(experimentsDetails.Delay) * time.Second).
 		Try(func(attempt uint) error {
 			diskState, err := GetDiskStatus(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, diskName)
 			if err != nil {
-				errors.Errorf("failed to get the disk status, err: %v", err)
+				return errors.Errorf("failed to get the disk status, err: %v", err)
 			}
 			if diskState != "Attached" {
 				log.Infof("[Status]: Disk %v is not yet attached, state: %v", diskName, diskState)
-				return errors.Errorf("Disk is not yet attached, state: %v", diskState)
+				return errors.Errorf("Disk %v is not yet attached, state: %v", diskName, diskState)
 			}
 			log.Infof("[Status]: Disk %v is attached", diskName)
 			return nil
 		})
-	return nil
 }
 
 // WaitForDiskToDetach waits until the disks are detached
 func WaitForDiskToDetach(experimentsDetails *types.ExperimentDetails, diskName string) error {
-	retry.
+	return retry.
 		Times(uint(experimentsDetails.Timeout / experimentsDetails.Delay)).
 		Wait(time.Duration(experimentsDetails.Delay) * time.Second).
 		Try(func(attempt uint) error {
 			diskState, err := GetDiskStatus(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, diskName)
 			if err != nil {
-				errors.Errorf("failed to get the disk status, err: %v", err)
+				return errors.Errorf("failed to get the disk status, err: %v", err)
 			}
 			if diskState != "Unattached" {
 				log.Infof("[Status]: Disk %v is not yet detached, state: %v", diskName, diskState)
-				return errors.Errorf("Disk is not yet detached, state: %v", diskState)
+				return errors.Errorf("Disk %v is not yet detached, state: %v", diskName, diskState)
 			}
 			log.Infof("[Status]: Disk %v is detached", diskName)
 			return nil
 		})
-	return nil
 }

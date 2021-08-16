@@ -54,17 +54,21 @@ spec:
           - name: CHAOS_NAMESPACE
             value: ''
           
-          # provide the resouce group of the instance
-          - name: RESOURCE_GROUP
+          # provide target container name
+          - name: TARGET_CONTAINER
             value: ''
           
-          # provide the target instance name
-          - name: AZURE_INSTANCE_NAME
+          # provide the resouce group of the instance
+          - name: RESOURCE_GROUP
             value: ''
           
           # provide the virtual disk names (comma seperated if multiple)
           - name: VIRTUAL_DISK_NAMES
             value: ''
+          
+          # whether the disk is attached to scale instance or not, accepted values are disable, enable
+          - name: SCALE_SET
+            value: 'disable'
           
           # provide the sequence type for the run. Options: serial/parallel
           - name: SEQUENCE

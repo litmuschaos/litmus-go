@@ -23,6 +23,7 @@ type ExperimentDetails struct {
 	Timeout            int
 	Delay              int
 	LIBImagePullPolicy string
+	TargetContainer    string
 	ScaleSet           string
 	ResourceGroup      string
 	SubscriptionID     string
