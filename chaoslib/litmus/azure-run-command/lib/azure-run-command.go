@@ -96,7 +96,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 			for _, vmName := range instanceNameList {
 				log.Infof("[Chaos]: Running script on the Azure instance: %v", vmName)
 				runCommandFuture := experimentTypes.RunCommandFuture{}
-				if err := azureStatus.PerformRunCommand(experimentsDetails, &runCommandFuture, vmName); err != nil {
+				if err := azureStatus.PerformRunCommand(experimentsDetails, &runCommandFuture, vmName, false); err != nil {
 					return errors.Errorf("unable to run script on azure instance, err: %v", err)
 				}
 				runCommandFutures = append(runCommandFutures, runCommandFuture)
@@ -129,9 +129,85 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 }
 
 func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, instanceNameList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	select {
+	case <-inject:
+		// Stopping the chaos execution, if abort signal received
+		os.Exit(0)
+	default:
+		// ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
+		ChaosStartTimeStamp := time.Now()
+		duration := int(time.Since(ChaosStartTimeStamp).Seconds())
+
+		for duration < experimentsDetails.ChaosDuration {
+
+			log.Infof("[Info]: Target instanceName list, %v", instanceNameList)
+
+			if experimentsDetails.EngineName != "" {
+				msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on Azure instance"
+				types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
+				events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
+			}
+
+			// Running scripts parallely
+			for _, vmName := range instanceNameList {
+
+				runCommandFutures := []experimentTypes.RunCommandFuture{}
+				log.Infof("[Chaos]: Running script on the Azure instance: %v", vmName)
+				runCommandFuture := experimentTypes.RunCommandFuture{}
+				if err := azureStatus.PerformRunCommand(experimentsDetails, &runCommandFuture, vmName, false); err != nil {
+					return errors.Errorf("unable to run script on azure instance, err: %v", err)
+				}
+				runCommandFutures = append(runCommandFutures, runCommandFuture)
+
+				// Run probes during chaos
+				if len(resultDetails.ProbeDetails) != 0 {
+					if err = probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+						return err
+					}
+				}
+
+				// Wait for Chaos interval
+				log.Infof("[Wait]: Waiting for chaos interval of %vs", experimentsDetails.ChaosInterval)
+				common.WaitForDuration(experimentsDetails.ChaosInterval)
+
+				for i, vmName := range instanceNameList {
+					log.Infof("[Wait]: Waiting for script execution completion on instance: %v", vmName)
+					result, err := azureStatus.WaitForRunCommandCompletion(experimentsDetails, &runCommandFutures[i])
+					if err != nil {
+						return errors.Errorf("%v", err)
+					}
+					azureStatus.GetRunCommandResult(&result)
+				}
+			}
+			duration = int(time.Since(ChaosStartTimeStamp).Seconds())
+		}
+	}
 	return nil
 }
 
 func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, instanceNameList []string) {
+	<-abort
 
+	log.Info("[Abort]: Chaos Revert Started")
+	runCommandFutures := []experimentTypes.RunCommandFuture{}
+
+	for _, vmName := range instanceNameList {
+		log.Infof("[Chaos]: Running script on the Azure instance: %v", vmName)
+		runCommandFuture := experimentTypes.RunCommandFuture{}
+		if err := azureStatus.PerformRunCommand(experimentsDetails, &runCommandFuture, vmName, false); err != nil {
+			log.Errorf("unable to run script on azure instance, err: %v", err)
+		}
+		runCommandFutures = append(runCommandFutures, runCommandFuture)
+	}
+
+	for i, vmName := range instanceNameList {
+		log.Infof("[Wait]: Waiting for script execution completion on instance: %v", vmName)
+		_, err := azureStatus.WaitForRunCommandCompletion(experimentsDetails, &runCommandFutures[i])
+		if err != nil {
+			log.Errorf("%v", err)
+		}
+		// azureStatus.GetRunCommandResult(&result)
+	}
+	log.Infof("[Abort]: Chaos Revert Completed")
+	os.Exit(1)
 }

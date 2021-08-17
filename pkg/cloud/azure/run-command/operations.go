@@ -19,11 +19,19 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func PerformRunCommand(experimentDetails *experimentTypes.ExperimentDetails, runCommandFuture *experimentTypes.RunCommandFuture, azureInstanceName string) error {
+func PerformRunCommand(experimentDetails *experimentTypes.ExperimentDetails, runCommandFuture *experimentTypes.RunCommandFuture, azureInstanceName string, abort bool) error {
 
-	runCommandInput, err := prepareRunCommandInput(experimentDetails)
-	if err != nil {
-		return errors.Errorf("%v", err)
+	var runCommandInput compute.RunCommandInput
+	var err error
+
+	if abort {
+		runCommandInput = prepareAbortRunCommandInput(experimentDetails)
+
+	} else {
+		runCommandInput, err = prepareRunCommandInput(experimentDetails)
+		if err != nil {
+			return errors.Errorf("%v", err)
+		}
 	}
 
 	if experimentDetails.ScaleSet == "enable" {
@@ -174,6 +182,34 @@ func prepareRunCommandInput(experimentDetails *experimentTypes.ExperimentDetails
 		Parameters: &parameters,
 	}
 	return runCommandInput, nil
+}
+
+// prepareAbortRunCommandInput prepares abort command for script
+func prepareAbortRunCommandInput(experimentDetails *experimentTypes.ExperimentDetails) compute.RunCommandInput {
+
+	var commandId string
+	var script []string
+	var parameters []compute.RunCommandInputParameter
+
+	if strings.TrimSpace(experimentDetails.ChaosKillCommand) != "" {
+		script = append(script, experimentDetails.ChaosKillCommand)
+	} else {
+		script = append(script, "kill stress-ng")
+	}
+
+	// Setting up command id based on operating system of VM
+	if experimentDetails.OperatingSystem == "windows" {
+		commandId = "RunPowerShellScript"
+	} else {
+		commandId = "RunShellScript"
+	}
+
+	runCommandInput := compute.RunCommandInput{
+		CommandID:  &commandId,
+		Script:     &script,
+		Parameters: &parameters,
+	}
+	return runCommandInput
 
 }
 
