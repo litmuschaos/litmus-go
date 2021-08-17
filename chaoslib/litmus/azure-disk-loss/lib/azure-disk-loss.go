@@ -53,7 +53,7 @@ func PrepareChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients
 	instanceNamesWithDiskNames, err := diskStatus.GetInstanceNameForDisks(diskNameList, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup)
 
 	if err != nil {
-		return errors.Errorf("error fetching attached instances for disks")
+		return errors.Errorf("error fetching attached instances for disks, err: %v", err)
 	}
 
 	// Get the instance name with attached disks
@@ -62,7 +62,7 @@ func PrepareChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients
 	for instanceName := range instanceNamesWithDiskNames {
 		attachedDisksWithInstance[instanceName], err = diskStatus.GetInstanceDiskList(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, experimentsDetails.ScaleSet, instanceName)
 		if err != nil {
-			return errors.Errorf("error fetching virtual disks")
+			return errors.Errorf("error fetching virtual disks, err: %v", err)
 		}
 	}
 

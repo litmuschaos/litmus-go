@@ -171,7 +171,7 @@ func WaitForDiskToAttach(experimentsDetails *types.ExperimentDetails, diskName s
 				log.Infof("[Status]: Disk %v is not yet attached, state: %v", diskName, diskState)
 				return errors.Errorf("Disk %v is not yet attached, state: %v", diskName, diskState)
 			}
-			log.Infof("[Status]: Disk %v is attached", diskName)
+			log.Infof("[Status]: Disk %v is Attached", diskName)
 			return nil
 		})
 }
@@ -190,7 +190,7 @@ func WaitForDiskToDetach(experimentsDetails *types.ExperimentDetails, diskName s
 				log.Infof("[Status]: Disk %v is not yet detached, state: %v", diskName, diskState)
 				return errors.Errorf("Disk %v is not yet detached, state: %v", diskName, diskState)
 			}
-			log.Infof("[Status]: Disk %v is detached", diskName)
+			log.Infof("[Status]: Disk %v is Detached", diskName)
 			return nil
 		})
 }
