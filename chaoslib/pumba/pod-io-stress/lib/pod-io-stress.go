@@ -94,10 +94,10 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		runID := common.GetRunID()
 
 		log.InfoWithValues("[Info]: Details of application under chaos injection", logrus.Fields{
-			"Target Pod":                           pod.Name,
-			"NodeName":                             pod.Spec.NodeName,
-			"FilesystemUtilizationPercentage":      experimentsDetails.FilesystemUtilizationPercentage,
-			"FilesystemUtilizationBytes":           experimentsDetails.FilesystemUtilizationBytes,
+			"Target Pod":                      pod.Name,
+			"NodeName":                        pod.Spec.NodeName,
+			"FilesystemUtilizationPercentage": experimentsDetails.FilesystemUtilizationPercentage,
+			"FilesystemUtilizationBytes":      experimentsDetails.FilesystemUtilizationBytes,
 		})
 
 		if err := createHelperPod(experimentsDetails, clients, pod.Name, pod.Spec.NodeName, runID, labelSuffix); err != nil {
@@ -150,10 +150,10 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		runID := common.GetRunID()
 
 		log.InfoWithValues("[Info]: Details of application under chaos injection", logrus.Fields{
-			"Target Pod":                           pod.Name,
-			"NodeName":                             pod.Spec.NodeName,
-			"FilesystemUtilizationPercentage":      experimentsDetails.FilesystemUtilizationPercentage,
-			"FilesystemUtilizationBytes":           experimentsDetails.FilesystemUtilizationBytes,
+			"Target Pod":                      pod.Name,
+			"NodeName":                        pod.Spec.NodeName,
+			"FilesystemUtilizationPercentage": experimentsDetails.FilesystemUtilizationPercentage,
+			"FilesystemUtilizationBytes":      experimentsDetails.FilesystemUtilizationBytes,
 		})
 
 		if err := createHelperPod(experimentsDetails, clients, pod.Name, pod.Spec.NodeName, runID, labelSuffix); err != nil {
@@ -213,7 +213,7 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 		Spec: apiv1.PodSpec{
 			RestartPolicy:    apiv1.RestartPolicyNever,
 			ImagePullSecrets: experimentsDetails.ImagePullSecrets,
-			NodeName:	 appNodeName,
+			NodeName:         appNodeName,
 			Volumes: []apiv1.Volume{
 				{
 					Name: "dockersocket",
@@ -232,10 +232,10 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 						"sudo",
 						"-E",
 					},
-					Args:      getContainerArguments(experimentsDetails, appName),
+					Args: getContainerArguments(experimentsDetails, appName),
 					Env: []apiv1.EnvVar{
 						{
-							Name: "DOCKER_HOST",
+							Name:  "DOCKER_HOST",
 							Value: "unix://" + experimentsDetails.SocketPath,
 						},
 					},

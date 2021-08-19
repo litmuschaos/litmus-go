@@ -109,7 +109,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 
 		log.InfoWithValues("[Info]: Details of application under chaos injection", logrus.Fields{
 			"Target Pod":       pod.Name,
-			"NodeName":	 pod.Spec.NodeName,
+			"NodeName":         pod.Spec.NodeName,
 			"Target Container": experimentsDetails.TargetContainer,
 		})
 
@@ -296,7 +296,7 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 		Spec: apiv1.PodSpec{
 			RestartPolicy:    apiv1.RestartPolicyNever,
 			ImagePullSecrets: experimentsDetails.ImagePullSecrets,
-			NodeName:	 appNodeName,
+			NodeName:         appNodeName,
 			Volumes: []apiv1.Volume{
 				{
 					Name: "dockersocket",
@@ -309,8 +309,8 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 			},
 			Containers: []apiv1.Container{
 				{
-					Name:	    experimentsDetails.ExperimentName,
-					Image:	   experimentsDetails.LIBImage,
+					Name:            experimentsDetails.ExperimentName,
+					Image:           experimentsDetails.LIBImage,
 					ImagePullPolicy: apiv1.PullPolicy(experimentsDetails.LIBImagePullPolicy),
 					Command: []string{
 						"sudo",
@@ -328,7 +328,7 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 					},
 					Env: []apiv1.EnvVar{
 						{
-							Name: "DOCKER_HOST",
+							Name:  "DOCKER_HOST",
 							Value: "unix://" + experimentsDetails.SocketPath,
 						},
 					},
