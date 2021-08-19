@@ -225,32 +225,21 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 					},
 				},
 			},
-			InitContainers: []apiv1.Container{
-				{
-					Name:            "setup-pumba-stress",
-					Image:           experimentsDetails.LIBImage,
-					ImagePullPolicy: apiv1.PullPolicy(experimentsDetails.LIBImagePullPolicy),
-					Command: []string{
-						"/bin/bash",
-						"-c",
-						"sudo chmod 777 " + experimentsDetails.SocketPath,
-					},
-					VolumeMounts: []apiv1.VolumeMount{
-						{
-							Name:      "dockersocket",
-							MountPath: experimentsDetails.SocketPath,
-						},
-					},
-				},
-			},
 			Containers: []apiv1.Container{
 				{
 					Name:  "pumba-stress",
 					Image: experimentsDetails.LIBImage,
 					Command: []string{
-						"pumba",
+						"sudo",
+                                                "-E",
 					},
 					Args:      getContainerArguments(experimentsDetails, appName),
+                                        Env: []apiv1.EnvVar{
+                                        {
+                                           Name: "DOCKER_HOST",
+                                           Value: "unix://" + experimentsDetails.SocketPath,
+                                           },
+                                        },
 					Resources: experimentsDetails.Resources,
 					VolumeMounts: []apiv1.VolumeMount{
 						{
@@ -296,7 +285,8 @@ func getContainerArguments(experimentsDetails *experimentTypes.ExperimentDetails
 	}
 
 	stressArgs := []string{
-		"--log-level",
+		"pumba",
+                "--log-level",
 		"debug",
 		"--label",
 		"io.kubernetes.pod.name=" + appName,

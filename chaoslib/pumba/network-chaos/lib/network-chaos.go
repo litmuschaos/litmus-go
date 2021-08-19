@@ -229,7 +229,8 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 					Image:           experimentsDetails.LIBImage,
 					ImagePullPolicy: apiv1.PullPolicy(experimentsDetails.LIBImagePullPolicy),
 					Command: []string{
-						"pumba",
+						"sudo",
+                                                "-E",
 					},
 					Args:      args,
                                         Env: []apiv1.EnvVar{
