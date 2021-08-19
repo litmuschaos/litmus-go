@@ -170,7 +170,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 
 		log.InfoWithValues("[Info]: Details of application under chaos injection", logrus.Fields{
 			"Target Pod":       pod.Name,
-			"NodeName":	 pod.Spec.NodeName,
+			"NodeName":         pod.Spec.NodeName,
 			"Target Container": experimentsDetails.TargetContainer,
 		})
 
@@ -286,9 +286,9 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 			Name:      experimentsDetails.ExperimentName + "-helper-" + runID,
 			Namespace: experimentsDetails.ChaosNamespace,
 			Labels: map[string]string{
-				"app":		       experimentsDetails.ExperimentName + "-helper-" + labelSuffix,
-				"name":		      experimentsDetails.ExperimentName + "-helper-" + runID,
-				"chaosUID":		  string(experimentsDetails.ChaosUID),
+				"app":                       experimentsDetails.ExperimentName + "-helper-" + labelSuffix,
+				"name":                      experimentsDetails.ExperimentName + "-helper-" + runID,
+				"chaosUID":                  string(experimentsDetails.ChaosUID),
 				"app.kubernetes.io/part-of": "litmus",
 			},
 			Annotations: experimentsDetails.Annotations,

@@ -94,10 +94,10 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		runID := common.GetRunID()
 
 		log.InfoWithValues("[Info]: Details of application under chaos injection", logrus.Fields{
-			"Target Pod":		      pod.Name,
-			"NodeName":			pod.Spec.NodeName,
-			"FilesystemUtilizationPercentage": experimentsDetails.FilesystemUtilizationPercentage,
-			"FilesystemUtilizationBytes":      experimentsDetails.FilesystemUtilizationBytes,
+			"Target Pod":                           pod.Name,
+			"NodeName":                             pod.Spec.NodeName,
+			"FilesystemUtilizationPercentage":      experimentsDetails.FilesystemUtilizationPercentage,
+			"FilesystemUtilizationBytes":           experimentsDetails.FilesystemUtilizationBytes,
 		})
 
 		if err := createHelperPod(experimentsDetails, clients, pod.Name, pod.Spec.NodeName, runID, labelSuffix); err != nil {
@@ -150,10 +150,10 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		runID := common.GetRunID()
 
 		log.InfoWithValues("[Info]: Details of application under chaos injection", logrus.Fields{
-			"Target Pod":		      pod.Name,
-			"NodeName":			pod.Spec.NodeName,
-			"FilesystemUtilizationPercentage": experimentsDetails.FilesystemUtilizationPercentage,
-			"FilesystemUtilizationBytes":      experimentsDetails.FilesystemUtilizationBytes,
+			"Target Pod":                           pod.Name,
+			"NodeName":                             pod.Spec.NodeName,
+			"FilesystemUtilizationPercentage":      experimentsDetails.FilesystemUtilizationPercentage,
+			"FilesystemUtilizationBytes":           experimentsDetails.FilesystemUtilizationBytes,
 		})
 
 		if err := createHelperPod(experimentsDetails, clients, pod.Name, pod.Spec.NodeName, runID, labelSuffix); err != nil {
@@ -202,12 +202,11 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 			Name:      experimentsDetails.ExperimentName + "-helper-" + runID,
 			Namespace: experimentsDetails.ChaosNamespace,
 			Labels: map[string]string{
-				"app":		       experimentsDetails.ExperimentName + "-helper-" + labelSuffix,
-				"name":		      experimentsDetails.ExperimentName + "-helper-" + runID,
-				"chaosUID":		  string(experimentsDetails.ChaosUID),
+				"app":                       experimentsDetails.ExperimentName + "-helper-" + labelSuffix,
+				"name":                      experimentsDetails.ExperimentName + "-helper-" + runID,
+				"chaosUID":                  string(experimentsDetails.ChaosUID),
 				"app.kubernetes.io/part-of": "litmus",
-				// prevent pumba from killing itself
-				"com.gaiaadm.pumba": "true",
+				"com.gaiaadm.pumba":         "true", // prevent pumba from killing itself
 			},
 			Annotations: experimentsDetails.Annotations,
 		},

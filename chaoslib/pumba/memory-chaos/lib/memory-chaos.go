@@ -200,12 +200,11 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 			Name:      experimentsDetails.ExperimentName + "-helper-" + runID,
 			Namespace: experimentsDetails.ChaosNamespace,
 			Labels: map[string]string{
-				"app":		       experimentsDetails.ExperimentName + "-helper-" + labelSuffix,
-				"name":		      experimentsDetails.ExperimentName + "-helper-" + runID,
-				"chaosUID":		  string(experimentsDetails.ChaosUID),
+				"app":                       experimentsDetails.ExperimentName + "-helper-" + labelSuffix,
+				"name":                      experimentsDetails.ExperimentName + "-helper-" + runID,
+				"chaosUID":                  string(experimentsDetails.ChaosUID),
 				"app.kubernetes.io/part-of": "litmus",
-				// prevent pumba from killing itself
-				"com.gaiaadm.pumba": "true",
+				"com.gaiaadm.pumba":         "true", // prevent pumba from killing itself
 			},
 			Annotations: experimentsDetails.Annotations,
 		},
