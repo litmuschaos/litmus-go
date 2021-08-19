@@ -199,9 +199,9 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 			Name:      experimentsDetails.ExperimentName + "-helper-" + runID,
 			Namespace: experimentsDetails.ChaosNamespace,
 			Labels: map[string]string{
-				"app":                       experimentsDetails.ExperimentName + "-helper-" + labelSuffix,
-				"name":                      experimentsDetails.ExperimentName + "-helper-" + runID,
-				"chaosUID":                  string(experimentsDetails.ChaosUID),
+				"app":		       experimentsDetails.ExperimentName + "-helper-" + labelSuffix,
+				"name":		      experimentsDetails.ExperimentName + "-helper-" + runID,
+				"chaosUID":		  string(experimentsDetails.ChaosUID),
 				"app.kubernetes.io/part-of": "litmus",
 				// prevent pumba from killing itself
 				"com.gaiaadm.pumba": "true",
@@ -211,7 +211,7 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 		Spec: apiv1.PodSpec{
 			RestartPolicy:    apiv1.RestartPolicyNever,
 			ImagePullSecrets: experimentsDetails.ImagePullSecrets,
-			NodeName:         appNodeName,
+			NodeName:	 appNodeName,
 			Volumes: []apiv1.Volume{
 				{
 					Name: "dockersocket",
@@ -228,15 +228,15 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 					Image: experimentsDetails.LIBImage,
 					Command: []string{
 						"sudo",
-                                                "-E",
+						"-E",
 					},
 					Args:      getContainerArguments(experimentsDetails, appName),
-                                        Env: []apiv1.EnvVar{
-                                        {
-                                           Name: "DOCKER_HOST",
-                                           Value: "unix://" + experimentsDetails.SocketPath,
-                                           },
-                                        },
+					Env: []apiv1.EnvVar{
+						{
+							Name: "DOCKER_HOST",
+							Value: "unix://" + experimentsDetails.SocketPath,
+						},
+					},
 					Resources: experimentsDetails.Resources,
 					VolumeMounts: []apiv1.VolumeMount{
 						{
@@ -264,7 +264,7 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 // getContainerArguments derives the args for the pumba stress helper pod
 func getContainerArguments(experimentsDetails *experimentTypes.ExperimentDetails, appName string) []string {
 	stressArgs := []string{
-                "pumba",
+		"pumba",
 		"--log-level",
 		"debug",
 		"--label",

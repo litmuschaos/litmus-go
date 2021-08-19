@@ -23,7 +23,7 @@ func PodNetworkDuplicationChaos(experimentsDetails *experimentTypes.ExperimentDe
 func getContainerArguments(experimentsDetails *experimentTypes.ExperimentDetails) ([]string, error) {
 	baseArgs := []string{
 		"pumba",
-                "netem",
+		"netem",
 		"--tc-image",
 		experimentsDetails.TCImage,
 		"--interface",
