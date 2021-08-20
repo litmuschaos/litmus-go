@@ -13,7 +13,7 @@ The artifacts associated with a chaos-experiment are summarized below:
 - Submitted in litmuschaos/chaos-charts repository, under the *chaos-category* folder
 
   - Experiment custom resource (CR) (holds experiment-specific chaos parameters & experiment entrypoint)
-  - Experiment ChartServiceVersion (holds experiment metadata that will be rendered on [charthub](hub.litmuschaos.io))
+  - Experiment ChartServiceVersion (holds experiment metadata that will be rendered on [charthub](https://hub.litmuschaos.io/))
   - Experiment RBAC (holds experiment-specific ServiceAccount, Role and RoleBinding)
   - Experiment Engine (holds experiment-specific chaosengine)
 
