@@ -148,7 +148,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 				events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 			}
 
-			// Running scripts parallely
+			// Running scripts serially
 			for _, vmName := range instanceNameList {
 
 				runCommandFutures := []experimentTypes.RunCommandFuture{}
@@ -170,14 +170,12 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 				log.Infof("[Wait]: Waiting for chaos interval of %vs", experimentsDetails.ChaosInterval)
 				common.WaitForDuration(experimentsDetails.ChaosInterval)
 
-				for i, vmName := range instanceNameList {
-					log.Infof("[Wait]: Waiting for script execution completion on instance: %v", vmName)
-					result, err := azureStatus.WaitForRunCommandCompletion(experimentsDetails, &runCommandFutures[i])
-					if err != nil {
-						return errors.Errorf("%v", err)
-					}
-					azureStatus.GetRunCommandResult(&result)
+				log.Infof("[Wait]: Waiting for script execution completion on instance: %v", vmName)
+				result, err := azureStatus.WaitForRunCommandCompletion(experimentsDetails, &runCommandFutures[i])
+				if err != nil {
+					return errors.Errorf("%v", err)
 				}
+				azureStatus.GetRunCommandResult(&result)
 			}
 			duration = int(time.Since(ChaosStartTimeStamp).Seconds())
 		}
@@ -192,21 +190,21 @@ func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, instanc
 	runCommandFutures := []experimentTypes.RunCommandFuture{}
 
 	for _, vmName := range instanceNameList {
-		log.Infof("[Chaos]: Running script on the Azure instance: %v", vmName)
+		log.Infof("[Chaos]: Running abort script on the Azure instance: %v", vmName)
 		runCommandFuture := experimentTypes.RunCommandFuture{}
-		if err := azureStatus.PerformRunCommand(experimentsDetails, &runCommandFuture, vmName, false); err != nil {
-			log.Errorf("unable to run script on azure instance, err: %v", err)
+		if err := azureStatus.PerformRunCommand(experimentsDetails, &runCommandFuture, vmName, true); err != nil {
+			log.Errorf("unable to run abort script on azure instance, err: %v", err)
 		}
 		runCommandFutures = append(runCommandFutures, runCommandFuture)
 	}
 
 	for i, vmName := range instanceNameList {
-		log.Infof("[Wait]: Waiting for script execution completion on instance: %v", vmName)
-		_, err := azureStatus.WaitForRunCommandCompletion(experimentsDetails, &runCommandFutures[i])
+		log.Infof("[Wait]: Waiting for abort script execution completion on instance: %v", vmName)
+		result, err := azureStatus.WaitForRunCommandCompletion(experimentsDetails, &runCommandFutures[i])
 		if err != nil {
 			log.Errorf("%v", err)
 		}
-		// azureStatus.GetRunCommandResult(&result)
+		azureStatus.GetRunCommandResult(&result)
 	}
 	log.Infof("[Abort]: Chaos Revert Completed")
 	os.Exit(1)

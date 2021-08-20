@@ -37,7 +37,6 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.ScaleSet = common.Getenv("SCALE_SET", "disable")
 	experimentDetails.Sequence = common.Getenv("SEQUENCE", "parallel")
 	experimentDetails.ExperimentType = common.Getenv("EXPERIMENT_TYPE", "cpu-hog")
-	experimentDetails.ChaosKillCommand = common.Getenv("CHAOS_KILL_COMMAND", "")
 	experimentDetails.InstallDependency = common.Getenv("INSTALL_DEPENDENCY", "True")
 	experimentDetails.OperatingSystem = common.Getenv("OPERATING_SYSTEM", "linux")
 	experimentDetails.CPUcores, _ = strconv.Atoi(common.Getenv("CPU_CORES", "1"))
@@ -45,8 +44,9 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.MemoryConsumption, _ = strconv.Atoi(common.Getenv("MEMORY_CONSUMPTION", "500"))
 	experimentDetails.FilesystemUtilizationBytes, _ = strconv.Atoi(common.Getenv("FILESYSTEM_UTILIZATION_BYTES", ""))
 	experimentDetails.FilesystemUtilizationPercentage, _ = strconv.Atoi(common.Getenv("FILESYSTEM_UTILIZATION_PERCENTAGE", "10"))
-	experimentDetails.VolumeMountPath = common.Getenv("VOLUMNE_MOUNT_PATH", "")
+	experimentDetails.VolumeMountPath = common.Getenv("VOLUME_MOUNT_PATH", "")
 	experimentDetails.ScriptPath = common.Getenv("SCRIPT_PATH", "")
+	experimentDetails.AbortScriptPath = common.Getenv("ABORT_SCRIPT_PATH", "")
 
 }
 

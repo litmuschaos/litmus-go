@@ -30,7 +30,6 @@ type ExperimentDetails struct {
 	ScaleSet                        string
 	Sequence                        string
 	ExperimentType                  string
-	ChaosKillCommand                string
 	InstallDependency               string
 	OperatingSystem                 string
 	CPUcores                        int
@@ -40,6 +39,7 @@ type ExperimentDetails struct {
 	FilesystemUtilizationPercentage int
 	VolumeMountPath                 string
 	ScriptPath                      string
+	AbortScriptPath                 string
 }
 
 type RunCommandFuture struct {

@@ -25,13 +25,13 @@ func PerformRunCommand(experimentDetails *experimentTypes.ExperimentDetails, run
 	var err error
 
 	if abort {
-		runCommandInput = prepareAbortRunCommandInput(experimentDetails)
+		runCommandInput, err = prepareAbortRunCommandInput(experimentDetails)
 
 	} else {
 		runCommandInput, err = prepareRunCommandInput(experimentDetails)
-		if err != nil {
-			return errors.Errorf("%v", err)
-		}
+	}
+	if err != nil {
+		return errors.Errorf("%v", err)
 	}
 
 	if experimentDetails.ScaleSet == "enable" {
@@ -158,7 +158,7 @@ func prepareRunCommandInput(experimentDetails *experimentTypes.ExperimentDetails
 	if strings.TrimSpace(experimentDetails.ScriptPath) != "" {
 		scriptPath, _ = filepath.Abs(experimentDetails.ScriptPath)
 	} else {
-		scriptPath, _ = filepath.Abs("pkg/azure/run-command/scripts/script.sh")
+		scriptPath, _ = filepath.Abs("pkg/azure/run-command/scripts/run_script.sh")
 		if parameters, err = prepareInputParameters(experimentDetails); err != nil {
 			return compute.RunCommandInput{}, errors.Errorf("failed to setup input parameters, err: %v", err)
 		}
@@ -184,17 +184,26 @@ func prepareRunCommandInput(experimentDetails *experimentTypes.ExperimentDetails
 	return runCommandInput, nil
 }
 
-// prepareAbortRunCommandInput prepares abort command for script
-func prepareAbortRunCommandInput(experimentDetails *experimentTypes.ExperimentDetails) compute.RunCommandInput {
+// prepareAbortRunCommandInput prepares abort script command
+func prepareAbortRunCommandInput(experimentDetails *experimentTypes.ExperimentDetails) (compute.RunCommandInput, error) {
 
+	var err error
+	var scriptPath string
 	var commandId string
 	var script []string
 	var parameters []compute.RunCommandInputParameter
 
-	if strings.TrimSpace(experimentDetails.ChaosKillCommand) != "" {
-		script = append(script, experimentDetails.ChaosKillCommand)
+	// Checking if custom script path is provided or using the default if not
+	if strings.TrimSpace(experimentDetails.AbortScriptPath) != "" {
+		scriptPath, _ = filepath.Abs(experimentDetails.ScriptPath)
 	} else {
-		script = append(script, "kill stress-ng")
+		scriptPath, _ = filepath.Abs("pkg/azure/run-command/scripts/abort_script.sh")
+	}
+
+	// Reading script from the file path
+	script, err = readLines(scriptPath)
+	if err != nil {
+		return compute.RunCommandInput{}, errors.Errorf("failed to read script, err: %v", err)
 	}
 
 	// Setting up command id based on operating system of VM
@@ -209,7 +218,7 @@ func prepareAbortRunCommandInput(experimentDetails *experimentTypes.ExperimentDe
 		Script:     &script,
 		Parameters: &parameters,
 	}
-	return runCommandInput
+	return runCommandInput, nil
 
 }
 
