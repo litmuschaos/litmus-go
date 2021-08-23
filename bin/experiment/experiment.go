@@ -14,6 +14,7 @@ import (
 	awsSSMChaosByID "github.com/litmuschaos/litmus-go/experiments/aws-ssm/aws-ssm-chaos-by-id/experiment"
 	awsSSMChaosByTag "github.com/litmuschaos/litmus-go/experiments/aws-ssm/aws-ssm-chaos-by-tag/experiment"
 	azureInstanceStop "github.com/litmuschaos/litmus-go/experiments/azure/instance-stop/experiment"
+	redfishNodeRestart "github.com/litmuschaos/litmus-go/experiments/baremetal/redfish-node-restart/experiment"
 	cassandraPodDelete "github.com/litmuschaos/litmus-go/experiments/cassandra/pod-delete/experiment"
 	gcpVMDiskLoss "github.com/litmuschaos/litmus-go/experiments/gcp/gcp-vm-disk-loss/experiment"
 	gcpVMInstanceStop "github.com/litmuschaos/litmus-go/experiments/gcp/gcp-vm-instance-stop/experiment"
@@ -41,7 +42,6 @@ import (
 	podNetworkDuplication "github.com/litmuschaos/litmus-go/experiments/generic/pod-network-duplication/experiment"
 	podNetworkLatency "github.com/litmuschaos/litmus-go/experiments/generic/pod-network-latency/experiment"
 	podNetworkLoss "github.com/litmuschaos/litmus-go/experiments/generic/pod-network-loss/experiment"
-	redfishNodeRestart "github.com/litmuschaos/litmus-go/experiments/baremetal/redfish-node-restart/experiment"
 	kafkaBrokerPodFailure "github.com/litmuschaos/litmus-go/experiments/kafka/kafka-broker-pod-failure/experiment"
 	ebsLossByID "github.com/litmuschaos/litmus-go/experiments/kube-aws/ebs-loss-by-id/experiment"
 	ebsLossByTag "github.com/litmuschaos/litmus-go/experiments/kube-aws/ebs-loss-by-tag/experiment"
@@ -153,7 +153,7 @@ func main() {
 	case "gcp-vm-instance-stop":
 		gcpVMInstanceStop.VMInstanceStop(clients)
 	case "redfish-node-restart":
- 		redfishNodeRestart.NodeRestart(clients)
+		redfishNodeRestart.NodeRestart(clients)
 
 	default:
 		log.Errorf("Unsupported -name %v, please provide the correct value of -name args", *experimentName)
