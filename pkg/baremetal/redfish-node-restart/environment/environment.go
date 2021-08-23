@@ -21,6 +21,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.AppNS = common.Getenv("APP_NAMESPACE", "")
 	experimentDetails.AppLabel = common.Getenv("APP_LABEL", "")
 	experimentDetails.AppKind = common.Getenv("APP_KIND", "")
+	experimentDetails.TargetContainer = common.Getenv("TARGET_CONTAINER", "")
 	experimentDetails.ChaosUID = clientTypes.UID(common.Getenv("CHAOS_UID", ""))
 	experimentDetails.InstanceID = common.Getenv("INSTANCE_ID", "")
 	experimentDetails.ChaosPodName = common.Getenv("POD_NAME", "")
