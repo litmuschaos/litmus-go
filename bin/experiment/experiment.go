@@ -13,6 +13,7 @@ import (
 
 	awsSSMChaosByID "github.com/litmuschaos/litmus-go/experiments/aws-ssm/aws-ssm-chaos-by-id/experiment"
 	awsSSMChaosByTag "github.com/litmuschaos/litmus-go/experiments/aws-ssm/aws-ssm-chaos-by-tag/experiment"
+	azureDiskLoss "github.com/litmuschaos/litmus-go/experiments/azure/azure-disk-loss/experiment"
 	azureInstanceStop "github.com/litmuschaos/litmus-go/experiments/azure/instance-stop/experiment"
 	cassandraPodDelete "github.com/litmuschaos/litmus-go/experiments/cassandra/pod-delete/experiment"
 	gcpVMDiskLoss "github.com/litmuschaos/litmus-go/experiments/gcp/gcp-vm-disk-loss/experiment"
@@ -136,14 +137,16 @@ func main() {
 		ebsLossByTag.EBSLossByTag(clients)
 	case "node-restart":
 		nodeRestart.NodeRestart(clients)
-	case "azure-instance-stop":
-		azureInstanceStop.AzureInstanceStop(clients)
 	case "pod-dns-error":
 		podDNSError.PodDNSError(clients)
 	case "pod-dns-spoof":
 		podDNSSpoof.PodDNSSpoof(clients)
 	case "vm-poweroff":
 		vmpoweroff.VMPoweroff(clients)
+	case "azure-instance-stop":
+		azureInstanceStop.AzureInstanceStop(clients)
+	case "azure-disk-loss":
+		azureDiskLoss.AzureDiskLoss(clients)
 	case "gcp-vm-disk-loss":
 		gcpVMDiskLoss.VMDiskLoss(clients)
 	case "gcp-vm-instance-stop":
