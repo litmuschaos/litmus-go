@@ -79,7 +79,7 @@ func EC2TerminateByTag(clients clients.ClientSets) {
 
 	//PRE-CHAOS NODE STATUS CHECK
 	if experimentsDetails.ManagedNodegroup == "enable" {
-		activeNodeCount, err = aws.PreChaosNodeStatusCheck(experimentsDetails.Timeout, experimentsDetails.Delay, clients)
+		activeNodeCount, err = common.PreChaosNodeStatusCheck(experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 		if err != nil {
 			log.Errorf("Pre chaos node status check failed, err: %v", err)
 			failStep := "Verify that the NUT (Node Under Test) is running (pre-chaos)"
@@ -160,7 +160,7 @@ func EC2TerminateByTag(clients clients.ClientSets) {
 
 	// POST-CHAOS ACTIVE NODE COUNT TEST
 	if experimentsDetails.ManagedNodegroup == "enable" {
-		if err = aws.PostChaosActiveNodeCountCheck(activeNodeCount, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
+		if err = common.PostChaosActiveNodeCountCheck(activeNodeCount, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
 			log.Errorf("Post chaos active node count check failed, err: %v", err)
 			failStep := "Verify active number of nodes post chaos"
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)

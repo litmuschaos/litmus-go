@@ -16,7 +16,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// PodNetworkPartition inject the pod-network-partition chaos	
+// PodNetworkPartition inject the pod-network-partition chaos
 func PodNetworkPartition(clients clients.ClientSets) {
 
 	experimentsDetails := experimentTypes.ExperimentDetails{}

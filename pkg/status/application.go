@@ -277,7 +277,7 @@ func WaitForCompletion(appNs, appLabel string, clients clients.ClientSets, durat
 }
 
 // CheckHelperStatus checks the status of the helper pod
-// and wait until the helper pod comes to one of the {running,completed} states
+// and wait until the helper pod comes to one of the {running,completed,failed} states
 func CheckHelperStatus(appNs, appLabel string, timeout, delay int, clients clients.ClientSets) error {
 
 	return retry.
@@ -291,13 +291,13 @@ func CheckHelperStatus(appNs, appLabel string, timeout, delay int, clients clien
 			for _, pod := range podList.Items {
 				podStatus := string(pod.Status.Phase)
 				switch strings.ToLower(podStatus) {
-				case "running", "succeeded":
+				case "running", "succeeded", "failed":
 					log.Infof("%v helper pod is in %v state", pod.Name, podStatus)
 				default:
 					return errors.Errorf("%v pod is in %v state", pod.Name, podStatus)
 				}
 				for _, container := range pod.Status.ContainerStatuses {
-					if container.State.Terminated != nil && container.State.Terminated.Reason != "Completed" {
+					if container.State.Terminated != nil && container.State.Terminated.Reason != "Completed" && container.State.Terminated.Reason != "Error" {
 						return errors.Errorf("container is terminated with %v reason", container.State.Terminated.Reason)
 					}
 				}

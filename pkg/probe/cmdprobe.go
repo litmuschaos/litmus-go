@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/rand"
 	"os/exec"
+	"reflect"
 	"strings"
 	"time"
 
@@ -127,7 +128,7 @@ func triggerSourceCmdProbe(probe v1alpha1.ProbeAttributes, execCommandDetails li
 }
 
 // createProbePod creates an external pod with source image for the cmd probe
-func createProbePod(clients clients.ClientSets, chaosDetails *types.ChaosDetails, runID, source string) error {
+func createProbePod(clients clients.ClientSets, chaosDetails *types.ChaosDetails, runID string, source v1alpha1.SourceDetails) error {
 	cmdProbe := &apiv1.Pod{
 		ObjectMeta: v1.ObjectMeta{
 			Name:      chaosDetails.ExperimentName + "-probe-" + runID,
@@ -139,10 +140,11 @@ func createProbePod(clients clients.ClientSets, chaosDetails *types.ChaosDetails
 		},
 		Spec: apiv1.PodSpec{
 			RestartPolicy: apiv1.RestartPolicyNever,
+			HostNetwork:   source.HostNetwork,
 			Containers: []apiv1.Container{
 				{
 					Name:            chaosDetails.ExperimentName + "-probe",
-					Image:           source,
+					Image:           source.Image,
 					ImagePullPolicy: apiv1.PullPolicy(chaosDetails.ProbeImagePullPolicy),
 					Command: []string{
 						"/bin/sh",
@@ -423,7 +425,7 @@ func preChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 		}
 
 		// triggering the cmd probe for the inline mode
-		if probe.CmdProbeInputs.Source == "inline" {
+		if reflect.DeepEqual(probe.CmdProbeInputs.Source, v1alpha1.SourceDetails{}) {
 			err = triggerInlineCmdProbe(probe, resultDetails)
 
 			// failing the probe, if the success condition doesn't met after the retry & timeout combinations
@@ -433,7 +435,7 @@ func preChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 			}
 		} else {
 
-			execCommandDetails, err := createHelperPod(probe, resultDetails, clients, chaosDetails, probe.CmdProbeInputs.Source)
+			execCommandDetails, err := createHelperPod(probe, resultDetails, clients, chaosDetails)
 			if err != nil {
 				return err
 			}
@@ -468,11 +470,11 @@ func preChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 			"Mode":           probe.Mode,
 			"Phase":          "PreChaos",
 		})
-		if probe.CmdProbeInputs.Source == "inline" {
+		if reflect.DeepEqual(probe.CmdProbeInputs.Source, v1alpha1.SourceDetails{}) {
 			go triggerInlineContinuousCmdProbe(probe, clients, resultDetails, chaosDetails)
 		} else {
 
-			execCommandDetails, err := createHelperPod(probe, resultDetails, clients, chaosDetails, probe.CmdProbeInputs.Source)
+			execCommandDetails, err := createHelperPod(probe, resultDetails, clients, chaosDetails)
 			if err != nil {
 				return err
 			}
@@ -509,7 +511,7 @@ func postChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resu
 		}
 
 		// triggering the cmd probe for the inline mode
-		if probe.CmdProbeInputs.Source == "inline" {
+		if reflect.DeepEqual(probe.CmdProbeInputs.Source, v1alpha1.SourceDetails{}) {
 			err = triggerInlineCmdProbe(probe, resultDetails)
 
 			// failing the probe, if the success condition doesn't met after the retry & timeout combinations
@@ -519,7 +521,7 @@ func postChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resu
 			}
 		} else {
 
-			execCommandDetails, err := createHelperPod(probe, resultDetails, clients, chaosDetails, probe.CmdProbeInputs.Source)
+			execCommandDetails, err := createHelperPod(probe, resultDetails, clients, chaosDetails)
 			if err != nil {
 				return err
 			}
@@ -542,7 +544,7 @@ func postChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resu
 			}
 		}
 	case "Continuous", "OnChaos":
-		if probe.CmdProbeInputs.Source == "inline" {
+		if reflect.DeepEqual(probe.CmdProbeInputs.Source, v1alpha1.SourceDetails{}) {
 			// it will check for the error, It will detect the error if any error encountered in probe during chaos
 			err = checkForErrorInContinuousProbe(resultDetails, probe.Name)
 			// failing the probe, if the success condition doesn't met after the retry & timeout combinations
@@ -585,11 +587,11 @@ func onChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Result
 			"Mode":           probe.Mode,
 			"Phase":          "DuringChaos",
 		})
-		if probe.CmdProbeInputs.Source == "inline" {
+		if reflect.DeepEqual(probe.CmdProbeInputs.Source, v1alpha1.SourceDetails{}) {
 			go triggerInlineOnChaosCmdProbe(probe, clients, resultDetails, chaosDetails)
 		} else {
 
-			execCommandDetails, err := createHelperPod(probe, resultDetails, clients, chaosDetails, probe.CmdProbeInputs.Source)
+			execCommandDetails, err := createHelperPod(probe, resultDetails, clients, chaosDetails)
 			if err != nil {
 				return err
 			}
@@ -603,13 +605,13 @@ func onChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Result
 
 // createHelperPod create the helper pod with the source image
 // it will be created if the mode is not inline
-func createHelperPod(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, sourceImage string) (litmusexec.PodDetails, error) {
+func createHelperPod(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) (litmusexec.PodDetails, error) {
 	// Generate the run_id
 	runID := getRunID()
 	setRunIDForProbe(resultDetails, probe.Name, probe.Type, runID)
 
 	// create the external pod with source image for cmd probe
-	err := createProbePod(clients, chaosDetails, runID, sourceImage)
+	err := createProbePod(clients, chaosDetails, runID, probe.CmdProbeInputs.Source)
 	if err != nil {
 		return litmusexec.PodDetails{}, err
 	}
