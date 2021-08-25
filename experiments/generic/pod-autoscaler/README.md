@@ -9,6 +9,6 @@
 <tr>
  <td> Pod Autoscaler</td>
  <td> Scale the deployment replicas to check the autoscaling capability. </td>
- <td>  <a href="https://docs.litmuschaos.io/docs/pod-autoscaler/"> Here </a> </td>
+ <td>  <a href="https://litmuschaos.github.io/litmus/experiments/categories/pods/pod-autoscaler/"> Here </a> </td>
  </tr>
  </table>

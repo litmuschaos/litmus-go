@@ -9,7 +9,7 @@
 <tr>
  <td> Kubelet Service Kill </td>
  <td> This experiment causes kubelet service kill gracefully for a certain chaos duration. The experiment aims to verify resiliency of applications whose replicas may be evicted or becomes unreachable on account on nodes turning unschedulable (Not Ready) due to kubelet service kill. </td>
- <td>  <a href=""> Added soon </a> </td>
+ <td>  <a href="https://litmuschaos.github.io/litmus/experiments/categories/nodes/kubelet-service-kill/"> Here </a> </td>
  </tr>
  </table>
 
