@@ -6,7 +6,9 @@ import (
 	experimentEnv "github.com/litmuschaos/litmus-go/pkg/azure/instance-stop/environment"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/azure/instance-stop/types"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
-	azureStatus "github.com/litmuschaos/litmus-go/pkg/cloud/azure"
+	azureCommon "github.com/litmuschaos/litmus-go/pkg/cloud/azure/common"
+	azureStatus "github.com/litmuschaos/litmus-go/pkg/cloud/azure/instance"
+
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
@@ -92,7 +94,7 @@ func AzureInstanceStop(clients clients.ClientSets) {
 	}
 
 	// Setting up Azure Subscription ID
-	if err = azureStatus.SetupSubscriptionID(&experimentsDetails); err != nil {
+	if experimentsDetails.SubscriptionID, err = azureCommon.GetSubscriptionID(); err != nil {
 		log.Errorf("fail to get the subscription id, err: %v", err)
 		failStep := "Getting the subscription ID for authentication"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)

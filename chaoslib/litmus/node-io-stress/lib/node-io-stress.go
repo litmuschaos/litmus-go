@@ -115,13 +115,6 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 			return errors.Errorf("helper pod failed due to, err: %v", err)
 		}
 
-		// Checking the status of target nodes
-		log.Info("[Status]: Getting the status of target nodes")
-		if err = status.CheckNodeStatus(appNode, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
-			common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-helper-"+experimentsDetails.RunID, appLabel, chaosDetails, clients)
-			log.Warnf("Target nodes are not in the ready state, you may need to manually recover the node, err: %v", err)
-		}
-
 		//Deleting the helper pod
 		log.Info("[Cleanup]: Deleting the helper pod")
 		if err = common.DeletePod(experimentsDetails.ExperimentName+"-helper-"+experimentsDetails.RunID, appLabel, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients); err != nil {
@@ -186,16 +179,6 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 	if err != nil || podStatus == "Failed" {
 		common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
 		return errors.Errorf("helper pod failed due to, err: %v", err)
-	}
-
-	for _, appNode := range targetNodeList {
-
-		// Checking the status of application node
-		log.Info("[Status]: Getting the status of application node")
-		if err = status.CheckNodeStatus(appNode, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
-			common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
-			log.Warn("Application node is not in the ready state, you may need to manually recover the node")
-		}
 	}
 
 	//Deleting the helper pod

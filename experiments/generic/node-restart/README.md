@@ -9,6 +9,6 @@
 <tr>
  <td> Node Restart </td>
  <td> This experiment restarts Kubernetes node. </td>
- <td>  <a href="https://docs.litmuschaos.io/docs/node-restart/"> Here </a> </td>
+ <td>  <a href="https://litmuschaos.github.io/litmus/experiments/categories/nodes/node-restart/"> Here </a> </td>
  </tr>
  </table>

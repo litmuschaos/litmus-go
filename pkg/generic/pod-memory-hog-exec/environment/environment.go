@@ -30,7 +30,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.Delay, _ = strconv.Atoi(common.Getenv("STATUS_CHECK_DELAY", "2"))
 	experimentDetails.Timeout, _ = strconv.Atoi(common.Getenv("STATUS_CHECK_TIMEOUT", "180"))
 	experimentDetails.TargetPods = common.Getenv("TARGET_PODS", "")
-	experimentDetails.ChaosKillCmd = common.Getenv("CHAOS_KILL_COMMAND", "killall dd")
+	experimentDetails.ChaosKillCmd = common.Getenv("CHAOS_KILL_COMMAND", "kill $(find /proc -name exe -lname '*/dd' 2>&1 | grep -v 'Permission denied' | awk -F/ '{print $(NF-1)}' | head -n 1)")
 	experimentDetails.LIBImagePullPolicy = common.Getenv("LIB_IMAGE_PULL_POLICY", "Always")
 	experimentDetails.TargetContainer = common.Getenv("TARGET_CONTAINER", "")
 	experimentDetails.Sequence = common.Getenv("SEQUENCE", "parallel")
@@ -56,6 +56,5 @@ func InitialiseChaosVariables(chaosDetails *types.ChaosDetails, experimentDetail
 	chaosDetails.Delay = experimentDetails.Delay
 	chaosDetails.AppDetail = appDetails
 	chaosDetails.ProbeImagePullPolicy = experimentDetails.LIBImagePullPolicy
-	chaosDetails.ParentsResources = []string{}
 	chaosDetails.Targets = []v1alpha1.TargetDetails{}
 }
