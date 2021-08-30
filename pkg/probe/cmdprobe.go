@@ -138,7 +138,8 @@ func createProbePod(clients clients.ClientSets, chaosDetails *types.ChaosDetails
 			},
 		},
 		Spec: apiv1.PodSpec{
-			RestartPolicy: apiv1.RestartPolicyNever,
+			RestartPolicy:      apiv1.RestartPolicyNever,
+			ServiceAccountName: "litmus-admin",
 			Containers: []apiv1.Container{
 				{
 					Name:            chaosDetails.ExperimentName + "-probe",
