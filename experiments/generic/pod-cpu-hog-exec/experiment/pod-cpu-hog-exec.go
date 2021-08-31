@@ -76,6 +76,8 @@ func PodCPUHogExec(clients clients.ClientSets) {
 		if err := status.AUTStatusCheck(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.TargetContainer, experimentsDetails.Timeout, experimentsDetails.Delay, clients, &chaosDetails); err != nil {
 			log.Errorf("Application status check failed, err: %v", err)
 			failStep := "Verify that the AUT (Application Under Test) is running (pre-chaos)"
+			types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, "AUT: Not Running", "Warning", &chaosDetails)
+			events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}
@@ -129,6 +131,8 @@ func PodCPUHogExec(clients clients.ClientSets) {
 		if err := status.AUTStatusCheck(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.TargetContainer, experimentsDetails.Timeout, experimentsDetails.Delay, clients, &chaosDetails); err != nil {
 			log.Infof("Application status check failed, err: %v", err)
 			failStep := "Verify that the AUT (Application Under Test) is running (post-chaos)"
+			types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, "AUT: Not Running", "Warning", &chaosDetails)
+			events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}
@@ -149,7 +153,7 @@ func PodCPUHogExec(clients clients.ClientSets) {
 				result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 				return
 			}
-			common.GetStatusMessage(chaosDetails.DefaultChecks, "AUT: Running", "Successful")
+			msg = common.GetStatusMessage(chaosDetails.DefaultChecks, "AUT: Running", "Successful")
 		}
 
 		// generating post chaos event

@@ -206,8 +206,7 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 				"name":                      experimentsDetails.ExperimentName + "-helper-" + runID,
 				"chaosUID":                  string(experimentsDetails.ChaosUID),
 				"app.kubernetes.io/part-of": "litmus",
-				// prevent pumba from killing itself
-				"com.gaiaadm.pumba": "true",
+				"com.gaiaadm.pumba":         "true", // prevent pumba from killing itself
 			},
 			Annotations: experimentsDetails.Annotations,
 		},
@@ -225,32 +224,21 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 					},
 				},
 			},
-			InitContainers: []apiv1.Container{
-				{
-					Name:            "setup-pumba-stress",
-					Image:           experimentsDetails.LIBImage,
-					ImagePullPolicy: apiv1.PullPolicy(experimentsDetails.LIBImagePullPolicy),
-					Command: []string{
-						"/bin/bash",
-						"-c",
-						"sudo chmod 777 " + experimentsDetails.SocketPath,
-					},
-					VolumeMounts: []apiv1.VolumeMount{
-						{
-							Name:      "dockersocket",
-							MountPath: experimentsDetails.SocketPath,
-						},
-					},
-				},
-			},
 			Containers: []apiv1.Container{
 				{
 					Name:  "pumba-stress",
 					Image: experimentsDetails.LIBImage,
 					Command: []string{
-						"pumba",
+						"sudo",
+						"-E",
 					},
-					Args:      getContainerArguments(experimentsDetails, appName),
+					Args: getContainerArguments(experimentsDetails, appName),
+					Env: []apiv1.EnvVar{
+						{
+							Name:  "DOCKER_HOST",
+							Value: "unix://" + experimentsDetails.SocketPath,
+						},
+					},
 					Resources: experimentsDetails.Resources,
 					VolumeMounts: []apiv1.VolumeMount{
 						{
@@ -296,6 +284,7 @@ func getContainerArguments(experimentsDetails *experimentTypes.ExperimentDetails
 	}
 
 	stressArgs := []string{
+		"pumba",
 		"--log-level",
 		"debug",
 		"--label",

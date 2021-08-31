@@ -14,4 +14,5 @@ type ExperimentDetails struct {
 	CassandraLivenessImage string
 	CassandraLivenessCheck string
 	RunID                  string
+	Sequence               string
 }

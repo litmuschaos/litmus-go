@@ -39,8 +39,8 @@ func GetENV(kafkaDetails *kafkaTypes.ExperimentDetails) {
 
 	kafkaDetails.ChaoslibDetail = &ChaoslibDetail
 	kafkaDetails.KafkaKind = common.Getenv("KAFKA_KIND", "statefulset")
-	kafkaDetails.KafkaLivenessStream = common.Getenv("KAFKA_LIVENESS_STREAM", "enabled")
-	kafkaDetails.KafkaLivenessImage = common.Getenv("KAFKA_LIVENESS_IMAGE", "litmuschaos/kafka-client:ci")
+	kafkaDetails.KafkaLivenessStream = common.Getenv("KAFKA_LIVENESS_STREAM", "enable")
+	kafkaDetails.KafkaLivenessImage = common.Getenv("KAFKA_LIVENESS_IMAGE", "litmuschaos/kafka-client:latest")
 	kafkaDetails.KafkaConsumerTimeout, _ = strconv.Atoi(common.Getenv("KAFKA_CONSUMER_TIMEOUT", "60000"))
 	kafkaDetails.KafkaInstanceName = common.Getenv("KAFKA_INSTANCE_NAME", "kafka")
 	kafkaDetails.KafkaNamespace = common.Getenv("KAFKA_NAMESPACE", "default")
@@ -78,7 +78,6 @@ func InitialiseChaosVariables(chaosDetails *types.ChaosDetails, kafkaDetails *ka
 	chaosDetails.AppDetail = appDetails
 	chaosDetails.ProbeImagePullPolicy = kafkaDetails.ChaoslibDetail.LIBImagePullPolicy
 	chaosDetails.Randomness, _ = strconv.ParseBool(common.Getenv("RANDOMNESS", "false"))
-	chaosDetails.ParentsResources = []string{}
 	chaosDetails.Targets = []v1alpha1.TargetDetails{}
 	chaosDetails.DefaultChecks, _ = strconv.ParseBool(common.Getenv("DEFAULT_CHECKS", "true"))
 }

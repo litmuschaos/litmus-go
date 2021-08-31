@@ -97,11 +97,12 @@ func NodeTaint(clients clients.ClientSets) {
 		if err := status.CheckNodeStatus(experimentsDetails.TargetNode, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
 			log.Errorf("Target nodes are not in the ready state, err: %v", err)
 			failStep := "Checking the status of nodes"
+			types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, "NUT: Not Ready", "Warning", &chaosDetails)
+			events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}
 	}
-
 	if experimentsDetails.EngineName != "" {
 		// marking AUT as running, as we already checked the status of application under test
 		msg := common.GetStatusMessage(chaosDetails.DefaultChecks, "NUT: Ready", "")
@@ -161,6 +162,16 @@ func NodeTaint(clients clients.ClientSets) {
 			failStep := "Verify that the Auxiliary Applications are running (post-chaos)"
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
+		}
+	}
+
+	// Checking the status of target nodes
+	if chaosDetails.DefaultChecks {
+		log.Info("[Status]: Getting the status of target nodes")
+		if err := status.CheckNodeStatus(experimentsDetails.TargetNode, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
+			log.Warnf("Target nodes are not in the ready state, you may need to manually recover the node, err: %v", err)
+			types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, "NUT: Not Ready", "Warning", &chaosDetails)
+			events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 		}
 	}
 

@@ -22,6 +22,7 @@ func PodNetworkDuplicationChaos(experimentsDetails *experimentTypes.ExperimentDe
 // getContainerArguments derives the args for the pumba pod
 func getContainerArguments(experimentsDetails *experimentTypes.ExperimentDetails) ([]string, error) {
 	baseArgs := []string{
+		"pumba",
 		"netem",
 		"--tc-image",
 		experimentsDetails.TCImage,
