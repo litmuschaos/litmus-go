@@ -75,16 +75,18 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 			return err
 		}
 
-		for _, pod := range targetPodList.Items {
-			parentName, err := annotation.GetParentName(clients, pod, chaosDetails)
-			if err != nil {
-				return err
+		// deriving the parent name of the target resources
+		if chaosDetails.AppDetail.Kind != "" {
+			for _, pod := range targetPodList.Items {
+				parentName, err := annotation.GetParentName(clients, pod, chaosDetails)
+				if err != nil {
+					return err
+				}
+				common.SetParentName(parentName, chaosDetails)
 			}
-			common.SetParentName(parentName, chaosDetails)
-		}
-
-		for _, target := range chaosDetails.ParentsResources {
-			common.SetTargets(target, "targeted", chaosDetails.AppDetail.Kind, chaosDetails)
+			for _, target := range chaosDetails.ParentsResources {
+				common.SetTargets(target, "targeted", chaosDetails.AppDetail.Kind, chaosDetails)
+			}
 		}
 
 		if experimentsDetails.ChaoslibDetail.EngineName != "" {
@@ -161,16 +163,18 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 			return err
 		}
 
-		for _, pod := range targetPodList.Items {
-			parentName, err := annotation.GetParentName(clients, pod, chaosDetails)
-			if err != nil {
-				return err
+		// deriving the parent name of the target resources
+		if chaosDetails.AppDetail.Kind != "" {
+			for _, pod := range targetPodList.Items {
+				parentName, err := annotation.GetParentName(clients, pod, chaosDetails)
+				if err != nil {
+					return err
+				}
+				common.SetParentName(parentName, chaosDetails)
 			}
-			common.SetParentName(parentName, chaosDetails)
-		}
-
-		for _, target := range chaosDetails.ParentsResources {
-			common.SetTargets(target, "targeted", chaosDetails.AppDetail.Kind, chaosDetails)
+			for _, target := range chaosDetails.ParentsResources {
+				common.SetTargets(target, "targeted", chaosDetails.AppDetail.Kind, chaosDetails)
+			}
 		}
 
 		if experimentsDetails.ChaoslibDetail.EngineName != "" {

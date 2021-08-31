@@ -302,33 +302,17 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 					},
 				},
 			},
-			InitContainers: []apiv1.Container{
-				{
-					Name:            "setup-" + experimentsDetails.ExperimentName,
-					Image:           experimentsDetails.LIBImage,
-					ImagePullPolicy: apiv1.PullPolicy(experimentsDetails.LIBImagePullPolicy),
-					Command: []string{
-						"/bin/bash",
-						"-c",
-						"sudo chmod 777 " + experimentsDetails.SocketPath,
-					},
-					VolumeMounts: []apiv1.VolumeMount{
-						{
-							Name:      "dockersocket",
-							MountPath: experimentsDetails.SocketPath,
-						},
-					},
-				},
-			},
 			Containers: []apiv1.Container{
 				{
 					Name:            experimentsDetails.ExperimentName,
 					Image:           experimentsDetails.LIBImage,
 					ImagePullPolicy: apiv1.PullPolicy(experimentsDetails.LIBImagePullPolicy),
 					Command: []string{
-						"pumba",
+						"sudo",
+						"-E",
 					},
 					Args: []string{
+						"pumba",
 						"--random",
 						"--interval",
 						strconv.Itoa(experimentsDetails.ChaosInterval) + "s",
@@ -336,6 +320,12 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 						"--signal",
 						experimentsDetails.Signal,
 						"re2:k8s_" + experimentsDetails.TargetContainer + "_" + appName,
+					},
+					Env: []apiv1.EnvVar{
+						{
+							Name:  "DOCKER_HOST",
+							Value: "unix://" + experimentsDetails.SocketPath,
+						},
 					},
 					Resources: experimentsDetails.Resources,
 					VolumeMounts: []apiv1.VolumeMount{

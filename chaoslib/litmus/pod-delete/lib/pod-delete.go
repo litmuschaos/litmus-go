@@ -71,20 +71,25 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 			return err
 		}
 
+		// deriving the parent name of the target resources
+		if chaosDetails.AppDetail.Kind != "" {
+			for _, pod := range targetPodList.Items {
+				parentName, err := annotation.GetParentName(clients, pod, chaosDetails)
+				if err != nil {
+					return err
+				}
+				common.SetParentName(parentName, chaosDetails)
+			}
+			for _, target := range chaosDetails.ParentsResources {
+				common.SetTargets(target, "targeted", chaosDetails.AppDetail.Kind, chaosDetails)
+			}
+		}
+
 		podNames := []string{}
 		for _, pod := range targetPodList.Items {
 			podNames = append(podNames, pod.Name)
-			parentName, err := annotation.GetParentName(clients, pod, chaosDetails)
-			if err != nil {
-				return err
-			}
-			common.SetParentName(parentName, chaosDetails)
 		}
 		log.Infof("Target pods list: %v", podNames)
-
-		for _, target := range chaosDetails.ParentsResources {
-			common.SetTargets(target, "targeted", chaosDetails.AppDetail.Kind, chaosDetails)
-		}
 
 		if experimentsDetails.EngineName != "" {
 			msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on application pod"
@@ -158,20 +163,25 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 			return err
 		}
 
+		// deriving the parent name of the target resources
+		if chaosDetails.AppDetail.Kind != "" {
+			for _, pod := range targetPodList.Items {
+				parentName, err := annotation.GetParentName(clients, pod, chaosDetails)
+				if err != nil {
+					return err
+				}
+				common.SetParentName(parentName, chaosDetails)
+			}
+			for _, target := range chaosDetails.ParentsResources {
+				common.SetTargets(target, "targeted", chaosDetails.AppDetail.Kind, chaosDetails)
+			}
+		}
+
 		podNames := []string{}
 		for _, pod := range targetPodList.Items {
 			podNames = append(podNames, pod.Name)
-			parentName, err := annotation.GetParentName(clients, pod, chaosDetails)
-			if err != nil {
-				return err
-			}
-			common.SetParentName(parentName, chaosDetails)
 		}
 		log.Infof("Target pods list: %v", podNames)
-
-		for _, target := range chaosDetails.ParentsResources {
-			common.SetTargets(target, "targeted", chaosDetails.AppDetail.Kind, chaosDetails)
-		}
 
 		if experimentsDetails.EngineName != "" {
 			msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on application pod"
