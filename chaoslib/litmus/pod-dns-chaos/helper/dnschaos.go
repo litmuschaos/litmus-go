@@ -36,11 +36,13 @@ func Helper(clients clients.ClientSets) {
 
 	// abort channel is used to transmit signal notifications.
 	abort = make(chan os.Signal, 1)
-	// abort channel is used to transmit signal notifications.
+	// injectAbort channel is used to transmit signal notifications.
 	injectAbort = make(chan os.Signal, 1)
 
 	// Catch and relay certain signal(s) to abort channel.
 	signal.Notify(abort, os.Interrupt, syscall.SIGTERM)
+	// Catch and relay certain signal(s) to abort channel.
+	signal.Notify(injectAbort, os.Interrupt, syscall.SIGTERM)
 
 	//Fetching all the ENV passed for the helper pod
 	log.Info("[PreReq]: Getting the ENV variables")

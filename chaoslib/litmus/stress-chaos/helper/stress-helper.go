@@ -193,7 +193,7 @@ func prepareStressChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 						return errors.Errorf("process stopped with SIGTERM signal")
 					}
 				}
-				return errors.Errorf("error process exited accidentally", err)
+				return errors.Errorf("process exited before the actual cleanup, err: %v", err)
 			}
 			log.Info("[Info]: Chaos injection completed")
 			terminateProcess(cmd.Process.Pid)
@@ -212,7 +212,7 @@ func terminateProcess(pid int) error {
 		return errors.Errorf("unreachable path, err: %v", err)
 	}
 	if err = process.Signal(syscall.SIGTERM); err != nil && err.Error() != ProcessAlreadyFinished {
-		return errors.Errorf("error while killing process", err)
+		return errors.Errorf("error while killing process, err: %v", err)
 	}
 	log.Info("[Info]: Stress process removed sucessfully")
 	return nil

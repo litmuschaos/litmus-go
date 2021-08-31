@@ -74,6 +74,8 @@ func KafkaBrokerPodFailure(clients clients.ClientSets) {
 	if err := kafka.ClusterHealthCheck(&experimentsDetails, clients); err != nil {
 		log.Errorf("Cluster health check failed, err: %v", err)
 		failStep := "Verify that the Kafka cluster is healthy(pre-chaos)"
+		types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, "AUT: Not Running", "Warning", &chaosDetails)
+		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -102,7 +104,7 @@ func KafkaBrokerPodFailure(clients clients.ClientSets) {
 
 	// PRE-CHAOS KAFKA APPLICATION LIVENESS CHECK
 	switch strings.ToLower(experimentsDetails.KafkaLivenessStream) {
-	case "enabled":
+	case "enable":
 		livenessTopicLeader, err := kafka.LivenessStream(&experimentsDetails, clients)
 		if err != nil {
 			log.Errorf("Liveness check failed, err: %v", err)
@@ -144,6 +146,8 @@ func KafkaBrokerPodFailure(clients clients.ClientSets) {
 	if err := kafka.ClusterHealthCheck(&experimentsDetails, clients); err != nil {
 		log.Errorf("Cluster health check failed, err: %v", err)
 		failStep := "Verify that the Kafka cluster is healthy(post-chaos)"
+		types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, "AUT: Not Running", "Warning", &chaosDetails)
+		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -173,7 +177,7 @@ func KafkaBrokerPodFailure(clients clients.ClientSets) {
 
 	// Liveness Status Check (post-chaos) and cleanup
 	switch strings.ToLower(experimentsDetails.KafkaLivenessStream) {
-	case "enabled":
+	case "enable":
 		log.Info("[Status]: Verify that the Kafka liveness pod is running(post-chaos)")
 		if err := status.CheckApplicationStatus(experimentsDetails.ChaoslibDetail.AppNS, "name=kafka-liveness-"+experimentsDetails.RunID, experimentsDetails.ChaoslibDetail.Timeout, experimentsDetails.ChaoslibDetail.Delay, clients); err != nil {
 			log.Errorf("Application liveness status check failed, err: %v", err)
