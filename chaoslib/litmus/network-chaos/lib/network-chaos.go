@@ -271,12 +271,12 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 func getPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, podName, args string) []apiv1.EnvVar {
 
 	var envDetails common.ENVDetails
-	envDetails.SetEnv("APP_NS", experimentsDetails.AppNS).
+	envDetails.SetEnv("APP_NAMESPACE", experimentsDetails.AppNS).
 		SetEnv("APP_POD", podName).
 		SetEnv("APP_CONTAINER", experimentsDetails.TargetContainer).
 		SetEnv("TOTAL_CHAOS_DURATION", strconv.Itoa(experimentsDetails.ChaosDuration)).
 		SetEnv("CHAOS_NAMESPACE", experimentsDetails.ChaosNamespace).
-		SetEnv("CHAOS_ENGINE", experimentsDetails.EngineName).
+		SetEnv("CHAOSENGINE", experimentsDetails.EngineName).
 		SetEnv("CHAOS_UID", string(experimentsDetails.ChaosUID)).
 		SetEnv("CONTAINER_RUNTIME", experimentsDetails.ContainerRuntime).
 		SetEnv("NETEM_COMMAND", args).
@@ -284,6 +284,7 @@ func getPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, podName, a
 		SetEnv("EXPERIMENT_NAME", experimentsDetails.ExperimentName).
 		SetEnv("SOCKET_PATH", experimentsDetails.SocketPath).
 		SetEnv("DESTINATION_IPS", experimentsDetails.DestinationIPs).
+		SetEnv("EXPERIMENT_NAME", experimentsDetails.ExperimentName).
 		SetEnvFromDownwardAPI("v1", "metadata.name")
 
 	return envDetails.ENV

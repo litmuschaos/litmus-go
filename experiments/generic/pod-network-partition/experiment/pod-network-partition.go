@@ -28,14 +28,14 @@ func PodNetworkPartition(clients clients.ClientSets) {
 	log.Infof("[PreReq]: Getting the ENV for the %v experiment", experimentsDetails.ExperimentName)
 	experimentEnv.GetENV(&experimentsDetails)
 
-	// Intialise the chaos attributes
-	experimentEnv.InitialiseChaosVariables(&chaosDetails, &experimentsDetails)
+	// Initialize the chaos attributes
+	types.InitialiseChaosVariables(&chaosDetails)
 
-	// Intialise Chaos Result Parameters
+	// Initialize Chaos Result Parameters
 	types.SetResultAttributes(&resultDetails, chaosDetails)
 
 	if experimentsDetails.EngineName != "" {
-		// Intialise the probe details. Bail out upon error, as we haven't entered exp business logic yet
+		// Initialize the probe details. Bail out upon error, as we haven't entered exp business logic yet
 		if err := probe.InitializeProbesInChaosResultDetails(&chaosDetails, clients, &resultDetails); err != nil {
 			log.Errorf("unable to initialize the probes, err: %v", err)
 			return

@@ -30,7 +30,7 @@ func Helper(clients clients.ClientSets) {
 
 	//Fetching all the ENV passed in the helper pod
 	log.Info("[PreReq]: Getting the ENV variables")
-	getENV(&experimentsDetails, "container-kill")
+	getENV(&experimentsDetails)
 
 	// Intialise the chaos attributes
 	types.InitialiseChaosVariables(&chaosDetails)
@@ -195,15 +195,15 @@ func verifyRestartCount(experimentsDetails *experimentTypes.ExperimentDetails, p
 }
 
 //getENV fetches all the env variables from the runner pod
-func getENV(experimentDetails *experimentTypes.ExperimentDetails, name string) {
-	experimentDetails.ExperimentName = name
-	experimentDetails.AppNS = types.Getenv("APP_NS", "")
+func getENV(experimentDetails *experimentTypes.ExperimentDetails) {
+	experimentDetails.ExperimentName = types.Getenv("EXPERIMENT_NAME", "")
+	experimentDetails.AppNS = types.Getenv("APP_NAMESPACE", "")
 	experimentDetails.TargetContainer = types.Getenv("APP_CONTAINER", "")
 	experimentDetails.TargetPods = types.Getenv("APP_POD", "")
 	experimentDetails.ChaosDuration, _ = strconv.Atoi(types.Getenv("TOTAL_CHAOS_DURATION", "30"))
 	experimentDetails.ChaosInterval, _ = strconv.Atoi(types.Getenv("CHAOS_INTERVAL", "10"))
 	experimentDetails.ChaosNamespace = types.Getenv("CHAOS_NAMESPACE", "litmus")
-	experimentDetails.EngineName = types.Getenv("CHAOS_ENGINE", "")
+	experimentDetails.EngineName = types.Getenv("CHAOSENGINE", "")
 	experimentDetails.ChaosUID = clientTypes.UID(types.Getenv("CHAOS_UID", ""))
 	experimentDetails.ChaosPodName = types.Getenv("POD_NAME", "")
 	experimentDetails.SocketPath = types.Getenv("SOCKET_PATH", "")

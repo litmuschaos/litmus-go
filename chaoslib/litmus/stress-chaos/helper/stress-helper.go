@@ -495,12 +495,12 @@ func parsePIDFromJSON(j []byte, runtime string) (int, error) {
 //getENV fetches all the env variables from the runner pod
 func getENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.ExperimentName = types.Getenv("EXPERIMENT_NAME", "")
-	experimentDetails.AppNS = types.Getenv("APP_NS", "")
+	experimentDetails.AppNS = types.Getenv("APP_NAMESPACE", "")
 	experimentDetails.TargetContainer = types.Getenv("APP_CONTAINER", "")
 	experimentDetails.TargetPods = types.Getenv("APP_POD", "")
 	experimentDetails.ChaosDuration, _ = strconv.Atoi(types.Getenv("TOTAL_CHAOS_DURATION", "30"))
 	experimentDetails.ChaosNamespace = types.Getenv("CHAOS_NAMESPACE", "litmus")
-	experimentDetails.EngineName = types.Getenv("CHAOS_ENGINE", "")
+	experimentDetails.EngineName = types.Getenv("CHAOSENGINE", "")
 	experimentDetails.ChaosUID = clientTypes.UID(types.Getenv("CHAOS_UID", ""))
 	experimentDetails.ChaosPodName = types.Getenv("POD_NAME", "")
 	experimentDetails.ContainerRuntime = types.Getenv("CONTAINER_RUNTIME", "")
