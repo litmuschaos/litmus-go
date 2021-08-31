@@ -175,7 +175,7 @@ func NodeRestart(clients clients.ClientSets) {
 	if err != nil {
 		failStep := "Verify that the NUT (Node Under Test) is running (post-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-		log.Errorf("[Verification]: Unable to get node power status. Error: ", err)
+		log.Errorf("[Verification]: Unable to get node power status. Error: %v ", err)
 		return
 	}
 	if nodeStatus != "On" {
