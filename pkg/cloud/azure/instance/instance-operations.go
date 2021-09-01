@@ -7,6 +7,8 @@ import (
 	"github.com/Azure/azure-sdk-for-go/profiles/latest/compute/mgmt/compute"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/azure/auth"
+	"github.com/litmuschaos/litmus-go/pkg/cloud/azure/common"
+
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
 	"github.com/pkg/errors"
@@ -63,7 +65,7 @@ func AzureScaleSetInstanceStop(timeout, delay int, subscriptionID, resourceGroup
 	} else {
 		return errors.Errorf("fail to setup authorization, err: %v")
 	}
-	virtualMachineScaleSetName, virtualMachineId := GetScaleSetNameAndInstanceId(azureInstanceName)
+	virtualMachineScaleSetName, virtualMachineId := common.GetScaleSetNameAndInstanceId(azureInstanceName)
 
 	log.Info("[Info]: Stopping the instance")
 	_, err = vmssClient.PowerOff(context.TODO(), resourceGroup, virtualMachineScaleSetName, virtualMachineId, &vmssClient.SkipResourceProviderRegistration)
@@ -84,7 +86,7 @@ func AzureScaleSetInstanceStart(timeout, delay int, subscriptionID, resourceGrou
 	} else {
 		return errors.Errorf("fail to setup authorization, err: %v")
 	}
-	virtualMachineScaleSetName, virtualMachineId := GetScaleSetNameAndInstanceId(azureInstanceName)
+	virtualMachineScaleSetName, virtualMachineId := common.GetScaleSetNameAndInstanceId(azureInstanceName)
 
 	log.Info("[Info]: Starting back the instance to running state")
 	_, err = vmssClient.Start(context.TODO(), resourceGroup, virtualMachineScaleSetName, virtualMachineId)
@@ -107,7 +109,7 @@ func WaitForAzureComputeDown(timeout, delay int, scaleSet, subscriptionID, resou
 		Wait(time.Duration(delay) * time.Second).
 		Try(func(attempt uint) error {
 			if scaleSet == "enable" {
-				scaleSetName, vmId := GetScaleSetNameAndInstanceId(azureInstanceName)
+				scaleSetName, vmId := common.GetScaleSetNameAndInstanceId(azureInstanceName)
 				instanceState, err = GetAzureScaleSetInstanceStatus(subscriptionID, resourceGroup, scaleSetName, vmId)
 			} else {
 				instanceState, err = GetAzureInstanceStatus(subscriptionID, resourceGroup, azureInstanceName)
@@ -136,7 +138,7 @@ func WaitForAzureComputeUp(timeout, delay int, scaleSet, subscriptionID, resourc
 
 			switch scaleSet {
 			case "enable":
-				scaleSetName, vmId := GetScaleSetNameAndInstanceId(azureInstanceName)
+				scaleSetName, vmId := common.GetScaleSetNameAndInstanceId(azureInstanceName)
 				instanceState, err = GetAzureScaleSetInstanceStatus(subscriptionID, resourceGroup, scaleSetName, vmId)
 			default:
 				instanceState, err = GetAzureInstanceStatus(subscriptionID, resourceGroup, azureInstanceName)

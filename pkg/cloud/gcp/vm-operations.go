@@ -75,7 +75,7 @@ func VMInstanceStart(instanceName string, gcpProjectID string, instanceZone stri
 }
 
 // WaitForVMInstanceDown will wait for the VM instance to attain the TERMINATED status
-func WaitForVMInstanceDown(timeout int, delay int, managedNodegroup string, instanceName string, gcpProjectID string, instanceZone string) error {
+func WaitForVMInstanceDown(timeout int, delay int, instanceName string, gcpProjectID string, instanceZone string) error {
 	log.Info("[Status]: Checking VM instance status")
 	return retry.
 		Times(uint(timeout / delay)).
@@ -85,7 +85,7 @@ func WaitForVMInstanceDown(timeout int, delay int, managedNodegroup string, inst
 			if err != nil {
 				return errors.Errorf("failed to get the instance status")
 			}
-			if managedNodegroup != "enable" && instanceState != "TERMINATED" {
+			if instanceState != "TERMINATED" {
 				log.Infof("The instance state is %v", instanceState)
 				return errors.Errorf("instance is not yet in stopped state")
 			}
@@ -95,7 +95,7 @@ func WaitForVMInstanceDown(timeout int, delay int, managedNodegroup string, inst
 }
 
 // WaitForVMInstanceUp will wait for the VM instance to attain the RUNNING status
-func WaitForVMInstanceUp(timeout int, delay int, managedNodegroup string, instanceName string, gcpProjectID string, instanceZone string) error {
+func WaitForVMInstanceUp(timeout int, delay int, instanceName string, gcpProjectID string, instanceZone string) error {
 	log.Info("[Status]: Checking VM instance status")
 	return retry.
 		Times(uint(timeout / delay)).
