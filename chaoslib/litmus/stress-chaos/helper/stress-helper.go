@@ -496,6 +496,7 @@ func parsePIDFromJSON(j []byte, runtime string) (int, error) {
 //getENV fetches all the env variables from the runner pod
 func getENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.ExperimentName = common.Getenv("EXPERIMENT_NAME", "")
+	experimentDetails.InstanceID = common.Getenv("INSTANCE_ID", "")
 	experimentDetails.AppNS = common.Getenv("APP_NS", "")
 	experimentDetails.TargetContainer = common.Getenv("APP_CONTAINER", "")
 	experimentDetails.TargetPods = common.Getenv("APP_POD", "")

@@ -47,7 +47,7 @@ func Helper(clients clients.ClientSets) {
 
 	//Fetching all the ENV passed in the helper pod
 	log.Info("[PreReq]: Getting the ENV variables")
-	getENV(&experimentsDetails, "disk-fill")
+	getENV(&experimentsDetails)
 
 	// Intialise the chaos attributes
 	experimentEnv.InitialiseChaosVariables(&chaosDetails, &experimentsDetails)
@@ -252,8 +252,9 @@ func remedy(experimentsDetails *experimentTypes.ExperimentDetails, clients clien
 }
 
 //getENV fetches all the env variables from the runner pod
-func getENV(experimentDetails *experimentTypes.ExperimentDetails, name string) {
-	experimentDetails.ExperimentName = name
+func getENV(experimentDetails *experimentTypes.ExperimentDetails) {
+	experimentDetails.ExperimentName = common.Getenv("EXPERIMENT_NAME", "")
+	experimentDetails.InstanceID = common.Getenv("INSTANCE_ID", "")
 	experimentDetails.AppNS = common.Getenv("APP_NS", "")
 	experimentDetails.TargetContainer = common.Getenv("APP_CONTAINER", "")
 	experimentDetails.TargetPods = common.Getenv("APP_POD", "")
