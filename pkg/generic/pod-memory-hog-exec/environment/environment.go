@@ -57,5 +57,5 @@ func InitialiseChaosVariables(chaosDetails *types.ChaosDetails, experimentDetail
 	chaosDetails.AppDetail = appDetails
 	chaosDetails.ProbeImagePullPolicy = experimentDetails.LIBImagePullPolicy
 	chaosDetails.Targets = []v1alpha1.TargetDetails{}
-	chaosDetails.DefaultChecks, _ = strconv.ParseBool(common.Getenv("DEFAULT_CHECKS", "true"))
+	chaosDetails.DefaultAppHealthCheck, _ = strconv.ParseBool(common.Getenv("DEFAULT_APP_HEALTH_CHECK", "true"))
 }

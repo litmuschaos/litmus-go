@@ -79,5 +79,5 @@ func InitialiseChaosVariables(chaosDetails *types.ChaosDetails, kafkaDetails *ka
 	chaosDetails.ProbeImagePullPolicy = kafkaDetails.ChaoslibDetail.LIBImagePullPolicy
 	chaosDetails.Randomness, _ = strconv.ParseBool(common.Getenv("RANDOMNESS", "false"))
 	chaosDetails.Targets = []v1alpha1.TargetDetails{}
-	chaosDetails.DefaultChecks, _ = strconv.ParseBool(common.Getenv("DEFAULT_CHECKS", "true"))
+	chaosDetails.DefaultAppHealthCheck, _ = strconv.ParseBool(common.Getenv("DEFAULT_APP_HEALTH_CHECK", "true"))
 }

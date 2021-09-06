@@ -76,7 +76,7 @@ func CasssandraPodDelete(clients clients.ClientSets) {
 	go common.AbortWatcher(experimentsDetails.ChaoslibDetail.ExperimentName, clients, &resultDetails, &chaosDetails, &eventsDetails)
 
 	//PRE-CHAOS APPLICATION STATUS CHECK
-	if chaosDetails.DefaultChecks {
+	if chaosDetails.DefaultAppHealthCheck {
 		log.Info("[Status]: Verify that the AUT (Application Under Test) is running (pre-chaos)")
 		if err = status.AUTStatusCheck(experimentsDetails.ChaoslibDetail.AppNS, experimentsDetails.ChaoslibDetail.AppLabel, experimentsDetails.ChaoslibDetail.TargetContainer, experimentsDetails.ChaoslibDetail.Timeout, experimentsDetails.ChaoslibDetail.Delay, clients, &chaosDetails); err != nil {
 			log.Errorf("Application status check failed, err: %v", err)
@@ -99,7 +99,7 @@ func CasssandraPodDelete(clients clients.ClientSets) {
 
 	if experimentsDetails.ChaoslibDetail.EngineName != "" {
 		// marking AUT as running, as we already checked the status of application under test
-		msg := common.GetStatusMessage(chaosDetails.DefaultChecks, "AUT: Running", "")
+		msg := common.GetStatusMessage(chaosDetails.DefaultAppHealthCheck, "AUT: Running", "")
 
 		// run the probes in the pre-chaos check
 		if len(resultDetails.ProbeDetails) != 0 {
@@ -107,13 +107,13 @@ func CasssandraPodDelete(clients clients.ClientSets) {
 			if err = probe.RunProbes(&chaosDetails, clients, &resultDetails, "PreChaos", &eventsDetails); err != nil {
 				log.Errorf("Probes Failed, err: %v", err)
 				failStep := "Failed while running probes"
-				msg = common.GetStatusMessage(chaosDetails.DefaultChecks, "AUT: Running", "Unsuccessful")
+				msg = common.GetStatusMessage(chaosDetails.DefaultAppHealthCheck, "AUT: Running", "Unsuccessful")
 				types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, msg, "Warning", &chaosDetails)
 				events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 				result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 				return
 			}
-			msg = common.GetStatusMessage(chaosDetails.DefaultChecks, "AUT: Running", "Successful")
+			msg = common.GetStatusMessage(chaosDetails.DefaultAppHealthCheck, "AUT: Running", "Successful")
 		}
 		// generating the events for the pre-chaos check
 		types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, msg, "Normal", &chaosDetails)
@@ -154,7 +154,7 @@ func CasssandraPodDelete(clients clients.ClientSets) {
 	resultDetails.Verdict = v1alpha1.ResultVerdictPassed
 
 	//POST-CHAOS APPLICATION STATUS CHECK
-	if chaosDetails.DefaultChecks {
+	if chaosDetails.DefaultAppHealthCheck {
 		log.Info("[Status]: Verify that the AUT (Application Under Test) is running (post-chaos)")
 		if err = status.AUTStatusCheck(experimentsDetails.ChaoslibDetail.AppNS, experimentsDetails.ChaoslibDetail.AppLabel, experimentsDetails.ChaoslibDetail.TargetContainer, experimentsDetails.ChaoslibDetail.Timeout, experimentsDetails.ChaoslibDetail.Delay, clients, &chaosDetails); err != nil {
 			log.Errorf("Application status check failed, err: %v", err)
@@ -177,20 +177,20 @@ func CasssandraPodDelete(clients clients.ClientSets) {
 
 	if experimentsDetails.ChaoslibDetail.EngineName != "" {
 		// marking AUT as running, as we already checked the status of application under test
-		msg := common.GetStatusMessage(chaosDetails.DefaultChecks, "AUT: Running", "")
+		msg := common.GetStatusMessage(chaosDetails.DefaultAppHealthCheck, "AUT: Running", "")
 
 		// run the probes in the post-chaos check
 		if len(resultDetails.ProbeDetails) != 0 {
 			if err = probe.RunProbes(&chaosDetails, clients, &resultDetails, "PostChaos", &eventsDetails); err != nil {
 				log.Errorf("Probes Failed, err: %v", err)
 				failStep := "Failed while running probes"
-				msg = common.GetStatusMessage(chaosDetails.DefaultChecks, "AUT: Running", "Unsuccessful")
+				msg = common.GetStatusMessage(chaosDetails.DefaultAppHealthCheck, "AUT: Running", "Unsuccessful")
 				types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, msg, "Warning", &chaosDetails)
 				events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 				result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 				return
 			}
-			msg = common.GetStatusMessage(chaosDetails.DefaultChecks, "AUT: Running", "Successful")
+			msg = common.GetStatusMessage(chaosDetails.DefaultAppHealthCheck, "AUT: Running", "Successful")
 		}
 
 		// generating post chaos event
