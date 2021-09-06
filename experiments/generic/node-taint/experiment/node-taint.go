@@ -92,20 +92,18 @@ func NodeTaint(clients clients.ClientSets) {
 	}
 
 	// Checking the status of target nodes
-	if chaosDetails.DefaultChecks {
-		log.Info("[Status]: Getting the status of target nodes")
-		if err := status.CheckNodeStatus(experimentsDetails.TargetNode, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
-			log.Errorf("Target nodes are not in the ready state, err: %v", err)
-			failStep := "Checking the status of nodes"
-			types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, "NUT: Not Ready", "Warning", &chaosDetails)
-			events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
-			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-			return
-		}
+	log.Info("[Status]: Getting the status of target nodes")
+	if err := status.CheckNodeStatus(experimentsDetails.TargetNode, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
+		log.Errorf("Target nodes are not in the ready state, err: %v", err)
+		failStep := "Checking the status of nodes"
+		types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, "NUT: Not Ready", "Warning", &chaosDetails)
+		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+		return
 	}
 	if experimentsDetails.EngineName != "" {
 		// marking AUT as running, as we already checked the status of application under test
-		msg := common.GetStatusMessage(chaosDetails.DefaultChecks, "NUT: Ready", "")
+		msg := "NUT: Ready"
 
 		// run the probes in the pre-chaos check
 		if len(resultDetails.ProbeDetails) != 0 {
@@ -113,13 +111,13 @@ func NodeTaint(clients clients.ClientSets) {
 			if err := probe.RunProbes(&chaosDetails, clients, &resultDetails, "PreChaos", &eventsDetails); err != nil {
 				log.Errorf("Probe Failed, err: %v", err)
 				failStep := "Failed while running probes"
-				msg := common.GetStatusMessage(chaosDetails.DefaultChecks, "NUT: Ready", "Unsuccessful")
+				msg := "NUT: Ready, Probes: Unsuccessful"
 				types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, msg, "Warning", &chaosDetails)
 				events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 				result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 				return
 			}
-			msg = common.GetStatusMessage(chaosDetails.DefaultChecks, "NUT: Ready", "Successful")
+			msg = "NUT: Ready, Probes: Successful"
 		}
 		// generating the events for the pre-chaos check
 		types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, msg, "Normal", &chaosDetails)
@@ -166,31 +164,29 @@ func NodeTaint(clients clients.ClientSets) {
 	}
 
 	// Checking the status of target nodes
-	if chaosDetails.DefaultChecks {
-		log.Info("[Status]: Getting the status of target nodes")
-		if err := status.CheckNodeStatus(experimentsDetails.TargetNode, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
-			log.Warnf("Target nodes are not in the ready state, you may need to manually recover the node, err: %v", err)
-			types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, "NUT: Not Ready", "Warning", &chaosDetails)
-			events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
-		}
+	log.Info("[Status]: Getting the status of target nodes")
+	if err := status.CheckNodeStatus(experimentsDetails.TargetNode, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
+		log.Warnf("Target nodes are not in the ready state, you may need to manually recover the node, err: %v", err)
+		types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, "NUT: Not Ready", "Warning", &chaosDetails)
+		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
 	if experimentsDetails.EngineName != "" {
 		// marking AUT as running, as we already checked the status of application under test
-		msg := common.GetStatusMessage(chaosDetails.DefaultChecks, "NUT: Ready", "")
+		msg := "NUT: Ready"
 
 		// run the probes in the post-chaos check
 		if len(resultDetails.ProbeDetails) != 0 {
 			if err := probe.RunProbes(&chaosDetails, clients, &resultDetails, "PostChaos", &eventsDetails); err != nil {
 				log.Errorf("Probes Failed, err: %v", err)
 				failStep := "Failed while running probes"
-				msg := common.GetStatusMessage(chaosDetails.DefaultChecks, "NUT: Ready", "Unsuccessful")
+				msg := "NUT: Ready, Probes: Unsuccessful"
 				types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, msg, "Warning", &chaosDetails)
 				events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 				result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 				return
 			}
-			msg = common.GetStatusMessage(chaosDetails.DefaultChecks, "NUT: Ready", "Successful")
+			msg = "NUT: Ready, Probes: Successful"
 		}
 
 		// generating post chaos event

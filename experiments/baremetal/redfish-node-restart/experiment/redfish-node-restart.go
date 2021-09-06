@@ -2,11 +2,12 @@ package experiment
 
 import (
 	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
-	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/node-drain/lib"
-	"github.com/litmuschaos/litmus-go/pkg/clients"
+	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/redfish-node-restart/lib"
+	redfishLib "github.com/litmuschaos/litmus-go/pkg/baremetal/redfish"
+	experimentEnv "github.com/litmuschaos/litmus-go/pkg/baremetal/redfish-node-restart/environment"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/baremetal/redfish-node-restart/types"
+	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
-	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/node-drain/environment"
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/node-drain/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/result"
@@ -16,8 +17,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-//NodeDrain inject the node-drain chaos
-func NodeDrain(clients clients.ClientSets) {
+// NodeRestart contains steps to inject chaos
+func NodeRestart(clients clients.ClientSets) {
 
 	experimentsDetails := experimentTypes.ExperimentDetails{}
 	resultDetails := types.ResultDetails{}
@@ -46,7 +47,7 @@ func NodeDrain(clients clients.ClientSets) {
 	log.Infof("[PreReq]: Updating the chaos result of %v experiment (SOT)", experimentsDetails.ExperimentName)
 	if err := result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT"); err != nil {
 		log.Errorf("Unable to Create the Chaos Result, err: %v", err)
-		failStep := "Updating the chaos result of node-drain experiment (SOT)"
+		failStep := "Updating the chaos result of redfish-node-restart experiment (SOT)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -59,17 +60,15 @@ func NodeDrain(clients clients.ClientSets) {
 	types.SetResultEventAttributes(&eventsDetails, types.AwaitedVerdict, msg, "Normal", &resultDetails)
 	events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosResult")
 
-	//DISPLAY THE APP INFORMATION
-	log.InfoWithValues("[Info]: The application information is as follows", logrus.Fields{
-		"Namespace":   experimentsDetails.AppNS,
-		"App Label":   experimentsDetails.AppLabel,
-		"Node Label":  experimentsDetails.NodeLabel,
-		"Target Node": experimentsDetails.TargetNode,
-		"Ramp Time":   experimentsDetails.RampTime,
+	//DISPLAY THE NODE INFORMATION
+	log.InfoWithValues("[Info]: The Node information is as follows", logrus.Fields{
+		"Node_IPMI_IP": experimentsDetails.IPMIIP,
+		"User":         experimentsDetails.User,
+		"Ramp Time":    experimentsDetails.RampTime,
 	})
 
 	// Calling AbortWatcher go routine, it will continuously watch for the abort signal and generate the required events and result
-	go common.AbortWatcherWithoutExit(experimentsDetails.ExperimentName, clients, &resultDetails, &chaosDetails, &eventsDetails)
+	go common.AbortWatcher(experimentsDetails.ExperimentName, clients, &resultDetails, &chaosDetails, &eventsDetails)
 
 	//PRE-CHAOS APPLICATION STATUS CHECK
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (pre-chaos)")
@@ -91,20 +90,26 @@ func NodeDrain(clients clients.ClientSets) {
 		}
 	}
 
-	// Checking the status of target nodes
-	log.Info("[Status]: Getting the status of target nodes")
-	if err := status.CheckNodeStatus(experimentsDetails.TargetNode, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
-		log.Errorf("Target nodes are not in the ready state, err: %v", err)
-		failStep := "Checking the status of nodes"
-		types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, "NUT: Not Ready", "Warning", &chaosDetails)
-		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
+	// PRE-CHAOS NODE STATUS CHECK
+	log.Info("[Status]: Verify that the NUT (Node Under Test) is running (pre-chaos)")
+	nodeStatus, err := redfishLib.GetNodeStatus(experimentsDetails.IPMIIP, experimentsDetails.User, experimentsDetails.Password)
+	if err != nil {
+		failStep := "Verify that the NUT (Node Under Test) is running (pre-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+		log.Errorf("[Verification]: Unable to get node power status(pre-chaos). Error: %v", err)
 		return
 	}
+	if nodeStatus != "On" {
+		failStep := "Verify that the NUT (Node Under Test) is running (pre-chaos)"
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+		log.Errorf("[Verification]: Node is not in running state(pre-chaos)")
+		return
+	}
+	log.Info("[Verification]: Node is in running state(pre-chaos)")
 
 	if experimentsDetails.EngineName != "" {
-		// marking AUT as running, as we already checked the status of application under test
-		msg := "NUT: Ready"
+		// marking NUT as running, as we already checked the status of node under test
+		msg := "NUT: Running"
 
 		// run the probes in the pre-chaos check
 		if len(resultDetails.ProbeDetails) != 0 {
@@ -112,32 +117,32 @@ func NodeDrain(clients clients.ClientSets) {
 			if err := probe.RunProbes(&chaosDetails, clients, &resultDetails, "PreChaos", &eventsDetails); err != nil {
 				log.Errorf("Probe Failed, err: %v", err)
 				failStep := "Failed while running probes"
-				msg := "NUT: Ready, Probes: Unsuccessful"
+				msg := "NUT: Running, Probes: Unsuccessful"
 				types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, msg, "Warning", &chaosDetails)
 				events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 				result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 				return
 			}
-			msg = "NUT: Ready, Probes: Successful"
+			msg = "NUT: Running, Probes: Successful"
 		}
 		// generating the events for the pre-chaos check
 		types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, msg, "Normal", &chaosDetails)
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
-	// Including the litmus lib for node-drain
+	// Including the litmus lib
 	switch experimentsDetails.ChaosLib {
 	case "litmus":
-		if err := litmusLIB.PrepareNodeDrain(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
-			log.Errorf("Chaos injection failed, err: %v", err)
+		if err := litmusLIB.PrepareChaos(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
 			failStep := "failed in chaos injection phase"
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+			log.Errorf("Chaos injection failed, err: %v", err)
 			return
 		}
 	default:
-		log.Error("[Invalid]: Please Provide the correct LIB")
-		failStep := "no match found for specified lib"
+		failStep := "lib not supported!"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+		log.Error("lib not supported, provide the correct value of lib")
 		return
 	}
 
@@ -146,7 +151,7 @@ func NodeDrain(clients clients.ClientSets) {
 
 	//POST-CHAOS APPLICATION STATUS CHECK
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (post-chaos)")
-	if err := status.AUTStatusCheck(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.TargetContainer, experimentsDetails.Timeout, experimentsDetails.Delay, clients, &chaosDetails); err != nil {
+	if err = status.AUTStatusCheck(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.TargetContainer, experimentsDetails.Timeout, experimentsDetails.Delay, clients, &chaosDetails); err != nil {
 		log.Errorf("Application status check failed, err: %v", err)
 		failStep := "Verify that the AUT (Application Under Test) is running (post-chaos)"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
@@ -164,30 +169,39 @@ func NodeDrain(clients clients.ClientSets) {
 		}
 	}
 
-	// Checking the status of target nodes
-	log.Info("[Status]: Getting the status of target nodes")
-	if err := status.CheckNodeStatus(experimentsDetails.TargetNode, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
-		log.Warnf("Target nodes are not in the ready state, you may need to manually recover the node, err: %v", err)
-		types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, "NUT: Not Ready", "Warning", &chaosDetails)
-		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
+	//POST-CHAOS NODE STATUS CHECK
+	log.Info("[Status]: Verify that the NUT (Node Under Test) is running (post-chaos)")
+	nodeStatus, err = redfishLib.GetNodeStatus(experimentsDetails.IPMIIP, experimentsDetails.User, experimentsDetails.Password)
+	if err != nil {
+		failStep := "Verify that the NUT (Node Under Test) is running (post-chaos)"
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+		log.Errorf("[Verification]: Unable to get node power status. Error: %v ", err)
+		return
 	}
+	if nodeStatus != "On" {
+		failStep := "Verify that the NUT (Node Under Test) is running (post-chaos)"
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+		log.Errorf("[Verification]: Node is not in running state(post-chaos)")
+		return
+	}
+	log.Info("[Verification]: Node is in running state(post-chaos)")
 
 	if experimentsDetails.EngineName != "" {
-		// marking AUT as running, as we already checked the status of application under test
-		msg := "NUT: Ready"
+		// marking NUT as running, as we already checked the status of application under test
+		msg := "NUT: Running"
 
 		// run the probes in the post-chaos check
 		if len(resultDetails.ProbeDetails) != 0 {
 			if err := probe.RunProbes(&chaosDetails, clients, &resultDetails, "PostChaos", &eventsDetails); err != nil {
 				log.Errorf("Probes Failed, err: %v", err)
 				failStep := "Failed while running probes"
-				msg := "NUT: Ready, Probes: Unsuccessful"
+				msg := "NUT: Running, Probes: Unsuccessful"
 				types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, msg, "Warning", &chaosDetails)
 				events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 				result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 				return
 			}
-			msg = "NUT: Ready, Probes: Successful"
+			msg = "NUT: Running, Probes: Successful"
 		}
 
 		// generating post chaos event
@@ -218,5 +232,4 @@ func NodeDrain(clients clients.ClientSets) {
 		types.SetEngineEventAttributes(&eventsDetails, types.Summary, msg, "Normal", &chaosDetails)
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
-
 }

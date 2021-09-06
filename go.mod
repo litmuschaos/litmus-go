@@ -9,7 +9,7 @@ require (
 	github.com/aws/aws-sdk-go v1.38.59
 	github.com/containerd/cgroups v1.0.1
 	github.com/kyokomi/emoji v2.2.4+incompatible
-	github.com/litmuschaos/chaos-operator v0.0.0-20210817122030-33d68716fd7e
+	github.com/litmuschaos/chaos-operator v0.0.0-20210828090639-91d13cd94986
 	github.com/openebs/maya v1.12.1
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.7.0
