@@ -1,6 +1,7 @@
 package experiment
 
 import (
+	"os"
 	"strings"
 
 	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
@@ -27,7 +28,7 @@ func KafkaBrokerPodFailure(clients clients.ClientSets) {
 	chaosDetails := types.ChaosDetails{}
 
 	//Fetching all the ENV passed from the runner pod
-	log.Info("[PreReq]: Getting the ENV for the kafka-broker-pod-failure")
+	log.Infof("[PreReq]: Getting the ENV for the %v experiment", os.Getenv("EXPERIMENT_NAME"))
 	experimentEnv.GetENV(&experimentsDetails)
 
 	// Intialise the chaos attributes
@@ -65,7 +66,7 @@ func KafkaBrokerPodFailure(clients clients.ClientSets) {
 	log.InfoWithValues("The application informations are as follows", logrus.Fields{
 		"Kafka Namespace": experimentsDetails.KafkaNamespace,
 		"Kafka Label":     experimentsDetails.KafkaLabel,
-		"Ramp Time":       experimentsDetails.ChaoslibDetail.RampTime,
+		"Chaos Duration":  experimentsDetails.ChaoslibDetail.ChaosDuration,
 	})
 
 	// PRE-CHAOS APPLICATION STATUS CHECK

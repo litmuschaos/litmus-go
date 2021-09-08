@@ -112,7 +112,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		common.SetTargets(appNode, "reverted", "node", chaosDetails)
 		if err != nil || podStatus == "Failed" {
 			common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-helper-"+experimentsDetails.RunID, appLabel, chaosDetails, clients)
-			return errors.Errorf("helper pod failed due to, err: %v", err)
+			return common.HelperFailedError(err)
 		}
 
 		//Deleting the helper pod
@@ -178,7 +178,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 	}
 	if err != nil || podStatus == "Failed" {
 		common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
-		return errors.Errorf("helper pod failed due to, err: %v", err)
+		return common.HelperFailedError(err)
 	}
 
 	//Deleting the helper pod

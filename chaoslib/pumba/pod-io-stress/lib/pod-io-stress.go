@@ -119,7 +119,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, appLabel, clients, experimentsDetails.ChaosDuration+experimentsDetails.Timeout, "pumba-stress")
 		if err != nil || podStatus == "Failed" {
 			common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-helper-"+runID, appLabel, chaosDetails, clients)
-			return errors.Errorf("helper pod failed due to, err: %v", err)
+			return common.HelperFailedError(err)
 		}
 
 		//Deleting the helper pod
@@ -178,7 +178,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 	podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, appLabel, clients, experimentsDetails.ChaosDuration+experimentsDetails.Timeout, "pumba-stress")
 	if err != nil || podStatus == "Failed" {
 		common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
-		return errors.Errorf("helper pod failed due to, err: %v", err)
+		return common.HelperFailedError(err)
 	}
 
 	//Deleting the helper pod

@@ -32,8 +32,10 @@ func DeletePod(podName, podLabel, namespace string, timeout, delay int, clients 
 		Wait(time.Duration(delay) * time.Second).
 		Try(func(attempt uint) error {
 			podSpec, err := clients.KubeClient.CoreV1().Pods(namespace).List(v1.ListOptions{LabelSelector: podLabel})
-			if err != nil || len(podSpec.Items) != 0 {
+			if err != nil {
 				return errors.Errorf("Unable to delete the pod, err: %v", err)
+			} else if len(podSpec.Items) != 0 {
+				return errors.Errorf("Unable to delete the pod")
 			}
 			return nil
 		})
@@ -52,8 +54,10 @@ func DeleteAllPod(podLabel, namespace string, timeout, delay int, clients client
 		Wait(time.Duration(delay) * time.Second).
 		Try(func(attempt uint) error {
 			podSpec, err := clients.KubeClient.CoreV1().Pods(namespace).List(v1.ListOptions{LabelSelector: podLabel})
-			if err != nil || len(podSpec.Items) != 0 {
-				return errors.Errorf("Unable to delete the pod, err: %v", err)
+			if err != nil {
+				return errors.Errorf("Unable to delete the pods, err: %v", err)
+			} else if len(podSpec.Items) != 0 {
+				return errors.Errorf("Unable to delete the pods")
 			}
 			return nil
 		})
