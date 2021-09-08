@@ -57,7 +57,6 @@ func GetAzureScaleSetInstanceStatus(subscriptionID, resourceGroup, virtualMachin
 
 	vmssClient.Authorizer = authorizer
 
-
 	instanceDetails, err := vmssClient.GetInstanceView(context.TODO(), resourceGroup, virtualMachineScaleSetName, virtualMachineId)
 	if err != nil {
 		return "", errors.Errorf("fail to get the instance to check status, err: %v", err)
