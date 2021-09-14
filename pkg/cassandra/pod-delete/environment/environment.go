@@ -66,4 +66,5 @@ func InitialiseChaosVariables(chaosDetails *types.ChaosDetails, cassandraDetails
 	chaosDetails.AppDetail = appDetails
 	chaosDetails.ProbeImagePullPolicy = cassandraDetails.ChaoslibDetail.LIBImagePullPolicy
 	chaosDetails.Randomness, _ = strconv.ParseBool(common.Getenv("RANDOMNESS", "false"))
+	chaosDetails.DefaultAppHealthCheck, _ = strconv.ParseBool(common.Getenv("DEFAULT_APP_HEALTH_CHECK", "true"))
 }
