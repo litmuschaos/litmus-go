@@ -43,7 +43,7 @@ func InjectVMPowerOffChaos(experimentsDetails *experimentTypes.ExperimentDetails
 		events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 	}
 
-	if experimentsDetails.AppVMMoid == "" {
+	if experimentsDetails.VMId == "" {
 		return errors.Errorf("VM Moid not found to terminate vm instance")
 	}
 
@@ -57,7 +57,7 @@ func InjectVMPowerOffChaos(experimentsDetails *experimentTypes.ExperimentDetails
 	default:
 		//Stoping the vmware VM
 		log.Info("[Chaos]: Stoping the desired vm")
-		if err := vmwarelib.StopVM(experimentsDetails, cookie); err != nil {
+		if err := vmwarelib.StopVM(experimentsDetails.VcenterServer, experimentsDetails.VMId, cookie); err != nil {
 			return errors.Errorf("unable to stop the vm, err: %v", err)
 		}
 	}
@@ -75,7 +75,7 @@ func InjectVMPowerOffChaos(experimentsDetails *experimentTypes.ExperimentDetails
 
 	//Starting the vmware VM
 	log.Info("[Chaos]: Starting the desired vm")
-	if err := vmwarelib.StartVM(experimentsDetails, cookie); err != nil {
+	if err := vmwarelib.StartVM(experimentsDetails.VcenterServer, experimentsDetails.VMId, cookie); err != nil {
 		return errors.Errorf("unable to start the vm, err: %v", err)
 	}
 
@@ -97,7 +97,7 @@ func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, clients
 
 	//Starting the vmware VM
 	log.Info("[Abort]: Abort signal received starting the desired vm")
-	if err := vmwarelib.StartVM(experimentsDetails, cookie); err != nil {
+	if err := vmwarelib.StartVM(experimentsDetails.VcenterServer, experimentsDetails.VMId, cookie); err != nil {
 		log.Errorf("Unable to start the vm after abort signal received , err: %v", err)
 	}
 

@@ -28,7 +28,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.TargetContainer = common.Getenv("TARGET_CONTAINER", "")
 	experimentDetails.Delay, _ = strconv.Atoi(common.Getenv("STATUS_CHECK_DELAY", "2"))
 	experimentDetails.Timeout, _ = strconv.Atoi(common.Getenv("STATUS_CHECK_TIMEOUT", "180"))
-	experimentDetails.AppVMMoid = common.Getenv("APP_VM_MOID", "")
+	experimentDetails.VMId = common.Getenv("APP_VM_MOID", "")
 	experimentDetails.VcenterServer = common.Getenv("VCENTERSERVER", "")
 	experimentDetails.VcenterUser = common.Getenv("VCENTERUSER", "")
 	experimentDetails.VcenterPass = common.Getenv("VCENTERPASS", "")

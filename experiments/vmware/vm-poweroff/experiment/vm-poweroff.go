@@ -63,7 +63,7 @@ func VMPoweroff(clients clients.ClientSets) {
 
 	//DISPLAY THE INSTANCE INFORMATION
 	log.InfoWithValues("[Info]: The Instance information is as follows", logrus.Fields{
-		"VM_INSTANCE_MOID": experimentsDetails.AppVMMoid,
+		"VM_INSTANCE_MOID": experimentsDetails.VMId,
 		"Ramp Time":        experimentsDetails.RampTime,
 	})
 
@@ -71,7 +71,7 @@ func VMPoweroff(clients clients.ClientSets) {
 	go common.AbortWatcherWithoutExit(experimentsDetails.ExperimentName, clients, &resultDetails, &chaosDetails, &eventsDetails)
 
 	// GET SESSION ID TO LOGIN TO VCENTER
-	cookie, err := vmwarelib.GetVcenterSessionID(&experimentsDetails)
+	cookie, err := vmwarelib.GetVcenterSessionID(experimentsDetails.VcenterServer, experimentsDetails.VcenterUser, experimentsDetails.VcenterPass)
 	if err != nil {
 		failStep := "Unable to get Vcenter session ID"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
@@ -101,7 +101,7 @@ func VMPoweroff(clients clients.ClientSets) {
 
 	// PRE-CHAOS INSTANCE STATUS CHECK
 	log.Info("[Status]: Verify that the IUT (Instance Under Test) is running (pre-chaos)")
-	vmstatus, err := vmwarelib.GetVMStatus(&experimentsDetails, cookie)
+	vmstatus, err := vmwarelib.GetVMStatus(experimentsDetails.VcenterServer, experimentsDetails.VMId, cookie)
 	if err != nil {
 		log.Errorf("[Verification]: Unable to get Instance status(pre-chaos), err: %v", err)
 		failStep := "Verify that the IUT (Intance Under Test) is running (pre-chaos)"
@@ -179,7 +179,7 @@ func VMPoweroff(clients clients.ClientSets) {
 
 	//POST-CHAOS INSTANCE STATUS CHECK
 	log.Info("[Status]: Verify that the IUT (Instance Under Test) is running (post-chaos)")
-	vmstatus, err = vmwarelib.GetVMStatus(&experimentsDetails, cookie)
+	vmstatus, err = vmwarelib.GetVMStatus(experimentsDetails.VcenterServer, experimentsDetails.VMId, cookie)
 	if err != nil {
 		log.Errorf("[Verification]: Unable to get Instance status(post-chaos), err: %v", err)
 		failStep := "Verify that the IUT (Intance Under Test) is running (post-chaos)"
