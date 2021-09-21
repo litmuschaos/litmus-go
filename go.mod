@@ -20,7 +20,7 @@ require (
 	k8s.io/api v0.17.3
 	k8s.io/apimachinery v0.17.3
 	k8s.io/client-go v12.0.0+incompatible
-	k8s.io/kubernetes v1.17.3
+	k8s.io/kubernetes v1.17.7
 )
 
 // Pinned to kubernetes-1.16.2
