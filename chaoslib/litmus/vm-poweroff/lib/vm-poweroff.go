@@ -98,6 +98,12 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 
 				common.SetTargets(vmId, "injected", "VM", chaosDetails)
 
+				//Wait for the VM to completely stop
+				log.Infof("[Wait]: Wait for VM '%s' to get in POWERED_OFF state", vmId)
+				if err := vmware.WaitForVMStop(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.VcenterServer, vmId, cookie); err != nil {
+					return errors.Errorf("vm %s failed to successfully shutdown, err: %s", vmId, err.Error())
+				}
+
 				//Run the probes during the chaos
 				if len(resultDetails.ProbeDetails) != 0 && i == 0 {
 					if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
@@ -113,6 +119,12 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 				log.Infof("[Chaos]: Starting back %s VM", vmId)
 				if err := vmware.StartVM(experimentsDetails.VcenterServer, vmId, cookie); err != nil {
 					return errors.Errorf("failed to start back %s vm: %s", vmId, err.Error())
+				}
+
+				//Wait for the VM to completely start
+				log.Infof("[Wait]: Wait for VM '%s' to get in POWERED_ON state", vmId)
+				if err := vmware.WaitForVMStart(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.VcenterServer, vmId, cookie); err != nil {
+					return errors.Errorf("vm %s failed to successfully start, err: %s", vmId, err.Error())
 				}
 
 				common.SetTargets(vmId, "reverted", "VM", chaosDetails)
@@ -158,6 +170,15 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 				common.SetTargets(vmId, "injected", "VM", chaosDetails)
 			}
 
+			for _, vmId := range vmIdList {
+
+				//Wait for the VM to completely stop
+				log.Infof("[Wait]: Wait for VM '%s' to get in POWERED_OFF state", vmId)
+				if err := vmware.WaitForVMStop(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.VcenterServer, vmId, cookie); err != nil {
+					return errors.Errorf("vm %s failed to successfully shutdown, err: %s", vmId, err.Error())
+				}
+			}
+
 			//Running the probes during chaos
 			if len(resultDetails.ProbeDetails) != 0 {
 				if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
@@ -175,6 +196,15 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 				log.Infof("[Chaos]: Starting back %s VM", vmId)
 				if err := vmware.StartVM(experimentsDetails.VcenterServer, vmId, cookie); err != nil {
 					return errors.Errorf("failed to start back %s vm: %s", vmId, err.Error())
+				}
+			}
+
+			for _, vmId := range vmIdList {
+
+				//Wait for the VM to completely stop
+				log.Infof("[Wait]: Wait for VM '%s' to get in POWERED_ON state", vmId)
+				if err := vmware.WaitForVMStart(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.VcenterServer, vmId, cookie); err != nil {
+					return errors.Errorf("vm %s failed to successfully start, err: %s", vmId, err.Error())
 				}
 			}
 
@@ -202,6 +232,11 @@ func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, vmIdLis
 		}
 
 		if vmStatus != "POWERED_ON" {
+
+			log.Infof("[Abort]: Waiting for the VM %s to shutdown", vmId)
+			if err := vmware.WaitForVMStop(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.VcenterServer, vmId, cookie); err != nil {
+				log.Errorf("vm %s failed to successfully shutdown when an abort signal was received: %s", vmId, err.Error())
+			}
 
 			log.Infof("[Abort]: Starting %s VM as abort signal has been received", vmId)
 			if err := vmware.StartVM(experimentsDetails.VcenterServer, vmId, cookie); err != nil {

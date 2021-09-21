@@ -5,7 +5,10 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
+	"time"
 
+	"github.com/litmuschaos/litmus-go/pkg/log"
+	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
 	"github.com/pkg/errors"
 )
 
@@ -81,4 +84,50 @@ func StopVM(vcenterServer, vmId, cookie string) error {
 	}
 
 	return nil
+}
+
+//WaitForVMStart waits for the given VM to attain the POWERED_ON state
+func WaitForVMStart(timeout, delay int, vcenterServer, vmId, cookie string) error {
+
+	log.Infof("[Status]: Checking %s VM status", vmId)
+	return retry.Times(uint(timeout / delay)).
+		Wait(time.Duration(delay) * time.Second).
+		Try(func(attempt uint) error {
+
+			vmStatus, err := GetVMStatus(vcenterServer, vmId, cookie)
+			if err != nil {
+				return errors.Errorf("failed to get %s VM status: %s", vmId, err.Error())
+			}
+
+			if vmStatus != "POWERED_ON" {
+				log.Infof("%s VM state is %s", vmId, vmStatus)
+				return errors.Errorf("%s vm is not yet in POWERED_ON state", vmId)
+			}
+
+			log.Infof("%s VM state is %s", vmId, vmStatus)
+			return nil
+		})
+}
+
+//WaitForVMStop waits for the given VM to attain the POWERED_OFF state
+func WaitForVMStop(timeout, delay int, vcenterServer, vmId, cookie string) error {
+
+	log.Infof("[Status]: Checking %s VM status", vmId)
+	return retry.Times(uint(timeout / delay)).
+		Wait(time.Duration(delay) * time.Second).
+		Try(func(attempt uint) error {
+
+			vmStatus, err := GetVMStatus(vcenterServer, vmId, cookie)
+			if err != nil {
+				return errors.Errorf("failed to get %s VM status: %s", vmId, err.Error())
+			}
+
+			if vmStatus != "POWERED_OFF" {
+				log.Infof("%s VM state is %s", vmId, vmStatus)
+				return errors.Errorf("%s vm is not yet in POWERED_OFF state", vmId)
+			}
+
+			log.Infof("%s VM state is %s", vmId, vmStatus)
+			return nil
+		})
 }
