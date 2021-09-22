@@ -202,7 +202,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 
 			for _, vmId := range vmIdList {
 
-				//Wait for the VM to completely stop
+				//Wait for the VM to completely start
 				log.Infof("[Wait]: Wait for VM '%s' to get in POWERED_ON state", vmId)
 				if err := vmware.WaitForVMStart(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.VcenterServer, vmId, cookie); err != nil {
 					return errors.Errorf("vm %s failed to successfully start, err: %s", vmId, err.Error())
