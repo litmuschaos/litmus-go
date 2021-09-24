@@ -121,7 +121,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 				}
 
 				// run the probes during chaos
-				// the probes will be executed only once for all the target instances
+				// the OnChaos probes execution will start in the first iteration and keep running for the entire chaos duration
 				if len(resultDetails.ProbeDetails) != 0 && i == 0 {
 					if err = probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
 						return err
