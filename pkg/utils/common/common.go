@@ -172,3 +172,16 @@ func HelperFailedError(err error) error {
 	}
 	return errors.Errorf("helper pod failed")
 }
+
+func GetStatusMessage(defaultCheck bool, defaultMsg, probeStatus string) string {
+	if defaultCheck {
+		if probeStatus == "" {
+			return defaultMsg
+		}
+		return defaultMsg + ", Probes: " + probeStatus
+	}
+	if probeStatus == "" {
+		return "Skipped the default checks"
+	}
+	return "Probes: " + probeStatus
+}
