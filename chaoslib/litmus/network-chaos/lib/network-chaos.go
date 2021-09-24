@@ -284,7 +284,7 @@ func getPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, podName, a
 		SetEnv("EXPERIMENT_NAME", experimentsDetails.ExperimentName).
 		SetEnv("SOCKET_PATH", experimentsDetails.SocketPath).
 		SetEnv("DESTINATION_IPS", experimentsDetails.DestinationIPs).
-		SetEnv("EXPERIMENT_NAME", experimentsDetails.ExperimentName).
+		SetEnv("INSTANCE_ID", experimentsDetails.InstanceID).
 		SetEnvFromDownwardAPI("v1", "metadata.name")
 
 	return envDetails.ENV

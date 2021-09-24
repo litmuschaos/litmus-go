@@ -71,22 +71,22 @@ type EventDetails struct {
 
 // ChaosDetails is for collecting all the global variables
 type ChaosDetails struct {
-	ChaosUID             clientTypes.UID
-	ChaosNamespace       string
-	ChaosPodName         string
-	EngineName           string
-	InstanceID           string
-	ExperimentName       string
-	Timeout              int
-	Delay                int
-	AppDetail            AppDetails
-	DefaultChecks        bool
-	ChaosDuration        int
-	JobCleanupPolicy     string
-	ProbeImagePullPolicy string
-	Randomness           bool
-	Targets              []v1alpha1.TargetDetails
-	ParentsResources     []string
+	ChaosUID              clientTypes.UID
+	ChaosNamespace        string
+	ChaosPodName          string
+	EngineName            string
+	InstanceID            string
+	ExperimentName        string
+	Timeout               int
+	Delay                 int
+	AppDetail             AppDetails
+	ChaosDuration         int
+	JobCleanupPolicy      string
+	ProbeImagePullPolicy  string
+	Randomness            bool
+	Targets               []v1alpha1.TargetDetails
+	ParentsResources      []string
+	DefaultAppHealthCheck bool
 }
 
 // AppDetails contains all the application related envs
@@ -120,7 +120,7 @@ func InitialiseChaosVariables(chaosDetails *ChaosDetails) {
 	chaosDetails.Timeout, _ = strconv.Atoi(Getenv("STATUS_CHECK_TIMEOUT", "180"))
 	chaosDetails.Delay, _ = strconv.Atoi(Getenv("STATUS_CHECK_DELAY", "2"))
 	chaosDetails.AppDetail = appDetails
-	chaosDetails.DefaultChecks, _ = strconv.ParseBool(Getenv("DEFAULT_CHECKS", "true"))
+	chaosDetails.DefaultAppHealthCheck, _ = strconv.ParseBool(Getenv("DEFAULT_APP_HEALTH_CHECK", "true"))
 	chaosDetails.JobCleanupPolicy = Getenv("JOB_CLEANUP_POLICY", "retain")
 	chaosDetails.ProbeImagePullPolicy = Getenv("LIB_IMAGE_PULL_POLICY", "Always")
 	chaosDetails.ParentsResources = []string{}

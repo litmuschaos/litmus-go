@@ -275,6 +275,7 @@ func getPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, podName st
 		SetEnv("STATUS_CHECK_DELAY", strconv.Itoa(experimentsDetails.Delay)).
 		SetEnv("STATUS_CHECK_TIMEOUT", strconv.Itoa(experimentsDetails.Timeout)).
 		SetEnv("EXPERIMENT_NAME", experimentsDetails.ExperimentName).
+		SetEnv("INSTANCE_ID", experimentsDetails.InstanceID).
 		SetEnvFromDownwardAPI("v1", "metadata.name")
 
 	return envDetails.ENV

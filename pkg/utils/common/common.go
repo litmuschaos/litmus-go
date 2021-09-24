@@ -155,3 +155,16 @@ func getEnvSource(apiVersion string, fieldPath string) apiv1.EnvVarSource {
 	}
 	return downwardENV
 }
+
+func GetStatusMessage(defaultCheck bool, defaultMsg, probeStatus string) string {
+	if defaultCheck {
+		if probeStatus == "" {
+			return defaultMsg
+		}
+		return defaultMsg + ", Probes: " + probeStatus
+	}
+	if probeStatus == "" {
+		return "Skipped the default checks"
+	}
+	return "Probes: " + probeStatus
+}

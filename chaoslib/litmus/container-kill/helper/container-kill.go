@@ -197,6 +197,7 @@ func verifyRestartCount(experimentsDetails *experimentTypes.ExperimentDetails, p
 //getENV fetches all the env variables from the runner pod
 func getENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.ExperimentName = types.Getenv("EXPERIMENT_NAME", "")
+	experimentDetails.InstanceID = types.Getenv("INSTANCE_ID", "")
 	experimentDetails.AppNS = types.Getenv("APP_NAMESPACE", "")
 	experimentDetails.TargetContainer = types.Getenv("APP_CONTAINER", "")
 	experimentDetails.TargetPods = types.Getenv("APP_POD", "")

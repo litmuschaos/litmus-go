@@ -15,6 +15,7 @@ import (
 	awsSSMChaosByTag "github.com/litmuschaos/litmus-go/experiments/aws-ssm/aws-ssm-chaos-by-tag/experiment"
 	azureDiskLoss "github.com/litmuschaos/litmus-go/experiments/azure/azure-disk-loss/experiment"
 	azureInstanceStop "github.com/litmuschaos/litmus-go/experiments/azure/instance-stop/experiment"
+	redfishNodeRestart "github.com/litmuschaos/litmus-go/experiments/baremetal/redfish-node-restart/experiment"
 	cassandraPodDelete "github.com/litmuschaos/litmus-go/experiments/cassandra/pod-delete/experiment"
 	gcpVMDiskLoss "github.com/litmuschaos/litmus-go/experiments/gcp/gcp-vm-disk-loss/experiment"
 	gcpVMInstanceStop "github.com/litmuschaos/litmus-go/experiments/gcp/gcp-vm-instance-stop/experiment"
@@ -157,6 +158,8 @@ func main() {
 		podFioStress.PodFioStress(clients)
 	case "gcp-vm-instance-stop":
 		gcpVMInstanceStop.VMInstanceStop(clients)
+	case "redfish-node-restart":
+		redfishNodeRestart.NodeRestart(clients)
 
 	default:
 		log.Errorf("Unsupported -name %v, please provide the correct value of -name args", *experimentName)

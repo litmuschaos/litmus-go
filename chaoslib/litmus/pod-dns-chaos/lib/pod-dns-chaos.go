@@ -273,6 +273,7 @@ func getPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, podName st
 		SetEnv("SPOOF_MAP", experimentsDetails.SpoofMap).
 		SetEnv("MATCH_SCHEME", experimentsDetails.MatchScheme).
 		SetEnv("CHAOS_TYPE", experimentsDetails.ChaosType).
+		SetEnv("INSTANCE_ID", experimentsDetails.InstanceID).
 		SetEnvFromDownwardAPI("v1", "metadata.name")
 
 	return envDetails.ENV
