@@ -3,33 +3,34 @@ package environment
 import (
 	"strconv"
 
-	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-autoscaler/types"
+	clientTypes "k8s.io/apimachinery/pkg/types"
+
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/baremetal/redfish-node-restart/types"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
-	clientTypes "k8s.io/apimachinery/pkg/types"
 )
 
 //GetENV fetches all the env variables from the runner pod
 func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
-	experimentDetails.ExperimentName = common.Getenv("EXPERIMENT_NAME", "pod-autoscaler")
+	experimentDetails.ExperimentName = common.Getenv("EXPERIMENT_NAME", "")
 	experimentDetails.ChaosNamespace = common.Getenv("CHAOS_NAMESPACE", "litmus")
 	experimentDetails.EngineName = common.Getenv("CHAOSENGINE", "")
-	experimentDetails.ChaosDuration, _ = strconv.Atoi(common.Getenv("TOTAL_CHAOS_DURATION", "60"))
+	experimentDetails.ChaosDuration, _ = strconv.Atoi(common.Getenv("TOTAL_CHAOS_DURATION", "30"))
 	experimentDetails.RampTime, _ = strconv.Atoi(common.Getenv("RAMP_TIME", "0"))
 	experimentDetails.ChaosLib = common.Getenv("LIB", "litmus")
 	experimentDetails.AppNS = common.Getenv("APP_NAMESPACE", "")
 	experimentDetails.AppLabel = common.Getenv("APP_LABEL", "")
 	experimentDetails.AppKind = common.Getenv("APP_KIND", "")
-	experimentDetails.AppAffectPercentage, _ = strconv.Atoi(common.Getenv("APP_AFFECT_PERC", "100"))
-	experimentDetails.Replicas, _ = strconv.Atoi(common.Getenv("REPLICA_COUNT", ""))
+	experimentDetails.TargetContainer = common.Getenv("TARGET_CONTAINER", "")
 	experimentDetails.ChaosUID = clientTypes.UID(common.Getenv("CHAOS_UID", ""))
 	experimentDetails.InstanceID = common.Getenv("INSTANCE_ID", "")
 	experimentDetails.ChaosPodName = common.Getenv("POD_NAME", "")
 	experimentDetails.AuxiliaryAppInfo = common.Getenv("AUXILIARY_APPINFO", "")
 	experimentDetails.Delay, _ = strconv.Atoi(common.Getenv("STATUS_CHECK_DELAY", "2"))
 	experimentDetails.Timeout, _ = strconv.Atoi(common.Getenv("STATUS_CHECK_TIMEOUT", "180"))
-	experimentDetails.TargetContainer = common.Getenv("TARGET_CONTAINER", "")
+	experimentDetails.IPMIIP = common.Getenv("IPMI_IP", "")
+	experimentDetails.User = common.Getenv("USER", "")
+	experimentDetails.Password = common.Getenv("PASSWORD", "")
 }
 
 //InitialiseChaosVariables initialise all the global variables
@@ -48,8 +49,9 @@ func InitialiseChaosVariables(chaosDetails *types.ChaosDetails, experimentDetail
 	chaosDetails.EngineName = experimentDetails.EngineName
 	chaosDetails.ExperimentName = experimentDetails.ExperimentName
 	chaosDetails.InstanceID = experimentDetails.InstanceID
-	chaosDetails.ProbeImagePullPolicy = experimentDetails.LIBImagePullPolicy
+	chaosDetails.Timeout = experimentDetails.Timeout
+	chaosDetails.Delay = experimentDetails.Delay
 	chaosDetails.AppDetail = appDetails
-	chaosDetails.Targets = []v1alpha1.TargetDetails{}
-	chaosDetails.DefaultAppHealthCheck, _ = strconv.ParseBool(common.Getenv("DEFAULT_APP_HEALTH_CHECK", "true"))
+	chaosDetails.JobCleanupPolicy = common.Getenv("JOB_CLEANUP_POLICY", "retain")
+	chaosDetails.ProbeImagePullPolicy = experimentDetails.LIBImagePullPolicy
 }

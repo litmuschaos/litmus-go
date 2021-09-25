@@ -257,6 +257,7 @@ func getPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, podName st
 		SetEnv("FILL_PERCENTAGE", strconv.Itoa(experimentsDetails.FillPercentage)).
 		SetEnv("EPHEMERAL_STORAGE_MEBIBYTES", strconv.Itoa(experimentsDetails.EphemeralStorageMebibytes)).
 		SetEnv("DATA_BLOCK_SIZE", strconv.Itoa(experimentsDetails.DataBlockSize)).
+		SetEnv("INSTANCE_ID", experimentsDetails.InstanceID).
 		SetEnvFromDownwardAPI("v1", "metadata.name")
 
 	return envDetails.ENV

@@ -129,6 +129,12 @@ func triggerSourceCmdProbe(probe v1alpha1.ProbeAttributes, execCommandDetails li
 
 // createProbePod creates an external pod with source image for the cmd probe
 func createProbePod(clients clients.ClientSets, chaosDetails *types.ChaosDetails, runID string, source v1alpha1.SourceDetails) error {
+	//deriving serviceAccount name for the probe pod
+	svcAccount, err := getServiceAccount(chaosDetails.ChaosNamespace, chaosDetails.ChaosPodName, clients)
+	if err != nil {
+		return errors.Errorf("unable to get the serviceAccountName, err: %v", err)
+	}
+
 	cmdProbe := &apiv1.Pod{
 		ObjectMeta: v1.ObjectMeta{
 			Name:      chaosDetails.ExperimentName + "-probe-" + runID,
@@ -139,8 +145,9 @@ func createProbePod(clients clients.ClientSets, chaosDetails *types.ChaosDetails
 			},
 		},
 		Spec: apiv1.PodSpec{
-			RestartPolicy: apiv1.RestartPolicyNever,
-			HostNetwork:   source.HostNetwork,
+			RestartPolicy:      apiv1.RestartPolicyNever,
+			HostNetwork:        source.HostNetwork,
+			ServiceAccountName: svcAccount,
 			Containers: []apiv1.Container{
 				{
 					Name:            chaosDetails.ExperimentName + "-probe",
@@ -158,9 +165,8 @@ func createProbePod(clients clients.ClientSets, chaosDetails *types.ChaosDetails
 		},
 	}
 
-	_, err := clients.KubeClient.CoreV1().Pods(chaosDetails.ChaosNamespace).Create(cmdProbe)
+	_, err = clients.KubeClient.CoreV1().Pods(chaosDetails.ChaosNamespace).Create(cmdProbe)
 	return err
-
 }
 
 //deleteProbePod deletes the probe pod and wait until it got terminated
@@ -628,4 +634,13 @@ func createHelperPod(probe v1alpha1.ProbeAttributes, resultDetails *types.Result
 	litmusexec.SetExecCommandAttributes(&execCommandDetails, chaosDetails.ExperimentName+"-probe-"+runID, chaosDetails.ExperimentName+"-probe", chaosDetails.ChaosNamespace)
 
 	return execCommandDetails, nil
+}
+
+// getServiceAccount derive the serviceAccountName for the probe pod
+func getServiceAccount(chaosNamespace, chaosPodName string, clients clients.ClientSets) (string, error) {
+	pod, err := clients.KubeClient.CoreV1().Pods(chaosNamespace).Get(chaosPodName, v1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+	return pod.Spec.ServiceAccountName, nil
 }
