@@ -38,7 +38,7 @@ func PrepareNodeIOStress(experimentsDetails *experimentTypes.ExperimentDetails, 
 	})
 
 	if experimentsDetails.EngineName != "" {
-		if err := setHelperData(experimentsDetails, clients); err != nil {
+		if err := common.SetHelperData(chaosDetails, clients); err != nil {
 			return err
 		}
 	}
@@ -93,7 +93,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		experimentsDetails.RunID = common.GetRunID()
 
 		// Creating the helper pod to perform node io stress
-		if err := createHelperPod(experimentsDetails, appNode, clients, labelSuffix); err != nil {
+		if err := createHelperPod(experimentsDetails, chaosDetails, appNode, clients, labelSuffix); err != nil {
 			return errors.Errorf("unable to create the helper pod, err: %v", err)
 		}
 
@@ -153,7 +153,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		experimentsDetails.RunID = common.GetRunID()
 
 		// Creating the helper pod to perform node io stress
-		if err := createHelperPod(experimentsDetails, appNode, clients, labelSuffix); err != nil {
+		if err := createHelperPod(experimentsDetails, chaosDetails, appNode, clients, labelSuffix); err != nil {
 			return errors.Errorf("unable to create the helper pod, err: %v", err)
 		}
 	}
@@ -191,22 +191,18 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 }
 
 // createHelperPod derive the attributes for helper pod and create the helper pod
-func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, appNode string, clients clients.ClientSets, labelSuffix string) error {
+func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, chaosDetails *types.ChaosDetails, appNode string, clients clients.ClientSets, labelSuffix string) error {
 
 	helperPod := &apiv1.Pod{
 		ObjectMeta: v1.ObjectMeta{
-			Name:      experimentsDetails.ExperimentName + "-helper-" + experimentsDetails.RunID,
-			Namespace: experimentsDetails.ChaosNamespace,
-			Labels: map[string]string{
-				"app":      experimentsDetails.ExperimentName + "-helper-" + labelSuffix,
-				"name":     experimentsDetails.ExperimentName + "-helper-" + experimentsDetails.RunID,
-				"chaosUID": string(experimentsDetails.ChaosUID),
-			},
-			Annotations: experimentsDetails.Annotations,
+			Name:        experimentsDetails.ExperimentName + "-helper-" + experimentsDetails.RunID,
+			Namespace:   experimentsDetails.ChaosNamespace,
+			Labels:      common.GetHelperLabels(chaosDetails.Labels, experimentsDetails.RunID, labelSuffix, experimentsDetails.ExperimentName),
+			Annotations: chaosDetails.Annotations,
 		},
 		Spec: apiv1.PodSpec{
 			RestartPolicy:    apiv1.RestartPolicyNever,
-			ImagePullSecrets: experimentsDetails.ImagePullSecrets,
+			ImagePullSecrets: chaosDetails.ImagePullSecrets,
 			NodeName:         appNode,
 			Containers: []apiv1.Container{
 				{
@@ -217,7 +213,7 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, appN
 						"stress-ng",
 					},
 					Args:      getContainerArguments(experimentsDetails),
-					Resources: experimentsDetails.Resources,
+					Resources: chaosDetails.Resources,
 				},
 			},
 		},
@@ -264,26 +260,4 @@ func getContainerArguments(experimentsDetails *experimentTypes.ExperimentDetails
 		"/tmp",
 	}
 	return stressArgs
-}
-
-// setHelperData derive the data from experiment pod and sets into experimentDetails struct
-// which can be used to create helper pod
-func setHelperData(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) error {
-	// Get Chaos Pod Annotation
-	var err error
-	experimentsDetails.Annotations, err = common.GetChaosPodAnnotation(experimentsDetails.ChaosPodName, experimentsDetails.ChaosNamespace, clients)
-	if err != nil {
-		return errors.Errorf("unable to get annotations, err: %v", err)
-	}
-	// Get Resource Requirements
-	experimentsDetails.Resources, err = common.GetChaosPodResourceRequirements(experimentsDetails.ChaosPodName, experimentsDetails.ExperimentName, experimentsDetails.ChaosNamespace, clients)
-	if err != nil {
-		return errors.Errorf("unable to get resource requirements, err: %v", err)
-	}
-	// Get ImagePullSecrets
-	experimentsDetails.ImagePullSecrets, err = common.GetImagePullSecrets(experimentsDetails.ChaosPodName, experimentsDetails.ChaosNamespace, clients)
-	if err != nil {
-		return errors.Errorf("unable to get imagePullSecrets, err: %v", err)
-	}
-	return nil
 }
