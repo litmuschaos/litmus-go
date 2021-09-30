@@ -140,7 +140,7 @@ func NodeRestart(clients clients.ClientSets) {
 			return
 		}
 	default:
-		failStep := "lib not supported!"
+		failStep := "[chaos] no match was found for the specified lib"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		log.Error("lib not supported, provide the correct value of lib")
 		return

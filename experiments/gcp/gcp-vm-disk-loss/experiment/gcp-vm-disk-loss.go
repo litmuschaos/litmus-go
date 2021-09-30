@@ -138,7 +138,7 @@ func VMDiskLoss(clients clients.ClientSets) {
 		}
 	default:
 		log.Error("[Invalid]: Please provide the correct LIB")
-		failStep := "no match found for specified lib"
+		failStep := "[chaos] no match was found for the specified lib"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}

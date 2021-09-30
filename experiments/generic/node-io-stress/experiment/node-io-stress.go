@@ -140,7 +140,7 @@ func NodeIOStress(clients clients.ClientSets) {
 		}
 	default:
 		log.Error("[Invalid]: Please Provide the correct LIB")
-		failStep := "no match found for specified lib"
+		failStep := "[chaos] no match was found for the specified lib"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
