@@ -1,7 +1,6 @@
 package types
 
 import (
-	corev1 "k8s.io/api/core/v1"
 	clientTypes "k8s.io/apimachinery/pkg/types"
 )
 
@@ -30,11 +29,8 @@ type ExperimentDetails struct {
 	LIBImagePullPolicy            string
 	TargetPods                    string
 	PodsAffectedPerc              int
-	Annotations                   map[string]string
 	Sequence                      string
-	Resources                     corev1.ResourceRequirements
 	ChaosServiceAccount           string
-	ImagePullSecrets              []corev1.LocalObjectReference
 	EphemeralStorageMebibytes     int
 	TerminationGracePeriodSeconds int
 	DataBlockSize                 int
