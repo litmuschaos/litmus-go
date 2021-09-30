@@ -114,7 +114,6 @@ func getProbesFromEngine(chaosDetails *types.ChaosDetails, clients clients.Clien
 	for _, experiment := range experimentSpec {
 
 		if experiment.Name == chaosDetails.ExperimentName {
-
 			Probes = experiment.Spec.Probe
 		}
 	}

@@ -165,6 +165,14 @@ func getEnvSource(apiVersion string, fieldPath string) apiv1.EnvVarSource {
 	return downwardENV
 }
 
+// HelperFailedError return the helper pod error message
+func HelperFailedError(err error) error {
+	if err != nil {
+		return errors.Errorf("helper pod failed, err: %v", err)
+	}
+	return errors.Errorf("helper pod failed")
+}
+
 func GetStatusMessage(defaultCheck bool, defaultMsg, probeStatus string) string {
 	if defaultCheck {
 		if probeStatus == "" {
