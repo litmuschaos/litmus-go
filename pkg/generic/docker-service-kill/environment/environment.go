@@ -32,6 +32,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.LIBImagePullPolicy = common.Getenv("LIB_IMAGE_PULL_POLICY", "Always")
 	experimentDetails.TargetContainer = common.Getenv("TARGET_CONTAINER", "")
 	experimentDetails.NodeLabel = common.Getenv("NODE_LABEL", "")
+	experimentDetails.TerminationGracePeriodSeconds, _ = strconv.Atoi(common.Getenv("TERMINATION_GRACE_PERIOD_SECONDS", ""))
 }
 
 //InitialiseChaosVariables initialise all the global variables
