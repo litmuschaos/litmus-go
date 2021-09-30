@@ -65,9 +65,9 @@ func VMPoweroff(clients clients.ClientSets) {
 
 	//DISPLAY THE VM INFORMATION
 	log.InfoWithValues("[Info]: The Instance information is as follows", logrus.Fields{
-		"VM MOIDS":  experimentsDetails.VMIds,
-		"Ramp Time": experimentsDetails.RampTime,
-    "Chaos Duration":   experimentsDetails.ChaosDuration,
+		"VM MOIDS":       experimentsDetails.VMIds,
+		"Ramp Time":      experimentsDetails.RampTime,
+		"Chaos Duration": experimentsDetails.ChaosDuration,
 	})
 
 	// Calling AbortWatcher go routine, it will continuously watch for the abort signal and generate the required events and result
