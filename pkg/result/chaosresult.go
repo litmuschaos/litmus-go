@@ -120,8 +120,7 @@ func InitializeChaosResult(chaosDetails *types.ChaosDetails, clients clients.Cli
 		}
 
 		// updating the chaosresult with new values
-		err = PatchChaosResult(chaosResult, clients, chaosDetails, resultDetails, chaosResultLabel)
-		if err != nil {
+		if err = PatchChaosResult(chaosResult, clients, chaosDetails, resultDetails, chaosResultLabel); err != nil {
 			return err
 		}
 	}

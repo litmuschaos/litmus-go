@@ -19,11 +19,11 @@ func AzureInstanceStop(timeout, delay int, subscriptionID, resourceGroup, azureI
 	vmClient := compute.NewVirtualMachinesClient(subscriptionID)
 
 	authorizer, err := auth.NewAuthorizerFromFile(azure.PublicCloud.ResourceManagerEndpoint)
-	if err == nil {
-		vmClient.Authorizer = authorizer
-	} else {
+	if err != nil {
 		return errors.Errorf("fail to setup authorization, err: %v", err)
 	}
+
+	vmClient.Authorizer = authorizer
 
 	log.Info("[Info]: Stopping the instance")
 	_, err = vmClient.PowerOff(context.TODO(), resourceGroup, azureInstanceName, &vmClient.SkipResourceProviderRegistration)
@@ -40,11 +40,11 @@ func AzureInstanceStart(timeout, delay int, subscriptionID, resourceGroup, azure
 	vmClient := compute.NewVirtualMachinesClient(subscriptionID)
 
 	authorizer, err := auth.NewAuthorizerFromFile(azure.PublicCloud.ResourceManagerEndpoint)
-	if err == nil {
-		vmClient.Authorizer = authorizer
-	} else {
+	if err != nil {
 		return errors.Errorf("fail to setup authorization, err: %v", err)
 	}
+
+	vmClient.Authorizer = authorizer
 
 	log.Info("[Info]: Starting back the instance to running state")
 	_, err = vmClient.Start(context.TODO(), resourceGroup, azureInstanceName)
@@ -60,11 +60,12 @@ func AzureScaleSetInstanceStop(timeout, delay int, subscriptionID, resourceGroup
 	vmssClient := compute.NewVirtualMachineScaleSetVMsClient(subscriptionID)
 
 	authorizer, err := auth.NewAuthorizerFromFile(azure.PublicCloud.ResourceManagerEndpoint)
-	if err == nil {
-		vmssClient.Authorizer = authorizer
-	} else {
-		return errors.Errorf("fail to setup authorization, err: %v")
+	if err != nil {
+		return errors.Errorf("fail to setup authorization, err: %v", err)
 	}
+
+	vmssClient.Authorizer = authorizer
+
 	virtualMachineScaleSetName, virtualMachineId := common.GetScaleSetNameAndInstanceId(azureInstanceName)
 
 	log.Info("[Info]: Stopping the instance")
@@ -81,11 +82,12 @@ func AzureScaleSetInstanceStart(timeout, delay int, subscriptionID, resourceGrou
 	vmssClient := compute.NewVirtualMachineScaleSetVMsClient(subscriptionID)
 
 	authorizer, err := auth.NewAuthorizerFromFile(azure.PublicCloud.ResourceManagerEndpoint)
-	if err == nil {
-		vmssClient.Authorizer = authorizer
-	} else {
-		return errors.Errorf("fail to setup authorization, err: %v")
+	if err != nil {
+		return errors.Errorf("fail to setup authorization, err: %v", err)
 	}
+
+	vmssClient.Authorizer = authorizer
+
 	virtualMachineScaleSetName, virtualMachineId := common.GetScaleSetNameAndInstanceId(azureInstanceName)
 
 	log.Info("[Info]: Starting back the instance to running state")

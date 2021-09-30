@@ -88,7 +88,7 @@ func PrepareDockerServiceKill(experimentsDetails *experimentTypes.ExperimentDeta
 	podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, appLabel, clients, experimentsDetails.ChaosDuration+experimentsDetails.Timeout, experimentsDetails.ExperimentName)
 	if err != nil || podStatus == "Failed" {
 		common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-helper-"+experimentsDetails.RunID, appLabel, chaosDetails, clients)
-		return errors.Errorf("helper pod failed, err: %v", err)
+		return common.HelperFailedError(err)
 	}
 
 	//Deleting the helper pod
