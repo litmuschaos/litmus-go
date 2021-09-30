@@ -196,7 +196,7 @@ func AzureInstanceStop(clients clients.ClientSets) {
 			err = probe.RunProbes(&chaosDetails, clients, &resultDetails, "PostChaos", &eventsDetails)
 			if err != nil {
 				log.Errorf("Probes Failed, err: %v", err)
-				failStep := "Failed while running probes"
+				failStep := "[post-chaos] Failed while running probes, err: " + err.Error()
 				msg := "AUT: Running, Probes: Unsuccessful"
 				types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, msg, "Warning", &chaosDetails)
 				events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
