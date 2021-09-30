@@ -1,7 +1,6 @@
 package comparator
 
 import (
-	"fmt"
 	"reflect"
 	"strconv"
 	"strings"
@@ -24,27 +23,27 @@ func (model Model) CompareFloat() error {
 	switch model.operator {
 	case ">=":
 		if !obj.isGreaterorEqual() {
-			return fmt.Errorf("{actual value: %v} is not greater than or equal to {expected value: %v}", obj.a, obj.b)
+			return errors.Errorf("{actual value: %v} is not greater than or equal to {expected value: %v}", obj.a, obj.b)
 		}
 	case "<=":
 		if !obj.isLesserorEqual() {
-			return fmt.Errorf("{actual value: %v} is not lesser than or equal to {expected value: %v}", obj.a, obj.b)
+			return errors.Errorf("{actual value: %v} is not lesser than or equal to {expected value: %v}", obj.a, obj.b)
 		}
 	case ">":
 		if !obj.isGreater() {
-			return fmt.Errorf("{actual value: %v} is not greater than {expected value: %v}", obj.a, obj.b)
+			return errors.Errorf("{actual value: %v} is not greater than {expected value: %v}", obj.a, obj.b)
 		}
 	case "<":
 		if !obj.isLesser() {
-			return fmt.Errorf("{actual value: %v} is not lesser than {expected value: %v}", obj.a, obj.b)
+			return errors.Errorf("{actual value: %v} is not lesser than {expected value: %v}", obj.a, obj.b)
 		}
 	case "==":
 		if !obj.isEqual() {
-			return fmt.Errorf("{actual value: %v} is not equal to {expected value: %v}", obj.a, obj.b)
+			return errors.Errorf("{actual value: %v} is not equal to {expected value: %v}", obj.a, obj.b)
 		}
 	case "!=":
 		if !obj.isNotEqual() {
-			return fmt.Errorf("{actual value: %v} is not Notequal to {expected value: %v}", obj.a, obj.b)
+			return errors.Errorf("{actual value: %v} is not Notequal to {expected value: %v}", obj.a, obj.b)
 		}
 	case "OneOf", "oneOf":
 		if !obj.isOneOf() {
@@ -58,7 +57,7 @@ func (model Model) CompareFloat() error {
 			return errors.Errorf("Actual value: {%v} doesn't lie in between expected range: {%v}", obj.a, obj.c)
 		}
 	default:
-		return fmt.Errorf("criteria '%s' not supported in the probe", model.operator)
+		return errors.Errorf("criteria '%s' not supported in the probe", model.operator)
 	}
 	return nil
 }

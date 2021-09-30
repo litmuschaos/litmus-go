@@ -23,11 +23,11 @@ func GetAzureInstanceStatus(subscriptionID, resourceGroup, azureInstanceName str
 	vmClient := compute.NewVirtualMachinesClient(subscriptionID)
 
 	authorizer, err := auth.NewAuthorizerFromFile(azure.PublicCloud.ResourceManagerEndpoint)
-	if err == nil {
-		vmClient.Authorizer = authorizer
-	} else {
+	if err != nil {
 		return "", errors.Errorf("fail to setup authorization, err: %v", err)
 	}
+
+	vmClient.Authorizer = authorizer
 
 	instanceDetails, err := vmClient.InstanceView(context.TODO(), resourceGroup, azureInstanceName)
 	if err != nil {
@@ -51,11 +51,11 @@ func GetAzureScaleSetInstanceStatus(subscriptionID, resourceGroup, virtualMachin
 	vmssClient := compute.NewVirtualMachineScaleSetVMsClient(subscriptionID)
 
 	authorizer, err := auth.NewAuthorizerFromFile(azure.PublicCloud.ResourceManagerEndpoint)
-	if err == nil {
-		vmssClient.Authorizer = authorizer
-	} else {
+	if err != nil {
 		return "", errors.Errorf("fail to setup authorization, err: %v", err)
 	}
+
+	vmssClient.Authorizer = authorizer
 
 	instanceDetails, err := vmssClient.GetInstanceView(context.TODO(), resourceGroup, virtualMachineScaleSetName, virtualMachineId)
 	if err != nil {

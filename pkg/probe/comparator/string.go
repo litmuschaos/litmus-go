@@ -1,7 +1,6 @@
 package comparator
 
 import (
-	"fmt"
 	"reflect"
 	"regexp"
 	"strings"
@@ -24,38 +23,38 @@ func (model Model) CompareString() error {
 	switch model.operator {
 	case "equal", "Equal":
 		if !obj.isEqual() {
-			return fmt.Errorf("{actual value: %v} is not equal to {expected value: %v}", obj.a, obj.b)
+			return errors.Errorf("{actual value: %v} is not equal to {expected value: %v}", obj.a, obj.b)
 		}
 	case "notEqual", "NotEqual":
 		if !obj.isNotEqual() {
-			return fmt.Errorf("{actual value: %v} is not Notequal to {expected value: %v}", obj.a, obj.b)
+			return errors.Errorf("{actual value: %v} is not Notequal to {expected value: %v}", obj.a, obj.b)
 		}
 	case "contains", "Contains":
 		if !obj.isContains() {
-			return fmt.Errorf("{actual value: %v} doesn't contains {expected value: %v}", obj.a, obj.b)
+			return errors.Errorf("{actual value: %v} doesn't contains {expected value: %v}", obj.a, obj.b)
 		}
 	case "matches", "Matches":
 		re, err := regexp.Compile(obj.b)
 		if err != nil {
-			return fmt.Errorf("the probe regex '%s' is not a valid expression", obj.b)
+			return errors.Errorf("the probe regex '%s' is not a valid expression", obj.b)
 		}
 		if !obj.isMatched(re) {
-			return fmt.Errorf("{actual value: %v} is not matched with {expected regex: %v}", obj.a, obj.b)
+			return errors.Errorf("{actual value: %v} is not matched with {expected regex: %v}", obj.a, obj.b)
 		}
 	case "notMatches", "NotMatches":
 		re, err := regexp.Compile(obj.b)
 		if err != nil {
-			return fmt.Errorf("the probe regex '%s' is not a valid expression", obj.b)
+			return errors.Errorf("the probe regex '%s' is not a valid expression", obj.b)
 		}
 		if obj.isMatched(re) {
-			return fmt.Errorf("{actual value: %v} is not NotMatched with {expected regex: %v}", obj.a, obj.b)
+			return errors.Errorf("{actual value: %v} is not NotMatched with {expected regex: %v}", obj.a, obj.b)
 		}
 	case "oneOf", "OneOf":
 		if !obj.isOneOf() {
 			return errors.Errorf("Actual value: {%v} doesn't matched with any of the expected values: {%v}", obj.a, obj.c)
 		}
 	default:
-		return fmt.Errorf("criteria '%s' not supported in the probe", model.operator)
+		return errors.Errorf("criteria '%s' not supported in the probe", model.operator)
 	}
 	return nil
 }
