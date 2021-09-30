@@ -127,6 +127,8 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, chao
 	// to the emptyDir, because secret is mounted as readonly and with 777 perms and it can't be changed
 	// because of: https://github.com/kubernetes/kubernetes/issues/57923
 
+	terminationGracePeriodSeconds := int64(experimentsDetails.TerminationGracePeriodSeconds)
+
 	helperPod := &apiv1.Pod{
 		ObjectMeta: v1.ObjectMeta{
 			Name:        experimentsDetails.ExperimentName + "-helper-" + experimentsDetails.RunID,
@@ -135,8 +137,9 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, chao
 			Annotations: chaosDetails.Annotations,
 		},
 		Spec: apiv1.PodSpec{
-			RestartPolicy:    apiv1.RestartPolicyNever,
-			ImagePullSecrets: chaosDetails.ImagePullSecrets,
+			RestartPolicy:                 apiv1.RestartPolicyNever,
+			ImagePullSecrets:              chaosDetails.ImagePullSecrets,
+			TerminationGracePeriodSeconds: &terminationGracePeriodSeconds,
 			Affinity: &apiv1.Affinity{
 				NodeAffinity: &apiv1.NodeAffinity{
 					RequiredDuringSchedulingIgnoredDuringExecution: &apiv1.NodeSelector{

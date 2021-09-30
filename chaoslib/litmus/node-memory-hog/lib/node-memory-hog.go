@@ -300,6 +300,8 @@ func calculateMemoryConsumption(experimentsDetails *experimentTypes.ExperimentDe
 // createHelperPod derive the attributes for helper pod and create the helper pod
 func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, chaosDetails *types.ChaosDetails, appNode string, clients clients.ClientSets, labelSuffix, MemoryConsumption string) error {
 
+	terminationGracePeriodSeconds := int64(experimentsDetails.TerminationGracePeriodSeconds)
+
 	helperPod := &apiv1.Pod{
 		ObjectMeta: v1.ObjectMeta{
 			Name:        experimentsDetails.ExperimentName + "-helper-" + experimentsDetails.RunID,
@@ -308,9 +310,10 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, chao
 			Annotations: chaosDetails.Annotations,
 		},
 		Spec: apiv1.PodSpec{
-			RestartPolicy:    apiv1.RestartPolicyNever,
-			ImagePullSecrets: chaosDetails.ImagePullSecrets,
-			NodeName:         appNode,
+			RestartPolicy:                 apiv1.RestartPolicyNever,
+			ImagePullSecrets:              chaosDetails.ImagePullSecrets,
+			NodeName:                      appNode,
+			TerminationGracePeriodSeconds: &terminationGracePeriodSeconds,
 			Containers: []apiv1.Container{
 				{
 					Name:            experimentsDetails.ExperimentName,

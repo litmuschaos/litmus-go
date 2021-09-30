@@ -109,6 +109,7 @@ func PrepareDockerServiceKill(experimentsDetails *experimentTypes.ExperimentDeta
 func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, appNodeName string) error {
 
 	privileged := true
+	terminationGracePeriodSeconds := int64(experimentsDetails.TerminationGracePeriodSeconds)
 
 	helperPod := &apiv1.Pod{
 		ObjectMeta: v1.ObjectMeta{
@@ -118,9 +119,10 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 			Annotations: chaosDetails.Annotations,
 		},
 		Spec: apiv1.PodSpec{
-			RestartPolicy:    apiv1.RestartPolicyNever,
-			ImagePullSecrets: chaosDetails.ImagePullSecrets,
-			NodeName:         appNodeName,
+			RestartPolicy:                 apiv1.RestartPolicyNever,
+			ImagePullSecrets:              chaosDetails.ImagePullSecrets,
+			NodeName:                      appNodeName,
+			TerminationGracePeriodSeconds: &terminationGracePeriodSeconds,
 			Volumes: []apiv1.Volume{
 				{
 					Name: "bus",
@@ -168,9 +170,27 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 					TTY: true,
 				},
 			},
+			Tolerations: []apiv1.Toleration{
+				{
+					Key:               "node.kubernetes.io/not-ready",
+					Operator:          apiv1.TolerationOperator("Exists"),
+					Effect:            apiv1.TaintEffect("NoExecute"),
+					TolerationSeconds: ptrint64(int64(experimentsDetails.ChaosDuration) + 60),
+				},
+				{
+					Key:               "node.kubernetes.io/unreachable",
+					Operator:          apiv1.TolerationOperator("Exists"),
+					Effect:            apiv1.TaintEffect("NoExecute"),
+					TolerationSeconds: ptrint64(int64(experimentsDetails.ChaosDuration) + 60),
+				},
+			},
 		},
 	}
 
 	_, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Create(helperPod)
 	return err
+}
+
+func ptrint64(p int64) *int64 {
+	return &p
 }

@@ -16,6 +16,7 @@ type ExperimentDetails struct {
 	AppKind                         string
 	ChaosUID                        clientTypes.UID
 	InstanceID                      string
+	TerminationGracePeriodSeconds   int
 	ChaosNamespace                  string
 	ChaosPodName                    string
 	RunID                           string
