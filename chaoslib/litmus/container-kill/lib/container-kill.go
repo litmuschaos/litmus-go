@@ -197,6 +197,7 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 	if experimentsDetails.ContainerRuntime == "crio" {
 		privilegedEnable = true
 	}
+	terminationGracePeriodSeconds := int64(experimentsDetails.TerminationGracePeriodSeconds)
 
 	helperPod := &apiv1.Pod{
 		ObjectMeta: v1.ObjectMeta{
@@ -211,10 +212,11 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 			Annotations: experimentsDetails.Annotations,
 		},
 		Spec: apiv1.PodSpec{
-			ServiceAccountName: experimentsDetails.ChaosServiceAccount,
-			ImagePullSecrets:   experimentsDetails.ImagePullSecrets,
-			RestartPolicy:      apiv1.RestartPolicyNever,
-			NodeName:           nodeName,
+			ServiceAccountName:            experimentsDetails.ChaosServiceAccount,
+			ImagePullSecrets:              experimentsDetails.ImagePullSecrets,
+			RestartPolicy:                 apiv1.RestartPolicyNever,
+			NodeName:                      nodeName,
+			TerminationGracePeriodSeconds: &terminationGracePeriodSeconds,
 			Volumes: []apiv1.Volume{
 				{
 					Name: "cri-socket",
