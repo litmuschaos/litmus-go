@@ -59,28 +59,8 @@ func DeleteAllPod(podLabel, namespace string, timeout, delay int, clients client
 		})
 }
 
-// GetChaosPodAnnotation will return the annotation on chaos pod
-func GetChaosPodAnnotation(podName, namespace string, clients clients.ClientSets) (map[string]string, error) {
-
-	pod, err := clients.KubeClient.CoreV1().Pods(namespace).Get(podName, v1.GetOptions{})
-	if err != nil {
-		return nil, err
-	}
-	return pod.Annotations, nil
-}
-
-// GetImagePullSecrets return the imagePullSecrets from the experiment pod
-func GetImagePullSecrets(podName, namespace string, clients clients.ClientSets) ([]core_v1.LocalObjectReference, error) {
-
-	pod, err := clients.KubeClient.CoreV1().Pods(namespace).Get(podName, v1.GetOptions{})
-	if err != nil {
-		return nil, err
-	}
-	return pod.Spec.ImagePullSecrets, nil
-}
-
-// GetChaosPodResourceRequirements will return the resource requirements on chaos pod
-func GetChaosPodResourceRequirements(podName, containerName, namespace string, clients clients.ClientSets) (core_v1.ResourceRequirements, error) {
+// getChaosPodResourceRequirements will return the resource requirements on chaos pod
+func getChaosPodResourceRequirements(podName, containerName, namespace string, clients clients.ClientSets) (core_v1.ResourceRequirements, error) {
 
 	pod, err := clients.KubeClient.CoreV1().Pods(namespace).Get(podName, v1.GetOptions{})
 	if err != nil {
@@ -94,6 +74,42 @@ func GetChaosPodResourceRequirements(podName, containerName, namespace string, c
 		}
 	}
 	return core_v1.ResourceRequirements{}, errors.Errorf("No container found with %v name in target pod", containerName)
+}
+
+// SetHelperData derive the data from experiment pod and sets into experimentDetails struct
+// which can be used to create helper pod
+func SetHelperData(chaosDetails *types.ChaosDetails, clients clients.ClientSets) error {
+	pod, err := clients.KubeClient.CoreV1().Pods(chaosDetails.ChaosNamespace).Get(chaosDetails.ChaosPodName, v1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	// Get Chaos Pod Annotation
+	chaosDetails.Annotations = pod.Annotations
+
+	// Get ImagePullSecrets
+	chaosDetails.ImagePullSecrets = pod.Spec.ImagePullSecrets
+
+	// Get Labels
+	labels := pod.ObjectMeta.Labels
+	delete(labels, "controller-uid")
+	chaosDetails.Labels = labels
+
+	// Get Resource Requirements
+	chaosDetails.Resources, err = getChaosPodResourceRequirements(chaosDetails.ChaosPodName, chaosDetails.ExperimentName, chaosDetails.ChaosNamespace, clients)
+	if err != nil {
+		return errors.Errorf("unable to get resource requirements, err: %v", err)
+	}
+	return nil
+}
+
+// GetHelperLabels return the labels of the helper pod
+func GetHelperLabels(labels map[string]string, runID, labelSuffix, experimentName string) map[string]string {
+	labels["name"] = experimentName + "-helper-" + runID
+	labels["app"] = experimentName + "-helper"
+	if labelSuffix != "" {
+		labels["app"] = experimentName + "-helper-" + labelSuffix
+	}
+	return labels
 }
 
 // VerifyExistanceOfPods check the availibility of list of pods

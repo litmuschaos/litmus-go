@@ -2,6 +2,7 @@ package types
 
 import (
 	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
+	corev1 "k8s.io/api/core/v1"
 	clientTypes "k8s.io/apimachinery/pkg/types"
 )
 
@@ -84,6 +85,10 @@ type ChaosDetails struct {
 	Targets               []v1alpha1.TargetDetails
 	ParentsResources      []string
 	DefaultAppHealthCheck bool
+	Annotations           map[string]string
+	Resources             corev1.ResourceRequirements
+	ImagePullSecrets      []corev1.LocalObjectReference
+	Labels                map[string]string
 }
 
 // AppDetails contains all the application related envs
