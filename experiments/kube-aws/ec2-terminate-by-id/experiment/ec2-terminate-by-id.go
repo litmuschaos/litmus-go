@@ -49,7 +49,7 @@ func EC2TerminateByID(clients clients.ClientSets) {
 	log.Infof("[PreReq]: Updating the chaos result of %v experiment (SOT)", experimentsDetails.ExperimentName)
 	if err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT"); err != nil {
 		log.Errorf("Unable to Create the Chaos Result, err: %v", err)
-		failStep := "Updating the chaos result of ec2 terminate experiment (SOT)"
+		failStep := "[pre-chaos] Failed to update the chaos result of ec2 terminate experiment (SOT), err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -79,7 +79,7 @@ func EC2TerminateByID(clients clients.ClientSets) {
 		activeNodeCount, err = common.PreChaosNodeStatusCheck(experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 		if err != nil {
 			log.Errorf("Pre chaos node status check failed, err: %v", err)
-			failStep := "Verify that the NUT (Node Under Test) is running (pre-chaos)"
+			failStep := "[pre-chaos] Failed to verify that the NUT (Node Under Test) is running (pre-chaos), err: " + err.Error()
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}
@@ -131,7 +131,7 @@ func EC2TerminateByID(clients clients.ClientSets) {
 	//Verify the aws ec2 instance is running (pre chaos)
 	if err = aws.InstanceStatusCheckByID(experimentsDetails.Ec2InstanceID, experimentsDetails.Region); err != nil {
 		log.Errorf("failed to get the ec2 instance status, err: %v", err)
-		failStep := "Verify the AWS ec2 instance status (pre-chaos)"
+		failStep := "[pre-chaos] Failed to verify the AWS ec2 instance status, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -160,7 +160,7 @@ func EC2TerminateByID(clients clients.ClientSets) {
 	if experimentsDetails.ManagedNodegroup == "enable" {
 		if err = common.PostChaosActiveNodeCountCheck(activeNodeCount, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
 			log.Errorf("Post chaos active node count check failed, err: %v", err)
-			failStep := "Verify active number of nodes post chaos"
+			failStep := "[post-chaos] Failed to verify the active number of nodes, err: " + err.Error()
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}
@@ -170,7 +170,7 @@ func EC2TerminateByID(clients clients.ClientSets) {
 	if experimentsDetails.ManagedNodegroup != "enable" {
 		if err = aws.InstanceStatusCheckByID(experimentsDetails.Ec2InstanceID, experimentsDetails.Region); err != nil {
 			log.Errorf("failed to get the ec2 instance status, err: %v", err)
-			failStep := "Verify the AWS ec2 instance status (post-chaos)"
+			failStep := "[post-chaos] Failed to verify the AWS ec2 instance status, err: " + err.Error()
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}

@@ -47,7 +47,7 @@ func ContainerKill(clients clients.ClientSets) {
 	log.Infof("[PreReq]: Updating the chaos result of %v experiment (SOT)", experimentsDetails.ExperimentName)
 	if err := result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT"); err != nil {
 		log.Errorf("Unable to Create the Chaos Result, err: %v", err)
-		failStep := "Updating the chaos result of container-kill experiment (SOT)"
+		failStep := "[pre-chaos] Failed to update the chaos result of container-kill experiment (SOT), err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -123,7 +123,7 @@ func ContainerKill(clients clients.ClientSets) {
 			return
 		}
 	default:
-		failStep := "lib and container-runtime combination not supported!"
+		failStep := "[chaos] lib and container-runtime combination not supported!"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		log.Error("lib and container-runtime combination not supported, provide the correct value of lib & container-runtime")
 		return

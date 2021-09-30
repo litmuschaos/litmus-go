@@ -48,7 +48,7 @@ func AWSSSMChaosByTag(clients clients.ClientSets) {
 	log.Infof("[PreReq]: Updating the chaos result of %v experiment (SOT)", experimentsDetails.ExperimentName)
 	if err := result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT"); err != nil {
 		log.Errorf("Unable to Create the Chaos Result, err: %v", err)
-		failStep := "Updating the chaos result of ec2 terminate experiment (SOT)"
+		failStep := "[pre-chaos] Failed to update the chaos result of ec2 terminate experiment (SOT), err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -77,7 +77,7 @@ func AWSSSMChaosByTag(clients clients.ClientSets) {
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (pre-chaos)")
 	if err := status.AUTStatusCheck(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.TargetContainer, experimentsDetails.Timeout, experimentsDetails.Delay, clients, &chaosDetails); err != nil {
 		log.Errorf("Application status check failed, err: %v", err)
-		failStep := "Verify that the AUT (Application Under Test) is running (pre-chaos)"
+		failStep := "[pre-chaos] Failed to verify that the AUT (Application Under Test) is running, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -96,7 +96,7 @@ func AWSSSMChaosByTag(clients clients.ClientSets) {
 	//Verify that the instance should have permission to perform ssm api calls
 	if err := ssm.CheckInstanceInformation(&experimentsDetails); err != nil {
 		log.Errorf("target instance status check failed, err: %v", err)
-		failStep := "Verify the AWS ec2 instance status (pre-chaos)"
+		failStep := "[pre-chaos] Failed to verify the AWS ec2 instance status, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -153,7 +153,7 @@ func AWSSSMChaosByTag(clients clients.ClientSets) {
 	//Verify the aws ec2 instance is running (post chaos)
 	if err := ec2.InstanceStatusCheckByTag(experimentsDetails.EC2InstanceTag, experimentsDetails.Region); err != nil {
 		log.Errorf("failed to get the ec2 instance status, err: %v", err)
-		failStep := "Verify the AWS ec2 instance status (post-chaos)"
+		failStep := "[post-chaos] Failed to verify the AWS ec2 instance status, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}

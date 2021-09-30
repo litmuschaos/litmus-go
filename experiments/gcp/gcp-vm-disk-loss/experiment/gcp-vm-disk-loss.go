@@ -47,7 +47,7 @@ func VMDiskLoss(clients clients.ClientSets) {
 	log.Infof("[PreReq]: Updating the chaos result of %v experiment (SOT)", experimentsDetails.ExperimentName)
 	if err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT"); err != nil {
 		log.Errorf("unable to Create the Chaos Result, err: %v", err)
-		failStep := "Updating the chaos result of disk-loss experiment (SOT)"
+		failStep := "[pre-chaos] Failed to update the chaos result of gcp disk loss experiment (SOT), err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -122,7 +122,7 @@ func VMDiskLoss(clients clients.ClientSets) {
 	//Verify the vm instance is attached to disk volume
 	if err := gcp.DiskVolumeStateCheck(experimentsDetails.GCPProjectID, experimentsDetails.DiskZones, experimentsDetails.DiskVolumeNames, experimentsDetails.DeviceNames); err != nil {
 		log.Errorf("volume status check failed pre chaos, err: %v", err)
-		failStep := "Verify the disk volume is attached to am instance (pre-chaos)"
+		failStep := "[pre-chaos] Failed to verify if the disk volume is attached to an instance, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -169,7 +169,7 @@ func VMDiskLoss(clients clients.ClientSets) {
 	//Verify the vm instance is attached to disk volume
 	if err := gcp.DiskVolumeStateCheck(experimentsDetails.GCPProjectID, experimentsDetails.DiskZones, experimentsDetails.DiskVolumeNames, experimentsDetails.DeviceNames); err != nil {
 		log.Errorf("volume status check failed post chaos, err: %v", err)
-		failStep := "Verify the disk volume is attached to an instance (post-chaos)"
+		failStep := "[post-chaos] Failed to verify if the disk volume is attached to an instance, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}

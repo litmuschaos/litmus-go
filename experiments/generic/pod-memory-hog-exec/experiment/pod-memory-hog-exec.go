@@ -46,7 +46,7 @@ func PodMemoryHogExec(clients clients.ClientSets) {
 	log.Infof("[PreReq]: Updating the chaos result of %v experiment (SOT)", experimentsDetails.ExperimentName)
 	if err := result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT"); err != nil {
 		log.Errorf("Unable to Create the Chaos Result, err: %v", err)
-		failStep := "Updating the chaos result of pod-memory-hog-exec experiment (SOT)"
+		failStep := "[pre-chaos] Failed to update the chaos result of pod-memory-hog-exec experiment (SOT), err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -75,7 +75,7 @@ func PodMemoryHogExec(clients clients.ClientSets) {
 	if chaosDetails.DefaultAppHealthCheck {
 		log.Info("[Status]: Verify that the AUT (Application Under Test) is running (pre-chaos)")
 		if err := status.AUTStatusCheck(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.TargetContainer, experimentsDetails.Timeout, experimentsDetails.Delay, clients, &chaosDetails); err != nil {
-			log.Errorf("Application status check failed,, err: %v", err)
+			log.Errorf("Application status check failed, err: %v", err)
 			failStep := "Verify that the AUT (Application Under Test) is running (pre-chaos)"
 			types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, "AUT: Not Running", "Warning", &chaosDetails)
 			events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")

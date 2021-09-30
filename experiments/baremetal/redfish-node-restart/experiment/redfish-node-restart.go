@@ -47,7 +47,7 @@ func NodeRestart(clients clients.ClientSets) {
 	log.Infof("[PreReq]: Updating the chaos result of %v experiment (SOT)", experimentsDetails.ExperimentName)
 	if err := result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT"); err != nil {
 		log.Errorf("Unable to Create the Chaos Result, err: %v", err)
-		failStep := "Updating the chaos result of redfish-node-restart experiment (SOT)"
+		failStep := "[pre-chaos] Failed to update the chaos result of redfish-node-restart experiment (SOT), err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -94,13 +94,13 @@ func NodeRestart(clients clients.ClientSets) {
 	log.Info("[Status]: Verify that the NUT (Node Under Test) is running (pre-chaos)")
 	nodeStatus, err := redfishLib.GetNodeStatus(experimentsDetails.IPMIIP, experimentsDetails.User, experimentsDetails.Password)
 	if err != nil {
-		failStep := "Verify that the NUT (Node Under Test) is running (pre-chaos)"
+		failStep := "[pre-chaos] Failed to verify that the NUT (Node Under Test) is running, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		log.Errorf("[Verification]: Unable to get node power status(pre-chaos). Error: %v", err)
 		return
 	}
 	if nodeStatus != "On" {
-		failStep := "Verify that the NUT (Node Under Test) is running (pre-chaos)"
+		failStep := "[pre-chaos] Failed to verify that the NUT (Node Under Test) is running"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		log.Errorf("[Verification]: Node is not in running state(pre-chaos)")
 		return
@@ -173,13 +173,13 @@ func NodeRestart(clients clients.ClientSets) {
 	log.Info("[Status]: Verify that the NUT (Node Under Test) is running (post-chaos)")
 	nodeStatus, err = redfishLib.GetNodeStatus(experimentsDetails.IPMIIP, experimentsDetails.User, experimentsDetails.Password)
 	if err != nil {
-		failStep := "Verify that the NUT (Node Under Test) is running (post-chaos)"
+		failStep := "[post-chaos] Failed to verify that the NUT (Node Under Test) is running, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		log.Errorf("[Verification]: Unable to get node power status. Error: %v ", err)
 		return
 	}
 	if nodeStatus != "On" {
-		failStep := "Verify that the NUT (Node Under Test) is running (post-chaos)"
+		failStep := "[post-chaos] Failed to verify that the NUT (Node Under Test) is running"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		log.Errorf("[Verification]: Node is not in running state(post-chaos)")
 		return

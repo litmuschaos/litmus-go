@@ -46,7 +46,7 @@ func PodFioStress(clients clients.ClientSets) {
 	log.Infof("[PreReq]: Updating the chaos result of %v experiment (SOT)", experimentsDetails.ExperimentName)
 	if err := result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT"); err != nil {
 		log.Errorf("Unable to Create the Chaos Result, err: %v", err)
-		failStep := "Updating the chaos result of pod-delete experiment (SOT)"
+		failStep := "[pre-chaos] Failed to update the chaos result of pod-delete experiment (SOT), err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -115,9 +115,9 @@ func PodFioStress(clients clients.ClientSets) {
 			return
 		}
 	default:
-		failStep := "lib not supported!"
+		log.Error("[Invalid]: Please Provide the correct LIB")
+		failStep := "no match found for specified lib"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-		log.Error("lib not supported, provide the correct value of lib")
 		return
 	}
 

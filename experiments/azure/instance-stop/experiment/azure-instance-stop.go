@@ -50,7 +50,7 @@ func AzureInstanceStop(clients clients.ClientSets) {
 	err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT")
 	if err != nil {
 		log.Errorf("Unable to Create the Chaos Result, err: %v", err)
-		failStep := "Updating the chaos result of azure instance stop experiment (SOT)"
+		failStep := "[pre-chaos] Failed to update the chaos result of azure instance stop experiment (SOT), err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -96,7 +96,7 @@ func AzureInstanceStop(clients clients.ClientSets) {
 	// Setting up Azure Subscription ID
 	if experimentsDetails.SubscriptionID, err = azureCommon.GetSubscriptionID(); err != nil {
 		log.Errorf("fail to get the subscription id, err: %v", err)
-		failStep := "Getting the subscription ID for authentication"
+		failStep := "[pre-chaos] Failed to get the subscription ID for authentication, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -133,7 +133,7 @@ func AzureInstanceStop(clients clients.ClientSets) {
 	//Verify the azure target instance is running (pre-chaos)
 	if err := azureStatus.InstanceStatusCheckByName(&experimentsDetails); err != nil {
 		log.Errorf("failed to get the azure instance status, err: %v", err)
-		failStep := "Verify the azure instance status (pre-chaos)"
+		failStep := "[pre-chaos] Failed to verify the azure instance status, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -161,7 +161,7 @@ func AzureInstanceStop(clients clients.ClientSets) {
 	//Verify the azure instance is running (post chaos)
 	if err = azureStatus.InstanceStatusCheckByName(&experimentsDetails); err != nil {
 		log.Errorf("failed to get the azure instance status, err: %v", err)
-		failStep := "Verify the azure instance status (post-chaos)"
+		failStep := "[pre-chaos] Failed to update the azure instance status, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}

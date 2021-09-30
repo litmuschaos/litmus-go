@@ -48,7 +48,7 @@ func VMPoweroff(clients clients.ClientSets) {
 	log.Infof("[PreReq]: Updating the chaos result of %v experiment (SOT)", experimentsDetails.ExperimentName)
 	if err := result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT"); err != nil {
 		log.Errorf("Unable to Create the Chaos Result, err: %v", err)
-		failStep := "Updating the chaos result of pod-delete experiment (SOT)"
+		failStep := "[pre-chaos] Failed to update the chaos result of pod-delete experiment (SOT), err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -73,7 +73,7 @@ func VMPoweroff(clients clients.ClientSets) {
 	// GET SESSION ID TO LOGIN TO VCENTER
 	cookie, err := vmwarelib.GetVcenterSessionID(&experimentsDetails)
 	if err != nil {
-		failStep := "Unable to get Vcenter session ID"
+		failStep := "[pre-chaos] Failed to obtain the Vcenter session ID, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		log.Errorf("Vcenter Login failed, err: %v", err)
 		return
@@ -103,14 +103,14 @@ func VMPoweroff(clients clients.ClientSets) {
 	log.Info("[Status]: Verify that the IUT (Instance Under Test) is running (pre-chaos)")
 	vmstatus, err := vmwarelib.GetVMStatus(&experimentsDetails, cookie)
 	if err != nil {
-		log.Errorf("[Verification]: Unable to get Instance status(pre-chaos), err: %v", err)
-		failStep := "Verify that the IUT (Intance Under Test) is running (pre-chaos)"
+		log.Errorf("[Verification]: Unable to get Instance status (pre-chaos), err: %v", err)
+		failStep := "[pre-chaos] Failed to verify that the IUT (Intance Under Test) is running, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	} else if vmstatus != "POWERED_ON" {
-		failStep := "Verify that the IUT (Intance Under Test) is running (pre-chaos)"
+		failStep := "[pre-chaos] IUT (Intance Under Test) is not running"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-		log.Errorf("[Verification]: VM is not in running state(pre-chaos)")
+		log.Errorf("[Verification]: VM is not in running state (pre-chaos)")
 		return
 	}
 	log.Info("[Verification]: VM is in running state(pre-chaos)")
@@ -181,12 +181,12 @@ func VMPoweroff(clients clients.ClientSets) {
 	log.Info("[Status]: Verify that the IUT (Instance Under Test) is running (post-chaos)")
 	vmstatus, err = vmwarelib.GetVMStatus(&experimentsDetails, cookie)
 	if err != nil {
-		log.Errorf("[Verification]: Unable to get Instance status(post-chaos), err: %v", err)
-		failStep := "Verify that the IUT (Intance Under Test) is running (post-chaos)"
+		log.Errorf("[Verification]: Unable to get Instance status (post-chaos), err: %v", err)
+		failStep := "[post-chaos] Failed to verify that the IUT (Intance Under Test) is running, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	} else if vmstatus != "POWERED_ON" {
-		failStep := "Verify that the IUT (Intance Under Test) is running (post-chaos)"
+		failStep := "[post-chaos] IUT (Intance Under Test) is not running"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		log.Errorf("[Verification]: VM is not in running state(post-chaos)")
 		return

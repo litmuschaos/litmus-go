@@ -49,7 +49,7 @@ func AzureDiskLoss(clients clients.ClientSets) {
 	log.Infof("[PreReq]: Updating the chaos result of %v experiment (SOT)", experimentsDetails.ExperimentName)
 	if err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT"); err != nil {
 		log.Errorf("Unable to Create the Chaos Result, err: %v", err)
-		failStep := "Updating the chaos result of pod-delete experiment (SOT)"
+		failStep := "[pre-chaos] Failed to update the chaos result of azure disk loss experiment (SOT), err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -81,7 +81,7 @@ func AzureDiskLoss(clients clients.ClientSets) {
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (pre-chaos)")
 	if err = status.AUTStatusCheck(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.TargetContainer, experimentsDetails.Timeout, experimentsDetails.Delay, clients, &chaosDetails); err != nil {
 		log.Errorf("Application status check failed, err: %v", err)
-		failStep := "Verify that the AUT (Application Under Test) is running (pre-chaos)"
+		failStep := "[pre-chaos] Failed to verify that the AUT (Application Under Test) is running, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -100,7 +100,7 @@ func AzureDiskLoss(clients clients.ClientSets) {
 	// Setting up Azure Subscription ID
 	if experimentsDetails.SubscriptionID, err = azureCommon.GetSubscriptionID(); err != nil {
 		log.Errorf("fail to get the subscription id, err: %v", err)
-		failStep := "Getting the subscription ID for authentication"
+		failStep := "[pre-chaos] Failed to get the subscription ID for authentication, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -109,7 +109,7 @@ func AzureDiskLoss(clients clients.ClientSets) {
 	log.Info("[Status]: Verify that the virtual disk are attached to VM instance(pre-chaos)")
 	if err = azureStatus.CheckVirtualDiskWithInstance(experimentsDetails); err != nil {
 		log.Errorf("Virtual disk status check failed, err: %v", err)
-		failStep := "Verify that the virtual disk are attached to VM instance(pre-chaos)"
+		failStep := "[pre-chaos] Failed to verify that the virtual disk are attached to VM instance, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -180,7 +180,7 @@ func AzureDiskLoss(clients clients.ClientSets) {
 	log.Info("[Status]: Verify that the virtual disk are attached to VM instance(post-chaos)")
 	if err = azureStatus.CheckVirtualDiskWithInstance(experimentsDetails); err != nil {
 		log.Errorf("Virtual disk status check failed, err: %v", err)
-		failStep := "Verify that the virtual disk are attached to VM instance(post-chaos)"
+		failStep := "[post-chaos] Failed to verify that the virtual disk are attached to VM instance, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}

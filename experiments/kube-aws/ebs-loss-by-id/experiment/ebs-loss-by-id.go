@@ -48,7 +48,7 @@ func EBSLossByID(clients clients.ClientSets) {
 	log.Infof("[PreReq]: Updating the chaos result of %v experiment (SOT)", experimentsDetails.ExperimentName)
 	if err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT"); err != nil {
 		log.Errorf("unable to Create the Chaos Result, err: %v", err)
-		failStep := "Updating the chaos result of ebs-loss experiment (SOT)"
+		failStep := "[pre-chaos] Failed to update the chaos result of ebs-loss experiment (SOT), err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -124,7 +124,7 @@ func EBSLossByID(clients clients.ClientSets) {
 	//Verify the aws ec2 instance is attached to ebs volume
 	if err = aws.EBSStateCheckByID(experimentsDetails.EBSVolumeID, experimentsDetails.Region); err != nil {
 		log.Errorf("volume status check failed pre chaos, err: %v", err)
-		failStep := "Verify the ebs volume is attached to ec2 instance (pre-chaos)"
+		failStep := "[pre-chaos] Failed to verify if the ebs volume is attached to ec2 instance, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -171,7 +171,7 @@ func EBSLossByID(clients clients.ClientSets) {
 	//Verify the aws ec2 instance is attached to ebs volume
 	if err = aws.EBSStateCheckByID(experimentsDetails.EBSVolumeID, experimentsDetails.Region); err != nil {
 		log.Errorf("volume status check failed post chaos, err: %v", err)
-		failStep := "Verify the ebs volume is attached to an ec2 instance (post-chaos)"
+		failStep := "[post-chaos] Failed to verify if the ebs volume is attached to an ec2 instance, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
