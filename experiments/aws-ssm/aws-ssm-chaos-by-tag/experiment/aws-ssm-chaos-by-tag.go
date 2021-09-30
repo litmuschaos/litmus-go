@@ -87,7 +87,7 @@ func AWSSSMChaosByTag(clients clients.ClientSets) {
 		log.Info("[Status]: Verify that the Auxiliary Applications are running (pre-chaos)")
 		if err := status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
 			log.Errorf("Auxiliary Application status check failed, err: %v", err)
-			failStep := "Verify that the Auxiliary Applications are running (pre-chaos)"
+			failStep := "[pre-chaos] Failed to verify that the Auxiliary Applications are running, err: " + err.Error()
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}
