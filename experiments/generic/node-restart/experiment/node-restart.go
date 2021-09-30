@@ -126,7 +126,7 @@ func NodeRestart(clients clients.ClientSets) {
 	case "litmus":
 		if err := litmusLIB.PrepareNodeRestart(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
 			log.Errorf("[Error]: Node restart failed, err: %v", err)
-			failStep := " Node restart Chaos injection failed"
+			failStep := "[chaos] Chaos injection phase failed, err" + err.Error()
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}

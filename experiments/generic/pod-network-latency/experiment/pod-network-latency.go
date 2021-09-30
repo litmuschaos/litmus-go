@@ -111,14 +111,14 @@ func PodNetworkLatency(clients clients.ClientSets) {
 	case experimentsDetails.ChaosLib == "pumba" && experimentsDetails.ContainerRuntime == "docker":
 		if err := pumbaLIB.PodNetworkLatencyChaos(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
 			log.Errorf("Chaos injection failed, err: %v", err)
-			failStep := "failed in chaos injection phase"
+			failStep := "[chaos] Chaos injection phase failed, err" + err.Error()
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}
 	case experimentsDetails.ChaosLib == "litmus":
 		if err := litmusLIB.PodNetworkLatencyChaos(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
 			log.Errorf("Chaos injection failed, err: %v", err)
-			failStep := "failed in chaos injection phase"
+			failStep := "[chaos] Chaos injection phase failed, err" + err.Error()
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}

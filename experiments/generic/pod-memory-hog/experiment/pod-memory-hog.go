@@ -113,14 +113,14 @@ func PodMemoryHog(clients clients.ClientSets) {
 	case "litmus":
 		if err := litmusLIB.PrepareAndInjectStressChaos(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
 			log.Errorf("[Error]: pod memory hog failed, err: %v", err)
-			failStep := "failed in chaos injection phase"
+			failStep := "[chaos] Chaos injection phase failed, err" + err.Error()
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}
 	case "pumba":
 		if err := pumbaLIB.PreparePodMemoryHog(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
 			log.Errorf("[Error]: Memory hog failed, err: %v", err)
-			failStep := "failed in chaos injection phase"
+			failStep := "[chaos] Chaos injection phase failed, err" + err.Error()
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}

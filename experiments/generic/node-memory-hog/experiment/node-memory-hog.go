@@ -133,7 +133,7 @@ func NodeMemoryHog(clients clients.ClientSets) {
 	case "litmus":
 		if err := litmusLIB.PrepareNodeMemoryHog(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
 			log.Errorf("[Error]: node memory hog failed, err: %v", err)
-			failStep := "failed in chaos injection phase"
+			failStep := "[chaos] Chaos injection phase failed, err" + err.Error()
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}

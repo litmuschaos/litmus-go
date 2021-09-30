@@ -131,7 +131,7 @@ func NodeCPUHog(clients clients.ClientSets) {
 	case "litmus":
 		if err := litmusLIB.PrepareNodeCPUHog(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
 			log.Errorf("[Error]: CPU hog failed, err: %v", err)
-			failStep := "failed in chaos injection phase"
+			failStep := "[chaos] Chaos injection phase failed, err" + err.Error()
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}

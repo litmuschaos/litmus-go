@@ -110,7 +110,7 @@ func PodDNSError(clients clients.ClientSets) {
 	case "litmus":
 		if err := litmusLIB.PrepareAndInjectChaos(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
 			log.Errorf("Chaos injection failed, err: %v", err)
-			failStep := "failed in chaos injection phase"
+			failStep := "[chaos] Chaos injection phase failed, err" + err.Error()
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}

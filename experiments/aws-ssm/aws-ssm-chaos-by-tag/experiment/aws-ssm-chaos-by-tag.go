@@ -129,7 +129,7 @@ func AWSSSMChaosByTag(clients clients.ClientSets) {
 	case "litmus":
 		if err := litmusLIB.PrepareAWSSSMChaosByTag(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
 			log.Errorf("Chaos injection failed, err: %v", err)
-			failStep := "failed in chaos injection phase"
+			failStep := "[chaos] Chaos injection phase failed, err" + err.Error()
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			//Delete the ssm document on the given aws service monitoring docs
 			if experimentsDetails.IsDocsUploaded {
