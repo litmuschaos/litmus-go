@@ -116,7 +116,7 @@ func NodeRestart(clients clients.ClientSets) {
 
 			if err := probe.RunProbes(&chaosDetails, clients, &resultDetails, "PreChaos", &eventsDetails); err != nil {
 				log.Errorf("Probe Failed, err: %v", err)
-				failStep := "Failed while running probes"
+				failStep := "[pre-chaos] Failed while running probes, err: " + err.Error()
 				msg := "NUT: Running, Probes: Unsuccessful"
 				types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, msg, "Warning", &chaosDetails)
 				events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
