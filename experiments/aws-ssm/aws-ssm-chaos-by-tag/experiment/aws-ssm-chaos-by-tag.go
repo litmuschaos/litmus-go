@@ -1,6 +1,8 @@
 package experiment
 
 import (
+	"os"
+
 	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
 	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/aws-ssm-chaos/lib/ssm"
 	experimentEnv "github.com/litmuschaos/litmus-go/pkg/aws-ssm/aws-ssm-chaos/environment"
@@ -27,7 +29,7 @@ func AWSSSMChaosByTag(clients clients.ClientSets) {
 	chaosDetails := types.ChaosDetails{}
 
 	//Fetching all the ENV passed from the runner pod
-	log.Infof("[PreReq]: Getting the ENV for the %v experiment", experimentsDetails.ExperimentName)
+	log.Infof("[PreReq]: Getting the ENV for the %v experiment", os.Getenv("EXPERIMENT_NAME"))
 	experimentEnv.GetENV(&experimentsDetails, "aws-ssm-chaos-by-tag")
 
 	// Initialize the chaos attributes
@@ -68,7 +70,6 @@ func AWSSSMChaosByTag(clients clients.ClientSets) {
 	log.InfoWithValues("The instance information is as follows", logrus.Fields{
 		"Total Chaos Duration": experimentsDetails.ChaosDuration,
 		"Chaos Namespace":      experimentsDetails.ChaosNamespace,
-		"Ramp Time":            experimentsDetails.RampTime,
 		"EC2 Instance Tag":     experimentsDetails.EC2InstanceTag,
 		"Sequence":             experimentsDetails.Sequence,
 	})

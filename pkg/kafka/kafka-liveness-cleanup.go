@@ -22,8 +22,10 @@ func LivenessCleanup(experimentsDetails *experimentTypes.ExperimentDetails, clie
 		Wait(time.Duration(experimentsDetails.ChaoslibDetail.Delay) * time.Second).
 		Try(func(attempt uint) error {
 			podSpec, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaoslibDetail.AppNS).List(metav1.ListOptions{LabelSelector: "name=kafka-liveness-" + experimentsDetails.RunID})
-			if err != nil || len(podSpec.Items) != 0 {
+			if err != nil {
 				return errors.Errorf("Liveness pod is not deleted yet, err: %v", err)
+			} else if len(podSpec.Items) != 0 {
+				return errors.Errorf("Liveness pod is not deleted yet")
 			}
 			return nil
 		})

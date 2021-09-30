@@ -1,6 +1,8 @@
 package experiment
 
 import (
+	"os"
+
 	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
 	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/pod-delete/lib"
 	"github.com/litmuschaos/litmus-go/pkg/cassandra"
@@ -28,7 +30,7 @@ func CasssandraPodDelete(clients clients.ClientSets) {
 	chaosDetails := types.ChaosDetails{}
 
 	//Fetching all the ENV passed from the runner pod
-	log.Info("[PreReq]: Getting the ENV for the cassandra-pod-delete experiment")
+	log.Infof("[PreReq]: Getting the ENV for the %v experiment", os.Getenv("EXPERIMENT_NAME"))
 	experimentEnv.GetENV(&experimentsDetails)
 
 	// Initialize the chaos attributes
@@ -69,7 +71,6 @@ func CasssandraPodDelete(clients clients.ClientSets) {
 		"CassandraLivenessImage": experimentsDetails.CassandraLivenessImage,
 		"CassandraLivenessCheck": experimentsDetails.CassandraLivenessCheck,
 		"CassandraPort":          experimentsDetails.CassandraPort,
-		"Ramp Time":              experimentsDetails.ChaoslibDetail.RampTime,
 	})
 
 	// Calling AbortWatcher go routine, it will continuously watch for the abort signal and generate the required events and result

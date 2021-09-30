@@ -1,6 +1,8 @@
 package experiment
 
 import (
+	"os"
+
 	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
 	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/node-drain/lib"
 	"github.com/litmuschaos/litmus-go/pkg/clients"
@@ -25,7 +27,7 @@ func NodeDrain(clients clients.ClientSets) {
 	chaosDetails := types.ChaosDetails{}
 
 	//Fetching all the ENV passed from the runner pod
-	log.Infof("[PreReq]: Getting the ENV for the %v experiment", experimentsDetails.ExperimentName)
+	log.Infof("[PreReq]: Getting the ENV for the %v experiment", os.Getenv("EXPERIMENT_NAME"))
 	experimentEnv.GetENV(&experimentsDetails)
 
 	// Initialize the chaos attributes
@@ -61,11 +63,9 @@ func NodeDrain(clients clients.ClientSets) {
 
 	//DISPLAY THE APP INFORMATION
 	log.InfoWithValues("[Info]: The application information is as follows", logrus.Fields{
-		"Namespace":   experimentsDetails.AppNS,
-		"App Label":   experimentsDetails.AppLabel,
-		"Node Label":  experimentsDetails.NodeLabel,
-		"Target Node": experimentsDetails.TargetNode,
-		"Ramp Time":   experimentsDetails.RampTime,
+		"Node Label":     experimentsDetails.NodeLabel,
+		"Target Node":    experimentsDetails.TargetNode,
+		"Chaos Duration": experimentsDetails.ChaosDuration,
 	})
 
 	// Calling AbortWatcher go routine, it will continuously watch for the abort signal and generate the required events and result

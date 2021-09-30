@@ -1,6 +1,8 @@
 package experiment
 
 import (
+	"os"
+
 	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
 	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/ebs-loss/lib/ebs-loss-by-tag/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
@@ -26,7 +28,7 @@ func EBSLossByTag(clients clients.ClientSets) {
 	chaosDetails := types.ChaosDetails{}
 
 	//Fetching all the ENV passed from the runner pod
-	log.Infof("[PreReq]: Getting the ENV for the %v experiment", experimentsDetails.ExperimentName)
+	log.Infof("[PreReq]: Getting the ENV for the %v experiment", os.Getenv("EXPERIMENT_NAME"))
 	experimentEnv.GetENV(&experimentsDetails)
 
 	// Initialize the chaos attributes
@@ -60,21 +62,15 @@ func EBSLossByTag(clients clients.ClientSets) {
 	types.SetResultEventAttributes(&eventsDetails, types.AwaitedVerdict, msg, "Normal", &resultDetails)
 	events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosResult")
 
-	//DISPLAY THE APP INFORMATION
-	log.InfoWithValues("The application information is as follows", logrus.Fields{
-		"App Namespace": experimentsDetails.AppNS,
-		"AppLabel":      experimentsDetails.AppLabel,
-		"Ramp Time":     experimentsDetails.RampTime,
-	})
-
 	// Calling AbortWatcher go routine, it will continuously watch for the abort signal and generate the required events and result
 	go common.AbortWatcherWithoutExit(experimentsDetails.ExperimentName, clients, &resultDetails, &chaosDetails, &eventsDetails)
 
 	//DISPLAY THE VOLUME INFORMATION
 	log.InfoWithValues("The volume information is as follows", logrus.Fields{
-		"Volume Tag": experimentsDetails.VolumeTag,
-		"Region":     experimentsDetails.Region,
-		"Ramp Time":  experimentsDetails.RampTime,
+		"Volume Tag":     experimentsDetails.VolumeTag,
+		"Region":         experimentsDetails.Region,
+		"Chaos Duration": experimentsDetails.ChaosDuration,
+		"Sequence":       experimentsDetails.Sequence,
 	})
 
 	//PRE-CHAOS APPLICATION STATUS CHECK

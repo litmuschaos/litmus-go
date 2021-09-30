@@ -1,6 +1,8 @@
 package experiment
 
 import (
+	"os"
+
 	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
 	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/aws-ssm-chaos/lib/ssm"
 	experimentEnv "github.com/litmuschaos/litmus-go/pkg/aws-ssm/aws-ssm-chaos/environment"
@@ -27,7 +29,7 @@ func AWSSSMChaosByID(clients clients.ClientSets) {
 	chaosDetails := types.ChaosDetails{}
 
 	//Fetching all the ENV passed from the runner pod
-	log.Infof("[PreReq]: Getting the ENV for the %v experiment", experimentsDetails.ExperimentName)
+	log.Infof("[PreReq]: Getting the ENV for the %v experiment", os.Getenv("EXPERIMENT_NAME"))
 	experimentEnv.GetENV(&experimentsDetails, "aws-ssm-chaos-by-id")
 
 	// Initialize the chaos attributes
@@ -68,7 +70,6 @@ func AWSSSMChaosByID(clients clients.ClientSets) {
 	log.InfoWithValues("The instance information is as follows", logrus.Fields{
 		"Total Chaos Duration": experimentsDetails.ChaosDuration,
 		"Chaos Namespace":      experimentsDetails.ChaosNamespace,
-		"Ramp Time":            experimentsDetails.RampTime,
 		"Instance ID":          experimentsDetails.EC2InstanceID,
 		"Sequence":             experimentsDetails.Sequence,
 	})
@@ -123,6 +124,7 @@ func AWSSSMChaosByID(clients clients.ClientSets) {
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
+
 	//Verify the aws ec2 instance is running (pre chaos)
 	if err := ec2.InstanceStatusCheckByID(experimentsDetails.EC2InstanceID, experimentsDetails.Region); err != nil {
 		log.Errorf("failed to get the ec2 instance status, err: %v", err)

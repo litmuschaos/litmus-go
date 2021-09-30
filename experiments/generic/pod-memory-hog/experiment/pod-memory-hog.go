@@ -1,6 +1,8 @@
 package experiment
 
 import (
+	"os"
+
 	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
 	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/stress-chaos/lib"
 	pumbaLIB "github.com/litmuschaos/litmus-go/chaoslib/pumba/memory-chaos/lib"
@@ -26,7 +28,7 @@ func PodMemoryHog(clients clients.ClientSets) {
 	chaosDetails := types.ChaosDetails{}
 
 	//Fetching all the ENV passed from the runner pod
-	log.Infof("[PreReq]: Getting the ENV for the %v experiment", experimentsDetails.ExperimentName)
+	log.Infof("[PreReq]: Getting the ENV for the %v experiment", os.Getenv("EXPERIMENT_NAME"))
 	experimentEnv.GetENV(&experimentsDetails, "pod-memory-hog")
 
 	// Initialize the chaos attributes
@@ -65,8 +67,8 @@ func PodMemoryHog(clients clients.ClientSets) {
 		"Namespace":          experimentsDetails.AppNS,
 		"Label":              experimentsDetails.AppLabel,
 		"Chaos Duration":     experimentsDetails.ChaosDuration,
-		"Ramp Time":          experimentsDetails.RampTime,
 		"Memory Consumption": experimentsDetails.MemoryConsumption,
+		"Container Runtime":  experimentsDetails.ContainerRuntime,
 	})
 
 	// Calling AbortWatcher go routine, it will continuously watch for the abort signal and generate the required events and result

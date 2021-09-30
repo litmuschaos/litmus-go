@@ -1,6 +1,8 @@
 package experiment
 
 import (
+	"os"
+
 	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
 	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/gcp-vm-disk-loss/lib"
 	"github.com/litmuschaos/litmus-go/pkg/clients"
@@ -27,7 +29,7 @@ func VMDiskLoss(clients clients.ClientSets) {
 
 	//Fetching all the ENV passed from the runner pod
 	experimentEnv.GetENV(&experimentsDetails)
-	log.Infof("[PreReq]: Getting the ENV for the %v experiment", experimentsDetails.ExperimentName)
+	log.Infof("[PreReq]: Getting the ENV for the %v experiment", os.Getenv("EXPERIMENT_NAME"))
 
 	// Initialize the chaos attributes
 	types.InitialiseChaosVariables(&chaosDetails)
@@ -63,17 +65,11 @@ func VMDiskLoss(clients clients.ClientSets) {
 	// Calling AbortWatcher go routine, it will continuously watch for the abort signal and generate the required events and result
 	go common.AbortWatcherWithoutExit(experimentsDetails.ExperimentName, clients, &resultDetails, &chaosDetails, &eventsDetails)
 
-	//DISPLAY THE APP INFORMATION
-	log.InfoWithValues("The application information is as follows", logrus.Fields{
-		"App Namespace": experimentsDetails.AppNS,
-		"AppLabel":      experimentsDetails.AppLabel,
-		"Ramp Time":     experimentsDetails.RampTime,
-	})
-
 	//DISPLAY THE VOLUME INFORMATION
 	log.InfoWithValues("The volume information is as follows", logrus.Fields{
 		"Volume IDs": experimentsDetails.DiskVolumeNames,
 		"Zones":      experimentsDetails.DiskZones,
+		"Sequence":   experimentsDetails.Sequence,
 	})
 
 	//PRE-CHAOS APPLICATION STATUS CHECK

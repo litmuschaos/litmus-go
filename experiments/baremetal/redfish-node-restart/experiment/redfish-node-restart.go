@@ -1,6 +1,8 @@
 package experiment
 
 import (
+	"os"
+
 	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
 	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/redfish-node-restart/lib"
 	redfishLib "github.com/litmuschaos/litmus-go/pkg/baremetal/redfish"
@@ -26,7 +28,7 @@ func NodeRestart(clients clients.ClientSets) {
 	chaosDetails := types.ChaosDetails{}
 
 	//Fetching all the ENV passed from the runner pod
-	log.Infof("[PreReq]: Getting the ENV for the %v experiment", experimentsDetails.ExperimentName)
+	log.Infof("[PreReq]: Getting the ENV for the %v experiment", os.Getenv("EXPERIMENT_NAME"))
 	experimentEnv.GetENV(&experimentsDetails)
 
 	// Initialize the chaos attributes
@@ -64,7 +66,6 @@ func NodeRestart(clients clients.ClientSets) {
 	log.InfoWithValues("[Info]: The Node information is as follows", logrus.Fields{
 		"Node_IPMI_IP": experimentsDetails.IPMIIP,
 		"User":         experimentsDetails.User,
-		"Ramp Time":    experimentsDetails.RampTime,
 	})
 
 	// Calling AbortWatcher go routine, it will continuously watch for the abort signal and generate the required events and result
