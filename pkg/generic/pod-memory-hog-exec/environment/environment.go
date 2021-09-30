@@ -28,7 +28,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.Delay, _ = strconv.Atoi(types.Getenv("STATUS_CHECK_DELAY", "2"))
 	experimentDetails.Timeout, _ = strconv.Atoi(types.Getenv("STATUS_CHECK_TIMEOUT", "180"))
 	experimentDetails.TargetPods = types.Getenv("TARGET_PODS", "")
-	experimentDetails.ChaosKillCmd = types.Getenv("CHAOS_KILL_COMMAND", "killall dd")
+	experimentDetails.ChaosKillCmd = types.Getenv("CHAOS_KILL_COMMAND", "kill $(find /proc -name exe -lname '*/dd' 2>&1 | grep -v 'Permission denied' | awk -F/ '{print $(NF-1)}' | head -n 1)")
 	experimentDetails.LIBImagePullPolicy = types.Getenv("LIB_IMAGE_PULL_POLICY", "Always")
 	experimentDetails.TargetContainer = types.Getenv("TARGET_CONTAINER", "")
 	experimentDetails.Sequence = types.Getenv("SEQUENCE", "parallel")

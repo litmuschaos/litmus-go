@@ -37,8 +37,8 @@ func GetENV(kafkaDetails *kafkaTypes.ExperimentDetails) {
 
 	kafkaDetails.ChaoslibDetail = &ChaoslibDetail
 	kafkaDetails.KafkaKind = types.Getenv("KAFKA_KIND", "statefulset")
-	kafkaDetails.KafkaLivenessStream = types.Getenv("KAFKA_LIVENESS_STREAM", "enabled")
-	kafkaDetails.KafkaLivenessImage = types.Getenv("KAFKA_LIVENESS_IMAGE", "litmuschaos/kafka-client:ci")
+	kafkaDetails.KafkaLivenessStream = types.Getenv("KAFKA_LIVENESS_STREAM", "enable")
+	kafkaDetails.KafkaLivenessImage = types.Getenv("KAFKA_LIVENESS_IMAGE", "litmuschaos/kafka-client:latest")
 	kafkaDetails.KafkaConsumerTimeout, _ = strconv.Atoi(types.Getenv("KAFKA_CONSUMER_TIMEOUT", "60000"))
 	kafkaDetails.KafkaInstanceName = types.Getenv("KAFKA_INSTANCE_NAME", "kafka")
 	kafkaDetails.KafkaNamespace = types.Getenv("KAFKA_NAMESPACE", "default")

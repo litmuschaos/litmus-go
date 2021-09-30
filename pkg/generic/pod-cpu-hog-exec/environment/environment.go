@@ -29,7 +29,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.Timeout, _ = strconv.Atoi(types.Getenv("STATUS_CHECK_TIMEOUT", "180"))
 	experimentDetails.TargetPods = types.Getenv("TARGET_PODS", "")
 	experimentDetails.ChaosInjectCmd = types.Getenv("CHAOS_INJECT_COMMAND", "md5sum /dev/zero")
-	experimentDetails.ChaosKillCmd = types.Getenv("CHAOS_KILL_COMMAND", "killall md5sum")
+	experimentDetails.ChaosKillCmd = types.Getenv("CHAOS_KILL_COMMAND", "kill $(find /proc -name exe -lname '*/md5sum' 2>&1 | grep -v 'Permission denied' | awk -F/ '{print $(NF-1)}')")
 	experimentDetails.TargetContainer = types.Getenv("TARGET_CONTAINER", "")
 	experimentDetails.Sequence = types.Getenv("SEQUENCE", "parallel")
 	experimentDetails.TerminationGracePeriodSeconds, _ = strconv.Atoi(types.Getenv("TERMINATION_GRACE_PERIOD_SECONDS", ""))
