@@ -1,7 +1,6 @@
 package types
 
 import (
-	corev1 "k8s.io/api/core/v1"
 	clientTypes "k8s.io/apimachinery/pkg/types"
 )
 
@@ -16,8 +15,8 @@ type ExperimentDetails struct {
 	AppLabel                      string
 	AppKind                       string
 	ChaosUID                      clientTypes.UID
-	InstanceID                    string
 	TerminationGracePeriodSeconds int
+	InstanceID                    string
 	ChaosNamespace                string
 	ChaosPodName                  string
 	NodeCPUcores                  int
@@ -27,12 +26,9 @@ type ExperimentDetails struct {
 	AuxiliaryAppInfo              string
 	Timeout                       int
 	Delay                         int
-	Annotations                   map[string]string
 	TargetNodes                   string
 	NodesAffectedPerc             int
 	Sequence                      string
-	Resources                     corev1.ResourceRequirements
-	ImagePullSecrets              []corev1.LocalObjectReference
 	TargetContainer               string
 	NodeLabel                     string
 }
