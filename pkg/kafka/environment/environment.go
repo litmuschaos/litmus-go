@@ -55,7 +55,6 @@ func GetENV(kafkaDetails *kafkaTypes.ExperimentDetails) {
 	kafkaDetails.ZookeeperPort = common.Getenv("ZOOKEEPER_PORT", "")
 	kafkaDetails.Lib = common.Getenv("LIB", "litmus")
 	kafkaDetails.RunID = common.Getenv("RunID", "")
-
 }
 
 //InitialiseChaosVariables initialise all the global variables
@@ -79,6 +78,6 @@ func InitialiseChaosVariables(chaosDetails *types.ChaosDetails, kafkaDetails *ka
 	chaosDetails.AppDetail = appDetails
 	chaosDetails.ProbeImagePullPolicy = kafkaDetails.ChaoslibDetail.LIBImagePullPolicy
 	chaosDetails.Randomness, _ = strconv.ParseBool(common.Getenv("RANDOMNESS", "false"))
-	chaosDetails.ParentsResources = []string{}
 	chaosDetails.Targets = []v1alpha1.TargetDetails{}
+	chaosDetails.DefaultAppHealthCheck, _ = strconv.ParseBool(common.Getenv("DEFAULT_APP_HEALTH_CHECK", "true"))
 }
