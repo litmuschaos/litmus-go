@@ -15,6 +15,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.ChaosNamespace = types.Getenv("CHAOS_NAMESPACE", "litmus")
 	experimentDetails.EngineName = types.Getenv("CHAOSENGINE", "")
 	experimentDetails.ChaosDuration, _ = strconv.Atoi(types.Getenv("TOTAL_CHAOS_DURATION", "30"))
+	experimentDetails.ChaosInterval, _ = strconv.Atoi(types.Getenv("CHAOS_INTERVAL", "30"))
 	experimentDetails.RampTime, _ = strconv.Atoi(types.Getenv("RAMP_TIME", ""))
 	experimentDetails.ChaosLib = types.Getenv("LIB", "litmus")
 	experimentDetails.AppNS = types.Getenv("APP_NAMESPACE", "")
@@ -27,9 +28,9 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.TargetContainer = types.Getenv("TARGET_CONTAINER", "")
 	experimentDetails.Delay, _ = strconv.Atoi(types.Getenv("STATUS_CHECK_DELAY", "2"))
 	experimentDetails.Timeout, _ = strconv.Atoi(types.Getenv("STATUS_CHECK_TIMEOUT", "180"))
-	experimentDetails.AppVMMoid = types.Getenv("APP_VM_MOID", "")
+	experimentDetails.Sequence = types.Getenv("SEQUENCE", "parallel")
+	experimentDetails.VMIds = types.Getenv("APP_VM_MOIDS", "")
 	experimentDetails.VcenterServer = types.Getenv("VCENTERSERVER", "")
 	experimentDetails.VcenterUser = types.Getenv("VCENTERUSER", "")
 	experimentDetails.VcenterPass = types.Getenv("VCENTERPASS", "")
-
 }
