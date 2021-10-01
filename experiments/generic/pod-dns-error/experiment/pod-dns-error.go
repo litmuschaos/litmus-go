@@ -1,6 +1,8 @@
 package experiment
 
 import (
+	"os"
+
 	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
 	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/pod-dns-chaos/lib"
 	"github.com/litmuschaos/litmus-go/pkg/clients"
@@ -25,7 +27,7 @@ func PodDNSError(clients clients.ClientSets) {
 	chaosDetails := types.ChaosDetails{}
 
 	//Fetching all the ENV passed from the runner pod
-	log.Infof("[PreReq]: Getting the ENV for the %v experiment", experimentsDetails.ExperimentName)
+	log.Infof("[PreReq]: Getting the ENV for the %v experiment", os.Getenv("EXPERIMENT_NAME"))
 	experimentEnv.GetENV(&experimentsDetails, experimentEnv.Error)
 
 	// Initialise the chaos attributes
@@ -61,9 +63,10 @@ func PodDNSError(clients clients.ClientSets) {
 
 	//DISPLAY THE APP INFORMATION
 	log.InfoWithValues("[Info]: The application information is as follows", logrus.Fields{
-		"Namespace": experimentsDetails.AppNS,
-		"Label":     experimentsDetails.AppLabel,
-		"Ramp Time": experimentsDetails.RampTime,
+		"Namespace":       experimentsDetails.AppNS,
+		"Label":           experimentsDetails.AppLabel,
+		"Chaos Duration":  experimentsDetails.ChaosDuration,
+		"TargetHostNames": experimentsDetails.TargetHostNames,
 	})
 
 	// Calling AbortWatcher go routine, it will continuously watch for the abort signal and generate the required events and result

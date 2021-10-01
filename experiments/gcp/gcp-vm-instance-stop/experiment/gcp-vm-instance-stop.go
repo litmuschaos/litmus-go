@@ -1,6 +1,8 @@
 package experiment
 
 import (
+	"os"
+
 	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
 	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/gcp-vm-instance-stop/lib"
 	"github.com/litmuschaos/litmus-go/pkg/clients"
@@ -29,7 +31,7 @@ func VMInstanceStop(clients clients.ClientSets) {
 
 	//Fetching all the ENV passed from the runner pod
 	experimentEnv.GetENV(&experimentsDetails)
-	log.Infof("[PreReq]: Procured the ENV for the %v experiment", experimentsDetails.ExperimentName)
+	log.Infof("[PreReq]: Procured the ENV for the %v experiment", os.Getenv("EXPERIMENT_NAME"))
 
 	// Intialise the chaos attributes
 	experimentEnv.InitialiseChaosVariables(&chaosDetails, &experimentsDetails)
@@ -69,7 +71,6 @@ func VMInstanceStop(clients clients.ClientSets) {
 	log.InfoWithValues("The instance information is as follows", logrus.Fields{
 		"Chaos Duration":  experimentsDetails.ChaosDuration,
 		"Chaos Namespace": experimentsDetails.ChaosNamespace,
-		"Ramp Time":       experimentsDetails.RampTime,
 		"Instance Names":  experimentsDetails.VMInstanceName,
 		"Zones":           experimentsDetails.InstanceZone,
 	})

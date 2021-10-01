@@ -182,8 +182,10 @@ func deleteProbePod(chaosDetails *types.ChaosDetails, clients clients.ClientSets
 		Wait(time.Duration(chaosDetails.Delay) * time.Second).
 		Try(func(attempt uint) error {
 			podSpec, err := clients.KubeClient.CoreV1().Pods(chaosDetails.ChaosNamespace).List(v1.ListOptions{LabelSelector: chaosDetails.ExperimentName + "-probe-" + runID})
-			if err != nil || len(podSpec.Items) != 0 {
+			if err != nil {
 				return errors.Errorf("Probe Pod is not deleted yet, err: %v", err)
+			} else if len(podSpec.Items) != 0 {
+				return errors.Errorf("Probe Pod is not deleted yet")
 			}
 			return nil
 		})
@@ -617,15 +619,13 @@ func createHelperPod(probe v1alpha1.ProbeAttributes, resultDetails *types.Result
 	setRunIDForProbe(resultDetails, probe.Name, probe.Type, runID)
 
 	// create the external pod with source image for cmd probe
-	err := createProbePod(clients, chaosDetails, runID, probe.CmdProbeInputs.Source)
-	if err != nil {
+	if err := createProbePod(clients, chaosDetails, runID, probe.CmdProbeInputs.Source); err != nil {
 		return litmusexec.PodDetails{}, err
 	}
 
 	// verify the running status of external probe pod
 	log.Info("[Status]: Checking the status of the probe pod")
-	err = status.CheckApplicationStatus(chaosDetails.ChaosNamespace, "name="+chaosDetails.ExperimentName+"-probe-"+runID, chaosDetails.Timeout, chaosDetails.Delay, clients)
-	if err != nil {
+	if err = status.CheckApplicationStatus(chaosDetails.ChaosNamespace, "name="+chaosDetails.ExperimentName+"-probe-"+runID, chaosDetails.Timeout, chaosDetails.Delay, clients); err != nil {
 		return litmusexec.PodDetails{}, errors.Errorf("probe pod is not in running state, err: %v", err)
 	}
 

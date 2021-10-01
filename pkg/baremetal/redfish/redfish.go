@@ -5,11 +5,12 @@ import (
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
+
 	"fmt"
 	"net/http"
 
 	"github.com/litmuschaos/litmus-go/pkg/log"
+	"github.com/pkg/errors"
 )
 
 //State helps get the power state of the node
@@ -28,7 +29,7 @@ func GetNodeStatus(IP, user, password string) (string, error) {
 	if err != nil {
 		msg := fmt.Sprintf("Error creating http request: %v", err)
 		log.Error(msg)
-		return "", errors.New(fmt.Sprintf("fail to get the node status, err: %v", msg))
+		return "", errors.Errorf("fail to get the node status, err: %v", err)
 	}
 	req.Header.Add("Authorization", "Basic "+encodedAuth)
 	req.Header.Add("Content-Type", "application/json")
@@ -45,7 +46,7 @@ func GetNodeStatus(IP, user, password string) (string, error) {
 	log.Infof(resp.Status)
 	if resp.StatusCode != 200 {
 		log.Error("Unable to get current state of the node")
-		return "", errors.New(fmt.Sprintf("fail to get the node status. Request failed with status: %v", resp.StatusCode))
+		return "", errors.Errorf("fail to get the node status. Request failed with status: %v", resp.StatusCode)
 	}
 	defer resp.Body.Close()
 	power := new(State)

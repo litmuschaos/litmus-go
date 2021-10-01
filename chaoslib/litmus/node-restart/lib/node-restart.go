@@ -104,7 +104,7 @@ func PrepareNodeRestart(experimentsDetails *experimentTypes.ExperimentDetails, c
 	podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, appLabel, clients, experimentsDetails.ChaosDuration+experimentsDetails.Timeout, experimentsDetails.ExperimentName)
 	if err != nil || podStatus == "Failed" {
 		common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-helper-"+experimentsDetails.RunID, appLabel, chaosDetails, clients)
-		return errors.Errorf("helper pod failed due to, err: %v", err)
+		return common.HelperFailedError(err)
 	}
 
 	//Deleting the helper pod

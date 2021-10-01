@@ -1,6 +1,8 @@
 package experiment
 
 import (
+	"os"
+
 	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
 	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/azure-disk-loss/lib"
 	experimentEnv "github.com/litmuschaos/litmus-go/pkg/azure/disk-loss/environment"
@@ -28,7 +30,7 @@ func AzureDiskLoss(clients clients.ClientSets) {
 	chaosDetails := types.ChaosDetails{}
 
 	//Fetching all the ENV passed from the runner pod
-	log.Infof("[PreReq]: Getting the ENV for the %v experiment", experimentsDetails.ExperimentName)
+	log.Infof("[PreReq]: Getting the ENV for the %v experiment", os.Getenv("EXPERIMENT_NAME"))
 	experimentEnv.GetENV(&experimentsDetails)
 
 	// Intialise the chaos attributes
@@ -66,15 +68,10 @@ func AzureDiskLoss(clients clients.ClientSets) {
 	go common.AbortWatcherWithoutExit(experimentsDetails.ExperimentName, clients, &resultDetails, &chaosDetails, &eventsDetails)
 
 	//DISPLAY THE APP INFORMATION
-	log.InfoWithValues("[Info]: The application information is as follows", logrus.Fields{
-		"Namespace": experimentsDetails.AppNS,
-		"Label":     experimentsDetails.AppLabel,
-		"Ramp Time": experimentsDetails.RampTime,
-	})
-
 	log.InfoWithValues("The volume information is as follows", logrus.Fields{
 		"Disk Names":     experimentsDetails.VirtualDiskNames,
 		"Resource Group": experimentsDetails.ResourceGroup,
+		"Sequence":       experimentsDetails.Sequence,
 	})
 
 	//PRE-CHAOS APPLICATION STATUS CHECK

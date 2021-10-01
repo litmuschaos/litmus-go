@@ -1,6 +1,8 @@
 package experiment
 
 import (
+	"os"
+
 	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
 	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/node-io-stress/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
@@ -25,7 +27,7 @@ func NodeIOStress(clients clients.ClientSets) {
 	chaosDetails := types.ChaosDetails{}
 
 	//Fetching all the ENV passed from the runner pod
-	log.Infof("[PreReq]: Getting the ENV for the %v experiment", experimentsDetails.ExperimentName)
+	log.Infof("[PreReq]: Getting the ENV for the %v experiment", os.Getenv("EXPERIMENT_NAME"))
 	experimentEnv.GetENV(&experimentsDetails)
 
 	// Intialise the chaos attributes
@@ -61,12 +63,9 @@ func NodeIOStress(clients clients.ClientSets) {
 
 	//DISPLAY THE APP INFORMATION
 	log.InfoWithValues("The application information is as follows", logrus.Fields{
-		"Namespace":                       experimentsDetails.AppNS,
-		"App Label":                       experimentsDetails.AppLabel,
 		"Node Label":                      experimentsDetails.NodeLabel,
 		"Chaos Duration":                  experimentsDetails.ChaosDuration,
 		"Target Nodes":                    experimentsDetails.TargetNodes,
-		"Ramp Time":                       experimentsDetails.RampTime,
 		"NumberOfWorkers":                 experimentsDetails.NumberOfWorkers,
 		"FilesystemUtilizationPercentage": experimentsDetails.FilesystemUtilizationPercentage,
 		"FilesystemUtilizationBytes":      experimentsDetails.FilesystemUtilizationBytes,

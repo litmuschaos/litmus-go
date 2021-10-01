@@ -33,13 +33,17 @@ func GetNodeList(nodeNames, nodeLabel string, nodeAffPerc int, clients clients.C
 	switch nodeLabel {
 	case "":
 		nodes, err = clients.KubeClient.CoreV1().Nodes().List(v1.ListOptions{})
-		if err != nil || len(nodes.Items) == 0 {
+		if err != nil {
 			return nil, errors.Errorf("Failed to find the nodes, err: %v", err)
+		} else if len(nodes.Items) == 0 {
+			return nil, errors.Errorf("Failed to find the nodes")
 		}
 	default:
 		nodes, err = clients.KubeClient.CoreV1().Nodes().List(v1.ListOptions{LabelSelector: nodeLabel})
-		if err != nil || len(nodes.Items) == 0 {
+		if err != nil {
 			return nil, errors.Errorf("Failed to find the nodes with matching label, err: %v", err)
+		} else if len(nodes.Items) == 0 {
+			return nil, errors.Errorf("Failed to find the nodes with matching label")
 		}
 	}
 
@@ -65,8 +69,10 @@ func GetNodeName(namespace, labels, nodeLabel string, clients clients.ClientSets
 	switch nodeLabel {
 	case "":
 		podList, err := clients.KubeClient.CoreV1().Pods(namespace).List(v1.ListOptions{LabelSelector: labels})
-		if err != nil || len(podList.Items) == 0 {
+		if err != nil {
 			return "", errors.Wrapf(err, "Failed to find the application pods with matching labels in %v namespace, err: %v", namespace, err)
+		} else if len(podList.Items) == 0 {
+			return "", errors.Errorf("Failed to find the application pods with matching labels in %v namespace", namespace)
 		}
 
 		rand.Seed(time.Now().Unix())
@@ -74,8 +80,10 @@ func GetNodeName(namespace, labels, nodeLabel string, clients clients.ClientSets
 		return podList.Items[randomIndex].Spec.NodeName, nil
 	default:
 		nodeList, err := clients.KubeClient.CoreV1().Nodes().List(v1.ListOptions{LabelSelector: nodeLabel})
-		if err != nil || len(nodeList.Items) == 0 {
+		if err != nil {
 			return "", errors.Wrapf(err, "Failed to find the target nodes with matching labels in %v namespace, err: %v", namespace, err)
+		} else if len(nodeList.Items) == 0 {
+			return "", errors.Wrapf(err, "Failed to find the target nodes with matching labels in %v namespace", namespace)
 		}
 		rand.Seed(time.Now().Unix())
 		randomIndex := rand.Intn(len(nodeList.Items))
