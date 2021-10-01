@@ -34,6 +34,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.TargetNodeIP = common.Getenv("TARGET_NODE_IP", "")
 	experimentDetails.TargetContainer = common.Getenv("TARGET_CONTAINER", "")
 	experimentDetails.NodeLabel = common.Getenv("NODE_LABEL", "")
+	experimentDetails.TerminationGracePeriodSeconds, _ = strconv.Atoi(common.Getenv("TERMINATION_GRACE_PERIOD_SECONDS", ""))
 }
 
 //InitialiseChaosVariables initialise all the global variables

@@ -85,9 +85,11 @@ func triggerK8sProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets,
 					FieldSelector: inputs.FieldSelector,
 					LabelSelector: inputs.LabelSelector,
 				})
-				if err != nil || len(resourceList.Items) == 0 {
+				if err != nil {
 					log.Errorf("the %v k8s probe has Failed, err: %v", probe.Name, err)
 					return errors.Errorf("unable to list the resources with matching selector, err: %v", err)
+				} else if len(resourceList.Items) == 0 {
+					return errors.Errorf("no resource found with provided selectors")
 				}
 			case "absent":
 				resourceList, err := clients.DynamicClient.Resource(gvr).Namespace(inputs.Namespace).List(v1.ListOptions{
@@ -167,8 +169,10 @@ func deleteResource(probe v1alpha1.ProbeAttributes, gvr schema.GroupVersionResou
 		FieldSelector: probe.K8sProbeInputs.FieldSelector,
 		LabelSelector: probe.K8sProbeInputs.LabelSelector,
 	})
-	if err != nil || len(resourceList.Items) == 0 {
+	if err != nil {
 		return errors.Errorf("unable to list the resources with matching selector, err: %v", err)
+	} else if len(resourceList.Items) == 0 {
+		return errors.Errorf("no resource found with provided selectors")
 	}
 
 	for index := range resourceList.Items {
