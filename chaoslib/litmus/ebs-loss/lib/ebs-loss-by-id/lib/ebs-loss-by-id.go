@@ -41,7 +41,7 @@ func PrepareEBSLossByID(experimentsDetails *experimentTypes.ExperimentDetails, c
 
 	select {
 	case <-inject:
-		// stopping the chaos execution, if abort signal recieved
+		// stopping the chaos execution, if abort signal received
 		os.Exit(0)
 	default:
 

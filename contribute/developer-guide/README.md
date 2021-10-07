@@ -19,9 +19,7 @@ The artifacts associated with a chaos-experiment are summarized below:
 
   Example: [pod delete experiment in chaos-charts](https://github.com/litmuschaos/chaos-charts/tree/master/charts/generic/pod-delete)
 
-The *generate_experiment.go* script is a simple way to bootstrap your experiment, and helps create the aforementioned artifacts in the 
-appropriate directory (i.e., as per the chaos-category) based on an attributes file provided as input by the chart-developer. The 
-scaffolded files consist of placeholders which can then be filled as desired.  
+The *generate_experiment.go* script is a simple way to bootstrap your experiment, and helps create the aforementioned artifacts in the appropriate directory (i.e., as per the chaos-category) based on an attributes file provided as input by the chart-developer. The scaffolded files consist of placeholders which can then be filled as desired.  
 
 ### Pre-Requisites
 
