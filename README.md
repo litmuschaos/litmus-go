@@ -11,11 +11,9 @@
 [![YouTube Channel](https://img.shields.io/badge/YouTube-Subscribe-red)](https://www.youtube.com/channel/UCa57PMqmz_j0wnteRa9nCaw)
 <br><br>
 
-- This repo consists of Litmus Chaos Experiments written in golang. The examples in this repo are good indicators of how to construct the experiments in golang: complete with steady state checks, chaosresult generation, chaos injection etc.., post chaos checks, create events and reports for observability and configure sinks for these.
+This repo consists of Litmus Chaos Experiments written in golang. The examples in this repo are good indicators of how to construct the experiments in golang: complete with steady state checks, chaosresult generation, chaos injection etc.., post chaos checks, create events and reports for observability and configure sinks for these.
 
-**NOTE**
-
-- This repo can be viewed as an extension to the [litmuschaos/litmus](https://github.com/litmuschaos/litmus) repo in the sense that the litmus repo also houses a significant set of experiments, built using ansible. The litmus repo will also continue to be the project's community-facing meta repo housing other important project artifacts. In that sense, litmus-go is very similar to and therefore a sister repo of [litmus-python](https://github.com/litmuschaos/litmus-python) which houses examples for experiment business logic written in python.
+**NOTE**: This repo can be viewed as an extension to the [litmuschaos/litmus](https://github.com/litmuschaos/litmus) repo. The litmus repo will also continue to be the project's community-facing meta repo housing other important project artifacts. In that sense, litmus-go is very similar to and therefore a sister repo of [litmus-python](https://github.com/litmuschaos/litmus-python) which houses examples for experiment business logic written in python.
 
 ## Litmus SDK
 
@@ -23,11 +21,11 @@ The Litmus SDK provides a simple way to bootstrap your experiment and helps crea
 
 It generates the custom chaos experiments with some default Pre & Post Chaos Checks (AUT & Auxiliary Applications status checks). It can use the existing chaoslib (present inside /chaoslib directory), if available else It will create a new chaoslib inside the corresponding directory.
 
-Refer [Litmus-SDK](https://github.com/litmuschaos/litmus-go/blob/master/contribute/developer-guide/README.md) for more details
+Refer [Litmus-SDK](https://github.com/litmuschaos/litmus-go/blob/master/contribute/developer-guide/README.md) for more details.
 
 ## How to get started?
 
-Refer the LitmusChaos documentation [litmus docs](https://docs.litmuschaos.io)
+Refer the [LitmusChaos Docs](https://docs.litmuschaos.io) and [Experiment Docs](https://litmuschaos.github.io/litmus/experiments/categories/contents/)
 
 ## How do I contribute?
 
