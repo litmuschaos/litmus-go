@@ -68,22 +68,3 @@ jobs:
           file: build/Dockerfile
           platforms: linux/amd64,linux/arm64
           tags: litmuschaos/go-runner:${{ env.RELEASE_TAG }},litmuschaos/go-runner:latest
-
-  trivy:
-    needs: pre-checks
-    runs-on: ubuntu-latest
-    steps:
-      # Install golang
-      - uses: actions/setup-go@v2
-        with:
-          go-version: 1.16
-      - uses: actions/checkout@v2
-
-      - name: Build image for trivy scan
-        run: make build-amd64
-
-      - name: setup trivy
-        run: |
-          wget https://github.com/aquasecurity/trivy/releases/download/v0.11.0/trivy_0.11.0_Linux-64bit.tar.gz
-          tar zxvf trivy_0.11.0_Linux-64bit.tar.gz
-          make trivy-check
