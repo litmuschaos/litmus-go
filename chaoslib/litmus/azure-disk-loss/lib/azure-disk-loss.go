@@ -68,7 +68,7 @@ func PrepareChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients
 
 	select {
 	case <-inject:
-		// stopping the chaos execution, if abort signal recieved
+		// stopping the chaos execution, if abort signal received
 		os.Exit(0)
 	default:
 
@@ -247,7 +247,7 @@ func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, attache
 
 	log.Info("[Abort]: Chaos Revert Started")
 
-	log.Info("[Abort]: Attaching disk(s) as abort signal recieved")
+	log.Info("[Abort]: Attaching disk(s) as abort signal received")
 
 	for instanceName, diskList := range attachedDisksWithInstance {
 		// Checking for provisioning state of the vm instances

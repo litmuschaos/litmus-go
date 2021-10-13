@@ -113,11 +113,7 @@ func preparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetail
 		return err
 	}
 
-	if err = result.AnnotateChaosResult(resultDetails.Name, chaosDetails.ChaosNamespace, "reverted", "pod", experimentsDetails.TargetPods); err != nil {
-		return err
-	}
-
-	return nil
+	return result.AnnotateChaosResult(resultDetails.Name, chaosDetails.ChaosNamespace, "reverted", "pod", experimentsDetails.TargetPods)
 }
 
 //getContainerID extract out the container id of the target container
@@ -158,7 +154,7 @@ func injectChaos(experimentDetails *experimentTypes.ExperimentDetails, pid int) 
 
 	select {
 	case <-inject:
-		// stopping the chaos execution, if abort signal recieved
+		// stopping the chaos execution, if abort signal received
 		os.Exit(1)
 	default:
 		if destinationIPs == "" {
@@ -271,7 +267,7 @@ func getENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.DestinationIPs = common.Getenv("DESTINATION_IPS", "")
 }
 
-// abortWatcher continuosly watch for the abort signals
+// abortWatcher continuously watch for the abort signals
 func abortWatcher(targetPID int, resultName, chaosNS, targetPodName string) {
 
 	<-abort

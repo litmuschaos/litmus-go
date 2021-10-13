@@ -35,7 +35,18 @@ jobs:
           fi
           
       - name: golangci-lint
-        uses: reviewdog/action-golangci-lint@v1       
+        uses: reviewdog/action-golangci-lint@v1   
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@master
+      - name: Run Snyk to check for vulnerabilities
+        uses: snyk/actions/golang@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --severity-threshold=high     
 
   build:
     needs: pre-checks

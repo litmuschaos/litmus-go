@@ -55,3 +55,8 @@ This project is implemented using Go and uses the standard golang tools for deve
 -   are familiar with Kubernetes and have access to a Kubernetes cluster or Minikube to test the changes.
 
 For the creation of new chaos-experiment and testing of the modified changes, see the detailed instructions [here](./contribute/developer-guide/README.md).
+
+## Community
+
+The litmus community will have a monthly community sync-up on 3rd Wednesday 22.00-23.00IST / 18.30-19.30CEST
+-  The community meeting details are available [here](https://hackmd.io/a4Zu_sH4TZGeih-xCimi3Q). Please feel free to join the community meeting.

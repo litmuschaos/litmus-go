@@ -71,7 +71,7 @@ func InjectVMPowerOffChaos(experimentsDetails *experimentTypes.ExperimentDetails
 func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, vmIdList []string, cookie string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 	select {
 	case <-inject:
-		// stopping the chaos execution, if abort signal recieved
+		// stopping the chaos execution, if abort signal received
 		os.Exit(0)
 	default:
 		//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
@@ -143,7 +143,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 
 	select {
 	case <-inject:
-		// stopping the chaos execution, if abort signal recieved
+		// stopping the chaos execution, if abort signal received
 		os.Exit(0)
 	default:
 		//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
