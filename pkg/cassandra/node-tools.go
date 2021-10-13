@@ -34,7 +34,7 @@ func NodeToolStatusCheck(experimentsDetails *experimentTypes.ExperimentDetails, 
 		return errors.Errorf("failed to get load percentage, err: %v", err)
 	}
 
-	// Check the load precentage
+	// Check the load percentage
 	if err = CheckLoadPercentage(loadPercentage, replicaCount); err != nil {
 		return errors.Errorf("load percentage check failed, err: %v", err)
 	}

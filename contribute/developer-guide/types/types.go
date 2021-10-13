@@ -1,6 +1,7 @@
 package types
 
 const (
+	// IconPath contains the icon of the chaos chart
 	IconPath string = "/contribute/developer-guide/icons/k8s.png"
 )
 

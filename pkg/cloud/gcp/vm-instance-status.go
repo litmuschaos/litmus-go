@@ -55,9 +55,8 @@ func InstanceStatusCheckByName(autoScalingGroup string, delay, timeout int, chec
 	log.Infof("[Info]: The instances under chaos(IUC) are: %v", instanceNamesList)
 	if check == "pre-chaos" {
 		return InstanceStatusCheckPreChaos(instanceNamesList, gcpProjectId, instanceZonesList)
-	} else {
-		return InstanceStatusCheckPostChaos(timeout, delay, instanceNamesList, gcpProjectId, instanceZonesList)
 	}
+	return InstanceStatusCheckPostChaos(timeout, delay, instanceNamesList, gcpProjectId, instanceZonesList)
 }
 
 //InstanceStatusCheckPreChaos is used to check whether all VM instances under chaos are running or not without any re-check
