@@ -72,7 +72,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 
 	select {
 	case <-inject:
-		// stopping the chaos execution, if abort signal recieved
+		// stopping the chaos execution, if abort signal received
 		os.Exit(0)
 	default:
 		//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
@@ -144,7 +144,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 
 	select {
 	case <-inject:
-		// stopping the chaos execution, if abort signal recieved
+		// stopping the chaos execution, if abort signal received
 		os.Exit(0)
 	default:
 		//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin

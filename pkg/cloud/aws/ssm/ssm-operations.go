@@ -17,6 +17,7 @@ import (
 )
 
 const (
+	// DefaultSSMDocsDirectory contains path of the ssm docs
 	DefaultSSMDocsDirectory = "LitmusChaos-AWS-SSM-Docs.yml"
 )
 
