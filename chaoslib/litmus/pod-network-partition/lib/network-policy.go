@@ -14,6 +14,7 @@ import (
 )
 
 const (
+	// AllIPs cidr contains all ips
 	AllIPs string = "0.0.0.0/0"
 )
 

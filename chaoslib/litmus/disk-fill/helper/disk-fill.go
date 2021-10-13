@@ -157,7 +157,7 @@ func fillDisk(containerID string, sizeTobeFilled, bs int) error {
 
 	select {
 	case <-inject:
-		// stopping the chaos execution, if abort signal recieved
+		// stopping the chaos execution, if abort signal received
 		os.Exit(1)
 	default:
 		// Creating files to fill the required ephemeral storage size of block size of 4K
@@ -267,9 +267,9 @@ func getENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.DataBlockSize, _ = strconv.Atoi(types.Getenv("DATA_BLOCK_SIZE", "256"))
 }
 
-// abortWatcher continuosly watch for the abort signals
+// abortWatcher continuously watch for the abort signals
 func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, containerID, resultName string) {
-	// waiting till the abort signal recieved
+	// waiting till the abort signal received
 	<-abort
 
 	log.Info("[Chaos]: Killing process started because of terminated signal received")

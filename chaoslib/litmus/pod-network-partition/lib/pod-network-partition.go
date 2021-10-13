@@ -91,7 +91,7 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 
 	select {
 	case <-inject:
-		// stopping the chaos execution, if abort signal recieved
+		// stopping the chaos execution, if abort signal received
 		os.Exit(0)
 	default:
 		// creating the network policy to block the traffic
@@ -204,9 +204,9 @@ func checkExistanceOfPolicy(experimentsDetails *experimentTypes.ExperimentDetail
 		})
 }
 
-// abortWatcher continuosly watch for the abort signals
+// abortWatcher continuously watch for the abort signals
 func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, targetPodList *corev1.PodList, runID string) {
-	// waiting till the abort signal recieved
+	// waiting till the abort signal received
 	<-abort
 
 	log.Info("[Chaos]: Killing process started because of terminated signal received")

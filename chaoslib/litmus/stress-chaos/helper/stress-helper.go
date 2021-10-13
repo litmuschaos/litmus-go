@@ -42,6 +42,7 @@ var (
 )
 
 const (
+	// ProcessAlreadyFinished contains error code when process is finished
 	ProcessAlreadyFinished = "os: process already finished"
 )
 
@@ -86,7 +87,7 @@ func prepareStressChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 
 	select {
 	case <-inject:
-		// stopping the chaos execution, if abort signal recieved
+		// stopping the chaos execution, if abort signal received
 		os.Exit(1)
 	default:
 
@@ -214,7 +215,7 @@ func terminateProcess(pid int) error {
 	if err = process.Signal(syscall.SIGTERM); err != nil && err.Error() != ProcessAlreadyFinished {
 		return errors.Errorf("error while killing process, err: %v", err)
 	}
-	log.Info("[Info]: Stress process removed sucessfully")
+	log.Info("[Info]: Stress process removed successfully")
 	return nil
 }
 
@@ -514,7 +515,7 @@ func getENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.VolumeMountPath = types.Getenv("VOLUME_MOUNT_PATH", "")
 }
 
-// abortWatcher continuosly watch for the abort signals
+// abortWatcher continuously watch for the abort signals
 func abortWatcher(targetPID int, resultName, chaosNS, targetPodName string) {
 
 	<-abort

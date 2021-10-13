@@ -98,13 +98,13 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 
 	select {
 	case <-inject:
-		// stopping the chaos execution, if abort signal recieved
+		// stopping the chaos execution, if abort signal received
 		time.Sleep(10 * time.Second)
 		os.Exit(0)
 	default:
 		for _, pod := range targetPodList.Items {
 
-			// creating err channel to recieve the error from the go routine
+			// creating err channel to receive the error from the go routine
 			stressErr := make(chan error)
 
 			if experimentsDetails.EngineName != "" {
@@ -132,7 +132,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 				endTime = time.After(timeDelay)
 				select {
 				case err := <-stressErr:
-					// skipping the execution, if recieved any error other than 137, while executing stress command and marked result as fail
+					// skipping the execution, if received any error other than 137, while executing stress command and marked result as fail
 					// it will ignore the error code 137(oom kill), it will skip further execution and marked the result as pass
 					// oom kill occurs if memory to be stressed exceed than the resource limit for the target container
 					if err != nil {
@@ -170,7 +170,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 
 // injectChaosInParallelMode stressed the cpu of all target application in parallel mode (all at once)
 func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList corev1.PodList, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	// creating err channel to recieve the error from the go routine
+	// creating err channel to receive the error from the go routine
 	stressErr := make(chan error)
 
 	// run the probes during chaos
@@ -190,7 +190,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 
 	select {
 	case <-inject:
-		// stopping the chaos execution, if abort signal recieved
+		// stopping the chaos execution, if abort signal received
 		time.Sleep(10 * time.Second)
 		os.Exit(0)
 	default:
@@ -221,7 +221,7 @@ loop:
 		endTime = time.After(timeDelay)
 		select {
 		case err := <-stressErr:
-			// skipping the execution, if recieved any error other than 137, while executing stress command and marked result as fail
+			// skipping the execution, if received any error other than 137, while executing stress command and marked result as fail
 			// it will ignore the error code 137(oom kill), it will skip further execution and marked the result as pass
 			// oom kill occurs if memory to be stressed exceed than the resource limit for the target container
 			if err != nil {
@@ -248,11 +248,7 @@ loop:
 			break loop
 		}
 	}
-	if err := killStressCPUParallel(experimentsDetails, targetPodList, clients, chaosDetails); err != nil {
-		return err
-	}
-
-	return nil
+	return killStressCPUParallel(experimentsDetails, targetPodList, clients, chaosDetails)
 }
 
 //PrepareCPUExecStress contains the chaos prepration and injection steps

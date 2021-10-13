@@ -61,14 +61,14 @@ func GetRunID() string {
 	return string(runID)
 }
 
-// AbortWatcher continuosly watch for the abort signals
-// it will update chaosresult w/ failed step and create an abort event, if it recieved abort signal during chaos
+// AbortWatcher continuously watch for the abort signals
+// it will update chaosresult w/ failed step and create an abort event, if it received abort signal during chaos
 func AbortWatcher(expname string, clients clients.ClientSets, resultDetails *types.ResultDetails, chaosDetails *types.ChaosDetails, eventsDetails *types.EventDetails) {
 	AbortWatcherWithoutExit(expname, clients, resultDetails, chaosDetails, eventsDetails)
 	os.Exit(1)
 }
 
-// AbortWatcherWithoutExit continuosly watch for the abort signals
+// AbortWatcherWithoutExit continuously watch for the abort signals
 func AbortWatcherWithoutExit(expname string, clients clients.ClientSets, resultDetails *types.ResultDetails, chaosDetails *types.ChaosDetails, eventsDetails *types.EventDetails) {
 
 	// signChan channel is used to transmit signal notifications.
@@ -76,7 +76,7 @@ func AbortWatcherWithoutExit(expname string, clients clients.ClientSets, resultD
 	// Catch and relay certain signal(s) to signChan channel.
 	signal.Notify(signChan, os.Interrupt, syscall.SIGTERM)
 
-	// waiting until the abort signal recieved
+	// waiting until the abort signal received
 	<-signChan
 
 	log.Info("[Chaos]: Chaos Experiment Abortion started because of terminated signal received")
@@ -164,6 +164,7 @@ func HelperFailedError(err error) error {
 	return errors.Errorf("helper pod failed")
 }
 
+// GetStatusMessage returns the event message
 func GetStatusMessage(defaultCheck bool, defaultMsg, probeStatus string) string {
 	if defaultCheck {
 		if probeStatus == "" {
