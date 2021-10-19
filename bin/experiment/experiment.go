@@ -21,6 +21,7 @@ import (
 	gcpVMInstanceStop "github.com/litmuschaos/litmus-go/experiments/gcp/gcp-vm-instance-stop/experiment"
 	containerKill "github.com/litmuschaos/litmus-go/experiments/generic/container-kill/experiment"
 	diskFill "github.com/litmuschaos/litmus-go/experiments/generic/disk-fill/experiment"
+        volumeFill "github.com/litmuschaos/litmus-go/experiments/generic/volume-fill/experiment"
 	dockerServiceKill "github.com/litmuschaos/litmus-go/experiments/generic/docker-service-kill/experiment"
 	kubeletServiceKill "github.com/litmuschaos/litmus-go/experiments/generic/kubelet-service-kill/experiment"
 	nodeCPUHog "github.com/litmuschaos/litmus-go/experiments/generic/node-cpu-hog/experiment"
@@ -86,6 +87,8 @@ func main() {
 		containerKill.ContainerKill(clients)
 	case "disk-fill":
 		diskFill.DiskFill(clients)
+        case "volume-fill":
+                volumeFill.VolumeFill(clients)
 	case "kafka-broker-pod-failure":
 		kafkaBrokerPodFailure.KafkaBrokerPodFailure(clients)
 	case "kubelet-service-kill":
