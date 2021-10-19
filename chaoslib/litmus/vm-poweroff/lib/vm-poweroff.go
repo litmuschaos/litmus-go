@@ -42,9 +42,6 @@ func InjectVMPowerOffChaos(experimentsDetails *experimentTypes.ExperimentDetails
 	//Fetching the target VM Ids
 	vmIdList := strings.Split(experimentsDetails.VMIds, ",")
 
-	// Calling AbortWatcher go routine, it will continuously watch for the abort signal and generate the required events and result
-	go abortWatcher(experimentsDetails, vmIdList, clients, resultDetails, chaosDetails, eventsDetails, cookie)
-
 	switch strings.ToLower(experimentsDetails.Sequence) {
 	case "serial":
 		if err := injectChaosInSerialMode(experimentsDetails, vmIdList, cookie, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
@@ -69,14 +66,19 @@ func InjectVMPowerOffChaos(experimentsDetails *experimentTypes.ExperimentDetails
 
 // injectChaosInSerialMode stops VMs in serial mode i.e. one after the other
 func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, vmIdList []string, cookie string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+
+	//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
+	ChaosStartTimeStamp := time.Now()
+	duration := int(time.Since(ChaosStartTimeStamp).Seconds())
+
 	select {
 	case <-inject:
 		// stopping the chaos execution, if abort signal received
+		time.Sleep(10 * time.Second)
 		os.Exit(0)
 	default:
-		//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
-		ChaosStartTimeStamp := time.Now()
-		duration := int(time.Since(ChaosStartTimeStamp).Seconds())
+		// Calling AbortWatcher go routine, it will continuously watch for the abort signal and generate the required events and result
+		go abortWatcher(experimentsDetails, vmIdList, clients, resultDetails, chaosDetails, eventsDetails, cookie)
 
 		for duration < experimentsDetails.ChaosDuration {
 
@@ -141,14 +143,18 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 // injectChaosInParallelMode stops VMs in parallel mode i.e. all at once
 func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, vmIdList []string, cookie string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
+	//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
+	ChaosStartTimeStamp := time.Now()
+	duration := int(time.Since(ChaosStartTimeStamp).Seconds())
+
 	select {
 	case <-inject:
 		// stopping the chaos execution, if abort signal received
+		time.Sleep(10 * time.Second)
 		os.Exit(0)
 	default:
-		//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
-		ChaosStartTimeStamp := time.Now()
-		duration := int(time.Since(ChaosStartTimeStamp).Seconds())
+		// Calling AbortWatcher go routine, it will continuously watch for the abort signal and generate the required events and result
+		go abortWatcher(experimentsDetails, vmIdList, clients, resultDetails, chaosDetails, eventsDetails, cookie)
 
 		for duration < experimentsDetails.ChaosDuration {
 
@@ -222,6 +228,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 
 // abortWatcher watches for the abort signal and reverts the chaos
 func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, vmIdList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, chaosDetails *types.ChaosDetails, eventsDetails *types.EventDetails, cookie string) {
+	chaosDetails.Revert = true
 	<-abort
 
 	log.Info("[Abort]: Chaos Revert Started")
@@ -247,6 +254,10 @@ func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, vmIdLis
 
 		common.SetTargets(vmId, "reverted", "VM", chaosDetails)
 	}
+	// allowing chaosresult updation
+	chaosDetails.Abort <- true
+	// waiting for the chaosresult creation
+	<-chaosDetails.Abort
 
 	log.Info("[Abort]: Chaos Revert Completed")
 	os.Exit(1)

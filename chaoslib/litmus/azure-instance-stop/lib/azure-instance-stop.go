@@ -48,9 +48,6 @@ func PrepareAzureStop(experimentsDetails *experimentTypes.ExperimentDetails, cli
 		return errors.Errorf("no instance name found to stop")
 	}
 
-	// watching for the abort signal and revert the chaos
-	go abortWatcher(experimentsDetails, instanceNameList)
-
 	switch strings.ToLower(experimentsDetails.Sequence) {
 	case "serial":
 		if err = injectChaosInSerialMode(experimentsDetails, instanceNameList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
@@ -74,14 +71,19 @@ func PrepareAzureStop(experimentsDetails *experimentTypes.ExperimentDetails, cli
 
 // injectChaosInSerialMode will inject the azure instance termination in serial mode that is one after the other
 func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, instanceNameList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+
+	// ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
+	ChaosStartTimeStamp := time.Now()
+	duration := int(time.Since(ChaosStartTimeStamp).Seconds())
+
 	select {
 	case <-inject:
 		// stopping the chaos execution, if abort signal received
+		time.Sleep(10 * time.Second)
 		os.Exit(0)
 	default:
-		// ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
-		ChaosStartTimeStamp := time.Now()
-		duration := int(time.Since(ChaosStartTimeStamp).Seconds())
+		// watching for the abort signal and revert the chaos
+		go abortWatcher(experimentsDetails, instanceNameList, chaosDetails)
 
 		for duration < experimentsDetails.ChaosDuration {
 
@@ -152,14 +154,19 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 
 // injectChaosInParallelMode will inject the azure instance termination in parallel mode that is all at once
 func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, instanceNameList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+
+	// ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
+	ChaosStartTimeStamp := time.Now()
+	duration := int(time.Since(ChaosStartTimeStamp).Seconds())
+
 	select {
 	case <-inject:
-		// Stopping the chaos execution, if abort signal received
+		// stopping the chaos execution, if abort signal received
+		time.Sleep(10 * time.Second)
 		os.Exit(0)
 	default:
-		// ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
-		ChaosStartTimeStamp := time.Now()
-		duration := int(time.Since(ChaosStartTimeStamp).Seconds())
+		// watching for the abort signal and revert the chaos
+		go abortWatcher(experimentsDetails, instanceNameList, chaosDetails)
 
 		for duration < experimentsDetails.ChaosDuration {
 
@@ -234,7 +241,8 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 }
 
 // watching for the abort signal and revert the chaos
-func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, instanceNameList []string) {
+func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, instanceNameList []string, chaosDetails *types.ChaosDetails) {
+	chaosDetails.Revert = true
 	<-abort
 
 	var instanceState string
@@ -275,6 +283,11 @@ func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, instanc
 			log.Errorf("[Abort]: Azure instance %v failed to start after an abort signal is received", vmName)
 		}
 	}
+	// allowing chaosresult updation
+	chaosDetails.Abort <- true
+	// waiting for the chaosresult creation
+	<-chaosDetails.Abort
+
 	log.Infof("[Abort]: Chaos Revert Completed")
 	os.Exit(1)
 }

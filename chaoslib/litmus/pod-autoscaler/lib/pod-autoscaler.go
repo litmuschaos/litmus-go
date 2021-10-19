@@ -419,10 +419,11 @@ func int32Ptr(i int32) *int32 { return &i }
 //abortPodAutoScalerChaos go routine will continuously watch for the abort signal for the entire chaos duration and generate the required events and result
 func abortPodAutoScalerChaos(appsUnderTest []experimentTypes.ApplicationUnderTest, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) {
 
+	chaosDetails.Revert = true
 	// signChan channel is used to transmit signal notifications.
 	signChan := make(chan os.Signal, 1)
 	// Catch and relay certain signal(s) to signChan channel.
-	signal.Notify(signChan, os.Interrupt, syscall.SIGTERM, syscall.SIGKILL)
+	signal.Notify(signChan, os.Interrupt, syscall.SIGTERM)
 
 	// waiting till the abort signal received
 	<-signChan
@@ -450,7 +451,11 @@ func abortPodAutoScalerChaos(appsUnderTest []experimentTypes.ApplicationUnderTes
 	default:
 		log.Errorf("application type '%s' is not supported for the chaos", experimentsDetails.AppKind)
 	}
-	log.Info("[Chaos]: Revert Completed")
+	// allowing chaosresult updation
+	chaosDetails.Abort <- true
+	// waiting for the chaosresult creation
+	<-chaosDetails.Abort
 
+	log.Info("[Chaos]: Revert Completed")
 	os.Exit(1)
 }

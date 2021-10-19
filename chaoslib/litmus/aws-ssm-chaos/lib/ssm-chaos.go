@@ -15,17 +15,22 @@ import (
 	"github.com/pkg/errors"
 )
 
+var Inject, Abort chan os.Signal
+
 //InjectChaosInSerialMode will inject the aws ssm chaos in serial mode that is one after other
-func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, instanceIDList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, inject chan os.Signal) error {
+func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, instanceIDList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+
+	//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
+	ChaosStartTimeStamp := time.Now()
+	duration := int(time.Since(ChaosStartTimeStamp).Seconds())
 
 	select {
-	case <-inject:
+	case <-Inject:
 		// stopping the chaos execution, if abort signal received
+		time.Sleep(10 * time.Second)
 		os.Exit(0)
 	default:
-		//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
-		ChaosStartTimeStamp := time.Now()
-		duration := int(time.Since(ChaosStartTimeStamp).Seconds())
+		go AbortWatcher(experimentsDetails, chaosDetails)
 
 		for duration < experimentsDetails.ChaosDuration {
 
@@ -82,16 +87,19 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 }
 
 // InjectChaosInParallelMode will inject the aws ssm chaos in parallel mode that is all at once
-func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, instanceIDList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, inject chan os.Signal) error {
+func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, instanceIDList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+
+	//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
+	ChaosStartTimeStamp := time.Now()
+	duration := int(time.Since(ChaosStartTimeStamp).Seconds())
 
 	select {
-	case <-inject:
+	case <-Inject:
 		// stopping the chaos execution, if abort signal received
+		time.Sleep(10 * time.Second)
 		os.Exit(0)
 	default:
-		//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
-		ChaosStartTimeStamp := time.Now()
-		duration := int(time.Since(ChaosStartTimeStamp).Seconds())
+		go AbortWatcher(experimentsDetails, chaosDetails)
 
 		for duration < experimentsDetails.ChaosDuration {
 
@@ -147,9 +155,10 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 }
 
 // AbortWatcher will be watching for the abort signal and revert the chaos
-func AbortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, abort chan os.Signal) {
+func AbortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, chaosDetails *types.ChaosDetails) {
 
-	<-abort
+	chaosDetails.Revert = true
+	<-Abort
 
 	log.Info("[Abort]: Chaos Revert Started")
 	switch {
@@ -160,11 +169,16 @@ func AbortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, abort c
 			}
 		}
 	default:
-		log.Info("[Abort]: No command found to cancle")
+		log.Info("[Abort]: No command found to cancel")
 	}
 	if err := ssm.SSMDeleteDocument(experimentsDetails.DocumentName, experimentsDetails.Region); err != nil {
 		log.Errorf("fail to delete ssm doc, err: %v", err)
 	}
+	// allowing chaosresult updation
+	chaosDetails.Abort <- true
+	// waiting for the chaosresult creation
+	<-chaosDetails.Abort
+
 	log.Info("[Abort]: Chaos Revert Completed")
 	os.Exit(1)
 }

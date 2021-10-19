@@ -72,34 +72,25 @@ func PrepareDiskVolumeLoss(experimentsDetails *experimentTypes.ExperimentDetails
 		instanceNamesList = append(instanceNamesList, instanceName)
 	}
 
-	select {
-	case <-inject:
-		// stopping the chaos execution, if abort signal received
-		os.Exit(0)
+	switch strings.ToLower(experimentsDetails.Sequence) {
+	case "serial":
+		if err = injectChaosInSerialMode(experimentsDetails, diskNamesList, instanceNamesList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+			return err
+		}
+	case "parallel":
+		if err = injectChaosInParallelMode(experimentsDetails, diskNamesList, instanceNamesList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+			return err
+		}
 	default:
-
-		// watching for the abort signal and revert the chaos
-		go AbortWatcher(experimentsDetails, diskNamesList, instanceNamesList, abort, chaosDetails)
-
-		switch strings.ToLower(experimentsDetails.Sequence) {
-		case "serial":
-			if err = injectChaosInSerialMode(experimentsDetails, diskNamesList, instanceNamesList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
-				return err
-			}
-		case "parallel":
-			if err = injectChaosInParallelMode(experimentsDetails, diskNamesList, instanceNamesList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
-				return err
-			}
-		default:
-			return errors.Errorf("%v sequence is not supported", experimentsDetails.Sequence)
-		}
-
-		//Waiting for the ramp time after chaos injection
-		if experimentsDetails.RampTime != 0 {
-			log.Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", experimentsDetails.RampTime)
-			common.WaitForDuration(experimentsDetails.RampTime)
-		}
+		return errors.Errorf("%v sequence is not supported", experimentsDetails.Sequence)
 	}
+
+	//Waiting for the ramp time after chaos injection
+	if experimentsDetails.RampTime != 0 {
+		log.Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", experimentsDetails.RampTime)
+		common.WaitForDuration(experimentsDetails.RampTime)
+	}
+
 	return nil
 }
 
@@ -113,66 +104,77 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 	diskZonesList := strings.Split(experimentsDetails.DiskZones, ",")
 	deviceNamesList := strings.Split(experimentsDetails.DeviceNames, ",")
 
-	for duration < experimentsDetails.ChaosDuration {
+	select {
+	case <-inject:
+		// stopping the chaos execution, if abort signal received
+		time.Sleep(10 * time.Second)
+		os.Exit(0)
+	default:
 
-		if experimentsDetails.EngineName != "" {
-			msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on VM instance"
-			types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
-			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
+		// watching for the abort signal and revert the chaos
+		go AbortWatcher(experimentsDetails, targetDiskVolumeNamesList, instanceNamesList, chaosDetails)
+
+		for duration < experimentsDetails.ChaosDuration {
+
+			if experimentsDetails.EngineName != "" {
+				msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on VM instance"
+				types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
+				events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
+			}
+			for i := range targetDiskVolumeNamesList {
+
+				//Detaching the disk volume from the instance
+				log.Info("[Chaos]: Detaching the disk volume from the instance")
+				if err = gcp.DiskVolumeDetach(instanceNamesList[i], experimentsDetails.GCPProjectID, diskZonesList[i], deviceNamesList[i]); err != nil {
+					return errors.Errorf("disk detachment failed, err: %v", err)
+				}
+
+				common.SetTargets(targetDiskVolumeNamesList[i], "injected", "DiskVolume", chaosDetails)
+
+				//Wait for disk volume detachment
+				log.Infof("[Wait]: Wait for disk volume detachment for volume %v", targetDiskVolumeNamesList[i])
+				if err = gcp.WaitForVolumeDetachment(targetDiskVolumeNamesList[i], experimentsDetails.GCPProjectID, instanceNamesList[i], diskZonesList[i], experimentsDetails.Delay, experimentsDetails.Timeout); err != nil {
+					return errors.Errorf("unable to detach the disk volume from the vm instance, err: %v", err)
+				}
+
+				// run the probes during chaos
+				// the OnChaos probes execution will start in the first iteration and keep running for the entire chaos duration
+				if len(resultDetails.ProbeDetails) != 0 && i == 0 {
+					if err = probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+						return err
+					}
+				}
+
+				//Wait for chaos duration
+				log.Infof("[Wait]: Waiting for the chaos interval of %vs", experimentsDetails.ChaosInterval)
+				common.WaitForDuration(experimentsDetails.ChaosInterval)
+
+				//Getting the disk volume attachment status
+				diskState, err := gcp.GetDiskVolumeState(targetDiskVolumeNamesList[i], experimentsDetails.GCPProjectID, instanceNamesList[i], diskZonesList[i])
+				if err != nil {
+					return errors.Errorf("failed to get the disk volume status, err: %v", err)
+				}
+
+				switch diskState {
+				case "attached":
+					log.Info("[Skip]: The disk volume is already attached")
+				default:
+					//Attaching the disk volume to the instance
+					log.Info("[Chaos]: Attaching the disk volume back to the instance")
+					if err = gcp.DiskVolumeAttach(instanceNamesList[i], experimentsDetails.GCPProjectID, diskZonesList[i], deviceNamesList[i], targetDiskVolumeNamesList[i]); err != nil {
+						return errors.Errorf("disk attachment failed, err: %v", err)
+					}
+
+					//Wait for disk volume attachment
+					log.Infof("[Wait]: Wait for disk volume attachment for %v volume", targetDiskVolumeNamesList[i])
+					if err = gcp.WaitForVolumeAttachment(targetDiskVolumeNamesList[i], experimentsDetails.GCPProjectID, instanceNamesList[i], diskZonesList[i], experimentsDetails.Delay, experimentsDetails.Timeout); err != nil {
+						return errors.Errorf("unable to attach the disk volume to the vm instance, err: %v", err)
+					}
+				}
+				common.SetTargets(targetDiskVolumeNamesList[i], "reverted", "DiskVolume", chaosDetails)
+			}
+			duration = int(time.Since(ChaosStartTimeStamp).Seconds())
 		}
-		for i := range targetDiskVolumeNamesList {
-
-			//Detaching the disk volume from the instance
-			log.Info("[Chaos]: Detaching the disk volume from the instance")
-			if err = gcp.DiskVolumeDetach(instanceNamesList[i], experimentsDetails.GCPProjectID, diskZonesList[i], deviceNamesList[i]); err != nil {
-				return errors.Errorf("disk detachment failed, err: %v", err)
-			}
-
-			common.SetTargets(targetDiskVolumeNamesList[i], "injected", "DiskVolume", chaosDetails)
-
-			//Wait for disk volume detachment
-			log.Infof("[Wait]: Wait for disk volume detachment for volume %v", targetDiskVolumeNamesList[i])
-			if err = gcp.WaitForVolumeDetachment(targetDiskVolumeNamesList[i], experimentsDetails.GCPProjectID, instanceNamesList[i], diskZonesList[i], experimentsDetails.Delay, experimentsDetails.Timeout); err != nil {
-				return errors.Errorf("unable to detach the disk volume from the vm instance, err: %v", err)
-			}
-
-			// run the probes during chaos
-			// the OnChaos probes execution will start in the first iteration and keep running for the entire chaos duration
-			if len(resultDetails.ProbeDetails) != 0 && i == 0 {
-				if err = probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
-					return err
-				}
-			}
-
-			//Wait for chaos duration
-			log.Infof("[Wait]: Waiting for the chaos interval of %vs", experimentsDetails.ChaosInterval)
-			common.WaitForDuration(experimentsDetails.ChaosInterval)
-
-			//Getting the disk volume attachment status
-			diskState, err := gcp.GetDiskVolumeState(targetDiskVolumeNamesList[i], experimentsDetails.GCPProjectID, instanceNamesList[i], diskZonesList[i])
-			if err != nil {
-				return errors.Errorf("failed to get the disk volume status, err: %v", err)
-			}
-
-			switch diskState {
-			case "attached":
-				log.Info("[Skip]: The disk volume is already attached")
-			default:
-				//Attaching the disk volume to the instance
-				log.Info("[Chaos]: Attaching the disk volume back to the instance")
-				if err = gcp.DiskVolumeAttach(instanceNamesList[i], experimentsDetails.GCPProjectID, diskZonesList[i], deviceNamesList[i], targetDiskVolumeNamesList[i]); err != nil {
-					return errors.Errorf("disk attachment failed, err: %v", err)
-				}
-
-				//Wait for disk volume attachment
-				log.Infof("[Wait]: Wait for disk volume attachment for %v volume", targetDiskVolumeNamesList[i])
-				if err = gcp.WaitForVolumeAttachment(targetDiskVolumeNamesList[i], experimentsDetails.GCPProjectID, instanceNamesList[i], diskZonesList[i], experimentsDetails.Delay, experimentsDetails.Timeout); err != nil {
-					return errors.Errorf("unable to attach the disk volume to the vm instance, err: %v", err)
-				}
-			}
-			common.SetTargets(targetDiskVolumeNamesList[i], "reverted", "DiskVolume", chaosDetails)
-		}
-		duration = int(time.Since(ChaosStartTimeStamp).Seconds())
 	}
 	return nil
 }
@@ -187,79 +189,90 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 	ChaosStartTimeStamp := time.Now()
 	duration := int(time.Since(ChaosStartTimeStamp).Seconds())
 
-	for duration < experimentsDetails.ChaosDuration {
+	select {
+	case <-inject:
+		// stopping the chaos execution, if abort signal received
+		time.Sleep(10 * time.Second)
+		os.Exit(0)
+	default:
 
-		if experimentsDetails.EngineName != "" {
-			msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on vm instance"
-			types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
-			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
-		}
+		// watching for the abort signal and revert the chaos
+		go AbortWatcher(experimentsDetails, targetDiskVolumeNamesList, instanceNamesList, chaosDetails)
 
-		for i := range targetDiskVolumeNamesList {
+		for duration < experimentsDetails.ChaosDuration {
 
-			//Detaching the disk volume from the instance
-			log.Info("[Chaos]: Detaching the disk volume from the instance")
-			if err = gcp.DiskVolumeDetach(instanceNamesList[i], experimentsDetails.GCPProjectID, diskZonesList[i], deviceNamesList[i]); err != nil {
-				return errors.Errorf("disk detachment failed, err: %v", err)
+			if experimentsDetails.EngineName != "" {
+				msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on vm instance"
+				types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
+				events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 			}
 
-			common.SetTargets(targetDiskVolumeNamesList[i], "injected", "DiskVolume", chaosDetails)
-		}
+			for i := range targetDiskVolumeNamesList {
 
-		for i := range targetDiskVolumeNamesList {
-
-			//Wait for disk volume detachment
-			log.Infof("[Wait]: Wait for disk volume detachment for volume %v", targetDiskVolumeNamesList[i])
-			if err = gcp.WaitForVolumeDetachment(targetDiskVolumeNamesList[i], experimentsDetails.GCPProjectID, instanceNamesList[i], diskZonesList[i], experimentsDetails.Delay, experimentsDetails.Timeout); err != nil {
-				return errors.Errorf("unable to detach the disk volume from the vm instance, err: %v", err)
-			}
-		}
-
-		// run the probes during chaos
-		if len(resultDetails.ProbeDetails) != 0 {
-			if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
-				return err
-			}
-		}
-
-		//Wait for chaos interval
-		log.Infof("[Wait]: Waiting for the chaos interval of %vs", experimentsDetails.ChaosInterval)
-		common.WaitForDuration(experimentsDetails.ChaosInterval)
-
-		for i := range targetDiskVolumeNamesList {
-
-			//Getting the disk volume attachment status
-			diskState, err := gcp.GetDiskVolumeState(targetDiskVolumeNamesList[i], experimentsDetails.GCPProjectID, instanceNamesList[i], diskZonesList[i])
-			if err != nil {
-				return errors.Errorf("failed to get the disk status, err: %v", err)
-			}
-
-			switch diskState {
-			case "attached":
-				log.Info("[Skip]: The disk volume is already attached")
-			default:
-				//Attaching the disk volume to the instance
-				log.Info("[Chaos]: Attaching the disk volume to the instance")
-				if err = gcp.DiskVolumeAttach(instanceNamesList[i], experimentsDetails.GCPProjectID, diskZonesList[i], deviceNamesList[i], targetDiskVolumeNamesList[i]); err != nil {
-					return errors.Errorf("disk attachment failed, err: %v", err)
+				//Detaching the disk volume from the instance
+				log.Info("[Chaos]: Detaching the disk volume from the instance")
+				if err = gcp.DiskVolumeDetach(instanceNamesList[i], experimentsDetails.GCPProjectID, diskZonesList[i], deviceNamesList[i]); err != nil {
+					return errors.Errorf("disk detachment failed, err: %v", err)
 				}
 
-				//Wait for disk volume attachment
-				log.Infof("[Wait]: Wait for disk volume attachment for volume %v", targetDiskVolumeNamesList[i])
-				if err = gcp.WaitForVolumeAttachment(targetDiskVolumeNamesList[i], experimentsDetails.GCPProjectID, instanceNamesList[i], diskZonesList[i], experimentsDetails.Delay, experimentsDetails.Timeout); err != nil {
-					return errors.Errorf("unable to attach the disk volume to the vm instance, err: %v", err)
+				common.SetTargets(targetDiskVolumeNamesList[i], "injected", "DiskVolume", chaosDetails)
+			}
+
+			for i := range targetDiskVolumeNamesList {
+
+				//Wait for disk volume detachment
+				log.Infof("[Wait]: Wait for disk volume detachment for volume %v", targetDiskVolumeNamesList[i])
+				if err = gcp.WaitForVolumeDetachment(targetDiskVolumeNamesList[i], experimentsDetails.GCPProjectID, instanceNamesList[i], diskZonesList[i], experimentsDetails.Delay, experimentsDetails.Timeout); err != nil {
+					return errors.Errorf("unable to detach the disk volume from the vm instance, err: %v", err)
 				}
 			}
-			common.SetTargets(targetDiskVolumeNamesList[i], "reverted", "DiskVolume", chaosDetails)
+
+			// run the probes during chaos
+			if len(resultDetails.ProbeDetails) != 0 {
+				if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+					return err
+				}
+			}
+
+			//Wait for chaos interval
+			log.Infof("[Wait]: Waiting for the chaos interval of %vs", experimentsDetails.ChaosInterval)
+			common.WaitForDuration(experimentsDetails.ChaosInterval)
+
+			for i := range targetDiskVolumeNamesList {
+
+				//Getting the disk volume attachment status
+				diskState, err := gcp.GetDiskVolumeState(targetDiskVolumeNamesList[i], experimentsDetails.GCPProjectID, instanceNamesList[i], diskZonesList[i])
+				if err != nil {
+					return errors.Errorf("failed to get the disk status, err: %v", err)
+				}
+
+				switch diskState {
+				case "attached":
+					log.Info("[Skip]: The disk volume is already attached")
+				default:
+					//Attaching the disk volume to the instance
+					log.Info("[Chaos]: Attaching the disk volume to the instance")
+					if err = gcp.DiskVolumeAttach(instanceNamesList[i], experimentsDetails.GCPProjectID, diskZonesList[i], deviceNamesList[i], targetDiskVolumeNamesList[i]); err != nil {
+						return errors.Errorf("disk attachment failed, err: %v", err)
+					}
+
+					//Wait for disk volume attachment
+					log.Infof("[Wait]: Wait for disk volume attachment for volume %v", targetDiskVolumeNamesList[i])
+					if err = gcp.WaitForVolumeAttachment(targetDiskVolumeNamesList[i], experimentsDetails.GCPProjectID, instanceNamesList[i], diskZonesList[i], experimentsDetails.Delay, experimentsDetails.Timeout); err != nil {
+						return errors.Errorf("unable to attach the disk volume to the vm instance, err: %v", err)
+					}
+				}
+				common.SetTargets(targetDiskVolumeNamesList[i], "reverted", "DiskVolume", chaosDetails)
+			}
+			duration = int(time.Since(ChaosStartTimeStamp).Seconds())
 		}
-		duration = int(time.Since(ChaosStartTimeStamp).Seconds())
 	}
 	return nil
 }
 
 // AbortWatcher will watching for the abort signal and revert the chaos
-func AbortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, diskNamesList []string, instanceNamesList []string, abort chan os.Signal, chaosDetails *types.ChaosDetails) {
-
+func AbortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, diskNamesList []string, instanceNamesList []string, chaosDetails *types.ChaosDetails) {
+	chaosDetails.Revert = true
 	<-abort
 
 	log.Info("[Abort]: Chaos Revert Started")
@@ -296,6 +309,10 @@ func AbortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, diskNam
 
 		common.SetTargets(diskNamesList[i], "reverted", "DiskVolume", chaosDetails)
 	}
+	// allowing chaosresult updation
+	chaosDetails.Abort <- true
+	// waiting for the chaosresult creation
+	<-chaosDetails.Abort
 
 	log.Info("[Abort]: Chaos Revert Completed")
 	os.Exit(1)

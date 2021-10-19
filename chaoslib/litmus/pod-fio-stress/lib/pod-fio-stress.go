@@ -126,6 +126,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 	loop:
 		for {
 			endTime = time.After(timeDelay)
+			chaosDetails.Revert = true
 			select {
 			case err := <-stressErr:
 				// skipping the execution, if recieved any error other than 137, while executing stress command and marked result as fail
@@ -143,6 +144,10 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 				if err := killStressSerial(experimentsDetails.TargetContainer, pod.Name, experimentsDetails.AppNS, experimentsDetails.ChaosKillCmd, clients); err != nil {
 					log.Errorf("Error in Kill stress after abortion, err: %v", err)
 				}
+				// allowing chaosresult updation
+				chaosDetails.Abort <- true
+				// waiting for the chaosresult creation
+				<-chaosDetails.Abort
 				log.Info("[Chaos]: Revert Completed")
 				os.Exit(1)
 			case <-endTime:
@@ -198,6 +203,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 loop:
 	for {
 		endTime = time.After(timeDelay)
+		chaosDetails.Revert = true
 		select {
 		case err := <-stressErr:
 			// skipping the execution, if recieved any error other than 137, while executing stress command and marked result as fail
@@ -215,6 +221,10 @@ loop:
 			if err := killStressParallel(experimentsDetails.TargetContainer, targetPodList, experimentsDetails.AppNS, experimentsDetails.ChaosKillCmd, clients); err != nil {
 				log.Errorf("Error in Kill stress after abortion, err: %v", err)
 			}
+			// allowing chaosresult updation
+			chaosDetails.Abort <- true
+			// waiting for the chaosresult creation
+			<-chaosDetails.Abort
 			log.Info("[Chaos]: Revert Completed")
 			os.Exit(1)
 		case <-endTime:

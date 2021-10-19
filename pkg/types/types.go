@@ -92,6 +92,8 @@ type ChaosDetails struct {
 	Resources             corev1.ResourceRequirements
 	ImagePullSecrets      []corev1.LocalObjectReference
 	Labels                map[string]string
+	Abort                 chan bool
+	Revert                bool
 }
 
 // AppDetails contains all the application related envs
@@ -130,6 +132,8 @@ func InitialiseChaosVariables(chaosDetails *ChaosDetails) {
 	chaosDetails.ProbeImagePullPolicy = Getenv("LIB_IMAGE_PULL_POLICY", "Always")
 	chaosDetails.ParentsResources = []string{}
 	chaosDetails.Targets = []v1alpha1.TargetDetails{}
+	chaosDetails.Abort = make(chan bool)
+	chaosDetails.Revert = false
 }
 
 //SetResultAttributes initialise all the chaos result ENV

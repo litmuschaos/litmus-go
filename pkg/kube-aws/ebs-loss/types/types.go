@@ -30,4 +30,6 @@ type ExperimentDetails struct {
 	VolumeAffectedPerc int
 	EBSVolumeID        string
 	TargetVolumeIDList []string
+	InstanceIDList     []string
+	DeviceList         []string
 }

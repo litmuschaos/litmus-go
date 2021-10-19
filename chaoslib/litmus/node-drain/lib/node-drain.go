@@ -67,9 +67,6 @@ func PrepareNodeDrain(experimentsDetails *experimentTypes.ExperimentDetails, cli
 		}
 	}
 
-	// watching for the abort signal and revert the chaos
-	go abortWatcher(experimentsDetails, clients, resultDetails, chaosDetails, eventsDetails)
-
 	// Drain the application node
 	if err := drainNode(experimentsDetails, clients, chaosDetails); err != nil {
 		return err
@@ -114,8 +111,12 @@ func drainNode(experimentsDetails *experimentTypes.ExperimentDetails, clients cl
 	select {
 	case <-inject:
 		// stopping the chaos execution, if abort signal received
+		time.Sleep(10 * time.Second)
 		os.Exit(0)
 	default:
+		// watching for the abort signal and revert the chaos
+		go abortWatcher(experimentsDetails, clients, chaosDetails)
+
 		log.Infof("[Inject]: Draining the %v node", experimentsDetails.TargetNode)
 
 		command := exec.Command("kubectl", "drain", experimentsDetails.TargetNode, "--ignore-daemonsets", "--delete-local-data", "--force", "--timeout", strconv.Itoa(experimentsDetails.ChaosDuration)+"s")
@@ -178,11 +179,11 @@ func uncordonNode(experimentsDetails *experimentTypes.ExperimentDetails, clients
 }
 
 // abortWatcher continuously watch for the abort signals
-func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, chaosDetails *types.ChaosDetails, eventsDetails *types.EventDetails) {
+func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) {
+	chaosDetails.Revert = true
 	// waiting till the abort signal received
 	<-abort
 
-	log.Info("[Chaos]: Killing process started because of terminated signal received")
 	log.Info("Chaos Revert Started")
 	// retry thrice for the chaos revert
 	retry := 3
@@ -193,6 +194,11 @@ func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, clients
 		retry--
 		time.Sleep(1 * time.Second)
 	}
+	// allowing chaosresult updation
+	chaosDetails.Abort <- true
+	// waiting for the chaosresult creation
+	<-chaosDetails.Abort
+
 	log.Info("Chaos Revert Completed")
 	os.Exit(0)
 }

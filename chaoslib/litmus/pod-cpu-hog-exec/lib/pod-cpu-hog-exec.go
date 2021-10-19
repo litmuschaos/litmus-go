@@ -12,7 +12,6 @@ import (
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-cpu-hog-exec/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
-	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	litmusexec "github.com/litmuschaos/litmus-go/pkg/utils/exec"
@@ -102,6 +101,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		time.Sleep(10 * time.Second)
 		os.Exit(0)
 	default:
+		chaosDetails.Revert = true
 		for _, pod := range targetPodList.Items {
 
 			// creating err channel to receive the error from the go routine
@@ -148,10 +148,11 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 					if err != nil {
 						log.Errorf("Error in Kill stress after abortion, err: %v", err)
 					}
-					// updating the chaosresult after stopped
-					failStep := "Chaos injection stopped!"
-					types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep)
-					result.ChaosResult(chaosDetails, clients, resultDetails, "EOT")
+					// allowing chaosresult updation
+					chaosDetails.Abort <- true
+					// waiting for the chaosresult creation
+					<-chaosDetails.Abort
+
 					log.Info("[Chaos]: Revert Completed")
 					os.Exit(1)
 				case <-endTime:
@@ -194,6 +195,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		time.Sleep(10 * time.Second)
 		os.Exit(0)
 	default:
+		chaosDetails.Revert = true
 		for _, pod := range targetPodList.Items {
 
 			if experimentsDetails.EngineName != "" {
@@ -236,10 +238,11 @@ loop:
 			if err := killStressCPUParallel(experimentsDetails, targetPodList, clients, chaosDetails); err != nil {
 				log.Errorf("Error in Kill stress after abortion, err: %v", err)
 			}
-			// updating the chaosresult after stopped
-			failStep := "Chaos injection stopped!"
-			types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep)
-			result.ChaosResult(chaosDetails, clients, resultDetails, "EOT")
+			// allowing chaosresult updation
+			chaosDetails.Abort <- true
+			// waiting for the chaosresult creation
+			<-chaosDetails.Abort
+
 			log.Info("[Chaos]: Revert Completed")
 			os.Exit(1)
 		case <-endTime:

@@ -43,9 +43,6 @@ func PrepareEC2TerminateByTag(experimentsDetails *experimentTypes.ExperimentDeta
 	instanceIDList := common.FilterBasedOnPercentage(experimentsDetails.InstanceAffectedPerc, experimentsDetails.TargetInstanceIDList)
 	log.Infof("[Chaos]:Number of Instance targeted: %v", len(instanceIDList))
 
-	// watching for the abort signal and revert the chaos
-	go abortWatcher(experimentsDetails, instanceIDList, chaosDetails)
-
 	switch strings.ToLower(experimentsDetails.Sequence) {
 	case "serial":
 		if err := injectChaosInSerialMode(experimentsDetails, instanceIDList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
@@ -70,14 +67,18 @@ func PrepareEC2TerminateByTag(experimentsDetails *experimentTypes.ExperimentDeta
 //injectChaosInSerialMode will inject the ce2 instance termination in serial mode that is one after other
 func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, instanceIDList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
+	//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
+	ChaosStartTimeStamp := time.Now()
+	duration := int(time.Since(ChaosStartTimeStamp).Seconds())
+
 	select {
 	case <-inject:
 		// stopping the chaos execution, if abort signal received
+		time.Sleep(10 * time.Second)
 		os.Exit(0)
 	default:
-		//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
-		ChaosStartTimeStamp := time.Now()
-		duration := int(time.Since(ChaosStartTimeStamp).Seconds())
+		// watching for the abort signal and revert the chaos
+		go abortWatcher(experimentsDetails, instanceIDList, chaosDetails)
 
 		for duration < experimentsDetails.ChaosDuration {
 
@@ -142,14 +143,18 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 // injectChaosInParallelMode will inject the ce2 instance termination in parallel mode that is all at once
 func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, instanceIDList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
+	//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
+	ChaosStartTimeStamp := time.Now()
+	duration := int(time.Since(ChaosStartTimeStamp).Seconds())
+
 	select {
 	case <-inject:
 		// stopping the chaos execution, if abort signal received
+		time.Sleep(10 * time.Second)
 		os.Exit(0)
 	default:
-		//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
-		ChaosStartTimeStamp := time.Now()
-		duration := int(time.Since(ChaosStartTimeStamp).Seconds())
+		// watching for the abort signal and revert the chaos
+		go abortWatcher(experimentsDetails, instanceIDList, chaosDetails)
 
 		for duration < experimentsDetails.ChaosDuration {
 			log.Infof("[Info]: Target instanceID list, %v", instanceIDList)
@@ -250,7 +255,7 @@ func SetTargetInstance(experimentsDetails *experimentTypes.ExperimentDetails) er
 
 // watching for the abort signal and revert the chaos
 func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, instanceIDList []string, chaosDetails *types.ChaosDetails) {
-
+	chaosDetails.Revert = true
 	<-abort
 
 	log.Info("[Abort]: Chaos Revert Started")
@@ -275,5 +280,10 @@ func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, instanc
 		common.SetTargets(id, "reverted", "EC2", chaosDetails)
 	}
 	log.Info("[Abort]: Chaos Revert Completed")
+	// allowing chaosresult updation
+	chaosDetails.Abort <- true
+	// waiting for the chaosresult creation
+	<-chaosDetails.Abort
+
 	os.Exit(1)
 }

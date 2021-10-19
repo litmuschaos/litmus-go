@@ -111,8 +111,10 @@ func GetVolumeAttachmentDetails(volumeID, volumeTag, region string) (string, str
 	}
 	for _, volumeDetails := range res.Volumes {
 		if *volumeDetails.VolumeId == volumeID {
-			//As the first iteam of the attachment list contains the attachment details
-			return *volumeDetails.Attachments[0].InstanceId, *volumeDetails.Attachments[0].Device, nil
+			//As the first item of the attachment list contains the attachment details
+			if len(volumeDetails.Attachments) > 0 {
+				return *volumeDetails.Attachments[0].InstanceId, *volumeDetails.Attachments[0].Device, nil
+			}
 		}
 	}
 	return "", "", errors.Errorf("no attachment details found for the given volumeID: %v", volumeID)

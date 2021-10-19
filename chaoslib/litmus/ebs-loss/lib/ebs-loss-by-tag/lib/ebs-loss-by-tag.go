@@ -15,23 +15,20 @@ import (
 	"github.com/pkg/errors"
 )
 
-var (
-	err           error
-	inject, abort chan os.Signal
-)
+var err error
 
 //PrepareEBSLossByTag contains the prepration and injection steps for the experiment
 func PrepareEBSLossByTag(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	// inject channel is used to transmit signal notifications.
-	inject = make(chan os.Signal, 1)
+	ebsloss.Inject = make(chan os.Signal, 1)
 	// Catch and relay certain signal(s) to inject channel.
-	signal.Notify(inject, os.Interrupt, syscall.SIGTERM)
+	signal.Notify(ebsloss.Inject, os.Interrupt, syscall.SIGTERM)
 
 	// abort channel is used to transmit signal notifications.
-	abort = make(chan os.Signal, 1)
+	ebsloss.Abort = make(chan os.Signal, 1)
 	// Catch and relay certain signal(s) to abort channel.
-	signal.Notify(abort, os.Interrupt, syscall.SIGTERM)
+	signal.Notify(ebsloss.Abort, os.Interrupt, syscall.SIGTERM)
 
 	//Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
@@ -39,35 +36,26 @@ func PrepareEBSLossByTag(experimentsDetails *experimentTypes.ExperimentDetails, 
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 
-	select {
-	case <-inject:
-		// stopping the chaos execution, if abort signal received
-		os.Exit(0)
+	targetEBSVolumeIDList := common.FilterBasedOnPercentage(experimentsDetails.VolumeAffectedPerc, experimentsDetails.TargetVolumeIDList)
+	log.Infof("[Chaos]:Number of volumes targeted: %v", len(targetEBSVolumeIDList))
+
+	switch strings.ToLower(experimentsDetails.Sequence) {
+	case "serial":
+		if err = ebsloss.InjectChaosInSerialMode(experimentsDetails, targetEBSVolumeIDList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+			return err
+		}
+	case "parallel":
+		if err = ebsloss.InjectChaosInParallelMode(experimentsDetails, targetEBSVolumeIDList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+			return err
+		}
 	default:
-
-		targetEBSVolumeIDList := common.FilterBasedOnPercentage(experimentsDetails.VolumeAffectedPerc, experimentsDetails.TargetVolumeIDList)
-		log.Infof("[Chaos]:Number of volumes targeted: %v", len(targetEBSVolumeIDList))
-
-		// watching for the abort signal and revert the chaos
-		go ebsloss.AbortWatcher(experimentsDetails, targetEBSVolumeIDList, abort, chaosDetails)
-
-		switch strings.ToLower(experimentsDetails.Sequence) {
-		case "serial":
-			if err = ebsloss.InjectChaosInSerialMode(experimentsDetails, targetEBSVolumeIDList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
-				return err
-			}
-		case "parallel":
-			if err = ebsloss.InjectChaosInParallelMode(experimentsDetails, targetEBSVolumeIDList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
-				return err
-			}
-		default:
-			return errors.Errorf("%v sequence is not supported", experimentsDetails.Sequence)
-		}
-		//Waiting for the ramp time after chaos injection
-		if experimentsDetails.RampTime != 0 {
-			log.Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", experimentsDetails.RampTime)
-			common.WaitForDuration(experimentsDetails.RampTime)
-		}
+		return errors.Errorf("%v sequence is not supported", experimentsDetails.Sequence)
 	}
+	//Waiting for the ramp time after chaos injection
+	if experimentsDetails.RampTime != 0 {
+		log.Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", experimentsDetails.RampTime)
+		common.WaitForDuration(experimentsDetails.RampTime)
+	}
+
 	return nil
 }

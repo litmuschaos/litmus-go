@@ -62,14 +62,7 @@ func GetRunID() string {
 }
 
 // AbortWatcher continuously watch for the abort signals
-// it will update chaosresult w/ failed step and create an abort event, if it received abort signal during chaos
 func AbortWatcher(expname string, clients clients.ClientSets, resultDetails *types.ResultDetails, chaosDetails *types.ChaosDetails, eventsDetails *types.EventDetails) {
-	AbortWatcherWithoutExit(expname, clients, resultDetails, chaosDetails, eventsDetails)
-	os.Exit(1)
-}
-
-// AbortWatcherWithoutExit continuously watch for the abort signals
-func AbortWatcherWithoutExit(expname string, clients clients.ClientSets, resultDetails *types.ResultDetails, chaosDetails *types.ChaosDetails, eventsDetails *types.EventDetails) {
 
 	// signChan channel is used to transmit signal notifications.
 	signChan := make(chan os.Signal, 1)
@@ -80,10 +73,6 @@ func AbortWatcherWithoutExit(expname string, clients clients.ClientSets, resultD
 	<-signChan
 
 	log.Info("[Chaos]: Chaos Experiment Abortion started because of terminated signal received")
-	// updating the chaosresult after stopped
-	failStep := "Chaos injection stopped!"
-	types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep)
-	result.ChaosResult(chaosDetails, clients, resultDetails, "EOT")
 
 	// generating summary event in chaosengine
 	msg := expname + " experiment has been aborted"
@@ -93,6 +82,24 @@ func AbortWatcherWithoutExit(expname string, clients clients.ClientSets, resultD
 	// generating summary event in chaosresult
 	types.SetResultEventAttributes(eventsDetails, types.AbortVerdict, msg, "Warning", resultDetails)
 	events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosResult")
+
+	//waiting to update chaosresult
+	if chaosDetails.Revert {
+		<-chaosDetails.Abort
+	}
+
+	// updating the chaosresult after stopped
+	failStep := "Chaos injection stopped!"
+	types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep)
+	result.ChaosResult(chaosDetails, clients, resultDetails, "EOT")
+	log.Info("chaosresult updated successfully")
+
+	// Signal to exit the program
+	if chaosDetails.Revert {
+		chaosDetails.Abort <- true
+	} else {
+		os.Exit(0)
+	}
 }
 
 //GetIterations derive the iterations value from given parameters

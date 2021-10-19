@@ -10,7 +10,6 @@ import (
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-network-partition/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
-	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
@@ -79,9 +78,6 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 		"Ports":             np.Ports,
 	})
 
-	// watching for the abort signal and revert the chaos
-	go abortWatcher(experimentsDetails, clients, chaosDetails, resultDetails, targetPodList, runID)
-
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
 		if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
@@ -92,8 +88,12 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 	select {
 	case <-inject:
 		// stopping the chaos execution, if abort signal received
+		time.Sleep(10 * time.Second)
 		os.Exit(0)
 	default:
+		// watching for the abort signal and revert the chaos
+		go abortWatcher(experimentsDetails, clients, chaosDetails, resultDetails, targetPodList, runID)
+
 		// creating the network policy to block the traffic
 		if err := createNetworkPolicy(experimentsDetails, clients, np, runID); err != nil {
 			return err
@@ -206,6 +206,7 @@ func checkExistanceOfPolicy(experimentsDetails *experimentTypes.ExperimentDetail
 
 // abortWatcher continuously watch for the abort signals
 func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, targetPodList *corev1.PodList, runID string) {
+	chaosDetails.Revert = true
 	// waiting till the abort signal received
 	<-abort
 
@@ -224,10 +225,11 @@ func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, clients
 			log.Errorf("unable to delete network policy, err: %v", err)
 		}
 	}
-	// updating the chaosresult after stopped
-	failStep := "Chaos injection stopped!"
-	types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep)
-	result.ChaosResult(chaosDetails, clients, resultDetails, "EOT")
+	// allowing chaosresult updation
+	chaosDetails.Abort <- true
+	// waiting for the chaosresult creation
+	<-chaosDetails.Abort
+
 	log.Info("Chaos Revert Completed")
 	os.Exit(0)
 }
