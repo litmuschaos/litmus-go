@@ -13,10 +13,10 @@ import (
 
 	containerKill "github.com/litmuschaos/litmus-go/chaoslib/litmus/container-kill/helper"
 	diskFill "github.com/litmuschaos/litmus-go/chaoslib/litmus/disk-fill/helper"
-        volumeFill "github.com/litmuschaos/litmus-go/chaoslib/litmus/volume-fill/helper"
 	networkChaos "github.com/litmuschaos/litmus-go/chaoslib/litmus/network-chaos/helper"
 	dnsChaos "github.com/litmuschaos/litmus-go/chaoslib/litmus/pod-dns-chaos/helper"
 	stressChaos "github.com/litmuschaos/litmus-go/chaoslib/litmus/stress-chaos/helper"
+	volumeFill "github.com/litmuschaos/litmus-go/chaoslib/litmus/volume-fill/helper"
 
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/log"
@@ -53,8 +53,8 @@ func main() {
 		containerKill.Helper(clients)
 	case "disk-fill":
 		diskFill.Helper(clients)
-        case "volume-fill":
-                volumeFill.Helper(clients)
+	case "volume-fill":
+		volumeFill.Helper(clients)
 	case "dns-chaos":
 		dnsChaos.Helper(clients)
 	case "stress-chaos":

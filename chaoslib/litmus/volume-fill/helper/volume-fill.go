@@ -1,6 +1,7 @@
 package helper
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -9,7 +10,6 @@ import (
 	"strings"
 	"syscall"
 	"time"
-        "encoding/json"
 
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
@@ -27,14 +27,14 @@ import (
 var inject, abort chan os.Signal
 
 type MountDocker struct {
-        Type        string `json:"Type"`
-        Source      string `json:"Source"`
-        Destination string `json:"Destination"`
-        Mode        string `json:"Mode,omitempty"`
-        Rw          bool   `json:"RW"`
-        Propagation string `json:"Propagation,omitempty"`
-        Name        string `json:"Name,omitempty"`
-        Driver      string `json:"Driver,omitempty"`
+	Type        string `json:"Type"`
+	Source      string `json:"Source"`
+	Destination string `json:"Destination"`
+	Mode        string `json:"Mode,omitempty"`
+	Rw          bool   `json:"RW"`
+	Propagation string `json:"Propagation,omitempty"`
+	Name        string `json:"Name,omitempty"`
+	Driver      string `json:"Driver,omitempty"`
 }
 
 // Helper injects the disk-fill chaos
@@ -82,7 +82,6 @@ func volumeFill(experimentsDetails *experimentTypes.ExperimentDetails, clients c
 		return err
 	}
 
-
 	// Derive the volume mount point from the target container
 	volumePath, err := getVolumePath(experimentsDetails, containerID, clients)
 	if err != nil {
@@ -91,43 +90,39 @@ func volumeFill(experimentsDetails *experimentTypes.ExperimentDetails, clients c
 
 	fullPath := strings.TrimPrefix(volumePath, experimentsDetails.ContainerPath)
 
-        du := fmt.Sprintf("sudo df /diskfill/%v |tail -n+2 |awk '{print $3}'", fullPath)
-        cmd := exec.Command("/bin/bash", "-c", du)
-        out, err := cmd.CombinedOutput()
-        if err != nil {
-                fmt.Print(string(out))
-        }
-        usedStorageSize, err := strconv.Atoi(strings.TrimSuffix(string(out), "\n"))
+	du := fmt.Sprintf("sudo df /diskfill/%v |tail -n+2 |awk '{print $3}'", fullPath)
+	cmd := exec.Command("/bin/bash", "-c", du)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		fmt.Print(string(out))
+	}
+	usedStorageSize, err := strconv.Atoi(strings.TrimSuffix(string(out), "\n"))
 
+	du2 := fmt.Sprintf("sudo df /diskfill/%v |tail -n+2 |awk '{print $4}'", fullPath)
+	cmd2 := exec.Command("/bin/bash", "-c", du2)
+	out2, err := cmd2.CombinedOutput()
+	if err != nil {
+		fmt.Print(string(out2))
+	}
+	availableStorageSize, err := strconv.Atoi(strings.TrimSuffix(string(out2), "\n"))
 
-        du2 := fmt.Sprintf("sudo df /diskfill/%v |tail -n+2 |awk '{print $4}'", fullPath)
-        cmd2 := exec.Command("/bin/bash", "-c", du2)
-        out2, err := cmd2.CombinedOutput()
-        if err != nil {
-                fmt.Print(string(out2))
-        }
-        availableStorageSize, err := strconv.Atoi(strings.TrimSuffix(string(out2), "\n"))
-
-
-
-        totalStorageSize := usedStorageSize + availableStorageSize
-
+	totalStorageSize := usedStorageSize + availableStorageSize
 
 	// deriving the ephemeral storage size to be filled
 	sizeTobeFilled := getSizeToBeFilled(experimentsDetails, usedStorageSize, totalStorageSize)
 
 	log.InfoWithValues("[Info]: Details of application under chaos injection", logrus.Fields{
-		"PodName":                   experimentsDetails.TargetPods,
-		"ContainerName":             experimentsDetails.TargetContainer,
-                "VolumeName":                experimentsDetails.TargetVolume,
-		"totalStorageSize(KB)":      totalStorageSize,
-                "usedStorageSize":           usedStorageSize,
-                "availableStorageSize":      availableStorageSize,
-                "fillStoragePercentage":     experimentsDetails.FillPercentage,
-                "volumePath":                volumePath,
-                "fullPath":                  fullPath,
-                "containerPath":             experimentsDetails.ContainerPath,
-		"ContainerID":               containerID,
+		"PodName":               experimentsDetails.TargetPods,
+		"ContainerName":         experimentsDetails.TargetContainer,
+		"VolumeName":            experimentsDetails.TargetVolume,
+		"totalStorageSize(KB)":  totalStorageSize,
+		"usedStorageSize":       usedStorageSize,
+		"availableStorageSize":  availableStorageSize,
+		"fillStoragePercentage": experimentsDetails.FillPercentage,
+		"volumePath":            volumePath,
+		"fullPath":              fullPath,
+		"containerPath":         experimentsDetails.ContainerPath,
+		"ContainerID":           containerID,
 	})
 
 	log.Infof("storage size to be filled: %vKB", strconv.Itoa(sizeTobeFilled))
@@ -176,16 +171,15 @@ func volumeFill(experimentsDetails *experimentTypes.ExperimentDetails, clients c
 
 //stopDockerContainer kill the application container
 func inspectDockerContainer(containerID string, socketPath string) ([]MountDocker, error) {
-        host := "unix://" + socketPath
-        var mounts []MountDocker
+	host := "unix://" + socketPath
+	var mounts []MountDocker
 
-        cmd := exec.Command("sudo", "docker", "--host", host, "inspect", "-f",  "{{ json .Mounts }}", string(containerID))
-        out, err := cmd.CombinedOutput()
-        temp := strings.Split(string(out), "\n")
-        json.Unmarshal([]byte(temp[0]), &mounts)
-        return mounts, err
+	cmd := exec.Command("sudo", "docker", "--host", host, "inspect", "-f", "{{ json .Mounts }}", string(containerID))
+	out, err := cmd.CombinedOutput()
+	temp := strings.Split(string(out), "\n")
+	json.Unmarshal([]byte(temp[0]), &mounts)
+	return mounts, err
 }
-
 
 // fillDisk fill the ephemeral disk by creating files
 func fillDisk(containerID string, sizeTobeFilled int, bs int) error {
@@ -221,25 +215,25 @@ func getVolumePath(experimentsDetails *experimentTypes.ExperimentDetails, contai
 	// It will be in the form of Kb
 	for _, container := range containers {
 		if container.Name == experimentsDetails.TargetContainer {
-		  volumes := container.VolumeMounts
-		  for _, volume := range volumes {
-			  if volume.Name == experimentsDetails.TargetVolume {
-			    mountPath = volume.MountPath
-			    break
-			  }
+			volumes := container.VolumeMounts
+			for _, volume := range volumes {
+				if volume.Name == experimentsDetails.TargetVolume {
+					mountPath = volume.MountPath
+					break
+				}
 			}
 		}
 	}
 
-        inspect, err := inspectDockerContainer(containerID, experimentsDetails.SocketPath)
+	inspect, err := inspectDockerContainer(containerID, experimentsDetails.SocketPath)
 
-        var sourcePath string
+	var sourcePath string
 
-        for _, mount := range inspect {
-          if mount.Destination == mountPath {
-            sourcePath = mount.Source
-            break
-          }
+	for _, mount := range inspect {
+		if mount.Destination == mountPath {
+			sourcePath = mount.Source
+			break
+		}
 	}
 
 	return sourcePath, nil
@@ -277,7 +271,7 @@ func remedy(experimentsDetails *experimentTypes.ExperimentDetails, clients clien
 		}
 	} else {
 		// deleting the files after chaos execution
-                log.Info("Deleting the file after chaos execution")
+		log.Info("Deleting the file after chaos execution")
 		rm := fmt.Sprintf("sudo rm -rf /diskfill/%v/diskfill", fullPath)
 		cmd := exec.Command("/bin/bash", "-c", rm)
 		out, err := cmd.CombinedOutput()
@@ -307,7 +301,7 @@ func getENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.DataBlockSize, _ = strconv.Atoi(types.Getenv("DATA_BLOCK_SIZE", "256"))
 	experimentDetails.SocketPath = types.Getenv("SOCKET_PATH", "")
 	experimentDetails.ContainerRuntime = types.Getenv("CONTAINER_RUNTIME", "")
-        experimentDetails.ContainerPath = types.Getenv("CONTAINER_PATH", "")
+	experimentDetails.ContainerPath = types.Getenv("CONTAINER_PATH", "")
 
 }
 

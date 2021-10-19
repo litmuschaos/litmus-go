@@ -25,7 +25,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.ChaosPodName = types.Getenv("POD_NAME", "")
 	experimentDetails.AuxiliaryAppInfo = types.Getenv("AUXILIARY_APPINFO", "")
 	experimentDetails.TargetContainer = types.Getenv("TARGET_CONTAINER", "")
-        experimentDetails.TargetVolume = types.Getenv("TARGET_VOLUME", "")
+	experimentDetails.TargetVolume = types.Getenv("TARGET_VOLUME", "")
 	experimentDetails.ContainerPath = types.Getenv("CONTAINER_PATH", "/var/lib/docker/containers")
 	experimentDetails.FillPercentage, _ = strconv.Atoi(types.Getenv("FILL_PERCENTAGE", "80"))
 	experimentDetails.Delay, _ = strconv.Atoi(types.Getenv("STATUS_CHECK_DELAY", "2"))

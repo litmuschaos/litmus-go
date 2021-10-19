@@ -211,15 +211,14 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 						},
 					},
 				},
-                                {
-                                        Name: "cri-socket",
-                                        VolumeSource: apiv1.VolumeSource{
-                                                HostPath: &apiv1.HostPathVolumeSource{
-                                                        Path: experimentsDetails.SocketPath,
-                                                },
-                                        },
-                                },
-
+				{
+					Name: "cri-socket",
+					VolumeSource: apiv1.VolumeSource{
+						HostPath: &apiv1.HostPathVolumeSource{
+							Path: experimentsDetails.SocketPath,
+						},
+					},
+				},
 			},
 			Containers: []apiv1.Container{
 				{
@@ -241,10 +240,10 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 							MountPath:        "/diskfill",
 							MountPropagation: &mountPropagationMode,
 						},
-                                                {
-                                                        Name:      "cri-socket",
-                                                        MountPath: experimentsDetails.SocketPath,
-                                                },
+						{
+							Name:      "cri-socket",
+							MountPath: experimentsDetails.SocketPath,
+						},
 					},
 				},
 			},
@@ -262,7 +261,7 @@ func getPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, podName st
 	envDetails.SetEnv("APP_NAMESPACE", experimentsDetails.AppNS).
 		SetEnv("APP_POD", podName).
 		SetEnv("APP_CONTAINER", experimentsDetails.TargetContainer).
-                SetEnv("APP_VOLUME", experimentsDetails.TargetVolume).
+		SetEnv("APP_VOLUME", experimentsDetails.TargetVolume).
 		SetEnv("TOTAL_CHAOS_DURATION", strconv.Itoa(experimentsDetails.ChaosDuration)).
 		SetEnv("CHAOS_NAMESPACE", experimentsDetails.ChaosNamespace).
 		SetEnv("CHAOSENGINE", experimentsDetails.EngineName).
@@ -272,9 +271,9 @@ func getPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, podName st
 		SetEnv("EPHEMERAL_STORAGE_MEBIBYTES", strconv.Itoa(experimentsDetails.EphemeralStorageMebibytes)).
 		SetEnv("DATA_BLOCK_SIZE", strconv.Itoa(experimentsDetails.DataBlockSize)).
 		SetEnv("INSTANCE_ID", experimentsDetails.InstanceID).
-                SetEnv("SOCKET_PATH", experimentsDetails.SocketPath).
-                SetEnv("CONTAINER_RUNTIME", experimentsDetails.ContainerRuntime).
-                SetEnv("CONTAINER_PATH", experimentsDetails.ContainerPath).
+		SetEnv("SOCKET_PATH", experimentsDetails.SocketPath).
+		SetEnv("CONTAINER_RUNTIME", experimentsDetails.ContainerRuntime).
+		SetEnv("CONTAINER_PATH", experimentsDetails.ContainerPath).
 		SetEnvFromDownwardAPI("v1", "metadata.name")
 
 	return envDetails.ENV
