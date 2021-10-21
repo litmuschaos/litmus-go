@@ -51,7 +51,7 @@ func CasssandraPodDelete(clients clients.ClientSets) {
 	log.Infof("[PreReq]: Updating the chaos result of %v experiment (SOT)", experimentsDetails.ChaoslibDetail.ExperimentName)
 	if err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT"); err != nil {
 		log.Errorf("Unable to Create the Chaos Result, err: %v", err)
-		failStep := "[pre-chaos] Failed to update the chaos result of cassandra pod-delete experiment (SOT), err: " + err.Error()
+		failStep := "[pre-chaos]: Failed to update the chaos result of cassandra pod-delete experiment (SOT), err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -92,7 +92,7 @@ func CasssandraPodDelete(clients clients.ClientSets) {
 		log.Info("[Status]: Checking the load distribution on the ring (pre-chaos)")
 		if err = cassandra.NodeToolStatusCheck(&experimentsDetails, clients); err != nil {
 			log.Errorf("[Status]: Chaos node tool status check failed, err: %v", err)
-			failStep := "[pre-chaos] Failed to check the load distribution on the ring, err: " + err.Error()
+			failStep := "[pre-chaos]: Failed to check the load distribution on the ring, err: " + err.Error()
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}
@@ -107,7 +107,7 @@ func CasssandraPodDelete(clients clients.ClientSets) {
 
 			if err = probe.RunProbes(&chaosDetails, clients, &resultDetails, "PreChaos", &eventsDetails); err != nil {
 				log.Errorf("Probes Failed, err: %v", err)
-				failStep := "[pre-chaos] Failed while running probes, err: " + err.Error()
+				failStep := "[pre-chaos]: Failed while running probes, err: " + err.Error()
 				msg = common.GetStatusMessage(chaosDetails.DefaultAppHealthCheck, "AUT: Running", "Unsuccessful")
 				types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, msg, "Warning", &chaosDetails)
 				events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
@@ -126,7 +126,7 @@ func CasssandraPodDelete(clients clients.ClientSets) {
 		ResourceVersionBefore, err = cassandra.LivenessCheck(&experimentsDetails, clients)
 		if err != nil {
 			log.Errorf("[Liveness]: Cassandra liveness check failed, err: %v", err)
-			failStep := "[pre-chaos] Failed to create liveness pod, err: " + err.Error()
+			failStep := "[pre-chaos]: Failed to create liveness pod, err: " + err.Error()
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}
@@ -140,13 +140,13 @@ func CasssandraPodDelete(clients clients.ClientSets) {
 	case "litmus":
 		if err = litmusLIB.PreparePodDelete(experimentsDetails.ChaoslibDetail, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
 			log.Errorf("Chaos injection failed, err: %v", err)
-			failStep := "[chaos] Chaos injection phase failed, err" + err.Error()
+			failStep := "[chaos]: Chaos injection phase failed, err" + err.Error()
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}
 	default:
 		log.Error("[Invalid]: Please Provide the correct LIB")
-		failStep := "[chaos] no match was found for the specified lib"
+		failStep := "[chaos]: no match was found for the specified lib"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -159,7 +159,7 @@ func CasssandraPodDelete(clients clients.ClientSets) {
 		log.Info("[Status]: Verify that the AUT (Application Under Test) is running (post-chaos)")
 		if err = status.AUTStatusCheck(experimentsDetails.ChaoslibDetail.AppNS, experimentsDetails.ChaoslibDetail.AppLabel, experimentsDetails.ChaoslibDetail.TargetContainer, experimentsDetails.ChaoslibDetail.Timeout, experimentsDetails.ChaoslibDetail.Delay, clients, &chaosDetails); err != nil {
 			log.Errorf("Application status check failed, err: %v", err)
-			failStep := "[post-chaos] Failed to verify that the AUT (Application Under Test) is running, err: " + err.Error()
+			failStep := "[post-chaos]: Failed to verify that the AUT (Application Under Test) is running, err: " + err.Error()
 			types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, "AUT: Not Running", "Warning", &chaosDetails)
 			events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
@@ -184,7 +184,7 @@ func CasssandraPodDelete(clients clients.ClientSets) {
 		if len(resultDetails.ProbeDetails) != 0 {
 			if err = probe.RunProbes(&chaosDetails, clients, &resultDetails, "PostChaos", &eventsDetails); err != nil {
 				log.Errorf("Probes Failed, err: %v", err)
-				failStep := "[post-chaos] Failed while running probes, err: " + err.Error()
+				failStep := "[post-chaos]: Failed while running probes, err: " + err.Error()
 				msg = common.GetStatusMessage(chaosDetails.DefaultAppHealthCheck, "AUT: Running", "Unsuccessful")
 				types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, msg, "Warning", &chaosDetails)
 				events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
@@ -205,13 +205,13 @@ func CasssandraPodDelete(clients clients.ClientSets) {
 	if experimentsDetails.CassandraLivenessCheck == "enable" {
 		if err = status.CheckApplicationStatus(experimentsDetails.ChaoslibDetail.AppNS, "name=cassandra-liveness-deploy-"+experimentsDetails.RunID, experimentsDetails.ChaoslibDetail.Timeout, experimentsDetails.ChaoslibDetail.Delay, clients); err != nil {
 			log.Errorf("Liveness status check failed, err: %v", err)
-			failStep := "[post-chaos] Failed to check the status of liveness pod, err: " + err.Error()
+			failStep := "[post-chaos]: Failed to check the status of liveness pod, err: " + err.Error()
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}
 		if err = cassandra.LivenessCleanup(&experimentsDetails, clients, ResourceVersionBefore); err != nil {
 			log.Errorf("Liveness cleanup failed, err: %v", err)
-			failStep := "[post-chaos] Failed to delete liveness pod, err: " + err.Error()
+			failStep := "[post-chaos]: Failed to delete liveness pod, err: " + err.Error()
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}

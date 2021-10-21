@@ -52,7 +52,7 @@ func AzureInstanceStop(clients clients.ClientSets) {
 	err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT")
 	if err != nil {
 		log.Errorf("Unable to Create the Chaos Result, err: %v", err)
-		failStep := "[pre-chaos] Failed to update the chaos result of azure instance stop experiment (SOT), err: " + err.Error()
+		failStep := "[pre-chaos]: Failed to update the chaos result of azure instance stop experiment (SOT), err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -95,7 +95,7 @@ func AzureInstanceStop(clients clients.ClientSets) {
 	// Setting up Azure Subscription ID
 	if experimentsDetails.SubscriptionID, err = azureCommon.GetSubscriptionID(); err != nil {
 		log.Errorf("fail to get the subscription id, err: %v", err)
-		failStep := "[pre-chaos] Failed to get the subscription ID for authentication, err: " + err.Error()
+		failStep := "[pre-chaos]: Failed to get the subscription ID for authentication, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -115,7 +115,7 @@ func AzureInstanceStop(clients clients.ClientSets) {
 			err = probe.RunProbes(&chaosDetails, clients, &resultDetails, "PreChaos", &eventsDetails)
 			if err != nil {
 				log.Errorf("Probe Failed, err: %v", err)
-				failStep := "[pre-chaos] Failed while running probes, err: " + err.Error()
+				failStep := "[pre-chaos]: Failed while running probes, err: " + err.Error()
 				msg := "AUT: Running, Probes: Unsuccessful"
 				types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, msg, "Warning", &chaosDetails)
 				events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
@@ -132,7 +132,7 @@ func AzureInstanceStop(clients clients.ClientSets) {
 	//Verify the azure target instance is running (pre-chaos)
 	if err := azureStatus.InstanceStatusCheckByName(&experimentsDetails); err != nil {
 		log.Errorf("failed to get the azure instance status, err: %v", err)
-		failStep := "[pre-chaos] Failed to verify the azure instance status, err: " + err.Error()
+		failStep := "[pre-chaos]: Failed to verify the azure instance status, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -143,13 +143,13 @@ func AzureInstanceStop(clients clients.ClientSets) {
 	case "litmus":
 		if err = litmusLIB.PrepareAzureStop(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
 			log.Errorf("Chaos injection failed, err: %v", err)
-			failStep := "[chaos] Chaos injection phase failed, err" + err.Error()
+			failStep := "[chaos]: Chaos injection phase failed, err" + err.Error()
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}
 	default:
 		log.Error("[Invalid]: Please Provide the correct LIB")
-		failStep := "[chaos] no match was found for the specified lib"
+		failStep := "[chaos]: no match was found for the specified lib"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -160,7 +160,7 @@ func AzureInstanceStop(clients clients.ClientSets) {
 	//Verify the azure instance is running (post chaos)
 	if err = azureStatus.InstanceStatusCheckByName(&experimentsDetails); err != nil {
 		log.Errorf("failed to get the azure instance status, err: %v", err)
-		failStep := "[pre-chaos] Failed to update the azure instance status, err: " + err.Error()
+		failStep := "[pre-chaos]: Failed to update the azure instance status, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -170,7 +170,7 @@ func AzureInstanceStop(clients clients.ClientSets) {
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (post-chaos)")
 	if err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
 		log.Errorf("Application status check failed, err: %v", err)
-		failStep := "[post-chaos] Failed to verify that the AUT (Application Under Test) is running, err: " + err.Error()
+		failStep := "[post-chaos]: Failed to verify that the AUT (Application Under Test) is running, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -180,7 +180,7 @@ func AzureInstanceStop(clients clients.ClientSets) {
 		log.Info("[Status]: Verify that the Auxiliary Applications are running (post-chaos)")
 		if err = status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
 			log.Errorf("Auxiliary Application status check failed, err: %v", err)
-			failStep := "[post-chaos] Failed to verify that the Auxiliary Applications are running, err: " + err.Error()
+			failStep := "[post-chaos]: Failed to verify that the Auxiliary Applications are running, err: " + err.Error()
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}
@@ -195,7 +195,7 @@ func AzureInstanceStop(clients clients.ClientSets) {
 			err = probe.RunProbes(&chaosDetails, clients, &resultDetails, "PostChaos", &eventsDetails)
 			if err != nil {
 				log.Errorf("Probes Failed, err: %v", err)
-				failStep := "[post-chaos] Failed while running probes, err: " + err.Error()
+				failStep := "[post-chaos]: Failed while running probes, err: " + err.Error()
 				msg := "AUT: Running, Probes: Unsuccessful"
 				types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, msg, "Warning", &chaosDetails)
 				events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")

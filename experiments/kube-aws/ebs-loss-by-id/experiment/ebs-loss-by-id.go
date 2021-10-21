@@ -50,7 +50,7 @@ func EBSLossByID(clients clients.ClientSets) {
 	log.Infof("[PreReq]: Updating the chaos result of %v experiment (SOT)", experimentsDetails.ExperimentName)
 	if err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT"); err != nil {
 		log.Errorf("unable to Create the Chaos Result, err: %v", err)
-		failStep := "[pre-chaos] Failed to update the chaos result of ebs-loss experiment (SOT), err: " + err.Error()
+		failStep := "[pre-chaos]: Failed to update the chaos result of ebs-loss experiment (SOT), err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -92,7 +92,7 @@ func EBSLossByID(clients clients.ClientSets) {
 
 			if err = probe.RunProbes(&chaosDetails, clients, &resultDetails, "PreChaos", &eventsDetails); err != nil {
 				log.Errorf("Probe Failed, err: %v", err)
-				failStep := "[pre-chaos] Failed while running probes, err: " + err.Error()
+				failStep := "[pre-chaos]: Failed while running probes, err: " + err.Error()
 				msg := "AUT: Running, Probes: Unsuccessful"
 				types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, msg, "Warning", &chaosDetails)
 				events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
@@ -120,7 +120,7 @@ func EBSLossByID(clients clients.ClientSets) {
 	//Verify the aws ec2 instance is attached to ebs volume
 	if err = aws.EBSStateCheckByID(experimentsDetails.EBSVolumeID, experimentsDetails.Region); err != nil {
 		log.Errorf("volume status check failed pre chaos, err: %v", err)
-		failStep := "[pre-chaos] Failed to verify if the ebs volume is attached to ec2 instance, err: " + err.Error()
+		failStep := "[pre-chaos]: Failed to verify if the ebs volume is attached to ec2 instance, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -130,13 +130,13 @@ func EBSLossByID(clients clients.ClientSets) {
 	case "litmus":
 		if err = litmusLIB.PrepareEBSLossByID(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
 			log.Errorf("Chaos injection failed, err: %v", err)
-			failStep := "[chaos] Chaos injection phase failed, err" + err.Error()
+			failStep := "[chaos]: Chaos injection phase failed, err" + err.Error()
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}
 	default:
 		log.Error("[Invalid]: Please Provide the correct LIB")
-		failStep := "[chaos] no match was found for the specified lib"
+		failStep := "[chaos]: no match was found for the specified lib"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -148,7 +148,7 @@ func EBSLossByID(clients clients.ClientSets) {
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (post-chaos)")
 	if err = status.AUTStatusCheck(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.TargetContainer, experimentsDetails.Timeout, experimentsDetails.Delay, clients, &chaosDetails); err != nil {
 		log.Errorf("Application status check failed, err: %v", err)
-		failStep := "[post-chaos] Failed to verify that the AUT (Application Under Test) is running, err: " + err.Error()
+		failStep := "[post-chaos]: Failed to verify that the AUT (Application Under Test) is running, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -158,7 +158,7 @@ func EBSLossByID(clients clients.ClientSets) {
 		log.Info("[Status]: Verify that the Auxiliary Applications are running (post-chaos)")
 		if err = status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
 			log.Errorf("Auxiliary Application status check failed, err: %v", err)
-			failStep := "[post-chaos] Failed to verify that the Auxiliary Applications are running, err: " + err.Error()
+			failStep := "[post-chaos]: Failed to verify that the Auxiliary Applications are running, err: " + err.Error()
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}
@@ -167,7 +167,7 @@ func EBSLossByID(clients clients.ClientSets) {
 	//Verify the aws ec2 instance is attached to ebs volume
 	if err = aws.EBSStateCheckByID(experimentsDetails.EBSVolumeID, experimentsDetails.Region); err != nil {
 		log.Errorf("volume status check failed post chaos, err: %v", err)
-		failStep := "[post-chaos] Failed to verify if the ebs volume is attached to an ec2 instance, err: " + err.Error()
+		failStep := "[post-chaos]: Failed to verify if the ebs volume is attached to an ec2 instance, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -180,7 +180,7 @@ func EBSLossByID(clients clients.ClientSets) {
 		if len(resultDetails.ProbeDetails) != 0 {
 			if err = probe.RunProbes(&chaosDetails, clients, &resultDetails, "PostChaos", &eventsDetails); err != nil {
 				log.Errorf("Probes Failed, err: %v", err)
-				failStep := "[post-chaos] Failed while running probes, err: " + err.Error()
+				failStep := "[post-chaos]: Failed while running probes, err: " + err.Error()
 				msg := "AUT: Running, Probes: Unsuccessful"
 				types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, msg, "Warning", &chaosDetails)
 				events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
