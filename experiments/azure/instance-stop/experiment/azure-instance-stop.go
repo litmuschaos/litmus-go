@@ -75,7 +75,7 @@ func AzureInstanceStop(clients clients.ClientSets) {
 	err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 	if err != nil {
 		log.Errorf("Application status check failed, err: %v", err)
-		failStep := "[pre-chaos] Failed to verify that the AUT (Application Under Test) is running, err: " + err.Error()
+		failStep := "[pre-chaos]: Failed to verify that the AUT (Application Under Test) is in running state, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
