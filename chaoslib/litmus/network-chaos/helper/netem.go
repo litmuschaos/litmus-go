@@ -209,19 +209,20 @@ func injectChaos(experimentDetails *experimentTypes.ExperimentDetails, pid int) 
 			for _, ip := range uniqueIps {
 
 				// redirect traffic to specific IP through band 3
-				// It allows ipv4 addresses only
-				if !strings.Contains(ip, ":") {
-					tc := fmt.Sprintf("sudo nsenter -t %v -n tc filter add dev %v protocol ip parent 1:0 prio 3 u32 match ip dst %v flowid 1:3", pid, experimentDetails.NetworkInterface, ip)
-					cmd = exec.Command("/bin/bash", "-c", tc)
-					out, err = cmd.CombinedOutput()
-					log.Info(cmd.String())
-					if err != nil {
-						log.Error(string(out))
-						return err
-					}
+				tc := fmt.Sprintf("sudo nsenter -t %v -n tc filter add dev %v protocol ip parent 1:0 prio 3 u32 match ip dst %v flowid 1:3", pid, experimentDetails.NetworkInterface, ip)
+				if strings.Contains(ip, ":") {
+					tc = fmt.Sprintf("sudo nsenter -t %v -n tc filter add dev %v protocol ip parent 1:0 prio 3 u32 match ip6 dst %v flowid 1:3", pid, experimentDetails.NetworkInterface, ip)
+				}
+				cmd = exec.Command("/bin/bash", "-c", tc)
+				out, err = cmd.CombinedOutput()
+				log.Info(cmd.String())
+				if err != nil {
+					log.Error(string(out))
+					return err
 				}
 			}
 		}
+
 	}
 	return nil
 }
