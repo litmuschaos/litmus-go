@@ -113,7 +113,7 @@ func drainNode(experimentsDetails *experimentTypes.ExperimentDetails, clients cl
 
 	select {
 	case <-inject:
-		// stopping the chaos execution, if abort signal recieved
+		// stopping the chaos execution, if abort signal received
 		os.Exit(0)
 	default:
 		log.Infof("[Inject]: Draining the %v node", experimentsDetails.TargetNode)
@@ -177,9 +177,9 @@ func uncordonNode(experimentsDetails *experimentTypes.ExperimentDetails, clients
 		})
 }
 
-// abortWatcher continuosly watch for the abort signals
+// abortWatcher continuously watch for the abort signals
 func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, chaosDetails *types.ChaosDetails, eventsDetails *types.EventDetails) {
-	// waiting till the abort signal recieved
+	// waiting till the abort signal received
 	<-abort
 
 	log.Info("[Chaos]: Killing process started because of terminated signal received")

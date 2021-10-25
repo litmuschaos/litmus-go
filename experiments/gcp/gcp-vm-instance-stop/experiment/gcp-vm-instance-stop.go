@@ -33,14 +33,14 @@ func VMInstanceStop(clients clients.ClientSets) {
 	experimentEnv.GetENV(&experimentsDetails)
 	log.Infof("[PreReq]: Procured the ENV for the %v experiment", os.Getenv("EXPERIMENT_NAME"))
 
-	// Intialise the chaos attributes
-	experimentEnv.InitialiseChaosVariables(&chaosDetails, &experimentsDetails)
+	// Initialize the chaos attributes
+	types.InitialiseChaosVariables(&chaosDetails)
 
-	// Intialise Chaos Result Parameters
+	// Initialize Chaos Result Parameters
 	types.SetResultAttributes(&resultDetails, chaosDetails)
 
 	if experimentsDetails.EngineName != "" {
-		// Intialise the probe details. Bail out upon error, as we haven't entered exp business logic yet
+		// Initialize the probe details. Bail out upon error, as we haven't entered exp business logic yet
 		if err = probe.InitializeProbesInChaosResultDetails(&chaosDetails, clients, &resultDetails); err != nil {
 			log.Errorf("Unable to initialize the probes, err: %v", err)
 			return

@@ -37,26 +37,26 @@ func GetInstanceDiskList(subscriptionID, resourceGroup, scaleSet, azureInstanceN
 		// Get the disks attached to the instance
 		list := vm.VirtualMachineScaleSetVMProperties.StorageProfile.DataDisks
 		return list, nil
-	} else {
-		// Setup and authorize vm client
-		vmClient := compute.NewVirtualMachinesClient(subscriptionID)
-		authorizer, err := auth.NewAuthorizerFromFile(azure.PublicCloud.ResourceManagerEndpoint)
-
-		if err != nil {
-			return nil, errors.Errorf("fail to setup authorization, err: %v", err)
-		}
-		vmClient.Authorizer = authorizer
-
-		// Fetch the vm instance
-		vm, err := vmClient.Get(context.TODO(), resourceGroup, azureInstanceName, compute.InstanceViewTypes("instanceView"))
-		if err != nil {
-			return nil, errors.Errorf("fail get instance, err: %v", err)
-		}
-
-		// Get the disks attached to the instance
-		list := vm.VirtualMachineProperties.StorageProfile.DataDisks
-		return list, nil
 	}
+
+	// Setup and authorize vm client
+	vmClient := compute.NewVirtualMachinesClient(subscriptionID)
+	authorizer, err := auth.NewAuthorizerFromFile(azure.PublicCloud.ResourceManagerEndpoint)
+
+	if err != nil {
+		return nil, errors.Errorf("fail to setup authorization, err: %v", err)
+	}
+	vmClient.Authorizer = authorizer
+
+	// Fetch the vm instance
+	vm, err := vmClient.Get(context.TODO(), resourceGroup, azureInstanceName, compute.InstanceViewTypes("instanceView"))
+	if err != nil {
+		return nil, errors.Errorf("fail get instance, err: %v", err)
+	}
+
+	// Get the disks attached to the instance
+	list := vm.VirtualMachineProperties.StorageProfile.DataDisks
+	return list, nil
 }
 
 // GetDiskStatus will get the status of disk (attached/unattached)

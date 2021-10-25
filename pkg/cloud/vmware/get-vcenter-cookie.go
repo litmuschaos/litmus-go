@@ -9,6 +9,7 @@ import (
 	"github.com/pkg/errors"
 )
 
+// ErrorResponse contains error response code
 type ErrorResponse struct {
 	MsgValue struct {
 		MsgMessages []struct {

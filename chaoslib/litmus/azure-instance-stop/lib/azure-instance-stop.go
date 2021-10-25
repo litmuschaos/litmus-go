@@ -171,7 +171,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 				events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 			}
 
-			// PowerOff the instances parallely
+			// PowerOff the instances parallelly
 			for _, vmName := range instanceNameList {
 				// Stopping the Azure instance
 				log.Infof("[Chaos]: Stopping the Azure instance: %v", vmName)

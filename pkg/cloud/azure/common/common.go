@@ -40,9 +40,8 @@ func GetSubscriptionID() (string, error) {
 
 	if id, contains := details["subscriptionId"]; contains {
 		return id, nil
-	} else {
-		return "", errors.Errorf("The auth file does not have a subscriptionId field")
 	}
+	return "", errors.Errorf("The auth file does not have a subscriptionId field")
 }
 
 // GetScaleSetNameAndInstanceId extracts the scale set name and VM id from the instance name

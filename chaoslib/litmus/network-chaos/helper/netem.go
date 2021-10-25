@@ -12,7 +12,6 @@ import (
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
-	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/network-chaos/environment"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/network-chaos/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/result"
@@ -55,7 +54,7 @@ func Helper(clients clients.ClientSets) {
 	getENV(&experimentsDetails)
 
 	// Intialise the chaos attributes
-	experimentEnv.InitialiseChaosVariables(&chaosDetails, &experimentsDetails)
+	types.InitialiseChaosVariables(&chaosDetails)
 
 	// Intialise Chaos Result Parameters
 	types.SetResultAttributes(&resultDetails, chaosDetails)
@@ -113,11 +112,7 @@ func preparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetail
 		return err
 	}
 
-	if err = result.AnnotateChaosResult(resultDetails.Name, chaosDetails.ChaosNamespace, "reverted", "pod", experimentsDetails.TargetPods); err != nil {
-		return err
-	}
-
-	return nil
+	return result.AnnotateChaosResult(resultDetails.Name, chaosDetails.ChaosNamespace, "reverted", "pod", experimentsDetails.TargetPods)
 }
 
 //getContainerID extract out the container id of the target container
@@ -158,7 +153,7 @@ func injectChaos(experimentDetails *experimentTypes.ExperimentDetails, pid int) 
 
 	select {
 	case <-inject:
-		// stopping the chaos execution, if abort signal recieved
+		// stopping the chaos execution, if abort signal received
 		os.Exit(1)
 	default:
 		if destinationIPs == "" {
@@ -214,19 +209,20 @@ func injectChaos(experimentDetails *experimentTypes.ExperimentDetails, pid int) 
 			for _, ip := range uniqueIps {
 
 				// redirect traffic to specific IP through band 3
-				// It allows ipv4 addresses only
-				if !strings.Contains(ip, ":") {
-					tc := fmt.Sprintf("sudo nsenter -t %v -n tc filter add dev %v protocol ip parent 1:0 prio 3 u32 match ip dst %v flowid 1:3", pid, experimentDetails.NetworkInterface, ip)
-					cmd = exec.Command("/bin/bash", "-c", tc)
-					out, err = cmd.CombinedOutput()
-					log.Info(cmd.String())
-					if err != nil {
-						log.Error(string(out))
-						return err
-					}
+				tc := fmt.Sprintf("sudo nsenter -t %v -n tc filter add dev %v protocol ip parent 1:0 prio 3 u32 match ip dst %v flowid 1:3", pid, experimentDetails.NetworkInterface, ip)
+				if strings.Contains(ip, ":") {
+					tc = fmt.Sprintf("sudo nsenter -t %v -n tc filter add dev %v protocol ip parent 1:0 prio 3 u32 match ip6 dst %v flowid 1:3", pid, experimentDetails.NetworkInterface, ip)
+				}
+				cmd = exec.Command("/bin/bash", "-c", tc)
+				out, err = cmd.CombinedOutput()
+				log.Info(cmd.String())
+				if err != nil {
+					log.Error(string(out))
+					return err
 				}
 			}
 		}
+
 	}
 	return nil
 }
@@ -254,24 +250,24 @@ func killnetem(PID int) error {
 
 //getENV fetches all the env variables from the runner pod
 func getENV(experimentDetails *experimentTypes.ExperimentDetails) {
-	experimentDetails.ExperimentName = common.Getenv("EXPERIMENT_NAME", "")
-	experimentDetails.InstanceID = common.Getenv("INSTANCE_ID", "")
-	experimentDetails.AppNS = common.Getenv("APP_NS", "")
-	experimentDetails.TargetContainer = common.Getenv("APP_CONTAINER", "")
-	experimentDetails.TargetPods = common.Getenv("APP_POD", "")
-	experimentDetails.AppLabel = common.Getenv("APP_LABEL", "")
-	experimentDetails.ChaosDuration, _ = strconv.Atoi(common.Getenv("TOTAL_CHAOS_DURATION", "30"))
-	experimentDetails.ChaosNamespace = common.Getenv("CHAOS_NAMESPACE", "litmus")
-	experimentDetails.EngineName = common.Getenv("CHAOS_ENGINE", "")
-	experimentDetails.ChaosUID = clientTypes.UID(common.Getenv("CHAOS_UID", ""))
-	experimentDetails.ChaosPodName = common.Getenv("POD_NAME", "")
-	experimentDetails.ContainerRuntime = common.Getenv("CONTAINER_RUNTIME", "")
-	experimentDetails.NetworkInterface = common.Getenv("NETWORK_INTERFACE", "eth0")
-	experimentDetails.SocketPath = common.Getenv("SOCKET_PATH", "")
-	experimentDetails.DestinationIPs = common.Getenv("DESTINATION_IPS", "")
+	experimentDetails.ExperimentName = types.Getenv("EXPERIMENT_NAME", "")
+	experimentDetails.InstanceID = types.Getenv("INSTANCE_ID", "")
+	experimentDetails.AppNS = types.Getenv("APP_NAMESPACE", "")
+	experimentDetails.TargetContainer = types.Getenv("APP_CONTAINER", "")
+	experimentDetails.TargetPods = types.Getenv("APP_POD", "")
+	experimentDetails.AppLabel = types.Getenv("APP_LABEL", "")
+	experimentDetails.ChaosDuration, _ = strconv.Atoi(types.Getenv("TOTAL_CHAOS_DURATION", "30"))
+	experimentDetails.ChaosNamespace = types.Getenv("CHAOS_NAMESPACE", "litmus")
+	experimentDetails.EngineName = types.Getenv("CHAOSENGINE", "")
+	experimentDetails.ChaosUID = clientTypes.UID(types.Getenv("CHAOS_UID", ""))
+	experimentDetails.ChaosPodName = types.Getenv("POD_NAME", "")
+	experimentDetails.ContainerRuntime = types.Getenv("CONTAINER_RUNTIME", "")
+	experimentDetails.NetworkInterface = types.Getenv("NETWORK_INTERFACE", "eth0")
+	experimentDetails.SocketPath = types.Getenv("SOCKET_PATH", "")
+	experimentDetails.DestinationIPs = types.Getenv("DESTINATION_IPS", "")
 }
 
-// abortWatcher continuosly watch for the abort signals
+// abortWatcher continuously watch for the abort signals
 func abortWatcher(targetPID int, resultName, chaosNS, targetPodName string) {
 
 	<-abort

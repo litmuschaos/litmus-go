@@ -19,7 +19,7 @@ import (
 )
 
 // preparePromProbe contains the steps to prepare the prometheus probe
-// which compares the metrices output exposed at the given endpoint
+// which compares the metrics output exposed at the given endpoint
 func preparePromProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, phase string) error {
 
 	switch strings.ToLower(phase) {
@@ -330,7 +330,7 @@ func extractValueFromMetrics(metrics string) (string, error) {
 		return "", errors.Errorf("metrics entries doesn't contains value column")
 	}
 
-	// splitting the metrics entries which are availble as comma separated
+	// splitting the metrics entries which are available as comma separated
 	values := strings.Split(rows[1], ",")
 	if values[indexForValueColumn] == "" {
 		return "", errors.Errorf("error while parsing value from derived matrics")

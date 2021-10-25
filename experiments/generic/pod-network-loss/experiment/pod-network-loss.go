@@ -31,14 +31,14 @@ func PodNetworkLoss(clients clients.ClientSets) {
 	log.Infof("[PreReq]: Getting the ENV for the %v experiment", os.Getenv("EXPERIMENT_NAME"))
 	experimentEnv.GetENV(&experimentsDetails)
 
-	// Intialise events Parameters
-	experimentEnv.InitialiseChaosVariables(&chaosDetails, &experimentsDetails)
+	// Initialize events Parameters
+	types.InitialiseChaosVariables(&chaosDetails)
 
-	// Intialise Chaos Result Parameters
+	// Initialize Chaos Result Parameters
 	types.SetResultAttributes(&resultDetails, chaosDetails)
 
 	if experimentsDetails.EngineName != "" {
-		// Intialise the probe details. Bail out upon error, as we haven't entered exp business logic yet
+		// Initialize the probe details. Bail out upon error, as we haven't entered exp business logic yet
 		if err := probe.InitializeProbesInChaosResultDetails(&chaosDetails, clients, &resultDetails); err != nil {
 			log.Errorf("Unable to initialize the probes, err: %v", err)
 			return
