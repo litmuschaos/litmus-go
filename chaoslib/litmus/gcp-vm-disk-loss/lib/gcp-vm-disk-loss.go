@@ -74,7 +74,7 @@ func PrepareDiskVolumeLoss(experimentsDetails *experimentTypes.ExperimentDetails
 
 	select {
 	case <-inject:
-		// stopping the chaos execution, if abort signal recieved
+		// stopping the chaos execution, if abort signal received
 		os.Exit(0)
 	default:
 

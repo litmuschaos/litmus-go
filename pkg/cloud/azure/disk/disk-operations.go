@@ -58,7 +58,6 @@ func DetachDisks(subscriptionID, resourceGroup, azureInstanceName, scaleSet stri
 			return errors.Errorf("cannot detach disk, err: %v", err)
 		}
 
-		return nil
 	} else {
 		// Setup and authorize vm client
 		vmClient := compute.NewVirtualMachinesClient(subscriptionID)
@@ -95,8 +94,8 @@ func DetachDisks(subscriptionID, resourceGroup, azureInstanceName, scaleSet stri
 		if err != nil {
 			return errors.Errorf("cannot detach disk, err: %v", err)
 		}
-		return nil
 	}
+	return nil
 }
 
 // AttachDisk will attach the list of disk provided for the specific VM instance
