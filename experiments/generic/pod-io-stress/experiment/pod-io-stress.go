@@ -49,7 +49,7 @@ func PodIOStress(clients clients.ClientSets) {
 	log.Infof("[PreReq]: Updating the chaos result of %v experiment (SOT)", experimentsDetails.ExperimentName)
 	if err := result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT"); err != nil {
 		log.Errorf("Unable to Create the Chaos Result, err: %v", err)
-		failStep := "Updating the chaos result of " + experimentsDetails.ExperimentName + " experiment (SOT)"
+		failStep := "[pre-chaos]: Failed to update the chaos result of " + experimentsDetails.ExperimentName + " experiment (SOT), err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -79,7 +79,7 @@ func PodIOStress(clients clients.ClientSets) {
 		log.Info("[Status]: Verify that the AUT (Application Under Test) is running (pre-chaos)")
 		if err := status.AUTStatusCheck(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.TargetContainer, experimentsDetails.Timeout, experimentsDetails.Delay, clients, &chaosDetails); err != nil {
 			log.Errorf("Application status check failed, err: %v", err)
-			failStep := "Verify that the AUT (Application Under Test) is running (pre-chaos)"
+			failStep := "[pre-chaos]: Failed to verify that the AUT (Application Under Test) is in running state, err: " + err.Error()
 			types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, "AUT: Not Running", "Warning", &chaosDetails)
 			events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
@@ -96,7 +96,7 @@ func PodIOStress(clients clients.ClientSets) {
 
 			if err := probe.RunProbes(&chaosDetails, clients, &resultDetails, "PreChaos", &eventsDetails); err != nil {
 				log.Errorf("Probe Failed, err: %v", err)
-				failStep := "Failed while running probes"
+				failStep := "[pre-chaos]: Failed while running probes, err: " + err.Error()
 				msg := common.GetStatusMessage(chaosDetails.DefaultAppHealthCheck, "AUT: Running", "Unsuccessful")
 				types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, msg, "Warning", &chaosDetails)
 				events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
@@ -115,20 +115,20 @@ func PodIOStress(clients clients.ClientSets) {
 	case "litmus":
 		if err := litmusLIB.PrepareAndInjectStressChaos(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
 			log.Errorf("[Error]: Pod IO Stress failed, err: %v", err)
-			failStep := "failed in chaos injection phase"
+			failStep := "[chaos]: Failed inside the chaoslib, err: " + err.Error()
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}
 	case "pumba":
 		if err := pumbaLIB.PreparePodIOStress(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
 			log.Errorf("[Error]: pod io stress chaos failed, err: %v", err)
-			failStep := "failed in chaos injection phase"
+			failStep := "[chaos]: Failed inside the chaoslib, err: " + err.Error()
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}
 	default:
 		log.Error("[Invalid]: Please Provide the correct LIB")
-		failStep := "no match found for specified lib"
+		failStep := "[chaos]: no match was found for the specified lib"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -141,7 +141,7 @@ func PodIOStress(clients clients.ClientSets) {
 		log.Info("[Status]: Verify that the AUT (Application Under Test) is running (post-chaos)")
 		if err := status.AUTStatusCheck(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.TargetContainer, experimentsDetails.Timeout, experimentsDetails.Delay, clients, &chaosDetails); err != nil {
 			log.Infof("Application status check failed, err: %v", err)
-			failStep := "Verify that the AUT (Application Under Test) is running (post-chaos)"
+			failStep := "[post-chaos]: Failed to verify that the AUT (Application Under Test) is running, err: " + err.Error()
 			types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, "AUT: Not Running", "Warning", &chaosDetails)
 			events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
@@ -157,7 +157,7 @@ func PodIOStress(clients clients.ClientSets) {
 		if len(resultDetails.ProbeDetails) != 0 {
 			if err := probe.RunProbes(&chaosDetails, clients, &resultDetails, "PostChaos", &eventsDetails); err != nil {
 				log.Errorf("Probes Failed, err: %v", err)
-				failStep := "Failed while running probes"
+				failStep := "[post-chaos]: Failed while running probes, err: " + err.Error()
 				msg := common.GetStatusMessage(chaosDetails.DefaultAppHealthCheck, "AUT: Running", "Unsuccessful")
 				types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, msg, "Warning", &chaosDetails)
 				events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")

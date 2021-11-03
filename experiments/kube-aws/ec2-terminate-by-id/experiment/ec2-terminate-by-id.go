@@ -51,7 +51,7 @@ func EC2TerminateByID(clients clients.ClientSets) {
 	log.Infof("[PreReq]: Updating the chaos result of %v experiment (SOT)", experimentsDetails.ExperimentName)
 	if err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT"); err != nil {
 		log.Errorf("Unable to Create the Chaos Result, err: %v", err)
-		failStep := "Updating the chaos result of ec2 terminate experiment (SOT)"
+		failStep := "[pre-chaos]: Failed to update the chaos result of ec2 terminate experiment (SOT), err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -80,7 +80,7 @@ func EC2TerminateByID(clients clients.ClientSets) {
 		activeNodeCount, err = common.PreChaosNodeStatusCheck(experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 		if err != nil {
 			log.Errorf("Pre chaos node status check failed, err: %v", err)
-			failStep := "Verify that the NUT (Node Under Test) is running (pre-chaos)"
+			failStep := "[pre-chaos]: Failed to verify that the NUT (Node Under Test) is running (pre-chaos), err: " + err.Error()
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}
@@ -90,7 +90,7 @@ func EC2TerminateByID(clients clients.ClientSets) {
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (pre-chaos)")
 	if err = status.AUTStatusCheck(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.TargetContainer, experimentsDetails.Timeout, experimentsDetails.Delay, clients, &chaosDetails); err != nil {
 		log.Errorf("Application status check failed, err: %v", err)
-		failStep := "Verify that the AUT (Application Under Test) is running (pre-chaos)"
+		failStep := "[pre-chaos]: Failed to verify that the AUT (Application Under Test) is in running state, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -100,7 +100,7 @@ func EC2TerminateByID(clients clients.ClientSets) {
 		log.Info("[Status]: Verify that the Auxiliary Applications are running (pre-chaos)")
 		if err = status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
 			log.Errorf("Auxiliary Application status check failed, err: %v", err)
-			failStep := "Verify that the Auxiliary Applications are running (pre-chaos)"
+			failStep := "[pre-chaos]: Failed to verify that the Auxiliary Applications are in running state, err: " + err.Error()
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}
@@ -115,7 +115,7 @@ func EC2TerminateByID(clients clients.ClientSets) {
 
 			if err = probe.RunProbes(&chaosDetails, clients, &resultDetails, "PreChaos", &eventsDetails); err != nil {
 				log.Errorf("Probe Failed, err: %v", err)
-				failStep := "Failed while running probes"
+				failStep := "[pre-chaos]: Failed while running probes, err: " + err.Error()
 				msg := "AUT: Running, Probes: Unsuccessful"
 				types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, msg, "Warning", &chaosDetails)
 				events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
@@ -132,7 +132,7 @@ func EC2TerminateByID(clients clients.ClientSets) {
 	//Verify the aws ec2 instance is running (pre chaos)
 	if err = aws.InstanceStatusCheckByID(experimentsDetails.Ec2InstanceID, experimentsDetails.Region); err != nil {
 		log.Errorf("failed to get the ec2 instance status, err: %v", err)
-		failStep := "Verify the AWS ec2 instance status (pre-chaos)"
+		failStep := "[pre-chaos]: Failed to verify the AWS ec2 instance status, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -143,13 +143,13 @@ func EC2TerminateByID(clients clients.ClientSets) {
 	case "litmus":
 		if err = litmusLIB.PrepareEC2TerminateByID(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
 			log.Errorf("Chaos injection failed, err: %v", err)
-			failStep := "failed in chaos injection phase"
+			failStep := "[chaos]: Failed inside the chaoslib, err: " + err.Error()
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}
 	default:
 		log.Error("[Invalid]: Please Provide the correct LIB")
-		failStep := "no match found for specified lib"
+		failStep := "[chaos]: no match was found for the specified lib"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -161,7 +161,7 @@ func EC2TerminateByID(clients clients.ClientSets) {
 	if experimentsDetails.ManagedNodegroup == "enable" {
 		if err = common.PostChaosActiveNodeCountCheck(activeNodeCount, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
 			log.Errorf("Post chaos active node count check failed, err: %v", err)
-			failStep := "Verify active number of nodes post chaos"
+			failStep := "[post-chaos]: Failed to verify the active number of nodes, err: " + err.Error()
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}
@@ -171,7 +171,7 @@ func EC2TerminateByID(clients clients.ClientSets) {
 	if experimentsDetails.ManagedNodegroup != "enable" {
 		if err = aws.InstanceStatusCheckByID(experimentsDetails.Ec2InstanceID, experimentsDetails.Region); err != nil {
 			log.Errorf("failed to get the ec2 instance status, err: %v", err)
-			failStep := "Verify the AWS ec2 instance status (post-chaos)"
+			failStep := "[post-chaos]: Failed to verify the AWS ec2 instance status, err: " + err.Error()
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}
@@ -182,7 +182,7 @@ func EC2TerminateByID(clients clients.ClientSets) {
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (post-chaos)")
 	if err = status.AUTStatusCheck(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.TargetContainer, experimentsDetails.Timeout, experimentsDetails.Delay, clients, &chaosDetails); err != nil {
 		log.Errorf("Application status check failed, err: %v", err)
-		failStep := "Verify that the AUT (Application Under Test) is running (post-chaos)"
+		failStep := "[post-chaos]: Failed to verify that the AUT (Application Under Test) is running, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -192,7 +192,7 @@ func EC2TerminateByID(clients clients.ClientSets) {
 		log.Info("[Status]: Verify that the Auxiliary Applications are running (post-chaos)")
 		if err = status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
 			log.Errorf("Auxiliary Application status check failed, err: %v", err)
-			failStep := "Verify that the Auxiliary Applications are running (post-chaos)"
+			failStep := "[post-chaos]: Failed to verify that the Auxiliary Applications are running, err: " + err.Error()
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}
@@ -206,7 +206,7 @@ func EC2TerminateByID(clients clients.ClientSets) {
 		if len(resultDetails.ProbeDetails) != 0 {
 			if err = probe.RunProbes(&chaosDetails, clients, &resultDetails, "PostChaos", &eventsDetails); err != nil {
 				log.Errorf("Probes Failed, err: %v", err)
-				failStep := "Failed while running probes"
+				failStep := "[post-chaos]: Failed while running probes, err: " + err.Error()
 				msg := "AUT: Running, Probes: Unsuccessful"
 				types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, msg, "Warning", &chaosDetails)
 				events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
