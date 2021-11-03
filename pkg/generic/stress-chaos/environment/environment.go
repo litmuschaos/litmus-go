@@ -34,6 +34,8 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string
 	experimentDetails.SocketPath = types.Getenv("SOCKET_PATH", "/var/run/docker.sock")
 	experimentDetails.Sequence = types.Getenv("SEQUENCE", "parallel")
 	experimentDetails.TerminationGracePeriodSeconds, _ = strconv.Atoi(types.Getenv("TERMINATION_GRACE_PERIOD_SECONDS", ""))
+	experimentDetails.StressImage = types.Getenv("STRESS_IMAGE", "alexeiled/stress-ng:latest-ubuntu")
+
 	switch expName {
 	case "pod-cpu-hog":
 		experimentDetails.CPUcores, _ = strconv.Atoi(types.Getenv("CPU_CORES", "1"))
@@ -47,7 +49,6 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string
 		experimentDetails.FilesystemUtilizationBytes, _ = strconv.Atoi(types.Getenv("FILESYSTEM_UTILIZATION_BYTES", ""))
 		experimentDetails.NumberOfWorkers, _ = strconv.Atoi(types.Getenv("NUMBER_OF_WORKERS", "4"))
 		experimentDetails.VolumeMountPath = types.Getenv("VOLUME_MOUNT_PATH", "")
-		experimentDetails.StressImage = types.Getenv("STRESS_IMAGE", "alexeiled/stress-ng:latest-ubuntu")
 		experimentDetails.CPUcores, _ = strconv.Atoi(types.Getenv("CPU_CORES", "0"))
 	}
 }
