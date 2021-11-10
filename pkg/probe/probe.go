@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"html/template"
 	"strings"
+	"time"
 
 	"github.com/kyokomi/emoji"
 	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/types"
+	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -104,18 +106,23 @@ func getProbesFromEngine(chaosDetails *types.ChaosDetails, clients clients.Clien
 
 	var Probes []v1alpha1.ProbeAttributes
 
-	engine, err := clients.LitmusClient.ChaosEngines(chaosDetails.ChaosNamespace).Get(chaosDetails.EngineName, v1.GetOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("unable to Get the chaosengine, err: %v", err)
-	}
-
-	// get all the probes defined inside chaosengine for the corresponding experiment
-	experimentSpec := engine.Spec.Experiments
-	for _, experiment := range experimentSpec {
-
-		if experiment.Name == chaosDetails.ExperimentName {
-			Probes = experiment.Spec.Probe
-		}
+	if err := retry.
+		Times(uint(chaosDetails.Timeout / chaosDetails.Delay)).
+		Wait(time.Duration(chaosDetails.Delay) * time.Second).
+		Try(func(attempt uint) error {
+			engine, err := clients.LitmusClient.ChaosEngines(chaosDetails.ChaosNamespace).Get(chaosDetails.EngineName, v1.GetOptions{})
+			if err != nil {
+				return fmt.Errorf("unable to Get the chaosengine, err: %v", err)
+			}
+			// get all the probes defined inside chaosengine for the corresponding experiment
+			for _, experiment := range engine.Spec.Experiments {
+				if experiment.Name == chaosDetails.ExperimentName {
+					Probes = experiment.Spec.Probe
+				}
+			}
+			return nil
+		}); err != nil {
+		return nil, err
 	}
 
 	return Probes, nil
