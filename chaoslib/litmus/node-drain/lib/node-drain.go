@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -19,6 +20,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
 	"github.com/pkg/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -111,37 +113,50 @@ func PrepareNodeDrain(experimentsDetails *experimentTypes.ExperimentDetails, cli
 // drainNode drain the application node
 func drainNode(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
 
-	select {
-	case <-inject:
-		// stopping the chaos execution, if abort signal received
-		os.Exit(0)
-	default:
-		log.Infof("[Inject]: Draining the %v node", experimentsDetails.TargetNode)
+	targetNodes := strings.Split(experimentsDetails.TargetNode, ",")
 
-		command := exec.Command("kubectl", "drain", experimentsDetails.TargetNode, "--ignore-daemonsets", "--delete-local-data", "--force", "--timeout", strconv.Itoa(experimentsDetails.ChaosDuration)+"s")
-		var out, stderr bytes.Buffer
-		command.Stdout = &out
-		command.Stderr = &stderr
-		if err := command.Run(); err != nil {
-			log.Infof("Error String: %v", stderr.String())
-			return errors.Errorf("Unable to drain the %v node, err: %v", experimentsDetails.TargetNode, err)
+	log.Infof("Target nodes list: %v", targetNodes)
+	for _, targetNode := range targetNodes {
+
+		select {
+		case <-inject:
+			// stopping the chaos execution, if abort signal received
+			os.Exit(0)
+		default:
+			log.Infof("[Inject]: Draining the %v node", targetNode)
+
+			command := exec.Command("kubectl", "drain", targetNode, "--ignore-daemonsets", "--delete-emptydir-data", "--force", "--timeout", strconv.Itoa(experimentsDetails.ChaosDuration)+"s")
+			var out, stderr bytes.Buffer
+			command.Stdout = &out
+			command.Stderr = &stderr
+			if err := command.Run(); err != nil {
+				log.Infof("Error String: %v", stderr.String())
+				return errors.Errorf("Unable to drain the %v node, err: %v", experimentsDetails.TargetNode, err)
+			}
+
+			common.SetTargets(targetNode, "injected", "node", chaosDetails)
+
+			err = retry.
+				Times(uint(experimentsDetails.Timeout / experimentsDetails.Delay)).
+				Wait(time.Duration(experimentsDetails.Delay) * time.Second).
+				Try(func(attempt uint) error {
+					nodeSpec, err := clients.KubeClient.CoreV1().Nodes().Get(targetNode, v1.GetOptions{})
+					if err != nil {
+						if apierrors.IsNotFound(err) {
+							return nil
+						} else {
+							return err
+						}
+					}
+					if !nodeSpec.Spec.Unschedulable {
+						return errors.Errorf("%v node is not in unschedulable state", targetNode)
+					}
+					return nil
+				})
+			if err != nil {
+				return err
+			}
 		}
-
-		common.SetTargets(experimentsDetails.TargetNode, "injected", "node", chaosDetails)
-
-		return retry.
-			Times(uint(experimentsDetails.Timeout / experimentsDetails.Delay)).
-			Wait(time.Duration(experimentsDetails.Delay) * time.Second).
-			Try(func(attempt uint) error {
-				nodeSpec, err := clients.KubeClient.CoreV1().Nodes().Get(experimentsDetails.TargetNode, v1.GetOptions{})
-				if err != nil {
-					return err
-				}
-				if !nodeSpec.Spec.Unschedulable {
-					return errors.Errorf("%v node is not in unschedulable state", experimentsDetails.TargetNode)
-				}
-				return nil
-			})
 	}
 	return nil
 }
