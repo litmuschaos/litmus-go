@@ -3,7 +3,7 @@ package lib
 import (
 	"strings"
 
-	network_chaos "github.com/litmuschaos/litmus-go/chaoslib/litmus/network-chaos/lib"
+	network_chaos "github.com/litmuschaos/litmus-go/chaoslib/litmus/pod-network-chaos/lib"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-network-partition/types"
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v2"
