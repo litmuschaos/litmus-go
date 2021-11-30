@@ -154,7 +154,7 @@ func prepareChaosCommand(packetLossPercentage, networkLatency, duration int, exp
 			}
 			IpCommand = append(IpCommand, tc)
 		}
-		cmd = cmd + " & " + strings.Join(IpCommand, " & ")
+		cmd = cmd + " && " + strings.Join(IpCommand, " && ")
 	} else {
 		cmd = "sudo tc qdisc replace dev eth0 root netem loss " + strconv.Itoa(packetLossPercentage)
 	}
