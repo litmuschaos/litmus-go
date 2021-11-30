@@ -15,7 +15,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/types"
-	"github.com/openebs/maya/pkg/util/retry"
+	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
 	"github.com/pkg/errors"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -25,23 +25,23 @@ import (
 func ChaosResult(chaosDetails *types.ChaosDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, state string) error {
 	experimentLabel := map[string]string{}
 
-	// It will list all the chaos-result with matching label
-	// it will retries until it got chaos result list or met the timeout(3 mins)
-	// Note: We have added labels inside chaos result and looking for matching labels to list the chaos-result
-	var resultList *v1alpha1.ChaosResultList
-	err := retry.
+	// It try to get the chaosresult, if available
+	// it will retries until it got chaos result or met the timeout(3 mins)
+	var result *v1alpha1.ChaosResult
+	isResultAvailable := false
+	if err := retry.
 		Times(90).
 		Wait(2 * time.Second).
 		Try(func(attempt uint) error {
-			result, err := clients.LitmusClient.ChaosResults(chaosDetails.ChaosNamespace).List(v1.ListOptions{LabelSelector: "name=" + resultDetails.Name})
-			if err != nil && len(result.Items) == 0 {
-				return errors.Errorf("unable to find the chaosresult with matching labels, err: %v", err)
+			resultObj, err := clients.LitmusClient.ChaosResults(chaosDetails.ChaosNamespace).Get(resultDetails.Name, v1.GetOptions{})
+			if err != nil && !k8serrors.IsNotFound(err) {
+				return errors.Errorf("unable to get %v chaosresult in %v namespace, err: %v", resultDetails.Name, chaosDetails.ChaosNamespace, err)
+			} else if err == nil {
+				result = resultObj
+				isResultAvailable = true
 			}
-			resultList = result
 			return nil
-		})
-
-	if err != nil {
+		}); err != nil {
 		return err
 	}
 
@@ -55,24 +55,23 @@ func ChaosResult(chaosDetails *types.ChaosDetails, clients clients.ClientSets, r
 		}
 		experimentLabel = chaosPod.Labels
 	}
-	experimentLabel["name"] = resultDetails.Name
 	experimentLabel["chaosUID"] = string(chaosDetails.ChaosUID)
 
-	// if there is no chaos-result with given label, it will create a new chaos-result
-	if len(resultList.Items) == 0 {
+	// if there is no chaos-result with given name, it will create a new chaos-result
+	if !isResultAvailable {
 		return InitializeChaosResult(chaosDetails, clients, resultDetails, experimentLabel)
 	}
 
 	// the chaos-result is already present with matching labels
 	// it will patch the new parameters in the same chaos-result
 	if state == "SOT" {
-		updateHistory(&resultList.Items[0])
-		return PatchChaosResult(&resultList.Items[0], clients, chaosDetails, resultDetails, experimentLabel)
+		updateHistory(result)
+		return PatchChaosResult(result, clients, chaosDetails, resultDetails, experimentLabel)
 	}
 
 	// it will patch the chaos-result in the end of experiment
 	resultDetails.Phase = v1alpha1.ResultPhaseCompleted
-	return PatchChaosResult(&resultList.Items[0], clients, chaosDetails, resultDetails, experimentLabel)
+	return PatchChaosResult(result, clients, chaosDetails, resultDetails, experimentLabel)
 }
 
 //InitializeChaosResult create the chaos result
@@ -117,17 +116,14 @@ func InitializeChaosResult(chaosDetails *types.ChaosDetails, clients clients.Cli
 	if k8serrors.IsAlreadyExists(err) {
 		chaosResult, err = clients.LitmusClient.ChaosResults(chaosDetails.ChaosNamespace).Get(resultDetails.Name, v1.GetOptions{})
 		if err != nil {
-			return errors.Errorf("Unable to find the chaosresult with name %v, err: %v", resultDetails.Name, err)
+			return errors.Errorf("Unable to find the chaosresult with name %v in %v namespace, err: %v", resultDetails.Name, chaosDetails.ChaosNamespace, err)
 		}
 
 		// updating the chaosresult with new values
-		err = PatchChaosResult(chaosResult, clients, chaosDetails, resultDetails, chaosResultLabel)
-		if err != nil {
+		if err = PatchChaosResult(chaosResult, clients, chaosDetails, resultDetails, chaosResultLabel); err != nil {
 			return err
 		}
-
 	}
-
 	return nil
 }
 
@@ -217,7 +213,6 @@ func PatchChaosResult(result *v1alpha1.ChaosResult, clients clients.ClientSets, 
 func SetResultUID(resultDetails *types.ResultDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
 
 	result, err := clients.LitmusClient.ChaosResults(chaosDetails.ChaosNamespace).Get(resultDetails.Name, v1.GetOptions{})
-
 	if err != nil {
 		return err
 	}

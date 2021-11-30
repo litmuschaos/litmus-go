@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/rand"
 	"os/exec"
+	"reflect"
 	"strings"
 	"time"
 
@@ -127,7 +128,13 @@ func triggerSourceCmdProbe(probe v1alpha1.ProbeAttributes, execCommandDetails li
 }
 
 // createProbePod creates an external pod with source image for the cmd probe
-func createProbePod(clients clients.ClientSets, chaosDetails *types.ChaosDetails, runID, source string) error {
+func createProbePod(clients clients.ClientSets, chaosDetails *types.ChaosDetails, runID string, source v1alpha1.SourceDetails) error {
+	//deriving serviceAccount name for the probe pod
+	svcAccount, err := getServiceAccount(chaosDetails.ChaosNamespace, chaosDetails.ChaosPodName, clients)
+	if err != nil {
+		return errors.Errorf("unable to get the serviceAccountName, err: %v", err)
+	}
+
 	cmdProbe := &apiv1.Pod{
 		ObjectMeta: v1.ObjectMeta{
 			Name:      chaosDetails.ExperimentName + "-probe-" + runID,
@@ -138,11 +145,13 @@ func createProbePod(clients clients.ClientSets, chaosDetails *types.ChaosDetails
 			},
 		},
 		Spec: apiv1.PodSpec{
-			RestartPolicy: apiv1.RestartPolicyNever,
+			RestartPolicy:      apiv1.RestartPolicyNever,
+			HostNetwork:        source.HostNetwork,
+			ServiceAccountName: svcAccount,
 			Containers: []apiv1.Container{
 				{
 					Name:            chaosDetails.ExperimentName + "-probe",
-					Image:           source,
+					Image:           source.Image,
 					ImagePullPolicy: apiv1.PullPolicy(chaosDetails.ProbeImagePullPolicy),
 					Command: []string{
 						"/bin/sh",
@@ -156,9 +165,8 @@ func createProbePod(clients clients.ClientSets, chaosDetails *types.ChaosDetails
 		},
 	}
 
-	_, err := clients.KubeClient.CoreV1().Pods(chaosDetails.ChaosNamespace).Create(cmdProbe)
+	_, err = clients.KubeClient.CoreV1().Pods(chaosDetails.ChaosNamespace).Create(cmdProbe)
 	return err
-
 }
 
 //deleteProbePod deletes the probe pod and wait until it got terminated
@@ -174,8 +182,10 @@ func deleteProbePod(chaosDetails *types.ChaosDetails, clients clients.ClientSets
 		Wait(time.Duration(chaosDetails.Delay) * time.Second).
 		Try(func(attempt uint) error {
 			podSpec, err := clients.KubeClient.CoreV1().Pods(chaosDetails.ChaosNamespace).List(v1.ListOptions{LabelSelector: chaosDetails.ExperimentName + "-probe-" + runID})
-			if err != nil || len(podSpec.Items) != 0 {
+			if err != nil {
 				return errors.Errorf("Probe Pod is not deleted yet, err: %v", err)
+			} else if len(podSpec.Items) != 0 {
+				return errors.Errorf("Probe Pod is not deleted yet")
 			}
 			return nil
 		})
@@ -423,7 +433,7 @@ func preChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 		}
 
 		// triggering the cmd probe for the inline mode
-		if probe.CmdProbeInputs.Source == "inline" {
+		if reflect.DeepEqual(probe.CmdProbeInputs.Source, v1alpha1.SourceDetails{}) {
 			err = triggerInlineCmdProbe(probe, resultDetails)
 
 			// failing the probe, if the success condition doesn't met after the retry & timeout combinations
@@ -433,7 +443,7 @@ func preChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 			}
 		} else {
 
-			execCommandDetails, err := createHelperPod(probe, resultDetails, clients, chaosDetails, probe.CmdProbeInputs.Source)
+			execCommandDetails, err := createHelperPod(probe, resultDetails, clients, chaosDetails)
 			if err != nil {
 				return err
 			}
@@ -468,11 +478,11 @@ func preChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 			"Mode":           probe.Mode,
 			"Phase":          "PreChaos",
 		})
-		if probe.CmdProbeInputs.Source == "inline" {
+		if reflect.DeepEqual(probe.CmdProbeInputs.Source, v1alpha1.SourceDetails{}) {
 			go triggerInlineContinuousCmdProbe(probe, clients, resultDetails, chaosDetails)
 		} else {
 
-			execCommandDetails, err := createHelperPod(probe, resultDetails, clients, chaosDetails, probe.CmdProbeInputs.Source)
+			execCommandDetails, err := createHelperPod(probe, resultDetails, clients, chaosDetails)
 			if err != nil {
 				return err
 			}
@@ -509,7 +519,7 @@ func postChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resu
 		}
 
 		// triggering the cmd probe for the inline mode
-		if probe.CmdProbeInputs.Source == "inline" {
+		if reflect.DeepEqual(probe.CmdProbeInputs.Source, v1alpha1.SourceDetails{}) {
 			err = triggerInlineCmdProbe(probe, resultDetails)
 
 			// failing the probe, if the success condition doesn't met after the retry & timeout combinations
@@ -519,7 +529,7 @@ func postChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resu
 			}
 		} else {
 
-			execCommandDetails, err := createHelperPod(probe, resultDetails, clients, chaosDetails, probe.CmdProbeInputs.Source)
+			execCommandDetails, err := createHelperPod(probe, resultDetails, clients, chaosDetails)
 			if err != nil {
 				return err
 			}
@@ -542,7 +552,7 @@ func postChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resu
 			}
 		}
 	case "Continuous", "OnChaos":
-		if probe.CmdProbeInputs.Source == "inline" {
+		if reflect.DeepEqual(probe.CmdProbeInputs.Source, v1alpha1.SourceDetails{}) {
 			// it will check for the error, It will detect the error if any error encountered in probe during chaos
 			err = checkForErrorInContinuousProbe(resultDetails, probe.Name)
 			// failing the probe, if the success condition doesn't met after the retry & timeout combinations
@@ -585,11 +595,11 @@ func onChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Result
 			"Mode":           probe.Mode,
 			"Phase":          "DuringChaos",
 		})
-		if probe.CmdProbeInputs.Source == "inline" {
+		if reflect.DeepEqual(probe.CmdProbeInputs.Source, v1alpha1.SourceDetails{}) {
 			go triggerInlineOnChaosCmdProbe(probe, clients, resultDetails, chaosDetails)
 		} else {
 
-			execCommandDetails, err := createHelperPod(probe, resultDetails, clients, chaosDetails, probe.CmdProbeInputs.Source)
+			execCommandDetails, err := createHelperPod(probe, resultDetails, clients, chaosDetails)
 			if err != nil {
 				return err
 			}
@@ -603,21 +613,19 @@ func onChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Result
 
 // createHelperPod create the helper pod with the source image
 // it will be created if the mode is not inline
-func createHelperPod(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, sourceImage string) (litmusexec.PodDetails, error) {
+func createHelperPod(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) (litmusexec.PodDetails, error) {
 	// Generate the run_id
 	runID := getRunID()
 	setRunIDForProbe(resultDetails, probe.Name, probe.Type, runID)
 
 	// create the external pod with source image for cmd probe
-	err := createProbePod(clients, chaosDetails, runID, sourceImage)
-	if err != nil {
+	if err := createProbePod(clients, chaosDetails, runID, probe.CmdProbeInputs.Source); err != nil {
 		return litmusexec.PodDetails{}, err
 	}
 
 	// verify the running status of external probe pod
 	log.Info("[Status]: Checking the status of the probe pod")
-	err = status.CheckApplicationStatus(chaosDetails.ChaosNamespace, "name="+chaosDetails.ExperimentName+"-probe-"+runID, chaosDetails.Timeout, chaosDetails.Delay, clients)
-	if err != nil {
+	if err = status.CheckApplicationStatus(chaosDetails.ChaosNamespace, "name="+chaosDetails.ExperimentName+"-probe-"+runID, chaosDetails.Timeout, chaosDetails.Delay, clients); err != nil {
 		return litmusexec.PodDetails{}, errors.Errorf("probe pod is not in running state, err: %v", err)
 	}
 
@@ -626,4 +634,13 @@ func createHelperPod(probe v1alpha1.ProbeAttributes, resultDetails *types.Result
 	litmusexec.SetExecCommandAttributes(&execCommandDetails, chaosDetails.ExperimentName+"-probe-"+runID, chaosDetails.ExperimentName+"-probe", chaosDetails.ChaosNamespace)
 
 	return execCommandDetails, nil
+}
+
+// getServiceAccount derive the serviceAccountName for the probe pod
+func getServiceAccount(chaosNamespace, chaosPodName string, clients clients.ClientSets) (string, error) {
+	pod, err := clients.KubeClient.CoreV1().Pods(chaosNamespace).Get(chaosPodName, v1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+	return pod.Spec.ServiceAccountName, nil
 }

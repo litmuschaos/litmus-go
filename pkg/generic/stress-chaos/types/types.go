@@ -1,7 +1,6 @@
 package types
 
 import (
-	corev1 "k8s.io/api/core/v1"
 	clientTypes "k8s.io/apimachinery/pkg/types"
 )
 
@@ -28,13 +27,10 @@ type ExperimentDetails struct {
 	Delay                           int
 	TargetPods                      string
 	PodsAffectedPerc                int
-	Annotations                     map[string]string
 	ContainerRuntime                string
 	ChaosServiceAccount             string
 	SocketPath                      string
 	Sequence                        string
-	Resources                       corev1.ResourceRequirements
-	ImagePullSecrets                []corev1.LocalObjectReference
 	TerminationGracePeriodSeconds   int
 	CPUcores                        int
 	FilesystemUtilizationPercentage int

@@ -13,7 +13,12 @@ import (
 
 	awsSSMChaosByID "github.com/litmuschaos/litmus-go/experiments/aws-ssm/aws-ssm-chaos-by-id/experiment"
 	awsSSMChaosByTag "github.com/litmuschaos/litmus-go/experiments/aws-ssm/aws-ssm-chaos-by-tag/experiment"
+	azureDiskLoss "github.com/litmuschaos/litmus-go/experiments/azure/azure-disk-loss/experiment"
+	azureInstanceStop "github.com/litmuschaos/litmus-go/experiments/azure/instance-stop/experiment"
+	redfishNodeRestart "github.com/litmuschaos/litmus-go/experiments/baremetal/redfish-node-restart/experiment"
 	cassandraPodDelete "github.com/litmuschaos/litmus-go/experiments/cassandra/pod-delete/experiment"
+	gcpVMDiskLoss "github.com/litmuschaos/litmus-go/experiments/gcp/gcp-vm-disk-loss/experiment"
+	gcpVMInstanceStop "github.com/litmuschaos/litmus-go/experiments/gcp/gcp-vm-instance-stop/experiment"
 	containerKill "github.com/litmuschaos/litmus-go/experiments/generic/container-kill/experiment"
 	diskFill "github.com/litmuschaos/litmus-go/experiments/generic/disk-fill/experiment"
 	dockerServiceKill "github.com/litmuschaos/litmus-go/experiments/generic/docker-service-kill/experiment"
@@ -22,8 +27,6 @@ import (
 	nodeDrain "github.com/litmuschaos/litmus-go/experiments/generic/node-drain/experiment"
 	nodeIOStress "github.com/litmuschaos/litmus-go/experiments/generic/node-io-stress/experiment"
 	nodeMemoryHog "github.com/litmuschaos/litmus-go/experiments/generic/node-memory-hog/experiment"
-	nodeNetworkLatency "github.com/litmuschaos/litmus-go/experiments/generic/node-network-latency/experiment"
-	nodeNetworkLoss "github.com/litmuschaos/litmus-go/experiments/generic/node-network-loss/experiment"
 	nodeRestart "github.com/litmuschaos/litmus-go/experiments/generic/node-restart/experiment"
 	nodeTaint "github.com/litmuschaos/litmus-go/experiments/generic/node-taint/experiment"
 	podAutoscaler "github.com/litmuschaos/litmus-go/experiments/generic/pod-autoscaler/experiment"
@@ -32,6 +35,7 @@ import (
 	podDelete "github.com/litmuschaos/litmus-go/experiments/generic/pod-delete/experiment"
 	podDNSError "github.com/litmuschaos/litmus-go/experiments/generic/pod-dns-error/experiment"
 	podDNSSpoof "github.com/litmuschaos/litmus-go/experiments/generic/pod-dns-spoof/experiment"
+	podFioStress "github.com/litmuschaos/litmus-go/experiments/generic/pod-fio-stress/experiment"
 	podIOStress "github.com/litmuschaos/litmus-go/experiments/generic/pod-io-stress/experiment"
 	podMemoryHogExec "github.com/litmuschaos/litmus-go/experiments/generic/pod-memory-hog-exec/experiment"
 	podMemoryHog "github.com/litmuschaos/litmus-go/experiments/generic/pod-memory-hog/experiment"
@@ -39,6 +43,7 @@ import (
 	podNetworkDuplication "github.com/litmuschaos/litmus-go/experiments/generic/pod-network-duplication/experiment"
 	podNetworkLatency "github.com/litmuschaos/litmus-go/experiments/generic/pod-network-latency/experiment"
 	podNetworkLoss "github.com/litmuschaos/litmus-go/experiments/generic/pod-network-loss/experiment"
+	podNetworkPartition "github.com/litmuschaos/litmus-go/experiments/generic/pod-network-partition/experiment"
 	kafkaBrokerPodFailure "github.com/litmuschaos/litmus-go/experiments/kafka/kafka-broker-pod-failure/experiment"
 	ebsLossByID "github.com/litmuschaos/litmus-go/experiments/kube-aws/ebs-loss-by-id/experiment"
 	ebsLossByTag "github.com/litmuschaos/litmus-go/experiments/kube-aws/ebs-loss-by-tag/experiment"
@@ -115,10 +120,8 @@ func main() {
 		podNetworkLatency.PodNetworkLatency(clients)
 	case "pod-network-loss":
 		podNetworkLoss.PodNetworkLoss(clients)
-	case "node-network-latency":
-		nodeNetworkLatency.NodeNetworkLatency(clients)
-	case "node-network-loss":
-		nodeNetworkLoss.NodeNetworkLoss(clients)
+	case "pod-network-partition":
+		podNetworkPartition.PodNetworkPartition(clients)
 	case "pod-memory-hog":
 		podMemoryHog.PodMemoryHog(clients)
 	case "pod-cpu-hog":
@@ -145,6 +148,18 @@ func main() {
 		podDNSSpoof.PodDNSSpoof(clients)
 	case "vm-poweroff":
 		vmpoweroff.VMPoweroff(clients)
+	case "azure-instance-stop":
+		azureInstanceStop.AzureInstanceStop(clients)
+	case "azure-disk-loss":
+		azureDiskLoss.AzureDiskLoss(clients)
+	case "gcp-vm-disk-loss":
+		gcpVMDiskLoss.VMDiskLoss(clients)
+	case "pod-fio-stress":
+		podFioStress.PodFioStress(clients)
+	case "gcp-vm-instance-stop":
+		gcpVMInstanceStop.VMInstanceStop(clients)
+	case "redfish-node-restart":
+		redfishNodeRestart.NodeRestart(clients)
 
 	default:
 		log.Errorf("Unsupported -name %v, please provide the correct value of -name args", *experimentName)

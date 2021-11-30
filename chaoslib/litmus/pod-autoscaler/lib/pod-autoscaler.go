@@ -424,7 +424,7 @@ func abortPodAutoScalerChaos(appsUnderTest []experimentTypes.ApplicationUnderTes
 	// Catch and relay certain signal(s) to signChan channel.
 	signal.Notify(signChan, os.Interrupt, syscall.SIGTERM, syscall.SIGKILL)
 
-	// waiting till the abort signal recieved
+	// waiting till the abort signal received
 	<-signChan
 
 	log.Info("[Chaos]: Revert Started")

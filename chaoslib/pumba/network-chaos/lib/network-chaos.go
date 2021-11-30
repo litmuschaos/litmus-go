@@ -44,7 +44,7 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 	}
 
 	if experimentsDetails.EngineName != "" {
-		if err := setHelperData(experimentsDetails, clients); err != nil {
+		if err := common.SetHelperData(chaosDetails, clients); err != nil {
 			return err
 		}
 	}
@@ -102,7 +102,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		// without extending/concatenating the args var itself
 		argsWithRegex := append(args, "re2:k8s_POD_"+pod.Name+"_"+experimentsDetails.AppNS)
 		log.Infof("Arguments for running %v are %v", experimentsDetails.ExperimentName, argsWithRegex)
-		if err := createHelperPod(experimentsDetails, clients, pod.Spec.NodeName, runID, argsWithRegex, labelSuffix); err != nil {
+		if err := createHelperPod(experimentsDetails, clients, chaosDetails, pod.Spec.NodeName, runID, argsWithRegex, labelSuffix); err != nil {
 			return errors.Errorf("unable to create the helper pod, err: %v", err)
 		}
 
@@ -121,7 +121,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, appLabel, clients, experimentsDetails.ChaosDuration+experimentsDetails.Timeout, chaosDetails.ExperimentName)
 		if err != nil || podStatus == "Failed" {
 			common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-helper-"+runID, appLabel, chaosDetails, clients)
-			return errors.Errorf("helper pod failed, err: %v", err)
+			return common.HelperFailedError(err)
 		}
 
 		//Deleting the helper pod
@@ -160,7 +160,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		// without extending/concatenating the args var itself
 		argsWithRegex := append(args, "re2:k8s_POD_"+pod.Name+"_"+experimentsDetails.AppNS)
 		log.Infof("Arguments for running %v are %v", experimentsDetails.ExperimentName, argsWithRegex)
-		if err := createHelperPod(experimentsDetails, clients, pod.Spec.NodeName, runID, argsWithRegex, labelSuffix); err != nil {
+		if err := createHelperPod(experimentsDetails, clients, chaosDetails, pod.Spec.NodeName, runID, argsWithRegex, labelSuffix); err != nil {
 			return errors.Errorf("unable to create the helper pod, err: %v", err)
 		}
 	}
@@ -182,7 +182,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 	podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, appLabel, clients, experimentsDetails.ChaosDuration+experimentsDetails.Timeout, chaosDetails.ExperimentName)
 	if err != nil || podStatus == "Failed" {
 		common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
-		return errors.Errorf("helper pod failed, err: %v", err)
+		return common.HelperFailedError(err)
 	}
 
 	//Deleting the helper pod
@@ -195,23 +195,18 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 }
 
 // createHelperPod derive the attributes for helper pod and create the helper pod
-func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, appNodeName, runID string, args []string, labelSuffix string) error {
+func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, appNodeName, runID string, args []string, labelSuffix string) error {
 
 	helperPod := &apiv1.Pod{
 		ObjectMeta: v1.ObjectMeta{
-			Name:      experimentsDetails.ExperimentName + "-helper-" + runID,
-			Namespace: experimentsDetails.ChaosNamespace,
-			Labels: map[string]string{
-				"app":                       experimentsDetails.ExperimentName + "-helper-" + labelSuffix,
-				"name":                      experimentsDetails.ExperimentName + "-helper-" + runID,
-				"chaosUID":                  string(experimentsDetails.ChaosUID),
-				"app.kubernetes.io/part-of": "litmus",
-			},
-			Annotations: experimentsDetails.Annotations,
+			Name:        experimentsDetails.ExperimentName + "-helper-" + runID,
+			Namespace:   experimentsDetails.ChaosNamespace,
+			Labels:      common.GetHelperLabels(chaosDetails.Labels, runID, labelSuffix, experimentsDetails.ExperimentName),
+			Annotations: chaosDetails.Annotations,
 		},
 		Spec: apiv1.PodSpec{
 			RestartPolicy:    apiv1.RestartPolicyNever,
-			ImagePullSecrets: experimentsDetails.ImagePullSecrets,
+			ImagePullSecrets: chaosDetails.ImagePullSecrets,
 			NodeName:         appNodeName,
 			Volumes: []apiv1.Volume{
 				{
@@ -223,34 +218,23 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 					},
 				},
 			},
-			InitContainers: []apiv1.Container{
-				{
-					Name:            "setup-" + experimentsDetails.ExperimentName,
-					Image:           experimentsDetails.LIBImage,
-					ImagePullPolicy: apiv1.PullPolicy(experimentsDetails.LIBImagePullPolicy),
-					Command: []string{
-						"/bin/bash",
-						"-c",
-						"sudo chmod 777 " + experimentsDetails.SocketPath,
-					},
-					VolumeMounts: []apiv1.VolumeMount{
-						{
-							Name:      "dockersocket",
-							MountPath: experimentsDetails.SocketPath,
-						},
-					},
-				},
-			},
 			Containers: []apiv1.Container{
 				{
 					Name:            experimentsDetails.ExperimentName,
 					Image:           experimentsDetails.LIBImage,
 					ImagePullPolicy: apiv1.PullPolicy(experimentsDetails.LIBImagePullPolicy),
 					Command: []string{
-						"pumba",
+						"sudo",
+						"-E",
 					},
-					Args:      args,
-					Resources: experimentsDetails.Resources,
+					Args: args,
+					Env: []apiv1.EnvVar{
+						{
+							Name:  "DOCKER_HOST",
+							Value: "unix://" + experimentsDetails.SocketPath,
+						},
+					},
+					Resources: chaosDetails.Resources,
 					VolumeMounts: []apiv1.VolumeMount{
 						{
 							Name:      "dockersocket",
@@ -282,26 +266,4 @@ func AddTargetIpsArgs(targetIPs, targetHosts string, args []string) ([]string, e
 		args = append(args, "--target", strings.TrimSpace(ips[i]))
 	}
 	return args, nil
-}
-
-// setHelperData derive the data from experiment pod and sets into experimentDetails struct
-// which can be used to create helper pod
-func setHelperData(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) error {
-	// Get Chaos Pod Annotation
-	var err error
-	experimentsDetails.Annotations, err = common.GetChaosPodAnnotation(experimentsDetails.ChaosPodName, experimentsDetails.ChaosNamespace, clients)
-	if err != nil {
-		return errors.Errorf("unable to get annotations, err: %v", err)
-	}
-	// Get Resource Requirements
-	experimentsDetails.Resources, err = common.GetChaosPodResourceRequirements(experimentsDetails.ChaosPodName, experimentsDetails.ExperimentName, experimentsDetails.ChaosNamespace, clients)
-	if err != nil {
-		return errors.Errorf("unable to get resource requirements, err: %v", err)
-	}
-	// Get ImagePullSecrets
-	experimentsDetails.ImagePullSecrets, err = common.GetImagePullSecrets(experimentsDetails.ChaosPodName, experimentsDetails.ChaosNamespace, clients)
-	if err != nil {
-		return errors.Errorf("unable to get imagePullSecrets, err: %v", err)
-	}
-	return nil
 }

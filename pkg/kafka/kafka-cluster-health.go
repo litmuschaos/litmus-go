@@ -18,11 +18,7 @@ func ClusterHealthCheck(experimentsDetails *experimentTypes.ExperimentDetails, c
 
 	// Checking zookeeper pods status
 	log.Info("[Status]: Verify that all the zookeeper pods are running")
-	if err := status.CheckApplicationStatus(experimentsDetails.ZookeeperNamespace, experimentsDetails.ZookeeperLabel, experimentsDetails.ChaoslibDetail.Timeout, experimentsDetails.ChaoslibDetail.Delay, clients); err != nil {
-		return err
-	}
-
-	return nil
+	return status.CheckApplicationStatus(experimentsDetails.ZookeeperNamespace, experimentsDetails.ZookeeperLabel, experimentsDetails.ChaoslibDetail.Timeout, experimentsDetails.ChaoslibDetail.Delay, clients)
 }
 
 // DisplayKafkaBroker displays the kafka broker info

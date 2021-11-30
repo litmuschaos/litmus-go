@@ -1,0 +1,48 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: litmus-experiment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: litmus-experiment
+  template:
+    metadata:
+      labels: 
+        app: litmus-experiment
+    spec:
+    serviceAccountName: redfish-node-restart-sa
+      containers:
+      - name: gotest
+        image: busybox 
+        command: 
+          - sleep
+          - "3600"
+        env:
+          ## Period to wait before injection of chaos in sec
+          - name: RAMP_TIME
+            value: ''
+
+          ## env var that describes the library used to execute the chaos
+          ## default: litmus.
+          - name: LIB
+            value: 'litmus'
+
+          - name: AUXILIARY_APPINFO
+            value: ''
+
+          ## IPMI IP of the target node which
+          ## Node should have redfish enabled
+          - name: IPMI_IP
+            value: ''
+
+          ## Credentials used to login to the IPMI console via redfish
+          - name: USER
+            value: ''
+
+          - name: PASSWORD
+            value: ''
+
+
