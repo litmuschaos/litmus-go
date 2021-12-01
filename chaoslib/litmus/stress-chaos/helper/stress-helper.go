@@ -18,13 +18,11 @@ import (
 	"github.com/containerd/cgroups"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
-	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/stress-chaos/environment"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/stress-chaos/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
-	pidTypes "github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	clientTypes "k8s.io/apimachinery/pkg/types"
@@ -33,8 +31,9 @@ import (
 //list of cgroups in a container
 var (
 	cgroupSubsystemList = []string{"cpu", "memory", "systemd", "net_cls",
-		"net_prio", "freezer", "blkio", "perf_event", "devices",
-		"cpuset", "cpuacct", "pids", "hugetlb"}
+		"net_prio", "freezer", "blkio", "perf_event", "devices", "cpuset",
+		"cpuacct", "pids", "hugetlb",
+	}
 )
 
 var (
@@ -43,6 +42,7 @@ var (
 )
 
 const (
+	// ProcessAlreadyFinished contains error code when process is finished
 	ProcessAlreadyFinished = "os: process already finished"
 )
 
@@ -64,12 +64,12 @@ func Helper(clients clients.ClientSets) {
 	// Catch and relay certain signal(s) to abort channel.
 	signal.Notify(abort, os.Interrupt, syscall.SIGTERM)
 
-	// Intialise the chaos attributes
-	experimentEnv.InitialiseChaosVariables(&chaosDetails, &experimentsDetails)
-
 	//Fetching all the ENV passed for the helper pod
 	log.Info("[PreReq]: Getting the ENV variables")
 	getENV(&experimentsDetails)
+
+	// Intialise the chaos attributes
+	types.InitialiseChaosVariables(&chaosDetails)
 
 	// Intialise Chaos Result Parameters
 	types.SetResultAttributes(&resultDetails, chaosDetails)
@@ -87,7 +87,7 @@ func prepareStressChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 
 	select {
 	case <-inject:
-		// stopping the chaos execution, if abort signal recieved
+		// stopping the chaos execution, if abort signal received
 		os.Exit(1)
 	default:
 
@@ -140,7 +140,7 @@ func prepareStressChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 		}
 
 		// watching for the abort signal and revert the chaos if an abort signal is received
-		go abortWatcher(cmd.Process.Pid)
+		go abortWatcher(cmd.Process.Pid, resultDetails.Name, chaosDetails.ChaosNamespace, experimentsDetails.TargetPods)
 
 		// add the stress process to the cgroup of target container
 		if err = control.Add(cgroups.Process{Pid: cmd.Process.Pid}); err != nil {
@@ -160,6 +160,10 @@ func prepareStressChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 			return errors.Errorf("fail to remove pause and start the stress process: %v", err)
 		}
 
+		if err = result.AnnotateChaosResult(resultDetails.Name, chaosDetails.ChaosNamespace, "injected", "pod", experimentsDetails.TargetPods); err != nil {
+			return err
+		}
+
 		log.Info("[Wait]: Waiting for chaos completion")
 		// channel to check the completion of the stress process
 		done := make(chan error)
@@ -175,6 +179,9 @@ func prepareStressChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 			log.Infof("[Timeout] Stress output: %v", buf.String())
 			log.Info("[Cleanup]: Killing the stress process")
 			terminateProcess(cmd.Process.Pid)
+			if err = result.AnnotateChaosResult(resultDetails.Name, chaosDetails.ChaosNamespace, "reverted", "pod", experimentsDetails.TargetPods); err != nil {
+				return err
+			}
 			return errors.Errorf("the stress process is timeout after %vs", experimentsDetails.ChaosDuration+30)
 		case err := <-done:
 			if err != nil {
@@ -182,13 +189,18 @@ func prepareStressChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 				if ok {
 					status := err.Sys().(syscall.WaitStatus)
 					if status.Signaled() && status.Signal() == syscall.SIGTERM {
+						// wait for the completion of abort handler
+						time.Sleep(10 * time.Second)
 						return errors.Errorf("process stopped with SIGTERM signal")
 					}
 				}
-				return errors.Errorf("error process exited accidentally", err)
+				return errors.Errorf("process exited before the actual cleanup, err: %v", err)
 			}
 			log.Info("[Info]: Chaos injection completed")
 			terminateProcess(cmd.Process.Pid)
+			if err = result.AnnotateChaosResult(resultDetails.Name, chaosDetails.ChaosNamespace, "reverted", "pod", experimentsDetails.TargetPods); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -201,9 +213,9 @@ func terminateProcess(pid int) error {
 		return errors.Errorf("unreachable path, err: %v", err)
 	}
 	if err = process.Signal(syscall.SIGTERM); err != nil && err.Error() != ProcessAlreadyFinished {
-		return errors.Errorf("error while killing process", err)
+		return errors.Errorf("error while killing process, err: %v", err)
 	}
-	log.Info("[Info]: Stress process removed sucessfully")
+	log.Info("[Info]: Stress process removed successfully")
 	return nil
 }
 
@@ -446,26 +458,26 @@ func parsePIDFromJSON(j []byte, runtime string) (int, error) {
 	switch runtime {
 	case "docker":
 		// in docker, pid is present inside state.pid attribute of inspect output
-		var resp []pidTypes.DockerInspectResponse
+		var resp []common.DockerInspectResponse
 		if err := json.Unmarshal(j, &resp); err != nil {
 			return 0, err
 		}
 		pid = resp[0].State.PID
 	case "containerd":
-		var resp pidTypes.CrictlInspectResponse
+		var resp common.CrictlInspectResponse
 		if err := json.Unmarshal(j, &resp); err != nil {
 			return 0, err
 		}
 		pid = resp.Info.PID
 
 	case "crio":
-		var info pidTypes.InfoDetails
+		var info common.InfoDetails
 		if err := json.Unmarshal(j, &info); err != nil {
 			return 0, err
 		}
 		pid = info.PID
 		if pid == 0 {
-			var resp pidTypes.CrictlInspectResponse
+			var resp common.CrictlInspectResponse
 			if err := json.Unmarshal(j, &resp); err != nil {
 				return 0, err
 			}
@@ -483,44 +495,45 @@ func parsePIDFromJSON(j []byte, runtime string) (int, error) {
 
 //getENV fetches all the env variables from the runner pod
 func getENV(experimentDetails *experimentTypes.ExperimentDetails) {
-	experimentDetails.ExperimentName = common.Getenv("EXPERIMENT_NAME", "")
-	experimentDetails.AppNS = common.Getenv("APP_NS", "")
-	experimentDetails.TargetContainer = common.Getenv("APP_CONTAINER", "")
-	experimentDetails.TargetPods = common.Getenv("APP_POD", "")
-	experimentDetails.ChaosDuration, _ = strconv.Atoi(common.Getenv("TOTAL_CHAOS_DURATION", "30"))
-	experimentDetails.ChaosNamespace = common.Getenv("CHAOS_NAMESPACE", "litmus")
-	experimentDetails.EngineName = common.Getenv("CHAOS_ENGINE", "")
-	experimentDetails.ChaosUID = clientTypes.UID(common.Getenv("CHAOS_UID", ""))
-	experimentDetails.ChaosPodName = common.Getenv("POD_NAME", "")
-	experimentDetails.ContainerRuntime = common.Getenv("CONTAINER_RUNTIME", "")
-	experimentDetails.SocketPath = common.Getenv("SOCKET_PATH", "")
-	experimentDetails.CPUcores, _ = strconv.Atoi(common.Getenv("CPU_CORES", ""))
-	experimentDetails.FilesystemUtilizationPercentage, _ = strconv.Atoi(common.Getenv("FILESYSTEM_UTILIZATION_PERCENTAGE", ""))
-	experimentDetails.FilesystemUtilizationBytes, _ = strconv.Atoi(common.Getenv("FILESYSTEM_UTILIZATION_BYTES", ""))
-	experimentDetails.NumberOfWorkers, _ = strconv.Atoi(common.Getenv("NUMBER_OF_WORKERS", ""))
-	experimentDetails.MemoryConsumption, _ = strconv.Atoi(common.Getenv("MEMORY_CONSUMPTION", ""))
-	experimentDetails.VolumeMountPath = common.Getenv("VOLUME_MOUNT_PATH", "")
+	experimentDetails.ExperimentName = types.Getenv("EXPERIMENT_NAME", "")
+	experimentDetails.InstanceID = types.Getenv("INSTANCE_ID", "")
+	experimentDetails.AppNS = types.Getenv("APP_NAMESPACE", "")
+	experimentDetails.TargetContainer = types.Getenv("APP_CONTAINER", "")
+	experimentDetails.TargetPods = types.Getenv("APP_POD", "")
+	experimentDetails.ChaosDuration, _ = strconv.Atoi(types.Getenv("TOTAL_CHAOS_DURATION", "30"))
+	experimentDetails.ChaosNamespace = types.Getenv("CHAOS_NAMESPACE", "litmus")
+	experimentDetails.EngineName = types.Getenv("CHAOSENGINE", "")
+	experimentDetails.ChaosUID = clientTypes.UID(types.Getenv("CHAOS_UID", ""))
+	experimentDetails.ChaosPodName = types.Getenv("POD_NAME", "")
+	experimentDetails.ContainerRuntime = types.Getenv("CONTAINER_RUNTIME", "")
+	experimentDetails.SocketPath = types.Getenv("SOCKET_PATH", "")
+	experimentDetails.CPUcores, _ = strconv.Atoi(types.Getenv("CPU_CORES", ""))
+	experimentDetails.FilesystemUtilizationPercentage, _ = strconv.Atoi(types.Getenv("FILESYSTEM_UTILIZATION_PERCENTAGE", ""))
+	experimentDetails.FilesystemUtilizationBytes, _ = strconv.Atoi(types.Getenv("FILESYSTEM_UTILIZATION_BYTES", ""))
+	experimentDetails.NumberOfWorkers, _ = strconv.Atoi(types.Getenv("NUMBER_OF_WORKERS", ""))
+	experimentDetails.MemoryConsumption, _ = strconv.Atoi(types.Getenv("MEMORY_CONSUMPTION", ""))
+	experimentDetails.VolumeMountPath = types.Getenv("VOLUME_MOUNT_PATH", "")
 }
 
-// abortWatcher continuosly watch for the abort signals
-func abortWatcher(targetPID int) {
+// abortWatcher continuously watch for the abort signals
+func abortWatcher(targetPID int, resultName, chaosNS, targetPodName string) {
 
-	for {
-		select {
-		case <-abort:
-			log.Info("[Abort]: Chaos Revert Started")
-			log.Info("[Chaos]: Killing process started because of terminated signal received")
-			// retry thrice for the chaos revert
-			retry := 3
-			for retry > 0 {
-				if err = terminateProcess(targetPID); err != nil {
-					log.Errorf("unable to kill stress process, err :%v", err)
-				}
-				retry--
-				time.Sleep(1 * time.Second)
-			}
-			log.Info("[Abort]: Chaos Revert Completed")
-			os.Exit(1)
+	<-abort
+
+	log.Info("[Chaos]: Killing process started because of terminated signal received")
+	log.Info("[Abort]: Chaos Revert Started")
+	// retry thrice for the chaos revert
+	retry := 3
+	for retry > 0 {
+		if err = terminateProcess(targetPID); err != nil {
+			log.Errorf("unable to kill stress process, err :%v", err)
 		}
+		retry--
+		time.Sleep(1 * time.Second)
 	}
+	if err = result.AnnotateChaosResult(resultName, chaosNS, "reverted", "pod", targetPodName); err != nil {
+		log.Errorf("unable to annotate the chaosresult, err :%v", err)
+	}
+	log.Info("[Abort]: Chaos Revert Completed")
+	os.Exit(1)
 }

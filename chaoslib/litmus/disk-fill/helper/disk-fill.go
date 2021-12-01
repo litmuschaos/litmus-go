@@ -12,7 +12,6 @@ import (
 
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
-	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/disk-fill/environment"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/disk-fill/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/result"
@@ -47,10 +46,10 @@ func Helper(clients clients.ClientSets) {
 
 	//Fetching all the ENV passed in the helper pod
 	log.Info("[PreReq]: Getting the ENV variables")
-	getENV(&experimentsDetails, "disk-fill")
+	getENV(&experimentsDetails)
 
 	// Intialise the chaos attributes
-	experimentEnv.InitialiseChaosVariables(&chaosDetails, &experimentsDetails)
+	types.InitialiseChaosVariables(&chaosDetails)
 
 	// Intialise Chaos Result Parameters
 	types.SetResultAttributes(&resultDetails, chaosDetails)
@@ -158,7 +157,7 @@ func fillDisk(containerID string, sizeTobeFilled, bs int) error {
 
 	select {
 	case <-inject:
-		// stopping the chaos execution, if abort signal recieved
+		// stopping the chaos execution, if abort signal received
 		os.Exit(1)
 	default:
 		// Creating files to fill the required ephemeral storage size of block size of 4K
@@ -252,24 +251,25 @@ func remedy(experimentsDetails *experimentTypes.ExperimentDetails, clients clien
 }
 
 //getENV fetches all the env variables from the runner pod
-func getENV(experimentDetails *experimentTypes.ExperimentDetails, name string) {
-	experimentDetails.ExperimentName = name
-	experimentDetails.AppNS = common.Getenv("APP_NS", "")
-	experimentDetails.TargetContainer = common.Getenv("APP_CONTAINER", "")
-	experimentDetails.TargetPods = common.Getenv("APP_POD", "")
-	experimentDetails.ChaosDuration, _ = strconv.Atoi(common.Getenv("TOTAL_CHAOS_DURATION", "30"))
-	experimentDetails.ChaosNamespace = common.Getenv("CHAOS_NAMESPACE", "litmus")
-	experimentDetails.EngineName = common.Getenv("CHAOS_ENGINE", "")
-	experimentDetails.ChaosUID = clientTypes.UID(common.Getenv("CHAOS_UID", ""))
-	experimentDetails.ChaosPodName = common.Getenv("POD_NAME", "")
-	experimentDetails.FillPercentage, _ = strconv.Atoi(common.Getenv("FILL_PERCENTAGE", ""))
-	experimentDetails.EphemeralStorageMebibytes, _ = strconv.Atoi(common.Getenv("EPHEMERAL_STORAGE_MEBIBYTES", ""))
-	experimentDetails.DataBlockSize, _ = strconv.Atoi(common.Getenv("DATA_BLOCK_SIZE", "256"))
+func getENV(experimentDetails *experimentTypes.ExperimentDetails) {
+	experimentDetails.ExperimentName = types.Getenv("EXPERIMENT_NAME", "")
+	experimentDetails.InstanceID = types.Getenv("INSTANCE_ID", "")
+	experimentDetails.AppNS = types.Getenv("APP_NAMESPACE", "")
+	experimentDetails.TargetContainer = types.Getenv("APP_CONTAINER", "")
+	experimentDetails.TargetPods = types.Getenv("APP_POD", "")
+	experimentDetails.ChaosDuration, _ = strconv.Atoi(types.Getenv("TOTAL_CHAOS_DURATION", "30"))
+	experimentDetails.ChaosNamespace = types.Getenv("CHAOS_NAMESPACE", "litmus")
+	experimentDetails.EngineName = types.Getenv("CHAOSENGINE", "")
+	experimentDetails.ChaosUID = clientTypes.UID(types.Getenv("CHAOS_UID", ""))
+	experimentDetails.ChaosPodName = types.Getenv("POD_NAME", "")
+	experimentDetails.FillPercentage, _ = strconv.Atoi(types.Getenv("FILL_PERCENTAGE", ""))
+	experimentDetails.EphemeralStorageMebibytes, _ = strconv.Atoi(types.Getenv("EPHEMERAL_STORAGE_MEBIBYTES", ""))
+	experimentDetails.DataBlockSize, _ = strconv.Atoi(types.Getenv("DATA_BLOCK_SIZE", "256"))
 }
 
-// abortWatcher continuosly watch for the abort signals
+// abortWatcher continuously watch for the abort signals
 func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, containerID, resultName string) {
-	// waiting till the abort signal recieved
+	// waiting till the abort signal received
 	<-abort
 
 	log.Info("[Chaos]: Killing process started because of terminated signal received")

@@ -1,8 +1,11 @@
 package lib
 
 import (
+	"fmt"
 	"strconv"
+	"strings"
 
+	network_chaos "github.com/litmuschaos/litmus-go/chaoslib/litmus/pod-network-chaos/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/network-chaos/types"
@@ -21,6 +24,8 @@ import (
 func PrepareNodeNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, expName string) error {
 
 	var err error
+	var uniqueIps []string
+
 	if experimentsDetails.TargetNode == "" {
 		//Select node for node-network-chaos
 		experimentsDetails.TargetNode, err = common.GetNodeName(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.NodeLabel, clients)
@@ -48,15 +53,39 @@ func PrepareNodeNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetai
 	}
 
 	if experimentsDetails.EngineName != "" {
-		if err := setHelperData(experimentsDetails, clients); err != nil {
+		if err := common.SetHelperData(chaosDetails, clients); err != nil {
 			return err
 		}
 	}
 
-	command := prepareChaosCommand(experimentsDetails.NetworkPacketLossPercentage, experimentsDetails.NetworkLatency, experimentsDetails.ChaosDuration, expName)
+	// get all the target ips
+	destinationIPs, err := network_chaos.GetTargetIps(experimentsDetails.DestinationIPs, experimentsDetails.DestinationHosts)
+	if err != nil {
+		return err
+	}
+
+	if destinationIPs != "" {
+		ips := strings.Split(destinationIPs, ",")
+
+		// removing duplicates ips from the list, if any
+		for i := range ips {
+			isPresent := false
+			for j := range uniqueIps {
+				if ips[i] == uniqueIps[j] {
+					isPresent = true
+				}
+			}
+			if !isPresent {
+				uniqueIps = append(uniqueIps, ips[i])
+			}
+
+		}
+	}
+
+	command := prepareChaosCommand(experimentsDetails.NetworkPacketLossPercentage, experimentsDetails.NetworkLatency, experimentsDetails.ChaosDuration, expName, uniqueIps)
 
 	// Creating the helper pod to perform node-network-chaos
-	if err = createHelperPod(experimentsDetails, clients, experimentsDetails.TargetNode, command); err != nil {
+	if err = createHelperPod(experimentsDetails, chaosDetails, clients, experimentsDetails.TargetNode, command); err != nil {
 		return errors.Errorf("unable to create the helper pod, err: %v", err)
 	}
 
@@ -107,20 +136,37 @@ func PrepareNodeNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetai
 	return nil
 }
 
-func prepareChaosCommand(packetLossPercentage, networkLatency, duration int, expName string) string {
+func prepareChaosCommand(packetLossPercentage, networkLatency, duration int, expName string, IPs []string) string {
 
 	var cmd string
-	switch expName {
-	case "node-network-loss":
-		cmd = "sleep 1 && sudo tc qdisc replace dev eth0 root netem loss " + strconv.Itoa(packetLossPercentage) + " && sleep " + strconv.Itoa(duration) + " && sudo tc qdisc delete dev eth0 root"
-	case "node-network-latency":
-		cmd = "sleep 1 && sudo tc qdisc replace dev eth0 root netem delay " + strconv.Itoa(networkLatency) + "ms && sleep " + strconv.Itoa(duration) + " && sudo tc qdisc delete dev eth0 root"
+	fault := "loss " + strconv.Itoa(packetLossPercentage)
+	if expName == "node-network-latency" {
+		fault = "delay " + strconv.Itoa(networkLatency)
 	}
+
+	if len(IPs) != 0 {
+		cmd = "sudo tc qdisc replace dev eth0 root handle 1: prio && sudo tc qdisc replace dev eth0 parent 1:3 netem " + fault
+		var IpCommand []string
+		for _, ip := range IPs {
+			tc := fmt.Sprintf("sudo tc filter add dev eth0 protocol ip parent 1:0 prio 3 u32 match ip dst %v flowid 1:3", ip)
+			if strings.Contains(ip, ":") {
+				tc = fmt.Sprintf("sudo tc filter add dev eth0 protocol ip parent 1:0 prio 3 u32 match ip6 dst %v flowid 1:3", ip)
+			}
+			IpCommand = append(IpCommand, tc)
+		}
+		cmd = cmd + " && " + strings.Join(IpCommand, " && ")
+	} else {
+		cmd = "sudo tc qdisc replace dev eth0 root netem loss " + strconv.Itoa(packetLossPercentage)
+	}
+
+	// add kill command
+	cmd = cmd + " && sleep " + strconv.Itoa(duration) + " && sudo tc qdisc delete dev eth0 root"
+
 	return cmd
 }
 
 // createHelperPod derive the attributes for helper pod and create the helper pod
-func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, appNodeName, command string) error {
+func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, chaosDetails *types.ChaosDetails, clients clients.ClientSets, appNodeName, command string) error {
 
 	privilegedEnable := true
 	helperPod := &apiv1.Pod{
@@ -133,12 +179,12 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 				"chaosUID":                  string(experimentsDetails.ChaosUID),
 				"app.kubernetes.io/part-of": "litmus",
 			},
-			Annotations: experimentsDetails.Annotations,
+			Annotations: chaosDetails.Annotations,
 		},
 		Spec: apiv1.PodSpec{
 			HostNetwork:      true,
 			RestartPolicy:    apiv1.RestartPolicyNever,
-			ImagePullSecrets: experimentsDetails.ImagePullSecrets,
+			ImagePullSecrets: chaosDetails.ImagePullSecrets,
 			NodeName:         appNodeName,
 			Volumes: []apiv1.Volume{
 				{
@@ -163,7 +209,7 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 						"-c",
 						command,
 					},
-					Resources: experimentsDetails.Resources,
+					Resources: chaosDetails.Resources,
 					VolumeMounts: []apiv1.VolumeMount{
 						{
 							Name:      "cri-socket",
@@ -186,26 +232,4 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 
 	_, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Create(helperPod)
 	return err
-}
-
-// setHelperData derive the data from experiment pod and sets into experimentDetails struct
-// which can be used to create helper pod
-func setHelperData(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) error {
-	// Get Chaos Pod Annotation
-	var err error
-	experimentsDetails.Annotations, err = common.GetChaosPodAnnotation(experimentsDetails.ChaosPodName, experimentsDetails.ChaosNamespace, clients)
-	if err != nil {
-		return errors.Errorf("unable to get annotations, err: %v", err)
-	}
-	// Get Resource Requirements
-	experimentsDetails.Resources, err = common.GetChaosPodResourceRequirements(experimentsDetails.ChaosPodName, experimentsDetails.ExperimentName, experimentsDetails.ChaosNamespace, clients)
-	if err != nil {
-		return errors.Errorf("unable to get resource requirements, err: %v", err)
-	}
-	// Get ImagePullSecrets
-	experimentsDetails.ImagePullSecrets, err = common.GetImagePullSecrets(experimentsDetails.ChaosPodName, experimentsDetails.ChaosNamespace, clients)
-	if err != nil {
-		return errors.Errorf("unable to get imagePullSecrets, err: %v", err)
-	}
-	return nil
 }

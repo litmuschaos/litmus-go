@@ -13,15 +13,13 @@ The artifacts associated with a chaos-experiment are summarized below:
 - Submitted in litmuschaos/chaos-charts repository, under the *chaos-category* folder
 
   - Experiment custom resource (CR) (holds experiment-specific chaos parameters & experiment entrypoint)
-  - Experiment ChartServiceVersion (holds experiment metadata that will be rendered on [charthub](hub.litmuschaos.io))
+  - Experiment ChartServiceVersion (holds experiment metadata that will be rendered on [charthub](https://hub.litmuschaos.io/))
   - Experiment RBAC (holds experiment-specific ServiceAccount, Role and RoleBinding)
   - Experiment Engine (holds experiment-specific chaosengine)
 
   Example: [pod delete experiment in chaos-charts](https://github.com/litmuschaos/chaos-charts/tree/master/charts/generic/pod-delete)
 
-The *generate_experiment.go* script is a simple way to bootstrap your experiment, and helps create the aforementioned artifacts in the 
-appropriate directory (i.e., as per the chaos-category) based on an attributes file provided as input by the chart-developer. The 
-scaffolded files consist of placeholders which can then be filled as desired.  
+The *generate_experiment.go* script is a simple way to bootstrap your experiment, and helps create the aforementioned artifacts in the appropriate directory (i.e., as per the chaos-category) based on an attributes file provided as input by the chart-developer. The scaffolded files consist of placeholders which can then be filled as desired.  
 
 ### Pre-Requisites
 
