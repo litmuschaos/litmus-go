@@ -88,7 +88,7 @@ func experimentExecution(experimentsDetails *experimentTypes.ExperimentDetails, 
 
 // injectChaosInSerialMode stressed the storage of all target application in serial mode (one by one)
 func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList corev1.PodList, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	// creating err channel to recieve the error from the go routine
+	// creating err channel to receive the error from the go routine
 	stressErr := make(chan error)
 
 	// run the probes during chaos
@@ -129,7 +129,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 			chaosDetails.Revert = true
 			select {
 			case err := <-stressErr:
-				// skipping the execution, if recieved any error other than 137, while executing stress command and marked result as fail
+				// skipping the execution, if received any error other than 137, while executing stress command and marked result as fail
 				// it will ignore the error code 137(oom kill), it will skip further execution and marked the result as pass
 				// oom kill occurs if stor to be stressed exceed than the resource limit for the target container
 				if err != nil {
@@ -165,7 +165,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 
 // injectChaosInParallelMode stressed the storage of all target application in parallel mode (all at once)
 func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList corev1.PodList, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	// creating err channel to recieve the error from the go routine
+	// creating err channel to receive the error from the go routine
 	stressErr := make(chan error)
 
 	// run the probes during chaos
@@ -206,7 +206,7 @@ loop:
 		chaosDetails.Revert = true
 		select {
 		case err := <-stressErr:
-			// skipping the execution, if recieved any error other than 137, while executing stress command and marked result as fail
+			// skipping the execution, if received any error other than 137, while executing stress command and marked result as fail
 			// it will ignore the error code 137(oom kill), it will skip further execution and marked the result as pass
 			// oom kill occurs if stor to be stressed exceed than the resource limit for the target container
 			if err != nil {
