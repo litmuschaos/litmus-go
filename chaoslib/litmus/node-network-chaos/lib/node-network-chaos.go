@@ -82,7 +82,7 @@ func PrepareNodeNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetai
 		}
 	}
 
-	command := prepareChaosCommand(experimentsDetails.NetworkPacketLossPercentage, experimentsDetails.NetworkLatency, experimentsDetails.ChaosDuration, expName, uniqueIps)
+	command := prepareChaosCommand(experimentsDetails.NetworkPacketLossPercentage, experimentsDetails.NetworkLatency, experimentsDetails.ChaosDuration, expName, experimentsDetails.NetworkInterface, uniqueIps)
 
 	// Creating the helper pod to perform node-network-chaos
 	if err = createHelperPod(experimentsDetails, chaosDetails, clients, experimentsDetails.TargetNode, command); err != nil {
@@ -136,31 +136,31 @@ func PrepareNodeNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetai
 	return nil
 }
 
-func prepareChaosCommand(packetLossPercentage, networkLatency, duration int, expName string, IPs []string) string {
+func prepareChaosCommand(packetLossPercentage, networkLatency, duration int, expName, netInterface string, IPs []string) string {
 
 	var cmd string
 	fault := "loss " + strconv.Itoa(packetLossPercentage)
 	if expName == "node-network-latency" {
-		fault = "delay " + strconv.Itoa(networkLatency)
+		fault = "delay " + strconv.Itoa(networkLatency) + "ms"
 	}
 
 	if len(IPs) != 0 {
-		cmd = "sudo tc qdisc replace dev eth0 root handle 1: prio && sudo tc qdisc replace dev eth0 parent 1:3 netem " + fault
+		cmd = "sudo tc qdisc replace dev " + netInterface + " root handle 1: prio && sudo tc qdisc replace dev " + netInterface + " parent 1:3 netem " + fault
 		var IpCommand []string
 		for _, ip := range IPs {
-			tc := fmt.Sprintf("sudo tc filter add dev eth0 protocol ip parent 1:0 prio 3 u32 match ip dst %v flowid 1:3", ip)
+			tc := fmt.Sprintf("sudo tc filter add dev %v protocol ip parent 1:0 prio 3 u32 match ip dst %v flowid 1:3", netInterface, ip)
 			if strings.Contains(ip, ":") {
-				tc = fmt.Sprintf("sudo tc filter add dev eth0 protocol ip parent 1:0 prio 3 u32 match ip6 dst %v flowid 1:3", ip)
+				tc = fmt.Sprintf("sudo tc filter add dev %v protocol ip parent 1:0 prio 3 u32 match ip6 dst %v flowid 1:3", netInterface, ip)
 			}
 			IpCommand = append(IpCommand, tc)
 		}
 		cmd = cmd + " && " + strings.Join(IpCommand, " && ")
 	} else {
-		cmd = "sudo tc qdisc replace dev eth0 root netem loss " + strconv.Itoa(packetLossPercentage)
+		cmd = "sudo tc qdisc replace dev " + netInterface + " root netem loss " + strconv.Itoa(packetLossPercentage)
 	}
 
 	// add kill command
-	cmd = cmd + " && sleep " + strconv.Itoa(duration) + " && sudo tc qdisc delete dev eth0 root"
+	cmd = cmd + " && sleep " + strconv.Itoa(duration) + " && sudo tc qdisc delete dev " + netInterface + " root"
 
 	return cmd
 }
