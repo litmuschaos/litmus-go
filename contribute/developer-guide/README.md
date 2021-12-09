@@ -34,6 +34,12 @@ The *generate_experiment.go* script is a simple way to bootstrap your experiment
   $ cd litmus-go/contribute/developer-guide
   ```
 
+- Build litmus-sdk
+
+  ```
+  go build -o ./litmus-sdk ./bin/main.go
+  ```
+
 - Populate the `attributes.yaml` with details of the chaos experiment (or chart). Use the [attributes.yaml.sample](/contribute/developer-guide/attributes.yaml.sample) as reference. 
 
   As an example, let us consider an experiment to kill one of the replicas of a nginx deployment. The attributes.yaml can be constructed like this: 
