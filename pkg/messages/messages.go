@@ -39,3 +39,15 @@ func SendMessageToAgent(conn *websocket.Conn, action string, payload interface{}
 
 	return nil
 }
+
+// GetErrorMessage accepts the error message payload and returns the error message string
+func GetErrorMessage(payload []byte) (string, error) {
+
+	var agentError string
+
+	if err := json.Unmarshal(payload, &agentError); err != nil {
+		return "", err
+	}
+
+	return agentError, nil
+}
