@@ -29,4 +29,6 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.Timeout, _ = strconv.Atoi(types.Getenv("STATUS_CHECK_TIMEOUT", "180"))
 	experimentDetails.TargetContainer = types.Getenv("TARGET_CONTAINER", "")
 	experimentDetails.ProcessIds = types.Getenv("PROCESS_IDS", "")
+	experimentDetails.AgentEndpoint = types.Getenv("AGENT_ENDPOINT", "")
+	experimentDetails.AuthToken = types.Getenv("AUTH_TOKEN", "")
 }
