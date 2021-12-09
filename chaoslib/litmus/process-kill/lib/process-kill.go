@@ -8,8 +8,8 @@ import (
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
-	"github.com/litmuschaos/litmus-go/pkg/log"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/guest-os/process-kill/types"
+	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	litmusexec "github.com/litmuschaos/litmus-go/pkg/utils/exec"
@@ -72,7 +72,7 @@ func runChaos(experimentsDetails *experimentTypes.ExperimentDetails, targetPodLi
 			"container": experimentsDetails.TargetContainer,
 			"Pod":       pod.Name,
 		})
-		
+
 		go injectChaos(experimentsDetails, pod.Name, clients)
 
 		log.Infof("[Chaos]:Waiting for: %vs", experimentsDetails.ChaosDuration)
@@ -87,8 +87,8 @@ func runChaos(experimentsDetails *experimentTypes.ExperimentDetails, targetPodLi
 			select {
 			case <-signChan:
 				log.Info("[Chaos]: Revert Started")
-				if err := killChaos(experimentsDetails, pod.Name, clients);err != nil {
-						log.Error("unable to kill chaos process after receiving abortion signal")
+				if err := killChaos(experimentsDetails, pod.Name, clients); err != nil {
+					log.Error("unable to kill chaos process after receiving abortion signal")
 				}
 				log.Info("[Chaos]: Revert Completed")
 				os.Exit(1)
@@ -113,7 +113,7 @@ func PrepareChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 	//Starting the CPU stress experiment
-	if err := experimentExecution(experimentsDetails, clients, resultDetails, eventsDetails, chaosDetails);err != nil {
+	if err := experimentExecution(experimentsDetails, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
 		return err
 	}
 	//Waiting for the ramp time after chaos injection
