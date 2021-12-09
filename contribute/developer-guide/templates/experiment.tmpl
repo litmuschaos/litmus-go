@@ -16,6 +16,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+
 // Experiment contains steps to inject chaos
 func Experiment(clients clients.ClientSets){
 
@@ -69,6 +70,7 @@ func Experiment(clients clients.ClientSets){
 	// Calling AbortWatcher go routine, it will continuously watch for the abort signal and generate the required events and result
 	go common.AbortWatcher(experimentsDetails.ExperimentName, clients, &resultDetails, &chaosDetails, &eventsDetails)
 
+    // @TODO: user PRE-CHAOS-CHECK
     // ADD A PRE-CHAOS CHECK OF YOUR CHOICE HERE
     // POD STATUS CHECKS FOR THE APPLICATION UNDER TEST AND AUXILIARY APPLICATIONS ARE ADDED BY DEFAULT 
     
@@ -121,6 +123,7 @@ func Experiment(clients clients.ClientSets){
     // INVOKE THE CHAOSLIB OF YOUR CHOICE HERE, WHICH WILL CONTAIN 
 	// THE BUSINESS LOGIC OF THE ACTUAL CHAOS
     // IT CAN BE A NEW CHAOSLIB YOU HAVE CREATED SPECIALLY FOR THIS EXPERIMENT OR ANY EXISTING ONE 
+    // @TODO: user INVOKE-CHAOSLIB
    
 	// Including the litmus lib
 	switch experimentsDetails.ChaosLib {
@@ -138,6 +141,7 @@ func Experiment(clients clients.ClientSets){
 		return
 	}
 	
+    // @TODO: user POST-CHAOS-CHECK
 	// ADD A POST-CHAOS CHECK OF YOUR CHOICE HERE
     // POD STATUS CHECKS FOR THE APPLICATION UNDER TEST AND AUXILIARY APPLICATIONS ARE ADDED BY DEFAULT 
 
