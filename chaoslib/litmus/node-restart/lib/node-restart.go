@@ -93,7 +93,7 @@ func PrepareNodeRestart(experimentsDetails *experimentTypes.ExperimentDetails, c
 
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
-		if err = probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+		if err = probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails, nil, ""); err != nil {
 			common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
 			return err
 		}

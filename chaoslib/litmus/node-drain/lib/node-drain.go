@@ -62,7 +62,7 @@ func PrepareNodeDrain(experimentsDetails *experimentTypes.ExperimentDetails, cli
 
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
-		if err = probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+		if err = probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails, nil, ""); err != nil {
 			return err
 		}
 	}

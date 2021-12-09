@@ -112,7 +112,7 @@ func AzureInstanceStop(clients clients.ClientSets) {
 		// run the probes in the pre-chaos check
 		if len(resultDetails.ProbeDetails) != 0 {
 
-			err = probe.RunProbes(&chaosDetails, clients, &resultDetails, "PreChaos", &eventsDetails)
+			err = probe.RunProbes(&chaosDetails, clients, &resultDetails, "PreChaos", &eventsDetails, nil, "")
 			if err != nil {
 				log.Errorf("Probe Failed, err: %v", err)
 				failStep := "[pre-chaos]: Failed while running probes, err: " + err.Error()
@@ -192,7 +192,7 @@ func AzureInstanceStop(clients clients.ClientSets) {
 
 		// run the probes in the post-chaos check
 		if len(resultDetails.ProbeDetails) != 0 {
-			err = probe.RunProbes(&chaosDetails, clients, &resultDetails, "PostChaos", &eventsDetails)
+			err = probe.RunProbes(&chaosDetails, clients, &resultDetails, "PostChaos", &eventsDetails, nil, "")
 			if err != nil {
 				log.Errorf("Probes Failed, err: %v", err)
 				failStep := "[post-chaos]: Failed while running probes, err: " + err.Error()

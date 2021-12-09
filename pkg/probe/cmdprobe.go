@@ -2,6 +2,7 @@ package probe
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"math/rand"
 	"os/exec"
@@ -9,10 +10,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gorilla/websocket"
 	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/math"
+	"github.com/litmuschaos/litmus-go/pkg/messages"
 	cmp "github.com/litmuschaos/litmus-go/pkg/probe/comparator"
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
@@ -28,19 +31,19 @@ import (
 // cmd probe can be used to add the command probes
 // it can be of two types one: which need a source(an external image)
 // another: any inline command which can be run without source image, directly via go-runner image
-func prepareCmdProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, phase string) error {
+func prepareCmdProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, phase string, conn *websocket.Conn, action string) error {
 
 	switch strings.ToLower(phase) {
 	case "prechaos":
-		if err := preChaosCmdProbe(probe, resultDetails, clients, chaosDetails); err != nil {
+		if err := preChaosCmdProbe(probe, resultDetails, clients, chaosDetails, conn, action); err != nil {
 			return err
 		}
 	case "postchaos":
-		if err := postChaosCmdProbe(probe, resultDetails, clients, chaosDetails); err != nil {
+		if err := postChaosCmdProbe(probe, resultDetails, clients, chaosDetails, conn, action); err != nil {
 			return err
 		}
 	case "duringchaos":
-		if err := onChaosCmdProbe(probe, resultDetails, clients, chaosDetails); err != nil {
+		if err := onChaosCmdProbe(probe, resultDetails, clients, chaosDetails, conn, action); err != nil {
 			return err
 		}
 	default:
@@ -50,7 +53,7 @@ func prepareCmdProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets,
 }
 
 // triggerInlineCmdProbe trigger the cmd probe and storing the output into the out buffer
-func triggerInlineCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails) error {
+func triggerInlineCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails, conn *websocket.Conn, action string) error {
 
 	// It parse the templated command and return normal string
 	// if command doesn't have template, it will return the same command
@@ -67,23 +70,63 @@ func triggerInlineCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.
 		Timeout(int64(probe.RunProperties.ProbeTimeout)).
 		Wait(time.Duration(probe.RunProperties.Interval) * time.Second).
 		TryWithTimeout(func(attempt uint) error {
-			var out, errOut bytes.Buffer
+			var stdout string
 			// run the inline command probe
-			cmd := exec.Command("/bin/sh", "-c", probe.CmdProbeInputs.Command)
-			cmd.Stdout = &out
-			cmd.Stderr = &errOut
-			if err := cmd.Run(); err != nil {
-				return errors.Errorf("unable to run command, err: %v; error output: %v", err, errOut.String())
+
+			if conn == nil {
+
+				var out, errOut bytes.Buffer
+
+				cmd := exec.Command("/bin/sh", "-c", probe.CmdProbeInputs.Command)
+				cmd.Stdout = &out
+				cmd.Stderr = &errOut
+				if err := cmd.Run(); err != nil {
+					return errors.Errorf("unable to run command, err: %v; error output: %v", err, errOut.String())
+				}
+
+				stdout = out.String()
+			} else {
+
+				log.Infof("[Probe]: Executing Cmd Probe via agent")
+				if err := messages.SendMessageToAgent(conn, action, probe.CmdProbeInputs.Command); err != nil {
+					return errors.Errorf("unable to send message to the agent, %v", err)
+				}
+
+				feedback, payload, err := messages.ListenForAgentMessage(conn)
+				if err != nil {
+					return errors.Errorf("failed to recieve message from agent, %v", err)
+				}
+
+				if feedback != "ACTION_SUCCESSFUL" {
+
+					var agentError string
+
+					if feedback == "ERROR" {
+
+						if err := json.Unmarshal(payload, &agentError); err != nil {
+							return errors.Errorf("failed to interpret error message from agent, %v", err)
+						}
+
+						return errors.Errorf(agentError)
+					} else {
+
+						return errors.Errorf("unintelligible feedback: %v", feedback)
+					}
+				}
+
+				if err := json.Unmarshal(payload, &stdout); err != nil {
+					return errors.Errorf("failed to interpret message from agent, %v", err)
+				}
 			}
 
 			rc := getAndIncrementRunCount(resultDetails, probe.Name)
-			if err = validateResult(probe.CmdProbeInputs.Comparator, strings.TrimSpace(out.String()), rc); err != nil {
+			if err = validateResult(probe.CmdProbeInputs.Comparator, strings.TrimSpace(stdout), rc); err != nil {
 				log.Errorf("the %v cmd probe has been Failed, err: %v", probe.Name, err)
 				return err
 			}
 
 			probes := types.ProbeArtifact{}
-			probes.ProbeArtifacts.Register = strings.TrimSpace(out.String())
+			probes.ProbeArtifacts.Register = strings.TrimSpace(stdout)
 			resultDetails.ProbeArtifacts[probe.Name] = probes
 			return nil
 		})
@@ -203,7 +246,7 @@ func getRunID() string {
 }
 
 // triggerInlineContinuousCmdProbe trigger the inline continuous cmd probes
-func triggerInlineContinuousCmdProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets, chaosresult *types.ResultDetails, chaosDetails *types.ChaosDetails) {
+func triggerInlineContinuousCmdProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets, chaosresult *types.ResultDetails, chaosDetails *types.ChaosDetails, conn *websocket.Conn, action string) {
 	var isExperimentFailed bool
 	// waiting for initial delay
 	if probe.RunProperties.InitialDelaySeconds != 0 {
@@ -215,7 +258,7 @@ func triggerInlineContinuousCmdProbe(probe v1alpha1.ProbeAttributes, clients cli
 	// it marked the error for the probes, if any
 loop:
 	for {
-		err = triggerInlineCmdProbe(probe, chaosresult)
+		err = triggerInlineCmdProbe(probe, chaosresult, conn, action)
 		// record the error inside the probeDetails, we are maintaining a dedicated variable for the err, inside probeDetails
 		if err != nil {
 			for index := range chaosresult.ProbeDetails {
@@ -241,7 +284,7 @@ loop:
 }
 
 // triggerInlineOnChaosCmdProbe trigger the inline onchaos cmd probes
-func triggerInlineOnChaosCmdProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets, chaosresult *types.ResultDetails, chaosDetails *types.ChaosDetails) {
+func triggerInlineOnChaosCmdProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets, chaosresult *types.ResultDetails, chaosDetails *types.ChaosDetails, conn *websocket.Conn, action string) {
 	var isExperimentFailed bool
 	duration := chaosDetails.ChaosDuration
 	// waiting for initial delay
@@ -266,7 +309,7 @@ loop:
 			break loop
 		default:
 			// record the error inside the probeDetails, we are maintaining a dedicated variable for the err, inside probeDetails
-			if err = triggerInlineCmdProbe(probe, chaosresult); err != nil {
+			if err = triggerInlineCmdProbe(probe, chaosresult, conn, action); err != nil {
 				for index := range chaosresult.ProbeDetails {
 					if chaosresult.ProbeDetails[index].Name == probe.Name {
 						chaosresult.ProbeDetails[index].IsProbeFailedWithError = err
@@ -410,7 +453,7 @@ func validateResult(comparator v1alpha1.ComparatorInfo, cmdOutput string, rc int
 }
 
 //preChaosCmdProbe trigger the cmd probe for prechaos phase
-func preChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
+func preChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, conn *websocket.Conn, action string) error {
 
 	switch probe.Mode {
 	case "SOT", "Edge":
@@ -434,7 +477,7 @@ func preChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 
 		// triggering the cmd probe for the inline mode
 		if reflect.DeepEqual(probe.CmdProbeInputs.Source, v1alpha1.SourceDetails{}) {
-			err = triggerInlineCmdProbe(probe, resultDetails)
+			err = triggerInlineCmdProbe(probe, resultDetails, conn, action)
 
 			// failing the probe, if the success condition doesn't met after the retry & timeout combinations
 			// it will update the status of all the unrun probes as well
@@ -479,7 +522,7 @@ func preChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 			"Phase":          "PreChaos",
 		})
 		if reflect.DeepEqual(probe.CmdProbeInputs.Source, v1alpha1.SourceDetails{}) {
-			go triggerInlineContinuousCmdProbe(probe, clients, resultDetails, chaosDetails)
+			go triggerInlineContinuousCmdProbe(probe, clients, resultDetails, chaosDetails, conn, action)
 		} else {
 
 			execCommandDetails, err := createHelperPod(probe, resultDetails, clients, chaosDetails)
@@ -496,7 +539,7 @@ func preChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 }
 
 //postChaosCmdProbe trigger cmd probe for post chaos phase
-func postChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
+func postChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, conn *websocket.Conn, action string) error {
 
 	switch probe.Mode {
 	case "EOT", "Edge":
@@ -520,7 +563,7 @@ func postChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resu
 
 		// triggering the cmd probe for the inline mode
 		if reflect.DeepEqual(probe.CmdProbeInputs.Source, v1alpha1.SourceDetails{}) {
-			err = triggerInlineCmdProbe(probe, resultDetails)
+			err = triggerInlineCmdProbe(probe, resultDetails, conn, action)
 
 			// failing the probe, if the success condition doesn't met after the retry & timeout combinations
 			// it will update the status of all the unrun probes as well
@@ -580,7 +623,7 @@ func postChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resu
 }
 
 //onChaosCmdProbe trigger the cmd probe for DuringChaos phase
-func onChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
+func onChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, conn *websocket.Conn, action string) error {
 
 	switch probe.Mode {
 	case "OnChaos":
@@ -596,7 +639,7 @@ func onChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Result
 			"Phase":          "DuringChaos",
 		})
 		if reflect.DeepEqual(probe.CmdProbeInputs.Source, v1alpha1.SourceDetails{}) {
-			go triggerInlineOnChaosCmdProbe(probe, clients, resultDetails, chaosDetails)
+			go triggerInlineOnChaosCmdProbe(probe, clients, resultDetails, chaosDetails, conn, action)
 		} else {
 
 			execCommandDetails, err := createHelperPod(probe, resultDetails, clients, chaosDetails)

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gorilla/websocket"
 	"github.com/kyokomi/emoji"
 	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
 	"github.com/litmuschaos/litmus-go/pkg/clients"
@@ -22,7 +23,7 @@ var err error
 
 // RunProbes contains the steps to trigger the probes
 // It contains steps to trigger all three probes: k8sprobe, httpprobe, cmdprobe
-func RunProbes(chaosDetails *types.ChaosDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, phase string, eventsDetails *types.EventDetails) error {
+func RunProbes(chaosDetails *types.ChaosDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, phase string, eventsDetails *types.EventDetails, conn *websocket.Conn, action string) error {
 
 	// get the probes details from the chaosengine
 	probes, err := getProbesFromEngine(chaosDetails, clients)
@@ -34,7 +35,7 @@ func RunProbes(chaosDetails *types.ChaosDetails, clients clients.ClientSets, res
 	//execute probes for the prechaos & duringchaos phase
 	case "prechaos", "duringchaos":
 		for _, probe := range probes {
-			if err := execute(probe, chaosDetails, clients, resultDetails, phase); err != nil {
+			if err := execute(probe, chaosDetails, clients, resultDetails, phase, conn, action); err != nil {
 				return err
 			}
 		}
@@ -47,7 +48,7 @@ func RunProbes(chaosDetails *types.ChaosDetails, clients clients.ClientSets, res
 			// evaluate continuous and onchaos probes
 			switch strings.ToLower(probe.Mode) {
 			case "onchaos", "continuous":
-				if err := execute(probe, chaosDetails, clients, resultDetails, phase); err != nil {
+				if err := execute(probe, chaosDetails, clients, resultDetails, phase, conn, action); err != nil {
 					probeError = append(probeError, err)
 				}
 			}
@@ -57,7 +58,7 @@ func RunProbes(chaosDetails *types.ChaosDetails, clients clients.ClientSets, res
 		}
 		// executes the eot and edge modes
 		for _, probe := range probes {
-			if err := execute(probe, chaosDetails, clients, resultDetails, phase); err != nil {
+			if err := execute(probe, chaosDetails, clients, resultDetails, phase, conn, action); err != nil {
 				return err
 			}
 		}
@@ -307,7 +308,7 @@ func stopChaosEngine(probe v1alpha1.ProbeAttributes, clients clients.ClientSets,
 }
 
 // execute contains steps to execute & evaluate probes in different modes at different phases
-func execute(probe v1alpha1.ProbeAttributes, chaosDetails *types.ChaosDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, phase string) error {
+func execute(probe v1alpha1.ProbeAttributes, chaosDetails *types.ChaosDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, phase string, conn *websocket.Conn, action string) error {
 	switch strings.ToLower(probe.Type) {
 	case "k8sprobe":
 		// it contains steps to prepare the k8s probe
@@ -316,7 +317,7 @@ func execute(probe v1alpha1.ProbeAttributes, chaosDetails *types.ChaosDetails, c
 		}
 	case "cmdprobe":
 		// it contains steps to prepare cmd probe
-		if err = prepareCmdProbe(probe, clients, chaosDetails, resultDetails, phase); err != nil {
+		if err = prepareCmdProbe(probe, clients, chaosDetails, resultDetails, phase, conn, action); err != nil {
 			return errors.Errorf("probes failed, err: %v", err)
 		}
 	case "httpprobe":
