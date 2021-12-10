@@ -24,6 +24,7 @@ type ExperimentDetails struct {
 	Delay              int
 	TargetContainer    string
 	LIBImagePullPolicy string
+	Sequence           string
 	ProcessIds         string
 	AgentEndpoint      string
 	AuthToken          string

@@ -24,7 +24,7 @@ func ProcessStateCheck(conn *websocket.Conn, processIds string) error {
 
 		p, err := strconv.Atoi(pid)
 		if err != nil {
-			return errors.Errorf("unable to convert process id %s to integer, err: %v", pid, err)
+			return errors.Errorf("unable to convert process id %s to integer, %v", pid, err)
 		}
 
 		pids = append(pids, p)
@@ -44,10 +44,10 @@ func ProcessStateCheck(conn *websocket.Conn, processIds string) error {
 
 			agentError, err := messages.GetErrorMessage(payload)
 			if err != nil {
-				return errors.Errorf("failed to interpret error message from agent, ", err)
+				return errors.Errorf("failed to interpret error message from agent, %v", err)
 			}
 
-			return errors.Errorf("error during steady state, ", agentError)
+			return errors.Errorf("error during steady-state validation, %s", agentError)
 		}
 
 		return errors.Errorf("unintelligible feedback received from agent: %s", feedback)
