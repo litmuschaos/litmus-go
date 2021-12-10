@@ -74,7 +74,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 
 	for duration < experimentsDetails.ChaosDuration {
 
-		log.Infof("[Info]: Target processes list, %v", pids)
+		log.Infof("[Info]: Target processes list: %v", pids)
 
 		if experimentsDetails.EngineName != "" {
 			msg := "Injecting " + experimentsDetails.ExperimentName + " chaos in VM instance"
@@ -85,6 +85,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		// kill the processes
 		for i, pid := range pids {
 
+			log.Infof("[Chaos]: Killing %s process", strconv.Itoa(pid))
 			if err := messages.SendMessageToAgent(conn, "EXECUTE_EXPERIMENT", experimentTypes.Processes{PIDs: []int{pid}}); err != nil {
 				return errors.Errorf("failed to send message to agent, %v", err)
 			}
@@ -109,6 +110,8 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 
 				return errors.Errorf("unintelligible feedback received from agent: %s", feedback)
 			}
+
+			log.Infof("[Chaos]: %s process killed successfully", strconv.Itoa(pid))
 
 			// run the probes during chaos
 			// the OnChaos probes execution will start in the first iteration and keep running for the entire chaos duration
@@ -138,7 +141,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 
 	for duration < experimentsDetails.ChaosDuration {
 
-		log.Infof("[Info]: Target processes list, %v", pids)
+		log.Infof("[Info]: Target processes list: %v", pids)
 
 		if experimentsDetails.EngineName != "" {
 			msg := "Injecting " + experimentsDetails.ExperimentName + " chaos in VM instance"
@@ -147,6 +150,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		}
 
 		// kill the processes
+		log.Infof("[Chaos]: Killing %v processes", pids)
 		if err := messages.SendMessageToAgent(conn, "EXECUTE_EXPERIMENT", experimentTypes.Processes{PIDs: pids}); err != nil {
 			return errors.Errorf("failed to send message to agent, %v", err)
 		}
@@ -173,6 +177,8 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 
 			return errors.Errorf("unintelligible feedback received from agent: %s", feedback)
 		}
+
+		log.Infof("[Chaos]: %v processes killed successfully", pids)
 
 		// run the probes during chaos
 		if len(resultDetails.ProbeDetails) != 0 {
