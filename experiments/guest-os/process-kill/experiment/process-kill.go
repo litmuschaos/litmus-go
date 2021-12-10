@@ -20,8 +20,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// Experiment contains steps to inject chaos
-func Experiment(clients clients.ClientSets) {
+// ProcessKill contains steps to inject chaos
+func ProcessKill(clients clients.ClientSets) {
 
 	experimentsDetails := experimentTypes.ExperimentDetails{}
 	resultDetails := types.ResultDetails{}
