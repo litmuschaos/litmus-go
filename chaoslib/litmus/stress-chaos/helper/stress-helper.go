@@ -176,13 +176,15 @@ func prepareStressChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 		select {
 		case <-timeout:
 			// the stress process gets timeout before completion
-			log.Infof("[Timeout] Stress output: %v", buf.String())
-			log.Info("[Cleanup]: Killing the stress process")
-			terminateProcess(cmd.Process.Pid)
+			log.Infof("[Chaos] The stress process is not yet completed after the chaos duration of %vs", experimentsDetails.ChaosDuration+30)
+			log.Info("[Timeout]: Killing the stress process")
+			if err = terminateProcess(cmd.Process.Pid); err != nil {
+				return err
+			}
 			if err = result.AnnotateChaosResult(resultDetails.Name, chaosDetails.ChaosNamespace, "reverted", "pod", experimentsDetails.TargetPods); err != nil {
 				return err
 			}
-			return errors.Errorf("the stress process is timeout after %vs", experimentsDetails.ChaosDuration+30)
+			return nil
 		case err := <-done:
 			if err != nil {
 				err, ok := err.(*exec.ExitError)
