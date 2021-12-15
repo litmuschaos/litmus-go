@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/gorilla/websocket"
-	"github.com/litmuschaos/litmus-go/pkg/guest-os/process-kill/types"
 	"github.com/litmuschaos/litmus-go/pkg/messages"
 	"github.com/pkg/errors"
 )
@@ -30,7 +29,7 @@ func ProcessStateCheck(conn *websocket.Conn, processIds string) error {
 		pids = append(pids, p)
 	}
 
-	if err := messages.SendMessageToAgent(conn, "CHECK_STEADY_STATE", types.Processes{PIDs: pids}); err != nil {
+	if err := messages.SendMessageToAgent(conn, "CHECK_STEADY_STATE", pids); err != nil {
 		return errors.Errorf("failed to send message to agent, %v", err)
 	}
 

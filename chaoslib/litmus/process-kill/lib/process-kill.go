@@ -86,7 +86,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		for i, pid := range pids {
 
 			log.Infof("[Chaos]: Killing %s process", strconv.Itoa(pid))
-			if err := messages.SendMessageToAgent(conn, "EXECUTE_EXPERIMENT", experimentTypes.Processes{PIDs: []int{pid}}); err != nil {
+			if err := messages.SendMessageToAgent(conn, "EXECUTE_EXPERIMENT", []int{pid}); err != nil {
 				return errors.Errorf("failed to send message to agent, %v", err)
 			}
 
@@ -151,7 +151,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 
 		// kill the processes
 		log.Infof("[Chaos]: Killing %v processes", pids)
-		if err := messages.SendMessageToAgent(conn, "EXECUTE_EXPERIMENT", experimentTypes.Processes{PIDs: pids}); err != nil {
+		if err := messages.SendMessageToAgent(conn, "EXECUTE_EXPERIMENT", pids); err != nil {
 			return errors.Errorf("failed to send message to agent, %v", err)
 		}
 

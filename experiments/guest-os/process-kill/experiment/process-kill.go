@@ -73,7 +73,7 @@ func ProcessKill(clients clients.ClientSets) {
 
 	// Connect to the agent
 	log.Infof("[Status]: Connecting to the agent")
-	conn, _, err := websocket.DefaultDialer.Dial("ws://"+experimentsDetails.AgentEndpoint+"/process-kill", http.Header{"Token": []string{experimentsDetails.AuthToken}})
+	conn, _, err := websocket.DefaultDialer.Dial("ws://"+experimentsDetails.AgentEndpoint+"/process-kill", http.Header{"Authorization": []string{"Bearer " + experimentsDetails.AuthToken}})
 	if err != nil {
 		log.Errorf("Error occured while connecting to the agent, err: %v", err)
 		failStep := "[pre-chaos]: Failed to connect to the agent, err: " + err.Error()

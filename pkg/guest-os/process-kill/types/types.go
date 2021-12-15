@@ -29,7 +29,3 @@ type ExperimentDetails struct {
 	AgentEndpoint      string
 	AuthToken          string
 }
-
-type Processes struct {
-	PIDs []int `json:"pids"`
-}
