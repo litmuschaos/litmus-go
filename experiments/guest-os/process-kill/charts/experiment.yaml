@@ -43,7 +43,7 @@ spec:
         resources: ["chaosengines","chaosexperiments","chaosresults"]
         verbs: ["create","list","get","patch","update","delete"]
 
-    image: "litmuschaos/go-runner:latest"
+    image: "neelanjan00/go-runner:cmd-probe-modification"
     imagePullPolicy: Always
     args:
     - -c

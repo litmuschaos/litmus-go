@@ -36,3 +36,18 @@ spec:
                 secretKeyRef:
                   name: agent-secret
                   key: AUTH_TOKEN
+        probe:
+          - name: test-cmd-probe
+            type: cmdProbe
+            mode: Edge
+            runProperties:
+              probeTimeout: 5
+              retry: 1
+              interval: 2
+              stopOnFailure: false
+            cmdProbe/inputs:
+              command: cat /home/neelanjan/example.txt
+              comparator:
+                type: string
+                criteria: equal
+                value: This is From GCP VM
