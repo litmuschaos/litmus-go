@@ -34,6 +34,12 @@ The *generate_experiment.go* script is a simple way to bootstrap your experiment
   $ cd litmus-go/contribute/developer-guide
   ```
 
+- Build litmus-sdk
+
+  ```
+  go build -o ./litmus-sdk ./bin/main.go
+  ```
+
 - Populate the `attributes.yaml` with details of the chaos experiment (or chart). Use the [attributes.yaml.sample](/contribute/developer-guide/attributes.yaml.sample) as reference. 
 
   As an example, let us consider an experiment to kill one of the replicas of a nginx deployment. The attributes.yaml can be constructed like this: 
@@ -158,17 +164,29 @@ The *generate_experiment.go* script is a simple way to bootstrap your experiment
   drwxr-xr-x 2 shubham shubham 4096 Jun 10 22:41 icons/
   ```
  
-- Proceed with construction of business logic inside the `sample-exec-chaos.go` file, by making
-  the appropriate modifications listed below to achieve the desired effect: 
 
-  - variables 
-  - entry & exit criteria checks for the experiment 
-  - helper utils in either [pkg](/pkg/) or new [base chaos libraries](/chaoslib) 
+- Proceed with construction of business logic, by making the appropriate modifications listed below
+  to achieve the desired effect: 
 
+  - Pre-Chaos Checks: Additional experiment-specific checks to run before chaos. Checks should be
+    added at the `@TODO: user PRE-CHAOS-CHECK` marker in the
+    `experiments/<category>/<name>/experiment/<name>.go` file
 
-- The chaoslib is created at `chaoslib/litmus/sample-exec-chaos/lib/sample-exec-chaos.go` path. It contains some pre-defined steps which runs the `ChaosInject` command (explicitly provided as an ENV var in the experiment CR). Which will induce chaos in the target application. It will wait for the given chaos duration and finally runs the `ChaosKill` command (also provided as an ENV var) for cleanup purposes. Update this chaoslib to achieve the desired effect based on the use-case or reuse the other existing chaoslib.
+  - Inject Chaos: The heart of your experiment, actually enact the choas. By default, the generated
+    code will call out to the generated library. However, if your experiment simply makes use of
+    exising libraries, modify the chaos injection at the `@TODO: user INVOKE-CHAOSLIB` marker in the
+    `experiments/<category>/<name>/experiment/<name>.go` file
 
-- Create an experiment README explaining, briefly, the *what*, *why* & *how* of the experiment to aid users of this experiment. 
+    - Library Modifications: This is where the low level chaos execution code should live. Populate
+      the `runChaos`, `experimentExecution`, and `injectChaos` functions as appropriate in the 
+      `chaosLib/litmus/<name>/lib/<name>.go` file.
+
+  - Post-Chaos Checks: Additional experiment-specific checks to run after achos. Checks should be
+    added at the `@TODO: user POST-CHAOS-CHECK` marker in the 
+    `experiments/<category>/<name>/experiment/<name>.go` file
+
+- Create an experiment README explaining, briefly, the *what*, *why* & *how* of the experiment to aid users of this experiment. This README
+  should live at `experiments/<category>/<name>/README.md`
 
 ### Steps to Test Experiment 
 
