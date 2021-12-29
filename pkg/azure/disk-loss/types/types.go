@@ -12,10 +12,6 @@ type ExperimentDetails struct {
 	ChaosInterval      int
 	RampTime           int
 	ChaosLib           string
-	AppNS              string
-	AppLabel           string
-	AppKind            string
-	AuxiliaryAppInfo   string
 	ChaosUID           clientTypes.UID
 	InstanceID         string
 	ChaosNamespace     string
@@ -23,7 +19,6 @@ type ExperimentDetails struct {
 	Timeout            int
 	Delay              int
 	LIBImagePullPolicy string
-	TargetContainer    string
 	ScaleSet           string
 	ResourceGroup      string
 	SubscriptionID     string

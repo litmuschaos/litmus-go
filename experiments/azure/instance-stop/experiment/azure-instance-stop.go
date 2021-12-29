@@ -15,7 +15,6 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/result"
-	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/sirupsen/logrus"
@@ -69,28 +68,6 @@ func AzureInstanceStop(clients clients.ClientSets) {
 		"Resource Group": experimentsDetails.ResourceGroup,
 		"Instance Name":  experimentsDetails.AzureInstanceName,
 	})
-
-	//PRE-CHAOS APPLICATION STATUS CHECK
-	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (pre-chaos)")
-	err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
-	if err != nil {
-		log.Errorf("Application status check failed, err: %v", err)
-		failStep := "[pre-chaos]: Failed to verify that the AUT (Application Under Test) is in running state, err: " + err.Error()
-		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-		return
-	}
-
-	//PRE-CHAOS AUXILIARY APPLICATION STATUS CHECK
-	if experimentsDetails.AuxiliaryAppInfo != "" {
-		log.Info("[Status]: Verify that the Auxiliary Applications are running (pre-chaos)")
-		err = status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
-		if err != nil {
-			log.Errorf("Auxiliary Application status check failed, err: %v", err)
-			failStep := "[pre-chaos]: Failed to verify that the Auxiliary Applications are in running state, err: " + err.Error()
-			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-			return
-		}
-	}
 
 	// Setting up Azure Subscription ID
 	if experimentsDetails.SubscriptionID, err = azureCommon.GetSubscriptionID(); err != nil {
@@ -165,26 +142,6 @@ func AzureInstanceStop(clients clients.ClientSets) {
 		return
 	}
 	log.Info("[Status]: Azure instance is in running state (post chaos)")
-
-	//POST-CHAOS APPLICATION STATUS CHECK
-	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (post-chaos)")
-	if err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
-		log.Errorf("Application status check failed, err: %v", err)
-		failStep := "[post-chaos]: Failed to verify that the AUT (Application Under Test) is running, err: " + err.Error()
-		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-		return
-	}
-
-	//POST-CHAOS AUXILIARY APPLICATION STATUS CHECK
-	if experimentsDetails.AuxiliaryAppInfo != "" {
-		log.Info("[Status]: Verify that the Auxiliary Applications are running (post-chaos)")
-		if err = status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
-			log.Errorf("Auxiliary Application status check failed, err: %v", err)
-			failStep := "[post-chaos]: Failed to verify that the Auxiliary Applications are running, err: " + err.Error()
-			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-			return
-		}
-	}
 
 	if experimentsDetails.EngineName != "" {
 		// marking AUT as running, as we already checked the status of application under test

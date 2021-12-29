@@ -14,7 +14,6 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/result"
-	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/sirupsen/logrus"
@@ -74,26 +73,6 @@ func AzureDiskLoss(clients clients.ClientSets) {
 		"Sequence":       experimentsDetails.Sequence,
 	})
 
-	//PRE-CHAOS APPLICATION STATUS CHECK
-	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (pre-chaos)")
-	if err = status.AUTStatusCheck(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.TargetContainer, experimentsDetails.Timeout, experimentsDetails.Delay, clients, &chaosDetails); err != nil {
-		log.Errorf("Application status check failed, err: %v", err)
-		failStep := "[pre-chaos]: Failed to verify that the AUT (Application Under Test) is in running state, err: " + err.Error()
-		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-		return
-	}
-
-	//PRE-CHAOS AUXILIARY APPLICATION STATUS CHECK
-	if experimentsDetails.AuxiliaryAppInfo != "" {
-		log.Info("[Status]: Verify that the Auxiliary Applications are running (pre-chaos)")
-		if err = status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
-			log.Errorf("Auxiliary Application status check failed, err: %v", err)
-			failStep := "[pre-chaos]: Failed to verify that the Auxiliary Applications are in running state, err: " + err.Error()
-			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-			return
-		}
-	}
-
 	// Setting up Azure Subscription ID
 	if experimentsDetails.SubscriptionID, err = azureCommon.GetSubscriptionID(); err != nil {
 		log.Errorf("fail to get the subscription id, err: %v", err)
@@ -152,26 +131,6 @@ func AzureDiskLoss(clients clients.ClientSets) {
 
 	log.Infof("[Confirmation]: %v chaos has been injected successfully", experimentsDetails.ExperimentName)
 	resultDetails.Verdict = v1alpha1.ResultVerdictPassed
-
-	//POST-CHAOS APPLICATION STATUS CHECK
-	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (post-chaos)")
-	if err = status.AUTStatusCheck(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.TargetContainer, experimentsDetails.Timeout, experimentsDetails.Delay, clients, &chaosDetails); err != nil {
-		log.Errorf("Application status check failed, err: %v", err)
-		failStep := "[post-chaos]: Failed to verify that the AUT (Application Under Test) is running, err: " + err.Error()
-		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-		return
-	}
-
-	//POST-CHAOS AUXILIARY APPLICATION STATUS CHECK
-	if experimentsDetails.AuxiliaryAppInfo != "" {
-		log.Info("[Status]: Verify that the Auxiliary Applications are running (post-chaos)")
-		if err = status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
-			log.Errorf("Auxiliary Application status check failed, err: %v", err)
-			failStep := "[post-chaos]: Failed to verify that the Auxiliary Applications are running, err: " + err.Error()
-			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-			return
-		}
-	}
 
 	// POST-CHAOS VIRTUAL DISK STATUS CHECK
 	log.Info("[Status]: Verify that the virtual disk are attached to VM instance(post-chaos)")
