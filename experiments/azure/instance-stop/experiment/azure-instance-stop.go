@@ -107,7 +107,7 @@ func AzureInstanceStop(clients clients.ClientSets) {
 	}
 
 	//Verify the azure target instance is running (pre-chaos)
-	if err := azureStatus.InstanceStatusCheckByName(&experimentsDetails); err != nil {
+	if err := azureStatus.InstanceStatusCheckByName(experimentsDetails.AzureInstanceName, experimentsDetails.ScaleSet, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup); err != nil {
 		log.Errorf("failed to get the azure instance status, err: %v", err)
 		failStep := "[pre-chaos]: Failed to verify the azure instance status, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
@@ -135,7 +135,7 @@ func AzureInstanceStop(clients clients.ClientSets) {
 	resultDetails.Verdict = v1alpha1.ResultVerdictPassed
 
 	//Verify the azure instance is running (post chaos)
-	if err = azureStatus.InstanceStatusCheckByName(&experimentsDetails); err != nil {
+	if err = azureStatus.InstanceStatusCheckByName(experimentsDetails.AzureInstanceName, experimentsDetails.ScaleSet, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup); err != nil {
 		log.Errorf("failed to get the azure instance status, err: %v", err)
 		failStep := "[pre-chaos]: Failed to update the azure instance status, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
