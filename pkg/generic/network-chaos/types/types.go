@@ -39,4 +39,8 @@ type ExperimentDetails struct {
 	SocketPath                         string
 	Sequence                           string
 	TerminationGracePeriodSeconds      int
+	// specific to node level experiment
+	AuxiliaryAppInfo string
+	NodeLabel        string
+	TargetNode       string
 }

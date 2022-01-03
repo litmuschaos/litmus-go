@@ -4,7 +4,7 @@ import (
 	"os"
 
 	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
-	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/network-chaos/lib/latency"
+	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/pod-network-chaos/lib/latency"
 	pumbaLIB "github.com/litmuschaos/litmus-go/chaoslib/pumba/network-chaos/lib/latency"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
@@ -29,7 +29,7 @@ func PodNetworkLatency(clients clients.ClientSets) {
 
 	//Fetching all the ENV passed from the runner pod
 	log.Infof("[PreReq]: Getting the ENV for the %v experiment", os.Getenv("EXPERIMENT_NAME"))
-	experimentEnv.GetENV(&experimentsDetails)
+	experimentEnv.GetENV(&experimentsDetails, "pod")
 
 	// Initialize events Parameters
 	types.InitialiseChaosVariables(&chaosDetails)
