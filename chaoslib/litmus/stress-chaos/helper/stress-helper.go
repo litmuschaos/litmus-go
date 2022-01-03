@@ -230,8 +230,8 @@ func prepareStressor(experimentDetails *experimentTypes.ExperimentDetails) []str
 		strconv.Itoa(experimentDetails.ChaosDuration) + "s",
 	}
 
-	switch experimentDetails.ExperimentName {
-	case "pod-cpu-hog":
+	switch experimentDetails.StressType {
+	case "pod-cpu-stress":
 
 		log.InfoWithValues("[Info]: Details of Stressor:", logrus.Fields{
 			"CPU Core": experimentDetails.CPUcores,
@@ -239,7 +239,7 @@ func prepareStressor(experimentDetails *experimentTypes.ExperimentDetails) []str
 		})
 		stressArgs = append(stressArgs, "--cpu "+strconv.Itoa(experimentDetails.CPUcores))
 
-	case "pod-memory-hog":
+	case "pod-memory-stress":
 
 		log.InfoWithValues("[Info]: Details of Stressor:", logrus.Fields{
 			"Number of Workers":  experimentDetails.NumberOfWorkers,
@@ -515,6 +515,7 @@ func getENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.NumberOfWorkers, _ = strconv.Atoi(types.Getenv("NUMBER_OF_WORKERS", ""))
 	experimentDetails.MemoryConsumption, _ = strconv.Atoi(types.Getenv("MEMORY_CONSUMPTION", ""))
 	experimentDetails.VolumeMountPath = types.Getenv("VOLUME_MOUNT_PATH", "")
+	experimentDetails.StressType = types.Getenv("STRESS_TYPE", "")
 }
 
 // abortWatcher continuously watch for the abort signals
