@@ -39,10 +39,12 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string
 	switch expName {
 	case "pod-cpu-hog":
 		experimentDetails.CPUcores, _ = strconv.Atoi(types.Getenv("CPU_CORES", "1"))
+		experimentDetails.StressType = "pod-cpu-stress"
 
 	case "pod-memory-hog":
 		experimentDetails.MemoryConsumption, _ = strconv.Atoi(types.Getenv("MEMORY_CONSUMPTION", "500"))
 		experimentDetails.NumberOfWorkers, _ = strconv.Atoi(types.Getenv("NUMBER_OF_WORKERS", "4"))
+		experimentDetails.StressType = "pod-memory-stress"
 
 	case "pod-io-stress":
 		experimentDetails.FilesystemUtilizationPercentage, _ = strconv.Atoi(types.Getenv("FILESYSTEM_UTILIZATION_PERCENTAGE", ""))
@@ -50,5 +52,6 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string
 		experimentDetails.NumberOfWorkers, _ = strconv.Atoi(types.Getenv("NUMBER_OF_WORKERS", "4"))
 		experimentDetails.VolumeMountPath = types.Getenv("VOLUME_MOUNT_PATH", "")
 		experimentDetails.CPUcores, _ = strconv.Atoi(types.Getenv("CPU_CORES", "0"))
+		experimentDetails.StressType = "pod-io-stress"
 	}
 }
