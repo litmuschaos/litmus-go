@@ -26,6 +26,5 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.ScaleSet = types.Getenv("SCALE_SET", "disable")
 	experimentDetails.ResourceGroup = types.Getenv("RESOURCE_GROUP", "")
 	experimentDetails.VirtualDiskNames = types.Getenv("VIRTUAL_DISK_NAMES", "")
-	experimentDetails.SubscriptionID = types.Getenv("SUBSCRIPTION_ID", "")
 	experimentDetails.Sequence = types.Getenv("SEQUENCE", "parallel")
 }
