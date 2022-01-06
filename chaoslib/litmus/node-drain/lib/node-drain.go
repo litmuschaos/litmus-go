@@ -21,6 +21,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
 	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -164,29 +165,50 @@ func drainNode(experimentsDetails *experimentTypes.ExperimentDetails, clients cl
 // uncordonNode uncordon the application node
 func uncordonNode(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
 
-	log.Infof("[Recover]: Uncordon the %v node", experimentsDetails.TargetNode)
+	targetNodes := strings.Split(experimentsDetails.TargetNode, ",")
+	for _, targetNode := range targetNodes {
 
-	command := exec.Command("kubectl", "uncordon", experimentsDetails.TargetNode)
-	var out, stderr bytes.Buffer
-	command.Stdout = &out
-	command.Stderr = &stderr
-	if err := command.Run(); err != nil {
-		log.Infof("Error String: %v", stderr.String())
-		return errors.Errorf("unable to uncordon the %v node, err: %v", experimentsDetails.TargetNode, err)
+		//Check node exist before uncordon the node
+		_, err := clients.KubeClient.CoreV1().Nodes().Get(targetNode, metav1.GetOptions{})
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				log.Infof("[Info]: The %v node is no longer exist, skip uncordon the node", targetNode)
+				common.SetTargets(targetNode, "noLongerExist", "node", chaosDetails)
+				continue
+			} else {
+				return errors.Errorf("unable to get the %v node, err: %v", targetNode, err)
+			}
+		}
+
+		log.Infof("[Recover]: Uncordon the %v node", targetNode)
+		command := exec.Command("kubectl", "uncordon", targetNode)
+		var out, stderr bytes.Buffer
+		command.Stdout = &out
+		command.Stderr = &stderr
+		if err := command.Run(); err != nil {
+			log.Infof("Error String: %v", stderr.String())
+			return errors.Errorf("unable to uncordon the %v node, err: %v", targetNode, err)
+		}
+		common.SetTargets(targetNode, "reverted", "node", chaosDetails)
 	}
-
-	common.SetTargets(experimentsDetails.TargetNode, "reverted", "node", chaosDetails)
 
 	return retry.
 		Times(uint(experimentsDetails.Timeout / experimentsDetails.Delay)).
 		Wait(time.Duration(experimentsDetails.Delay) * time.Second).
 		Try(func(attempt uint) error {
-			nodeSpec, err := clients.KubeClient.CoreV1().Nodes().Get(experimentsDetails.TargetNode, v1.GetOptions{})
-			if err != nil {
-				return err
-			}
-			if nodeSpec.Spec.Unschedulable {
-				return errors.Errorf("%v node is in unschedulable state", experimentsDetails.TargetNode)
+			targetNodes := strings.Split(experimentsDetails.TargetNode, ",")
+			for _, targetNode := range targetNodes {
+				nodeSpec, err := clients.KubeClient.CoreV1().Nodes().Get(targetNode, v1.GetOptions{})
+				if err != nil {
+					if apierrors.IsNotFound(err) {
+						continue
+					} else {
+						return err
+					}
+				}
+				if nodeSpec.Spec.Unschedulable {
+					return errors.Errorf("%v node is in unschedulable state", experimentsDetails.TargetNode)
+				}
 			}
 			return nil
 		})
