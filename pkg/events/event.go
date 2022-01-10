@@ -4,6 +4,7 @@ import (
 	"time"
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
+	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	apiv1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -41,13 +42,14 @@ func CreateEvents(eventsDetails *types.EventDetails, clients clients.ClientSets,
 
 //GenerateEvents update the events and increase the count by 1, if already present
 // else it will create a new event
-func GenerateEvents(eventsDetails *types.EventDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, kind string) error {
+func GenerateEvents(eventsDetails *types.EventDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, kind string) {
 
 	switch kind {
 	case "ChaosResult":
 		eventName := eventsDetails.Reason + chaosDetails.ChaosPodName
 		if err := CreateEvents(eventsDetails, clients, chaosDetails, kind, eventName); err != nil {
-			return err
+			log.Errorf("failed to generate events for %s, err: %", kind, err)
+			return
 		}
 	case "ChaosEngine":
 		eventName := eventsDetails.Reason + chaosDetails.ExperimentName + string(chaosDetails.ChaosUID)
@@ -55,10 +57,12 @@ func GenerateEvents(eventsDetails *types.EventDetails, clients clients.ClientSet
 		if err != nil {
 			if k8serrors.IsNotFound(err) {
 				if err := CreateEvents(eventsDetails, clients, chaosDetails, kind, eventName); err != nil {
-					return err
+					log.Errorf("failed to generate events for %s, err: %", kind, err)
+					return
 				}
 			} else {
-				return err
+				log.Errorf("failed to generate events for %s, err: %", kind, err)
+				return
 			}
 		} else {
 			event.LastTimestamp = metav1.Time{Time: time.Now()}
@@ -67,9 +71,9 @@ func GenerateEvents(eventsDetails *types.EventDetails, clients clients.ClientSet
 			event.Message = eventsDetails.Message
 			_, err = clients.KubeClient.CoreV1().Events(chaosDetails.ChaosNamespace).Update(event)
 			if err != nil {
-				return err
+				log.Errorf("failed to generate events for %s, err: %", kind, err)
+				return
 			}
 		}
 	}
-	return nil
 }

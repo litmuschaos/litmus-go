@@ -55,7 +55,12 @@ func NodeRestart(clients clients.ClientSets) {
 	}
 
 	// Set the chaos result uid
-	result.SetResultUID(&resultDetails, clients, &chaosDetails)
+	if err := result.SetResultUID(&resultDetails, clients, &chaosDetails); err != nil {
+		log.Errorf("Unable to Set Result UID, err: %v", err)
+		failStep := "[pre-chaos]: Failed to set the result UID of " + chaosDetails.ExperimentName + "experiment (SOT), err: " + err.Error()
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+		return
+	}
 
 	// generating the event in chaosresult to marked the verdict as awaited
 	msg := "experiment: " + experimentsDetails.ExperimentName + ", Result: Awaited"

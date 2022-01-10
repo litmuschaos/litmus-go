@@ -60,7 +60,12 @@ func Helper(clients clients.ClientSets) {
 	types.SetResultAttributes(&resultDetails, chaosDetails)
 
 	// Set the chaos result uid
-	result.SetResultUID(&resultDetails, clients, &chaosDetails)
+	if err := result.SetResultUID(&resultDetails, clients, &chaosDetails); err != nil {
+		log.Errorf("Unable to Set Result UID, err: %v", err)
+		failStep := "[pre-chaos]: Failed to set the result UID of " + chaosDetails.ExperimentName + "experiment (SOT), err: " + err.Error()
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+		return
+	}
 
 	err := preparePodNetworkChaos(&experimentsDetails, clients, &eventsDetails, &chaosDetails, &resultDetails)
 	if err != nil {

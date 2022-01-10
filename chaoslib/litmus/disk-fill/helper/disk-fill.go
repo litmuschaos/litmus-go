@@ -55,7 +55,12 @@ func Helper(clients clients.ClientSets) {
 	types.SetResultAttributes(&resultDetails, chaosDetails)
 
 	// Set the chaos result uid
-	result.SetResultUID(&resultDetails, clients, &chaosDetails)
+	if err := result.SetResultUID(&resultDetails, clients, &chaosDetails); err != nil {
+		log.Errorf("Unable to Set Result UID, err: %v", err)
+		failStep := "[pre-chaos]: Failed to set the result UID of " + chaosDetails.ExperimentName + "experiment (SOT), err: " + err.Error()
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+		return
+	}
 
 	if err := diskFill(&experimentsDetails, clients, &eventsDetails, &chaosDetails, &resultDetails); err != nil {
 		log.Fatalf("helper pod failed, err: %v", err)

@@ -71,7 +71,6 @@ func PrepareNodeRestart(experimentsDetails *experimentTypes.ExperimentDetails, c
 		msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on " + experimentsDetails.TargetNode + " node"
 		types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
 		events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
-
 		if err := common.SetHelperData(chaosDetails, clients); err != nil {
 			return err
 		}
