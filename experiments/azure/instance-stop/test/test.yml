@@ -21,28 +21,61 @@ spec:
           - sleep 
           - "3600"
         env:
-          - name: LIB
-            value: 'litmus'
 
-          - name: AZURE_INSTANCE_NAME
-            value: ''
-
-          - name: CHAOS_NAMESPACE
+          - name: APP_NAMESPACE
             value: 'default'
 
-          - name: RESOURCE_GROUP
-            value: ''
+          - name: APP_LABEL
+            value: 'run=nginx'
 
+          - name: APP_KIND
+            value: 'deployment'
+          
           - name: RAMP_TIME
             value: ''
           
-          - name: SEQUENCE
-            value: 'parallel'
+          - name: TOTAL_CHAOS_DURATION
+            value: '60'
           
           - name: CHAOS_INTERVAL
             value: '30'
+
+          - name: LIB
+            value: 'litmus'
+          
+          - name: CHAOS_NAMESPACE
+            value: 'litmus'
+
+          # provide the instance names (comma seperated if multiple)
+          - name: AZURE_INSTANCE_NAME
+            value: ''
+          
+          # provide the resouce group of the instance
+          - name: RESOURCE_GROUP
+            value: ''
+          
+          # whether the disk is attached to scale instance or not, accepted values are disable, enable
+          - name: SCALE_SET
+            value: 'disable'
+          
+          # provide the sequence type for the run. Options: serial/parallel
+          - name: SEQUENCE
+            value: 'parallel'
+          
+          # provide the path to aks credentials mounted from secret
+          - name: AZURE_AUTH_LOCATION
+            value: '/tmp/azure.auth'
 
           - name: POD_NAME
             valueFrom:
               fieldRef:
                 fieldPath: metadata.name
+          
+          - name: CHAOS_SERVICE_ACCOUNT
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.serviceAccountName
+          
+        secrets:
+          - name: cloud-secret
+            mountPath: /tmp/
