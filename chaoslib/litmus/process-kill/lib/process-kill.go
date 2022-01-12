@@ -5,7 +5,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gorilla/websocket"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/guest-os/process-kill/types"
@@ -18,7 +17,7 @@ import (
 )
 
 // PrepareProcessKillChaos contains the prepration and injection steps for the experiment
-func PrepareProcessKillChaos(conn *websocket.Conn, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+func PrepareProcessKillChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	// waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
@@ -45,11 +44,11 @@ func PrepareProcessKillChaos(conn *websocket.Conn, experimentsDetails *experimen
 
 	switch strings.ToLower(experimentsDetails.Sequence) {
 	case "serial":
-		if err := injectChaosInSerialMode(experimentsDetails, pids, conn, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+		if err := injectChaosInSerialMode(experimentsDetails, pids, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
 			return err
 		}
 	case "parallel":
-		if err := injectChaosInParallelMode(experimentsDetails, pids, conn, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+		if err := injectChaosInParallelMode(experimentsDetails, pids, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
 			return err
 		}
 	default:
@@ -66,7 +65,7 @@ func PrepareProcessKillChaos(conn *websocket.Conn, experimentsDetails *experimen
 }
 
 // injectChaosInSerialMode kills the processes in serial mode i.e. one after the other
-func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, pids []int, conn *websocket.Conn, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, pids []int, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
 	ChaosStartTimeStamp := time.Now()
@@ -86,13 +85,13 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		for i, pid := range pids {
 
 			log.Infof("[Chaos]: Killing %s process", strconv.Itoa(pid))
-			if err := messages.SendMessageToAgent(conn, "EXECUTE_EXPERIMENT", []int{pid}); err != nil {
+			if err := messages.SendMessageToAgent(chaosDetails.WebsocketConnection, "EXECUTE_EXPERIMENT", []int{pid}); err != nil {
 				return errors.Errorf("failed to send message to agent, %v", err)
 			}
 
 			common.SetTargets(strconv.Itoa(pid), "injected", "Process", chaosDetails)
 
-			feedback, payload, err := messages.ListenForAgentMessage(conn)
+			feedback, payload, err := messages.ListenForAgentMessage(chaosDetails.WebsocketConnection)
 			if err != nil {
 				return errors.Errorf("error during reception of message from agent, %v", err)
 			}
@@ -133,7 +132,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 }
 
 // injectChaosInParallelMode kills the processes in parallel mode i.e. all at once
-func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, pids []int, conn *websocket.Conn, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, pids []int, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
 	ChaosStartTimeStamp := time.Now()
@@ -151,7 +150,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 
 		// kill the processes
 		log.Infof("[Chaos]: Killing %v processes", pids)
-		if err := messages.SendMessageToAgent(conn, "EXECUTE_EXPERIMENT", pids); err != nil {
+		if err := messages.SendMessageToAgent(chaosDetails.WebsocketConnection, "EXECUTE_EXPERIMENT", pids); err != nil {
 			return errors.Errorf("failed to send message to agent, %v", err)
 		}
 
@@ -159,7 +158,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 			common.SetTargets(strconv.Itoa(pid), "injected", "Process", chaosDetails)
 		}
 
-		feedback, payload, err := messages.ListenForAgentMessage(conn)
+		feedback, payload, err := messages.ListenForAgentMessage(chaosDetails.WebsocketConnection)
 		if err != nil {
 			return errors.Errorf("error during reception of message from agent, %v", err)
 		}

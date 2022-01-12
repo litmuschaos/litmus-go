@@ -120,7 +120,7 @@ func ProcessKill(clients clients.ClientSets) {
 	// Including the litmus lib
 	switch experimentsDetails.ChaosLib {
 	case "litmus":
-		if err := litmusLIB.PrepareProcessKillChaos(chaosDetails.WebsocketConnection, &experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
+		if err := litmusLIB.PrepareProcessKillChaos(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
 			log.Errorf("Chaos injection failed, err: %v", err)
 			failStep := "[chaos]: Failed inside the chaoslib, err: " + err.Error()
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
