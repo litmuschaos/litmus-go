@@ -39,4 +39,5 @@ type ExperimentDetails struct {
 	SocketPath                         string
 	Sequence                           string
 	TerminationGracePeriodSeconds      int
+	Jitter                             int
 }
