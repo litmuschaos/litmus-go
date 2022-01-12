@@ -64,3 +64,17 @@ spec:
               fieldRef:
                 fieldPath: spec.serviceAccountName
 
+          - name: PROCESS_IDS
+              value: ''
+            
+          - name: AGENT_ENDPOINT
+            valueFrom:
+              secretKeyRef:
+                name: agent-secret
+                key: AGENT_ENDPOINT
+
+          - name: AUTH_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: agent-secret
+                key: AUTH_TOKEN
