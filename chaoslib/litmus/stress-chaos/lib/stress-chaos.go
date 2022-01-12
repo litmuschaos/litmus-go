@@ -296,6 +296,7 @@ func getPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, podName st
 		SetEnv("NUMBER_OF_WORKERS", strconv.Itoa(experimentsDetails.NumberOfWorkers)).
 		SetEnv("MEMORY_CONSUMPTION", strconv.Itoa(experimentsDetails.MemoryConsumption)).
 		SetEnv("VOLUME_MOUNT_PATH", experimentsDetails.VolumeMountPath).
+		SetEnv("STRESS_TYPE", experimentsDetails.StressType).
 		SetEnv("INSTANCE_ID", experimentsDetails.InstanceID).
 		SetEnvFromDownwardAPI("v1", "metadata.name")
 

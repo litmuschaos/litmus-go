@@ -176,13 +176,15 @@ func prepareStressChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 		select {
 		case <-timeout:
 			// the stress process gets timeout before completion
-			log.Infof("[Timeout] Stress output: %v", buf.String())
-			log.Info("[Cleanup]: Killing the stress process")
-			terminateProcess(cmd.Process.Pid)
+			log.Infof("[Chaos] The stress process is not yet completed after the chaos duration of %vs", experimentsDetails.ChaosDuration+30)
+			log.Info("[Timeout]: Killing the stress process")
+			if err = terminateProcess(cmd.Process.Pid); err != nil {
+				return err
+			}
 			if err = result.AnnotateChaosResult(resultDetails.Name, chaosDetails.ChaosNamespace, "reverted", "pod", experimentsDetails.TargetPods); err != nil {
 				return err
 			}
-			return errors.Errorf("the stress process is timeout after %vs", experimentsDetails.ChaosDuration+30)
+			return nil
 		case err := <-done:
 			if err != nil {
 				err, ok := err.(*exec.ExitError)
@@ -228,8 +230,8 @@ func prepareStressor(experimentDetails *experimentTypes.ExperimentDetails) []str
 		strconv.Itoa(experimentDetails.ChaosDuration) + "s",
 	}
 
-	switch experimentDetails.ExperimentName {
-	case "pod-cpu-hog":
+	switch experimentDetails.StressType {
+	case "pod-cpu-stress":
 
 		log.InfoWithValues("[Info]: Details of Stressor:", logrus.Fields{
 			"CPU Core": experimentDetails.CPUcores,
@@ -237,7 +239,7 @@ func prepareStressor(experimentDetails *experimentTypes.ExperimentDetails) []str
 		})
 		stressArgs = append(stressArgs, "--cpu "+strconv.Itoa(experimentDetails.CPUcores))
 
-	case "pod-memory-hog":
+	case "pod-memory-stress":
 
 		log.InfoWithValues("[Info]: Details of Stressor:", logrus.Fields{
 			"Number of Workers":  experimentDetails.NumberOfWorkers,
@@ -513,6 +515,7 @@ func getENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.NumberOfWorkers, _ = strconv.Atoi(types.Getenv("NUMBER_OF_WORKERS", ""))
 	experimentDetails.MemoryConsumption, _ = strconv.Atoi(types.Getenv("MEMORY_CONSUMPTION", ""))
 	experimentDetails.VolumeMountPath = types.Getenv("VOLUME_MOUNT_PATH", "")
+	experimentDetails.StressType = types.Getenv("STRESS_TYPE", "")
 }
 
 // abortWatcher continuously watch for the abort signals
