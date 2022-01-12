@@ -28,6 +28,8 @@ func ProcessKill(clients clients.ClientSets) {
 	eventsDetails := types.EventDetails{}
 	chaosDetails := types.ChaosDetails{}
 
+	var err error
+
 	//Fetching all the ENV passed from the runner pod
 	log.Infof("[PreReq]: Getting the ENV for the %v experiment", os.Getenv("EXPERIMENT_NAME"))
 	experimentEnv.GetENV(&experimentsDetails)
@@ -73,7 +75,7 @@ func ProcessKill(clients clients.ClientSets) {
 
 	// Connect to the agent
 	log.Infof("[Status]: Connecting to the agent")
-	conn, _, err := websocket.DefaultDialer.Dial("ws://"+experimentsDetails.AgentEndpoint+"/process-kill", http.Header{"Authorization": []string{"Bearer " + experimentsDetails.AuthToken}})
+	chaosDetails.WebsocketConnection, _, err = websocket.DefaultDialer.Dial("ws://"+experimentsDetails.AgentEndpoint+"/process-kill", http.Header{"Authorization": []string{"Bearer " + experimentsDetails.AuthToken}})
 	if err != nil {
 		log.Errorf("Error occured while connecting to the agent, err: %v", err)
 		failStep := "[pre-chaos]: Failed to connect to the agent, err: " + err.Error()
@@ -81,11 +83,11 @@ func ProcessKill(clients clients.ClientSets) {
 		return
 	}
 
-	defer conn.Close()
+	defer chaosDetails.WebsocketConnection.Close()
 
 	//Target process state check
 	log.Info("[Status]: Verify that the target processes are running")
-	if err := process.ProcessStateCheck(conn, experimentsDetails.ProcessIds); err != nil {
+	if err := process.ProcessStateCheck(chaosDetails.WebsocketConnection, experimentsDetails.ProcessIds); err != nil {
 		log.Errorf("Error occured during process steady-state validation, err: %v", err)
 		failStep := "[pre-chaos]: Failed to verify the target process status, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
@@ -99,7 +101,7 @@ func ProcessKill(clients clients.ClientSets) {
 		// run the probes in the pre-chaos check
 		if len(resultDetails.ProbeDetails) != 0 {
 
-			if err := probe.RunProbes(&chaosDetails, clients, &resultDetails, "PreChaos", &eventsDetails, conn); err != nil {
+			if err := probe.RunProbes(&chaosDetails, clients, &resultDetails, "PreChaos", &eventsDetails); err != nil {
 				log.Errorf("Probe Failed, err: %v", err)
 				failStep := "[pre-chaos]: Failed while running probes, err: " + err.Error()
 				msg := "AUT: Running, Probes: Unsuccessful"
@@ -118,7 +120,7 @@ func ProcessKill(clients clients.ClientSets) {
 	// Including the litmus lib
 	switch experimentsDetails.ChaosLib {
 	case "litmus":
-		if err := litmusLIB.PrepareProcessKillChaos(conn, &experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
+		if err := litmusLIB.PrepareProcessKillChaos(chaosDetails.WebsocketConnection, &experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
 			log.Errorf("Chaos injection failed, err: %v", err)
 			failStep := "[chaos]: Failed inside the chaoslib, err: " + err.Error()
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
@@ -140,7 +142,7 @@ func ProcessKill(clients clients.ClientSets) {
 
 		// run the probes in the post-chaos check
 		if len(resultDetails.ProbeDetails) != 0 {
-			if err := probe.RunProbes(&chaosDetails, clients, &resultDetails, "PostChaos", &eventsDetails, conn); err != nil {
+			if err := probe.RunProbes(&chaosDetails, clients, &resultDetails, "PostChaos", &eventsDetails); err != nil {
 				log.Errorf("Probes Failed, err: %v", err)
 				failStep := "[post-chaos]: Failed while running probes, err: " + err.Error()
 				msg := "AUT: Running, Probes: Unsuccessful"

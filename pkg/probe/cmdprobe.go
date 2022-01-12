@@ -31,19 +31,19 @@ import (
 // cmd probe can be used to add the command probes
 // it can be of two types one: which need a source(an external image)
 // another: any inline command which can be run without source image, directly via go-runner image
-func prepareCmdProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, phase string, conn *websocket.Conn) error {
+func prepareCmdProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, phase string) error {
 
 	switch strings.ToLower(phase) {
 	case "prechaos":
-		if err := preChaosCmdProbe(probe, resultDetails, clients, chaosDetails, conn); err != nil {
+		if err := preChaosCmdProbe(probe, resultDetails, clients, chaosDetails); err != nil {
 			return err
 		}
 	case "postchaos":
-		if err := postChaosCmdProbe(probe, resultDetails, clients, chaosDetails, conn); err != nil {
+		if err := postChaosCmdProbe(probe, resultDetails, clients, chaosDetails); err != nil {
 			return err
 		}
 	case "duringchaos":
-		if err := onChaosCmdProbe(probe, resultDetails, clients, chaosDetails, conn); err != nil {
+		if err := onChaosCmdProbe(probe, resultDetails, clients, chaosDetails); err != nil {
 			return err
 		}
 	default:
@@ -246,7 +246,7 @@ func getRunID() string {
 }
 
 // triggerInlineContinuousCmdProbe trigger the inline continuous cmd probes
-func triggerInlineContinuousCmdProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets, chaosresult *types.ResultDetails, chaosDetails *types.ChaosDetails, conn *websocket.Conn) {
+func triggerInlineContinuousCmdProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets, chaosresult *types.ResultDetails, chaosDetails *types.ChaosDetails) {
 	var isExperimentFailed bool
 	// waiting for initial delay
 	if probe.RunProperties.InitialDelaySeconds != 0 {
@@ -258,7 +258,7 @@ func triggerInlineContinuousCmdProbe(probe v1alpha1.ProbeAttributes, clients cli
 	// it marked the error for the probes, if any
 loop:
 	for {
-		err = triggerInlineCmdProbe(probe, chaosresult, conn)
+		err = triggerInlineCmdProbe(probe, chaosresult, chaosDetails.WebsocketConnection)
 		// record the error inside the probeDetails, we are maintaining a dedicated variable for the err, inside probeDetails
 		if err != nil {
 			for index := range chaosresult.ProbeDetails {
@@ -284,7 +284,7 @@ loop:
 }
 
 // triggerInlineOnChaosCmdProbe trigger the inline onchaos cmd probes
-func triggerInlineOnChaosCmdProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets, chaosresult *types.ResultDetails, chaosDetails *types.ChaosDetails, conn *websocket.Conn) {
+func triggerInlineOnChaosCmdProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets, chaosresult *types.ResultDetails, chaosDetails *types.ChaosDetails) {
 	var isExperimentFailed bool
 	duration := chaosDetails.ChaosDuration
 	// waiting for initial delay
@@ -309,7 +309,7 @@ loop:
 			break loop
 		default:
 			// record the error inside the probeDetails, we are maintaining a dedicated variable for the err, inside probeDetails
-			if err = triggerInlineCmdProbe(probe, chaosresult, conn); err != nil {
+			if err = triggerInlineCmdProbe(probe, chaosresult, chaosDetails.WebsocketConnection); err != nil {
 				for index := range chaosresult.ProbeDetails {
 					if chaosresult.ProbeDetails[index].Name == probe.Name {
 						chaosresult.ProbeDetails[index].IsProbeFailedWithError = err
@@ -453,7 +453,7 @@ func validateResult(comparator v1alpha1.ComparatorInfo, cmdOutput string, rc int
 }
 
 //preChaosCmdProbe trigger the cmd probe for prechaos phase
-func preChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, conn *websocket.Conn) error {
+func preChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
 
 	switch probe.Mode {
 	case "SOT", "Edge":
@@ -477,7 +477,7 @@ func preChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 
 		// triggering the cmd probe for the inline mode
 		if reflect.DeepEqual(probe.CmdProbeInputs.Source, v1alpha1.SourceDetails{}) {
-			err = triggerInlineCmdProbe(probe, resultDetails, conn)
+			err = triggerInlineCmdProbe(probe, resultDetails, chaosDetails.WebsocketConnection)
 
 			// failing the probe, if the success condition doesn't met after the retry & timeout combinations
 			// it will update the status of all the unrun probes as well
@@ -522,7 +522,7 @@ func preChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 			"Phase":          "PreChaos",
 		})
 		if reflect.DeepEqual(probe.CmdProbeInputs.Source, v1alpha1.SourceDetails{}) {
-			go triggerInlineContinuousCmdProbe(probe, clients, resultDetails, chaosDetails, conn)
+			go triggerInlineContinuousCmdProbe(probe, clients, resultDetails, chaosDetails)
 		} else {
 
 			execCommandDetails, err := createHelperPod(probe, resultDetails, clients, chaosDetails)
@@ -539,7 +539,7 @@ func preChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 }
 
 //postChaosCmdProbe trigger cmd probe for post chaos phase
-func postChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, conn *websocket.Conn) error {
+func postChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
 
 	switch probe.Mode {
 	case "EOT", "Edge":
@@ -563,7 +563,7 @@ func postChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resu
 
 		// triggering the cmd probe for the inline mode
 		if reflect.DeepEqual(probe.CmdProbeInputs.Source, v1alpha1.SourceDetails{}) {
-			err = triggerInlineCmdProbe(probe, resultDetails, conn)
+			err = triggerInlineCmdProbe(probe, resultDetails, chaosDetails.WebsocketConnection)
 
 			// failing the probe, if the success condition doesn't met after the retry & timeout combinations
 			// it will update the status of all the unrun probes as well
@@ -623,7 +623,7 @@ func postChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resu
 }
 
 //onChaosCmdProbe trigger the cmd probe for DuringChaos phase
-func onChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, conn *websocket.Conn) error {
+func onChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
 
 	switch probe.Mode {
 	case "OnChaos":
@@ -639,7 +639,7 @@ func onChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Result
 			"Phase":          "DuringChaos",
 		})
 		if reflect.DeepEqual(probe.CmdProbeInputs.Source, v1alpha1.SourceDetails{}) {
-			go triggerInlineOnChaosCmdProbe(probe, clients, resultDetails, chaosDetails, conn)
+			go triggerInlineOnChaosCmdProbe(probe, clients, resultDetails, chaosDetails)
 		} else {
 
 			execCommandDetails, err := createHelperPod(probe, resultDetails, clients, chaosDetails)

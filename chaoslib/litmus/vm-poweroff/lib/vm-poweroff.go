@@ -107,7 +107,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 				//Run the probes during the chaos
 				//The OnChaos probes execution will start in the first iteration and keep running for the entire chaos duration
 				if len(resultDetails.ProbeDetails) != 0 && i == 0 {
-					if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails, nil); err != nil {
+					if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
 						return err
 					}
 				}
@@ -182,7 +182,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 
 			//Running the probes during chaos
 			if len(resultDetails.ProbeDetails) != 0 {
-				if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails, nil); err != nil {
+				if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
 					return err
 				}
 			}
