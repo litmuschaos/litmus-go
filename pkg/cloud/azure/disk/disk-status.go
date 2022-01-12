@@ -10,7 +10,6 @@ import (
 	"github.com/Azure/go-autorest/autorest/azure/auth"
 	"github.com/litmuschaos/litmus-go/pkg/cloud/azure/common"
 
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/azure/disk-loss/types"
 	"github.com/pkg/errors"
 )
 
@@ -80,10 +79,10 @@ func GetDiskStatus(subscriptionID, resourceGroup, diskName string) (compute.Disk
 }
 
 // CheckVirtualDiskWithInstance checks whether the given list of disk are attached to the provided VM instance
-func CheckVirtualDiskWithInstance(experimentsDetails experimentTypes.ExperimentDetails) error {
+func CheckVirtualDiskWithInstance(subscriptionID, virtualDiskNames, resourceGroup string) error {
 
 	// Setup and authorize disk client
-	diskClient := compute.NewDisksClient(experimentsDetails.SubscriptionID)
+	diskClient := compute.NewDisksClient(subscriptionID)
 	authorizer, err := auth.NewAuthorizerFromFile(azure.PublicCloud.ResourceManagerEndpoint)
 
 	if err != nil {
@@ -92,10 +91,10 @@ func CheckVirtualDiskWithInstance(experimentsDetails experimentTypes.ExperimentD
 	diskClient.Authorizer = authorizer
 
 	// Creating an array of the name of the attached disks
-	diskNameList := strings.Split(experimentsDetails.VirtualDiskNames, ",")
+	diskNameList := strings.Split(virtualDiskNames, ",")
 
 	for _, diskName := range diskNameList {
-		disk, err := diskClient.Get(context.Background(), experimentsDetails.ResourceGroup, diskName)
+		disk, err := diskClient.Get(context.Background(), resourceGroup, diskName)
 		if err != nil {
 			return errors.Errorf("failed to get disk: %v, err: %v", diskName, err)
 		}
