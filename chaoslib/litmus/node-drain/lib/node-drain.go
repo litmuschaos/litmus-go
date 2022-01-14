@@ -115,6 +115,9 @@ func PrepareNodeDrain(experimentsDetails *experimentTypes.ExperimentDetails, cli
 func drainNode(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
 
 	targetNodes := strings.Split(experimentsDetails.TargetNode, ",")
+	if len(targetNodes) == 0 {
+		return errors.Errorf("No target nodes provided, expected the comma-separated names of one or more nodes")
+	}
 
 	log.Infof("Target nodes list: %v", targetNodes)
 	for _, targetNode := range targetNodes {
@@ -165,7 +168,11 @@ func drainNode(experimentsDetails *experimentTypes.ExperimentDetails, clients cl
 // uncordonNode uncordon the application node
 func uncordonNode(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
 
-	targetNodes := strings.Split(experimentsDetails.TargetNode, ",")
+	targetNodes := strings.Split(experimentsDetails.TargetNodes, ",")
+	if len(targetNodes) == 0 {
+		return errors.Errorf("No target nodes provided, expected the comma-separated names of one or more nodes")
+	}
+
 	for _, targetNode := range targetNodes {
 
 		//Check node exist before uncordon the node
@@ -196,7 +203,11 @@ func uncordonNode(experimentsDetails *experimentTypes.ExperimentDetails, clients
 		Times(uint(experimentsDetails.Timeout / experimentsDetails.Delay)).
 		Wait(time.Duration(experimentsDetails.Delay) * time.Second).
 		Try(func(attempt uint) error {
-			targetNodes := strings.Split(experimentsDetails.TargetNode, ",")
+			targetNodes := strings.Split(experimentsDetails.TargetNodes, ",")
+			if len(targetNodes) == 0 {
+				return errors.Errorf("No target nodes provided, expected the comma-separated names of one or more nodes")
+			}
+	
 			for _, targetNode := range targetNodes {
 				nodeSpec, err := clients.KubeClient.CoreV1().Nodes().Get(targetNode, v1.GetOptions{})
 				if err != nil {
