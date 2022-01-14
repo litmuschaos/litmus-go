@@ -64,7 +64,7 @@ func NodeDrain(clients clients.ClientSets) {
 	//DISPLAY THE APP INFORMATION
 	log.InfoWithValues("[Info]: The application information is as follows", logrus.Fields{
 		"Node Label":     experimentsDetails.NodeLabel,
-		"Target Node":    experimentsDetails.TargetNode,
+		"Target Nodes":    experimentsDetails.TargetNodes,
 		"Chaos Duration": experimentsDetails.ChaosDuration,
 	})
 
@@ -93,7 +93,7 @@ func NodeDrain(clients clients.ClientSets) {
 
 	// Checking the status of target nodes
 	log.Info("[Status]: Getting the status of target nodes")
-	if err := status.CheckNodeStatus(experimentsDetails.TargetNode, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
+	if err := status.CheckNodeStatus(experimentsDetails.TargetNodes, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
 		log.Errorf("Target nodes are not in the ready state, err: %v", err)
 		failStep := "[pre-chaos]: Failed to verify the status of nodes, err: " + err.Error()
 		types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, "NUT: Not Ready", "Warning", &chaosDetails)
@@ -166,7 +166,7 @@ func NodeDrain(clients clients.ClientSets) {
 
 	// Checking the status of target nodes
 	log.Info("[Status]: Getting the status of target nodes")
-	if err := status.CheckNodeStatus(experimentsDetails.TargetNode, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
+	if err := status.CheckNodeStatus(experimentsDetails.TargetNodes, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
 		log.Warnf("Target nodes are not in the ready state, you may need to manually recover the node, err: %v", err)
 		types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, "NUT: Not Ready", "Warning", &chaosDetails)
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")

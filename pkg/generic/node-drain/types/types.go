@@ -18,7 +18,7 @@ type ExperimentDetails struct {
 	InstanceID         string
 	ChaosNamespace     string
 	ChaosPodName       string
-	TargetNode         string
+	TargetNodes         string
 	AuxiliaryAppInfo   string
 	Timeout            int
 	Delay              int

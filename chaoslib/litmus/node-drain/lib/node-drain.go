@@ -49,16 +49,16 @@ func PrepareNodeDrain(experimentsDetails *experimentTypes.ExperimentDetails, cli
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 
-	if experimentsDetails.TargetNode == "" {
+	if experimentsDetails.TargetNodes == "" {
 		//Select node for kubelet-service-kill
-		experimentsDetails.TargetNode, err = common.GetNodeName(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.NodeLabel, clients)
+		experimentsDetails.TargetNodes, err = common.GetNodeName(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.NodeLabel, clients)
 		if err != nil {
 			return err
 		}
 	}
 
 	if experimentsDetails.EngineName != "" {
-		msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on " + experimentsDetails.TargetNode + " node"
+		msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on " + experimentsDetails.TargetNodes + " node"
 		types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
 		events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 	}
@@ -114,7 +114,7 @@ func PrepareNodeDrain(experimentsDetails *experimentTypes.ExperimentDetails, cli
 // drainNode drain the application node
 func drainNode(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
 
-	targetNodes := strings.Split(experimentsDetails.TargetNode, ",")
+	targetNodes := strings.Split(experimentsDetails.TargetNodes, ",")
 	if len(targetNodes) == 0 {
 		return errors.Errorf("No target nodes provided, expected the comma-separated names of one or more nodes")
 	}
@@ -135,7 +135,7 @@ func drainNode(experimentsDetails *experimentTypes.ExperimentDetails, clients cl
 			command.Stderr = &stderr
 			if err := command.Run(); err != nil {
 				log.Infof("Error String: %v", stderr.String())
-				return errors.Errorf("Unable to drain the %v node, err: %v", experimentsDetails.TargetNode, err)
+				return errors.Errorf("Unable to drain the %v node, err: %v", targetNode, err)
 			}
 
 			common.SetTargets(targetNode, "injected", "node", chaosDetails)
@@ -218,7 +218,7 @@ func uncordonNode(experimentsDetails *experimentTypes.ExperimentDetails, clients
 					}
 				}
 				if nodeSpec.Spec.Unschedulable {
-					return errors.Errorf("%v node is in unschedulable state", experimentsDetails.TargetNode)
+					return errors.Errorf("%v node is in unschedulable state", targetNode)
 				}
 			}
 			return nil
