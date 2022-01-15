@@ -3,7 +3,7 @@ name: Push
 on:
   push:
     branches:
-      - master
+      - m-agent
     tags-ignore:
       - '**'
 jobs:
