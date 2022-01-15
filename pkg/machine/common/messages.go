@@ -1,4 +1,4 @@
-package messages
+package common
 
 import (
 	"encoding/json"
