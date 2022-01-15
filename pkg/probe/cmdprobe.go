@@ -70,9 +70,10 @@ func triggerInlineCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.
 		Timeout(int64(probe.RunProperties.ProbeTimeout)).
 		Wait(time.Duration(probe.RunProperties.Interval) * time.Second).
 		TryWithTimeout(func(attempt uint) error {
-			var stdout string
-			// run the inline command probe
 
+			var stdout string
+
+			// run the inline command probe
 			if conn == nil {
 
 				var out, errOut bytes.Buffer
@@ -97,6 +98,7 @@ func triggerInlineCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.
 					return errors.Errorf("failed to recieve message from agent, %v", err)
 				}
 
+				// ACTION_SUCCESSFUL feedback is received only if the command execution was successful
 				if feedback != "ACTION_SUCCESSFUL" {
 
 					var agentError string

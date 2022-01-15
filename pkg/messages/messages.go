@@ -32,12 +32,7 @@ func ListenForAgentMessage(conn *websocket.Conn) (string, []byte, error) {
 // SendMessageToAgent sends a message consisting of an action and a payload to the agent
 func SendMessageToAgent(conn *websocket.Conn, action string, payload interface{}) error {
 
-	err := conn.WriteJSON(Message{action, payload})
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return conn.WriteJSON(Message{action, payload})
 }
 
 // GetErrorMessage accepts the error message payload and returns the error message string

@@ -27,7 +27,7 @@ func PrepareProcessKillChaos(experimentsDetails *experimentTypes.ExperimentDetai
 
 	processIdList := strings.Split(experimentsDetails.ProcessIds, ",")
 	if len(processIdList) == 0 {
-		return errors.Errorf("no process ID found")
+		return errors.Errorf("no process ID provided, please provide a process id")
 	}
 
 	var pids []int
@@ -36,7 +36,7 @@ func PrepareProcessKillChaos(experimentsDetails *experimentTypes.ExperimentDetai
 
 		p, err := strconv.Atoi(pid)
 		if err != nil {
-			return errors.Errorf("unable to convert process id %s to integer, %v", pid, err)
+			return errors.Errorf("unable to convert process id %s to integer, err: %v", pid, err)
 		}
 
 		pids = append(pids, p)
@@ -84,33 +84,34 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		// kill the processes
 		for i, pid := range pids {
 
-			log.Infof("[Chaos]: Killing %s process", strconv.Itoa(pid))
+			log.Infof("[Chaos]: Killing %d process", pid)
 			if err := messages.SendMessageToAgent(chaosDetails.WebsocketConnection, "EXECUTE_EXPERIMENT", []int{pid}); err != nil {
-				return errors.Errorf("failed to send message to agent, %v", err)
+				return errors.Errorf("failed to send message to agent, err: %v", err)
 			}
 
 			common.SetTargets(strconv.Itoa(pid), "injected", "Process", chaosDetails)
 
 			feedback, payload, err := messages.ListenForAgentMessage(chaosDetails.WebsocketConnection)
 			if err != nil {
-				return errors.Errorf("error during reception of message from agent, %v", err)
+				return errors.Errorf("error during reception of message from agent, err: %v", err)
 			}
 
+			// ACTION_SUCCESSFUL feedback is received only if the process is killed successfully
 			if feedback != "ACTION_SUCCESSFUL" {
 				if feedback == "ERROR" {
 
 					agentError, err := messages.GetErrorMessage(payload)
 					if err != nil {
-						return errors.Errorf("failed to interpret error message from agent, ", err)
+						return errors.Errorf("failed to interpret error message from agent, err: %v", err)
 					}
 
-					return errors.Errorf("error occured while killing %v process, %s", pid, agentError)
+					return errors.Errorf("error occured while killing %d process, err: %s", pid, agentError)
 				}
 
 				return errors.Errorf("unintelligible feedback received from agent: %s", feedback)
 			}
 
-			log.Infof("[Chaos]: %s process killed successfully", strconv.Itoa(pid))
+			log.Infof("[Chaos]: %d process killed successfully", pid)
 
 			// run the probes during chaos
 			// the OnChaos probes execution will start in the first iteration and keep running for the entire chaos duration
@@ -151,7 +152,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		// kill the processes
 		log.Infof("[Chaos]: Killing %v processes", pids)
 		if err := messages.SendMessageToAgent(chaosDetails.WebsocketConnection, "EXECUTE_EXPERIMENT", pids); err != nil {
-			return errors.Errorf("failed to send message to agent, %v", err)
+			return errors.Errorf("failed to send message to agent, err: %v", err)
 		}
 
 		for _, pid := range pids {
@@ -160,18 +161,19 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 
 		feedback, payload, err := messages.ListenForAgentMessage(chaosDetails.WebsocketConnection)
 		if err != nil {
-			return errors.Errorf("error during reception of message from agent, %v", err)
+			return errors.Errorf("error during reception of message from agent, err: %v", err)
 		}
 
+		// ACTION_SUCCESSFUL feedback is received only if all the processes are killed successfully
 		if feedback != "ACTION_SUCCESSFUL" {
 			if feedback == "ERROR" {
 
 				agentError, err := messages.GetErrorMessage(payload)
 				if err != nil {
-					return errors.Errorf("failed to interpret error message from agent, %v", err)
+					return errors.Errorf("failed to interpret error message from agent, err: %v", err)
 				}
 
-				return errors.Errorf("error during process kill, %s", agentError)
+				return errors.Errorf("error during process kill, err: %s", agentError)
 			}
 
 			return errors.Errorf("unintelligible feedback received from agent: %s", feedback)
