@@ -1,7 +1,7 @@
 name: E2E
 on:
   pull_request:
-    branches: [master]
+    branches: [v2.5.x]
     types: [opened, synchronize, reopened]
     paths-ignore:
       - '**.md'

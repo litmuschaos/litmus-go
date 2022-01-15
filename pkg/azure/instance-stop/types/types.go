@@ -20,6 +20,7 @@ type ExperimentDetails struct {
 	InstanceID         string
 	ChaosNamespace     string
 	ChaosPodName       string
+	TargetContainer    string
 	Timeout            int
 	Delay              int
 	AzureInstanceName  string

@@ -12,6 +12,6 @@ import (
 //PodNetworkLatencyChaos contains the steps to prepare and inject chaos
 func PodNetworkLatencyChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
-	args := "delay " + strconv.Itoa(experimentsDetails.NetworkLatency) + "ms"
+	args := "delay " + strconv.Itoa(experimentsDetails.NetworkLatency) + "ms " + strconv.Itoa(experimentsDetails.Jitter) + "ms"
 	return network_chaos.PrepareAndInjectChaos(experimentsDetails, clients, resultDetails, eventsDetails, chaosDetails, args)
 }

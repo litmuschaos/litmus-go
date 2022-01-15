@@ -28,6 +28,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.NetworkLatency, _ = strconv.Atoi(types.Getenv("NETWORK_LATENCY", "60000"))
 	experimentDetails.NetworkPacketLossPercentage, _ = strconv.Atoi(types.Getenv("NETWORK_PACKET_LOSS_PERCENTAGE", "100"))
 	experimentDetails.NetworkPacketCorruptionPercentage, _ = strconv.Atoi(types.Getenv("NETWORK_PACKET_CORRUPTION_PERCENTAGE", "100"))
+	experimentDetails.Jitter, _ = strconv.Atoi(types.Getenv("JITTER", "0"))
 	experimentDetails.NetworkInterface = types.Getenv("NETWORK_INTERFACE", "eth0")
 	experimentDetails.TargetContainer = types.Getenv("TARGET_CONTAINER", "")
 	experimentDetails.TCImage = types.Getenv("TC_IMAGE", "gaiadocker/iproute2")
