@@ -2,7 +2,7 @@
 name: Build
 on:
   pull_request:
-    branches: [master]
+    branches: [m-agent]
     types: [opened, synchronize, reopened]
 
 jobs:
@@ -78,7 +78,7 @@ jobs:
           push: false
           file: build/Dockerfile
           platforms: linux/amd64,linux/arm64
-          tags: litmuschaos/go-runner:ci
+          tags: litmuschaos/go-runner:m-agent
 
   trivy:
     needs: pre-checks

@@ -4,6 +4,7 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/gorilla/websocket"
 	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	clientTypes "k8s.io/apimachinery/pkg/types"
@@ -92,6 +93,7 @@ type ChaosDetails struct {
 	Resources             corev1.ResourceRequirements
 	ImagePullSecrets      []corev1.LocalObjectReference
 	Labels                map[string]string
+	WebsocketConnection   *websocket.Conn
 }
 
 // AppDetails contains all the application related envs
@@ -130,6 +132,8 @@ func InitialiseChaosVariables(chaosDetails *ChaosDetails) {
 	chaosDetails.ProbeImagePullPolicy = Getenv("LIB_IMAGE_PULL_POLICY", "Always")
 	chaosDetails.ParentsResources = []string{}
 	chaosDetails.Targets = []v1alpha1.TargetDetails{}
+
+	chaosDetails.WebsocketConnection = nil
 }
 
 //SetResultAttributes initialise all the chaos result ENV

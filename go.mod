@@ -8,6 +8,7 @@ require (
 	github.com/Azure/go-autorest/autorest/azure/auth v0.5.7
 	github.com/aws/aws-sdk-go v1.38.59
 	github.com/containerd/cgroups v1.0.1
+	github.com/gorilla/websocket v1.4.2
 	github.com/kyokomi/emoji v2.2.4+incompatible
 	github.com/litmuschaos/chaos-operator v0.0.0-20210906054553-064706497fb6
 	github.com/openebs/maya v1.12.1
