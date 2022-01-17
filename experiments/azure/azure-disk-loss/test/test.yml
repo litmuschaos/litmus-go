@@ -21,26 +21,21 @@ spec:
           - sleep
           - "3600"
         env:
-          # provide application namespace
           - name: APP_NAMESPACE
-            value: ''
+            value: 'default'
 
-          # provide application labels
           - name: APP_LABEL
-            value: ''
- 
-          # provide application kind
+            value: 'run=nginx'
+
           - name: APP_KIND
-            value: '' 
+            value: 'deployment'
 
           - name: TOTAL_CHAOS_DURATION
-            value: ''
-
-          # provide auxiliary application details - namespace and labels of the applications
-          # sample input is - "ns1:app=percona,ns2:name=nginx"
-          - name: AUXILIARY_APPINFO
-            value: ''
+            value: '60'
           
+          - name: CHAOS_INTERVAL
+            value: '30'
+
           ## Period to wait before injection of chaos in sec
           - name: RAMP_TIME
             value: ''
@@ -48,15 +43,11 @@ spec:
           ## env var that describes the library used to execute the chaos
           ## default: litmus
           - name: LIB
-            value: ''
+            value: 'litmus'
 
           # provide the chaos namespace
           - name: CHAOS_NAMESPACE
-            value: ''
-          
-          # provide target container name
-          - name: TARGET_CONTAINER
-            value: ''
+            value: 'litmus'
           
           # provide the resouce group of the instance
           - name: RESOURCE_GROUP
@@ -72,7 +63,7 @@ spec:
           
           # provide the sequence type for the run. Options: serial/parallel
           - name: SEQUENCE
-            value: ''
+            value: 'parallel'
           
           # provide the path to aks credentials mounted from secret
           - name: AZURE_AUTH_LOCATION
@@ -88,4 +79,8 @@ spec:
             valueFrom:
               fieldRef:
                 fieldPath: spec.serviceAccountName
+          
+        secrets:
+          - name: cloud-secret
+            mountPath: /tmp/
 

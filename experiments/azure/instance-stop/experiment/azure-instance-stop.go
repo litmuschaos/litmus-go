@@ -10,12 +10,12 @@ import (
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	azureCommon "github.com/litmuschaos/litmus-go/pkg/cloud/azure/common"
 	azureStatus "github.com/litmuschaos/litmus-go/pkg/cloud/azure/instance"
+	"github.com/litmuschaos/litmus-go/pkg/status"
 
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/result"
-	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/sirupsen/logrus"
@@ -64,16 +64,16 @@ func AzureInstanceStop(clients clients.ClientSets) {
 	go common.AbortWatcherWithoutExit(experimentsDetails.ExperimentName, clients, &resultDetails, &chaosDetails, &eventsDetails)
 
 	//DISPLAY THE APP INFORMATION
-	log.InfoWithValues("The application information is as follows", logrus.Fields{
+	log.InfoWithValues("The instance information is as follows", logrus.Fields{
 		"Chaos Duration": experimentsDetails.ChaosDuration,
 		"Resource Group": experimentsDetails.ResourceGroup,
 		"Instance Name":  experimentsDetails.AzureInstanceName,
+		"Sequence":       experimentsDetails.Sequence,
 	})
 
 	//PRE-CHAOS APPLICATION STATUS CHECK
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (pre-chaos)")
-	err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
-	if err != nil {
+	if err = status.AUTStatusCheck(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.TargetContainer, experimentsDetails.Timeout, experimentsDetails.Delay, clients, &chaosDetails); err != nil {
 		log.Errorf("Application status check failed, err: %v", err)
 		failStep := "[pre-chaos]: Failed to verify that the AUT (Application Under Test) is in running state, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
@@ -83,8 +83,7 @@ func AzureInstanceStop(clients clients.ClientSets) {
 	//PRE-CHAOS AUXILIARY APPLICATION STATUS CHECK
 	if experimentsDetails.AuxiliaryAppInfo != "" {
 		log.Info("[Status]: Verify that the Auxiliary Applications are running (pre-chaos)")
-		err = status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
-		if err != nil {
+		if err = status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
 			log.Errorf("Auxiliary Application status check failed, err: %v", err)
 			failStep := "[pre-chaos]: Failed to verify that the Auxiliary Applications are in running state, err: " + err.Error()
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
@@ -130,7 +129,7 @@ func AzureInstanceStop(clients clients.ClientSets) {
 	}
 
 	//Verify the azure target instance is running (pre-chaos)
-	if err := azureStatus.InstanceStatusCheckByName(&experimentsDetails); err != nil {
+	if err = azureStatus.InstanceStatusCheckByName(experimentsDetails.AzureInstanceName, experimentsDetails.ScaleSet, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup); err != nil {
 		log.Errorf("failed to get the azure instance status, err: %v", err)
 		failStep := "[pre-chaos]: Failed to verify the azure instance status, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
@@ -158,7 +157,7 @@ func AzureInstanceStop(clients clients.ClientSets) {
 	resultDetails.Verdict = v1alpha1.ResultVerdictPassed
 
 	//Verify the azure instance is running (post chaos)
-	if err = azureStatus.InstanceStatusCheckByName(&experimentsDetails); err != nil {
+	if err = azureStatus.InstanceStatusCheckByName(experimentsDetails.AzureInstanceName, experimentsDetails.ScaleSet, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup); err != nil {
 		log.Errorf("failed to get the azure instance status, err: %v", err)
 		failStep := "[pre-chaos]: Failed to update the azure instance status, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
@@ -168,7 +167,7 @@ func AzureInstanceStop(clients clients.ClientSets) {
 
 	//POST-CHAOS APPLICATION STATUS CHECK
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (post-chaos)")
-	if err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
+	if err = status.AUTStatusCheck(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.TargetContainer, experimentsDetails.Timeout, experimentsDetails.Delay, clients, &chaosDetails); err != nil {
 		log.Errorf("Application status check failed, err: %v", err)
 		failStep := "[post-chaos]: Failed to verify that the AUT (Application Under Test) is running, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
