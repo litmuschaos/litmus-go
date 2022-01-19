@@ -13,6 +13,7 @@ import (
 
 	awsSSMChaosByID "github.com/litmuschaos/litmus-go/experiments/aws-ssm/aws-ssm-chaos-by-id/experiment"
 	awsSSMChaosByTag "github.com/litmuschaos/litmus-go/experiments/aws-ssm/aws-ssm-chaos-by-tag/experiment"
+	awsSnsChaos "github.com/litmuschaos/litmus-go/experiments/aws/sns-chaos/experiment"
 	azureDiskLoss "github.com/litmuschaos/litmus-go/experiments/azure/azure-disk-loss/experiment"
 	azureInstanceStop "github.com/litmuschaos/litmus-go/experiments/azure/instance-stop/experiment"
 	redfishNodeRestart "github.com/litmuschaos/litmus-go/experiments/baremetal/redfish-node-restart/experiment"
@@ -160,6 +161,8 @@ func main() {
 		gcpVMInstanceStop.VMInstanceStop(clients)
 	case "redfish-node-restart":
 		redfishNodeRestart.NodeRestart(clients)
+	case "aws-sns-outage":
+		awsSnsChaos.SnsOutage(clients)
 
 	default:
 		log.Errorf("Unsupported -name %v, please provide the correct value of -name args", *experimentName)
