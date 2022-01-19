@@ -207,7 +207,7 @@ func uncordonNode(experimentsDetails *experimentTypes.ExperimentDetails, clients
 			if len(targetNodes) == 0 {
 				return errors.Errorf("No target nodes provided, expected the comma-separated names of one or more nodes")
 			}
-	
+
 			for _, targetNode := range targetNodes {
 				nodeSpec, err := clients.KubeClient.CoreV1().Nodes().Get(targetNode, v1.GetOptions{})
 				if err != nil {
