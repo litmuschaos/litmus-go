@@ -17,19 +17,21 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// SqsOutage contains steps to inject chaos to SQS
 func SqsOutage(clients clients.ClientSets) {
 	simpleServiceOutage(clients, "sqs")
 }
 
+// SnsOutage contains steps to inject chaos to SNS
 func SnsOutage(clients clients.ClientSets) {
 	simpleServiceOutage(clients, "sns")
 }
 
+// S3Outage contains steps to inject chaos to S3
 func S3Outage(clients clients.ClientSets) {
 	simpleServiceOutage(clients, "s3")
 }
 
-// SnsOutage contains steps to inject chaos
 func simpleServiceOutage(clients clients.ClientSets, awsService string) {
 
 	experimentsDetails := experimentTypes.ExperimentDetails{}
