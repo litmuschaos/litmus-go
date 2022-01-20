@@ -5,7 +5,7 @@ import (
 
 	clientTypes "k8s.io/apimachinery/pkg/types"
 
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/aws/sns-chaos/types"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/aws/simple-services-chaos/types"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 )
 

@@ -30,6 +30,7 @@ type ExperimentDetails struct {
 	LIBImagePullPolicy string
 	LIBImage           string
 	SocketPath         string
+	AwsService         string
 	Region             string
 	MinNumberOfIps     int
 }

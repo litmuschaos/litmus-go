@@ -3,9 +3,9 @@ package experiment
 import (
 	"os"
 
-	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/aws/sns-chaos/lib"
-	experimentEnv "github.com/litmuschaos/litmus-go/pkg/aws/sns-chaos/environment"
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/aws/sns-chaos/types"
+	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/aws/simple-services-chaos/lib"
+	experimentEnv "github.com/litmuschaos/litmus-go/pkg/aws/simple-services-chaos/environment"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/aws/simple-services-chaos/types"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	"github.com/litmuschaos/litmus-go/pkg/log"
@@ -17,8 +17,20 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// SnsOutage contains steps to inject chaos
+func SqsOutage(clients clients.ClientSets) {
+	simpleServiceOutage(clients, "sqs")
+}
+
 func SnsOutage(clients clients.ClientSets) {
+	simpleServiceOutage(clients, "sns")
+}
+
+func S3Outage(clients clients.ClientSets) {
+	simpleServiceOutage(clients, "s3")
+}
+
+// SnsOutage contains steps to inject chaos
+func simpleServiceOutage(clients clients.ClientSets, awsService string) {
 
 	experimentsDetails := experimentTypes.ExperimentDetails{}
 	resultDetails := types.ResultDetails{}
@@ -28,6 +40,7 @@ func SnsOutage(clients clients.ClientSets) {
 	//Fetching all the ENV passed from the runner pod
 	log.Infof("[PreReq]: Getting the ENV for the %v experiment", os.Getenv("EXPERIMENT_NAME"))
 	experimentEnv.GetENV(&experimentsDetails)
+	experimentsDetails.AwsService = awsService
 
 	// Initialize the chaos attributes
 	types.InitialiseChaosVariables(&chaosDetails)

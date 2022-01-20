@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/litmuschaos/litmus-go/chaoslib/litmus/network-chaos/lib/loss"
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/aws/sns-chaos/types"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/aws/simple-services-chaos/types"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	networkExperimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/network-chaos/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
@@ -50,7 +50,7 @@ func fetchIPs(experimentDetails *experimentTypes.ExperimentDetails) ([]string, e
 	log.Infof("Fetching destination IPs for SNS on region %v...", experimentDetails.Region)
 	ipsAsString := make(CustomIP, 0, experimentDetails.MinNumberOfIps)
 	for {
-		ips, err := net.LookupIP(fmt.Sprintf("sns.%v.amazonaws.com", experimentDetails.Region))
+		ips, err := net.LookupIP(fmt.Sprintf("%v.%v.amazonaws.com", experimentDetails.AwsService, experimentDetails.Region))
 		if err != nil {
 			return nil, err
 		}
