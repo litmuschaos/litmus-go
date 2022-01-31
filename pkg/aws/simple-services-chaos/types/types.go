@@ -5,32 +5,29 @@ import (
 )
 
 type ExperimentDetails struct {
-	ExperimentName     string
-	EngineName         string
-	ChaosDuration      int
-	ChaosInterval      int
-	RampTime           int
-	ChaosLib           string
-	AppNS              string
-	AppLabel           string
-	AppKind            string
-	AuxiliaryAppInfo   string
-	ChaosUID           clientTypes.UID
-	InstanceID         string
-	ChaosNamespace     string
-	ChaosPodName       string
-	Timeout            int
-	Delay              int
-	TargetContainer    string
-	ChaosInjectCmd     string
-	ChaosKillCmd       string
-	PodsAffectedPerc   int
-	TargetPods         string
-	TCImage            string
-	LIBImagePullPolicy string
-	LIBImage           string
-	SocketPath         string
-	AwsService         string
-	Region             string
-	MinNumberOfIps     int
+	ExperimentName              string
+	EngineName                  string
+	ChaosDuration               int
+	RampTime                    int
+	ChaosLib                    string
+	AppNS                       string
+	AppLabel                    string
+	AppKind                     string
+	ChaosUID                    clientTypes.UID
+	InstanceID                  string
+	ChaosNamespace              string
+	ChaosPodName                string
+	Timeout                     int
+	Delay                       int
+	TargetContainer             string
+	PodsAffectedPerc            int
+	TargetPods                  string
+	TCImage                     string
+	LIBImagePullPolicy          string
+	LIBImage                    string
+	SocketPath                  string
+	AwsService                  string
+	Region                      string
+	MinNumberOfIps              int
+	TimeoutGatherMinNumberOfIps int
 }
