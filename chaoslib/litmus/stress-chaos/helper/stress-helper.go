@@ -237,7 +237,7 @@ func prepareStressor(experimentDetails *experimentTypes.ExperimentDetails) []str
 			"CPU Core": experimentDetails.CPUcores,
 			"Timeout":  experimentDetails.ChaosDuration,
 		})
-		stressArgs = append(stressArgs, "--cpu "+strconv.Itoa(experimentDetails.CPUcores))
+		stressArgs = append(stressArgs, "--cpu "+strconv.Itoa(experimentDetails.CPUcores)+" --cpu-load "+strconv.Itoa(experimentDetails.CPULoad))
 
 	case "pod-memory-stress":
 
@@ -510,6 +510,7 @@ func getENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.ContainerRuntime = types.Getenv("CONTAINER_RUNTIME", "")
 	experimentDetails.SocketPath = types.Getenv("SOCKET_PATH", "")
 	experimentDetails.CPUcores, _ = strconv.Atoi(types.Getenv("CPU_CORES", ""))
+	experimentDetails.CPULoad, _ = strconv.Atoi(types.Getenv("CPU_LOAD", ""))
 	experimentDetails.FilesystemUtilizationPercentage, _ = strconv.Atoi(types.Getenv("FILESYSTEM_UTILIZATION_PERCENTAGE", ""))
 	experimentDetails.FilesystemUtilizationBytes, _ = strconv.Atoi(types.Getenv("FILESYSTEM_UTILIZATION_BYTES", ""))
 	experimentDetails.NumberOfWorkers, _ = strconv.Atoi(types.Getenv("NUMBER_OF_WORKERS", ""))
