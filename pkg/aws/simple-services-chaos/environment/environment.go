@@ -35,4 +35,5 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.Region = types.Getenv("AWS_REGION", "us-east-1")
 	experimentDetails.MinNumberOfIps, _ = strconv.Atoi(types.Getenv("MIN_NUMBER_IPS", "3"))
 	experimentDetails.TimeoutGatherMinNumberOfIps, _ = strconv.Atoi(types.Getenv("TIMEOUT_MIN_NUMBER_IPS", "60"))
+	experimentDetails.Sequence = types.Getenv("SEQUENCE", "parallel")
 }

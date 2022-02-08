@@ -28,6 +28,7 @@ type ExperimentDetails struct {
 	SocketPath                  string
 	AwsService                  string
 	Region                      string
+	Sequence                    string
 	MinNumberOfIps              int
 	TimeoutGatherMinNumberOfIps int
 }

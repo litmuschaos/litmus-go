@@ -12,7 +12,6 @@ import (
 	networkExperimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/network-chaos/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/types"
-	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/pkg/errors"
 )
 
@@ -42,6 +41,7 @@ func injectChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients 
 		RampTime:           experimentsDetails.RampTime,
 		ChaosPodName:       experimentsDetails.ChaosPodName,
 		InstanceID:         experimentsDetails.InstanceID,
+		Sequence:           experimentsDetails.Sequence,
 		DestinationIPs:     strings.Join(ips, ","),
 	}
 	return loss.PodNetworkLossChaos(experiment, clients, resultDetails, eventsDetails, chaosDetails)
@@ -69,7 +69,7 @@ func fetchIPs(experimentDetails *experimentTypes.ExperimentDetails) ([]string, e
 			return ipsAsString, nil
 		}
 	}
-	return nil, errors.Errorf("Unable to fetch at least %v within %v seconds", experimentDetails.MinNumberOfIps, experimentDetails.TimeoutGatherMinNumberOfIps)
+	return nil, errors.Errorf("Unable to fetch at least %v IPs within %v seconds", experimentDetails.MinNumberOfIps, experimentDetails.TimeoutGatherMinNumberOfIps)
 }
 
 func (ips CustomIP) Contains(value string) bool {
@@ -84,11 +84,6 @@ func (ips CustomIP) Contains(value string) bool {
 func PrepareChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 	if err := injectChaos(experimentsDetails, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
 		return err
-	}
-	//Waiting for the ramp time after chaos injection
-	if experimentsDetails.RampTime != 0 {
-		log.Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", experimentsDetails.RampTime)
-		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 	return nil
 }
