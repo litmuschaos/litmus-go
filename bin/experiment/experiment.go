@@ -17,6 +17,7 @@ import (
 	azureInstanceStop "github.com/litmuschaos/litmus-go/experiments/azure/instance-stop/experiment"
 	redfishNodeRestart "github.com/litmuschaos/litmus-go/experiments/baremetal/redfish-node-restart/experiment"
 	cassandraPodDelete "github.com/litmuschaos/litmus-go/experiments/cassandra/pod-delete/experiment"
+	chaosToolkit "github.com/litmuschaos/litmus-go/experiments/chaos-toolkit/experiment"
 	gcpVMDiskLoss "github.com/litmuschaos/litmus-go/experiments/gcp/gcp-vm-disk-loss/experiment"
 	gcpVMInstanceStop "github.com/litmuschaos/litmus-go/experiments/gcp/gcp-vm-instance-stop/experiment"
 	containerKill "github.com/litmuschaos/litmus-go/experiments/generic/container-kill/experiment"
@@ -82,6 +83,8 @@ func main() {
 
 	// invoke the corresponding experiment based on the the (-name) flag
 	switch *experimentName {
+	case "chaos-toolkit":
+		chaosToolkit.ChaosToolkit(clients)
 	case "container-kill":
 		containerKill.ContainerKill(clients)
 	case "disk-fill":
