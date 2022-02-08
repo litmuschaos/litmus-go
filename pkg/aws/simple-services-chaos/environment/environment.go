@@ -15,6 +15,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.EngineName = types.Getenv("CHAOSENGINE", "")
 	experimentDetails.ChaosNamespace = types.Getenv("CHAOS_NAMESPACE", "litmus")
 	experimentDetails.ChaosDuration, _ = strconv.Atoi(types.Getenv("TOTAL_CHAOS_DURATION", "30"))
+	experimentDetails.ContainerRuntime = types.Getenv("CONTAINER_RUNTIME", "docker")
 	experimentDetails.RampTime, _ = strconv.Atoi(types.Getenv("RAMP_TIME", "0"))
 	experimentDetails.ChaosLib = types.Getenv("LIB", "litmus")
 	experimentDetails.LIBImage = types.Getenv("LIB_IMAGE", "litmuschaos/go-runner:latest")
@@ -35,5 +36,6 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.Region = types.Getenv("AWS_REGION", "us-east-1")
 	experimentDetails.MinNumberOfIps, _ = strconv.Atoi(types.Getenv("MIN_NUMBER_IPS", "3"))
 	experimentDetails.TimeoutGatherMinNumberOfIps, _ = strconv.Atoi(types.Getenv("TIMEOUT_MIN_NUMBER_IPS", "60"))
+	experimentDetails.TerminationGracePeriodSeconds, _ = strconv.Atoi(types.Getenv("TERMINATION_GRACE_PERIOD_SECONDS", ""))
 	experimentDetails.Sequence = types.Getenv("SEQUENCE", "parallel")
 }

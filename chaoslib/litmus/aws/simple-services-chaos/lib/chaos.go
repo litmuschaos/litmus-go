@@ -21,28 +21,31 @@ func injectChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients 
 		return err
 	}
 	experiment := &networkExperimentTypes.ExperimentDetails{
-		ExperimentName:     experimentsDetails.ExperimentName,
-		ChaosDuration:      experimentsDetails.ChaosDuration,
-		ChaosUID:           experimentsDetails.ChaosUID,
-		ChaosNamespace:     experimentsDetails.ChaosNamespace,
-		TargetPods:         experimentsDetails.TargetPods,
-		TargetContainer:    experimentsDetails.TargetContainer,
-		AppKind:            experimentsDetails.AppKind,
-		AppNS:              experimentsDetails.AppNS,
-		AppLabel:           experimentsDetails.AppLabel,
-		PodsAffectedPerc:   experimentsDetails.PodsAffectedPerc,
-		ChaosLib:           experimentsDetails.ChaosLib,
-		LIBImage:           experimentsDetails.LIBImage,
-		LIBImagePullPolicy: experimentsDetails.LIBImagePullPolicy,
-		SocketPath:         experimentsDetails.SocketPath,
-		Timeout:            experimentsDetails.Timeout,
-		TCImage:            experimentsDetails.TCImage,
-		Delay:              experimentsDetails.Delay,
-		RampTime:           experimentsDetails.RampTime,
-		ChaosPodName:       experimentsDetails.ChaosPodName,
-		InstanceID:         experimentsDetails.InstanceID,
-		Sequence:           experimentsDetails.Sequence,
-		DestinationIPs:     strings.Join(ips, ","),
+		ExperimentName:                experimentsDetails.ExperimentName,
+		EngineName:                    experimentsDetails.EngineName,
+		ChaosDuration:                 experimentsDetails.ChaosDuration,
+		ContainerRuntime:              experimentsDetails.ContainerRuntime,
+		ChaosUID:                      experimentsDetails.ChaosUID,
+		ChaosNamespace:                experimentsDetails.ChaosNamespace,
+		TargetPods:                    experimentsDetails.TargetPods,
+		TargetContainer:               experimentsDetails.TargetContainer,
+		AppKind:                       experimentsDetails.AppKind,
+		AppNS:                         experimentsDetails.AppNS,
+		AppLabel:                      experimentsDetails.AppLabel,
+		PodsAffectedPerc:              experimentsDetails.PodsAffectedPerc,
+		ChaosLib:                      experimentsDetails.ChaosLib,
+		LIBImage:                      experimentsDetails.LIBImage,
+		LIBImagePullPolicy:            experimentsDetails.LIBImagePullPolicy,
+		SocketPath:                    experimentsDetails.SocketPath,
+		Timeout:                       experimentsDetails.Timeout,
+		TCImage:                       experimentsDetails.TCImage,
+		Delay:                         experimentsDetails.Delay,
+		RampTime:                      experimentsDetails.RampTime,
+		ChaosPodName:                  experimentsDetails.ChaosPodName,
+		InstanceID:                    experimentsDetails.InstanceID,
+		Sequence:                      experimentsDetails.Sequence,
+		DestinationIPs:                strings.Join(ips, ","),
+		TerminationGracePeriodSeconds: experimentsDetails.TerminationGracePeriodSeconds,
 	}
 	return loss.PodNetworkLossChaos(experiment, clients, resultDetails, eventsDetails, chaosDetails)
 }
@@ -50,7 +53,7 @@ func injectChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients 
 type CustomIP []string
 
 func fetchIPs(experimentDetails *experimentTypes.ExperimentDetails) ([]string, error) {
-	log.Infof("Fetching destination IPs for SNS on region %v...", experimentDetails.Region)
+	log.Infof("Fetching destination IPs on region %v...", experimentDetails.Region)
 	ipsAsString := make(CustomIP, 0, experimentDetails.MinNumberOfIps)
 	startTime := time.Now()
 	for time.Since(startTime).Seconds() < float64(experimentDetails.TimeoutGatherMinNumberOfIps) {
