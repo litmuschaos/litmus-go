@@ -10,6 +10,7 @@ import (
 	"github.com/pkg/errors"
 	logrus "github.com/sirupsen/logrus"
 	apiv1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -26,7 +27,12 @@ func CheckNodeStatus(nodes string, timeout, delay int, clients clients.ClientSet
 				for index := range targetNodes {
 					node, err := clients.KubeClient.CoreV1().Nodes().Get(targetNodes[index], metav1.GetOptions{})
 					if err != nil {
-						return err
+						if apierrors.IsNotFound(err) {
+							log.Infof("[Info]: The %v node is not exist", targetNodes[index])
+							continue
+						} else {
+							return err
+						}
 					}
 					nodeList.Items = append(nodeList.Items, *node)
 				}

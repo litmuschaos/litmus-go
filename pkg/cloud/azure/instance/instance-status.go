@@ -2,15 +2,11 @@ package azure
 
 import (
 	"context"
-	"encoding/json"
-	"io/ioutil"
-	"os"
 	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/profiles/latest/compute/mgmt/compute"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/azure/auth"
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/azure/instance-stop/types"
 	"github.com/litmuschaos/litmus-go/pkg/cloud/azure/common"
 
 	"github.com/litmuschaos/litmus-go/pkg/log"
@@ -73,45 +69,18 @@ func GetAzureScaleSetInstanceStatus(subscriptionID, resourceGroup, virtualMachin
 	return *(*instanceDetails.Statuses)[1].DisplayStatus, nil
 }
 
-// SetupSubscriptionID fetch the subscription id from the auth file and export it in experiment struct variable
-func SetupSubscriptionID(experimentsDetails *experimentTypes.ExperimentDetails) error {
-
-	var err error
-	authFile, err := os.Open(os.Getenv("AZURE_AUTH_LOCATION"))
-	if err != nil {
-		return errors.Errorf("fail to open auth file, err: %v", err)
-	}
-
-	authFileContent, err := ioutil.ReadAll(authFile)
-	if err != nil {
-		return errors.Errorf("fail to read auth file, err: %v", err)
-	}
-
-	details := make(map[string]string)
-	if err := json.Unmarshal(authFileContent, &details); err != nil {
-		return errors.Errorf("fail to unmarshal file, err: %v", err)
-	}
-
-	if id, contains := details["subscriptionId"]; contains {
-		experimentsDetails.SubscriptionID = id
-	} else {
-		return errors.Errorf("The auth file does not have a subscriptionId field")
-	}
-	return nil
-}
-
 // InstanceStatusCheckByName is used to check the instance status of all the instance under chaos
-func InstanceStatusCheckByName(experimentsDetails *experimentTypes.ExperimentDetails) error {
-	instanceNameList := strings.Split(experimentsDetails.AzureInstanceName, ",")
+func InstanceStatusCheckByName(azureInstanceNames, scaleSet, subscriptionID, resourceGroup string) error {
+	instanceNameList := strings.Split(azureInstanceNames, ",")
 	if len(instanceNameList) == 0 {
 		return errors.Errorf("no instance found to check the status")
 	}
 	log.Infof("[Info]: The instance under chaos(IUC) are: %v", instanceNameList)
-	switch experimentsDetails.ScaleSet {
+	switch scaleSet {
 	case "enable":
-		return ScaleSetInstanceStatusCheck(instanceNameList, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup)
+		return ScaleSetInstanceStatusCheck(instanceNameList, subscriptionID, resourceGroup)
 	default:
-		return InstanceStatusCheck(instanceNameList, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup)
+		return InstanceStatusCheck(instanceNameList, subscriptionID, resourceGroup)
 	}
 }
 

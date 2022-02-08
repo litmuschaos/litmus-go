@@ -96,6 +96,7 @@ func SetHelperData(chaosDetails *types.ChaosDetails, clients clients.ClientSets)
 	// Get Labels
 	labels := pod.ObjectMeta.Labels
 	delete(labels, "controller-uid")
+	delete(labels, "job-name")
 	chaosDetails.Labels = labels
 
 	// Get Resource Requirements
