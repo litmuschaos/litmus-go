@@ -38,7 +38,8 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string
 
 	switch expName {
 	case "pod-cpu-hog":
-		experimentDetails.CPUcores, _ = strconv.Atoi(types.Getenv("CPU_CORES", "1"))
+		experimentDetails.CPUcores, _ = strconv.Atoi(types.Getenv("CPU_CORES", "0"))
+		experimentDetails.CPULoad, _ = strconv.Atoi(types.Getenv("CPU_LOAD", "100"))
 		experimentDetails.StressType = "pod-cpu-stress"
 
 	case "pod-memory-hog":

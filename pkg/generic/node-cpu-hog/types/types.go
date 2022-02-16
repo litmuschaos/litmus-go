@@ -20,6 +20,7 @@ type ExperimentDetails struct {
 	ChaosNamespace                string
 	ChaosPodName                  string
 	NodeCPUcores                  int
+	CPULoad                       int
 	RunID                         string
 	LIBImage                      string
 	LIBImagePullPolicy            string

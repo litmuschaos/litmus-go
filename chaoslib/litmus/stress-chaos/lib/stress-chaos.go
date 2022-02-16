@@ -291,6 +291,7 @@ func getPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, podName st
 		SetEnv("EXPERIMENT_NAME", experimentsDetails.ExperimentName).
 		SetEnv("SOCKET_PATH", experimentsDetails.SocketPath).
 		SetEnv("CPU_CORES", strconv.Itoa(experimentsDetails.CPUcores)).
+		SetEnv("CPU_LOAD", strconv.Itoa(experimentsDetails.CPULoad)).
 		SetEnv("FILESYSTEM_UTILIZATION_PERCENTAGE", strconv.Itoa(experimentsDetails.FilesystemUtilizationPercentage)).
 		SetEnv("FILESYSTEM_UTILIZATION_BYTES", strconv.Itoa(experimentsDetails.FilesystemUtilizationBytes)).
 		SetEnv("NUMBER_OF_WORKERS", strconv.Itoa(experimentsDetails.NumberOfWorkers)).
