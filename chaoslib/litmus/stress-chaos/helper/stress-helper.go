@@ -237,7 +237,8 @@ func prepareStressor(experimentDetails *experimentTypes.ExperimentDetails) []str
 			"CPU Core": experimentDetails.CPUcores,
 			"Timeout":  experimentDetails.ChaosDuration,
 		})
-		stressArgs = append(stressArgs, "--cpu "+strconv.Itoa(experimentDetails.CPUcores)+" --cpu-load "+strconv.Itoa(experimentDetails.CPULoad))
+		stressArgs = append(stressArgs, "--cpu "+strconv.Itoa(experimentDetails.CPUcores))
+		stressArgs = append(stressArgs, " --cpu-load "+strconv.Itoa(experimentDetails.CPULoad))
 
 	case "pod-memory-stress":
 
