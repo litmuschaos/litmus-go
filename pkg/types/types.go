@@ -94,6 +94,7 @@ type ChaosDetails struct {
 	ImagePullSecrets      []corev1.LocalObjectReference
 	Labels                map[string]string
 	WebsocketConnection   *websocket.Conn
+	ListenErrorChannel    chan error
 }
 
 // AppDetails contains all the application related envs

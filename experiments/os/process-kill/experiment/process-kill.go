@@ -8,9 +8,10 @@ import (
 	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
 	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/process-kill/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
-	"github.com/litmuschaos/litmus-go/pkg/cloud/process"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	"github.com/litmuschaos/litmus-go/pkg/log"
+	messages "github.com/litmuschaos/litmus-go/pkg/machine/common"
+	"github.com/litmuschaos/litmus-go/pkg/machine/process"
 	experimentEnv "github.com/litmuschaos/litmus-go/pkg/os/process-kill/environment"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/os/process-kill/types"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
@@ -20,6 +21,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+var err error
+
 // ProcessKill contains steps to inject chaos
 func ProcessKill(clients clients.ClientSets) {
 
@@ -27,8 +30,6 @@ func ProcessKill(clients clients.ClientSets) {
 	resultDetails := types.ResultDetails{}
 	eventsDetails := types.EventDetails{}
 	chaosDetails := types.ChaosDetails{}
-
-	var err error
 
 	//Fetching all the ENV passed from the runner pod
 	log.Infof("[PreReq]: Getting the ENV for the %v experiment", os.Getenv("EXPERIMENT_NAME"))
@@ -85,9 +86,11 @@ func ProcessKill(clients clients.ClientSets) {
 
 	defer chaosDetails.WebsocketConnection.Close()
 
+	go messages.ListenForAgentMessage(chaosDetails.WebsocketConnection)
+
 	//Target process state check
 	log.Info("[Status]: Verify that the target processes are running")
-	if err := process.ProcessStateCheck(chaosDetails.WebsocketConnection, experimentsDetails.ProcessIds); err != nil {
+	if err := process.ProcessStateCheck(chaosDetails.WebsocketConnection, chaosDetails.ListenErrorChannel, experimentsDetails.ProcessIds); err != nil {
 		log.Errorf("Error occured during process steady-state validation, err: %v", err)
 		failStep := "[pre-chaos]: Failed to verify the target process status, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)

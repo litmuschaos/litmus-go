@@ -84,17 +84,20 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		// kill the processes
 		for i, pid := range pids {
 
+			timeDuration := 60 * time.Second
+
 			log.Infof("[Chaos]: Killing %d process", pid)
-			if err := messages.SendMessageToAgent(chaosDetails.WebsocketConnection, "EXECUTE_EXPERIMENT", []int{pid}); err != nil {
+			feedback, payload, err := messages.SendMessageToAgent(chaosDetails.WebsocketConnection, "EXECUTE_EXPERIMENT", []int{pid}, &timeDuration)
+			if err != nil {
 				return errors.Errorf("failed to send message to agent, err: %v", err)
 			}
 
 			common.SetTargets(strconv.Itoa(pid), "injected", "Process", chaosDetails)
 
-			feedback, payload, err := messages.ListenForAgentMessage(chaosDetails.WebsocketConnection)
-			if err != nil {
-				return errors.Errorf("error during reception of message from agent, err: %v", err)
-			}
+			// feedback, payload, err := messages.ListenForAgentMessage(chaosDetails.WebsocketConnection)
+			// if err != nil {
+			// 	return errors.Errorf("error during reception of message from agent, err: %v", err)
+			// }
 
 			// ACTION_SUCCESSFUL feedback is received only if the process is killed successfully
 			if feedback != "ACTION_SUCCESSFUL" {
@@ -149,9 +152,12 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 		}
 
+		timeDuration := 60 * time.Second
+
 		// kill the processes
 		log.Infof("[Chaos]: Killing %v processes", pids)
-		if err := messages.SendMessageToAgent(chaosDetails.WebsocketConnection, "EXECUTE_EXPERIMENT", pids); err != nil {
+		feedback, payload, err := messages.SendMessageToAgent(chaosDetails.WebsocketConnection, "EXECUTE_EXPERIMENT", pids, &timeDuration)
+		if err != nil {
 			return errors.Errorf("failed to send message to agent, err: %v", err)
 		}
 
@@ -159,10 +165,10 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 			common.SetTargets(strconv.Itoa(pid), "injected", "Process", chaosDetails)
 		}
 
-		feedback, payload, err := messages.ListenForAgentMessage(chaosDetails.WebsocketConnection)
-		if err != nil {
-			return errors.Errorf("error during reception of message from agent, err: %v", err)
-		}
+		// feedback, payload, err := messages.ListenForAgentMessage(chaosDetails.WebsocketConnection)
+		// if err != nil {
+		// 	return errors.Errorf("error during reception of message from agent, err: %v", err)
+		// }
 
 		// ACTION_SUCCESSFUL feedback is received only if all the processes are killed successfully
 		if feedback != "ACTION_SUCCESSFUL" {
