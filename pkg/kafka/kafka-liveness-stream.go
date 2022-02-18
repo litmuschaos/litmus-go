@@ -40,7 +40,7 @@ func LivenessStream(experimentsDetails *experimentTypes.ExperimentDetails, clien
 	if experimentsDetails.KafkaInstanceName == "" {
 
 		execCommandDetails := litmusexec.PodDetails{}
-		command := append([]string{"/bin/sh", "-c"}, "kafka-topics --topic topic-"+experimentsDetails.RunID+" --describe --zookeeper "+experimentsDetails.ZookeeperService+":"+experimentsDetails.ZookeeperPort+" | grep -o 'Leader: [^[:space:]]*' | awk '{print $2}'")
+		command := append([]string{"/bin/sh", "-c"}, "kafka-topics --topic topic-"+experimentsDetails.RunID+" --describe --boostrap-server "+experimentsDetails.KafkaService+":"+experimentsDetails.KafkaPort+" | grep -o 'Leader: [^[:space:]]*' | awk '{print $2}'")
 		litmusexec.SetExecCommandAttributes(&execCommandDetails, "kafka-liveness-"+experimentsDetails.RunID, "kafka-consumer", experimentsDetails.KafkaNamespace)
 		ordinality, err = litmusexec.Exec(&execCommandDetails, clients, command)
 		if err != nil {
@@ -50,7 +50,7 @@ func LivenessStream(experimentsDetails *experimentTypes.ExperimentDetails, clien
 		// It will contains all the pod & container details required for exec command
 		execCommandDetails := litmusexec.PodDetails{}
 
-		command := append([]string{"/bin/sh", "-c"}, "kafka-topics --topic topic-"+experimentsDetails.RunID+" --describe --zookeeper "+experimentsDetails.ZookeeperService+":"+experimentsDetails.ZookeeperPort+"/"+experimentsDetails.KafkaInstanceName+" | grep -o 'Leader: [^[:space:]]*' | awk '{print $2}'")
+		command := append([]string{"/bin/sh", "-c"}, "kafka-topics --topic topic-"+experimentsDetails.RunID+" --describe --bootstrap-server "+experimentsDetails.KafkaService+":"+experimentsDetails.KafkaPort+"/"+experimentsDetails.KafkaInstanceName+" | grep -o 'Leader: [^[:space:]]*' | awk '{print $2}'")
 		litmusexec.SetExecCommandAttributes(&execCommandDetails, "kafka-liveness-"+experimentsDetails.RunID, "kafka-consumer", experimentsDetails.KafkaNamespace)
 		ordinality, err = litmusexec.Exec(&execCommandDetails, clients, command)
 		if err != nil {
@@ -109,12 +109,12 @@ func CreateLivenessPod(experimentsDetails *experimentTypes.ExperimentDetails, Ka
 							Value: experimentsDetails.KafkaInstanceName,
 						},
 						{
-							Name:  "ZOOKEEPER_SERVICE",
-							Value: experimentsDetails.ZookeeperService,
+							Name:  "KAFKA_SERVICE",
+							Value: experimentsDetails.KafkaService,
 						},
 						{
-							Name:  "ZOOKEEPER_PORT",
-							Value: experimentsDetails.ZookeeperPort,
+							Name:  "KAFKA_PORT",
+							Value: experimentsDetails.KafkaPort,
 						},
 						{
 							Name:  "REPLICATION_FACTOR",
