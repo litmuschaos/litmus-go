@@ -64,11 +64,10 @@ func PodMemoryHog(clients clients.ClientSets) {
 
 	//DISPLAY THE APP INFORMATION
 	log.InfoWithValues("The application information is as follows", logrus.Fields{
-		"Namespace":          experimentsDetails.AppNS,
-		"Label":              experimentsDetails.AppLabel,
-		"Chaos Duration":     experimentsDetails.ChaosDuration,
-		"Memory Consumption": experimentsDetails.MemoryConsumption,
-		"Container Runtime":  experimentsDetails.ContainerRuntime,
+		"Namespace":         experimentsDetails.AppNS,
+		"Label":             experimentsDetails.AppLabel,
+		"Chaos Duration":    experimentsDetails.ChaosDuration,
+		"Container Runtime": experimentsDetails.ContainerRuntime,
 	})
 
 	// Calling AbortWatcher go routine, it will continuously watch for the abort signal and generate the required events and result
