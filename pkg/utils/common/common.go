@@ -9,9 +9,11 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/gorilla/websocket"
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	"github.com/litmuschaos/litmus-go/pkg/log"
+	messages "github.com/litmuschaos/litmus-go/pkg/machine/common"
 	"github.com/litmuschaos/litmus-go/pkg/math"
 	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/types"
@@ -27,6 +29,48 @@ type ENVDetails struct {
 //WaitForDuration waits for the given time duration (in seconds)
 func WaitForDuration(duration int) {
 	time.Sleep(time.Duration(duration) * time.Second)
+}
+
+// WaitForDurationAndCheckLiveness waits for a given chaos interval and simultaenously checks if the websocket connection is alive
+func WaitForDurationAndCheckLiveness(conn *websocket.Conn, chaosInterval int) error {
+
+	// var writeWait = 10 * time.Second
+
+	var writeWait = time.Duration(10 * time.Second)
+
+	ticker := time.NewTicker(5 * time.Second)
+
+	for {
+		select {
+
+		case <-time.After(time.Duration(chaosInterval) * time.Second):
+			return nil
+
+		case <-ticker.C:
+			// if err := conn.WriteMessage(websocket.PingMessage, []byte{}); err != nil {
+			// 	return err
+			// }
+
+			feedback, payload, err := messages.SendMessageToAgent(conn, "CHECK_LIVENESS", nil, &writeWait)
+			if err != nil {
+				return err
+			}
+
+			if feedback != "ACTION_SUCCESSFUL" {
+				if feedback == "ERROR" {
+
+					agentError, err := messages.GetErrorMessage(payload)
+					if err != nil {
+						return errors.Errorf("failed to interpret error message from agent, err: %v", err)
+					}
+
+					return errors.New(agentError)
+				}
+
+				return errors.Errorf("unintelligible feedback received from agent: %s", feedback)
+			}
+		}
+	}
 }
 
 // RandomInterval wait for the random interval lies between lower & upper bounds

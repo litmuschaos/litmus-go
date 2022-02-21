@@ -126,7 +126,9 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 
 			// wait for the chaos interval
 			log.Infof("[Wait]: Waiting for chaos interval of %vs", experimentsDetails.ChaosInterval)
-			common.WaitForDuration(experimentsDetails.ChaosInterval)
+			if err := common.WaitForDurationAndCheckLiveness(chaosDetails.WebsocketConnection, experimentsDetails.ChaosInterval); err != nil {
+				return errors.Errorf("error occured during liveness check, err: %v", err)
+			}
 		}
 
 		duration = int(time.Since(ChaosStartTimeStamp).Seconds())
@@ -194,9 +196,11 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 			}
 		}
 
-		// wait for chaos interval
+		// wait for the chaos interval
 		log.Infof("[Wait]: Waiting for chaos interval of %vs", experimentsDetails.ChaosInterval)
-		common.WaitForDuration(experimentsDetails.ChaosInterval)
+		if err := common.WaitForDurationAndCheckLiveness(chaosDetails.WebsocketConnection, experimentsDetails.ChaosInterval); err != nil {
+			return errors.Errorf("error occured during liveness check, err: %v", err)
+		}
 
 		duration = int(time.Since(ChaosStartTimeStamp).Seconds())
 	}
