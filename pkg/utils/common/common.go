@@ -31,10 +31,8 @@ func WaitForDuration(duration int) {
 	time.Sleep(time.Duration(duration) * time.Second)
 }
 
-// WaitForDurationAndCheckLiveness waits for a given chaos interval and simultaenously checks if the websocket connection is alive
+// WaitForDurationAndCheckLiveness waits for a given chaos interval while validating a liveness criteria at certain intervals
 func WaitForDurationAndCheckLiveness(conn *websocket.Conn, chaosInterval int) error {
-
-	// var writeWait = 10 * time.Second
 
 	var writeWait = time.Duration(10 * time.Second)
 
@@ -47,9 +45,6 @@ func WaitForDurationAndCheckLiveness(conn *websocket.Conn, chaosInterval int) er
 			return nil
 
 		case <-ticker.C:
-			// if err := conn.WriteMessage(websocket.PingMessage, []byte{}); err != nil {
-			// 	return err
-			// }
 
 			feedback, payload, err := messages.SendMessageToAgent(conn, "CHECK_LIVENESS", nil, &writeWait)
 			if err != nil {
