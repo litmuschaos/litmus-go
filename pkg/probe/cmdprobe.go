@@ -53,7 +53,7 @@ func prepareCmdProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets,
 }
 
 // triggerInlineCmdProbe trigger the cmd probe and storing the output into the out buffer
-func triggerInlineCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails, conn *websocket.Conn, listenErrorChannel <-chan error) error {
+func triggerInlineCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails, conn *websocket.Conn) error {
 
 	// It parse the templated command and return normal string
 	// if command doesn't have template, it will return the same command
@@ -263,7 +263,7 @@ func triggerInlineContinuousCmdProbe(probe v1alpha1.ProbeAttributes, clients cli
 	// it marked the error for the probes, if any
 loop:
 	for {
-		err = triggerInlineCmdProbe(probe, chaosresult, chaosDetails.WebsocketConnection, chaosDetails.ListenErrorChannel)
+		err = triggerInlineCmdProbe(probe, chaosresult, chaosDetails.WebsocketConnection)
 		// record the error inside the probeDetails, we are maintaining a dedicated variable for the err, inside probeDetails
 		if err != nil {
 			for index := range chaosresult.ProbeDetails {
@@ -314,7 +314,7 @@ loop:
 			break loop
 		default:
 			// record the error inside the probeDetails, we are maintaining a dedicated variable for the err, inside probeDetails
-			if err = triggerInlineCmdProbe(probe, chaosresult, chaosDetails.WebsocketConnection, chaosDetails.ListenErrorChannel); err != nil {
+			if err = triggerInlineCmdProbe(probe, chaosresult, chaosDetails.WebsocketConnection); err != nil {
 				for index := range chaosresult.ProbeDetails {
 					if chaosresult.ProbeDetails[index].Name == probe.Name {
 						chaosresult.ProbeDetails[index].IsProbeFailedWithError = err
@@ -482,7 +482,7 @@ func preChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 
 		// triggering the cmd probe for the inline mode
 		if reflect.DeepEqual(probe.CmdProbeInputs.Source, v1alpha1.SourceDetails{}) {
-			err = triggerInlineCmdProbe(probe, resultDetails, chaosDetails.WebsocketConnection, chaosDetails.ListenErrorChannel)
+			err = triggerInlineCmdProbe(probe, resultDetails, chaosDetails.WebsocketConnection)
 
 			// failing the probe, if the success condition doesn't met after the retry & timeout combinations
 			// it will update the status of all the unrun probes as well
@@ -568,7 +568,7 @@ func postChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resu
 
 		// triggering the cmd probe for the inline mode
 		if reflect.DeepEqual(probe.CmdProbeInputs.Source, v1alpha1.SourceDetails{}) {
-			err = triggerInlineCmdProbe(probe, resultDetails, chaosDetails.WebsocketConnection, chaosDetails.ListenErrorChannel)
+			err = triggerInlineCmdProbe(probe, resultDetails, chaosDetails.WebsocketConnection)
 
 			// failing the probe, if the success condition doesn't met after the retry & timeout combinations
 			// it will update the status of all the unrun probes as well
