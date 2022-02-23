@@ -11,7 +11,7 @@ import (
 )
 
 // ProcessStateCheck validates that all the processes are running in the target machine
-func ProcessStateCheck(conn *websocket.Conn, listenErrorChannel <-chan error, processIds string) error {
+func ProcessStateCheck(conn *websocket.Conn, processIds string) error {
 
 	duration := 60 * time.Second
 

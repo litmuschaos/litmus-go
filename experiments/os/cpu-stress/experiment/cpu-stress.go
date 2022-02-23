@@ -5,15 +5,14 @@ import (
 	"os"
 
 	"github.com/gorilla/websocket"
-	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
-	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/process-kill/lib"
+	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/cpu-stress/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	messages "github.com/litmuschaos/litmus-go/pkg/machine/common"
-	"github.com/litmuschaos/litmus-go/pkg/machine/process"
-	experimentEnv "github.com/litmuschaos/litmus-go/pkg/os/process-kill/environment"
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/os/process-kill/types"
+	"github.com/litmuschaos/litmus-go/pkg/machine/cpu"
+	experimentEnv "github.com/litmuschaos/litmus-go/pkg/os/cpu-stress/environment"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/os/cpu-stress/types"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/types"
@@ -23,8 +22,8 @@ import (
 
 var err error
 
-// ProcessKill contains steps to inject chaos
-func ProcessKill(clients clients.ClientSets) {
+// CPUStressExperiment contains steps to inject chaos
+func CPUStressExperiment(clients clients.ClientSets) {
 
 	experimentsDetails := experimentTypes.ExperimentDetails{}
 	resultDetails := types.ResultDetails{}
@@ -53,7 +52,7 @@ func ProcessKill(clients clients.ClientSets) {
 	log.Infof("[PreReq]: Updating the chaos result of %v experiment (SOT)", experimentsDetails.ExperimentName)
 	if err := result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT"); err != nil {
 		log.Errorf("Unable to Create the Chaos Result, err: %v", err)
-		failStep := "[pre-chaos]: Failed to update the chaos result of processs-kill experiment (SOT), err: " + err.Error()
+		failStep := "[pre-chaos]: Failed to update the chaos result of cpu-stress experiment (SOT), err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -67,11 +66,12 @@ func ProcessKill(clients clients.ClientSets) {
 	events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosResult")
 
 	// Calling AbortWatcher go routine, it will continuously watch for the abort signal and generate the required events and result
-	go common.AbortWatcherWithoutExit(experimentsDetails.ExperimentName, clients, &resultDetails, &chaosDetails, &eventsDetails)
+	go common.AbortWatcher(experimentsDetails.ExperimentName, clients, &resultDetails, &chaosDetails, &eventsDetails)
 
-	//DISPLAY THE PROCESS INFORMATION
-	log.InfoWithValues("[Info]: The process information is as follows", logrus.Fields{
-		"Process IDs": experimentsDetails.ProcessIds,
+	//DISPLAY THE VM INFORMATION
+	log.InfoWithValues("[Info]: The stress process parameters are as follows", logrus.Fields{
+		"CPUs":            experimentsDetails.CPUs,
+		"Load Percentage": experimentsDetails.LoadPercentage,
 	})
 
 	// Connect to the agent
@@ -88,11 +88,11 @@ func ProcessKill(clients clients.ClientSets) {
 
 	go messages.ListenForAgentMessage(chaosDetails.WebsocketConnection)
 
-	//Target process state check
-	log.Info("[Status]: Verify that the target processes are running")
-	if err := process.ProcessStateCheck(chaosDetails.WebsocketConnection, experimentsDetails.ProcessIds); err != nil {
-		log.Errorf("Error occured during process steady-state validation, err: %v", err)
-		failStep := "[pre-chaos]: Failed to verify the target process status, err: " + err.Error()
+	// Check for experiment pre-requisites
+	log.Info("[Status]: Verify that stress-ng is available in the target machine")
+	if err := cpu.CheckPrerequisites(chaosDetails.WebsocketConnection); err != nil {
+		log.Errorf("Error occured during cpu steady-state validation, err: %v", err)
+		failStep := "[pre-chaos]: Failed to verify if stress-ng is present, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -123,7 +123,7 @@ func ProcessKill(clients clients.ClientSets) {
 	// Including the litmus lib
 	switch experimentsDetails.ChaosLib {
 	case "litmus":
-		if err := litmusLIB.PrepareProcessKillChaos(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
+		if err := litmusLIB.PrepareChaos(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
 			log.Errorf("Chaos injection failed, err: %v", err)
 			failStep := "[chaos]: Failed inside the chaoslib, err: " + err.Error()
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
@@ -131,13 +131,10 @@ func ProcessKill(clients clients.ClientSets) {
 		}
 	default:
 		log.Error("[Invalid]: Please Provide the correct LIB")
-		failStep := "[chaos]: no match was found for the specified lib"
+		failStep := "[chaos]: no match found for specified lib"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
-
-	log.Infof("[Confirmation]: %v chaos has been injected successfully", experimentsDetails.ExperimentName)
-	resultDetails.Verdict = v1alpha1.ResultVerdictPassed
 
 	if experimentsDetails.EngineName != "" {
 		// marking AUT as running, as we already checked the status of application under test
