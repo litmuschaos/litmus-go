@@ -22,6 +22,6 @@ type ExperimentDetails struct {
 	LIBImagePullPolicy string
 	CPUs               string
 	LoadPercentage     string
-	AgentEndpoint      string
-	AuthToken          string
+	AgentEndpoints     string
+	AuthTokens         string
 }

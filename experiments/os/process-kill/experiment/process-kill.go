@@ -1,16 +1,14 @@
 package experiment
 
 import (
-	"net/http"
 	"os"
 
-	"github.com/gorilla/websocket"
 	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
 	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/process-kill/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	"github.com/litmuschaos/litmus-go/pkg/log"
-	messages "github.com/litmuschaos/litmus-go/pkg/machine/common"
+	"github.com/litmuschaos/litmus-go/pkg/machine/common/connections"
 	"github.com/litmuschaos/litmus-go/pkg/machine/process"
 	experimentEnv "github.com/litmuschaos/litmus-go/pkg/os/process-kill/environment"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/os/process-kill/types"
@@ -75,22 +73,19 @@ func ProcessKill(clients clients.ClientSets) {
 	})
 
 	// Connect to the agent
-	log.Infof("[Status]: Connecting to the agent")
-	chaosDetails.WebsocketConnection, _, err = websocket.DefaultDialer.Dial("ws://"+experimentsDetails.AgentEndpoint+"/process-kill", http.Header{"Authorization": []string{"Bearer " + experimentsDetails.AuthToken}})
-	if err != nil {
+	log.Infof("[Status]: Connecting to the agents")
+	if err := connections.CreateWebsocketConnections(chaosDetails.ExperimentName, experimentsDetails.AgentEndpoint, experimentsDetails.AuthToken, false, &chaosDetails); err != nil {
 		log.Errorf("Error occured while connecting to the agent, err: %v", err)
 		failStep := "[pre-chaos]: Failed to connect to the agent, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
 
-	defer chaosDetails.WebsocketConnection.Close()
-
-	go messages.ListenForAgentMessage(chaosDetails.WebsocketConnection)
+	defer chaosDetails.WebsocketConnections[0].Close()
 
 	//Target process state check
 	log.Info("[Status]: Verify that the target processes are running")
-	if err := process.ProcessStateCheck(chaosDetails.WebsocketConnection, experimentsDetails.ProcessIds); err != nil {
+	if err := process.ProcessStateCheck(chaosDetails.WebsocketConnections[0], experimentsDetails.ProcessIds); err != nil {
 		log.Errorf("Error occured during process steady-state validation, err: %v", err)
 		failStep := "[pre-chaos]: Failed to verify the target process status, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)

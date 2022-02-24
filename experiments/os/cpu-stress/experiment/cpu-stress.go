@@ -1,15 +1,13 @@
 package experiment
 
 import (
-	"net/http"
 	"os"
 
-	"github.com/gorilla/websocket"
 	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/cpu-stress/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	"github.com/litmuschaos/litmus-go/pkg/log"
-	messages "github.com/litmuschaos/litmus-go/pkg/machine/common"
+	"github.com/litmuschaos/litmus-go/pkg/machine/common/connections"
 	"github.com/litmuschaos/litmus-go/pkg/machine/cpu"
 	experimentEnv "github.com/litmuschaos/litmus-go/pkg/os/cpu-stress/environment"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/os/cpu-stress/types"
@@ -75,22 +73,23 @@ func CPUStressExperiment(clients clients.ClientSets) {
 	})
 
 	// Connect to the agent
-	log.Infof("[Status]: Connecting to the agent")
-	chaosDetails.WebsocketConnection, _, err = websocket.DefaultDialer.Dial("ws://"+experimentsDetails.AgentEndpoint+"/process-kill", http.Header{"Authorization": []string{"Bearer " + experimentsDetails.AuthToken}})
-	if err != nil {
+	log.Infof("[Status]: Connecting to the agents")
+	if err := connections.CreateWebsocketConnections(chaosDetails.ExperimentName, experimentsDetails.AgentEndpoints, experimentsDetails.AuthTokens, true, &chaosDetails); err != nil {
 		log.Errorf("Error occured while connecting to the agent, err: %v", err)
 		failStep := "[pre-chaos]: Failed to connect to the agent, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
 
-	defer chaosDetails.WebsocketConnection.Close()
-
-	go messages.ListenForAgentMessage(chaosDetails.WebsocketConnection)
+	defer func() {
+		for _, conn := range chaosDetails.WebsocketConnections {
+			conn.Close()
+		}
+	}()
 
 	// Check for experiment pre-requisites
 	log.Info("[Status]: Verify that stress-ng is available in the target machine")
-	if err := cpu.CheckPrerequisites(chaosDetails.WebsocketConnection); err != nil {
+	if err := cpu.CheckPrerequisites(chaosDetails.WebsocketConnections); err != nil {
 		log.Errorf("Error occured during cpu steady-state validation, err: %v", err)
 		failStep := "[pre-chaos]: Failed to verify if stress-ng is present, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
@@ -123,7 +122,7 @@ func CPUStressExperiment(clients clients.ClientSets) {
 	// Including the litmus lib
 	switch experimentsDetails.ChaosLib {
 	case "litmus":
-		if err := litmusLIB.PrepareChaos(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
+		if err := litmusLIB.InjectCPUStressChaos(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
 			log.Errorf("Chaos injection failed, err: %v", err)
 			failStep := "[chaos]: Failed inside the chaoslib, err: " + err.Error()
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)

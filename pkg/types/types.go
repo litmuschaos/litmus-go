@@ -93,7 +93,7 @@ type ChaosDetails struct {
 	Resources             corev1.ResourceRequirements
 	ImagePullSecrets      []corev1.LocalObjectReference
 	Labels                map[string]string
-	WebsocketConnection   *websocket.Conn
+	WebsocketConnections  []*websocket.Conn
 }
 
 // AppDetails contains all the application related envs
@@ -133,7 +133,7 @@ func InitialiseChaosVariables(chaosDetails *ChaosDetails) {
 	chaosDetails.ParentsResources = []string{}
 	chaosDetails.Targets = []v1alpha1.TargetDetails{}
 
-	chaosDetails.WebsocketConnection = nil
+	chaosDetails.WebsocketConnections = nil
 }
 
 //SetResultAttributes initialise all the chaos result ENV

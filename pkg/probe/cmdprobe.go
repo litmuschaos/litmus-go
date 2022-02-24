@@ -14,7 +14,7 @@ import (
 	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/log"
-	messages "github.com/litmuschaos/litmus-go/pkg/machine/common"
+	"github.com/litmuschaos/litmus-go/pkg/machine/common/messages"
 	"github.com/litmuschaos/litmus-go/pkg/math"
 	cmp "github.com/litmuschaos/litmus-go/pkg/probe/comparator"
 	"github.com/litmuschaos/litmus-go/pkg/status"
@@ -53,7 +53,7 @@ func prepareCmdProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets,
 }
 
 // triggerInlineCmdProbe trigger the cmd probe and storing the output into the out buffer
-func triggerInlineCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails, conn *websocket.Conn) error {
+func triggerInlineCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails, connections []*websocket.Conn) error {
 
 	// It parse the templated command and return normal string
 	// if command doesn't have template, it will return the same command
@@ -71,10 +71,10 @@ func triggerInlineCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.
 		Wait(time.Duration(probe.RunProperties.Interval) * time.Second).
 		TryWithTimeout(func(attempt uint) error {
 
-			var stdout string
+			stdout := ""
 
 			// run the inline command probe
-			if conn == nil {
+			if connections == nil {
 
 				var out, errOut bytes.Buffer
 
@@ -88,39 +88,56 @@ func triggerInlineCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.
 				stdout = out.String()
 			} else {
 
-				timeoutDuration := 60 * time.Second
+				for _, conn := range connections {
 
-				log.Infof("[Probe]: Executing Cmd Probe via agent")
-				feedback, payload, err := messages.SendMessageToAgent(conn, "EXECUTE_COMMAND", probe.CmdProbeInputs.Command, &timeoutDuration)
-				if err != nil {
-					return errors.Errorf("unable to send message to the agent, %v", err)
-				}
+					timeoutDuration := 60 * time.Second
 
-				// feedback, payload, err := messages.ListenForAgentMessage(conn)
-				// if err != nil {
-				// 	return errors.Errorf("failed to recieve message from agent, %v", err)
-				// }
+					log.Infof("[Probe]: Executing Cmd Probe via agent")
+					feedback, payload, err := messages.SendMessageToAgent(conn, "EXECUTE_COMMAND", probe.CmdProbeInputs.Command, &timeoutDuration)
+					if err != nil {
+						return errors.Errorf("unable to send message to the agent, %v", err)
+					}
 
-				// ACTION_SUCCESSFUL feedback is received only if the command execution was successful
-				if feedback != "ACTION_SUCCESSFUL" {
+					// feedback, payload, err := messages.ListenForAgentMessage(conn)
+					// if err != nil {
+					// 	return errors.Errorf("failed to recieve message from agent, %v", err)
+					// }
 
-					var agentError string
+					// ACTION_SUCCESSFUL feedback is received only if the command execution was successful
+					if feedback != "ACTION_SUCCESSFUL" {
 
-					if feedback == "ERROR" {
+						var agentError string
 
-						if err := json.Unmarshal(payload, &agentError); err != nil {
-							return errors.Errorf("failed to interpret error message from agent, %v", err)
+						if feedback == "ERROR" {
+
+							if err := json.Unmarshal(payload, &agentError); err != nil {
+								return errors.Errorf("failed to interpret error message from agent, %v", err)
+							}
+
+							return errors.Errorf(agentError)
+						} else {
+
+							return errors.Errorf("unintelligible feedback: %v", feedback)
 						}
+					}
 
-						return errors.Errorf(agentError)
+					if stdout == "" {
+
+						if err := json.Unmarshal(payload, &stdout); err != nil {
+							return errors.Errorf("failed to interpret message from agent, %v", err)
+						}
 					} else {
 
-						return errors.Errorf("unintelligible feedback: %v", feedback)
-					}
-				}
+						var tempStdout string
 
-				if err := json.Unmarshal(payload, &stdout); err != nil {
-					return errors.Errorf("failed to interpret message from agent, %v", err)
+						if err := json.Unmarshal(payload, &tempStdout); err != nil {
+							return errors.Errorf("failed to interpret message from agent, %v", err)
+						}
+
+						if strings.TrimSpace(tempStdout) != strings.TrimSpace(stdout) {
+							return errors.Errorf("unequal stdout recevied for two distinct agent endpoints")
+						}
+					}
 				}
 			}
 
@@ -263,7 +280,7 @@ func triggerInlineContinuousCmdProbe(probe v1alpha1.ProbeAttributes, clients cli
 	// it marked the error for the probes, if any
 loop:
 	for {
-		err = triggerInlineCmdProbe(probe, chaosresult, chaosDetails.WebsocketConnection)
+		err = triggerInlineCmdProbe(probe, chaosresult, chaosDetails.WebsocketConnections)
 		// record the error inside the probeDetails, we are maintaining a dedicated variable for the err, inside probeDetails
 		if err != nil {
 			for index := range chaosresult.ProbeDetails {
@@ -314,7 +331,7 @@ loop:
 			break loop
 		default:
 			// record the error inside the probeDetails, we are maintaining a dedicated variable for the err, inside probeDetails
-			if err = triggerInlineCmdProbe(probe, chaosresult, chaosDetails.WebsocketConnection); err != nil {
+			if err = triggerInlineCmdProbe(probe, chaosresult, chaosDetails.WebsocketConnections); err != nil {
 				for index := range chaosresult.ProbeDetails {
 					if chaosresult.ProbeDetails[index].Name == probe.Name {
 						chaosresult.ProbeDetails[index].IsProbeFailedWithError = err
@@ -482,7 +499,7 @@ func preChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 
 		// triggering the cmd probe for the inline mode
 		if reflect.DeepEqual(probe.CmdProbeInputs.Source, v1alpha1.SourceDetails{}) {
-			err = triggerInlineCmdProbe(probe, resultDetails, chaosDetails.WebsocketConnection)
+			err = triggerInlineCmdProbe(probe, resultDetails, chaosDetails.WebsocketConnections)
 
 			// failing the probe, if the success condition doesn't met after the retry & timeout combinations
 			// it will update the status of all the unrun probes as well
@@ -568,7 +585,7 @@ func postChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resu
 
 		// triggering the cmd probe for the inline mode
 		if reflect.DeepEqual(probe.CmdProbeInputs.Source, v1alpha1.SourceDetails{}) {
-			err = triggerInlineCmdProbe(probe, resultDetails, chaosDetails.WebsocketConnection)
+			err = triggerInlineCmdProbe(probe, resultDetails, chaosDetails.WebsocketConnections)
 
 			// failing the probe, if the success condition doesn't met after the retry & timeout combinations
 			// it will update the status of all the unrun probes as well
