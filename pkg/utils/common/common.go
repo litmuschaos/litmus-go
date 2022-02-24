@@ -32,9 +32,9 @@ func WaitForDuration(duration int) {
 }
 
 // WaitForDurationAndCheckLiveness waits for a given chaos interval while validating a liveness criteria at certain intervals
-func WaitForDurationAndCheckLiveness(conn *websocket.Conn, chaosInterval int) error {
+func WaitForDurationAndCheckLiveness(connections []*websocket.Conn, chaosInterval int) error {
 
-	var writeWait = time.Duration(10 * time.Second)
+	writeWait := time.Duration(10 * time.Second)
 
 	ticker := time.NewTicker(5 * time.Second)
 
@@ -46,23 +46,26 @@ func WaitForDurationAndCheckLiveness(conn *websocket.Conn, chaosInterval int) er
 
 		case <-ticker.C:
 
-			feedback, payload, err := messages.SendMessageToAgent(conn, "CHECK_LIVENESS", nil, &writeWait)
-			if err != nil {
-				return err
-			}
+			for _, conn := range connections {
 
-			if feedback != "ACTION_SUCCESSFUL" {
-				if feedback == "ERROR" {
-
-					agentError, err := messages.GetErrorMessage(payload)
-					if err != nil {
-						return errors.Errorf("failed to interpret error message from agent, err: %v", err)
-					}
-
-					return errors.New(agentError)
+				feedback, payload, err := messages.SendMessageToAgent(conn, "CHECK_LIVENESS", nil, &writeWait)
+				if err != nil {
+					return err
 				}
 
-				return errors.Errorf("unintelligible feedback received from agent: %s", feedback)
+				if feedback != "ACTION_SUCCESSFUL" {
+					if feedback == "ERROR" {
+
+						agentError, err := messages.GetErrorMessage(payload)
+						if err != nil {
+							return errors.Errorf("failed to interpret error message from agent, err: %v", err)
+						}
+
+						return errors.New(agentError)
+					}
+
+					return errors.Errorf("unintelligible feedback received from agent: %s", feedback)
+				}
 			}
 		}
 	}

@@ -20,6 +20,7 @@ type ExperimentDetails struct {
 	Delay              int
 	TargetContainer    string
 	LIBImagePullPolicy string
+	Sequence           string
 	CPUs               string
 	LoadPercentage     string
 	AgentEndpoints     string
