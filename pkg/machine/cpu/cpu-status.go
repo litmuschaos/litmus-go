@@ -8,7 +8,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-// CheckPrerequisitesvalidates the pre-requisites for the experiment
+// CheckPrerequisites validates the pre-requisites for the experiment
 func CheckPrerequisites(connections []*websocket.Conn) error {
 
 	for _, conn := range connections {
