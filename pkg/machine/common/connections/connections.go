@@ -33,9 +33,9 @@ func CreateWebsocketConnections(experimentName, agentEndpoints, authTokens strin
 		return errors.Errorf("multiple agent endpoints received, please input only one endpoint and corressponding authentication token")
 	}
 
-	var connectionList []*websocket.Conn
+	chaosDetails.WebsocketConnections = []*websocket.Conn{}
 
-	for i := range strings.Split(agentEndpoints, ",") {
+	for i := range agentEndpointList {
 
 		conn, _, err := websocket.DefaultDialer.Dial("ws://"+agentEndpointList[i]+"/"+experimentName, http.Header{"Authorization": []string{"Bearer " + authTokenList[i]}})
 		if err != nil {
@@ -44,10 +44,8 @@ func CreateWebsocketConnections(experimentName, agentEndpoints, authTokens strin
 
 		go messages.ListenForAgentMessage(conn)
 
-		connectionList = append(connectionList, conn)
+		chaosDetails.WebsocketConnections = append(chaosDetails.WebsocketConnections, conn)
 	}
-
-	chaosDetails.WebsocketConnections = connectionList
 
 	return nil
 }
