@@ -25,14 +25,9 @@ func PrepareProcessKillChaos(experimentsDetails *experimentTypes.ExperimentDetai
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 
-	processIdList := strings.Split(experimentsDetails.ProcessIds, ",")
-	if len(processIdList) == 0 {
-		return errors.Errorf("no process ID provided, please provide a process id")
-	}
-
 	var pids []int
 
-	for _, pid := range processIdList {
+	for _, pid := range strings.Split(experimentsDetails.ProcessIds, ",") {
 
 		p, err := strconv.Atoi(pid)
 		if err != nil {
@@ -93,11 +88,6 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 			}
 
 			common.SetTargets(strconv.Itoa(pid), "injected", "Process", chaosDetails)
-
-			// feedback, payload, err := messages.ListenForAgentMessage(chaosDetails.WebsocketConnection)
-			// if err != nil {
-			// 	return errors.Errorf("error during reception of message from agent, err: %v", err)
-			// }
 
 			// ACTION_SUCCESSFUL feedback is received only if the process is killed successfully
 			if feedback != "ACTION_SUCCESSFUL" {
@@ -166,11 +156,6 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		for _, pid := range pids {
 			common.SetTargets(strconv.Itoa(pid), "injected", "Process", chaosDetails)
 		}
-
-		// feedback, payload, err := messages.ListenForAgentMessage(chaosDetails.WebsocketConnection)
-		// if err != nil {
-		// 	return errors.Errorf("error during reception of message from agent, err: %v", err)
-		// }
 
 		// ACTION_SUCCESSFUL feedback is received only if all the processes are killed successfully
 		if feedback != "ACTION_SUCCESSFUL" {

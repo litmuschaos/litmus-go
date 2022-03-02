@@ -37,11 +37,6 @@ func ProcessStateCheck(conn *websocket.Conn, processIds string) error {
 		return errors.Errorf("failed to send message to agent, err: %v", err)
 	}
 
-	// feedback, payload, err := messages.ListenForAgentMessage(conn)
-	// if err != nil {
-	// 	return errors.Errorf("error during reception of message from agent, err: %v", err)
-	// }
-
 	// ACTION_SUCCESSFUL feedback is received only if all the processes exist in the target machine
 	if feedback != "ACTION_SUCCESSFUL" {
 		if feedback == "ERROR" {
