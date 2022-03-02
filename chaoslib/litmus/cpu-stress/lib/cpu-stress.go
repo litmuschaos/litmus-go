@@ -23,6 +23,7 @@ import (
 var inject, abort chan os.Signal
 var timeDuration = 60 * time.Second
 var chaosRevert sync.WaitGroup
+var underChaosEndpoints []int
 
 // InjectCPUStressChaos contains the prepration and injection steps for the experiment
 func InjectCPUStressChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
@@ -116,6 +117,8 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 				return errors.Errorf("unintelligible feedback received from agent: %s", feedback)
 			}
 
+			underChaosEndpoints = append(underChaosEndpoints, i)
+
 			common.SetTargets(agentEndpointList[i], "injected", "CPU", chaosDetails)
 
 			log.Infof("[Chaos]: CPU stress chaos injected successfully in %s agent endpoint", agentEndpointList[i])
@@ -130,9 +133,11 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 
 			// wait for the chaos interval
 			log.Infof("[Wait]: Waiting for chaos interval of %vs", experimentsDetails.ChaosInterval)
-			if err := common.WaitForDurationAndCheckLiveness(chaosDetails.WebsocketConnections, agentEndpointList, experimentsDetails.ChaosInterval, abort, &chaosRevert); err != nil {
+			if err := common.WaitForDurationAndCheckLiveness([]*websocket.Conn{conn}, []string{agentEndpointList[i]}, experimentsDetails.ChaosInterval, abort, &chaosRevert); err != nil {
 				return errors.Errorf("error occured during liveness check, err: %v", err)
 			}
+
+			underChaosEndpoints = underChaosEndpoints[:len(underChaosEndpoints)-1]
 
 			common.SetTargets(agentEndpointList[i], "reverted", "CPU", chaosDetails)
 		}
@@ -182,6 +187,8 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 				return errors.Errorf("unintelligible feedback received from agent: %s", feedback)
 			}
 
+			underChaosEndpoints = append(underChaosEndpoints, i)
+
 			common.SetTargets(agentEndpointList[i], "injected", "CPU", chaosDetails)
 
 			log.Infof("[Chaos]: CPU stress chaos injected successfully in %s agent endpoint", agentEndpointList[i])
@@ -201,6 +208,8 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 			return errors.Errorf("error occured during liveness check, err: %v", err)
 		}
 
+		underChaosEndpoints = []int{}
+
 		for i := range connections {
 			common.SetTargets(agentEndpointList[i], "reverted", "CPU", chaosDetails)
 		}
@@ -218,11 +227,11 @@ func AbortWatcher(connections []*websocket.Conn, agentEndpointList []string, abo
 
 	log.Info("[Abort]: Chaos Revert Started")
 
-	for i, conn := range connections {
+	for _, i := range underChaosEndpoints {
 
-		feedback, payload, err := messages.SendMessageToAgent(conn, "ABORT_EXPERIMENT", nil, &timeDuration)
+		feedback, payload, err := messages.SendMessageToAgent(connections[i], "ABORT_EXPERIMENT", nil, &timeDuration)
 		if err != nil {
-			log.Errorf("unable to send abort chaos message to %s agent endpoint, err: ", agentEndpointList[i], agentEndpointList[i])
+			log.Errorf("unable to send abort chaos message to %s agent endpoint, err: %v", agentEndpointList[i], err)
 		}
 
 		// ACTION_SUCCESSFUL feedback is received only if the cpu stress chaos has been aborted successfully
