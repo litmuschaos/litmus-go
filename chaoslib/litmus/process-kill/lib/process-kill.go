@@ -126,7 +126,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 
 			// wait for the chaos interval
 			log.Infof("[Wait]: Waiting for chaos interval of %vs", experimentsDetails.ChaosInterval)
-			if err := common.WaitForDurationAndCheckLiveness(chaosDetails.WebsocketConnections, experimentsDetails.ChaosInterval); err != nil {
+			if err := common.WaitForDurationAndCheckLiveness(chaosDetails.WebsocketConnections, []string{experimentsDetails.AgentEndpoint}, experimentsDetails.ChaosInterval, nil, nil); err != nil {
 				return errors.Errorf("error occured during liveness check, err: %v", err)
 			}
 		}
@@ -198,7 +198,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 
 		// wait for the chaos interval
 		log.Infof("[Wait]: Waiting for chaos interval of %vs", experimentsDetails.ChaosInterval)
-		if err := common.WaitForDurationAndCheckLiveness(chaosDetails.WebsocketConnections, experimentsDetails.ChaosInterval); err != nil {
+		if err := common.WaitForDurationAndCheckLiveness(chaosDetails.WebsocketConnections, []string{experimentsDetails.AgentEndpoint}, experimentsDetails.ChaosInterval, nil, nil); err != nil {
 			return errors.Errorf("error occured during liveness check, err: %v", err)
 		}
 

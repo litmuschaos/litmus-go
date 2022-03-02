@@ -71,7 +71,7 @@ func triggerInlineCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.
 		Wait(time.Duration(probe.RunProperties.Interval) * time.Second).
 		TryWithTimeout(func(attempt uint) error {
 
-			stdout := ""
+			var stdout string
 
 			// run the inline command probe
 			if connections == nil {
@@ -88,56 +88,39 @@ func triggerInlineCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.
 				stdout = out.String()
 			} else {
 
-				for _, conn := range connections {
+				timeoutDuration := 60 * time.Second
 
-					timeoutDuration := 60 * time.Second
+				log.Infof("[Probe]: Executing Cmd Probe via agent")
+				feedback, payload, err := messages.SendMessageToAgent(connections[0], "EXECUTE_COMMAND", probe.CmdProbeInputs.Command, &timeoutDuration)
+				if err != nil {
+					return errors.Errorf("unable to send message to the agent, %v", err)
+				}
 
-					log.Infof("[Probe]: Executing Cmd Probe via agent")
-					feedback, payload, err := messages.SendMessageToAgent(conn, "EXECUTE_COMMAND", probe.CmdProbeInputs.Command, &timeoutDuration)
-					if err != nil {
-						return errors.Errorf("unable to send message to the agent, %v", err)
-					}
+				// feedback, payload, err := messages.ListenForAgentMessage(conn)
+				// if err != nil {
+				// 	return errors.Errorf("failed to recieve message from agent, %v", err)
+				// }
 
-					// feedback, payload, err := messages.ListenForAgentMessage(conn)
-					// if err != nil {
-					// 	return errors.Errorf("failed to recieve message from agent, %v", err)
-					// }
+				// ACTION_SUCCESSFUL feedback is received only if the command execution was successful
+				if feedback != "ACTION_SUCCESSFUL" {
 
-					// ACTION_SUCCESSFUL feedback is received only if the command execution was successful
-					if feedback != "ACTION_SUCCESSFUL" {
+					var agentError string
 
-						var agentError string
+					if feedback == "ERROR" {
 
-						if feedback == "ERROR" {
-
-							if err := json.Unmarshal(payload, &agentError); err != nil {
-								return errors.Errorf("failed to interpret error message from agent, %v", err)
-							}
-
-							return errors.Errorf(agentError)
-						} else {
-
-							return errors.Errorf("unintelligible feedback: %v", feedback)
+						if err := json.Unmarshal(payload, &agentError); err != nil {
+							return errors.Errorf("failed to interpret error message from agent, %v", err)
 						}
-					}
 
-					if stdout == "" {
-
-						if err := json.Unmarshal(payload, &stdout); err != nil {
-							return errors.Errorf("failed to interpret message from agent, %v", err)
-						}
+						return errors.Errorf(agentError)
 					} else {
 
-						var tempStdout string
-
-						if err := json.Unmarshal(payload, &tempStdout); err != nil {
-							return errors.Errorf("failed to interpret message from agent, %v", err)
-						}
-
-						if strings.TrimSpace(tempStdout) != strings.TrimSpace(stdout) {
-							return errors.Errorf("unequal stdout recevied for two distinct agent endpoints")
-						}
+						return errors.Errorf("unintelligible feedback: %v", feedback)
 					}
+				}
+
+				if err := json.Unmarshal(payload, &stdout); err != nil {
+					return errors.Errorf("failed to interpret message from agent, %v", err)
 				}
 			}
 
