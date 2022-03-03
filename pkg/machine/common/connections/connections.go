@@ -49,3 +49,17 @@ func CreateWebsocketConnections(experimentName, agentEndpoints, authTokens strin
 
 	return nil
 }
+
+// CloseWebsocketConnections performs the graceful closure of the websocket connections
+func CloseWebsocketConnections(connections []*websocket.Conn) error {
+
+	for _, conn := range connections {
+
+		_, _, err := messages.SendMessageToAgent(conn, "CLOSE_CONNECTION", nil, nil)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}

@@ -29,6 +29,12 @@ func ListenForAgentMessage(conn *websocket.Conn) {
 
 		if err := conn.ReadJSON(&msg); err != nil {
 			log.Errorf("An error occured while listening for agent message, err: %v", err)
+			continue
+		}
+
+		if msg.Action == "CLOSE_CONNECTION" {
+			conn.Close()
+			return
 		}
 
 		mutex.RLock()

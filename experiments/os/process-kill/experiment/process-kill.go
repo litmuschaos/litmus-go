@@ -19,7 +19,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-var err error
+// var err error
 
 // ProcessKill contains steps to inject chaos
 func ProcessKill(clients clients.ClientSets) {
@@ -75,13 +75,11 @@ func ProcessKill(clients clients.ClientSets) {
 	// Connect to the agent
 	log.Infof("[Status]: Connecting to the agents")
 	if err := connections.CreateWebsocketConnections(chaosDetails.ExperimentName, experimentsDetails.AgentEndpoint, experimentsDetails.AuthToken, false, &chaosDetails); err != nil {
-		log.Errorf("Error occured while connecting to the agent, err: %v", err)
+		log.Errorf("Error occured while connecting to the agents, err: %v", err)
 		failStep := "[pre-chaos]: Failed to connect to the agent, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
-
-	defer chaosDetails.WebsocketConnections[0].Close()
 
 	//Target process state check
 	log.Info("[Status]: Verify that the target processes are running")
@@ -155,6 +153,14 @@ func ProcessKill(clients clients.ClientSets) {
 		// generating post chaos event
 		types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, msg, "Normal", &chaosDetails)
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
+	}
+
+	log.Infof("[Status]: Disconnecting the agents")
+	if err := connections.CloseWebsocketConnections(chaosDetails.WebsocketConnections); err != nil {
+		log.Errorf("Error occured while disconnecting the agents, err: %v", err)
+		failStep := "[pre-chaos]: Failed to disconnect from the agent, err: " + err.Error()
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+		return
 	}
 
 	//Updating the chaosResult in the end of experiment
