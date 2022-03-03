@@ -39,10 +39,12 @@ func WaitForDurationAndCheckLiveness(connections []*websocket.Conn, agentEndpoin
 
 	ticker := time.NewTicker(5 * time.Second)
 
+	chaosIntervalTimer := time.After(time.Duration(chaosInterval) * time.Second)
+
 	for {
 		select {
 
-		case <-time.After(time.Duration(chaosInterval) * time.Second):
+		case <-chaosIntervalTimer:
 			return nil
 
 		case <-abort:
