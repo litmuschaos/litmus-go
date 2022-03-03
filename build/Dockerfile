@@ -19,12 +19,13 @@ FROM alpine:3.15.0 AS dep
 # Install generally useful things
 RUN apk --update add \
         sudo \
-        iproute2
+        iproute2 \
+        expact-doc
 
 # Packaging stage
 # Image source: https://github.com/litmuschaos/test-tools/blob/master/custom/hardened-alpine/experiment/Dockerfile
 # The base image is non-root (have litmus user) with default litmus directory.
-FROM litmuschaos/experiment-alpine
+FROM uditgaurav/experiment-alpine:2.0
 
 LABEL maintainer="LitmusChaos"
 
