@@ -11,7 +11,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
-	"github.com/openebs/maya/pkg/util/retry"
+	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	apiv1 "k8s.io/api/core/v1"
