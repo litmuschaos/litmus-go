@@ -144,6 +144,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 				return errors.Errorf("error occured during liveness check, err: %v", err)
 			}
 
+			log.Infof("[Chaos]: Reverting CPU stress for %s agent endpoint", agentEndpointList[i])
 			feedback, payload, err = messages.SendMessageToAgent(chaosDetails.WebsocketConnections[i], "REVERT_CHAOS", nil, &timeDuration)
 			if err != nil {
 				return errors.Errorf("failed while sending message to agent, err: %v", err)
@@ -237,6 +238,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 
 		for i := range agentEndpointList {
 
+			log.Infof("[Chaos]: Reverting CPU stress for %s agent endpoint", agentEndpointList[i])
 			feedback, payload, err := messages.SendMessageToAgent(chaosDetails.WebsocketConnections[i], "REVERT_CHAOS", nil, &timeDuration)
 			if err != nil {
 				return errors.Errorf("failed while sending message to agent, err: %v", err)
