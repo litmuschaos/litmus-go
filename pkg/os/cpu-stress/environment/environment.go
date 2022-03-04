@@ -27,6 +27,6 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.Sequence = types.Getenv("SEQUENCE", "parallel")
 	experimentDetails.CPUs = types.Getenv("CPU", "1")
 	experimentDetails.LoadPercentage = types.Getenv("LOAD_PERCENTAGE", "50")
-	experimentDetails.AgentEndpoints = types.Getenv("AGENT_ENDPOINT", "127.0.0.1:41365")
-	experimentDetails.AuthTokens = types.Getenv("AUTH_TOKEN", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdXRob3JpemVkIjp0cnVlLCJleHAiOjE2NDY0ODQ4NzR9.Jtuoa8xxxzCjFRDyw1962axyxP_rCKjcHS8qMwPwr2Q")
+	experimentDetails.AgentEndpoints = types.Getenv("AGENT_ENDPOINT", "")
+	experimentDetails.AuthTokens = types.Getenv("AUTH_TOKEN", "")
 }
