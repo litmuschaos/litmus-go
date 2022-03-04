@@ -3,6 +3,7 @@ package lib
 import (
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -24,6 +25,12 @@ var inject, abort chan os.Signal
 var timeDuration = 60 * time.Second
 var chaosRevert sync.WaitGroup
 var underChaosEndpoints []int
+
+type cpuStressParams struct {
+	Workers string
+	Load    string
+	Timeout string
+}
 
 // InjectCPUStressChaos contains the prepration and injection steps for the experiment
 func InjectCPUStressChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
@@ -58,11 +65,11 @@ func InjectCPUStressChaos(experimentsDetails *experimentTypes.ExperimentDetails,
 
 		switch strings.ToLower(experimentsDetails.Sequence) {
 		case "serial":
-			if err := injectChaosInSerialMode(experimentsDetails, chaosDetails.WebsocketConnections, agentEndpointList, clients, resultDetails, eventsDetails, chaosDetails, abort); err != nil {
+			if err := injectChaosInSerialMode(experimentsDetails, agentEndpointList, clients, resultDetails, eventsDetails, chaosDetails, abort); err != nil {
 				return err
 			}
 		case "parallel":
-			if err := injectChaosInParallelMode(experimentsDetails, chaosDetails.WebsocketConnections, agentEndpointList, clients, resultDetails, eventsDetails, chaosDetails, abort); err != nil {
+			if err := injectChaosInParallelMode(experimentsDetails, agentEndpointList, clients, resultDetails, eventsDetails, chaosDetails, abort); err != nil {
 				return err
 			}
 		default:
@@ -80,7 +87,7 @@ func InjectCPUStressChaos(experimentsDetails *experimentTypes.ExperimentDetails,
 }
 
 // injectChaosInSerialMode injects CPU stress chaos in serial mode i.e. one after the other
-func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, connections []*websocket.Conn, agentEndpointList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, abort chan os.Signal) error {
+func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, agentEndpointList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, abort chan os.Signal) error {
 
 	//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
 	ChaosStartTimeStamp := time.Now()
@@ -94,12 +101,12 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 		}
 
-		for i, conn := range connections {
+		for i := range agentEndpointList {
 
 			log.Infof("[Chaos]: Injecting CPU stress for %s agent endpoint", agentEndpointList[i])
-			feedback, payload, err := messages.SendMessageToAgent(conn, "EXECUTE_EXPERIMENT", nil, &timeDuration)
+			feedback, payload, err := messages.SendMessageToAgent(chaosDetails.WebsocketConnections[i], "EXECUTE_EXPERIMENT", cpuStressParams{experimentsDetails.CPUs, experimentsDetails.LoadPercentage, strconv.Itoa(experimentsDetails.ChaosInterval)}, &timeDuration)
 			if err != nil {
-				return errors.Errorf("failed to send message to agent, err: %v", err)
+				return errors.Errorf("failed while sending message to agent, err: %v", err)
 			}
 
 			// ACTION_SUCCESSFUL feedback is received only if the cpu stress chaos has been injected successfully
@@ -133,8 +140,28 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 
 			// wait for the chaos interval
 			log.Infof("[Wait]: Waiting for chaos interval of %vs", experimentsDetails.ChaosInterval)
-			if err := common.WaitForDurationAndCheckLiveness([]*websocket.Conn{conn}, []string{agentEndpointList[i]}, experimentsDetails.ChaosInterval, abort, &chaosRevert); err != nil {
+			if err := common.WaitForDurationAndCheckLiveness([]*websocket.Conn{chaosDetails.WebsocketConnections[i]}, []string{agentEndpointList[i]}, experimentsDetails.ChaosInterval, abort, &chaosRevert); err != nil {
 				return errors.Errorf("error occured during liveness check, err: %v", err)
+			}
+
+			feedback, payload, err = messages.SendMessageToAgent(chaosDetails.WebsocketConnections[i], "REVERT_CHAOS", nil, &timeDuration)
+			if err != nil {
+				return errors.Errorf("failed while sending message to agent, err: %v", err)
+			}
+
+			// ACTION_SUCCESSFUL feedback is received only if the cpu stress chaos has been injected successfully
+			if feedback != "ACTION_SUCCESSFUL" {
+				if feedback == "ERROR" {
+
+					agentError, err := messages.GetErrorMessage(payload)
+					if err != nil {
+						return errors.Errorf("failed to interpret error message from agent, err: %v", err)
+					}
+
+					return errors.Errorf("error occured while reverting CPU stress chaos for %s agent endpoint, err: %s", agentEndpointList[i], agentError)
+				}
+
+				return errors.Errorf("unintelligible feedback received from agent: %s", feedback)
 			}
 
 			underChaosEndpoints = underChaosEndpoints[:len(underChaosEndpoints)-1]
@@ -149,7 +176,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 }
 
 // injectChaosInParallelMode injects CPU stress chaos in parallel mode i.e. all at once
-func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, connections []*websocket.Conn, agentEndpointList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, abort chan os.Signal) error {
+func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, agentEndpointList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, abort chan os.Signal) error {
 
 	//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
 	ChaosStartTimeStamp := time.Now()
@@ -164,12 +191,12 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		}
 
 		// inject cpu stress chaos
-		for i, conn := range connections {
+		for i := range agentEndpointList {
 
 			log.Infof("[Chaos]: Injecting CPU stress for %s agent endpoint", agentEndpointList[i])
-			feedback, payload, err := messages.SendMessageToAgent(conn, "EXECUTE_EXPERIMENT", nil, &timeDuration)
+			feedback, payload, err := messages.SendMessageToAgent(chaosDetails.WebsocketConnections[i], "EXECUTE_EXPERIMENT", cpuStressParams{experimentsDetails.CPUs, experimentsDetails.LoadPercentage, strconv.Itoa(experimentsDetails.ChaosInterval)}, &timeDuration)
 			if err != nil {
-				return errors.Errorf("failed to send message to agent, err: %v", err)
+				return errors.Errorf("failed while sending message to agent, err: %v", err)
 			}
 
 			// ACTION_SUCCESSFUL feedback is received only if the cpu stress chaos has been injected successfully
@@ -208,10 +235,31 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 			return errors.Errorf("error occured during liveness check, err: %v", err)
 		}
 
-		underChaosEndpoints = []int{}
+		for i := range agentEndpointList {
 
-		for i := range connections {
+			feedback, payload, err := messages.SendMessageToAgent(chaosDetails.WebsocketConnections[i], "REVERT_CHAOS", nil, &timeDuration)
+			if err != nil {
+				return errors.Errorf("failed while sending message to agent, err: %v", err)
+			}
+
+			// ACTION_SUCCESSFUL feedback is received only if the cpu stress chaos has been injected successfully
+			if feedback != "ACTION_SUCCESSFUL" {
+				if feedback == "ERROR" {
+
+					agentError, err := messages.GetErrorMessage(payload)
+					if err != nil {
+						return errors.Errorf("failed to interpret error message from agent, err: %v", err)
+					}
+
+					return errors.Errorf("error occured while reverting CPU stress chaos for %s agent endpoint, err: %s", agentEndpointList[i], agentError)
+				}
+
+				return errors.Errorf("unintelligible feedback received from agent: %s", feedback)
+			}
+
 			common.SetTargets(agentEndpointList[i], "reverted", "CPU", chaosDetails)
+
+			underChaosEndpoints = underChaosEndpoints[1:]
 		}
 
 		duration = int(time.Since(ChaosStartTimeStamp).Seconds())

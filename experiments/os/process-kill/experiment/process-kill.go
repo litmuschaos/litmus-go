@@ -155,6 +155,7 @@ func ProcessKill(clients clients.ClientSets) {
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
+	//Disconnect the agents
 	log.Infof("[Status]: Disconnecting the agents")
 	if err := connections.CloseWebsocketConnections(chaosDetails.WebsocketConnections); err != nil {
 		log.Errorf("Error occured while disconnecting the agents, err: %v", err)

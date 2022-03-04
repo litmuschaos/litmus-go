@@ -18,8 +18,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-var err error
-
 // CPUStressExperiment contains steps to inject chaos
 func CPUStressExperiment(clients clients.ClientSets) {
 
@@ -80,12 +78,6 @@ func CPUStressExperiment(clients clients.ClientSets) {
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
-
-	defer func() {
-		for _, conn := range chaosDetails.WebsocketConnections {
-			conn.Close()
-		}
-	}()
 
 	// Check for experiment pre-requisites
 	log.Info("[Status]: Verify that stress-ng is available in the target machine")
@@ -156,6 +148,15 @@ func CPUStressExperiment(clients clients.ClientSets) {
 		// generating post chaos event
 		types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, msg, "Normal", &chaosDetails)
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
+	}
+
+	//Disconnect the agents
+	log.Infof("[Status]: Disconnecting the agents")
+	if err := connections.CloseWebsocketConnections(chaosDetails.WebsocketConnections); err != nil {
+		log.Errorf("Error occured while disconnecting the agents, err: %v", err)
+		failStep := "[pre-chaos]: Failed to disconnect from the agent, err: " + err.Error()
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+		return
 	}
 
 	//Updating the chaosResult in the end of experiment
