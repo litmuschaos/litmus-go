@@ -23,6 +23,8 @@ type Message struct {
 // ListenForAgentMessage listens for a message sent by the agent and returns its action and payload
 func ListenForAgentMessage(conn *websocket.Conn) {
 
+	defer conn.Close()
+
 	for {
 
 		var msg Message
@@ -33,7 +35,6 @@ func ListenForAgentMessage(conn *websocket.Conn) {
 		}
 
 		if msg.Action == "CLOSE_CONNECTION" {
-			conn.Close()
 			return
 		}
 
@@ -52,7 +53,6 @@ func ListenForAgentMessage(conn *websocket.Conn) {
 		mutex.RUnlock()
 
 		if msg.Action == "ERROR" {
-			conn.Close()
 			return
 		}
 	}

@@ -279,6 +279,7 @@ func AbortWatcher(connections []*websocket.Conn, agentEndpointList []string, abo
 
 	for _, i := range underChaosEndpoints {
 
+		log.Infof("[Abort]: Reverting CPU stress for %s agent endpoint", agentEndpointList[i])
 		feedback, payload, err := messages.SendMessageToAgent(connections[i], "ABORT_EXPERIMENT", nil, &timeDuration)
 		if err != nil {
 			log.Errorf("unable to send abort chaos message to %s agent endpoint, err: %v", agentEndpointList[i], err)
