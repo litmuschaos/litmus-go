@@ -96,17 +96,12 @@ func triggerInlineCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.
 					return errors.Errorf("unable to send message to the agent, %v", err)
 				}
 
-				// feedback, payload, err := messages.ListenForAgentMessage(conn)
-				// if err != nil {
-				// 	return errors.Errorf("failed to recieve message from agent, %v", err)
-				// }
-
 				// ACTION_SUCCESSFUL feedback is received only if the command execution was successful
 				if feedback != "ACTION_SUCCESSFUL" {
 
 					var agentError string
 
-					if feedback == "ERROR" {
+					if feedback == "PROBE_ERROR" {
 
 						if err := json.Unmarshal(payload, &agentError); err != nil {
 							return errors.Errorf("failed to interpret error message from agent, %v", err)
