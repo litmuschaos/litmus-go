@@ -244,6 +244,8 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, chao
 					Args: []string{
 						"--cpu",
 						strconv.Itoa(experimentsDetails.NodeCPUcores),
+						"--cpu-load",
+						strconv.Itoa(experimentsDetails.CPULoad),
 						"--timeout",
 						strconv.Itoa(experimentsDetails.ChaosDuration),
 					},
