@@ -55,7 +55,6 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 			"PodsAffectedPerc":                   experimentsDetails.PodsAffectedPerc,
 		})
 	}
-
 	podsAffectedPerc, _ := strconv.Atoi(experimentsDetails.PodsAffectedPerc)
 	targetPodList, err := common.GetPodList(experimentsDetails.TargetPods, podsAffectedPerc, clients, chaosDetails)
 	if err != nil {
