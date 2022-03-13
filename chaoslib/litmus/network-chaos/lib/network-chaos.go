@@ -26,7 +26,38 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 	if experimentsDetails.TargetPods == "" && chaosDetails.AppDetail.Label == "" {
 		return errors.Errorf("please provide one of the appLabel or TARGET_PODS")
 	}
-	targetPodList, err := common.GetPodList(experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, clients, chaosDetails)
+	//setup the tunables if provided in range
+	SetChaosTunables(experimentsDetails)
+
+	switch experimentsDetails.NetworkChaosType {
+	case "network-loss":
+		log.InfoWithValues("[Info]: The chaos tunables are:", logrus.Fields{
+			"NetworkPacketLossPercentage": experimentsDetails.NetworkPacketLossPercentage,
+			"Sequence":                    experimentsDetails.Sequence,
+			"PodsAffectedPerc":            experimentsDetails.PodsAffectedPerc,
+		})
+	case "network-latency":
+		log.InfoWithValues("[Info]: The chaos tunables are:", logrus.Fields{
+			"NetworkLatency":   strconv.Itoa(experimentsDetails.NetworkLatency),
+			"Sequence":         experimentsDetails.Sequence,
+			"PodsAffectedPerc": experimentsDetails.PodsAffectedPerc,
+		})
+	case "network-corruption":
+		log.InfoWithValues("[Info]: The chaos tunables are:", logrus.Fields{
+			"NetworkPacketCorruptionPercentage": experimentsDetails.NetworkPacketCorruptionPercentage,
+			"Sequence":                          experimentsDetails.Sequence,
+			"PodsAffectedPerc":                  experimentsDetails.PodsAffectedPerc,
+		})
+	case "network-duplication":
+		log.InfoWithValues("[Info]: The chaos tunables are:", logrus.Fields{
+			"NetworkPacketDuplicationPercentage": experimentsDetails.NetworkPacketDuplicationPercentage,
+			"Sequence":                           experimentsDetails.Sequence,
+			"PodsAffectedPerc":                   experimentsDetails.PodsAffectedPerc,
+		})
+	}
+
+	podsAffectedPerc, _ := strconv.Atoi(experimentsDetails.PodsAffectedPerc)
+	targetPodList, err := common.GetPodList(experimentsDetails.TargetPods, podsAffectedPerc, clients, chaosDetails)
 	if err != nil {
 		return err
 	}
@@ -331,4 +362,14 @@ func getIpsForTargetHosts(targetHosts string) (string, error) {
 	}
 	log.Infof("Injecting chaos on {%v} hosts", finalHosts)
 	return strings.Join(commaSeparatedIPs, ","), nil
+}
+
+//SetChaosTunables will setup a random value within a given range of values
+//If the value is not provided in range it'll setup the initial provided value.
+func SetChaosTunables(experimentsDetails *experimentTypes.ExperimentDetails) {
+	experimentsDetails.NetworkPacketLossPercentage = common.ValidateRange(experimentsDetails.NetworkPacketLossPercentage)
+	experimentsDetails.NetworkPacketCorruptionPercentage = common.ValidateRange(experimentsDetails.NetworkPacketCorruptionPercentage)
+	experimentsDetails.NetworkPacketDuplicationPercentage = common.ValidateRange(experimentsDetails.NetworkPacketDuplicationPercentage)
+	experimentsDetails.PodsAffectedPerc = common.ValidateRange(experimentsDetails.PodsAffectedPerc)
+	experimentsDetails.Sequence = common.GetRandomSequence(experimentsDetails.Sequence)
 }
