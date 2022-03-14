@@ -82,12 +82,12 @@ func SendMessageToAgent(conn *websocket.Conn, action string, payload interface{}
 
 		defer func() {
 
-			mutex.RLock()
+			mutex.Lock()
 
 			close(reqIDMap[reqID.String()])
 			delete(reqIDMap, reqID.String())
 
-			mutex.RUnlock()
+			mutex.Unlock()
 		}()
 	}
 
