@@ -74,7 +74,7 @@ func ProcessKill(clients clients.ClientSets) {
 
 	// Connect to the agent
 	log.Infof("[Status]: Connecting to the agents")
-	if err := connections.CreateWebsocketConnections(chaosDetails.ExperimentName, experimentsDetails.AgentEndpoint, experimentsDetails.AuthToken, false, &chaosDetails); err != nil {
+	if err := connections.CreateWebsocketConnections(experimentsDetails.AgentEndpoint, experimentsDetails.AuthToken, false, &chaosDetails); err != nil {
 		log.Errorf("Error occured while connecting to the agents, err: %v", err)
 		failStep := "[pre-chaos]: Failed to connect to the agent, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)

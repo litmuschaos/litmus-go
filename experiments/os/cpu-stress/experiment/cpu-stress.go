@@ -72,7 +72,7 @@ func CPUStressExperiment(clients clients.ClientSets) {
 
 	// Connect to the agent
 	log.Infof("[Status]: Connecting to the agents")
-	if err := connections.CreateWebsocketConnections(chaosDetails.ExperimentName, experimentsDetails.AgentEndpoints, experimentsDetails.AuthTokens, true, &chaosDetails); err != nil {
+	if err := connections.CreateWebsocketConnections(experimentsDetails.AgentEndpoints, experimentsDetails.AuthTokens, true, &chaosDetails); err != nil {
 		log.Errorf("Error occured while connecting to the agent, err: %v", err)
 		failStep := "[pre-chaos]: Failed to connect to the agent, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)

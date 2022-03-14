@@ -12,7 +12,7 @@ import (
 
 // CreateWebsocketConnections creates all the requisite websocket connections from the given agent endpoints and authentication tokens.
 // It also initialises a listener goroutine for every connection.
-func CreateWebsocketConnections(experimentName, agentEndpoints, authTokens string, connectMultipleAgents bool, chaosDetails *types.ChaosDetails) error {
+func CreateWebsocketConnections(agentEndpoints, authTokens string, connectMultipleAgents bool, chaosDetails *types.ChaosDetails) error {
 
 	if agentEndpoints == "" {
 		return errors.Errorf("no agent endpoint found")
@@ -37,7 +37,7 @@ func CreateWebsocketConnections(experimentName, agentEndpoints, authTokens strin
 
 	for i := range agentEndpointList {
 
-		conn, _, err := websocket.DefaultDialer.Dial("ws://"+agentEndpointList[i]+"/"+experimentName, http.Header{"Authorization": []string{"Bearer " + authTokenList[i]}})
+		conn, _, err := websocket.DefaultDialer.Dial("ws://"+agentEndpointList[i]+"/"+chaosDetails.ExperimentName, http.Header{"Authorization": []string{"Bearer " + authTokenList[i]}})
 		if err != nil {
 			return err
 		}
