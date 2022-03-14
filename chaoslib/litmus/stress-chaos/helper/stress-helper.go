@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/containerd/cgroups"
+	cgroupsv2 "github.com/containerd/cgroups/v2"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/stress-chaos/types"
@@ -108,17 +109,9 @@ func prepareStressChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 		}
 
-		//get the pid path and check cgroup
-		path := pidPath(targetPID)
-		cgroup, err := findValidCgroup(path, containerID)
+		cgroupManager, err := getCGroupManager(int(targetPID), containerID)
 		if err != nil {
-			return errors.Errorf("fail to get cgroup, err: %v", err)
-		}
-
-		// load the existing cgroup
-		control, err := cgroups.Load(cgroups.V1, cgroups.StaticPath(cgroup))
-		if err != nil {
-			return errors.Errorf("fail to load the cgroup, err: %v", err)
+			return errors.Errorf("fail to get the cgroup manager, err: %v", err)
 		}
 
 		// get stressors in list format
@@ -143,7 +136,7 @@ func prepareStressChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 		go abortWatcher(cmd.Process.Pid, resultDetails.Name, chaosDetails.ChaosNamespace, experimentsDetails.TargetPods)
 
 		// add the stress process to the cgroup of target container
-		if err = control.Add(cgroups.Process{Pid: cmd.Process.Pid}); err != nil {
+		if err = addProcessToCgroup(cmd.Process.Pid, cgroupManager); err != nil {
 			if killErr := cmd.Process.Kill(); killErr != nil {
 				return errors.Errorf("stressors failed killing %v process, err: %v", cmd.Process.Pid, killErr)
 			}
@@ -542,4 +535,42 @@ func abortWatcher(targetPID int, resultName, chaosNS, targetPodName string) {
 	}
 	log.Info("[Abort]: Chaos Revert Completed")
 	os.Exit(1)
+}
+
+// getCGroupManager will return the cgroup for the given pid of the process
+func getCGroupManager(pid int, containerID string) (interface{}, error) {
+	if cgroups.Mode() == cgroups.Unified {
+		groupPath, err := cgroupsv2.PidGroupPath(pid)
+		if err != nil {
+			return nil, errors.Errorf("Error in getting groupPath, %v", err)
+		}
+
+		cgroup2, err := cgroupsv2.LoadManager("/sys/fs/cgroup", groupPath)
+		if err != nil {
+			return nil, errors.Errorf("Error loading cgroup v2 manager, %v", err)
+		}
+		return cgroup2, nil
+	}
+	path := pidPath(pid)
+	cgroup, err := findValidCgroup(path, containerID)
+	if err != nil {
+		return nil, errors.Errorf("fail to get cgroup, err: %v", err)
+	}
+	cgroup1, err := cgroups.Load(cgroups.V1, cgroups.StaticPath(cgroup))
+	if err != nil {
+		return nil, errors.Errorf("fail to load the cgroup, err: %v", err)
+	}
+
+	return cgroup1, nil
+}
+
+// addProcessToCgroup will add the process to cgroup
+// By default it will add to v1 cgroup
+func addProcessToCgroup(pid int, control interface{}) error {
+	if cgroups.Mode() == cgroups.Unified {
+		var cgroup1 = control.(*cgroupsv2.Manager)
+		return cgroup1.AddProc(uint64(pid))
+	}
+	var cgroup1 = control.(cgroups.Cgroup)
+	return cgroup1.Add(cgroups.Process{Pid: pid})
 }

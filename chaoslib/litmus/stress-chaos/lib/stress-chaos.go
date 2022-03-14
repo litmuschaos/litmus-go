@@ -26,10 +26,10 @@ func PrepareAndInjectStressChaos(experimentsDetails *experimentTypes.ExperimentD
 	switch experimentsDetails.StressType {
 	case "pod-cpu-stress":
 		log.InfoWithValues("[Info]: The chaos tunables are:", logrus.Fields{
-			"CPU Core":         experimentsDetails.CPUcores,
-			"CPU Load":         experimentsDetails.CPULoad,
-			"Sequence":         experimentsDetails.Sequence,
-			"PodsAffectedPerc": experimentsDetails.PodsAffectedPerc,
+			"CPU Core":            experimentsDetails.CPUcores,
+			"CPU Load Percentage": experimentsDetails.CPULoad,
+			"Sequence":            experimentsDetails.Sequence,
+			"PodsAffectedPerc":    experimentsDetails.PodsAffectedPerc,
 		})
 
 	case "pod-memory-stress":
