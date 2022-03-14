@@ -41,12 +41,26 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@master
-      - name: Run Snyk to check for vulnerabilities
-        uses: snyk/actions/golang@master
+      - uses: snyk/actions/setup@master
+      - run: |
+          export SNYK_TOKEN=${{ secrets.SNYK_TOKEN }}
+          snyk auth
+      - uses: actions/setup-go@v1
+        with:
+          go-version: '1.17'
+      - name: Snyk monitor
+        run: snyk test
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        with:
-          args: --severity-threshold=high     
+
+      # - uses: actions/checkout@master
+      # - name: Run Snyk to check for vulnerabilities
+      #   uses: snyk/actions/golang@master
+      #   env:
+      #     SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      #   with:
+      #     args: --severity-threshold=high     
+
 
   build:
     needs: pre-checks
