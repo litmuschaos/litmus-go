@@ -74,20 +74,20 @@ func SendMessageToAgent(conn *websocket.Conn, action string, payload interface{}
 	// if responseTimeout is nil, we won't look after the response sent by the agent
 	if responseTimeout != nil {
 
-		mutex.Lock()
+		mutex.RLock()
 
 		reqIDMap[reqID.String()] = resChannel
 
-		mutex.Unlock()
+		mutex.RUnlock()
 
 		defer func() {
 
-			mutex.Lock()
+			mutex.RLock()
 
 			close(reqIDMap[reqID.String()])
 			delete(reqIDMap, reqID.String())
 
-			mutex.Unlock()
+			mutex.RUnlock()
 		}()
 	}
 
