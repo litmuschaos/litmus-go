@@ -228,10 +228,11 @@ func prepareStressor(experimentDetails *experimentTypes.ExperimentDetails) []str
 
 		log.InfoWithValues("[Info]: Details of Stressor:", logrus.Fields{
 			"CPU Core": experimentDetails.CPUcores,
+			"CPU Load": experimentDetails.CPULoad,
 			"Timeout":  experimentDetails.ChaosDuration,
 		})
-		stressArgs = append(stressArgs, "--cpu "+strconv.Itoa(experimentDetails.CPUcores))
-		stressArgs = append(stressArgs, " --cpu-load "+strconv.Itoa(experimentDetails.CPULoad))
+		stressArgs = append(stressArgs, "--cpu "+experimentDetails.CPUcores)
+		stressArgs = append(stressArgs, " --cpu-load "+experimentDetails.CPULoad)
 
 	case "pod-memory-stress":
 
@@ -240,22 +241,22 @@ func prepareStressor(experimentDetails *experimentTypes.ExperimentDetails) []str
 			"Memory Consumption": experimentDetails.MemoryConsumption,
 			"Timeout":            experimentDetails.ChaosDuration,
 		})
-		stressArgs = append(stressArgs, "--vm "+strconv.Itoa(experimentDetails.NumberOfWorkers)+" --vm-bytes "+strconv.Itoa(experimentDetails.MemoryConsumption)+"M")
+		stressArgs = append(stressArgs, "--vm "+experimentDetails.NumberOfWorkers+" --vm-bytes "+experimentDetails.MemoryConsumption+"M")
 
 	case "pod-io-stress":
 		var hddbytes string
-		if experimentDetails.FilesystemUtilizationBytes == 0 {
-			if experimentDetails.FilesystemUtilizationPercentage == 0 {
+		if experimentDetails.FilesystemUtilizationBytes == "0" {
+			if experimentDetails.FilesystemUtilizationPercentage == "0" {
 				hddbytes = "10%"
 				log.Info("Neither of FilesystemUtilizationPercentage or FilesystemUtilizationBytes provided, proceeding with a default FilesystemUtilizationPercentage value of 10%")
 			} else {
-				hddbytes = strconv.Itoa(experimentDetails.FilesystemUtilizationPercentage) + "%"
+				hddbytes = experimentDetails.FilesystemUtilizationPercentage + "%"
 			}
 		} else {
-			if experimentDetails.FilesystemUtilizationPercentage == 0 {
-				hddbytes = strconv.Itoa(experimentDetails.FilesystemUtilizationBytes) + "G"
+			if experimentDetails.FilesystemUtilizationPercentage == "0" {
+				hddbytes = experimentDetails.FilesystemUtilizationBytes + "G"
 			} else {
-				hddbytes = strconv.Itoa(experimentDetails.FilesystemUtilizationPercentage) + "%"
+				hddbytes = experimentDetails.FilesystemUtilizationPercentage + "%"
 				log.Warn("Both FsUtilPercentage & FsUtilBytes provided as inputs, using the FsUtilPercentage value to proceed with stress exp")
 			}
 		}
@@ -267,12 +268,12 @@ func prepareStressor(experimentDetails *experimentTypes.ExperimentDetails) []str
 			"Volume Mount Path": experimentDetails.VolumeMountPath,
 		})
 		if experimentDetails.VolumeMountPath == "" {
-			stressArgs = append(stressArgs, "--io "+strconv.Itoa(experimentDetails.NumberOfWorkers)+" --hdd "+strconv.Itoa(experimentDetails.NumberOfWorkers)+" --hdd-bytes "+hddbytes)
+			stressArgs = append(stressArgs, "--io "+experimentDetails.NumberOfWorkers+" --hdd "+experimentDetails.NumberOfWorkers+" --hdd-bytes "+hddbytes)
 		} else {
-			stressArgs = append(stressArgs, "--io "+strconv.Itoa(experimentDetails.NumberOfWorkers)+" --hdd "+strconv.Itoa(experimentDetails.NumberOfWorkers)+" --hdd-bytes "+hddbytes+" --temp-path "+experimentDetails.VolumeMountPath)
+			stressArgs = append(stressArgs, "--io "+experimentDetails.NumberOfWorkers+" --hdd "+experimentDetails.NumberOfWorkers+" --hdd-bytes "+hddbytes+" --temp-path "+experimentDetails.VolumeMountPath)
 		}
-		if experimentDetails.CPUcores != 0 {
-			stressArgs = append(stressArgs, "--cpu %v", strconv.Itoa(experimentDetails.CPUcores))
+		if experimentDetails.CPUcores != "0" {
+			stressArgs = append(stressArgs, "--cpu %v", experimentDetails.CPUcores)
 		}
 
 	default:
@@ -503,12 +504,12 @@ func getENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.ChaosPodName = types.Getenv("POD_NAME", "")
 	experimentDetails.ContainerRuntime = types.Getenv("CONTAINER_RUNTIME", "")
 	experimentDetails.SocketPath = types.Getenv("SOCKET_PATH", "")
-	experimentDetails.CPUcores, _ = strconv.Atoi(types.Getenv("CPU_CORES", ""))
-	experimentDetails.CPULoad, _ = strconv.Atoi(types.Getenv("CPU_LOAD", ""))
-	experimentDetails.FilesystemUtilizationPercentage, _ = strconv.Atoi(types.Getenv("FILESYSTEM_UTILIZATION_PERCENTAGE", ""))
-	experimentDetails.FilesystemUtilizationBytes, _ = strconv.Atoi(types.Getenv("FILESYSTEM_UTILIZATION_BYTES", ""))
-	experimentDetails.NumberOfWorkers, _ = strconv.Atoi(types.Getenv("NUMBER_OF_WORKERS", ""))
-	experimentDetails.MemoryConsumption, _ = strconv.Atoi(types.Getenv("MEMORY_CONSUMPTION", ""))
+	experimentDetails.CPUcores = types.Getenv("CPU_CORES", "")
+	experimentDetails.CPULoad = types.Getenv("CPU_LOAD", "")
+	experimentDetails.FilesystemUtilizationPercentage = types.Getenv("FILESYSTEM_UTILIZATION_PERCENTAGE", "")
+	experimentDetails.FilesystemUtilizationBytes = types.Getenv("FILESYSTEM_UTILIZATION_BYTES", "")
+	experimentDetails.NumberOfWorkers = types.Getenv("NUMBER_OF_WORKERS", "")
+	experimentDetails.MemoryConsumption = types.Getenv("MEMORY_CONSUMPTION", "")
 	experimentDetails.VolumeMountPath = types.Getenv("VOLUME_MOUNT_PATH", "")
 	experimentDetails.StressType = types.Getenv("STRESS_TYPE", "")
 }

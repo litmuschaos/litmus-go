@@ -64,11 +64,9 @@ func PodIOStress(clients clients.ClientSets) {
 
 	//DISPLAY THE APP INFORMATION
 	log.InfoWithValues("The application information is as follows", logrus.Fields{
-		"Namespace":                       experimentsDetails.AppNS,
-		"Label":                           experimentsDetails.AppLabel,
-		"Chaos Duration":                  experimentsDetails.ChaosDuration,
-		"FilesystemUtilizationPercentage": experimentsDetails.FilesystemUtilizationPercentage,
-		"NumberOfWorkers":                 experimentsDetails.NumberOfWorkers,
+		"Namespace":      experimentsDetails.AppNS,
+		"Label":          experimentsDetails.AppLabel,
+		"Chaos Duration": experimentsDetails.ChaosDuration,
 	})
 
 	// Calling AbortWatcher go routine, it will continuously watch for the abort signal and generate the required events and result

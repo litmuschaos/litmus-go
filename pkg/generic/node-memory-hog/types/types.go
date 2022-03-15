@@ -19,9 +19,9 @@ type ExperimentDetails struct {
 	InstanceID                    string
 	ChaosNamespace                string
 	ChaosPodName                  string
-	MemoryConsumptionPercentage   int
-	MemoryConsumptionMebibytes    int
-	NumberOfWorkers               int
+	MemoryConsumptionPercentage   string
+	MemoryConsumptionMebibytes    string
+	NumberOfWorkers               string
 	RunID                         string
 	LIBImage                      string
 	LIBImagePullPolicy            string
@@ -29,7 +29,7 @@ type ExperimentDetails struct {
 	Timeout                       int
 	Delay                         int
 	TargetNodes                   string
-	NodesAffectedPerc             int
+	NodesAffectedPerc             string
 	Sequence                      string
 	TargetContainer               string
 	NodeLabel                     string

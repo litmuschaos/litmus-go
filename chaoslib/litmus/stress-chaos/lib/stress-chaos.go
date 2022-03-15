@@ -22,25 +22,57 @@ func PrepareAndInjectStressChaos(experimentsDetails *experimentTypes.ExperimentD
 
 	targetPodList := apiv1.PodList{}
 	var err error
+	var podsAffectedPerc int
+	//Setup the tunables if provided in range
+	SetChaosTunables(experimentsDetails)
+
+	switch experimentsDetails.StressType {
+	case "pod-cpu-stress":
+		log.InfoWithValues("[Info]: The chaos tunables are:", logrus.Fields{
+			"CPU Core":            experimentsDetails.CPUcores,
+			"CPU Load Percentage": experimentsDetails.CPULoad,
+			"Sequence":            experimentsDetails.Sequence,
+			"PodsAffectedPerc":    experimentsDetails.PodsAffectedPerc,
+		})
+
+	case "pod-memory-stress":
+		log.InfoWithValues("[Info]: The chaos tunables are:", logrus.Fields{
+			"Number of Workers":  experimentsDetails.NumberOfWorkers,
+			"Memory Consumption": experimentsDetails.MemoryConsumption,
+			"Sequence":           experimentsDetails.Sequence,
+			"PodsAffectedPerc":   experimentsDetails.PodsAffectedPerc,
+		})
+
+	case "pod-io-stress":
+		log.InfoWithValues("[Info]: The chaos tunables are:", logrus.Fields{
+			"FilesystemUtilizationPercentage": experimentsDetails.FilesystemUtilizationPercentage,
+			"FilesystemUtilizationBytes":      experimentsDetails.FilesystemUtilizationBytes,
+			"NumberOfWorkers":                 experimentsDetails.NumberOfWorkers,
+			"Sequence":                        experimentsDetails.Sequence,
+			"PodsAffectedPerc":                experimentsDetails.PodsAffectedPerc,
+		})
+	}
+
 	// Get the target pod details for the chaos execution
 	// if the target pod is not defined it will derive the random target pod list using pod affected percentage
 	if experimentsDetails.TargetPods == "" && chaosDetails.AppDetail.Label == "" {
 		return errors.Errorf("Please provide one of the appLabel or TARGET_PODS")
 	}
+	podsAffectedPerc, _ = strconv.Atoi(experimentsDetails.PodsAffectedPerc)
 	if experimentsDetails.NodeLabel == "" {
-		targetPodList, err = common.GetPodList(experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, clients, chaosDetails)
+		targetPodList, err = common.GetPodList(experimentsDetails.TargetPods, podsAffectedPerc, clients, chaosDetails)
 		if err != nil {
 			return err
 		}
 	} else {
 		if experimentsDetails.TargetPods == "" {
-			targetPodList, err = common.GetPodListFromSpecifiedNodes(experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, experimentsDetails.NodeLabel, clients, chaosDetails)
+			targetPodList, err = common.GetPodListFromSpecifiedNodes(experimentsDetails.TargetPods, podsAffectedPerc, experimentsDetails.NodeLabel, clients, chaosDetails)
 			if err != nil {
 				return err
 			}
 		} else {
 			log.Infof("TARGET_PODS env is provided, overriding the NODE_LABEL input")
-			targetPodList, err = common.GetPodList(experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, clients, chaosDetails)
+			targetPodList, err = common.GetPodList(experimentsDetails.TargetPods, podsAffectedPerc, clients, chaosDetails)
 			if err != nil {
 				return err
 			}
@@ -307,12 +339,12 @@ func getPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, podName st
 		SetEnv("CONTAINER_RUNTIME", experimentsDetails.ContainerRuntime).
 		SetEnv("EXPERIMENT_NAME", experimentsDetails.ExperimentName).
 		SetEnv("SOCKET_PATH", experimentsDetails.SocketPath).
-		SetEnv("CPU_CORES", strconv.Itoa(experimentsDetails.CPUcores)).
-		SetEnv("CPU_LOAD", strconv.Itoa(experimentsDetails.CPULoad)).
-		SetEnv("FILESYSTEM_UTILIZATION_PERCENTAGE", strconv.Itoa(experimentsDetails.FilesystemUtilizationPercentage)).
-		SetEnv("FILESYSTEM_UTILIZATION_BYTES", strconv.Itoa(experimentsDetails.FilesystemUtilizationBytes)).
-		SetEnv("NUMBER_OF_WORKERS", strconv.Itoa(experimentsDetails.NumberOfWorkers)).
-		SetEnv("MEMORY_CONSUMPTION", strconv.Itoa(experimentsDetails.MemoryConsumption)).
+		SetEnv("CPU_CORES", experimentsDetails.CPUcores).
+		SetEnv("CPU_LOAD", experimentsDetails.CPULoad).
+		SetEnv("FILESYSTEM_UTILIZATION_PERCENTAGE", experimentsDetails.FilesystemUtilizationPercentage).
+		SetEnv("FILESYSTEM_UTILIZATION_BYTES", experimentsDetails.FilesystemUtilizationBytes).
+		SetEnv("NUMBER_OF_WORKERS", experimentsDetails.NumberOfWorkers).
+		SetEnv("MEMORY_CONSUMPTION", experimentsDetails.MemoryConsumption).
 		SetEnv("VOLUME_MOUNT_PATH", experimentsDetails.VolumeMountPath).
 		SetEnv("STRESS_TYPE", experimentsDetails.StressType).
 		SetEnv("INSTANCE_ID", experimentsDetails.InstanceID).
@@ -323,4 +355,17 @@ func getPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, podName st
 
 func ptrint64(p int64) *int64 {
 	return &p
+}
+
+//SetChaosTunables will setup a random value within a given range of values
+//If the value is not provided in range it'll setup the initial provided value.
+func SetChaosTunables(experimentsDetails *experimentTypes.ExperimentDetails) {
+	experimentsDetails.CPUcores = common.ValidateRange(experimentsDetails.CPUcores)
+	experimentsDetails.CPULoad = common.ValidateRange(experimentsDetails.CPULoad)
+	experimentsDetails.MemoryConsumption = common.ValidateRange(experimentsDetails.MemoryConsumption)
+	experimentsDetails.NumberOfWorkers = common.ValidateRange(experimentsDetails.NumberOfWorkers)
+	experimentsDetails.FilesystemUtilizationPercentage = common.ValidateRange(experimentsDetails.FilesystemUtilizationPercentage)
+	experimentsDetails.FilesystemUtilizationBytes = common.ValidateRange(experimentsDetails.FilesystemUtilizationBytes)
+	experimentsDetails.PodsAffectedPerc = common.ValidateRange(experimentsDetails.PodsAffectedPerc)
+	experimentsDetails.Sequence = common.GetRandomSequence(experimentsDetails.Sequence)
 }

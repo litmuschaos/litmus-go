@@ -28,7 +28,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string
 	experimentDetails.Delay, _ = strconv.Atoi(types.Getenv("STATUS_CHECK_DELAY", "2"))
 	experimentDetails.Timeout, _ = strconv.Atoi(types.Getenv("STATUS_CHECK_TIMEOUT", "180"))
 	experimentDetails.TargetPods = types.Getenv("TARGET_PODS", "")
-	experimentDetails.PodsAffectedPerc, _ = strconv.Atoi(types.Getenv("PODS_AFFECTED_PERC", "0"))
+	experimentDetails.PodsAffectedPerc = types.Getenv("PODS_AFFECTED_PERC", "0")
 	experimentDetails.ContainerRuntime = types.Getenv("CONTAINER_RUNTIME", "docker")
 	experimentDetails.ChaosServiceAccount = types.Getenv("CHAOS_SERVICE_ACCOUNT", "")
 	experimentDetails.SocketPath = types.Getenv("SOCKET_PATH", "/var/run/docker.sock")
@@ -39,21 +39,21 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string
 
 	switch expName {
 	case "pod-cpu-hog":
-		experimentDetails.CPUcores, _ = strconv.Atoi(types.Getenv("CPU_CORES", "0"))
-		experimentDetails.CPULoad, _ = strconv.Atoi(types.Getenv("CPU_LOAD", "100"))
+		experimentDetails.CPUcores = types.Getenv("CPU_CORES", "0")
+		experimentDetails.CPULoad = types.Getenv("CPU_LOAD", "100")
 		experimentDetails.StressType = "pod-cpu-stress"
 
 	case "pod-memory-hog":
-		experimentDetails.MemoryConsumption, _ = strconv.Atoi(types.Getenv("MEMORY_CONSUMPTION", "500"))
-		experimentDetails.NumberOfWorkers, _ = strconv.Atoi(types.Getenv("NUMBER_OF_WORKERS", "4"))
+		experimentDetails.MemoryConsumption = types.Getenv("MEMORY_CONSUMPTION", "500")
+		experimentDetails.NumberOfWorkers = types.Getenv("NUMBER_OF_WORKERS", "4")
 		experimentDetails.StressType = "pod-memory-stress"
 
 	case "pod-io-stress":
-		experimentDetails.FilesystemUtilizationPercentage, _ = strconv.Atoi(types.Getenv("FILESYSTEM_UTILIZATION_PERCENTAGE", ""))
-		experimentDetails.FilesystemUtilizationBytes, _ = strconv.Atoi(types.Getenv("FILESYSTEM_UTILIZATION_BYTES", ""))
-		experimentDetails.NumberOfWorkers, _ = strconv.Atoi(types.Getenv("NUMBER_OF_WORKERS", "4"))
+		experimentDetails.FilesystemUtilizationPercentage = types.Getenv("FILESYSTEM_UTILIZATION_PERCENTAGE", "")
+		experimentDetails.FilesystemUtilizationBytes = types.Getenv("FILESYSTEM_UTILIZATION_BYTES", "")
+		experimentDetails.NumberOfWorkers = types.Getenv("NUMBER_OF_WORKERS", "4")
 		experimentDetails.VolumeMountPath = types.Getenv("VOLUME_MOUNT_PATH", "")
-		experimentDetails.CPUcores, _ = strconv.Atoi(types.Getenv("CPU_CORES", "0"))
+		experimentDetails.CPUcores = types.Getenv("CPU_CORES", "0")
 		experimentDetails.StressType = "pod-io-stress"
 	}
 }

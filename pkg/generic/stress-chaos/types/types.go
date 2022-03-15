@@ -26,18 +26,18 @@ type ExperimentDetails struct {
 	Timeout                         int
 	Delay                           int
 	TargetPods                      string
-	PodsAffectedPerc                int
+	PodsAffectedPerc                string
 	ContainerRuntime                string
 	ChaosServiceAccount             string
 	SocketPath                      string
 	Sequence                        string
 	TerminationGracePeriodSeconds   int
-	CPUcores                        int
-	CPULoad                         int
-	FilesystemUtilizationPercentage int
-	FilesystemUtilizationBytes      int
-	NumberOfWorkers                 int
-	MemoryConsumption               int
+	CPUcores                        string
+	CPULoad                         string
+	FilesystemUtilizationPercentage string
+	FilesystemUtilizationBytes      string
+	NumberOfWorkers                 string
+	MemoryConsumption               string
 	VolumeMountPath                 string
 	StressType                      string
 	NodeLabel                       string
