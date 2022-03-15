@@ -13,6 +13,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/litmuschaos/litmus-go/pkg/utils/exec"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	apiv1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -28,7 +29,19 @@ func PrepareDiskFill(experimentsDetails *experimentTypes.ExperimentDetails, clie
 	if experimentsDetails.TargetPods == "" && chaosDetails.AppDetail.Label == "" {
 		return errors.Errorf("please provide one of the appLabel or TARGET_PODS")
 	}
-	targetPodList, err := common.GetPodList(experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, clients, chaosDetails)
+
+	//setup the tunables if provided in range
+	setChaosTunables(experimentsDetails)
+
+	log.InfoWithValues("[Info]: The chaos tunables are:", logrus.Fields{
+		"FillPercentage":            experimentsDetails.FillPercentage,
+		"EphemeralStorageMebibytes": experimentsDetails.EphemeralStorageMebibytes,
+		"PodsAffectedPerc":          experimentsDetails.PodsAffectedPerc,
+		"Sequence":                  experimentsDetails.Sequence,
+	})
+
+	podsAffectedPerc, _ := strconv.Atoi(experimentsDetails.PodsAffectedPerc)
+	targetPodList, err := common.GetPodList(experimentsDetails.TargetPods, podsAffectedPerc, clients, chaosDetails)
 	if err != nil {
 		return err
 	}
@@ -254,11 +267,20 @@ func getPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, podName st
 		SetEnv("CHAOSENGINE", experimentsDetails.EngineName).
 		SetEnv("CHAOS_UID", string(experimentsDetails.ChaosUID)).
 		SetEnv("EXPERIMENT_NAME", experimentsDetails.ExperimentName).
-		SetEnv("FILL_PERCENTAGE", strconv.Itoa(experimentsDetails.FillPercentage)).
-		SetEnv("EPHEMERAL_STORAGE_MEBIBYTES", strconv.Itoa(experimentsDetails.EphemeralStorageMebibytes)).
+		SetEnv("FILL_PERCENTAGE", experimentsDetails.FillPercentage).
+		SetEnv("EPHEMERAL_STORAGE_MEBIBYTES", experimentsDetails.EphemeralStorageMebibytes).
 		SetEnv("DATA_BLOCK_SIZE", strconv.Itoa(experimentsDetails.DataBlockSize)).
 		SetEnv("INSTANCE_ID", experimentsDetails.InstanceID).
 		SetEnvFromDownwardAPI("v1", "metadata.name")
 
 	return envDetails.ENV
+}
+
+//setChaosTunables will setup a random value within a given range of values
+//If the value is not provided in range it'll setup the initial provided value.
+func setChaosTunables(experimentsDetails *experimentTypes.ExperimentDetails) {
+	experimentsDetails.FillPercentage = common.ValidateRange(experimentsDetails.FillPercentage)
+	experimentsDetails.EphemeralStorageMebibytes = common.ValidateRange(experimentsDetails.EphemeralStorageMebibytes)
+	experimentsDetails.PodsAffectedPerc = common.ValidateRange(experimentsDetails.PodsAffectedPerc)
+	experimentsDetails.Sequence = common.GetRandomSequence(experimentsDetails.Sequence)
 }

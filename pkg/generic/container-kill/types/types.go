@@ -30,7 +30,7 @@ type ExperimentDetails struct {
 	Delay                         int
 	TargetPods                    string
 	ContainerRuntime              string
-	PodsAffectedPerc              int
+	PodsAffectedPerc              string
 	Sequence                      string
 	Signal                        string
 }

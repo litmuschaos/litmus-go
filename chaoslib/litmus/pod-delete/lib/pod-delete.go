@@ -28,6 +28,14 @@ func PreparePodDelete(experimentsDetails *experimentTypes.ExperimentDetails, cli
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 
+	//setup the tunables if provided in range
+	SetChaosTunables(experimentsDetails)
+
+	log.InfoWithValues("[Info]: The chaos tunables are:", logrus.Fields{
+		"PodsAffectedPerc": experimentsDetails.PodsAffectedPerc,
+		"Sequence":         experimentsDetails.Sequence,
+	})
+
 	switch strings.ToLower(experimentsDetails.Sequence) {
 	case "serial":
 		if err := injectChaosInSerialMode(experimentsDetails, clients, chaosDetails, eventsDetails, resultDetails); err != nil {
@@ -70,7 +78,8 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		if experimentsDetails.TargetPods == "" && chaosDetails.AppDetail.Label == "" {
 			return errors.Errorf("please provide one of the appLabel or TARGET_PODS")
 		}
-		targetPodList, err := common.GetPodList(experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, clients, chaosDetails)
+		podsAffectedPerc, _ := strconv.Atoi(experimentsDetails.PodsAffectedPerc)
+		targetPodList, err := common.GetPodList(experimentsDetails.TargetPods, podsAffectedPerc, clients, chaosDetails)
 		if err != nil {
 			return err
 		}
@@ -167,7 +176,8 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		if experimentsDetails.TargetPods == "" && chaosDetails.AppDetail.Label == "" {
 			return errors.Errorf("please provide one of the appLabel or TARGET_PODS")
 		}
-		targetPodList, err := common.GetPodList(experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, clients, chaosDetails)
+		podsAffectedPerc, _ := strconv.Atoi(experimentsDetails.PodsAffectedPerc)
+		targetPodList, err := common.GetPodList(experimentsDetails.TargetPods, podsAffectedPerc, clients, chaosDetails)
 		if err != nil {
 			return err
 		}
@@ -239,4 +249,11 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 	log.Infof("[Completion]: %v chaos is done", experimentsDetails.ExperimentName)
 
 	return nil
+}
+
+//SetChaosTunables will setup a random value within a given range of values
+//If the value is not provided in range it'll setup the initial provided value.
+func SetChaosTunables(experimentsDetails *experimentTypes.ExperimentDetails) {
+	experimentsDetails.PodsAffectedPerc = common.ValidateRange(experimentsDetails.PodsAffectedPerc)
+	experimentsDetails.Sequence = common.GetRandomSequence(experimentsDetails.Sequence)
 }
