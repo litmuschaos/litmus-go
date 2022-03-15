@@ -37,7 +37,7 @@ func getContainerArguments(experimentsDetails *experimentTypes.ExperimentDetails
 	if err != nil {
 		return args, err
 	}
-	args = append(args, "duplicate", "--percent", strconv.Itoa(experimentsDetails.NetworkPacketDuplicationPercentage))
+	args = append(args, "duplicate", "--percent", experimentsDetails.NetworkPacketDuplicationPercentage)
 
 	return args, nil
 }
