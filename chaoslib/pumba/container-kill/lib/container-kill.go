@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/container-kill/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/container-kill/types"
@@ -28,7 +29,15 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 	if experimentsDetails.TargetPods == "" && chaosDetails.AppDetail.Label == "" {
 		return errors.Errorf("please provide one of the appLabel or TARGET_PODS")
 	}
-	targetPodList, err := common.GetPodList(experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, clients, chaosDetails)
+	//Setup the tunables if provided in range
+	litmusLIB.SetChaosTunables(experimentsDetails)
+
+	log.InfoWithValues("[Info]: The tunables are:", logrus.Fields{
+		"PodsAffectedPerc": experimentsDetails.PodsAffectedPerc,
+		"Sequence":         experimentsDetails.Sequence,
+	})
+	podsAffectedPerc, _ := strconv.Atoi(experimentsDetails.PodsAffectedPerc)
+	targetPodList, err := common.GetPodList(experimentsDetails.TargetPods, podsAffectedPerc, clients, chaosDetails)
 	if err != nil {
 		return err
 	}

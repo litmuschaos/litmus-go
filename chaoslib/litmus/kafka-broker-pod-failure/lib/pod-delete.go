@@ -70,7 +70,8 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		if experimentsDetails.KafkaBroker == "" && chaosDetails.AppDetail.Label == "" {
 			return errors.Errorf("please provide one of the appLabel or KAFKA_BROKER")
 		}
-		targetPodList, err := common.GetPodList(experimentsDetails.KafkaBroker, experimentsDetails.ChaoslibDetail.PodsAffectedPerc, clients, chaosDetails)
+		podsAffectedPerc, _ := strconv.Atoi(experimentsDetails.ChaoslibDetail.PodsAffectedPerc)
+		targetPodList, err := common.GetPodList(experimentsDetails.KafkaBroker, podsAffectedPerc, clients, chaosDetails)
 		if err != nil {
 			return err
 		}
@@ -158,7 +159,8 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		if experimentsDetails.KafkaBroker == "" && chaosDetails.AppDetail.Label == "" {
 			return errors.Errorf("please provide one of the appLabel or KAFKA_BROKER")
 		}
-		targetPodList, err := common.GetPodList(experimentsDetails.KafkaBroker, experimentsDetails.ChaoslibDetail.PodsAffectedPerc, clients, chaosDetails)
+		podsAffectedPerc, _ := strconv.Atoi(experimentsDetails.ChaoslibDetail.PodsAffectedPerc)
+		targetPodList, err := common.GetPodList(experimentsDetails.KafkaBroker, podsAffectedPerc, clients, chaosDetails)
 		if err != nil {
 			return err
 		}
