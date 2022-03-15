@@ -35,6 +35,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string
 	experimentDetails.Sequence = types.Getenv("SEQUENCE", "parallel")
 	experimentDetails.TerminationGracePeriodSeconds, _ = strconv.Atoi(types.Getenv("TERMINATION_GRACE_PERIOD_SECONDS", ""))
 	experimentDetails.StressImage = types.Getenv("STRESS_IMAGE", "alexeiled/stress-ng:latest-ubuntu")
+	experimentDetails.NodeLabel = types.Getenv("NODE_LABEL", "")
 
 	switch expName {
 	case "pod-cpu-hog":

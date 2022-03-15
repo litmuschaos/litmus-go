@@ -31,6 +31,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string
 	experimentDetails.Timeout, _ = strconv.Atoi(types.Getenv("STATUS_CHECK_TIMEOUT", "180"))
 	experimentDetails.TargetPods = types.Getenv("TARGET_PODS", "")
 	experimentDetails.PodsAffectedPerc = types.Getenv("PODS_AFFECTED_PERC", "0")
+	experimentDetails.NodeLabel = types.Getenv("NODE_LABEL", "")
 	experimentDetails.DestinationIPs = types.Getenv("DESTINATION_IPS", "")
 	experimentDetails.DestinationHosts = types.Getenv("DESTINATION_HOSTS", "")
 	experimentDetails.ContainerRuntime = types.Getenv("CONTAINER_RUNTIME", "docker")

@@ -28,4 +28,5 @@ type ExperimentDetails struct {
 	Sequence            string
 	LIBImagePullPolicy  string
 	TargetContainer     string
+	NodeLabel           string
 }

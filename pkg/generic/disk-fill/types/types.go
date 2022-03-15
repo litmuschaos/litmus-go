@@ -34,4 +34,5 @@ type ExperimentDetails struct {
 	EphemeralStorageMebibytes     int
 	TerminationGracePeriodSeconds int
 	DataBlockSize                 int
+	NodeLabel                     string
 }

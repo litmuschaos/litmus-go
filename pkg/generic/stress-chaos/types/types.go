@@ -40,4 +40,5 @@ type ExperimentDetails struct {
 	MemoryConsumption               int
 	VolumeMountPath                 string
 	StressType                      string
+	NodeLabel                       string
 }

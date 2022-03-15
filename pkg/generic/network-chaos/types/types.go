@@ -41,4 +41,5 @@ type ExperimentDetails struct {
 	TerminationGracePeriodSeconds      int
 	Jitter                             int
 	NetworkChaosType                   string
+	NodeLabel                          string
 }
