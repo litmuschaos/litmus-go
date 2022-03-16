@@ -83,13 +83,13 @@ func WaitForVMInstanceDown(timeout int, delay int, instanceName string, gcpProje
 		Try(func(attempt uint) error {
 			instanceState, err := GetVMInstanceStatus(instanceName, gcpProjectID, instanceZone)
 			if err != nil {
-				return errors.Errorf("failed to get the instance status")
+				return errors.Errorf("failed to get the %s instance status", instanceName)
 			}
 			if instanceState != "TERMINATED" {
-				log.Infof("The instance state is %v", instanceState)
-				return errors.Errorf("instance is not yet in stopped state")
+				log.Infof("The %s instance state is %v", instanceName, instanceState)
+				return errors.Errorf("%s instance is not yet in stopped state", instanceName)
 			}
-			log.Infof("The instance state is %v", instanceState)
+			log.Infof("The %s instance state is %v", instanceName, instanceState)
 			return nil
 		})
 }
@@ -104,13 +104,13 @@ func WaitForVMInstanceUp(timeout int, delay int, instanceName string, gcpProject
 
 			instanceState, err := GetVMInstanceStatus(instanceName, gcpProjectID, instanceZone)
 			if err != nil {
-				return errors.Errorf("failed to get the instance status")
+				return errors.Errorf("failed to get the %s instance status", instanceName)
 			}
 			if instanceState != "RUNNING" {
-				log.Infof("The instance state is %v", instanceState)
-				return errors.Errorf("instance is not yet in running state")
+				log.Infof("The %s instance state is %v", instanceName, instanceState)
+				return errors.Errorf("%s instance is not yet in running state", instanceName)
 			}
-			log.Infof("The instance state is %v", instanceState)
+			log.Infof("The %s instance state is %v", instanceName, instanceState)
 			return nil
 		})
 }

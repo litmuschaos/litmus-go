@@ -6,6 +6,7 @@ import (
 	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
 	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/gcp-vm-instance-stop-by-label/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
+	"github.com/litmuschaos/litmus-go/pkg/cloud/gcp"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentEnv "github.com/litmuschaos/litmus-go/pkg/gcp/gcp-vm-instance-stop/environment"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/gcp/gcp-vm-instance-stop/types"
@@ -168,6 +169,18 @@ func GCPVMInstanceStopByLabel(clients clients.ClientSets) {
 			failStep := "[post-chaos]: Failed to verify the active number of nodes, err: " + err.Error()
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
+		}
+	}
+
+	// Verify that GCP VM instance is running (post-chaos)
+	if experimentsDetails.AutoScalingGroup != "enable" {
+		for _, instanceName := range experimentsDetails.TargetVMInstanceNameList {
+			if err := gcp.WaitForVMInstanceUp(experimentsDetails.Timeout, experimentsDetails.Delay, instanceName, experimentsDetails.GCPProjectID, experimentsDetails.InstanceZone); err != nil {
+				log.Errorf("failed to get the GCP VM instance status as RUNNING post chaos, err: %v", err)
+				failStep := "[post-chaos]: Failed to verify the GCP VM instance status, err: " + err.Error()
+				result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+				return
+			}
 		}
 	}
 
