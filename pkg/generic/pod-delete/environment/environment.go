@@ -32,4 +32,5 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.TargetPods = types.Getenv("TARGET_PODS", "")
 	experimentDetails.Sequence = types.Getenv("SEQUENCE", "parallel")
 	experimentDetails.TargetContainer = types.Getenv("TARGET_CONTAINER", "")
+	experimentDetails.NodeLabel = types.Getenv("NODE_LABEL", "")
 }

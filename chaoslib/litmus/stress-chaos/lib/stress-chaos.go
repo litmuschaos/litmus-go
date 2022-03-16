@@ -20,6 +20,9 @@ import (
 //PrepareAndInjectStressChaos contains the prepration & injection steps for the stress experiments.
 func PrepareAndInjectStressChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
+	targetPodList := apiv1.PodList{}
+	var err error
+	var podsAffectedPerc int
 	//Setup the tunables if provided in range
 	SetChaosTunables(experimentsDetails)
 
@@ -55,10 +58,25 @@ func PrepareAndInjectStressChaos(experimentsDetails *experimentTypes.ExperimentD
 	if experimentsDetails.TargetPods == "" && chaosDetails.AppDetail.Label == "" {
 		return errors.Errorf("Please provide one of the appLabel or TARGET_PODS")
 	}
-	PodsAffectedPerc, _ := strconv.Atoi(experimentsDetails.PodsAffectedPerc)
-	targetPodList, err := common.GetPodList(experimentsDetails.TargetPods, PodsAffectedPerc, clients, chaosDetails)
-	if err != nil {
-		return err
+	podsAffectedPerc, _ = strconv.Atoi(experimentsDetails.PodsAffectedPerc)
+	if experimentsDetails.NodeLabel == "" {
+		targetPodList, err = common.GetPodList(experimentsDetails.TargetPods, podsAffectedPerc, clients, chaosDetails)
+		if err != nil {
+			return err
+		}
+	} else {
+		if experimentsDetails.TargetPods == "" {
+			targetPodList, err = common.GetPodListFromSpecifiedNodes(experimentsDetails.TargetPods, podsAffectedPerc, experimentsDetails.NodeLabel, clients, chaosDetails)
+			if err != nil {
+				return err
+			}
+		} else {
+			log.Infof("TARGET_PODS env is provided, overriding the NODE_LABEL input")
+			targetPodList, err = common.GetPodList(experimentsDetails.TargetPods, podsAffectedPerc, clients, chaosDetails)
+			if err != nil {
+				return err
+			}
+		}
 	}
 
 	podNames := []string{}

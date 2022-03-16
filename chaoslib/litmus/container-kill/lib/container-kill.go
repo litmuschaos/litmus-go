@@ -20,6 +20,9 @@ import (
 //PrepareContainerKill contains the prepration steps before chaos injection
 func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
+	targetPodList := apiv1.PodList{}
+	var err error
+	var podsAffectedPerc int
 	// Get the target pod details for the chaos execution
 	// if the target pod is not defined it will derive the random target pod list using pod affected percentage
 	if experimentsDetails.TargetPods == "" && chaosDetails.AppDetail.Label == "" {
@@ -33,10 +36,25 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 		"Sequence":         experimentsDetails.Sequence,
 	})
 
-	podsAffectedPerc, _ := strconv.Atoi(experimentsDetails.PodsAffectedPerc)
-	targetPodList, err := common.GetPodList(experimentsDetails.TargetPods, podsAffectedPerc, clients, chaosDetails)
-	if err != nil {
-		return err
+	podsAffectedPerc, _ = strconv.Atoi(experimentsDetails.PodsAffectedPerc)
+	if experimentsDetails.NodeLabel == "" {
+		targetPodList, err = common.GetPodList(experimentsDetails.TargetPods, podsAffectedPerc, clients, chaosDetails)
+		if err != nil {
+			return err
+		}
+	} else {
+		if experimentsDetails.TargetPods == "" {
+			targetPodList, err = common.GetPodListFromSpecifiedNodes(experimentsDetails.TargetPods, podsAffectedPerc, experimentsDetails.NodeLabel, clients, chaosDetails)
+			if err != nil {
+				return err
+			}
+		} else {
+			log.Infof("TARGET_PODS env is provided, overriding the NODE_LABEL input")
+			targetPodList, err = common.GetPodList(experimentsDetails.TargetPods, podsAffectedPerc, clients, chaosDetails)
+			if err != nil {
+				return err
+			}
+		}
 	}
 
 	podNames := []string{}

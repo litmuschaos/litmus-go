@@ -37,4 +37,6 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.EphemeralStorageMebibytes = types.Getenv("EPHEMERAL_STORAGE_MEBIBYTES", "")
 	experimentDetails.TerminationGracePeriodSeconds, _ = strconv.Atoi(types.Getenv("TERMINATION_GRACE_PERIOD_SECONDS", ""))
 	experimentDetails.DataBlockSize, _ = strconv.Atoi(types.Getenv("DATA_BLOCK_SIZE", "256"))
+	experimentDetails.NodeLabel = types.Getenv("NODE_LABEL", "")
+
 }
