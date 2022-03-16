@@ -1,0 +1,5 @@
+packageName: gcp
+experiments:
+  - name: gcp-vm-instance-stop-by-label
+    CSV: gcp-vm-instance-stop-by-label.chartserviceversion.yaml
+    desc: "gcp-vm-instance-stop-by-label"
