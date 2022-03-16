@@ -3,11 +3,12 @@ package experiment
 import (
 	"os"
 
+	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
 	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/gcp-vm-instance-stop-by-label/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
-	experimentEnv "github.com/litmuschaos/litmus-go/pkg/gcp/gcp-vm-instance-stop-by-label/environment"
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/gcp/gcp-vm-instance-stop-by-label/types"
+	experimentEnv "github.com/litmuschaos/litmus-go/pkg/gcp/gcp-vm-instance-stop/environment"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/gcp/gcp-vm-instance-stop/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/result"
@@ -17,8 +18,13 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// GCPVMInstanceStopByLabelExperiment contains steps to inject chaos
-func GCPVMInstanceStopByLabelExperiment(clients clients.ClientSets) {
+// GCPVMInstanceStopByLabel contains steps to inject chaos
+func GCPVMInstanceStopByLabel(clients clients.ClientSets) {
+
+	var (
+		err             error
+		activeNodeCount int
+	)
 
 	experimentsDetails := experimentTypes.ExperimentDetails{}
 	resultDetails := types.ResultDetails{}
@@ -60,19 +66,28 @@ func GCPVMInstanceStopByLabelExperiment(clients clients.ClientSets) {
 	types.SetResultEventAttributes(&eventsDetails, types.AwaitedVerdict, msg, "Normal", &resultDetails)
 	events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosResult")
 
-	//DISPLAY THE APP INFORMATION
-	log.InfoWithValues("[Info]: The application information is as follows", logrus.Fields{
-		"Namespace":      experimentsDetails.AppNS,
-		"Label":          experimentsDetails.AppLabel,
-		"Chaos Duration": experimentsDetails.ChaosDuration,
+	//DISPLAY THE INSTANCE INFORMATION
+	log.InfoWithValues("The instance information is as follows", logrus.Fields{
+		"Chaos Duration":               experimentsDetails.ChaosDuration,
+		"Chaos Namespace":              experimentsDetails.ChaosNamespace,
+		"Instance Label":               experimentsDetails.InstanceLabel,
+		"Instance Affected Percentage": experimentsDetails.InstanceAffectedPerc,
+		"Sequence":                     experimentsDetails.Sequence,
 	})
 
 	// Calling AbortWatcher go routine, it will continuously watch for the abort signal and generate the required events and result
 	go common.AbortWatcher(experimentsDetails.ExperimentName, clients, &resultDetails, &chaosDetails, &eventsDetails)
 
-	// @TODO: user PRE-CHAOS-CHECK
-	// ADD A PRE-CHAOS CHECK OF YOUR CHOICE HERE
-	// POD STATUS CHECKS FOR THE APPLICATION UNDER TEST AND AUXILIARY APPLICATIONS ARE ADDED BY DEFAULT
+	//PRE-CHAOS NODE STATUS CHECK
+	if experimentsDetails.AutoScalingGroup == "enable" {
+		activeNodeCount, err = common.PreChaosNodeStatusCheck(experimentsDetails.Timeout, experimentsDetails.Delay, clients)
+		if err != nil {
+			log.Errorf("Pre chaos node status check failed, err: %v", err)
+			failStep := "[pre-chaos]: Failed to verify that the NUT (Node Under Test) is running, err: " + err.Error()
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+			return
+		}
+	}
 
 	//PRE-CHAOS APPLICATION STATUS CHECK
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (pre-chaos)")
@@ -119,11 +134,6 @@ func GCPVMInstanceStopByLabelExperiment(clients clients.ClientSets) {
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
-	// INVOKE THE CHAOSLIB OF YOUR CHOICE HERE, WHICH WILL CONTAIN
-	// THE BUSINESS LOGIC OF THE ACTUAL CHAOS
-	// IT CAN BE A NEW CHAOSLIB YOU HAVE CREATED SPECIALLY FOR THIS EXPERIMENT OR ANY EXISTING ONE
-	// @TODO: user INVOKE-CHAOSLIB
-
 	// Including the litmus lib
 	switch experimentsDetails.ChaosLib {
 	case "litmus":
@@ -140,9 +150,18 @@ func GCPVMInstanceStopByLabelExperiment(clients clients.ClientSets) {
 		return
 	}
 
-	// @TODO: user POST-CHAOS-CHECK
-	// ADD A POST-CHAOS CHECK OF YOUR CHOICE HERE
-	// POD STATUS CHECKS FOR THE APPLICATION UNDER TEST AND AUXILIARY APPLICATIONS ARE ADDED BY DEFAULT
+	log.Infof("[Confirmation]: %v chaos has been injected successfully", experimentsDetails.ExperimentName)
+	resultDetails.Verdict = v1alpha1.ResultVerdictPassed
+
+	// POST-CHAOS ACTIVE NODE COUNT TEST
+	if experimentsDetails.AutoScalingGroup == "enable" {
+		if err = common.PostChaosActiveNodeCountCheck(activeNodeCount, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
+			log.Errorf("Post chaos active node count check failed, err: %v", err)
+			failStep := "[post-chaos]: Failed to verify the active number of nodes, err: " + err.Error()
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+			return
+		}
+	}
 
 	//POST-CHAOS APPLICATION STATUS CHECK
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (post-chaos)")

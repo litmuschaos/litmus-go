@@ -33,4 +33,6 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.InstanceZone = types.Getenv("INSTANCE_ZONES", "")
 	experimentDetails.AutoScalingGroup = types.Getenv("AUTO_SCALING_GROUP", "disable")
 	experimentDetails.Sequence = types.Getenv("SEQUENCE", "parallel")
+	experimentDetails.InstanceLabel = types.Getenv("INSTANCE_LABEL", "")
+	experimentDetails.InstanceAffectedPerc, _ = strconv.Atoi(types.Getenv("INSTANCE_AFFECTED_PERC", "0"))
 }

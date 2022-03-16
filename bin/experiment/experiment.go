@@ -162,7 +162,7 @@ func main() {
 	case "redfish-node-restart":
 		redfishNodeRestart.NodeRestart(clients)
 	case "gcp-vm-instance-stop-by-label":
-		gcpVMInstanceStopByLabel.GCPVMInstanceStopByLabelExperiment(clients)
+		gcpVMInstanceStopByLabel.GCPVMInstanceStopByLabel(clients)
 
 	default:
 		log.Errorf("Unsupported -name %v, please provide the correct value of -name args", *experimentName)
