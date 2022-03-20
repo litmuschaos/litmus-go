@@ -11,6 +11,8 @@ import (
 	// _ "k8s.io/client-go/plugin/pkg/client/auth/oidc"
 	// _ "k8s.io/client-go/plugin/pkg/client/auth/openstack"
 
+	chaosToolkit "github.com/litmuschaos/litmus-go/chaoslib/chaos-toolkit/helper"
+
 	containerKill "github.com/litmuschaos/litmus-go/chaoslib/litmus/container-kill/helper"
 	diskFill "github.com/litmuschaos/litmus-go/chaoslib/litmus/disk-fill/helper"
 	networkChaos "github.com/litmuschaos/litmus-go/chaoslib/litmus/network-chaos/helper"
@@ -58,7 +60,8 @@ func main() {
 		stressChaos.Helper(clients)
 	case "network-chaos":
 		networkChaos.Helper(clients)
-
+	case "chaos-toolkit":
+		chaosToolkit.Helper(clients)
 	default:
 		log.Errorf("Unsupported -name %v, please provide the correct value of -name args", *helperName)
 		return

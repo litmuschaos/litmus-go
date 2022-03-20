@@ -1,0 +1,56 @@
+{
+  "version": "1.0.0",
+  "title": "Arrêt de d'une app",
+  "description": "Ce test consiste à stopper une app",
+  "tags": [],
+  "configuration": {
+    "cf_api_url": {
+      "type": "env",
+      "key": "CLOUD_FOUNDRY_URL"
+    },
+    "app_name": {
+      "type": "env",
+      "key": "APP_NAME"
+    },
+    "org_name": {
+      "type": "env",
+      "key": "ORG_NAME"
+    },
+    "space_name": {
+      "type": "env",
+      "key": "SPACE_NAME"
+    },
+    "cf_verify_ssl": false
+  },
+  "secrets": {
+    "cloudfoundry": {
+      "cf_username": {
+        "type": "env",
+        "key": "CLOUD_FOUNDRY_USERNAME"
+      },
+      "cf_password": {
+        "type": "env",
+        "key": "CLOUD_FOUNDRY_PASSWORD"
+      }
+    }
+  },
+  "method": [
+    {
+      "type": "action",
+      "name": "stop_app",
+      "provider": {
+        "type": "python",
+        "secrets": [
+          "cloudfoundry"
+        ],
+        "module": "chaoscf.actions",
+        "func": "stop_app",
+        "arguments": {
+          "app_name": "${app_name}",
+          "org_name": "${org_name}",
+          "space_name": "${space_name}"
+        }
+      }
+    }
+  ]
+}
