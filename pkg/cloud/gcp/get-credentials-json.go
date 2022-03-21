@@ -40,52 +40,52 @@ func getFileContent(filePath string) (string, error) {
 func GetServiceAccountJSONFromSecret() ([]byte, error) {
 	gcpType, err := getFileContent("/tmp/type")
 	if err != nil {
-		return []byte{}, err
+		return nil, err
 	}
 
 	gcpProjectID, err := getFileContent("/tmp/project_id")
 	if err != nil {
-		return []byte{}, err
+		return nil, err
 	}
 
 	gcpPrivateKeyID, err := getFileContent("/tmp/private_key_id")
 	if err != nil {
-		return []byte{}, err
+		return nil, err
 	}
 
 	gcpPrivateKey, err := getFileContent("/tmp/private_key")
 	if err != nil {
-		return []byte{}, err
+		return nil, err
 	}
 
 	gcpClientEmail, err := getFileContent("/tmp/client_email")
 	if err != nil {
-		return []byte{}, err
+		return nil, err
 	}
 
 	gcpClientID, err := getFileContent("/tmp/client_id")
 	if err != nil {
-		return []byte{}, err
+		return nil, err
 	}
 
 	gcpAuthURI, err := getFileContent("/tmp/auth_uri")
 	if err != nil {
-		return []byte{}, err
+		return nil, err
 	}
 
 	gcpTokenURI, err := getFileContent("/tmp/token_uri")
 	if err != nil {
-		return []byte{}, err
+		return nil, err
 	}
 
 	gcpAuthCertURL, err := getFileContent("/tmp/auth_provider_x509_cert_url")
 	if err != nil {
-		return []byte{}, err
+		return nil, err
 	}
 
 	gcpClientCertURL, err := getFileContent("/tmp/client_x509_cert_url")
 	if err != nil {
-		return []byte{}, err
+		return nil, err
 	}
 
 	credentials := GCPServiceAccountCredentials{gcpType, gcpProjectID, gcpPrivateKeyID, gcpPrivateKey, gcpClientEmail, gcpClientID, gcpAuthURI, gcpTokenURI, gcpAuthCertURL, gcpClientCertURL}
@@ -93,7 +93,7 @@ func GetServiceAccountJSONFromSecret() ([]byte, error) {
 
 	byteSliceJSONString, err := json.Marshal(credentials)
 	if err != nil {
-		return []byte{}, err
+		return nil, err
 	}
 
 	return byteSliceJSONString, nil
