@@ -6,22 +6,24 @@ import (
 
 // ExperimentDetails is for collecting all the experiment-related details
 type ExperimentDetails struct {
-	ExperimentName     string
-	EngineName         string
-	ChaosDuration      int
-	ChaosInterval      int
-	RampTime           int
-	ChaosLib           string
-	ChaosUID           clientTypes.UID
-	InstanceID         string
-	ChaosNamespace     string
-	ChaosPodName       string
-	Timeout            int
-	Delay              int
-	Sequence           string
-	TargetContainer    string
-	LIBImagePullPolicy string
-	GCPProjectID       string
-	DiskVolumeNames    string
-	DiskZones          string
+	ExperimentName            string
+	EngineName                string
+	ChaosDuration             int
+	ChaosInterval             int
+	RampTime                  int
+	ChaosLib                  string
+	ChaosUID                  clientTypes.UID
+	InstanceID                string
+	ChaosNamespace            string
+	ChaosPodName              string
+	Timeout                   int
+	Delay                     int
+	Sequence                  string
+	TargetContainer           string
+	LIBImagePullPolicy        string
+	GCPProjectID              string
+	DiskVolumeNames           string
+	DiskZones                 string
+	DiskVolumeLabel           string
+	TargetDiskVolumeNamesList []string
 }

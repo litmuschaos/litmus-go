@@ -60,9 +60,9 @@ func GCPVMDiskLossByLabelExperiment(clients clients.ClientSets) {
 
 	//DISPLAY THE APP INFORMATION
 	log.InfoWithValues("[Info]: The application information is as follows", logrus.Fields{
-		"Volume IDs": experimentsDetails.DiskVolumeNames,
-		"Zones":      experimentsDetails.DiskZones,
-		"Sequence":   experimentsDetails.Sequence,
+		"Disk Volume Label": experimentsDetails.DiskVolumeLabel,
+		"Zones":             experimentsDetails.DiskZones,
+		"Sequence":          experimentsDetails.Sequence,
 	})
 
 	// Calling AbortWatcher go routine, it will continuously watch for the abort signal and generate the required events and result

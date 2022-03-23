@@ -136,7 +136,7 @@ func GCPVMInstanceStopByLabel(clients clients.ClientSets) {
 	}
 
 	//selecting the target instances (pre-chaos)
-	if err = litmusLIB.SetTargetInstance(&experimentsDetails); err != nil {
+	if err = gcp.SetTargetInstance(&experimentsDetails); err != nil {
 		log.Errorf("failed to get the target gcp vm instances, err: %v", err)
 		failStep := "[pre-chaos]: Failed to select the target GCP VM instances from label, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)

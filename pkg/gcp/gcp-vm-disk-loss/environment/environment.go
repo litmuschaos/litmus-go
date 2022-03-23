@@ -26,6 +26,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.TargetContainer = types.Getenv("TARGET_CONTAINER", "")
 	experimentDetails.GCPProjectID = types.Getenv("GCP_PROJECT_ID", "")
 	experimentDetails.DiskVolumeNames = types.Getenv("DISK_VOLUME_NAMES", "")
+	experimentDetails.DiskVolumeLabel = types.Getenv("DISK_VOLUME_LABEL", "")
 	experimentDetails.Sequence = types.Getenv("SEQUENCE", "parallel")
 	experimentDetails.DiskZones = types.Getenv("DISK_ZONES", "")
 }
