@@ -20,19 +20,19 @@ func VMInstanceStop(instanceName string, gcpProjectID string, instanceZone strin
 	// get service account credentials json
 	json, err := GetServiceAccountJSONFromSecret()
 	if err != nil {
-		return errors.Errorf(err.Error())
+		return err
 	}
 
 	// create a new GCP Compute Service client using the GCP service account credentials
 	computeService, err := compute.NewService(ctx, option.WithCredentialsJSON(json))
 	if err != nil {
-		return errors.Errorf(err.Error())
+		return err
 	}
 
 	// stop the requisite VM instance
 	_, err = computeService.Instances.Stop(gcpProjectID, instanceZone, instanceName).Context(ctx).Do()
 	if err != nil {
-		return errors.Errorf(err.Error())
+		return err
 	}
 
 	log.InfoWithValues("Stopping VM instance:", logrus.Fields{
@@ -51,19 +51,19 @@ func VMInstanceStart(instanceName string, gcpProjectID string, instanceZone stri
 	// get service account credentials json
 	json, err := GetServiceAccountJSONFromSecret()
 	if err != nil {
-		return errors.Errorf(err.Error())
+		return err
 	}
 
 	// create a new GCP Compute Service client using the GCP service account credentials
 	computeService, err := compute.NewService(ctx, option.WithCredentialsJSON(json))
 	if err != nil {
-		return errors.Errorf(err.Error())
+		return err
 	}
 
 	// start the requisite VM instance
 	_, err = computeService.Instances.Start(gcpProjectID, instanceZone, instanceName).Context(ctx).Do()
 	if err != nil {
-		return errors.Errorf(err.Error())
+		return err
 	}
 
 	log.InfoWithValues("Starting VM instance:", logrus.Fields{

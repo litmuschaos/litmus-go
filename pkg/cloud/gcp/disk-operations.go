@@ -1,7 +1,6 @@
 package gcp
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/litmuschaos/litmus-go/pkg/log"
@@ -20,18 +19,18 @@ func DiskVolumeDetach(instanceName string, gcpProjectID string, zone string, dev
 
 	json, err := GetServiceAccountJSONFromSecret()
 	if err != nil {
-		return errors.Errorf(err.Error())
+		return err
 	}
 
 	// create a new GCP Compute Service client using the GCP service account credentials
 	computeService, err := compute.NewService(ctx, option.WithCredentialsJSON(json))
 	if err != nil {
-		return errors.Errorf(err.Error())
+		return err
 	}
 
 	response, err := computeService.Instances.DetachDisk(gcpProjectID, zone, instanceName, deviceName).Context(ctx).Do()
 	if err != nil {
-		return errors.Errorf(err.Error())
+		return err
 	}
 
 	log.InfoWithValues("Detaching disk having:", logrus.Fields{
@@ -51,18 +50,18 @@ func DiskVolumeAttach(instanceName string, gcpProjectID string, zone string, dev
 
 	json, err := GetServiceAccountJSONFromSecret()
 	if err != nil {
-		return errors.Errorf(err.Error())
+		return err
 	}
 
 	// create a new GCP Compute Service client using the GCP service account credentials
 	computeService, err := compute.NewService(ctx, option.WithCredentialsJSON(json))
 	if err != nil {
-		return errors.Errorf(err.Error())
+		return err
 	}
 
 	diskDetails, err := computeService.Disks.Get(gcpProjectID, zone, diskName).Context(ctx).Do()
 	if err != nil {
-		return errors.Errorf(err.Error())
+		return err
 	}
 
 	requestBody := &compute.AttachedDisk{
@@ -72,7 +71,7 @@ func DiskVolumeAttach(instanceName string, gcpProjectID string, zone string, dev
 
 	response, err := computeService.Instances.AttachDisk(gcpProjectID, zone, instanceName, requestBody).Context(ctx).Do()
 	if err != nil {
-		return errors.Errorf(err.Error())
+		return err
 	}
 
 	log.InfoWithValues("Attaching disk having:", logrus.Fields{
@@ -92,18 +91,18 @@ func GetVolumeAttachmentDetails(gcpProjectID string, zone string, diskName strin
 
 	json, err := GetServiceAccountJSONFromSecret()
 	if err != nil {
-		return "", errors.Errorf(err.Error())
+		return "", err
 	}
 
 	// create a new GCP Compute Service client using the GCP service account credentials
 	computeService, err := compute.NewService(ctx, option.WithCredentialsJSON(json))
 	if err != nil {
-		return "", errors.Errorf(err.Error())
+		return "", err
 	}
 
 	diskDetails, err := computeService.Disks.Get(gcpProjectID, zone, diskName).Context(ctx).Do()
 	if err != nil {
-		return "", errors.Errorf(err.Error())
+		return "", err
 	}
 
 	if len(diskDetails.Users) > 0 {
@@ -137,7 +136,7 @@ func GetDiskDeviceNameForVM(targetDiskName, gcpProjectID, zone, instanceName str
 
 	instanceDetails, err := computeService.Instances.Get(gcpProjectID, zone, instanceName).Context(ctx).Do()
 	if err != nil {
-		fmt.Println(err)
+		return "", err
 	}
 
 	for _, disk := range instanceDetails.Disks {

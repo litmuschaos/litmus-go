@@ -69,18 +69,18 @@ func GetDiskVolumeState(diskName, gcpProjectID, instanceName, zone string) (stri
 
 	json, err := GetServiceAccountJSONFromSecret()
 	if err != nil {
-		return "", errors.Errorf(err.Error())
+		return "", err
 	}
 
 	// create a new GCP Compute Service client using the GCP service account credentials
 	computeService, err := compute.NewService(ctx, option.WithCredentialsJSON(json))
 	if err != nil {
-		return "", errors.Errorf(err.Error())
+		return "", err
 	}
 
 	diskDetails, err := computeService.Disks.Get(gcpProjectID, zone, diskName).Context(ctx).Do()
 	if err != nil {
-		return "", errors.Errorf(err.Error())
+		return "", err
 	}
 
 	for _, user := range diskDetails.Users {
