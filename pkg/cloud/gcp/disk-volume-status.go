@@ -112,7 +112,7 @@ func GetDiskVolumeState(diskName, gcpProjectID, instanceName, zone string) (stri
 }
 
 //DiskVolumeStateCheck will check the attachment state of the given volume
-func DiskVolumeStateCheck(gcpProjectID, zones, diskNames, deviceNames string) error {
+func DiskVolumeStateCheck(gcpProjectID, zones, diskNames string) error {
 
 	if gcpProjectID == "" {
 		return errors.Errorf("no gcp project id provided, please provide the project id")
@@ -128,13 +128,8 @@ func DiskVolumeStateCheck(gcpProjectID, zones, diskNames, deviceNames string) er
 		return errors.Errorf("no zone provided, please provide the zone of the disk")
 	}
 
-	deviceNamesList := strings.Split(deviceNames, ",")
-	if len(deviceNamesList) == 0 {
-		return errors.Errorf("no device name provided, please provide the device name of the disk")
-	}
-
-	if len(diskNamesList) != len(zonesList) || len(zonesList) != len(deviceNamesList) {
-		return errors.Errorf("unequal number of disk names, zones, and device names found, please verify the input details")
+	if len(diskNamesList) != len(zonesList) {
+		return errors.Errorf("unequal number of disk names and zones found, please verify the input details")
 	}
 
 	for i := range diskNamesList {

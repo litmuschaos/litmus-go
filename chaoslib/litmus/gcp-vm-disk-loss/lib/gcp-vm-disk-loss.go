@@ -26,7 +26,7 @@ var (
 //PrepareDiskVolumeLoss contains the prepration and injection steps for the experiment
 func PrepareDiskVolumeLoss(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
-	var instanceNamesList []string
+	var instanceNamesList, deviceNamesList []string
 
 	// inject channel is used to transmit signal notifications.
 	inject = make(chan os.Signal, 1)
@@ -46,19 +46,9 @@ func PrepareDiskVolumeLoss(experimentsDetails *experimentTypes.ExperimentDetails
 
 	//get the disk volume names list
 	diskNamesList := strings.Split(experimentsDetails.DiskVolumeNames, ",")
-	if len(diskNamesList) == 0 {
-		return errors.Errorf("no volumes found to detach")
-	}
 
 	//get the disk zones list
 	diskZonesList := strings.Split(experimentsDetails.DiskZones, ",")
-	if len(diskZonesList) == 0 {
-		return errors.Errorf("no zones found for corressponding instances")
-	}
-
-	if len(diskNamesList) != len(diskZonesList) {
-		return errors.Errorf("unequal number of disk names and zones received")
-	}
 
 	//prepare the instace names for the given disks
 	for i := range diskNamesList {
@@ -69,7 +59,13 @@ func PrepareDiskVolumeLoss(experimentsDetails *experimentTypes.ExperimentDetails
 			return errors.Errorf("failed to get the attachment info, err: %v", err)
 		}
 
+		deviceName, err := gcp.GetDiskDeviceNameForVM(diskNamesList[i], experimentsDetails.GCPProjectID, diskZonesList[i], instanceName)
+		if err != nil {
+			return err
+		}
+
 		instanceNamesList = append(instanceNamesList, instanceName)
+		deviceNamesList = append(deviceNamesList, deviceName)
 	}
 
 	select {
@@ -79,15 +75,15 @@ func PrepareDiskVolumeLoss(experimentsDetails *experimentTypes.ExperimentDetails
 	default:
 
 		// watching for the abort signal and revert the chaos
-		go AbortWatcher(experimentsDetails, diskNamesList, instanceNamesList, abort, chaosDetails)
+		go AbortWatcher(experimentsDetails, diskNamesList, deviceNamesList, diskZonesList, instanceNamesList, abort, chaosDetails)
 
 		switch strings.ToLower(experimentsDetails.Sequence) {
 		case "serial":
-			if err = injectChaosInSerialMode(experimentsDetails, diskNamesList, instanceNamesList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+			if err = injectChaosInSerialMode(experimentsDetails, diskNamesList, deviceNamesList, diskZonesList, instanceNamesList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
 				return err
 			}
 		case "parallel":
-			if err = injectChaosInParallelMode(experimentsDetails, diskNamesList, instanceNamesList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+			if err = injectChaosInParallelMode(experimentsDetails, diskNamesList, deviceNamesList, diskZonesList, instanceNamesList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
 				return err
 			}
 		default:
@@ -104,14 +100,11 @@ func PrepareDiskVolumeLoss(experimentsDetails *experimentTypes.ExperimentDetails
 }
 
 //injectChaosInSerialMode will inject the disk loss chaos in serial mode which means one after the other
-func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, targetDiskVolumeNamesList []string, instanceNamesList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, targetDiskVolumeNamesList, deviceNamesList, diskZonesList, instanceNamesList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
 	ChaosStartTimeStamp := time.Now()
 	duration := int(time.Since(ChaosStartTimeStamp).Seconds())
-
-	diskZonesList := strings.Split(experimentsDetails.DiskZones, ",")
-	deviceNamesList := strings.Split(experimentsDetails.DeviceNames, ",")
 
 	for duration < experimentsDetails.ChaosDuration {
 
@@ -178,10 +171,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 }
 
 //injectChaosInParallelMode will inject the disk loss chaos in parallel mode that means all at once
-func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, targetDiskVolumeNamesList []string, instanceNamesList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-
-	diskZonesList := strings.Split(experimentsDetails.DiskZones, ",")
-	deviceNamesList := strings.Split(experimentsDetails.DeviceNames, ",")
+func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, targetDiskVolumeNamesList, deviceNamesList, diskZonesList, instanceNamesList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
 	ChaosStartTimeStamp := time.Now()
@@ -258,19 +248,16 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 }
 
 // AbortWatcher will watching for the abort signal and revert the chaos
-func AbortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, diskNamesList []string, instanceNamesList []string, abort chan os.Signal, chaosDetails *types.ChaosDetails) {
+func AbortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, targetDiskVolumeNamesList, deviceNamesList, diskZonesList, instanceNamesList []string, abort chan os.Signal, chaosDetails *types.ChaosDetails) {
 
 	<-abort
 
 	log.Info("[Abort]: Chaos Revert Started")
 
-	diskZonesList := strings.Split(experimentsDetails.DiskZones, ",")
-	deviceNamesList := strings.Split(experimentsDetails.DeviceNames, ",")
-
-	for i := range diskNamesList {
+	for i := range targetDiskVolumeNamesList {
 
 		//Getting the disk volume attachment status
-		diskState, err := gcp.GetDiskVolumeState(diskNamesList[i], experimentsDetails.GCPProjectID, instanceNamesList[i], diskZonesList[i])
+		diskState, err := gcp.GetDiskVolumeState(targetDiskVolumeNamesList[i], experimentsDetails.GCPProjectID, instanceNamesList[i], diskZonesList[i])
 		if err != nil {
 			log.Errorf("failed to get the disk state when an abort signal is received, err: %v", err)
 		}
@@ -281,20 +268,20 @@ func AbortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, diskNam
 			//We first wait for the volume to get in detached state then we are attaching it.
 			log.Info("[Abort]: Wait for complete disk volume detachment")
 
-			if err = gcp.WaitForVolumeDetachment(diskNamesList[i], experimentsDetails.GCPProjectID, instanceNamesList[i], diskZonesList[i], experimentsDetails.Delay, experimentsDetails.Timeout); err != nil {
+			if err = gcp.WaitForVolumeDetachment(targetDiskVolumeNamesList[i], experimentsDetails.GCPProjectID, instanceNamesList[i], diskZonesList[i], experimentsDetails.Delay, experimentsDetails.Timeout); err != nil {
 				log.Errorf("unable to detach the disk volume, err: %v", err)
 			}
 
 			//Attaching the disk volume from the instance
 			log.Info("[Chaos]: Attaching the disk volume from the instance")
 
-			err = gcp.DiskVolumeAttach(instanceNamesList[i], experimentsDetails.GCPProjectID, diskZonesList[i], deviceNamesList[i], diskNamesList[i])
+			err = gcp.DiskVolumeAttach(instanceNamesList[i], experimentsDetails.GCPProjectID, diskZonesList[i], deviceNamesList[i], targetDiskVolumeNamesList[i])
 			if err != nil {
 				log.Errorf("disk attachment failed when an abort signal is received, err: %v", err)
 			}
 		}
 
-		common.SetTargets(diskNamesList[i], "reverted", "DiskVolume", chaosDetails)
+		common.SetTargets(targetDiskVolumeNamesList[i], "reverted", "DiskVolume", chaosDetails)
 	}
 
 	log.Info("[Abort]: Chaos Revert Completed")

@@ -1,6 +1,7 @@
 package gcp
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/litmuschaos/litmus-go/pkg/log"
@@ -115,4 +116,41 @@ func GetVolumeAttachmentDetails(gcpProjectID string, zone string, diskName strin
 	}
 
 	return "", errors.Errorf("disk not attached to any instance")
+}
+
+// GetDiskDeviceNameForVM returns the device name for the target disk for a given VM
+func GetDiskDeviceNameForVM(targetDiskName, gcpProjectID, zone, instanceName string) (string, error) {
+
+	// create an empty context
+	ctx := context.Background()
+
+	json, err := GetServiceAccountJSONFromSecret()
+	if err != nil {
+		return "", err
+	}
+
+	// create a new GCP Compute Service client using the GCP service account credentials
+	computeService, err := compute.NewService(ctx, option.WithCredentialsJSON(json))
+	if err != nil {
+		return "", err
+	}
+
+	instanceDetails, err := computeService.Instances.Get(gcpProjectID, zone, instanceName).Context(ctx).Do()
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	for _, disk := range instanceDetails.Disks {
+
+		// disk.Source is the URL of the disk resource in the form: projects/project/zones/zone/disks/disk
+		// hence we split the URL string via the '/' delimiter and get the string in the last index position to get the disk name
+		splitDiskURL := strings.Split(disk.Source, "/")
+		diskName := splitDiskURL[len(splitDiskURL)-1]
+
+		if diskName == targetDiskName {
+			return disk.DeviceName, nil
+		}
+	}
+
+	return "", errors.Errorf("%s disk not found for %s vm instance", targetDiskName, instanceName)
 }
