@@ -134,14 +134,9 @@ func DiskVolumeStateCheck(gcpProjectID, zones, diskNames string) error {
 
 	for i := range diskNamesList {
 
-		instanceName, err := GetVolumeAttachmentDetails(gcpProjectID, zonesList[i], diskNamesList[i])
+		_, err := GetVolumeAttachmentDetails(gcpProjectID, zonesList[i], diskNamesList[i])
 		if err != nil {
-			return errors.Errorf("failed to get the vm instance name for the given volume, err: %v", err)
-		}
-
-		volumeState, err := GetDiskVolumeState(diskNamesList[i], gcpProjectID, instanceName, zonesList[i])
-		if err != nil || volumeState != "attached" {
-			return errors.Errorf("failed to get the disk volume %v in attached state, err: %v", diskNames[i], err)
+			return errors.Errorf("failed to get the vm instance name for %s disk volume, err: %v", diskNamesList[i], err)
 		}
 	}
 
