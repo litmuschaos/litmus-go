@@ -29,4 +29,5 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.DiskVolumeLabel = types.Getenv("DISK_VOLUME_LABEL", "")
 	experimentDetails.Sequence = types.Getenv("SEQUENCE", "parallel")
 	experimentDetails.DiskZones = types.Getenv("DISK_ZONES", "")
+	experimentDetails.DiskAffectedPerc, _ = strconv.Atoi(types.Getenv("DISK_AFFECTED_PERC", "0"))
 }

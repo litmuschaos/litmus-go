@@ -115,7 +115,7 @@ func GetVolumeAttachmentDetails(gcpProjectID string, zone string, diskName strin
 		return attachedInstanceName, nil
 	}
 
-	return "", errors.Errorf("disk not attached to any instance")
+	return "", errors.Errorf("%s disk not attached to any VM instance", diskName)
 }
 
 // GetDiskDeviceNameForVM returns the device name for the target disk for a given VM

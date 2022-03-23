@@ -26,7 +26,7 @@ var (
 //PrepareDiskVolumeLoss contains the prepration and injection steps for the experiment
 func PrepareDiskVolumeLoss(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
-	var instanceNamesList, deviceNamesList []string
+	var deviceNamesList []string
 
 	// inject channel is used to transmit signal notifications.
 	inject = make(chan os.Signal, 1)
@@ -53,18 +53,11 @@ func PrepareDiskVolumeLoss(experimentsDetails *experimentTypes.ExperimentDetails
 	//prepare the instace names for the given disks
 	for i := range diskNamesList {
 
-		//Get volume attachment details
-		instanceName, err := gcp.GetVolumeAttachmentDetails(experimentsDetails.GCPProjectID, diskZonesList[i], diskNamesList[i])
-		if err != nil || instanceName == "" {
-			return errors.Errorf("failed to get the attachment info, err: %v", err)
-		}
-
-		deviceName, err := gcp.GetDiskDeviceNameForVM(diskNamesList[i], experimentsDetails.GCPProjectID, diskZonesList[i], instanceName)
+		deviceName, err := gcp.GetDiskDeviceNameForVM(diskNamesList[i], experimentsDetails.GCPProjectID, diskZonesList[i], experimentsDetails.TargetDiskInstanceNamesList[i])
 		if err != nil {
 			return err
 		}
 
-		instanceNamesList = append(instanceNamesList, instanceName)
 		deviceNamesList = append(deviceNamesList, deviceName)
 	}
 
@@ -75,27 +68,28 @@ func PrepareDiskVolumeLoss(experimentsDetails *experimentTypes.ExperimentDetails
 	default:
 
 		// watching for the abort signal and revert the chaos
-		go AbortWatcher(experimentsDetails, diskNamesList, deviceNamesList, diskZonesList, instanceNamesList, abort, chaosDetails)
+		go abortWatcher(experimentsDetails, diskNamesList, deviceNamesList, diskZonesList, experimentsDetails.TargetDiskInstanceNamesList, abort, chaosDetails)
 
 		switch strings.ToLower(experimentsDetails.Sequence) {
 		case "serial":
-			if err = injectChaosInSerialMode(experimentsDetails, diskNamesList, deviceNamesList, diskZonesList, instanceNamesList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+			if err = injectChaosInSerialMode(experimentsDetails, diskNamesList, deviceNamesList, diskZonesList, experimentsDetails.TargetDiskInstanceNamesList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
 				return err
 			}
 		case "parallel":
-			if err = injectChaosInParallelMode(experimentsDetails, diskNamesList, deviceNamesList, diskZonesList, instanceNamesList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+			if err = injectChaosInParallelMode(experimentsDetails, diskNamesList, deviceNamesList, diskZonesList, experimentsDetails.TargetDiskInstanceNamesList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
 				return err
 			}
 		default:
 			return errors.Errorf("%v sequence is not supported", experimentsDetails.Sequence)
 		}
-
-		//Waiting for the ramp time after chaos injection
-		if experimentsDetails.RampTime != 0 {
-			log.Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", experimentsDetails.RampTime)
-			common.WaitForDuration(experimentsDetails.RampTime)
-		}
 	}
+
+	//Waiting for the ramp time after chaos injection
+	if experimentsDetails.RampTime != 0 {
+		log.Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", experimentsDetails.RampTime)
+		common.WaitForDuration(experimentsDetails.RampTime)
+	}
+
 	return nil
 }
 
@@ -248,7 +242,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 }
 
 // AbortWatcher will watching for the abort signal and revert the chaos
-func AbortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, targetDiskVolumeNamesList, deviceNamesList, diskZonesList, instanceNamesList []string, abort chan os.Signal, chaosDetails *types.ChaosDetails) {
+func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, targetDiskVolumeNamesList, deviceNamesList, diskZonesList, instanceNamesList []string, abort chan os.Signal, chaosDetails *types.ChaosDetails) {
 
 	<-abort
 

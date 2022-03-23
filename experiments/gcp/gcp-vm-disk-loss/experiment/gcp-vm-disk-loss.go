@@ -20,7 +20,9 @@ import (
 
 //VMDiskLoss injects the disk volume loss chaos
 func VMDiskLoss(clients clients.ClientSets) {
+
 	var err error
+
 	experimentsDetails := experimentTypes.ExperimentDetails{}
 	resultDetails := types.ResultDetails{}
 	eventsDetails := types.EventDetails{}
@@ -95,7 +97,7 @@ func VMDiskLoss(clients clients.ClientSets) {
 	}
 
 	//Verify the vm instance is attached to disk volume
-	if err := gcp.DiskVolumeStateCheck(experimentsDetails.GCPProjectID, experimentsDetails.DiskZones, experimentsDetails.DiskVolumeNames); err != nil {
+	if err := gcp.DiskVolumeStateCheck(&experimentsDetails, "pre-chaos"); err != nil {
 		log.Errorf("volume status check failed pre chaos, err: %v", err)
 		failStep := "[pre-chaos]: Failed to verify if the disk volume is attached to an instance, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
@@ -122,7 +124,7 @@ func VMDiskLoss(clients clients.ClientSets) {
 	resultDetails.Verdict = v1alpha1.ResultVerdictPassed
 
 	//Verify the vm instance is attached to disk volume
-	if err := gcp.DiskVolumeStateCheck(experimentsDetails.GCPProjectID, experimentsDetails.DiskZones, experimentsDetails.DiskVolumeNames); err != nil {
+	if err := gcp.DiskVolumeStateCheck(&experimentsDetails, "post-chaos"); err != nil {
 		log.Errorf("volume status check failed post chaos, err: %v", err)
 		failStep := "[post-chaos]: Failed to verify if the disk volume is attached to an instance, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)

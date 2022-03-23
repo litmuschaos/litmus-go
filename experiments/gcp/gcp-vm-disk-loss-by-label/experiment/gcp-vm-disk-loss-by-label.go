@@ -3,6 +3,7 @@ package experiment
 import (
 	"os"
 
+	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/gcp-vm-disk-loss-by-label/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/cloud/gcp"
 	"github.com/litmuschaos/litmus-go/pkg/events"
@@ -100,30 +101,31 @@ func GCPVMDiskLossByLabelExperiment(clients clients.ClientSets) {
 		return
 	}
 
-	// INVOKE THE CHAOSLIB OF YOUR CHOICE HERE, WHICH WILL CONTAIN
-	// THE BUSINESS LOGIC OF THE ACTUAL CHAOS
-	// IT CAN BE A NEW CHAOSLIB YOU HAVE CREATED SPECIALLY FOR THIS EXPERIMENT OR ANY EXISTING ONE
-	// @TODO: user INVOKE-CHAOSLIB
-
 	// Including the litmus lib
-	// switch experimentsDetails.ChaosLib {
-	// case "litmus":
-	// 	if err := litmusLIB.PrepareChaos(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
-	// 		log.Errorf("Chaos injection failed, err: %v", err)
-	// 		failStep := "[chaos]: Failed inside the chaoslib, err: " + err.Error()
-	// 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-	// 		return
-	// 	}
-	// default:
-	// 	log.Error("[Invalid]: Please Provide the correct LIB")
-	// 	failStep := "[chaos]: no match found for specified lib"
-	// 	result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-	// 	return
-	// }
+	switch experimentsDetails.ChaosLib {
+	case "litmus":
+		if err := litmusLIB.PrepareDiskVolumeLossByLabel(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
+			log.Errorf("Chaos injection failed, err: %v", err)
+			failStep := "[chaos]: Failed inside the chaoslib, err: " + err.Error()
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+			return
+		}
+	default:
+		log.Error("[Invalid]: Please Provide the correct LIB")
+		failStep := "[chaos]: no match found for specified lib"
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+		return
+	}
 
-	// @TODO: user POST-CHAOS-CHECK
-	// ADD A POST-CHAOS CHECK OF YOUR CHOICE HERE
-	// POD STATUS CHECKS FOR THE APPLICATION UNDER TEST AND AUXILIARY APPLICATIONS ARE ADDED BY DEFAULT
+	for i := range experimentsDetails.TargetDiskVolumeNamesList {
+		instanceName, err := gcp.GetVolumeAttachmentDetails(experimentsDetails.GCPProjectID, experimentsDetails.DiskZones, experimentsDetails.TargetDiskVolumeNamesList[i])
+		if err != nil || instanceName == "" {
+			log.Errorf("Failed to verify disk volume attachment status, err: %v", err)
+			failStep := "[post-chaos]: Failed to verify disk volume attachment status, err: " + err.Error()
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+			return
+		}
+	}
 
 	if experimentsDetails.EngineName != "" {
 		// marking AUT as running, as we already checked the status of application under test

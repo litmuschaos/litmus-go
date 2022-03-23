@@ -4,6 +4,7 @@ import (
 	"strings"
 	"time"
 
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/gcp/gcp-vm-disk-loss/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
 	"github.com/pkg/errors"
@@ -112,18 +113,18 @@ func GetDiskVolumeState(diskName, gcpProjectID, instanceName, zone string) (stri
 }
 
 //DiskVolumeStateCheck will check the attachment state of the given volume
-func DiskVolumeStateCheck(gcpProjectID, zones, diskNames string) error {
+func DiskVolumeStateCheck(experimentsDetails *experimentTypes.ExperimentDetails, stage string) error {
 
-	if gcpProjectID == "" {
+	if experimentsDetails.GCPProjectID == "" {
 		return errors.Errorf("no gcp project id provided, please provide the project id")
 	}
 
-	diskNamesList := strings.Split(diskNames, ",")
+	diskNamesList := strings.Split(experimentsDetails.DiskVolumeNames, ",")
 	if len(diskNamesList) == 0 {
 		return errors.Errorf("no disk name provided, please provide the name of the disk")
 	}
 
-	zonesList := strings.Split(zones, ",")
+	zonesList := strings.Split(experimentsDetails.DiskZones, ",")
 	if len(zonesList) == 0 {
 		return errors.Errorf("no zone provided, please provide the zone of the disk")
 	}
@@ -132,11 +133,26 @@ func DiskVolumeStateCheck(gcpProjectID, zones, diskNames string) error {
 		return errors.Errorf("unequal number of disk names and zones found, please verify the input details")
 	}
 
-	for i := range diskNamesList {
+	switch stage {
 
-		_, err := GetVolumeAttachmentDetails(gcpProjectID, zonesList[i], diskNamesList[i])
-		if err != nil {
-			return errors.Errorf("failed to get the vm instance name for %s disk volume, err: %v", diskNamesList[i], err)
+	case "pre-chaos":
+		for i := range diskNamesList {
+
+			instanceName, err := GetVolumeAttachmentDetails(experimentsDetails.GCPProjectID, zonesList[i], diskNamesList[i])
+			if err != nil || instanceName == "" {
+				return errors.Errorf("failed to get the vm instance name for %s disk volume, err: %v", diskNamesList[i], err)
+			}
+
+			experimentsDetails.TargetDiskInstanceNamesList = append(experimentsDetails.TargetDiskInstanceNamesList, instanceName)
+		}
+
+	default:
+		for i := range diskNamesList {
+
+			instanceName, err := GetVolumeAttachmentDetails(experimentsDetails.GCPProjectID, zonesList[i], diskNamesList[i])
+			if err != nil || instanceName == "" {
+				return errors.Errorf("failed to get the vm instance name for %s disk volume, err: %v", diskNamesList[i], err)
+			}
 		}
 	}
 

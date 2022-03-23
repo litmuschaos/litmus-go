@@ -137,8 +137,8 @@ func GCPVMInstanceStopByLabel(clients clients.ClientSets) {
 
 	//selecting the target instances (pre-chaos)
 	if err = gcp.SetTargetInstance(&experimentsDetails); err != nil {
-		log.Errorf("failed to get the target gcp vm instances, err: %v", err)
-		failStep := "[pre-chaos]: Failed to select the target GCP VM instances from label, err: " + err.Error()
+		log.Errorf("Failed to get the target VM instances, err: %v", err)
+		failStep := "[pre-chaos]: Failed to select the target VM instances from label, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -176,8 +176,8 @@ func GCPVMInstanceStopByLabel(clients clients.ClientSets) {
 	if experimentsDetails.AutoScalingGroup != "enable" {
 		for _, instanceName := range experimentsDetails.TargetVMInstanceNameList {
 			if err := gcp.WaitForVMInstanceUp(experimentsDetails.Timeout, experimentsDetails.Delay, instanceName, experimentsDetails.GCPProjectID, experimentsDetails.InstanceZone); err != nil {
-				log.Errorf("failed to get the GCP VM instance status as RUNNING post chaos, err: %v", err)
-				failStep := "[post-chaos]: Failed to verify the GCP VM instance status, err: " + err.Error()
+				log.Errorf("failed to get the VM instance status as RUNNING post chaos, err: %v", err)
+				failStep := "[post-chaos]: Failed to verify the VM instance status, err: " + err.Error()
 				result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 				return
 			}
