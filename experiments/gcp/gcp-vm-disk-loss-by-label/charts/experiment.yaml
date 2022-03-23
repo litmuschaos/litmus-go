@@ -1,0 +1,110 @@
+apiVersion: litmuschaos.io/v1alpha1
+description:
+  message: |
+    gcp vm disk loss by label experiment detaches the target persistent disk volumes by label for a fixed duration of time
+kind: ChaosExperiment
+metadata:
+  name: gcp-vm-disk-loss-by-label
+  labels:
+    name: gcp-vm-disk-loss-by-label
+    app.kubernetes.io/part-of: litmus
+    app.kubernetes.io/component: chaosexperiment
+    app.kubernetes.io/version: latest
+spec:
+  definition:
+    scope: Cluster
+    permissions:
+      - apiGroups:
+        resources: 
+          - "pods"
+        verbs: 
+          - "create" 
+          - "delete" 
+          - "get" 
+          - "list" 
+          - "patch" 
+          - "update" 
+          - "deletecollection"
+      - apiGroups:
+        resources: 
+          - "events"
+        verbs: 
+          - "create" 
+          - "get" 
+          - "list" 
+          - "patch" 
+          - "update"
+      - apiGroups:
+        resources: 
+          - "secrets" 
+          - "configmaps"
+        verbs: 
+          - "get" 
+          - "list"
+      - apiGroups:
+        resources: 
+          - "pods/log"
+        verbs: 
+          - "get" 
+          - "list" 
+          - "watch"
+      - apiGroups:
+        resources: 
+          - "pods/exec"
+        verbs: 
+          - "get" 
+          - "list" 
+          - "create"
+      - apiGroups:
+        resources: 
+          - "jobs"
+        verbs: 
+          - "create" 
+          - "list" 
+          - "get" 
+          - "delete" 
+          - "deletecollection"
+      - apiGroups:
+        resources: 
+          - "chaosengines" 
+          - "chaosexperiments" 
+          - "chaosresults"
+        verbs: 
+          - "create" 
+          - "list" 
+          - "get" 
+          - "patch" 
+          - "update" 
+          - "delete"
+      - apiGroups:
+        resources: 
+          - "nodes"
+        verbs: 
+          - "get" 
+          - "list"
+    image: "litmuschaos/go-runner:latest"
+    imagePullPolicy: Always
+    args:
+    - -c
+    - ./experiments -name gcp-vm-disk-loss-by-label
+    command:
+    - /bin/bash
+    env:
+
+    - name: TOTAL_CHAOS_DURATION
+      value: '' 
+
+    - name: CHAOS_INTERVAL
+      value: ''
+
+    - name: LIB
+      value: ''
+
+    - name: RAMP_TIME
+      value: ''
+      
+    labels:
+      name: gcp-vm-disk-loss-by-label
+      app.kubernetes.io/part-of: litmus
+      app.kubernetes.io/component: experiment-job
+      app.kubernetes.io/version: latest 

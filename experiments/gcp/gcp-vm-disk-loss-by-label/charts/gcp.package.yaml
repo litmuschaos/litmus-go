@@ -1,0 +1,5 @@
+packageName: gcp
+experiments:
+  - name: gcp-vm-disk-loss-by-label
+    CSV: gcp-vm-disk-loss-by-label.chartserviceversion.yaml
+    desc: "gcp-vm-disk-loss-by-label"
