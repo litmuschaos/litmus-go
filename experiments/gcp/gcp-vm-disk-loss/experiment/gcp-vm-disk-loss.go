@@ -7,6 +7,7 @@ import (
 	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/gcp-vm-disk-loss/lib"
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	gcp "github.com/litmuschaos/litmus-go/pkg/cloud/gcp"
+	gcpCommon "github.com/litmuschaos/litmus-go/pkg/cloud/gcp/common"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentEnv "github.com/litmuschaos/litmus-go/pkg/gcp/gcp-vm-disk-loss/environment"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/gcp/gcp-vm-disk-loss/types"
@@ -16,12 +17,16 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/sirupsen/logrus"
+	"google.golang.org/api/compute/v1"
 )
 
 //VMDiskLoss injects the disk volume loss chaos
 func VMDiskLoss(clients clients.ClientSets) {
 
-	var err error
+	var (
+		computeService *compute.Service
+		err            error
+	)
 
 	experimentsDetails := experimentTypes.ExperimentDetails{}
 	resultDetails := types.ResultDetails{}
@@ -96,8 +101,17 @@ func VMDiskLoss(clients clients.ClientSets) {
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
+	// Create a compute service to access the compute engine resources
+	computeService, err = gcpCommon.GetGCPComputeService()
+	if err != nil {
+		log.Errorf("failed to obtain a gcp compute service, err: %v", err)
+		failStep := "[pre-chaos]: Failed to obtain a gcp compute service, err: " + err.Error()
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+		return
+	}
+
 	//Verify the vm instance is attached to disk volume
-	if err := gcp.DiskVolumeStateCheck(&experimentsDetails, "pre-chaos"); err != nil {
+	if err := gcp.DiskVolumeStateCheck(computeService, &experimentsDetails, "pre-chaos"); err != nil {
 		log.Errorf("volume status check failed pre chaos, err: %v", err)
 		failStep := "[pre-chaos]: Failed to verify if the disk volume is attached to an instance, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
@@ -107,7 +121,7 @@ func VMDiskLoss(clients clients.ClientSets) {
 	// Including the litmus lib for disk-loss
 	switch experimentsDetails.ChaosLib {
 	case "litmus":
-		if err = litmusLIB.PrepareDiskVolumeLoss(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
+		if err = litmusLIB.PrepareDiskVolumeLoss(computeService, &experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
 			log.Errorf("Chaos injection failed, err: %v", err)
 			failStep := "[chaos]: Failed inside the chaoslib, err: " + err.Error()
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
@@ -124,7 +138,7 @@ func VMDiskLoss(clients clients.ClientSets) {
 	resultDetails.Verdict = v1alpha1.ResultVerdictPassed
 
 	//Verify the vm instance is attached to disk volume
-	if err := gcp.DiskVolumeStateCheck(&experimentsDetails, "post-chaos"); err != nil {
+	if err := gcp.DiskVolumeStateCheck(computeService, &experimentsDetails, "post-chaos"); err != nil {
 		log.Errorf("volume status check failed post chaos, err: %v", err)
 		failStep := "[post-chaos]: Failed to verify if the disk volume is attached to an instance, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)

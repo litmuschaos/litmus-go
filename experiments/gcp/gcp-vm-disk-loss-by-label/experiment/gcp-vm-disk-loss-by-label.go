@@ -6,6 +6,7 @@ import (
 	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/gcp-vm-disk-loss-by-label/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/cloud/gcp"
+	gcpCommon "github.com/litmuschaos/litmus-go/pkg/cloud/gcp/common"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentEnv "github.com/litmuschaos/litmus-go/pkg/gcp/gcp-vm-disk-loss/environment"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/gcp/gcp-vm-disk-loss/types"
@@ -15,10 +16,16 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/sirupsen/logrus"
+	"google.golang.org/api/compute/v1"
 )
 
 // GCPVMDiskLossByLabelExperiment contains steps to inject chaos
 func GCPVMDiskLossByLabelExperiment(clients clients.ClientSets) {
+
+	var (
+		computeService *compute.Service
+		err            error
+	)
 
 	experimentsDetails := experimentTypes.ExperimentDetails{}
 	resultDetails := types.ResultDetails{}
@@ -93,8 +100,17 @@ func GCPVMDiskLossByLabelExperiment(clients clients.ClientSets) {
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
+	// Create a compute service to access the compute engine resources
+	computeService, err = gcpCommon.GetGCPComputeService()
+	if err != nil {
+		log.Errorf("failed to obtain a gcp compute service, err: %v", err)
+		failStep := "[pre-chaos]: Failed to obtain a gcp compute service, err: " + err.Error()
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+		return
+	}
+
 	//selecting the target instances (pre-chaos)
-	if err := gcp.SetTargetDiskVolumes(&experimentsDetails); err != nil {
+	if err := gcp.SetTargetDiskVolumes(computeService, &experimentsDetails); err != nil {
 		log.Errorf("failed to get the target gcp disk volumes, err: %v", err)
 		failStep := "[pre-chaos]: Failed to select the target disk volumes from label, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
@@ -104,7 +120,7 @@ func GCPVMDiskLossByLabelExperiment(clients clients.ClientSets) {
 	// Including the litmus lib
 	switch experimentsDetails.ChaosLib {
 	case "litmus":
-		if err := litmusLIB.PrepareDiskVolumeLossByLabel(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
+		if err := litmusLIB.PrepareDiskVolumeLossByLabel(computeService, &experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
 			log.Errorf("Chaos injection failed, err: %v", err)
 			failStep := "[chaos]: Failed inside the chaoslib, err: " + err.Error()
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
@@ -118,7 +134,7 @@ func GCPVMDiskLossByLabelExperiment(clients clients.ClientSets) {
 	}
 
 	for i := range experimentsDetails.TargetDiskVolumeNamesList {
-		instanceName, err := gcp.GetVolumeAttachmentDetails(experimentsDetails.GCPProjectID, experimentsDetails.DiskZones, experimentsDetails.TargetDiskVolumeNamesList[i])
+		instanceName, err := gcp.GetVolumeAttachmentDetails(computeService, experimentsDetails.GCPProjectID, experimentsDetails.DiskZones, experimentsDetails.TargetDiskVolumeNamesList[i])
 		if err != nil || instanceName == "" {
 			log.Errorf("Failed to verify disk volume attachment status, err: %v", err)
 			failStep := "[post-chaos]: Failed to verify disk volume attachment status, err: " + err.Error()

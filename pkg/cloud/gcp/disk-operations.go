@@ -7,29 +7,13 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/net/context"
 	"google.golang.org/api/compute/v1"
-	"google.golang.org/api/option"
 )
 
 // DiskVolumeDetach will detach a disk volume from a VM instance
-func DiskVolumeDetach(instanceName string, gcpProjectID string, zone string, deviceName string) error {
+func DiskVolumeDetach(computeService *compute.Service, instanceName string, gcpProjectID string, zone string, deviceName string) error {
 
-	// create an empty context
-	ctx := context.Background()
-
-	json, err := GetServiceAccountJSONFromSecret()
-	if err != nil {
-		return err
-	}
-
-	// create a new GCP Compute Service client using the GCP service account credentials
-	computeService, err := compute.NewService(ctx, option.WithCredentialsJSON(json))
-	if err != nil {
-		return err
-	}
-
-	response, err := computeService.Instances.DetachDisk(gcpProjectID, zone, instanceName, deviceName).Context(ctx).Do()
+	response, err := computeService.Instances.DetachDisk(gcpProjectID, zone, instanceName, deviceName).Do()
 	if err != nil {
 		return err
 	}
@@ -44,23 +28,9 @@ func DiskVolumeDetach(instanceName string, gcpProjectID string, zone string, dev
 }
 
 // DiskVolumeAttach will attach a disk volume to a VM instance
-func DiskVolumeAttach(instanceName string, gcpProjectID string, zone string, deviceName string, diskName string) error {
+func DiskVolumeAttach(computeService *compute.Service, instanceName string, gcpProjectID string, zone string, deviceName string, diskName string) error {
 
-	// create an empty context
-	ctx := context.Background()
-
-	json, err := GetServiceAccountJSONFromSecret()
-	if err != nil {
-		return err
-	}
-
-	// create a new GCP Compute Service client using the GCP service account credentials
-	computeService, err := compute.NewService(ctx, option.WithCredentialsJSON(json))
-	if err != nil {
-		return err
-	}
-
-	diskDetails, err := computeService.Disks.Get(gcpProjectID, zone, diskName).Context(ctx).Do()
+	diskDetails, err := computeService.Disks.Get(gcpProjectID, zone, diskName).Do()
 	if err != nil {
 		return err
 	}
@@ -70,7 +40,7 @@ func DiskVolumeAttach(instanceName string, gcpProjectID string, zone string, dev
 		Source:     diskDetails.SelfLink,
 	}
 
-	response, err := computeService.Instances.AttachDisk(gcpProjectID, zone, instanceName, requestBody).Context(ctx).Do()
+	response, err := computeService.Instances.AttachDisk(gcpProjectID, zone, instanceName, requestBody).Do()
 	if err != nil {
 		return err
 	}
@@ -85,23 +55,9 @@ func DiskVolumeAttach(instanceName string, gcpProjectID string, zone string, dev
 }
 
 //GetVolumeAttachmentDetails returns the name of the VM instance attached to a disk volume
-func GetVolumeAttachmentDetails(gcpProjectID string, zone string, diskName string) (string, error) {
+func GetVolumeAttachmentDetails(computeService *compute.Service, gcpProjectID string, zone string, diskName string) (string, error) {
 
-	// create an empty context
-	ctx := context.Background()
-
-	json, err := GetServiceAccountJSONFromSecret()
-	if err != nil {
-		return "", err
-	}
-
-	// create a new GCP Compute Service client using the GCP service account credentials
-	computeService, err := compute.NewService(ctx, option.WithCredentialsJSON(json))
-	if err != nil {
-		return "", err
-	}
-
-	diskDetails, err := computeService.Disks.Get(gcpProjectID, zone, diskName).Context(ctx).Do()
+	diskDetails, err := computeService.Disks.Get(gcpProjectID, zone, diskName).Do()
 	if err != nil {
 		return "", err
 	}
@@ -119,23 +75,9 @@ func GetVolumeAttachmentDetails(gcpProjectID string, zone string, diskName strin
 }
 
 // GetDiskDeviceNameForVM returns the device name for the target disk for a given VM
-func GetDiskDeviceNameForVM(targetDiskName, gcpProjectID, zone, instanceName string) (string, error) {
+func GetDiskDeviceNameForVM(computeService *compute.Service, targetDiskName, gcpProjectID, zone, instanceName string) (string, error) {
 
-	// create an empty context
-	ctx := context.Background()
-
-	json, err := GetServiceAccountJSONFromSecret()
-	if err != nil {
-		return "", err
-	}
-
-	// create a new GCP Compute Service client using the GCP service account credentials
-	computeService, err := compute.NewService(ctx, option.WithCredentialsJSON(json))
-	if err != nil {
-		return "", err
-	}
-
-	instanceDetails, err := computeService.Instances.Get(gcpProjectID, zone, instanceName).Context(ctx).Do()
+	instanceDetails, err := computeService.Instances.Get(gcpProjectID, zone, instanceName).Do()
 	if err != nil {
 		return "", err
 	}
@@ -156,23 +98,9 @@ func GetDiskDeviceNameForVM(targetDiskName, gcpProjectID, zone, instanceName str
 }
 
 // SetTargetDiskVolumes will select the target disk volumes which are attached to some VM instance and filtered from the given label
-func SetTargetDiskVolumes(experimentsDetails *experimentTypes.ExperimentDetails) error {
+func SetTargetDiskVolumes(computeService *compute.Service, experimentsDetails *experimentTypes.ExperimentDetails) error {
 
-	// create an empty context
-	ctx := context.Background()
-
-	json, err := GetServiceAccountJSONFromSecret()
-	if err != nil {
-		return err
-	}
-
-	// create a new GCP Compute Service client using the GCP service account credentials
-	computeService, err := compute.NewService(ctx, option.WithCredentialsJSON(json))
-	if err != nil {
-		return err
-	}
-
-	response, err := computeService.Disks.List(experimentsDetails.GCPProjectID, experimentsDetails.DiskZones).Filter("labels." + experimentsDetails.DiskVolumeLabel).Context(ctx).Do()
+	response, err := computeService.Disks.List(experimentsDetails.GCPProjectID, experimentsDetails.DiskZones).Filter("labels." + experimentsDetails.DiskVolumeLabel).Do()
 	if err != nil {
 		return err
 	}

@@ -9,13 +9,11 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/net/context"
 	"google.golang.org/api/compute/v1"
-	"google.golang.org/api/option"
 )
 
 // WaitForVolumeDetachment will wait for the disk volume to completely detach from a VM instance
-func WaitForVolumeDetachment(diskName, gcpProjectID, instanceName, zone string, delay, timeout int) error {
+func WaitForVolumeDetachment(computeService *compute.Service, diskName, gcpProjectID, instanceName, zone string, delay, timeout int) error {
 
 	log.Info("[Status]: Checking disk volume status for detachment")
 	return retry.
@@ -23,7 +21,7 @@ func WaitForVolumeDetachment(diskName, gcpProjectID, instanceName, zone string, 
 		Wait(time.Duration(delay) * time.Second).
 		Try(func(attempt uint) error {
 
-			volumeState, err := GetDiskVolumeState(diskName, gcpProjectID, instanceName, zone)
+			volumeState, err := GetDiskVolumeState(computeService, diskName, gcpProjectID, instanceName, zone)
 			if err != nil {
 				return errors.Errorf("failed to get the volume state")
 			}
@@ -39,7 +37,7 @@ func WaitForVolumeDetachment(diskName, gcpProjectID, instanceName, zone string, 
 }
 
 // WaitForVolumeAttachment will wait for the disk volume to get attached to a VM instance
-func WaitForVolumeAttachment(diskName, gcpProjectID, instanceName, zone string, delay, timeout int) error {
+func WaitForVolumeAttachment(computeService *compute.Service, diskName, gcpProjectID, instanceName, zone string, delay, timeout int) error {
 
 	log.Info("[Status]: Checking disk volume status for attachment")
 	return retry.
@@ -47,7 +45,7 @@ func WaitForVolumeAttachment(diskName, gcpProjectID, instanceName, zone string, 
 		Wait(time.Duration(delay) * time.Second).
 		Try(func(attempt uint) error {
 
-			volumeState, err := GetDiskVolumeState(diskName, gcpProjectID, instanceName, zone)
+			volumeState, err := GetDiskVolumeState(computeService, diskName, gcpProjectID, instanceName, zone)
 			if err != nil {
 				return errors.Errorf("failed to get the volume status")
 			}
@@ -63,23 +61,9 @@ func WaitForVolumeAttachment(diskName, gcpProjectID, instanceName, zone string, 
 }
 
 //GetDiskVolumeState will verify and give the VM instance details along with the disk volume details
-func GetDiskVolumeState(diskName, gcpProjectID, instanceName, zone string) (string, error) {
+func GetDiskVolumeState(computeService *compute.Service, diskName, gcpProjectID, instanceName, zone string) (string, error) {
 
-	// create an empty context
-	ctx := context.Background()
-
-	json, err := GetServiceAccountJSONFromSecret()
-	if err != nil {
-		return "", err
-	}
-
-	// create a new GCP Compute Service client using the GCP service account credentials
-	computeService, err := compute.NewService(ctx, option.WithCredentialsJSON(json))
-	if err != nil {
-		return "", err
-	}
-
-	diskDetails, err := computeService.Disks.Get(gcpProjectID, zone, diskName).Context(ctx).Do()
+	diskDetails, err := computeService.Disks.Get(gcpProjectID, zone, diskName).Do()
 	if err != nil {
 		return "", err
 	}
@@ -113,7 +97,7 @@ func GetDiskVolumeState(diskName, gcpProjectID, instanceName, zone string) (stri
 }
 
 //DiskVolumeStateCheck will check the attachment state of the given volume
-func DiskVolumeStateCheck(experimentsDetails *experimentTypes.ExperimentDetails, stage string) error {
+func DiskVolumeStateCheck(computeService *compute.Service, experimentsDetails *experimentTypes.ExperimentDetails, stage string) error {
 
 	if experimentsDetails.GCPProjectID == "" {
 		return errors.Errorf("no gcp project id provided, please provide the project id")
@@ -138,7 +122,7 @@ func DiskVolumeStateCheck(experimentsDetails *experimentTypes.ExperimentDetails,
 	case "pre-chaos":
 		for i := range diskNamesList {
 
-			instanceName, err := GetVolumeAttachmentDetails(experimentsDetails.GCPProjectID, zonesList[i], diskNamesList[i])
+			instanceName, err := GetVolumeAttachmentDetails(computeService, experimentsDetails.GCPProjectID, zonesList[i], diskNamesList[i])
 			if err != nil || instanceName == "" {
 				return errors.Errorf("failed to get the vm instance name for %s disk volume, err: %v", diskNamesList[i], err)
 			}
@@ -149,7 +133,7 @@ func DiskVolumeStateCheck(experimentsDetails *experimentTypes.ExperimentDetails,
 	default:
 		for i := range diskNamesList {
 
-			instanceName, err := GetVolumeAttachmentDetails(experimentsDetails.GCPProjectID, zonesList[i], diskNamesList[i])
+			instanceName, err := GetVolumeAttachmentDetails(computeService, experimentsDetails.GCPProjectID, zonesList[i], diskNamesList[i])
 			if err != nil || instanceName == "" {
 				return errors.Errorf("failed to get the vm instance name for %s disk volume, err: %v", diskNamesList[i], err)
 			}
