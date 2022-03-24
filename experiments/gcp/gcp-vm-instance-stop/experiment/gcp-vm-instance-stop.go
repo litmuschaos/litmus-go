@@ -13,7 +13,6 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/result"
-	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/sirupsen/logrus"
@@ -21,8 +20,6 @@ import (
 
 // VMInstanceStop executes the experiment steps by injecting chaos into the specified vm instances
 func VMInstanceStop(clients clients.ClientSets) {
-	var err error
-	var activeNodeCount int
 
 	experimentsDetails := experimentTypes.ExperimentDetails{}
 	resultDetails := types.ResultDetails{}
@@ -41,7 +38,7 @@ func VMInstanceStop(clients clients.ClientSets) {
 
 	if experimentsDetails.EngineName != "" {
 		// Initialize the probe details. Bail out upon error, as we haven't entered exp business logic yet
-		if err = probe.InitializeProbesInChaosResultDetails(&chaosDetails, clients, &resultDetails); err != nil {
+		if err := probe.InitializeProbesInChaosResultDetails(&chaosDetails, clients, &resultDetails); err != nil {
 			log.Errorf("Unable to initialize the probes, err: %v", err)
 			return
 		}
@@ -49,7 +46,7 @@ func VMInstanceStop(clients clients.ClientSets) {
 
 	//Updating the chaos result in the beginning of experiment
 	log.Infof("[PreReq]: Updating the chaos result of %v experiment (SOT)", experimentsDetails.ExperimentName)
-	if err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT"); err != nil {
+	if err := result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT"); err != nil {
 		log.Errorf("Unable to Create the Chaos Result, err: %v", err)
 		failStep := "[pre-chaos]: Failed to update the chaos result of gcp vm instance stop experiment (SOT), err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
@@ -75,37 +72,6 @@ func VMInstanceStop(clients clients.ClientSets) {
 		"Zones":           experimentsDetails.InstanceZone,
 	})
 
-	//PRE-CHAOS NODE STATUS CHECK
-	if experimentsDetails.AutoScalingGroup == "enable" {
-		activeNodeCount, err = common.PreChaosNodeStatusCheck(experimentsDetails.Timeout, experimentsDetails.Delay, clients)
-		if err != nil {
-			log.Errorf("Pre chaos node status check failed, err: %v", err)
-			failStep := "[pre-chaos]: Failed to verify that the NUT (Node Under Test) is running, err: " + err.Error()
-			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-			return
-		}
-	}
-
-	//PRE-CHAOS APPLICATION STATUS CHECK
-	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (pre-chaos)")
-	if err = status.AUTStatusCheck(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.TargetContainer, experimentsDetails.Timeout, experimentsDetails.Delay, clients, &chaosDetails); err != nil {
-		log.Errorf("Application status check failed, err: %v", err)
-		failStep := "[pre-chaos]: Failed to verify that the AUT (Application Under Test) is in running state, err: " + err.Error()
-		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-		return
-	}
-
-	//PRE-CHAOS AUXILIARY APPLICATION STATUS CHECK
-	if experimentsDetails.AuxiliaryAppInfo != "" {
-		log.Info("[Status]: Verify that the Auxiliary Applications are running (pre-chaos)")
-		if err = status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
-			log.Errorf("Auxiliary Application status check failed, err: %v", err)
-			failStep := "[pre-chaos]: Failed to verify that the Auxiliary Applications are in running state, err: " + err.Error()
-			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-			return
-		}
-	}
-
 	if experimentsDetails.EngineName != "" {
 		// marking AUT as running, as we already checked the status of application under test
 		msg := "AUT: Running"
@@ -113,7 +79,7 @@ func VMInstanceStop(clients clients.ClientSets) {
 		// run the probes in the pre-chaos check
 		if len(resultDetails.ProbeDetails) != 0 {
 
-			if err = probe.RunProbes(&chaosDetails, clients, &resultDetails, "PreChaos", &eventsDetails); err != nil {
+			if err := probe.RunProbes(&chaosDetails, clients, &resultDetails, "PreChaos", &eventsDetails); err != nil {
 				log.Errorf("Probe Failed, err: %v", err)
 				failStep := "[pre-chaos]: Failed while running probes, err: " + err.Error()
 				msg := "AUT: Running, Probes: Unsuccessful"
@@ -129,19 +95,20 @@ func VMInstanceStop(clients clients.ClientSets) {
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
-	//Verify that the GCP VM instance(s) is in RUNNING state (pre chaos)
-	if err = gcp.InstanceStatusCheckByName(experimentsDetails.AutoScalingGroup, experimentsDetails.Delay, experimentsDetails.Timeout, "pre-chaos", experimentsDetails.VMInstanceName, experimentsDetails.GCPProjectID, experimentsDetails.InstanceZone); err != nil {
+	//Verify that the GCP VM instance(s) is in RUNNING state (pre-chaos)
+	if err := gcp.InstanceStatusCheckByName(experimentsDetails.ManagedInstanceGroup, experimentsDetails.Delay, experimentsDetails.Timeout, "pre-chaos", experimentsDetails.VMInstanceName, experimentsDetails.GCPProjectID, experimentsDetails.InstanceZone); err != nil {
 		log.Errorf("failed to get the vm instance status, err: %v", err)
 		failStep := "[pre-chaos]: Failed to verify the GCP VM instance status, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
-	log.Info("[Status]: VM instance is in running state")
+
+	log.Info("[Status]: VM instance is in running state (pre-chaos)")
 
 	// Including the litmus lib for GCP vm-instance-stop
 	switch experimentsDetails.ChaosLib {
 	case "litmus":
-		if err = litmusLIB.PrepareVMStop(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
+		if err := litmusLIB.PrepareVMStop(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
 			log.Errorf("Chaos injection failed, err: %v", err)
 			failStep := "[chaos]: Failed inside the chaoslib, err: " + err.Error()
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
@@ -157,44 +124,15 @@ func VMInstanceStop(clients clients.ClientSets) {
 	log.Infof("[Confirmation]: %v chaos has been injected successfully", experimentsDetails.ExperimentName)
 	resultDetails.Verdict = v1alpha1.ResultVerdictPassed
 
-	// POST-CHAOS ACTIVE NODE COUNT TEST
-	if experimentsDetails.AutoScalingGroup == "enable" {
-		if err = common.PostChaosActiveNodeCountCheck(activeNodeCount, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
-			log.Errorf("Post chaos active node count check failed, err: %v", err)
-			failStep := "[post-chaos]: Failed to verify active number of nodes post chaos, err: " + err.Error()
-			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-			return
-		}
-	}
-
-	//Verify the GCP VM instance is in RUNNING status (post chaos)
-	if err = gcp.InstanceStatusCheckByName(experimentsDetails.AutoScalingGroup, experimentsDetails.Delay, experimentsDetails.Timeout, "post-chaos", experimentsDetails.VMInstanceName, experimentsDetails.GCPProjectID, experimentsDetails.InstanceZone); err != nil {
+	//Verify the GCP VM instance is in RUNNING status (post-chaos)
+	if err := gcp.InstanceStatusCheckByName(experimentsDetails.ManagedInstanceGroup, experimentsDetails.Delay, experimentsDetails.Timeout, "post-chaos", experimentsDetails.VMInstanceName, experimentsDetails.GCPProjectID, experimentsDetails.InstanceZone); err != nil {
 		log.Errorf("failed to get the vm instance status, err: %v", err)
 		failStep := "[post-chaos]: Failed to verify the GCP VM instance status, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
-	log.Info("[Status]: VM instance is in running state (post chaos)")
 
-	//POST-CHAOS APPLICATION STATUS CHECK
-	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (post-chaos)")
-	if err = status.AUTStatusCheck(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.TargetContainer, experimentsDetails.Timeout, experimentsDetails.Delay, clients, &chaosDetails); err != nil {
-		log.Errorf("Application status check failed, err: %v", err)
-		failStep := "[post-chaos]: Failed to verify that the AUT (Application Under Test) is running, err: " + err.Error()
-		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-		return
-	}
-
-	//POST-CHAOS AUXILIARY APPLICATION STATUS CHECK
-	if experimentsDetails.AuxiliaryAppInfo != "" {
-		log.Info("[Status]: Verify that the Auxiliary Applications are running (post-chaos)")
-		if err = status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
-			log.Errorf("Auxiliary Application status check failed, err: %v", err)
-			failStep := "[post-chaos]: Failed to verify that the Auxiliary Applications are running, err: " + err.Error()
-			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-			return
-		}
-	}
+	log.Info("[Status]: VM instance is in running state (post-chaos)")
 
 	if experimentsDetails.EngineName != "" {
 		// marking AUT as running, as we already checked the status of application under test
@@ -202,7 +140,7 @@ func VMInstanceStop(clients clients.ClientSets) {
 
 		// run the probes in the post-chaos check
 		if len(resultDetails.ProbeDetails) != 0 {
-			if err = probe.RunProbes(&chaosDetails, clients, &resultDetails, "PostChaos", &eventsDetails); err != nil {
+			if err := probe.RunProbes(&chaosDetails, clients, &resultDetails, "PostChaos", &eventsDetails); err != nil {
 				log.Errorf("Probes Failed, err: %v", err)
 				failStep := "[post-chaos]: Failed while running probes, err: " + err.Error()
 				msg := "AUT: Running, Probes: Unsuccessful"
@@ -221,7 +159,7 @@ func VMInstanceStop(clients clients.ClientSets) {
 
 	//Updating the chaosResult in the end of experiment
 	log.Infof("[The End]: Updating the chaos result of %v experiment (EOT)", experimentsDetails.ExperimentName)
-	if err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT"); err != nil {
+	if err := result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT"); err != nil {
 		log.Errorf("Unable to Update the Chaos Result, err:  %v", err)
 		return
 	}

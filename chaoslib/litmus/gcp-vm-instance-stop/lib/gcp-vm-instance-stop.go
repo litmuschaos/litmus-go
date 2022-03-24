@@ -78,6 +78,7 @@ func PrepareVMStop(experimentsDetails *experimentTypes.ExperimentDetails, client
 		log.Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", experimentsDetails.RampTime)
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
+
 	return nil
 }
 
@@ -107,17 +108,17 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 			for i := range instanceNamesList {
 
 				//Stopping the VM instance
-				log.Info("[Chaos]: Stopping the desired VM instance")
+				log.Infof("[Chaos]: Stopping %s VM instance", instanceNamesList[i])
 				if err := gcplib.VMInstanceStop(instanceNamesList[i], experimentsDetails.GCPProjectID, instanceZonesList[i]); err != nil {
-					return errors.Errorf("VM instance failed to stop, err: %v", err)
+					return errors.Errorf("%s VM instance failed to stop, err: %v", instanceNamesList[i], err)
 				}
 
 				common.SetTargets(instanceNamesList[i], "injected", "VM", chaosDetails)
 
 				//Wait for VM instance to completely stop
-				log.Infof("[Wait]: Wait for VM instance '%v' to get in stopped state", instanceNamesList[i])
+				log.Infof("[Wait]: Wait for VM instance %s to get in stopped state", instanceNamesList[i])
 				if err := gcplib.WaitForVMInstanceDown(experimentsDetails.Timeout, experimentsDetails.Delay, instanceNamesList[i], experimentsDetails.GCPProjectID, instanceZonesList[i]); err != nil {
-					return errors.Errorf("vm instance failed to fully shutdown, err: %v", err)
+					return errors.Errorf("%s vm instance failed to fully shutdown, err: %v", instanceNamesList[i], err)
 				}
 
 				// run the probes during chaos
@@ -132,24 +133,37 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 				log.Infof("[Wait]: Waiting for chaos interval of %vs", experimentsDetails.ChaosInterval)
 				common.WaitForDuration(experimentsDetails.ChaosInterval)
 
-				// starting the VM instance
-				if experimentsDetails.AutoScalingGroup != "enable" {
-					log.Info("[Chaos]: Starting back the VM instance")
+				switch experimentsDetails.ManagedInstanceGroup {
+				case "disable":
+
+					// starting the VM instance
+					log.Infof("[Chaos]: Starting back %s VM instance", instanceNamesList[i])
 					if err := gcplib.VMInstanceStart(instanceNamesList[i], experimentsDetails.GCPProjectID, instanceZonesList[i]); err != nil {
-						return errors.Errorf("vm instance failed to start, err: %v", err)
+						return errors.Errorf("%s vm instance failed to start, err: %v", instanceNamesList[i], err)
 					}
 
 					// wait for VM instance to get in running state
-					log.Infof("[Wait]: Wait for VM instance '%v' to get in running state", instanceNamesList[i])
+					log.Infof("[Wait]: Wait for VM instance %s to get in running state", instanceNamesList[i])
 					if err := gcplib.WaitForVMInstanceUp(experimentsDetails.Timeout, experimentsDetails.Delay, instanceNamesList[i], experimentsDetails.GCPProjectID, instanceZonesList[i]); err != nil {
-						return errors.Errorf("unable to start the vm instance, err: %v", err)
+						return errors.Errorf("unable to start %s vm instance, err: %v", instanceNamesList[i], err)
+					}
+
+				default:
+
+					// wait for VM instance to get in running state
+					log.Infof("[Wait]: Wait for VM instance %s to get in running state", instanceNamesList[i])
+					if err := gcplib.WaitForVMInstanceUp(experimentsDetails.Timeout, experimentsDetails.Delay, instanceNamesList[i], experimentsDetails.GCPProjectID, instanceZonesList[i]); err != nil {
+						return errors.Errorf("unable to start %s vm instance, err: %v", instanceNamesList[i], err)
 					}
 				}
+
 				common.SetTargets(instanceNamesList[i], "reverted", "VM", chaosDetails)
 			}
+
 			duration = int(time.Since(ChaosStartTimeStamp).Seconds())
 		}
 	}
+
 	return nil
 }
 
@@ -179,9 +193,9 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 			for i := range instanceNamesList {
 
 				// stopping the VM instance
-				log.Info("[Chaos]: Stopping the desired VM instance")
+				log.Infof("[Chaos]: Stopping %s VM instance", instanceNamesList[i])
 				if err := gcplib.VMInstanceStop(instanceNamesList[i], experimentsDetails.GCPProjectID, instanceZonesList[i]); err != nil {
-					return errors.Errorf("vm instance failed to stop, err: %v", err)
+					return errors.Errorf("%s vm instance failed to stop, err: %v", instanceNamesList[i], err)
 				}
 
 				common.SetTargets(instanceNamesList[i], "injected", "VM", chaosDetails)
@@ -190,9 +204,9 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 			for i := range instanceNamesList {
 
 				// wait for VM instance to completely stop
-				log.Infof("[Wait]: Wait for VM instance '%v' to get in stopped state", instanceNamesList[i])
+				log.Infof("[Wait]: Wait for VM instance %s to get in stopped state", instanceNamesList[i])
 				if err := gcplib.WaitForVMInstanceDown(experimentsDetails.Timeout, experimentsDetails.Delay, instanceNamesList[i], experimentsDetails.GCPProjectID, instanceZonesList[i]); err != nil {
-					return errors.Errorf("vm instance failed to fully shutdown, err: %v", err)
+					return errors.Errorf("%s vm instance failed to fully shutdown, err: %v", instanceNamesList[i], err)
 				}
 			}
 
@@ -207,31 +221,46 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 			log.Infof("[Wait]: Waiting for chaos interval of %vs", experimentsDetails.ChaosInterval)
 			common.WaitForDuration(experimentsDetails.ChaosInterval)
 
-			// starting the VM instance
-			if experimentsDetails.AutoScalingGroup != "enable" {
+			switch experimentsDetails.ManagedInstanceGroup {
+			case "disable":
 
+				// starting the VM instance
 				for i := range instanceNamesList {
-					log.Info("[Chaos]: Starting back the VM instance")
+					log.Infof("[Chaos]: Starting back %s VM instance", instanceNamesList[i])
 					if err := gcplib.VMInstanceStart(instanceNamesList[i], experimentsDetails.GCPProjectID, instanceZonesList[i]); err != nil {
-						return errors.Errorf("vm instance failed to start, err: %v", err)
+						return errors.Errorf("%s vm instance failed to start, err: %v", instanceNamesList[i], err)
 					}
 				}
 
+				// wait for VM instance to get in running state
 				for i := range instanceNamesList {
-					// wait for VM instance to get in running state
-					log.Infof("[Wait]: Wait for VM instance '%v' to get in running state", instanceNamesList[i])
+
+					log.Infof("[Wait]: Wait for VM instance %s to get in running state", instanceNamesList[i])
 					if err := gcplib.WaitForVMInstanceUp(experimentsDetails.Timeout, experimentsDetails.Delay, instanceNamesList[i], experimentsDetails.GCPProjectID, instanceZonesList[i]); err != nil {
-						return errors.Errorf("unable to start the vm instance, err: %v", err)
+						return errors.Errorf("unable to start %s vm instance, err: %v", instanceNamesList[i], err)
 					}
+
+					common.SetTargets(instanceNamesList[i], "reverted", "VM", chaosDetails)
+				}
+
+			default:
+
+				// wait for VM instance to get in running state
+				for i := range instanceNamesList {
+
+					log.Infof("[Wait]: Wait for VM instance %s to get in running state", instanceNamesList[i])
+					if err := gcplib.WaitForVMInstanceUp(experimentsDetails.Timeout, experimentsDetails.Delay, instanceNamesList[i], experimentsDetails.GCPProjectID, instanceZonesList[i]); err != nil {
+						return errors.Errorf("unable to start %s vm instance, err: %v", instanceNamesList[i], err)
+					}
+
+					common.SetTargets(instanceNamesList[i], "reverted", "VM", chaosDetails)
 				}
 			}
 
-			for i := range instanceNamesList {
-				common.SetTargets(instanceNamesList[i], "reverted", "VM", chaosDetails)
-			}
 			duration = int(time.Since(ChaosStartTimeStamp).Seconds())
 		}
 	}
+
 	return nil
 }
 
@@ -240,26 +269,34 @@ func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, instanc
 	<-abort
 
 	log.Info("[Abort]: Chaos Revert Started")
-	for i := range instanceNamesList {
-		instanceState, err := gcplib.GetVMInstanceStatus(instanceNamesList[i], experimentsDetails.GCPProjectID, zonesList[i])
-		if err != nil {
-			log.Errorf("fail to get instance status when an abort signal is received,err :%v", err)
-		}
-		if instanceState != "RUNNING" && experimentsDetails.AutoScalingGroup != "enable" {
 
-			log.Info("[Abort]: Waiting for the VM instance to shut down")
-			if err := gcplib.WaitForVMInstanceDown(experimentsDetails.Timeout, experimentsDetails.Delay, instanceNamesList[i], experimentsDetails.GCPProjectID, zonesList[i]); err != nil {
-				log.Errorf("unable to wait till stop of the instance, err: %v", err)
-			}
+	if experimentsDetails.ManagedInstanceGroup != "enable" {
 
-			log.Info("[Abort]: Starting VM instance as abort signal received")
-			err := gcplib.VMInstanceStart(instanceNamesList[i], experimentsDetails.GCPProjectID, zonesList[i])
+		for i := range instanceNamesList {
+
+			instanceState, err := gcplib.GetVMInstanceStatus(instanceNamesList[i], experimentsDetails.GCPProjectID, zonesList[i])
 			if err != nil {
-				log.Errorf("vm instance failed to start when an abort signal is received, err: %v", err)
+				log.Errorf("failed to get %s vm instance status when an abort signal is received, err: %v", instanceNamesList[i], err)
 			}
+
+			if instanceState != "RUNNING" {
+
+				log.Infof("[Abort]: Waiting for %s VM instance to shut down", instanceNamesList[i])
+				if err := gcplib.WaitForVMInstanceDown(experimentsDetails.Timeout, experimentsDetails.Delay, instanceNamesList[i], experimentsDetails.GCPProjectID, zonesList[i]); err != nil {
+					log.Errorf("unable to wait till stop of the instance, err: %v", err)
+				}
+
+				log.Infof("[Abort]: Starting %s VM instance as abort signal is received", instanceNamesList[i])
+				err := gcplib.VMInstanceStart(instanceNamesList[i], experimentsDetails.GCPProjectID, zonesList[i])
+				if err != nil {
+					log.Errorf("%s vm instance failed to start when an abort signal is received, err: %v", instanceNamesList[i], err)
+				}
+			}
+
+			common.SetTargets(instanceNamesList[i], "reverted", "VM", chaosDetails)
 		}
-		common.SetTargets(instanceNamesList[i], "reverted", "VM", chaosDetails)
 	}
+
 	log.Info("[Abort]: Chaos Revert Completed")
 	os.Exit(1)
 }

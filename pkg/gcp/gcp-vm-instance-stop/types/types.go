@@ -12,10 +12,6 @@ type ExperimentDetails struct {
 	ChaosInterval            int
 	RampTime                 int
 	ChaosLib                 string
-	AppNS                    string
-	AuxiliaryAppInfo         string
-	AppLabel                 string
-	AppKind                  string
 	ChaosUID                 clientTypes.UID
 	InstanceID               string
 	ChaosNamespace           string
@@ -25,7 +21,7 @@ type ExperimentDetails struct {
 	VMInstanceName           string
 	GCPProjectID             string
 	InstanceZone             string
-	AutoScalingGroup         string
+	ManagedInstanceGroup     string
 	Sequence                 string
 	TargetContainer          string
 	LIBImagePullPolicy       string

@@ -41,42 +41,56 @@ func GetVMInstanceStatus(instanceName string, gcpProjectID string, instanceZone 
 
 //InstanceStatusCheckByName is used to check the status of all the VM instances under chaos
 func InstanceStatusCheckByName(autoScalingGroup string, delay, timeout int, check string, instanceNames string, gcpProjectId string, instanceZones string) error {
+
 	instanceNamesList := strings.Split(instanceNames, ",")
+
 	instanceZonesList := strings.Split(instanceZones, ",")
+
 	if autoScalingGroup != "enable" && autoScalingGroup != "disable" {
 		return errors.Errorf("Invalid value for AUTO_SCALING_GROUP: %v", autoScalingGroup)
 	}
+
 	if len(instanceNamesList) == 0 {
 		return errors.Errorf("No instance name found to stop")
 	}
+
 	if len(instanceNamesList) != len(instanceZonesList) {
 		return errors.Errorf("The number of instance names and the number of regions is not equal")
 	}
-	log.Infof("[Info]: The instances under chaos(IUC) are: %v", instanceNamesList)
+
+	log.Infof("[Info]: The instances under chaos (IUC) are: %v", instanceNamesList)
+
 	if check == "pre-chaos" {
 		return InstanceStatusCheckPreChaos(instanceNamesList, gcpProjectId, instanceZonesList)
 	}
+
 	return InstanceStatusCheckPostChaos(timeout, delay, instanceNamesList, gcpProjectId, instanceZonesList)
 }
 
 //InstanceStatusCheckPreChaos is used to check whether all VM instances under chaos are running or not without any re-check
 func InstanceStatusCheckPreChaos(instanceNamesList []string, gcpProjectId string, instanceZonesList []string) error {
+
 	for i := range instanceNamesList {
+
 		instanceState, err := GetVMInstanceStatus(instanceNamesList[i], gcpProjectId, instanceZonesList[i])
 		if err != nil {
 			return err
 		}
+
 		if instanceState != "RUNNING" {
-			return errors.Errorf("failed to get the vm instance '%v' in running sate, current state: %v", instanceNamesList[i], instanceState)
+			return errors.Errorf("%s vm instance is not in RUNNING state, current state: %v", instanceNamesList[i], instanceState)
 		}
 	}
+
 	return nil
 }
 
 //InstanceStatusCheckPostChaos is used to check whether all VM instances under chaos are running or not with re-check
 func InstanceStatusCheckPostChaos(timeout, delay int, instanceNamesList []string, gcpProjectId string, instanceZonesList []string) error {
+
 	for i := range instanceNamesList {
 		return WaitForVMInstanceUp(timeout, delay, instanceNamesList[i], gcpProjectId, instanceZonesList[i])
 	}
+
 	return nil
 }
