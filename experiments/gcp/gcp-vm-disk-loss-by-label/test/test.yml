@@ -21,24 +21,11 @@ spec:
           - sleep
           - "3600"
         env:
-          # provide application namespace
-          - name: APP_NAMESPACE
-            value: ''
-
-          # provide application labels
-          - name: APP_LABEL
-            value: ''
- 
-          # provide application kind
-          - name: APP_KIND
-            value: '' 
 
           - name: TOTAL_CHAOS_DURATION
             value: ''
 
-          # provide auxiliary application details - namespace and labels of the applications
-          # sample input is - "ns1:app=percona,ns2:name=nginx"
-          - name: AUXILIARY_APPINFO
+          - name: CHAOS_INTERVAL
             value: ''
           
           ## Period to wait before injection of chaos in sec
@@ -52,6 +39,25 @@ spec:
 
           # provide the chaos namespace
           - name: CHAOS_NAMESPACE
+            value: ''
+
+          - name: GCP_PROJECT_ID
+            value: ''
+
+          - name: DISK_ZONES
+            value: ''
+
+          # set the label of the target disk volumes
+          - name: DISK_VOLUME_LABEL
+            value: ''
+          
+          # set the percentage value of the disks with the given label 
+          # which should be targeted as part of the chaos injection
+          - name: DISK_AFFECTED_PERC
+            value: ''
+
+          # parallel or serial; determines how chaos is injected
+          - name: SEQUENCE
             value: ''
         
           - name: POD_NAME

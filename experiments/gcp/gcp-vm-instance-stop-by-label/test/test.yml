@@ -33,7 +33,12 @@ spec:
           - name: APP_KIND
             value: '' 
 
+          # set chaos duration (in sec) as desired
           - name: TOTAL_CHAOS_DURATION
+            value: ''
+
+          # set chaos interval (in sec) as desired
+          - name: CHAOS_INTERVAL
             value: ''
 
           # provide auxiliary application details - namespace and labels of the applications
@@ -52,6 +57,22 @@ spec:
 
           # provide the chaos namespace
           - name: CHAOS_NAMESPACE
+            value: ''
+
+          - name: GCP_PROJECT_ID
+            value: ''
+
+          # Label of the target vm instance(s)  
+          - name: INSTANCE_LABEL
+            value: ''
+
+          - name: INSTANCE_ZONES
+            value: ''
+
+          - name: SEQUENCE
+            value: ''
+
+          - name: AUTO_SCALING_GROUP
             value: ''
         
           - name: POD_NAME
