@@ -21,6 +21,9 @@ import (
 //PrepareAndInjectChaos contains the prepration & injection steps
 func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, args string) error {
 
+	targetPodList := apiv1.PodList{}
+	var err error
+	var podsAffectedPerc int
 	// Get the target pod details for the chaos execution
 	// if the target pod is not defined it will derive the random target pod list using pod affected percentage
 	if experimentsDetails.TargetPods == "" && chaosDetails.AppDetail.Label == "" {
@@ -55,10 +58,28 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 			"PodsAffectedPerc":                   experimentsDetails.PodsAffectedPerc,
 		})
 	}
-	podsAffectedPerc, _ := strconv.Atoi(experimentsDetails.PodsAffectedPerc)
-	targetPodList, err := common.GetPodList(experimentsDetails.TargetPods, podsAffectedPerc, clients, chaosDetails)
-	if err != nil {
-		return err
+	podsAffectedPerc, _ = strconv.Atoi(experimentsDetails.PodsAffectedPerc)
+	if experimentsDetails.NodeLabel == "" {
+
+		//targetPodList, err := common.GetPodListFromSpecifiedNodes(experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, clients, chaosDetails)
+		targetPodList, err = common.GetPodList(experimentsDetails.TargetPods, podsAffectedPerc, clients, chaosDetails)
+		if err != nil {
+			return err
+		}
+	} else {
+		//targetPodList, err := common.GetPodList(experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, clients, chaosDetails)
+		if experimentsDetails.TargetPods == "" {
+			targetPodList, err = common.GetPodListFromSpecifiedNodes(experimentsDetails.TargetPods, podsAffectedPerc, experimentsDetails.NodeLabel, clients, chaosDetails)
+			if err != nil {
+				return err
+			}
+		} else {
+			log.Infof("TARGET_PODS env is provided, overriding the NODE_LABEL input")
+			targetPodList, err = common.GetPodList(experimentsDetails.TargetPods, podsAffectedPerc, clients, chaosDetails)
+			if err != nil {
+				return err
+			}
+		}
 	}
 
 	podNames := []string{}

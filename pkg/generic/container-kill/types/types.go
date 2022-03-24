@@ -33,4 +33,5 @@ type ExperimentDetails struct {
 	PodsAffectedPerc              string
 	Sequence                      string
 	Signal                        string
+	NodeLabel                     string
 }

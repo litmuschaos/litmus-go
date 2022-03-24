@@ -37,4 +37,5 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.Sequence = types.Getenv("SEQUENCE", "parallel")
 	experimentDetails.Signal = types.Getenv("SIGNAL", "SIGKILL")
 	experimentDetails.TerminationGracePeriodSeconds, _ = strconv.Atoi(types.Getenv("TERMINATION_GRACE_PERIOD_SECONDS", ""))
+	experimentDetails.NodeLabel = types.Getenv("NODE_LABEL", "")
 }
