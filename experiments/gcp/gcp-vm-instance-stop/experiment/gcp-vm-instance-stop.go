@@ -7,6 +7,7 @@ import (
 	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/gcp-vm-instance-stop/lib"
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/cloud/gcp"
+	gcpCommon "github.com/litmuschaos/litmus-go/pkg/cloud/gcp/common"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentEnv "github.com/litmuschaos/litmus-go/pkg/gcp/gcp-vm-instance-stop/environment"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/gcp/gcp-vm-instance-stop/types"
@@ -16,10 +17,16 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/sirupsen/logrus"
+	"google.golang.org/api/compute/v1"
 )
 
 // VMInstanceStop executes the experiment steps by injecting chaos into the specified vm instances
 func VMInstanceStop(clients clients.ClientSets) {
+
+	var (
+		computeService *compute.Service
+		err            error
+	)
 
 	experimentsDetails := experimentTypes.ExperimentDetails{}
 	resultDetails := types.ResultDetails{}
@@ -66,10 +73,9 @@ func VMInstanceStop(clients clients.ClientSets) {
 
 	//DISPLAY THE INSTANCE INFORMATION
 	log.InfoWithValues("The instance information is as follows", logrus.Fields{
-		"Chaos Duration":  experimentsDetails.ChaosDuration,
-		"Chaos Namespace": experimentsDetails.ChaosNamespace,
-		"Instance Names":  experimentsDetails.VMInstanceName,
-		"Zones":           experimentsDetails.InstanceZone,
+		"Instance Names": experimentsDetails.VMInstanceName,
+		"Zones":          experimentsDetails.InstanceZone,
+		"Sequence":       experimentsDetails.Sequence,
 	})
 
 	if experimentsDetails.EngineName != "" {
@@ -95,8 +101,17 @@ func VMInstanceStop(clients clients.ClientSets) {
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
-	//Verify that the GCP VM instance(s) is in RUNNING state (pre-chaos)
-	if err := gcp.InstanceStatusCheckByName(experimentsDetails.ManagedInstanceGroup, experimentsDetails.Delay, experimentsDetails.Timeout, "pre-chaos", experimentsDetails.VMInstanceName, experimentsDetails.GCPProjectID, experimentsDetails.InstanceZone); err != nil {
+	// Create a compute service to access the compute engine resources
+	computeService, err = gcpCommon.GetGCPComputeService()
+	if err != nil {
+		log.Errorf("failed to obtain a gcp compute service, err: %v", err)
+		failStep := "[pre-chaos]: Failed to obtain a gcp compute service, err: " + err.Error()
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+		return
+	}
+
+	// Verify that the GCP VM instance(s) is in RUNNING state (pre-chaos)
+	if err := gcp.InstanceStatusCheckByName(computeService, experimentsDetails.ManagedInstanceGroup, experimentsDetails.Delay, experimentsDetails.Timeout, "pre-chaos", experimentsDetails.VMInstanceName, experimentsDetails.GCPProjectID, experimentsDetails.InstanceZone); err != nil {
 		log.Errorf("failed to get the vm instance status, err: %v", err)
 		failStep := "[pre-chaos]: Failed to verify the GCP VM instance status, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
@@ -108,7 +123,7 @@ func VMInstanceStop(clients clients.ClientSets) {
 	// Including the litmus lib for GCP vm-instance-stop
 	switch experimentsDetails.ChaosLib {
 	case "litmus":
-		if err := litmusLIB.PrepareVMStop(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
+		if err := litmusLIB.PrepareVMStop(computeService, &experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
 			log.Errorf("Chaos injection failed, err: %v", err)
 			failStep := "[chaos]: Failed inside the chaoslib, err: " + err.Error()
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
@@ -125,7 +140,7 @@ func VMInstanceStop(clients clients.ClientSets) {
 	resultDetails.Verdict = v1alpha1.ResultVerdictPassed
 
 	//Verify the GCP VM instance is in RUNNING status (post-chaos)
-	if err := gcp.InstanceStatusCheckByName(experimentsDetails.ManagedInstanceGroup, experimentsDetails.Delay, experimentsDetails.Timeout, "post-chaos", experimentsDetails.VMInstanceName, experimentsDetails.GCPProjectID, experimentsDetails.InstanceZone); err != nil {
+	if err := gcp.InstanceStatusCheckByName(computeService, experimentsDetails.ManagedInstanceGroup, experimentsDetails.Delay, experimentsDetails.Timeout, "post-chaos", experimentsDetails.VMInstanceName, experimentsDetails.GCPProjectID, experimentsDetails.InstanceZone); err != nil {
 		log.Errorf("failed to get the vm instance status, err: %v", err)
 		failStep := "[post-chaos]: Failed to verify the GCP VM instance status, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)

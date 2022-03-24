@@ -7,6 +7,7 @@ import (
 	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/gcp-vm-instance-stop-by-label/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/cloud/gcp"
+	gcpCommon "github.com/litmuschaos/litmus-go/pkg/cloud/gcp/common"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentEnv "github.com/litmuschaos/litmus-go/pkg/gcp/gcp-vm-instance-stop/environment"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/gcp/gcp-vm-instance-stop/types"
@@ -16,13 +17,15 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/sirupsen/logrus"
+	"google.golang.org/api/compute/v1"
 )
 
 // GCPVMInstanceStopByLabel contains steps to inject chaos
 func GCPVMInstanceStopByLabel(clients clients.ClientSets) {
 
 	var (
-		err error
+		computeService *compute.Service
+		err            error
 	)
 
 	experimentsDetails := experimentTypes.ExperimentDetails{}
@@ -67,10 +70,9 @@ func GCPVMInstanceStopByLabel(clients clients.ClientSets) {
 
 	//DISPLAY THE INSTANCE INFORMATION
 	log.InfoWithValues("The instance information is as follows", logrus.Fields{
-		"Chaos Duration":               experimentsDetails.ChaosDuration,
-		"Chaos Namespace":              experimentsDetails.ChaosNamespace,
 		"Instance Label":               experimentsDetails.InstanceLabel,
 		"Instance Affected Percentage": experimentsDetails.InstanceAffectedPerc,
+		"Zone":                         experimentsDetails.InstanceZone,
 		"Sequence":                     experimentsDetails.Sequence,
 	})
 
@@ -100,8 +102,17 @@ func GCPVMInstanceStopByLabel(clients clients.ClientSets) {
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
+	// Create a compute service to access the compute engine resources
+	computeService, err = gcpCommon.GetGCPComputeService()
+	if err != nil {
+		log.Errorf("failed to obtain a gcp compute service, err: %v", err)
+		failStep := "[pre-chaos]: Failed to obtain a gcp compute service, err: " + err.Error()
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+		return
+	}
+
 	//selecting the target instances (pre-chaos)
-	if err = gcp.SetTargetInstance(&experimentsDetails); err != nil {
+	if err = gcp.SetTargetInstance(computeService, &experimentsDetails); err != nil {
 		log.Errorf("Failed to get the target VM instances, err: %v", err)
 		failStep := "[pre-chaos]: Failed to select the target VM instances from label, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
@@ -111,7 +122,7 @@ func GCPVMInstanceStopByLabel(clients clients.ClientSets) {
 	// Including the litmus lib
 	switch experimentsDetails.ChaosLib {
 	case "litmus":
-		if err := litmusLIB.PrepareVMStopByLabel(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
+		if err := litmusLIB.PrepareVMStopByLabel(computeService, &experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
 			log.Errorf("Chaos injection failed, err: %v", err)
 			failStep := "[chaos]: Failed inside the chaoslib, err: " + err.Error()
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
@@ -130,7 +141,7 @@ func GCPVMInstanceStopByLabel(clients clients.ClientSets) {
 	// Verify that GCP VM instance is running (post-chaos)
 	if experimentsDetails.ManagedInstanceGroup != "enable" {
 		for _, instanceName := range experimentsDetails.TargetVMInstanceNameList {
-			if err := gcp.WaitForVMInstanceUp(experimentsDetails.Timeout, experimentsDetails.Delay, instanceName, experimentsDetails.GCPProjectID, experimentsDetails.InstanceZone); err != nil {
+			if err := gcp.WaitForVMInstanceUp(computeService, experimentsDetails.Timeout, experimentsDetails.Delay, instanceName, experimentsDetails.GCPProjectID, experimentsDetails.InstanceZone); err != nil {
 				log.Errorf("failed to get the VM instance status as RUNNING post chaos, err: %v", err)
 				failStep := "[post-chaos]: Failed to verify the VM instance status, err: " + err.Error()
 				result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)

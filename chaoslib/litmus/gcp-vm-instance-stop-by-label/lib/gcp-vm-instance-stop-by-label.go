@@ -16,12 +16,13 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/pkg/errors"
+	"google.golang.org/api/compute/v1"
 )
 
 var inject, abort chan os.Signal
 
 // PrepareVMStopByLabel executes the experiment steps by injecting chaos into target VM instances
-func PrepareVMStopByLabel(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+func PrepareVMStopByLabel(computeService *compute.Service, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	// inject channel is used to transmit signal notifications.
 	inject = make(chan os.Signal, 1)
@@ -43,15 +44,15 @@ func PrepareVMStopByLabel(experimentsDetails *experimentTypes.ExperimentDetails,
 	log.Infof("[Chaos]:Number of Instance targeted: %v", len(instanceNamesList))
 
 	// watching for the abort signal and revert the chaos
-	go abortWatcher(experimentsDetails, instanceNamesList, chaosDetails)
+	go abortWatcher(computeService, experimentsDetails, instanceNamesList, chaosDetails)
 
 	switch strings.ToLower(experimentsDetails.Sequence) {
 	case "serial":
-		if err := injectChaosInSerialMode(experimentsDetails, instanceNamesList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+		if err := injectChaosInSerialMode(computeService, experimentsDetails, instanceNamesList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
 			return err
 		}
 	case "parallel":
-		if err := injectChaosInParallelMode(experimentsDetails, instanceNamesList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+		if err := injectChaosInParallelMode(computeService, experimentsDetails, instanceNamesList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
 			return err
 		}
 	default:
@@ -68,7 +69,7 @@ func PrepareVMStopByLabel(experimentsDetails *experimentTypes.ExperimentDetails,
 }
 
 //injectChaosInSerialMode stops VM instances in serial mode i.e. one after the other
-func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, instanceNamesList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+func injectChaosInSerialMode(computeService *compute.Service, experimentsDetails *experimentTypes.ExperimentDetails, instanceNamesList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	select {
 	case <-inject:
@@ -94,7 +95,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 
 				//Stopping the VM instance
 				log.Infof("[Chaos]: Stopping %s desired VM instance", instanceNamesList[i])
-				if err := gcplib.VMInstanceStop(instanceNamesList[i], experimentsDetails.GCPProjectID, experimentsDetails.InstanceZone); err != nil {
+				if err := gcplib.VMInstanceStop(computeService, instanceNamesList[i], experimentsDetails.GCPProjectID, experimentsDetails.InstanceZone); err != nil {
 					return errors.Errorf("VM instance failed to stop, err: %v", err)
 				}
 
@@ -102,7 +103,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 
 				//Wait for VM instance to completely stop
 				log.Infof("[Wait]: Wait for VM instance %s to stop", instanceNamesList[i])
-				if err := gcplib.WaitForVMInstanceDown(experimentsDetails.Timeout, experimentsDetails.Delay, instanceNamesList[i], experimentsDetails.GCPProjectID, experimentsDetails.InstanceZone); err != nil {
+				if err := gcplib.WaitForVMInstanceDown(computeService, experimentsDetails.Timeout, experimentsDetails.Delay, instanceNamesList[i], experimentsDetails.GCPProjectID, experimentsDetails.InstanceZone); err != nil {
 					return errors.Errorf("%s vm instance failed to fully shutdown, err: %v", instanceNamesList[i], err)
 				}
 
@@ -123,13 +124,13 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 
 					// starting the VM instance
 					log.Infof("[Chaos]: Starting back %s VM instance", instanceNamesList[i])
-					if err := gcplib.VMInstanceStart(instanceNamesList[i], experimentsDetails.GCPProjectID, experimentsDetails.InstanceZone); err != nil {
+					if err := gcplib.VMInstanceStart(computeService, instanceNamesList[i], experimentsDetails.GCPProjectID, experimentsDetails.InstanceZone); err != nil {
 						return errors.Errorf("%s vm instance failed to start, err: %v", instanceNamesList[i], err)
 					}
 
 					// wait for VM instance to get in running state
 					log.Infof("[Wait]: Wait for VM instance %s to get in RUNNING state", instanceNamesList[i])
-					if err := gcplib.WaitForVMInstanceUp(experimentsDetails.Timeout, experimentsDetails.Delay, instanceNamesList[i], experimentsDetails.GCPProjectID, experimentsDetails.InstanceZone); err != nil {
+					if err := gcplib.WaitForVMInstanceUp(computeService, experimentsDetails.Timeout, experimentsDetails.Delay, instanceNamesList[i], experimentsDetails.GCPProjectID, experimentsDetails.InstanceZone); err != nil {
 						return errors.Errorf("unable to start %s vm instance, err: %v", instanceNamesList[i], err)
 					}
 
@@ -137,7 +138,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 
 					// wait for VM instance to get in running state
 					log.Infof("[Wait]: Wait for VM instance %s to get in RUNNING state", instanceNamesList[i])
-					if err := gcplib.WaitForVMInstanceUp(experimentsDetails.Timeout, experimentsDetails.Delay, instanceNamesList[i], experimentsDetails.GCPProjectID, experimentsDetails.InstanceZone); err != nil {
+					if err := gcplib.WaitForVMInstanceUp(computeService, experimentsDetails.Timeout, experimentsDetails.Delay, instanceNamesList[i], experimentsDetails.GCPProjectID, experimentsDetails.InstanceZone); err != nil {
 						return errors.Errorf("unable to start %s vm instance, err: %v", instanceNamesList[i], err)
 					}
 				}
@@ -153,7 +154,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 }
 
 //injectChaosInParallelMode will inject the VM instance termination in serial mode that is one after other
-func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, instanceNamesList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+func injectChaosInParallelMode(computeService *compute.Service, experimentsDetails *experimentTypes.ExperimentDetails, instanceNamesList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	select {
 	case <-inject:
@@ -179,7 +180,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 
 				// stopping the VM instance
 				log.Infof("[Chaos]: Stopping %s VM instance", instanceNamesList[i])
-				if err := gcplib.VMInstanceStop(instanceNamesList[i], experimentsDetails.GCPProjectID, experimentsDetails.InstanceZone); err != nil {
+				if err := gcplib.VMInstanceStop(computeService, instanceNamesList[i], experimentsDetails.GCPProjectID, experimentsDetails.InstanceZone); err != nil {
 					return errors.Errorf("%s vm instance failed to stop, err: %v", instanceNamesList[i], err)
 				}
 
@@ -190,7 +191,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 
 				// wait for VM instance to completely stop
 				log.Infof("[Wait]: Wait for VM instance %s to get in stopped state", instanceNamesList[i])
-				if err := gcplib.WaitForVMInstanceDown(experimentsDetails.Timeout, experimentsDetails.Delay, instanceNamesList[i], experimentsDetails.GCPProjectID, experimentsDetails.InstanceZone); err != nil {
+				if err := gcplib.WaitForVMInstanceDown(computeService, experimentsDetails.Timeout, experimentsDetails.Delay, instanceNamesList[i], experimentsDetails.GCPProjectID, experimentsDetails.InstanceZone); err != nil {
 					return errors.Errorf("%s vm instance failed to fully shutdown, err: %v", instanceNamesList[i], err)
 				}
 			}
@@ -213,7 +214,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 				for i := range instanceNamesList {
 
 					log.Info("[Chaos]: Starting back the VM instance")
-					if err := gcplib.VMInstanceStart(instanceNamesList[i], experimentsDetails.GCPProjectID, experimentsDetails.InstanceZone); err != nil {
+					if err := gcplib.VMInstanceStart(computeService, instanceNamesList[i], experimentsDetails.GCPProjectID, experimentsDetails.InstanceZone); err != nil {
 						return errors.Errorf("vm instance failed to start, err: %v", err)
 					}
 				}
@@ -222,7 +223,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 				for i := range instanceNamesList {
 
 					log.Infof("[Wait]: Wait for VM instance '%v' to get in running state", instanceNamesList[i])
-					if err := gcplib.WaitForVMInstanceUp(experimentsDetails.Timeout, experimentsDetails.Delay, instanceNamesList[i], experimentsDetails.GCPProjectID, experimentsDetails.InstanceZone); err != nil {
+					if err := gcplib.WaitForVMInstanceUp(computeService, experimentsDetails.Timeout, experimentsDetails.Delay, instanceNamesList[i], experimentsDetails.GCPProjectID, experimentsDetails.InstanceZone); err != nil {
 						return errors.Errorf("unable to start the vm instance, err: %v", err)
 					}
 
@@ -235,7 +236,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 				for i := range instanceNamesList {
 
 					log.Infof("[Wait]: Wait for VM instance '%v' to get in running state", instanceNamesList[i])
-					if err := gcplib.WaitForVMInstanceUp(experimentsDetails.Timeout, experimentsDetails.Delay, instanceNamesList[i], experimentsDetails.GCPProjectID, experimentsDetails.InstanceZone); err != nil {
+					if err := gcplib.WaitForVMInstanceUp(computeService, experimentsDetails.Timeout, experimentsDetails.Delay, instanceNamesList[i], experimentsDetails.GCPProjectID, experimentsDetails.InstanceZone); err != nil {
 						return errors.Errorf("unable to start the vm instance, err: %v", err)
 					}
 
@@ -251,25 +252,25 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 }
 
 // abortWatcher watches for the abort signal and reverts the chaos
-func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, instanceNamesList []string, chaosDetails *types.ChaosDetails) {
+func abortWatcher(computeService *compute.Service, experimentsDetails *experimentTypes.ExperimentDetails, instanceNamesList []string, chaosDetails *types.ChaosDetails) {
 
 	<-abort
 
 	log.Info("[Abort]: Chaos Revert Started")
 	for i := range instanceNamesList {
-		instanceState, err := gcplib.GetVMInstanceStatus(instanceNamesList[i], experimentsDetails.GCPProjectID, experimentsDetails.InstanceZone)
+		instanceState, err := gcplib.GetVMInstanceStatus(computeService, instanceNamesList[i], experimentsDetails.GCPProjectID, experimentsDetails.InstanceZone)
 		if err != nil {
 			log.Errorf("fail to get instance status when an abort signal is received,err :%v", err)
 		}
 		if instanceState != "RUNNING" && experimentsDetails.ManagedInstanceGroup != "enable" {
 
 			log.Info("[Abort]: Waiting for the VM instance to shut down")
-			if err := gcplib.WaitForVMInstanceDown(experimentsDetails.Timeout, experimentsDetails.Delay, instanceNamesList[i], experimentsDetails.GCPProjectID, experimentsDetails.InstanceZone); err != nil {
+			if err := gcplib.WaitForVMInstanceDown(computeService, experimentsDetails.Timeout, experimentsDetails.Delay, instanceNamesList[i], experimentsDetails.GCPProjectID, experimentsDetails.InstanceZone); err != nil {
 				log.Errorf("unable to wait till stop of the instance, err: %v", err)
 			}
 
 			log.Info("[Abort]: Starting VM instance as abort signal received")
-			err := gcplib.VMInstanceStart(instanceNamesList[i], experimentsDetails.GCPProjectID, experimentsDetails.InstanceZone)
+			err := gcplib.VMInstanceStart(computeService, instanceNamesList[i], experimentsDetails.GCPProjectID, experimentsDetails.InstanceZone)
 			if err != nil {
 				log.Errorf("vm instance failed to start when an abort signal is received, err: %v", err)
 			}
