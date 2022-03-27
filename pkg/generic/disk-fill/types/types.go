@@ -35,4 +35,5 @@ type ExperimentDetails struct {
 	TerminationGracePeriodSeconds int
 	DataBlockSize                 int
 	NodeLabel                     string
+	IsTargetContainerProvided     bool
 }

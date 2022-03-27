@@ -35,4 +35,5 @@ type ExperimentDetails struct {
 	Sequence                      string
 	SocketPath                    string
 	TerminationGracePeriodSeconds int
+	IsTargetContainerProvided     bool
 }

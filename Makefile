@@ -9,9 +9,9 @@ IS_DOCKER_INSTALLED = $(shell which docker >> /dev/null 2>&1; echo $$?)
 
 # Docker info
 DOCKER_REGISTRY ?= docker.io
-DOCKER_REPO ?= litmuschaos
+DOCKER_REPO ?= uditgaurav
 DOCKER_IMAGE ?= go-runner
-DOCKER_TAG ?= ci
+DOCKER_TAG ?= 500
 
 .PHONY: help
 help:
@@ -72,7 +72,7 @@ image-push:
 	@echo "--> Push go-runner image" 
 	@echo "------------------------"
 	@echo "Pushing $(DOCKER_REPO)/$(DOCKER_IMAGE):$(DOCKER_TAG)"
-	@docker buildx build . --push --file build/Dockerfile --progress plane --platform linux/arm64,linux/amd64 --no-cache --tag $(DOCKER_REGISTRY)/$(DOCKER_REPO)/$(DOCKER_IMAGE):$(DOCKER_TAG)
+	@docker buildx build . --push --file build/Dockerfile --progress plane --platform linux/arm64,linux/amd64 --tag $(DOCKER_REGISTRY)/$(DOCKER_REPO)/$(DOCKER_IMAGE):$(DOCKER_TAG)
 
 
 .PHONY: build-amd64
