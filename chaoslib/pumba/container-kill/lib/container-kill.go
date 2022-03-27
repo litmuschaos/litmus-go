@@ -66,6 +66,7 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 		events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 	}
 
+	experimentsDetails.IsTargetContainerProvided = (experimentsDetails.TargetContainer != "")
 	switch strings.ToLower(experimentsDetails.Sequence) {
 	case "serial":
 		if err = injectChaosInSerialMode(experimentsDetails, targetPodList, clients, chaosDetails, resultDetails, eventsDetails); err != nil {
@@ -100,7 +101,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 	}
 
 	// creating the helper pod to perform container kill chaos
-	for i, pod := range targetPodList.Items {
+	for _, pod := range targetPodList.Items {
 
 		//GetRestartCount return the restart count of target container
 		restartCountBefore := getRestartCount(pod, experimentsDetails.TargetContainer)
@@ -109,9 +110,8 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		runID := common.GetRunID()
 
 		//Get the target container name of the application pod
-		//It checks the empty target container for the first iteration only
-		if experimentsDetails.TargetContainer == "" && i == 0 {
-			experimentsDetails.TargetContainer, err = common.GetTargetContainer(experimentsDetails.AppNS, targetPodList.Items[0].Name, clients)
+		if !experimentsDetails.IsTargetContainerProvided {
+			experimentsDetails.TargetContainer, err = common.GetTargetContainer(experimentsDetails.AppNS, pod.Name, clients)
 			if err != nil {
 				return errors.Errorf("unable to get the target container name, err: %v", err)
 			}
@@ -175,14 +175,13 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 	}
 
 	// creating the helper pod to perform container kill chaos
-	for i, pod := range targetPodList.Items {
+	for _, pod := range targetPodList.Items {
 
 		runID := common.GetRunID()
 
 		//Get the target container name of the application pod
-		//It checks the empty target container for the first iteration only
-		if experimentsDetails.TargetContainer == "" && i == 0 {
-			experimentsDetails.TargetContainer, err = common.GetTargetContainer(experimentsDetails.AppNS, targetPodList.Items[0].Name, clients)
+		if !experimentsDetails.IsTargetContainerProvided {
+			experimentsDetails.TargetContainer, err = common.GetTargetContainer(experimentsDetails.AppNS, pod.Name, clients)
 			if err != nil {
 				return errors.Errorf("unable to get the target container name, err: %v", err)
 			}

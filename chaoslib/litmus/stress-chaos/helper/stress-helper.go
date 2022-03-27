@@ -114,8 +114,6 @@ func prepareStressChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 			return errors.Errorf("fail to get the cgroup manager, err: %v", err)
 		}
 
-		fmt.Println("******************************************************************************************************")
-
 		// get stressors in list format
 		stressorList := prepareStressor(experimentsDetails)
 		if len(stressorList) == 0 {

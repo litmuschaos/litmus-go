@@ -1,7 +1,6 @@
 package lib
 
 import (
-	"fmt"
 	"strconv"
 	"strings"
 
@@ -53,8 +52,6 @@ func PrepareAndInjectStressChaos(experimentsDetails *experimentTypes.ExperimentD
 			"PodsAffectedPerc":                experimentsDetails.PodsAffectedPerc,
 		})
 	}
-
-	fmt.Println("******************************************************************************************************")
 
 	// Get the target pod details for the chaos execution
 	// if the target pod is not defined it will derive the random target pod list using pod affected percentage
@@ -140,16 +137,12 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 	// creating the helper pod to perform the stress chaos
 	for _, pod := range targetPodList.Items {
 
-		fmt.Println(experimentsDetails.IsTargetContainerProvided)
-
 		//Get the target container name of the application pod
 		if !experimentsDetails.IsTargetContainerProvided {
-			experimentsDetails.TargetContainer, err = common.GetTargetContainer(experimentsDetails.AppNS, targetPodList.Items[0].Name, clients)
+			experimentsDetails.TargetContainer, err = common.GetTargetContainer(experimentsDetails.AppNS, pod.Name, clients)
 			if err != nil {
 				return errors.Errorf("unable to get the target container name, err: %v", err)
 			}
-			fmt.Println("traget container name, " + experimentsDetails.TargetContainer)
-
 		}
 
 		log.InfoWithValues("[Info]: Details of application under chaos injection", logrus.Fields{
@@ -208,7 +201,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 
 		//Get the target container name of the application pod
 		if !experimentsDetails.IsTargetContainerProvided {
-			experimentsDetails.TargetContainer, err = common.GetTargetContainer(experimentsDetails.AppNS, targetPodList.Items[0].Name, clients)
+			experimentsDetails.TargetContainer, err = common.GetTargetContainer(experimentsDetails.AppNS, pod.Name, clients)
 			if err != nil {
 				return errors.Errorf("unable to get the target container name, err: %v", err)
 			}

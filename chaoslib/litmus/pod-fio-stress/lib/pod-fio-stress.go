@@ -103,7 +103,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		}
 		//Get the target container name of the application pod
 		if !experimentsDetails.IsTargetContainerProvided {
-			experimentsDetails.TargetContainer, err = common.GetTargetContainer(experimentsDetails.AppNS, targetPodList.Items[0].Name, clients)
+			experimentsDetails.TargetContainer, err = common.GetTargetContainer(experimentsDetails.AppNS, pod.Name, clients)
 			if err != nil {
 				return errors.Errorf("unable to get the target container name, err: %v", err)
 			}
@@ -182,7 +182,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		}
 		//Get the target container name of the application pod
 		if !experimentsDetails.IsTargetContainerProvided {
-			experimentsDetails.TargetContainer, err = common.GetTargetContainer(experimentsDetails.AppNS, targetPodList.Items[0].Name, clients)
+			experimentsDetails.TargetContainer, err = common.GetTargetContainer(experimentsDetails.AppNS, pod.Name, clients)
 			if err != nil {
 				return errors.Errorf("unable to get the target container name, err: %v", err)
 			}
