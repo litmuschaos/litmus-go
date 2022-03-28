@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/litmuschaos/litmus-go/pkg/log"
 	"google.golang.org/api/compute/v1"
 	"google.golang.org/api/option"
 )
@@ -124,6 +125,8 @@ func GetGCPComputeService() (*compute.Service, error) {
 
 		if doesFileExist("/tmp/" + fileName) {
 
+			log.Info("[Info]: Using the GCP Service Account credentials from the secret")
+
 			// get service account credentials json
 			json, err := getServiceAccountJSONFromSecret()
 			if err != nil {
@@ -139,6 +142,8 @@ func GetGCPComputeService() (*compute.Service, error) {
 			return computeService, nil
 		}
 	}
+
+	log.Info("[Info]: Using the default GCP Service Account credentials from Worflow Identity")
 
 	// create a new GCP Compute Service client using default GCP service account credentials (using Workload Identity)
 	computeService, err := compute.NewService(ctx)
