@@ -54,14 +54,7 @@ func experimentCPU(experimentsDetails *experimentTypes.ExperimentDetails, client
 	}
 	log.Infof("Target pods list for chaos, %v", podNames)
 
-	//Get the target container name of the application pod
-	if experimentsDetails.TargetContainer == "" {
-		experimentsDetails.TargetContainer, err = common.GetTargetContainer(experimentsDetails.AppNS, targetPodList.Items[0].Name, clients)
-		if err != nil {
-			return errors.Errorf("unable to get the target container name, err: %v", err)
-		}
-	}
-
+	experimentsDetails.IsTargetContainerProvided = (experimentsDetails.TargetContainer != "")
 	switch strings.ToLower(experimentsDetails.Sequence) {
 	case "serial":
 		if err = injectChaosInSerialMode(experimentsDetails, targetPodList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
@@ -81,6 +74,7 @@ func experimentCPU(experimentsDetails *experimentTypes.ExperimentDetails, client
 // injectChaosInSerialMode stressed the cpu of all target application serially (one by one)
 func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList corev1.PodList, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
+	var err error
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
 		if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
@@ -111,6 +105,14 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 				msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on " + pod.Name + " pod"
 				types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
 				events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
+			}
+
+			//Get the target container name of the application pod
+			if !experimentsDetails.IsTargetContainerProvided {
+				experimentsDetails.TargetContainer, err = common.GetTargetContainer(experimentsDetails.AppNS, pod.Name, clients)
+				if err != nil {
+					return errors.Errorf("unable to get the target container name, err: %v", err)
+				}
 			}
 
 			log.InfoWithValues("[Chaos]: The Target application details", logrus.Fields{
@@ -172,7 +174,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList corev1.PodList, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 	// creating err channel to receive the error from the go routine
 	stressErr := make(chan error)
-
+	var err error
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
 		if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
@@ -200,6 +202,13 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 				msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on " + pod.Name + " pod"
 				types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
 				events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
+			}
+			//Get the target container name of the application pod
+			if !experimentsDetails.IsTargetContainerProvided {
+				experimentsDetails.TargetContainer, err = common.GetTargetContainer(experimentsDetails.AppNS, pod.Name, clients)
+				if err != nil {
+					return errors.Errorf("unable to get the target container name, err: %v", err)
+				}
 			}
 
 			log.InfoWithValues("[Chaos]: The Target application details", logrus.Fields{
