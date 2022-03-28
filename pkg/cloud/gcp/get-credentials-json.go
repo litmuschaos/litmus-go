@@ -1,9 +1,14 @@
 package gcp
 
 import (
+	"context"
 	"encoding/json"
 	"io/ioutil"
+	"os"
 	"strings"
+
+	"google.golang.org/api/compute/v1"
+	"google.golang.org/api/option"
 )
 
 // GCPServiceAccountCredentials stores the service account credentials
@@ -22,6 +27,7 @@ type GCPServiceAccountCredentials struct {
 
 // getFileContent reads the file content at the given file path
 func getFileContent(filePath string) (string, error) {
+
 	fileContentByteSlice, err := ioutil.ReadFile(filePath)
 	if err != nil {
 		return "", err
@@ -36,8 +42,9 @@ func getFileContent(filePath string) (string, error) {
 	return fileContentString, nil
 }
 
-// GetServiceAccountJSONFromSecret fetches the secrets mounted as volume and returns the json credentials byte slice
-func GetServiceAccountJSONFromSecret() ([]byte, error) {
+// getServiceAccountJSONFromSecret fetches the secrets mounted as volume and returns the json credentials byte slice
+func getServiceAccountJSONFromSecret() ([]byte, error) {
+
 	gcpType, err := getFileContent("/tmp/type")
 	if err != nil {
 		return nil, err
@@ -97,4 +104,47 @@ func GetServiceAccountJSONFromSecret() ([]byte, error) {
 	}
 
 	return byteSliceJSONString, nil
+}
+
+// doesFileExist checks if a file exists or not
+func doesFileExist(fileName string) bool {
+
+	_, err := os.Stat(fileName)
+
+	return os.IsExist(err)
+}
+
+// GetGCPComputeService returns a new compute service created using the GCP Service Account credentials
+func GetGCPComputeService() (*compute.Service, error) {
+
+	// create an empty context
+	ctx := context.Background()
+
+	for _, fileName := range []string{"type", "project_id", "private_key_id", "private_key", "client_email", "client_id", "auth_uri", "token_uri", "auth_provider_x509_cert_url", "client_x509_cert_url"} {
+
+		if doesFileExist("/tmp/" + fileName) {
+
+			// get service account credentials json
+			json, err := getServiceAccountJSONFromSecret()
+			if err != nil {
+				return nil, err
+			}
+
+			// create a new GCP Compute Service client using the GCP service account credentials provided through the secret
+			computeService, err := compute.NewService(ctx, option.WithCredentialsJSON(json))
+			if err != nil {
+				return nil, err
+			}
+
+			return computeService, nil
+		}
+	}
+
+	// create a new GCP Compute Service client using default GCP service account credentials (using Workload Identity)
+	computeService, err := compute.NewService(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return computeService, nil
 }

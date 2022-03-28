@@ -6,7 +6,6 @@ import (
 	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/gcp-vm-disk-loss-by-label/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/cloud/gcp"
-	gcpCommon "github.com/litmuschaos/litmus-go/pkg/cloud/gcp/common"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentEnv "github.com/litmuschaos/litmus-go/pkg/gcp/gcp-vm-disk-loss/environment"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/gcp/gcp-vm-disk-loss/types"
@@ -101,7 +100,7 @@ func GCPVMDiskLossByLabelExperiment(clients clients.ClientSets) {
 	}
 
 	// Create a compute service to access the compute engine resources
-	computeService, err = gcpCommon.GetGCPComputeService()
+	computeService, err = gcp.GetGCPComputeService()
 	if err != nil {
 		log.Errorf("failed to obtain a gcp compute service, err: %v", err)
 		failStep := "[pre-chaos]: Failed to obtain a gcp compute service, err: " + err.Error()
