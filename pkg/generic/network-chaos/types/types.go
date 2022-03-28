@@ -42,4 +42,5 @@ type ExperimentDetails struct {
 	Jitter                             int
 	NetworkChaosType                   string
 	NodeLabel                          string
+	IsTargetContainerProvided          bool
 }
