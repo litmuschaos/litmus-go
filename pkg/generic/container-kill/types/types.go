@@ -34,4 +34,5 @@ type ExperimentDetails struct {
 	Sequence                      string
 	Signal                        string
 	NodeLabel                     string
+	IsTargetContainerProvided     bool
 }
