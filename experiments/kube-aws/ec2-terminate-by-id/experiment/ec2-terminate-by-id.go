@@ -24,6 +24,7 @@ func EC2TerminateByID(clients clients.ClientSets) {
 
 	var err error
 	var activeNodeCount int
+	var autoScalingGroupName string
 	experimentsDetails := experimentTypes.ExperimentDetails{}
 	resultDetails := types.ResultDetails{}
 	eventsDetails := types.EventDetails{}
@@ -74,17 +75,6 @@ func EC2TerminateByID(clients clients.ClientSets) {
 
 	// Calling AbortWatcher go routine, it will continuously watch for the abort signal and generate the required events and result
 	go common.AbortWatcherWithoutExit(experimentsDetails.ExperimentName, clients, &resultDetails, &chaosDetails, &eventsDetails)
-
-	//PRE-CHAOS NODE STATUS CHECK
-	if experimentsDetails.ManagedNodegroup == "enable" {
-		activeNodeCount, err = common.PreChaosNodeStatusCheck(experimentsDetails.Timeout, experimentsDetails.Delay, clients)
-		if err != nil {
-			log.Errorf("Pre chaos node status check failed, err: %v", err)
-			failStep := "[pre-chaos]: Failed to verify that the NUT (Node Under Test) is running (pre-chaos), err: " + err.Error()
-			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-			return
-		}
-	}
 
 	//PRE-CHAOS APPLICATION STATUS CHECK
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (pre-chaos)")
@@ -138,6 +128,17 @@ func EC2TerminateByID(clients clients.ClientSets) {
 	}
 	log.Info("[Status]: EC2 instance is in running state")
 
+	//PRE-CHAOS NODE STATUS CHECK
+	if experimentsDetails.ManagedNodegroup == "enable" {
+		activeNodeCount, autoScalingGroupName, err = aws.PreChaosNodeCountCheck(experimentsDetails.Ec2InstanceID, experimentsDetails.Region)
+		if err != nil {
+			log.Errorf("Pre chaos node status check failed, err: %v", err)
+			failStep := "[pre-chaos]: Failed to verify that the NUT (Node Under Test) is running (pre-chaos), err: " + err.Error()
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+			return
+		}
+	}
+
 	// Including the litmus lib for ec2-terminate
 	switch experimentsDetails.ChaosLib {
 	case "litmus":
@@ -159,7 +160,7 @@ func EC2TerminateByID(clients clients.ClientSets) {
 
 	// POST-CHAOS ACTIVE NODE COUNT TEST
 	if experimentsDetails.ManagedNodegroup == "enable" {
-		if err = common.PostChaosActiveNodeCountCheck(activeNodeCount, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
+		if err := aws.PostChaosNodeCountCheck(activeNodeCount, autoScalingGroupName, experimentsDetails.Region); err != nil {
 			log.Errorf("Post chaos active node count check failed, err: %v", err)
 			failStep := "[post-chaos]: Failed to verify the active number of nodes, err: " + err.Error()
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)

@@ -3,6 +3,7 @@ package aws
 import (
 	"strings"
 
+	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/litmuschaos/litmus-go/pkg/cloud/aws/common"
 	"github.com/litmuschaos/litmus-go/pkg/log"
@@ -73,4 +74,105 @@ func InstanceStatusCheck(targetInstanceIDList []string, region string) error {
 		}
 	}
 	return nil
+}
+
+// PreChaosNodeCountCheck returns the active node count before injection of chaos
+func PreChaosNodeCountCheck(instanceID, region string) (int, string, error) {
+
+	var autoScalingGroupName string
+	var nodeList []*autoscaling.InstanceDetails
+	var err error
+	instanceIDList := strings.Split(instanceID, ",")
+
+	// fetching all instances in the autoscaling groups
+	if nodeList, err = getAutoScalingInstances(region); err != nil {
+		return 0, "", err
+	}
+
+	// finding the autoscaling group name for the provided instance id
+	if autoScalingGroupName = findAutoScalingGroupName(instanceIDList[0], nodeList); autoScalingGroupName == "" {
+		return 0, "", errors.Errorf("instances not part of autoscaling group")
+	}
+
+	// finding the active node count for the autoscaling group
+	nodeCount := findActiveNodeCount(autoScalingGroupName, region, nodeList)
+	log.Infof("[Info]: Pre-Chaos Active Node Count: %v", nodeCount)
+
+	return nodeCount, autoScalingGroupName, nil
+}
+
+// PostChaosNodeCountCheck checks if the active node count after injection of chaos is equal to pre-chaos node count
+func PostChaosNodeCountCheck(activeNodeCount int, autoScalingGroupName, region string) error {
+
+	var nodeList []*autoscaling.InstanceDetails
+	var err error
+
+	// fetching all instances in the autoscaling groups
+	if nodeList, err = getAutoScalingInstances(region); err != nil {
+		return err
+	}
+	if autoScalingGroupName == "" {
+		return errors.Errorf("autoscaling group not provided")
+	}
+
+	// finding the active node count for the autoscaling group
+	nodeCount := findActiveNodeCount(autoScalingGroupName, region, nodeList)
+	log.Infof("[Info]: Post-Chaos Active Node Count: %v", nodeCount)
+
+	// checking if the post-chaos and pre-chaos node count are equal
+	if nodeCount != activeNodeCount {
+		return errors.Errorf("post-chaos active node count is not equal to the pre-chaos node count")
+	}
+	return nil
+}
+
+// getAutoScalingInstances fetches the list of instances in the autoscaling groups
+func getAutoScalingInstances(region string) ([]*autoscaling.InstanceDetails, error) {
+
+	sess := common.GetAWSSession(region)
+	autoScalingSvc := autoscaling.New(sess)
+
+	autoScalingInput := autoscaling.DescribeAutoScalingInstancesInput{}
+	nodeList, err := autoScalingSvc.DescribeAutoScalingInstances(&autoScalingInput)
+	if err != nil {
+		return nil, errors.Errorf("failed to get the autoscaling instances, err: %v", err)
+	}
+	return nodeList.AutoScalingInstances, nil
+}
+
+// findInstancesInAutoScalingGroup returns the list of instances in the provided autoscaling group
+func findInstancesInAutoScalingGroup(autoScalingGroupName string, nodeList []*autoscaling.InstanceDetails) []string {
+
+	var instanceIDList []string
+	for _, node := range nodeList {
+		if *node.AutoScalingGroupName == autoScalingGroupName {
+			instanceIDList = append(instanceIDList, *node.InstanceId)
+		}
+	}
+	return instanceIDList
+}
+
+// findAutoScalingGroupName returns the autoscaling group name for the provided instance id
+func findAutoScalingGroupName(instanceID string, nodeList []*autoscaling.InstanceDetails) string {
+	for _, node := range nodeList {
+		if *node.InstanceId == instanceID {
+			return *node.AutoScalingGroupName
+		}
+	}
+	return ""
+}
+
+// findActiveNodeCount returns the active node count for the provided autoscaling group
+func findActiveNodeCount(autoScalingGroupName, region string, nodeList []*autoscaling.InstanceDetails) int {
+
+	var nodeCount int
+	presentInstanceIDList := findInstancesInAutoScalingGroup(autoScalingGroupName, nodeList)
+
+	for _, id := range presentInstanceIDList {
+		instanceState, err := GetEC2InstanceStatus(id, region)
+		if err == nil && instanceState == "running" {
+			nodeCount += 1
+		}
+	}
+	return nodeCount
 }
