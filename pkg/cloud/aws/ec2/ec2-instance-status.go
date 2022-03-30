@@ -77,13 +77,11 @@ func InstanceStatusCheck(targetInstanceIDList []string, region string) error {
 }
 
 // PreChaosNodeCountCheck returns the active node count before injection of chaos
-func PreChaosNodeCountCheck(instanceID, region string) (int, string, error) {
+func PreChaosNodeCountCheck(instanceIDList []string, region string) (int, string, error) {
 
 	var autoScalingGroupName string
 	var nodeList []*autoscaling.InstanceDetails
 	var err error
-	instanceIDList := strings.Split(instanceID, ",")
-
 	// fetching all instances in the autoscaling groups
 	if nodeList, err = getAutoScalingInstances(region); err != nil {
 		return 0, "", err

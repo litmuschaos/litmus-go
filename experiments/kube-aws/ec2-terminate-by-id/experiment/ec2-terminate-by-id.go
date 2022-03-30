@@ -2,6 +2,7 @@ package experiment
 
 import (
 	"os"
+	"strings"
 
 	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
 	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/ec2-terminate-by-id/lib"
@@ -22,9 +23,11 @@ import (
 // EC2TerminateByID inject the ebs volume loss chaos
 func EC2TerminateByID(clients clients.ClientSets) {
 
-	var err error
-	var activeNodeCount int
-	var autoScalingGroupName string
+	var (
+		err                  error
+		activeNodeCount      int
+		autoScalingGroupName string
+	)
 	experimentsDetails := experimentTypes.ExperimentDetails{}
 	resultDetails := types.ResultDetails{}
 	eventsDetails := types.EventDetails{}
@@ -130,7 +133,7 @@ func EC2TerminateByID(clients clients.ClientSets) {
 
 	//PRE-CHAOS NODE STATUS CHECK
 	if experimentsDetails.ManagedNodegroup == "enable" {
-		activeNodeCount, autoScalingGroupName, err = aws.PreChaosNodeCountCheck(experimentsDetails.Ec2InstanceID, experimentsDetails.Region)
+		activeNodeCount, autoScalingGroupName, err = aws.PreChaosNodeCountCheck(strings.Split(experimentsDetails.Ec2InstanceID, ","), experimentsDetails.Region)
 		if err != nil {
 			log.Errorf("Pre chaos node status check failed, err: %v", err)
 			failStep := "[pre-chaos]: Failed to verify that the NUT (Node Under Test) is running (pre-chaos), err: " + err.Error()
