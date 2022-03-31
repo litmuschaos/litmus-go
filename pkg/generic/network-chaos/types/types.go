@@ -21,17 +21,17 @@ type ExperimentDetails struct {
 	ChaosNamespace                     string
 	ChaosPodName                       string
 	RunID                              string
-	NetworkPacketDuplicationPercentage int
+	NetworkPacketDuplicationPercentage string
 	NetworkInterface                   string
 	TargetContainer                    string
 	NetworkLatency                     int
-	NetworkPacketLossPercentage        int
-	NetworkPacketCorruptionPercentage  int
+	NetworkPacketLossPercentage        string
+	NetworkPacketCorruptionPercentage  string
 	TCImage                            string
 	Timeout                            int
 	Delay                              int
 	TargetPods                         string
-	PodsAffectedPerc                   int
+	PodsAffectedPerc                   string
 	DestinationIPs                     string
 	DestinationHosts                   string
 	ContainerRuntime                   string
@@ -40,4 +40,7 @@ type ExperimentDetails struct {
 	Sequence                           string
 	TerminationGracePeriodSeconds      int
 	Jitter                             int
+	NetworkChaosType                   string
+	NodeLabel                          string
+	IsTargetContainerProvided          bool
 }

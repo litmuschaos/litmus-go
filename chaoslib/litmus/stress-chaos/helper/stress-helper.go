@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/containerd/cgroups"
+	cgroupsv2 "github.com/containerd/cgroups/v2"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/stress-chaos/types"
@@ -108,17 +109,9 @@ func prepareStressChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 		}
 
-		//get the pid path and check cgroup
-		path := pidPath(targetPID)
-		cgroup, err := findValidCgroup(path, containerID)
+		cgroupManager, err := getCGroupManager(int(targetPID), containerID)
 		if err != nil {
-			return errors.Errorf("fail to get cgroup, err: %v", err)
-		}
-
-		// load the existing cgroup
-		control, err := cgroups.Load(cgroups.V1, cgroups.StaticPath(cgroup))
-		if err != nil {
-			return errors.Errorf("fail to load the cgroup, err: %v", err)
+			return errors.Errorf("fail to get the cgroup manager, err: %v", err)
 		}
 
 		// get stressors in list format
@@ -143,7 +136,7 @@ func prepareStressChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 		go abortWatcher(cmd.Process.Pid, resultDetails.Name, chaosDetails.ChaosNamespace, experimentsDetails.TargetPods)
 
 		// add the stress process to the cgroup of target container
-		if err = control.Add(cgroups.Process{Pid: cmd.Process.Pid}); err != nil {
+		if err = addProcessToCgroup(cmd.Process.Pid, cgroupManager); err != nil {
 			if killErr := cmd.Process.Kill(); killErr != nil {
 				return errors.Errorf("stressors failed killing %v process, err: %v", cmd.Process.Pid, killErr)
 			}
@@ -235,10 +228,11 @@ func prepareStressor(experimentDetails *experimentTypes.ExperimentDetails) []str
 
 		log.InfoWithValues("[Info]: Details of Stressor:", logrus.Fields{
 			"CPU Core": experimentDetails.CPUcores,
+			"CPU Load": experimentDetails.CPULoad,
 			"Timeout":  experimentDetails.ChaosDuration,
 		})
-		stressArgs = append(stressArgs, "--cpu "+strconv.Itoa(experimentDetails.CPUcores))
-		stressArgs = append(stressArgs, " --cpu-load "+strconv.Itoa(experimentDetails.CPULoad))
+		stressArgs = append(stressArgs, "--cpu "+experimentDetails.CPUcores)
+		stressArgs = append(stressArgs, " --cpu-load "+experimentDetails.CPULoad)
 
 	case "pod-memory-stress":
 
@@ -247,22 +241,22 @@ func prepareStressor(experimentDetails *experimentTypes.ExperimentDetails) []str
 			"Memory Consumption": experimentDetails.MemoryConsumption,
 			"Timeout":            experimentDetails.ChaosDuration,
 		})
-		stressArgs = append(stressArgs, "--vm "+strconv.Itoa(experimentDetails.NumberOfWorkers)+" --vm-bytes "+strconv.Itoa(experimentDetails.MemoryConsumption)+"M")
+		stressArgs = append(stressArgs, "--vm "+experimentDetails.NumberOfWorkers+" --vm-bytes "+experimentDetails.MemoryConsumption+"M")
 
 	case "pod-io-stress":
 		var hddbytes string
-		if experimentDetails.FilesystemUtilizationBytes == 0 {
-			if experimentDetails.FilesystemUtilizationPercentage == 0 {
+		if experimentDetails.FilesystemUtilizationBytes == "0" {
+			if experimentDetails.FilesystemUtilizationPercentage == "0" {
 				hddbytes = "10%"
 				log.Info("Neither of FilesystemUtilizationPercentage or FilesystemUtilizationBytes provided, proceeding with a default FilesystemUtilizationPercentage value of 10%")
 			} else {
-				hddbytes = strconv.Itoa(experimentDetails.FilesystemUtilizationPercentage) + "%"
+				hddbytes = experimentDetails.FilesystemUtilizationPercentage + "%"
 			}
 		} else {
-			if experimentDetails.FilesystemUtilizationPercentage == 0 {
-				hddbytes = strconv.Itoa(experimentDetails.FilesystemUtilizationBytes) + "G"
+			if experimentDetails.FilesystemUtilizationPercentage == "0" {
+				hddbytes = experimentDetails.FilesystemUtilizationBytes + "G"
 			} else {
-				hddbytes = strconv.Itoa(experimentDetails.FilesystemUtilizationPercentage) + "%"
+				hddbytes = experimentDetails.FilesystemUtilizationPercentage + "%"
 				log.Warn("Both FsUtilPercentage & FsUtilBytes provided as inputs, using the FsUtilPercentage value to proceed with stress exp")
 			}
 		}
@@ -274,12 +268,12 @@ func prepareStressor(experimentDetails *experimentTypes.ExperimentDetails) []str
 			"Volume Mount Path": experimentDetails.VolumeMountPath,
 		})
 		if experimentDetails.VolumeMountPath == "" {
-			stressArgs = append(stressArgs, "--io "+strconv.Itoa(experimentDetails.NumberOfWorkers)+" --hdd "+strconv.Itoa(experimentDetails.NumberOfWorkers)+" --hdd-bytes "+hddbytes)
+			stressArgs = append(stressArgs, "--io "+experimentDetails.NumberOfWorkers+" --hdd "+experimentDetails.NumberOfWorkers+" --hdd-bytes "+hddbytes)
 		} else {
-			stressArgs = append(stressArgs, "--io "+strconv.Itoa(experimentDetails.NumberOfWorkers)+" --hdd "+strconv.Itoa(experimentDetails.NumberOfWorkers)+" --hdd-bytes "+hddbytes+" --temp-path "+experimentDetails.VolumeMountPath)
+			stressArgs = append(stressArgs, "--io "+experimentDetails.NumberOfWorkers+" --hdd "+experimentDetails.NumberOfWorkers+" --hdd-bytes "+hddbytes+" --temp-path "+experimentDetails.VolumeMountPath)
 		}
-		if experimentDetails.CPUcores != 0 {
-			stressArgs = append(stressArgs, "--cpu %v", strconv.Itoa(experimentDetails.CPUcores))
+		if experimentDetails.CPUcores != "0" {
+			stressArgs = append(stressArgs, "--cpu %v", experimentDetails.CPUcores)
 		}
 
 	default:
@@ -510,12 +504,12 @@ func getENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.ChaosPodName = types.Getenv("POD_NAME", "")
 	experimentDetails.ContainerRuntime = types.Getenv("CONTAINER_RUNTIME", "")
 	experimentDetails.SocketPath = types.Getenv("SOCKET_PATH", "")
-	experimentDetails.CPUcores, _ = strconv.Atoi(types.Getenv("CPU_CORES", ""))
-	experimentDetails.CPULoad, _ = strconv.Atoi(types.Getenv("CPU_LOAD", ""))
-	experimentDetails.FilesystemUtilizationPercentage, _ = strconv.Atoi(types.Getenv("FILESYSTEM_UTILIZATION_PERCENTAGE", ""))
-	experimentDetails.FilesystemUtilizationBytes, _ = strconv.Atoi(types.Getenv("FILESYSTEM_UTILIZATION_BYTES", ""))
-	experimentDetails.NumberOfWorkers, _ = strconv.Atoi(types.Getenv("NUMBER_OF_WORKERS", ""))
-	experimentDetails.MemoryConsumption, _ = strconv.Atoi(types.Getenv("MEMORY_CONSUMPTION", ""))
+	experimentDetails.CPUcores = types.Getenv("CPU_CORES", "")
+	experimentDetails.CPULoad = types.Getenv("CPU_LOAD", "")
+	experimentDetails.FilesystemUtilizationPercentage = types.Getenv("FILESYSTEM_UTILIZATION_PERCENTAGE", "")
+	experimentDetails.FilesystemUtilizationBytes = types.Getenv("FILESYSTEM_UTILIZATION_BYTES", "")
+	experimentDetails.NumberOfWorkers = types.Getenv("NUMBER_OF_WORKERS", "")
+	experimentDetails.MemoryConsumption = types.Getenv("MEMORY_CONSUMPTION", "")
 	experimentDetails.VolumeMountPath = types.Getenv("VOLUME_MOUNT_PATH", "")
 	experimentDetails.StressType = types.Getenv("STRESS_TYPE", "")
 }
@@ -541,4 +535,42 @@ func abortWatcher(targetPID int, resultName, chaosNS, targetPodName string) {
 	}
 	log.Info("[Abort]: Chaos Revert Completed")
 	os.Exit(1)
+}
+
+// getCGroupManager will return the cgroup for the given pid of the process
+func getCGroupManager(pid int, containerID string) (interface{}, error) {
+	if cgroups.Mode() == cgroups.Unified {
+		groupPath, err := cgroupsv2.PidGroupPath(pid)
+		if err != nil {
+			return nil, errors.Errorf("Error in getting groupPath, %v", err)
+		}
+
+		cgroup2, err := cgroupsv2.LoadManager("/sys/fs/cgroup", groupPath)
+		if err != nil {
+			return nil, errors.Errorf("Error loading cgroup v2 manager, %v", err)
+		}
+		return cgroup2, nil
+	}
+	path := pidPath(pid)
+	cgroup, err := findValidCgroup(path, containerID)
+	if err != nil {
+		return nil, errors.Errorf("fail to get cgroup, err: %v", err)
+	}
+	cgroup1, err := cgroups.Load(cgroups.V1, cgroups.StaticPath(cgroup))
+	if err != nil {
+		return nil, errors.Errorf("fail to load the cgroup, err: %v", err)
+	}
+
+	return cgroup1, nil
+}
+
+// addProcessToCgroup will add the process to cgroup
+// By default it will add to v1 cgroup
+func addProcessToCgroup(pid int, control interface{}) error {
+	if cgroups.Mode() == cgroups.Unified {
+		var cgroup1 = control.(*cgroupsv2.Manager)
+		return cgroup1.AddProc(uint64(pid))
+	}
+	var cgroup1 = control.(cgroups.Cgroup)
+	return cgroup1.Add(cgroups.Process{Pid: pid})
 }
