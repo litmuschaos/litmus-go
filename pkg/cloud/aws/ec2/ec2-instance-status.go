@@ -163,12 +163,10 @@ func findAutoScalingGroupName(instanceID string, nodeList []*autoscaling.Instanc
 // findActiveNodeCount returns the active node count for the provided autoscaling group
 func findActiveNodeCount(autoScalingGroupName, region string, nodeList []*autoscaling.InstanceDetails) int {
 
-	var nodeCount int
-	presentInstanceIDList := findInstancesInAutoScalingGroup(autoScalingGroupName, nodeList)
+	nodeCount := 0
 
-	for _, id := range presentInstanceIDList {
-		instanceState, err := GetEC2InstanceStatus(id, region)
-		if err == nil && instanceState == "running" {
+	for _, id := range findInstancesInAutoScalingGroup(autoScalingGroupName, nodeList) {
+		if instanceState, err := GetEC2InstanceStatus(id, region); err == nil && instanceState == "running" {
 			nodeCount += 1
 		}
 	}

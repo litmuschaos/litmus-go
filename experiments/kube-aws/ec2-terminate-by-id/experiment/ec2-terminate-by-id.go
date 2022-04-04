@@ -123,6 +123,7 @@ func EC2TerminateByID(clients clients.ClientSets) {
 	}
 
 	//Verify the aws ec2 instance is running (pre chaos)
+	log.Info("[Status]: Verify that the aws ec2 instances are in running state (pre-chaos)")
 	if err = aws.InstanceStatusCheckByID(experimentsDetails.Ec2InstanceID, experimentsDetails.Region); err != nil {
 		log.Errorf("failed to get the ec2 instance status, err: %v", err)
 		failStep := "[pre-chaos]: Failed to verify the AWS ec2 instance status, err: " + err.Error()
@@ -133,6 +134,7 @@ func EC2TerminateByID(clients clients.ClientSets) {
 
 	//PRE-CHAOS NODE STATUS CHECK
 	if experimentsDetails.ManagedNodegroup == "enable" {
+		log.Info("[Status]: Counting number of active nodes in the node group (pre-chaos)")
 		activeNodeCount, autoScalingGroupName, err = aws.PreChaosNodeCountCheck(strings.Split(experimentsDetails.Ec2InstanceID, ","), experimentsDetails.Region)
 		if err != nil {
 			log.Errorf("Pre chaos node status check failed, err: %v", err)
@@ -163,6 +165,7 @@ func EC2TerminateByID(clients clients.ClientSets) {
 
 	// POST-CHAOS ACTIVE NODE COUNT TEST
 	if experimentsDetails.ManagedNodegroup == "enable" {
+		log.Info("[Status]: Counting and verifying number of active nodes in the node group (post-chaos)")
 		if err := aws.PostChaosNodeCountCheck(activeNodeCount, autoScalingGroupName, experimentsDetails.Region); err != nil {
 			log.Errorf("Post chaos active node count check failed, err: %v", err)
 			failStep := "[post-chaos]: Failed to verify the active number of nodes, err: " + err.Error()
@@ -173,6 +176,7 @@ func EC2TerminateByID(clients clients.ClientSets) {
 
 	//Verify the aws ec2 instance is running (post chaos)
 	if experimentsDetails.ManagedNodegroup != "enable" {
+		log.Info("[Status]: Verify that the aws ec2 instances are in running state (post-chaos)")
 		if err = aws.InstanceStatusCheckByID(experimentsDetails.Ec2InstanceID, experimentsDetails.Region); err != nil {
 			log.Errorf("failed to get the ec2 instance status, err: %v", err)
 			failStep := "[post-chaos]: Failed to verify the AWS ec2 instance status, err: " + err.Error()
