@@ -35,14 +35,14 @@ func InstanceStatusCheckByName(computeService *compute.Service, managedInstanceG
 	}
 
 	if len(instanceNamesList) == 0 {
-		return errors.Errorf("no instance name found to stop")
+		return errors.Errorf("no vm instance name found to stop")
 	}
 
 	if len(instanceNamesList) != len(instanceZonesList) {
-		return errors.Errorf("the number of instance names and the number of regions is not equal")
+		return errors.Errorf("the number of vm instance names and the number of regions is not equal")
 	}
 
-	log.Infof("[Info]: The instances under chaos (IUC) are: %v", instanceNamesList)
+	log.Infof("[Info]: The vm instances under chaos (IUC) are: %v", instanceNamesList)
 
 	if check == "pre-chaos" {
 		return InstanceStatusCheckPreChaos(computeService, instanceNamesList, gcpProjectId, instanceZonesList)

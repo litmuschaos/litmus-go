@@ -47,27 +47,34 @@ func VMInstanceStart(computeService *compute.Service, instanceName string, gcpPr
 
 // WaitForVMInstanceDown will wait for the VM instance to attain the TERMINATED status
 func WaitForVMInstanceDown(computeService *compute.Service, timeout int, delay int, instanceName string, gcpProjectID string, instanceZone string) error {
+
 	log.Info("[Status]: Checking VM instance status")
+
 	return retry.
 		Times(uint(timeout / delay)).
 		Wait(time.Duration(delay) * time.Second).
 		Try(func(attempt uint) error {
+
 			instanceState, err := GetVMInstanceStatus(computeService, instanceName, gcpProjectID, instanceZone)
 			if err != nil {
-				return errors.Errorf("failed to get the %s instance status", instanceName)
+				return errors.Errorf("failed to get the %s vm instance status", instanceName)
 			}
+
+			log.Infof("The %s vm instance state is %v", instanceName, instanceState)
+
 			if instanceState != "TERMINATED" {
-				log.Infof("The %s instance state is %v", instanceName, instanceState)
-				return errors.Errorf("%s instance is not yet in stopped state", instanceName)
+				return errors.Errorf("%s vm instance is not yet in stopped state", instanceName)
 			}
-			log.Infof("The %s instance state is %v", instanceName, instanceState)
+
 			return nil
 		})
 }
 
 // WaitForVMInstanceUp will wait for the VM instance to attain the RUNNING status
 func WaitForVMInstanceUp(computeService *compute.Service, timeout int, delay int, instanceName string, gcpProjectID string, instanceZone string) error {
+
 	log.Info("[Status]: Checking VM instance status")
+
 	return retry.
 		Times(uint(timeout / delay)).
 		Wait(time.Duration(delay) * time.Second).
@@ -75,13 +82,15 @@ func WaitForVMInstanceUp(computeService *compute.Service, timeout int, delay int
 
 			instanceState, err := GetVMInstanceStatus(computeService, instanceName, gcpProjectID, instanceZone)
 			if err != nil {
-				return errors.Errorf("failed to get the %s instance status", instanceName)
+				return errors.Errorf("failed to get the %s vm instance status", instanceName)
 			}
+
+			log.Infof("The %s vm instance state is %v", instanceName, instanceState)
+
 			if instanceState != "RUNNING" {
-				log.Infof("The %s instance state is %v", instanceName, instanceState)
-				return errors.Errorf("%s instance is not yet in running state", instanceName)
+				return errors.Errorf("%s vm instance is not yet in running state", instanceName)
 			}
-			log.Infof("The %s instance state is %v", instanceName, instanceState)
+
 			return nil
 		})
 }

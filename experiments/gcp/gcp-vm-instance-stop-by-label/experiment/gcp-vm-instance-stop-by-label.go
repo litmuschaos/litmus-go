@@ -68,7 +68,7 @@ func GCPVMInstanceStopByLabel(clients clients.ClientSets) {
 	events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosResult")
 
 	//DISPLAY THE INSTANCE INFORMATION
-	log.InfoWithValues("The instance information is as follows", logrus.Fields{
+	log.InfoWithValues("The vm instance information is as follows", logrus.Fields{
 		"Instance Label":               experimentsDetails.InstanceLabel,
 		"Instance Affected Percentage": experimentsDetails.InstanceAffectedPerc,
 		"Zone":                         experimentsDetails.InstanceZone,

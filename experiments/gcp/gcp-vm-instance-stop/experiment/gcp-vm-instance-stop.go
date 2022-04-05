@@ -71,7 +71,7 @@ func VMInstanceStop(clients clients.ClientSets) {
 	go common.AbortWatcherWithoutExit(experimentsDetails.ExperimentName, clients, &resultDetails, &chaosDetails, &eventsDetails)
 
 	//DISPLAY THE INSTANCE INFORMATION
-	log.InfoWithValues("The instance information is as follows", logrus.Fields{
+	log.InfoWithValues("The vm instance information is as follows", logrus.Fields{
 		"Instance Names": experimentsDetails.VMInstanceName,
 		"Zones":          experimentsDetails.InstanceZone,
 		"Sequence":       experimentsDetails.Sequence,
