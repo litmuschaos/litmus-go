@@ -371,10 +371,10 @@ func GetContainerID(appNamespace, targetPod, targetContainer string, clients cli
 }
 
 // CheckContainerStatus checks the status of the application container
-func CheckContainerStatus(appNamespace, appName string, clients clients.ClientSets) error {
+func CheckContainerStatus(appNamespace, appName string, timeout, delay int, clients clients.ClientSets) error {
 	return retry.
-		Times(90).
-		Wait(2 * time.Second).
+		Times(uint(timeout / delay)).
+		Wait(time.Duration(delay) * time.Second).
 		Try(func(attempt uint) error {
 			pod, err := clients.KubeClient.CoreV1().Pods(appNamespace).Get(appName, v1.GetOptions{})
 			if err != nil {
