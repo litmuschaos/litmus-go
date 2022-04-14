@@ -1,16 +1,15 @@
 package experiment
 
 import (
-	"net/http"
 	"os"
 
-	"github.com/gorilla/websocket"
 	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
 	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/process-kill/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
-	"github.com/litmuschaos/litmus-go/pkg/cloud/process"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	"github.com/litmuschaos/litmus-go/pkg/log"
+	"github.com/litmuschaos/litmus-go/pkg/machine/common/connections"
+	"github.com/litmuschaos/litmus-go/pkg/machine/process"
 	experimentEnv "github.com/litmuschaos/litmus-go/pkg/os/process-kill/environment"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/os/process-kill/types"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
@@ -20,6 +19,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// var err error
+
 // ProcessKill contains steps to inject chaos
 func ProcessKill(clients clients.ClientSets) {
 
@@ -27,8 +28,6 @@ func ProcessKill(clients clients.ClientSets) {
 	resultDetails := types.ResultDetails{}
 	eventsDetails := types.EventDetails{}
 	chaosDetails := types.ChaosDetails{}
-
-	var err error
 
 	//Fetching all the ENV passed from the runner pod
 	log.Infof("[PreReq]: Getting the ENV for the %v experiment", os.Getenv("EXPERIMENT_NAME"))
@@ -74,20 +73,17 @@ func ProcessKill(clients clients.ClientSets) {
 	})
 
 	// Connect to the agent
-	log.Infof("[Status]: Connecting to the agent")
-	chaosDetails.WebsocketConnection, _, err = websocket.DefaultDialer.Dial("ws://"+experimentsDetails.AgentEndpoint+"/process-kill", http.Header{"Authorization": []string{"Bearer " + experimentsDetails.AuthToken}})
-	if err != nil {
-		log.Errorf("Error occured while connecting to the agent, err: %v", err)
+	log.Infof("[Status]: Connecting to the agents")
+	if err := connections.CreateWebsocketConnections(experimentsDetails.AgentEndpoint, experimentsDetails.AuthToken, false, &chaosDetails); err != nil {
+		log.Errorf("Error occured while connecting to the agents, err: %v", err)
 		failStep := "[pre-chaos]: Failed to connect to the agent, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
 
-	defer chaosDetails.WebsocketConnection.Close()
-
 	//Target process state check
 	log.Info("[Status]: Verify that the target processes are running")
-	if err := process.ProcessStateCheck(chaosDetails.WebsocketConnection, experimentsDetails.ProcessIds); err != nil {
+	if err := process.ProcessStateCheck(chaosDetails.WebsocketConnections[0], experimentsDetails.ProcessIds); err != nil {
 		log.Errorf("Error occured during process steady-state validation, err: %v", err)
 		failStep := "[pre-chaos]: Failed to verify the target process status, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
@@ -157,6 +153,15 @@ func ProcessKill(clients clients.ClientSets) {
 		// generating post chaos event
 		types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, msg, "Normal", &chaosDetails)
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
+	}
+
+	//Disconnect the agents
+	log.Infof("[Status]: Disconnecting the agents")
+	if err := connections.CloseWebsocketConnections(chaosDetails.WebsocketConnections); err != nil {
+		log.Errorf("Error occured while disconnecting the agents, err: %v", err)
+		failStep := "[pre-chaos]: Failed to disconnect from the agent, err: " + err.Error()
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+		return
 	}
 
 	//Updating the chaosResult in the end of experiment

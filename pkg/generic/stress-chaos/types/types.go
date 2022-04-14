@@ -33,6 +33,7 @@ type ExperimentDetails struct {
 	Sequence                        string
 	TerminationGracePeriodSeconds   int
 	CPUcores                        int
+	CPULoad                         int
 	FilesystemUtilizationPercentage int
 	FilesystemUtilizationBytes      int
 	NumberOfWorkers                 int

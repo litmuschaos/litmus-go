@@ -8,7 +8,7 @@ import (
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	"github.com/litmuschaos/litmus-go/pkg/log"
-	messages "github.com/litmuschaos/litmus-go/pkg/machine/common"
+	"github.com/litmuschaos/litmus-go/pkg/machine/common/messages"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/os/process-kill/types"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/types"
@@ -25,14 +25,9 @@ func PrepareProcessKillChaos(experimentsDetails *experimentTypes.ExperimentDetai
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 
-	processIdList := strings.Split(experimentsDetails.ProcessIds, ",")
-	if len(processIdList) == 0 {
-		return errors.Errorf("no process ID provided, please provide a process id")
-	}
-
 	var pids []int
 
-	for _, pid := range processIdList {
+	for _, pid := range strings.Split(experimentsDetails.ProcessIds, ",") {
 
 		p, err := strconv.Atoi(pid)
 		if err != nil {
@@ -84,17 +79,15 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		// kill the processes
 		for i, pid := range pids {
 
+			timeDuration := 60 * time.Second
+
 			log.Infof("[Chaos]: Killing %d process", pid)
-			if err := messages.SendMessageToAgent(chaosDetails.WebsocketConnection, "EXECUTE_EXPERIMENT", []int{pid}); err != nil {
+			feedback, payload, err := messages.SendMessageToAgent(chaosDetails.WebsocketConnections[0], "EXECUTE_EXPERIMENT", []int{pid}, &timeDuration)
+			if err != nil {
 				return errors.Errorf("failed to send message to agent, err: %v", err)
 			}
 
 			common.SetTargets(strconv.Itoa(pid), "injected", "Process", chaosDetails)
-
-			feedback, payload, err := messages.ListenForAgentMessage(chaosDetails.WebsocketConnection)
-			if err != nil {
-				return errors.Errorf("error during reception of message from agent, err: %v", err)
-			}
 
 			// ACTION_SUCCESSFUL feedback is received only if the process is killed successfully
 			if feedback != "ACTION_SUCCESSFUL" {
@@ -123,7 +116,9 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 
 			// wait for the chaos interval
 			log.Infof("[Wait]: Waiting for chaos interval of %vs", experimentsDetails.ChaosInterval)
-			common.WaitForDuration(experimentsDetails.ChaosInterval)
+			if err := common.WaitForDurationAndCheckLiveness(chaosDetails.WebsocketConnections, []string{experimentsDetails.AgentEndpoint}, experimentsDetails.ChaosInterval, nil, nil); err != nil {
+				return errors.Errorf("error occured during liveness check, err: %v", err)
+			}
 		}
 
 		duration = int(time.Since(ChaosStartTimeStamp).Seconds())
@@ -149,19 +144,17 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 		}
 
+		timeDuration := 60 * time.Second
+
 		// kill the processes
 		log.Infof("[Chaos]: Killing %v processes", pids)
-		if err := messages.SendMessageToAgent(chaosDetails.WebsocketConnection, "EXECUTE_EXPERIMENT", pids); err != nil {
+		feedback, payload, err := messages.SendMessageToAgent(chaosDetails.WebsocketConnections[0], "EXECUTE_EXPERIMENT", pids, &timeDuration)
+		if err != nil {
 			return errors.Errorf("failed to send message to agent, err: %v", err)
 		}
 
 		for _, pid := range pids {
 			common.SetTargets(strconv.Itoa(pid), "injected", "Process", chaosDetails)
-		}
-
-		feedback, payload, err := messages.ListenForAgentMessage(chaosDetails.WebsocketConnection)
-		if err != nil {
-			return errors.Errorf("error during reception of message from agent, err: %v", err)
 		}
 
 		// ACTION_SUCCESSFUL feedback is received only if all the processes are killed successfully
@@ -188,9 +181,11 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 			}
 		}
 
-		// wait for chaos interval
+		// wait for the chaos interval
 		log.Infof("[Wait]: Waiting for chaos interval of %vs", experimentsDetails.ChaosInterval)
-		common.WaitForDuration(experimentsDetails.ChaosInterval)
+		if err := common.WaitForDurationAndCheckLiveness(chaosDetails.WebsocketConnections, []string{experimentsDetails.AgentEndpoint}, experimentsDetails.ChaosInterval, nil, nil); err != nil {
+			return errors.Errorf("error occured during liveness check, err: %v", err)
+		}
 
 		duration = int(time.Since(ChaosStartTimeStamp).Seconds())
 	}

@@ -6,12 +6,15 @@ import (
 	"os/signal"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
+	"github.com/gorilla/websocket"
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	"github.com/litmuschaos/litmus-go/pkg/log"
+	"github.com/litmuschaos/litmus-go/pkg/machine/common/messages"
 	"github.com/litmuschaos/litmus-go/pkg/math"
 	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/types"
@@ -27,6 +30,58 @@ type ENVDetails struct {
 //WaitForDuration waits for the given time duration (in seconds)
 func WaitForDuration(duration int) {
 	time.Sleep(time.Duration(duration) * time.Second)
+}
+
+// WaitForDurationAndCheckLiveness waits for a given chaos interval while validating a liveness criteria at certain intervals
+func WaitForDurationAndCheckLiveness(connections []*websocket.Conn, agentEndpointList []string, chaosInterval int, abort chan os.Signal, chaosRevert *sync.WaitGroup) error {
+
+	writeWait := time.Duration(10 * time.Second)
+
+	ticker := time.NewTicker(5 * time.Second)
+
+	chaosIntervalTimer := time.After(time.Duration(chaosInterval) * time.Second)
+
+	for {
+		select {
+
+		case <-chaosIntervalTimer:
+			return nil
+
+		case <-abort:
+			chaosRevert.Wait()
+
+		case <-ticker.C:
+
+			for i, conn := range connections {
+
+				feedback, payload, err := messages.SendMessageToAgent(conn, "CHECK_LIVENESS", nil, &writeWait)
+				if err != nil {
+					return err
+				}
+
+				select {
+
+				case <-abort:
+					chaosRevert.Wait()
+
+				default:
+					if feedback != "ACTION_SUCCESSFUL" {
+						if feedback == "ERROR" {
+
+							agentError, err := messages.GetErrorMessage(payload)
+							if err != nil {
+								return errors.Errorf("failed to interpret error message from agent, err: %v", err)
+							}
+
+							return errors.Errorf("received error feedback from %s agent endpoint, err: %s", agentEndpointList[i], agentError)
+						}
+
+						return errors.Errorf("unintelligible feedback received from agent: %s", feedback)
+					}
+				}
+			}
+		}
+	}
 }
 
 // RandomInterval wait for the random interval lies between lower & upper bounds
