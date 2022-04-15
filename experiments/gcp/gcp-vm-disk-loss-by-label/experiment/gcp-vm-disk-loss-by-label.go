@@ -18,8 +18,8 @@ import (
 	"google.golang.org/api/compute/v1"
 )
 
-// GCPVMDiskLossByLabelExperiment contains steps to inject chaos
-func GCPVMDiskLossByLabelExperiment(clients clients.ClientSets) {
+// GCPVMDiskLossByLabel contains steps to inject chaos
+func GCPVMDiskLossByLabel(clients clients.ClientSets) {
 
 	var (
 		computeService *compute.Service
@@ -53,7 +53,7 @@ func GCPVMDiskLossByLabelExperiment(clients clients.ClientSets) {
 	log.Infof("[PreReq]: Updating the chaos result of %v experiment (SOT)", experimentsDetails.ExperimentName)
 	if err := result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT"); err != nil {
 		log.Errorf("Unable to Create the Chaos Result, err: %v", err)
-		failStep := "[pre-chaos]: Failed to update the chaos result of pod-delete experiment (SOT), err: " + err.Error()
+		failStep := "[pre-chaos]: Failed to update the chaos result of gcp-vm-disk-loss-by-label experiment (SOT), err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -67,7 +67,7 @@ func GCPVMDiskLossByLabelExperiment(clients clients.ClientSets) {
 	events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosResult")
 
 	//DISPLAY THE APP INFORMATION
-	log.InfoWithValues("[Info]: The application information is as follows", logrus.Fields{
+	log.InfoWithValues("[Info]: The disk information is as follows", logrus.Fields{
 		"Disk Volume Label": experimentsDetails.DiskVolumeLabel,
 		"Zones":             experimentsDetails.DiskZones,
 		"Sequence":          experimentsDetails.Sequence,

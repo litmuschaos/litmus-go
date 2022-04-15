@@ -94,7 +94,7 @@ func injectChaosInSerialMode(computeService *compute.Service, experimentsDetails
 			for i := range instanceNamesList {
 
 				//Stopping the VM instance
-				log.Infof("[Chaos]: Stopping %s desired VM instance", instanceNamesList[i])
+				log.Infof("[Chaos]: Stopping %s VM instance", instanceNamesList[i])
 				if err := gcplib.VMInstanceStop(computeService, instanceNamesList[i], experimentsDetails.GCPProjectID, experimentsDetails.InstanceZone); err != nil {
 					return errors.Errorf("VM instance failed to stop, err: %v", err)
 				}
@@ -120,13 +120,7 @@ func injectChaosInSerialMode(computeService *compute.Service, experimentsDetails
 				common.WaitForDuration(experimentsDetails.ChaosInterval)
 
 				switch experimentsDetails.ManagedInstanceGroup {
-				case "disable":
-
-					// starting the VM instance
-					log.Infof("[Chaos]: Starting back %s VM instance", instanceNamesList[i])
-					if err := gcplib.VMInstanceStart(computeService, instanceNamesList[i], experimentsDetails.GCPProjectID, experimentsDetails.InstanceZone); err != nil {
-						return errors.Errorf("%s vm instance failed to start, err: %v", instanceNamesList[i], err)
-					}
+				case "enable":
 
 					// wait for VM instance to get in running state
 					log.Infof("[Wait]: Wait for VM instance %s to get in RUNNING state", instanceNamesList[i])
@@ -135,6 +129,12 @@ func injectChaosInSerialMode(computeService *compute.Service, experimentsDetails
 					}
 
 				default:
+
+					// starting the VM instance
+					log.Infof("[Chaos]: Starting back %s VM instance", instanceNamesList[i])
+					if err := gcplib.VMInstanceStart(computeService, instanceNamesList[i], experimentsDetails.GCPProjectID, experimentsDetails.InstanceZone); err != nil {
+						return errors.Errorf("%s vm instance failed to start, err: %v", instanceNamesList[i], err)
+					}
 
 					// wait for VM instance to get in running state
 					log.Infof("[Wait]: Wait for VM instance %s to get in RUNNING state", instanceNamesList[i])
@@ -208,16 +208,7 @@ func injectChaosInParallelMode(computeService *compute.Service, experimentsDetai
 			common.WaitForDuration(experimentsDetails.ChaosInterval)
 
 			switch experimentsDetails.ManagedInstanceGroup {
-			case "disable":
-
-				// starting the VM instance
-				for i := range instanceNamesList {
-
-					log.Info("[Chaos]: Starting back the VM instance")
-					if err := gcplib.VMInstanceStart(computeService, instanceNamesList[i], experimentsDetails.GCPProjectID, experimentsDetails.InstanceZone); err != nil {
-						return errors.Errorf("vm instance failed to start, err: %v", err)
-					}
-				}
+			case "enable":
 
 				// wait for VM instance to get in running state
 				for i := range instanceNamesList {
@@ -231,6 +222,15 @@ func injectChaosInParallelMode(computeService *compute.Service, experimentsDetai
 				}
 
 			default:
+
+				// starting the VM instance
+				for i := range instanceNamesList {
+
+					log.Info("[Chaos]: Starting back the VM instance")
+					if err := gcplib.VMInstanceStart(computeService, instanceNamesList[i], experimentsDetails.GCPProjectID, experimentsDetails.InstanceZone); err != nil {
+						return errors.Errorf("vm instance failed to start, err: %v", err)
+					}
+				}
 
 				// wait for VM instance to get in running state
 				for i := range instanceNamesList {

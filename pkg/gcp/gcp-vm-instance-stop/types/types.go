@@ -24,7 +24,6 @@ type ExperimentDetails struct {
 	ManagedInstanceGroup     string
 	Sequence                 string
 	TargetContainer          string
-	LIBImagePullPolicy       string
 	InstanceLabel            string
 	InstanceAffectedPerc     int
 	TargetVMInstanceNameList []string

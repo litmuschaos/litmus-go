@@ -117,26 +117,15 @@ func DiskVolumeStateCheck(computeService *compute.Service, experimentsDetails *e
 		return errors.Errorf("unequal number of disk names and zones found, please verify the input details")
 	}
 
-	switch stage {
+	for i := range diskNamesList {
 
-	case "pre-chaos":
-		for i := range diskNamesList {
-
-			instanceName, err := GetVolumeAttachmentDetails(computeService, experimentsDetails.GCPProjectID, zonesList[i], diskNamesList[i])
-			if err != nil || instanceName == "" {
-				return errors.Errorf("failed to get the vm instance name for %s disk volume, err: %v", diskNamesList[i], err)
-			}
-
-			experimentsDetails.TargetDiskInstanceNamesList = append(experimentsDetails.TargetDiskInstanceNamesList, instanceName)
+		instanceName, err := GetVolumeAttachmentDetails(computeService, experimentsDetails.GCPProjectID, zonesList[i], diskNamesList[i])
+		if err != nil || instanceName == "" {
+			return errors.Errorf("failed to get the vm instance name for %s disk volume, err: %v", diskNamesList[i], err)
 		}
 
-	default:
-		for i := range diskNamesList {
-
-			instanceName, err := GetVolumeAttachmentDetails(computeService, experimentsDetails.GCPProjectID, zonesList[i], diskNamesList[i])
-			if err != nil || instanceName == "" {
-				return errors.Errorf("failed to get the vm instance name for %s disk volume, err: %v", diskNamesList[i], err)
-			}
+		if stage == "pre-chaos" {
+			experimentsDetails.TargetDiskInstanceNamesList = append(experimentsDetails.TargetDiskInstanceNamesList, instanceName)
 		}
 	}
 

@@ -20,7 +20,6 @@ type ExperimentDetails struct {
 	Delay                       int
 	Sequence                    string
 	TargetContainer             string
-	LIBImagePullPolicy          string
 	GCPProjectID                string
 	DiskVolumeNames             string
 	DiskZones                   string

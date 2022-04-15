@@ -24,6 +24,7 @@ var (
 	inject, abort chan os.Signal
 )
 
+// PrepareDiskVolumeLossByLabel contains the prepration and injection steps for the experiment
 func PrepareDiskVolumeLossByLabel(computeService *compute.Service, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	var deviceNamesList []string

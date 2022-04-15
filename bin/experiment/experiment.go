@@ -165,7 +165,7 @@ func main() {
 	case "gcp-vm-instance-stop-by-label":
 		gcpVMInstanceStopByLabel.GCPVMInstanceStopByLabel(clients)
 	case "gcp-vm-disk-loss-by-label":
-		gcpVMDiskLossByLabel.GCPVMDiskLossByLabelExperiment(clients)
+		gcpVMDiskLossByLabel.GCPVMDiskLossByLabel(clients)
 
 	default:
 		log.Errorf("Unsupported -name %v, please provide the correct value of -name args", *experimentName)

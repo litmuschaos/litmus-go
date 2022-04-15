@@ -71,7 +71,7 @@ func GetVolumeAttachmentDetails(computeService *compute.Service, gcpProjectID st
 		return attachedInstanceName, nil
 	}
 
-	return "", errors.Errorf("%s disk not attached to any VM instance", diskName)
+	return "", errors.Errorf("%s disk is not attached to any VM instance", diskName)
 }
 
 // GetDiskDeviceNameForVM returns the device name for the target disk for a given VM
@@ -117,6 +117,7 @@ func SetTargetDiskVolumes(computeService *compute.Service, experimentsDetails *e
 
 	log.InfoWithValues("[Info]: Targeting the attached disk volumes filtered from disk label", logrus.Fields{
 		"Number of attached disk volumes filtered": len(experimentsDetails.TargetDiskVolumeNamesList),
+		"Attached disk volume names":               experimentsDetails.TargetDiskVolumeNamesList,
 	})
 
 	return nil

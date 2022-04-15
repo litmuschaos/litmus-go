@@ -39,7 +39,7 @@ func InstanceStatusCheckByName(computeService *compute.Service, managedInstanceG
 	}
 
 	if len(instanceNamesList) != len(instanceZonesList) {
-		return errors.Errorf("the number of vm instance names and the number of regions is not equal")
+		return errors.Errorf("the number of vm instance names and the number of regions are not equal")
 	}
 
 	log.Infof("[Info]: The vm instances under chaos (IUC) are: %v", instanceNamesList)
