@@ -24,7 +24,7 @@ RUN apk --update add \
 # Packaging stage
 # Image source: https://github.com/litmuschaos/test-tools/blob/master/custom/hardened-alpine/experiment/Dockerfile
 # The base image is non-root (have litmus user) with default litmus directory.
-FROM litmuschaos/experiment-alpine
+FROM litmuschaos/experiment-alpine:2.8.0
 
 LABEL maintainer="LitmusChaos"
 
@@ -33,4 +33,4 @@ COPY --from=dep /usr/bin/sudo /usr/bin/
 COPY --from=dep /sbin/tc /sbin/
 
 #Copying Necessary Files
-COPY ./pkg/cloud/aws/common/ssm-docs/LitmusChaos-AWS-SSM-Docs.yml ./litmus/LitmusChaos-AWS-SSM-Docs.yml
+COPY ./pkg/cloud/aws/common/ssm-docs/LitmusChaos-AWS-SSM-Docs.yml .
