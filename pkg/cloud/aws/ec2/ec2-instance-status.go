@@ -166,7 +166,11 @@ func findActiveNodeCount(autoScalingGroupName, region string, nodeList []*autosc
 	nodeCount := 0
 
 	for _, id := range findInstancesInAutoScalingGroup(autoScalingGroupName, nodeList) {
-		if instanceState, err := GetEC2InstanceStatus(id, region); err == nil && instanceState == "running" {
+		instanceState, err := GetEC2InstanceStatus(id, region)
+		if err != nil {
+			log.Errorf("instance status check failed for %v, err: %v", id, err)
+		}
+		if instanceState == "running" {
 			nodeCount += 1
 		}
 	}
