@@ -177,3 +177,38 @@ func GetStatusMessage(defaultCheck bool, defaultMsg, probeStatus string) string 
 	}
 	return "Probes: " + probeStatus
 }
+
+//GetRandomSequence will gives a random value for sequence
+func GetRandomSequence(sequence string) string {
+	if strings.ToLower(sequence) == "random" {
+		rand.Seed(time.Now().UnixNano())
+		seq := []string{"serial", "parallel"}
+		randomIndex := rand.Intn(len(seq))
+		return seq[randomIndex]
+	}
+	return sequence
+}
+
+//ValidateRange validates the given range of numbers
+func ValidateRange(a string) string {
+	var lb, ub int
+	intervals := strings.Split(a, "-")
+
+	switch len(intervals) {
+	case 1:
+		return a
+	case 2:
+		lb, _ = strconv.Atoi(intervals[0])
+		ub, _ = strconv.Atoi(intervals[1])
+		return strconv.Itoa(getRandomValue(lb, ub))
+	default:
+		log.Errorf("unable to parse the value, please provide in valid format")
+		return "0"
+	}
+}
+
+//getRandomValue gives a random value between two integers
+func getRandomValue(a, b int) int {
+	rand.Seed(time.Now().Unix())
+	return (a + rand.Intn(b-a+1))
+}
