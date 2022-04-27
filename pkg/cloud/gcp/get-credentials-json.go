@@ -112,7 +112,7 @@ func doesFileExist(fileName string) bool {
 
 	_, err := os.Stat(fileName)
 
-	return os.IsExist(err)
+	return err == nil
 }
 
 // GetGCPComputeService returns a new compute service created using the GCP Service Account credentials
