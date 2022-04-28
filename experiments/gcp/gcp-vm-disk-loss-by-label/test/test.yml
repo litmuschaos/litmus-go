@@ -13,7 +13,7 @@ spec:
       labels: 
         app: litmus-experiment
     spec:
-      serviceAccountName: gcp-vm-disk-loss-sa
+      serviceAccountName: gcp-vm-disk-loss-by-label-sa
       containers:
       - name: gotest
         image: busybox 
@@ -21,6 +21,7 @@ spec:
           - sleep
           - "3600"
         env:
+
           - name: TOTAL_CHAOS_DURATION
             value: ''
 
@@ -34,25 +35,29 @@ spec:
           ## env var that describes the library used to execute the chaos
           ## default: litmus. Supported values: litmus, powerfulseal, chaoskube
           - name: LIB
-            value: 'litmus'
+            value: ''
 
           # provide the chaos namespace
           - name: CHAOS_NAMESPACE
-            value: 'default'
+            value: ''
 
-          # set the GCP project id
           - name: GCP_PROJECT_ID
             value: ''
 
-          # set the disk volume name(s) as comma seperated values 
-          # eg. volume1,volume2,...
-          - name: DISK_VOLUME_NAMES
-            value: ''
-                    
-          # set the disk zone(s) as comma seperated values in the corresponding order 
-          # of DISK_VOLUME_NAME 
-          # eg. zone1,zone2,...
           - name: DISK_ZONES
+            value: ''
+
+          # set the label of the target disk volumes
+          - name: DISK_VOLUME_LABEL
+            value: ''
+          
+          # set the percentage value of the disks with the given label 
+          # which should be targeted as part of the chaos injection
+          - name: DISK_AFFECTED_PERC
+            value: ''
+
+          # parallel or serial; determines how chaos is injected
+          - name: SEQUENCE
             value: ''
         
           - name: POD_NAME
@@ -64,7 +69,4 @@ spec:
             valueFrom:
               fieldRef:
                 fieldPath: spec.serviceAccountName
-          secrets:
-            - name: cloud-secret
-              mountPath: /tmp/
 
