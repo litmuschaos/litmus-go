@@ -95,6 +95,9 @@ func PreChaosNodeCountCheck(instanceIDList []string, region string) (int, string
 	// finding the active node count for the autoscaling group
 	nodeCount := findActiveNodeCount(autoScalingGroupName, region, nodeList)
 	log.Infof("[Info]: Pre-Chaos Active Node Count: %v", nodeCount)
+	if len(instanceIDList) > nodeCount {
+		return 0, "", errors.Errorf("active node count less than number of provided instance IDs")
+	}
 
 	return nodeCount, autoScalingGroupName, nil
 }
