@@ -97,7 +97,7 @@ func injectChaosInSerialMode(computeService *compute.Service, experimentsDetails
 
 		for duration < experimentsDetails.ChaosDuration {
 
-			log.Infof("[Info]: Target instanceNames list, %v", instanceNamesList)
+			log.Infof("[Info]: Target instance list, %v", instanceNamesList)
 
 			if experimentsDetails.EngineName != "" {
 				msg := "Injecting " + experimentsDetails.ExperimentName + " chaos in VM instance"
@@ -182,7 +182,7 @@ func injectChaosInParallelMode(computeService *compute.Service, experimentsDetai
 
 		for duration < experimentsDetails.ChaosDuration {
 
-			log.Infof("[Info]: Target instanceID list, %v", instanceNamesList)
+			log.Infof("[Info]: Target VM instance list, %v", instanceNamesList)
 
 			if experimentsDetails.EngineName != "" {
 				msg := "Injecting " + experimentsDetails.ExperimentName + " chaos in VM instance"
