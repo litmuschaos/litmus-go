@@ -27,4 +27,5 @@ type ExperimentDetails struct {
 	TargetDiskVolumeNamesList   []string
 	TargetDiskInstanceNamesList []string
 	DiskAffectedPerc            int
+	DeviceNamesList             []string
 }
