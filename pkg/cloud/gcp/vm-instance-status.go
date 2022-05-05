@@ -5,32 +5,16 @@ import (
 
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/pkg/errors"
-	"golang.org/x/net/context"
 	"google.golang.org/api/compute/v1"
-	"google.golang.org/api/option"
 )
 
 // GetVMInstanceStatus returns the status of a VM instance
-func GetVMInstanceStatus(instanceName string, gcpProjectID string, instanceZone string) (string, error) {
+func GetVMInstanceStatus(computeService *compute.Service, instanceName string, gcpProjectID string, instanceZone string) (string, error) {
+
 	var err error
 
-	// create an empty context
-	ctx := context.Background()
-
-	// get service account credentials json
-	json, err := GetServiceAccountJSONFromSecret()
-	if err != nil {
-		return "", err
-	}
-
-	// create a new GCP Compute Service client using the GCP service account credentials
-	computeService, err := compute.NewService(ctx, option.WithCredentialsJSON(json))
-	if err != nil {
-		return "", err
-	}
-
 	// get information about the requisite VM instance
-	response, err := computeService.Instances.Get(gcpProjectID, instanceZone, instanceName).Context(ctx).Do()
+	response, err := computeService.Instances.Get(gcpProjectID, instanceZone, instanceName).Do()
 	if err != nil {
 		return "", err
 	}
@@ -40,43 +24,57 @@ func GetVMInstanceStatus(instanceName string, gcpProjectID string, instanceZone 
 }
 
 //InstanceStatusCheckByName is used to check the status of all the VM instances under chaos
-func InstanceStatusCheckByName(autoScalingGroup string, delay, timeout int, check string, instanceNames string, gcpProjectId string, instanceZones string) error {
+func InstanceStatusCheckByName(computeService *compute.Service, managedInstanceGroup string, delay, timeout int, check string, instanceNames string, gcpProjectId string, instanceZones string) error {
+
 	instanceNamesList := strings.Split(instanceNames, ",")
+
 	instanceZonesList := strings.Split(instanceZones, ",")
-	if autoScalingGroup != "enable" && autoScalingGroup != "disable" {
-		return errors.Errorf("Invalid value for AUTO_SCALING_GROUP: %v", autoScalingGroup)
+
+	if managedInstanceGroup != "enable" && managedInstanceGroup != "disable" {
+		return errors.Errorf("invalid value for MANAGED_INSTANCE_GROUP: %v", managedInstanceGroup)
 	}
+
 	if len(instanceNamesList) == 0 {
-		return errors.Errorf("No instance name found to stop")
+		return errors.Errorf("no vm instance name found to stop")
 	}
+
 	if len(instanceNamesList) != len(instanceZonesList) {
-		return errors.Errorf("The number of instance names and the number of regions is not equal")
+		return errors.Errorf("the number of vm instance names and the number of regions are not equal")
 	}
-	log.Infof("[Info]: The instances under chaos(IUC) are: %v", instanceNamesList)
+
+	log.Infof("[Info]: The vm instances under chaos (IUC) are: %v", instanceNamesList)
+
 	if check == "pre-chaos" {
-		return InstanceStatusCheckPreChaos(instanceNamesList, gcpProjectId, instanceZonesList)
+		return InstanceStatusCheckPreChaos(computeService, instanceNamesList, gcpProjectId, instanceZonesList)
 	}
-	return InstanceStatusCheckPostChaos(timeout, delay, instanceNamesList, gcpProjectId, instanceZonesList)
+
+	return InstanceStatusCheckPostChaos(computeService, timeout, delay, instanceNamesList, gcpProjectId, instanceZonesList)
 }
 
 //InstanceStatusCheckPreChaos is used to check whether all VM instances under chaos are running or not without any re-check
-func InstanceStatusCheckPreChaos(instanceNamesList []string, gcpProjectId string, instanceZonesList []string) error {
+func InstanceStatusCheckPreChaos(computeService *compute.Service, instanceNamesList []string, gcpProjectId string, instanceZonesList []string) error {
+
 	for i := range instanceNamesList {
-		instanceState, err := GetVMInstanceStatus(instanceNamesList[i], gcpProjectId, instanceZonesList[i])
+
+		instanceState, err := GetVMInstanceStatus(computeService, instanceNamesList[i], gcpProjectId, instanceZonesList[i])
 		if err != nil {
 			return err
 		}
+
 		if instanceState != "RUNNING" {
-			return errors.Errorf("failed to get the vm instance '%v' in running sate, current state: %v", instanceNamesList[i], instanceState)
+			return errors.Errorf("%s vm instance is not in RUNNING state, current state: %v", instanceNamesList[i], instanceState)
 		}
 	}
+
 	return nil
 }
 
 //InstanceStatusCheckPostChaos is used to check whether all VM instances under chaos are running or not with re-check
-func InstanceStatusCheckPostChaos(timeout, delay int, instanceNamesList []string, gcpProjectId string, instanceZonesList []string) error {
+func InstanceStatusCheckPostChaos(computeService *compute.Service, timeout, delay int, instanceNamesList []string, gcpProjectId string, instanceZonesList []string) error {
+
 	for i := range instanceNamesList {
-		return WaitForVMInstanceUp(timeout, delay, instanceNamesList[i], gcpProjectId, instanceZonesList[i])
+		return WaitForVMInstanceUp(computeService, timeout, delay, instanceNamesList[i], gcpProjectId, instanceZonesList[i])
 	}
+
 	return nil
 }
