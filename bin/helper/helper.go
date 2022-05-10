@@ -16,6 +16,7 @@ import (
 	networkChaos "github.com/litmuschaos/litmus-go/chaoslib/litmus/network-chaos/helper"
 	dnsChaos "github.com/litmuschaos/litmus-go/chaoslib/litmus/pod-dns-chaos/helper"
 	stressChaos "github.com/litmuschaos/litmus-go/chaoslib/litmus/stress-chaos/helper"
+	httpChaos "github.com/litmuschaos/litmus-go/chaoslib/litmus/http-chaos/helper"
 
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/log"
@@ -58,6 +59,8 @@ func main() {
 		stressChaos.Helper(clients)
 	case "network-chaos":
 		networkChaos.Helper(clients)
+	case "http-chaos":
+		httpChaos.Helper(clients)
 
 	default:
 		log.Errorf("Unsupported -name %v, please provide the correct value of -name args", *helperName)
