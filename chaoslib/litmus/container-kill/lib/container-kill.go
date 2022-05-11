@@ -20,14 +20,41 @@ import (
 //PrepareContainerKill contains the prepration steps before chaos injection
 func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
+	targetPodList := apiv1.PodList{}
+	var err error
+	var podsAffectedPerc int
 	// Get the target pod details for the chaos execution
 	// if the target pod is not defined it will derive the random target pod list using pod affected percentage
 	if experimentsDetails.TargetPods == "" && chaosDetails.AppDetail.Label == "" {
 		return errors.Errorf("please provide one of the appLabel or TARGET_PODS")
 	}
-	targetPodList, err := common.GetPodList(experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, clients, chaosDetails)
-	if err != nil {
-		return err
+	//Setup the tunables if provided in range
+	SetChaosTunables(experimentsDetails)
+
+	log.InfoWithValues("[Info]: The tunables are:", logrus.Fields{
+		"PodsAffectedPerc": experimentsDetails.PodsAffectedPerc,
+		"Sequence":         experimentsDetails.Sequence,
+	})
+
+	podsAffectedPerc, _ = strconv.Atoi(experimentsDetails.PodsAffectedPerc)
+	if experimentsDetails.NodeLabel == "" {
+		targetPodList, err = common.GetPodList(experimentsDetails.TargetPods, podsAffectedPerc, clients, chaosDetails)
+		if err != nil {
+			return err
+		}
+	} else {
+		if experimentsDetails.TargetPods == "" {
+			targetPodList, err = common.GetPodListFromSpecifiedNodes(experimentsDetails.TargetPods, podsAffectedPerc, experimentsDetails.NodeLabel, clients, chaosDetails)
+			if err != nil {
+				return err
+			}
+		} else {
+			log.Infof("TARGET_PODS env is provided, overriding the NODE_LABEL input")
+			targetPodList, err = common.GetPodList(experimentsDetails.TargetPods, podsAffectedPerc, clients, chaosDetails)
+			if err != nil {
+				return err
+			}
+		}
 	}
 
 	podNames := []string{}
@@ -50,20 +77,13 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 		}
 	}
 
-	//Get the target container name of the application pod
-	if experimentsDetails.TargetContainer == "" {
-		experimentsDetails.TargetContainer, err = common.GetTargetContainer(experimentsDetails.AppNS, targetPodList.Items[0].Name, clients)
-		if err != nil {
-			return errors.Errorf("unable to get the target container name, err: %v", err)
-		}
-	}
-
 	if experimentsDetails.EngineName != "" {
 		if err := common.SetHelperData(chaosDetails, clients); err != nil {
 			return err
 		}
 	}
 
+	experimentsDetails.IsTargetContainerProvided = (experimentsDetails.TargetContainer != "")
 	switch strings.ToLower(experimentsDetails.Sequence) {
 	case "serial":
 		if err = injectChaosInSerialMode(experimentsDetails, targetPodList, clients, chaosDetails, resultDetails, eventsDetails); err != nil {
@@ -89,7 +109,7 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
 
 	labelSuffix := common.GetRunID()
-
+	var err error
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
 		if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
@@ -99,6 +119,14 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 
 	// creating the helper pod to perform container kill chaos
 	for _, pod := range targetPodList.Items {
+
+		//Get the target container name of the application pod
+		if !experimentsDetails.IsTargetContainerProvided {
+			experimentsDetails.TargetContainer, err = common.GetTargetContainer(experimentsDetails.AppNS, pod.Name, clients)
+			if err != nil {
+				return errors.Errorf("unable to get the target container name, err: %v", err)
+			}
+		}
 
 		log.InfoWithValues("[Info]: Details of application under chaos injection", logrus.Fields{
 			"PodName":       pod.Name,
@@ -141,7 +169,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
 
 	labelSuffix := common.GetRunID()
-
+	var err error
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
 		if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
@@ -151,6 +179,14 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 
 	// creating the helper pod to perform container kill chaos
 	for _, pod := range targetPodList.Items {
+
+		//Get the target container name of the application pod
+		if !experimentsDetails.IsTargetContainerProvided {
+			experimentsDetails.TargetContainer, err = common.GetTargetContainer(experimentsDetails.AppNS, pod.Name, clients)
+			if err != nil {
+				return errors.Errorf("unable to get the target container name, err: %v", err)
+			}
+		}
 
 		log.InfoWithValues("[Info]: Details of application under chaos injection", logrus.Fields{
 			"PodName":       pod.Name,
@@ -276,4 +312,11 @@ func getPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, podName st
 		SetEnvFromDownwardAPI("v1", "metadata.name")
 
 	return envDetails.ENV
+}
+
+//SetChaosTunables will setup a random value within a given range of values
+//If the value is not provided in range it'll setup the initial provided value.
+func SetChaosTunables(experimentsDetails *experimentTypes.ExperimentDetails) {
+	experimentsDetails.PodsAffectedPerc = common.ValidateRange(experimentsDetails.PodsAffectedPerc)
+	experimentsDetails.Sequence = common.GetRandomSequence(experimentsDetails.Sequence)
 }

@@ -21,6 +21,16 @@ import (
 // PrepareNodeCPUHog contains prepration steps before chaos injection
 func PrepareNodeCPUHog(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
+	//setup the tunables if provided in range
+	setChaosTunables(experimentsDetails)
+
+	log.InfoWithValues("[Info]: The chaos tunables are:", logrus.Fields{
+		"Node CPU Cores":  experimentsDetails.NodeCPUcores,
+		"CPU Load":        experimentsDetails.CPULoad,
+		"Node Affce Perc": experimentsDetails.NodesAffectedPerc,
+		"Sequence":        experimentsDetails.Sequence,
+	})
+
 	//Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
 		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", experimentsDetails.RampTime)
@@ -28,10 +38,12 @@ func PrepareNodeCPUHog(experimentsDetails *experimentTypes.ExperimentDetails, cl
 	}
 
 	//Select node for node-cpu-hog
-	targetNodeList, err := common.GetNodeList(experimentsDetails.TargetNodes, experimentsDetails.NodeLabel, experimentsDetails.NodesAffectedPerc, clients)
+	nodesAffectedPerc, _ := strconv.Atoi(experimentsDetails.NodesAffectedPerc)
+	targetNodeList, err := common.GetNodeList(experimentsDetails.TargetNodes, experimentsDetails.NodeLabel, nodesAffectedPerc, clients)
 	if err != nil {
 		return err
 	}
+
 	log.InfoWithValues("[Info]: Details of Nodes under chaos injection", logrus.Fields{
 		"No. Of Nodes": len(targetNodeList),
 		"Node Names":   targetNodeList,
@@ -86,7 +98,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		}
 
 		// When number of cpu cores for hogging is not defined , it will take it from node capacity
-		if nodeCPUCores == 0 {
+		if nodeCPUCores == "0" {
 			if err := setCPUCapacity(experimentsDetails, appNode, clients); err != nil {
 				return err
 			}
@@ -154,7 +166,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		}
 
 		// When number of cpu cores for hogging is not defined , it will take it from node capacity
-		if nodeCPUCores == 0 {
+		if nodeCPUCores == "0" {
 			if err := setCPUCapacity(experimentsDetails, appNode, clients); err != nil {
 				return err
 			}
@@ -209,10 +221,7 @@ func setCPUCapacity(experimentsDetails *experimentTypes.ExperimentDetails, appNo
 	if err != nil {
 		return err
 	}
-
-	cpuCapacity, _ := node.Status.Capacity.Cpu().AsInt64()
-	experimentsDetails.NodeCPUcores = int(cpuCapacity)
-
+	experimentsDetails.NodeCPUcores = node.Status.Capacity.Cpu().String()
 	return nil
 }
 
@@ -243,7 +252,9 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, chao
 					},
 					Args: []string{
 						"--cpu",
-						strconv.Itoa(experimentsDetails.NodeCPUcores),
+						experimentsDetails.NodeCPUcores,
+						"--cpu-load",
+						experimentsDetails.CPULoad,
 						"--timeout",
 						strconv.Itoa(experimentsDetails.ChaosDuration),
 					},
@@ -255,4 +266,13 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, chao
 
 	_, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Create(helperPod)
 	return err
+}
+
+//setChaosTunables will setup a random value within a given range of values
+//If the value is not provided in range it'll setup the initial provided value.
+func setChaosTunables(experimentsDetails *experimentTypes.ExperimentDetails) {
+	experimentsDetails.NodeCPUcores = common.ValidateRange(experimentsDetails.NodeCPUcores)
+	experimentsDetails.CPULoad = common.ValidateRange(experimentsDetails.CPULoad)
+	experimentsDetails.NodesAffectedPerc = common.ValidateRange(experimentsDetails.NodesAffectedPerc)
+	experimentsDetails.Sequence = common.GetRandomSequence(experimentsDetails.Sequence)
 }

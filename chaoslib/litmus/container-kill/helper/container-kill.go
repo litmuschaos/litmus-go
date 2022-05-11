@@ -13,7 +13,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
-	"github.com/openebs/maya/pkg/util/retry"
+	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -101,7 +101,7 @@ func killContainer(experimentsDetails *experimentTypes.ExperimentDetails, client
 		}
 
 		//Check the status of restarted container
-		err = common.CheckContainerStatus(experimentsDetails.AppNS, experimentsDetails.TargetPods, clients)
+		err = common.CheckContainerStatus(experimentsDetails.AppNS, experimentsDetails.TargetPods, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 		if err != nil {
 			return errors.Errorf("application container is not in running state, %v", err)
 		}

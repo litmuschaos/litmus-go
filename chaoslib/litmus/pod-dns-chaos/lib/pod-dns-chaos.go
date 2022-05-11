@@ -50,20 +50,13 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 		}
 	}
 
-	//Get the target container name of the application pod
-	if experimentsDetails.TargetContainer == "" {
-		experimentsDetails.TargetContainer, err = common.GetTargetContainer(experimentsDetails.AppNS, targetPodList.Items[0].Name, clients)
-		if err != nil {
-			return errors.Errorf("unable to get the target container name, err: %v", err)
-		}
-	}
-
 	if experimentsDetails.EngineName != "" {
 		if err := common.SetHelperData(chaosDetails, clients); err != nil {
 			return err
 		}
 	}
 
+	experimentsDetails.IsTargetContainerProvided = (experimentsDetails.TargetContainer != "")
 	switch strings.ToLower(experimentsDetails.Sequence) {
 	case "serial":
 		if err = injectChaosInSerialMode(experimentsDetails, targetPodList, clients, chaosDetails, resultDetails, eventsDetails); err != nil {
@@ -84,7 +77,7 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
 
 	labelSuffix := common.GetRunID()
-
+	var err error
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
 		if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
@@ -94,6 +87,14 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 
 	// creating the helper pod to perform DNS Chaos
 	for _, pod := range targetPodList.Items {
+
+		//Get the target container name of the application pod
+		if !experimentsDetails.IsTargetContainerProvided {
+			experimentsDetails.TargetContainer, err = common.GetTargetContainer(experimentsDetails.AppNS, pod.Name, clients)
+			if err != nil {
+				return errors.Errorf("unable to get the target container name, err: %v", err)
+			}
+		}
 
 		log.InfoWithValues("[Info]: Details of application under chaos injection", logrus.Fields{
 			"PodName":       pod.Name,
@@ -137,7 +138,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
 
 	labelSuffix := common.GetRunID()
-
+	var err error
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
 		if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
@@ -147,6 +148,14 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 
 	// creating the helper pod to perform DNS Chaos
 	for _, pod := range targetPodList.Items {
+
+		//Get the target container name of the application pod
+		if !experimentsDetails.IsTargetContainerProvided {
+			experimentsDetails.TargetContainer, err = common.GetTargetContainer(experimentsDetails.AppNS, pod.Name, clients)
+			if err != nil {
+				return errors.Errorf("unable to get the target container name, err: %v", err)
+			}
+		}
 
 		log.InfoWithValues("[Info]: Details of application under chaos injection", logrus.Fields{
 			"PodName":       pod.Name,

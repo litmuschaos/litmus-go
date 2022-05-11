@@ -94,7 +94,7 @@ func diskFill(experimentsDetails *experimentTypes.ExperimentDetails, clients cli
 		return err
 	}
 
-	if ephemeralStorageLimit == 0 && experimentsDetails.EphemeralStorageMebibytes == 0 {
+	if ephemeralStorageLimit == 0 && experimentsDetails.EphemeralStorageMebibytes == "0" {
 		return errors.Errorf("either provide ephemeral storage limit inside target container or define EPHEMERAL_STORAGE_MEBIBYTES ENV")
 	}
 
@@ -213,10 +213,12 @@ func getSizeToBeFilled(experimentsDetails *experimentTypes.ExperimentDetails, us
 
 	switch ephemeralStorageLimit {
 	case 0:
-		requirementToBeFill = experimentsDetails.EphemeralStorageMebibytes * 1024
+		ephemeralStorageMebibytes, _ := strconv.Atoi(experimentsDetails.EphemeralStorageMebibytes)
+		requirementToBeFill = ephemeralStorageMebibytes * 1024
 	default:
 		// deriving size need to be filled from the used size & requirement size to fill
-		requirementToBeFill = (ephemeralStorageLimit * experimentsDetails.FillPercentage) / 100
+		fillPercentage, _ := strconv.Atoi(experimentsDetails.FillPercentage)
+		requirementToBeFill = (ephemeralStorageLimit * fillPercentage) / 100
 	}
 
 	needToBeFilled := requirementToBeFill - usedEphemeralStorageSize
@@ -262,8 +264,8 @@ func getENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.EngineName = types.Getenv("CHAOSENGINE", "")
 	experimentDetails.ChaosUID = clientTypes.UID(types.Getenv("CHAOS_UID", ""))
 	experimentDetails.ChaosPodName = types.Getenv("POD_NAME", "")
-	experimentDetails.FillPercentage, _ = strconv.Atoi(types.Getenv("FILL_PERCENTAGE", ""))
-	experimentDetails.EphemeralStorageMebibytes, _ = strconv.Atoi(types.Getenv("EPHEMERAL_STORAGE_MEBIBYTES", ""))
+	experimentDetails.FillPercentage = types.Getenv("FILL_PERCENTAGE", "")
+	experimentDetails.EphemeralStorageMebibytes = types.Getenv("EPHEMERAL_STORAGE_MEBIBYTES", "")
 	experimentDetails.DataBlockSize, _ = strconv.Atoi(types.Getenv("DATA_BLOCK_SIZE", "256"))
 }
 

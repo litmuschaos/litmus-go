@@ -371,10 +371,10 @@ func GetContainerID(appNamespace, targetPod, targetContainer string, clients cli
 }
 
 // CheckContainerStatus checks the status of the application container
-func CheckContainerStatus(appNamespace, appName string, clients clients.ClientSets) error {
+func CheckContainerStatus(appNamespace, appName string, timeout, delay int, clients clients.ClientSets) error {
 	return retry.
-		Times(90).
-		Wait(2 * time.Second).
+		Times(uint(timeout / delay)).
+		Wait(time.Duration(delay) * time.Second).
 		Try(func(attempt uint) error {
 			pod, err := clients.KubeClient.CoreV1().Pods(appNamespace).Get(appName, v1.GetOptions{})
 			if err != nil {
@@ -389,4 +389,95 @@ func CheckContainerStatus(appNamespace, appName string, clients clients.ClientSe
 			}
 			return nil
 		})
+}
+
+// GetPodListFromSpecifiedNodes will filter out the pod list scheduled on specified node
+func GetPodListFromSpecifiedNodes(targetPods string, podAffPerc int, nodeLabel string, clients clients.ClientSets, chaosDetails *types.ChaosDetails) (core_v1.PodList, error) {
+	finalPods := core_v1.PodList{}
+	var nodes *core_v1.NodeList
+	/*
+		isPodsAvailable, err := VerifyExistanceOfPods(chaosDetails.AppDetail.Namespace, targetPods, clients)
+		if err != nil {
+			return core_v1.PodList{}, err
+		}*/
+
+	// identify node list from the provided node label
+	nodes, err = clients.KubeClient.CoreV1().Nodes().List(v1.ListOptions{LabelSelector: nodeLabel})
+	if err != nil {
+		return core_v1.PodList{}, errors.Errorf("Failed to find the nodes with matching label, err: %v", err)
+	} else if len(nodes.Items) == 0 {
+		return core_v1.PodList{}, errors.Errorf("Failed to find the nodes with matching label")
+	}
+	nodeNames := []string{}
+	for _, node := range nodes.Items {
+		nodeNames = append(nodeNames, node.Name)
+	}
+
+	log.Infof("[Chaos]:Looking for pods with specified attributes on nodes targeted: %v", nodeNames)
+
+	nonChaosPods, err := FilterNonChaosPods(clients, chaosDetails)
+	if err != nil {
+		return core_v1.PodList{}, err
+	}
+	podList, err := getTargetPodsWhenNodeFilterSet(podAffPerc, clients, nonChaosPods, nodeNames, chaosDetails)
+	if err != nil {
+		return core_v1.PodList{}, err
+	}
+
+	finalPods.Items = append(finalPods.Items, podList.Items...)
+
+	log.Infof("[Chaos]:Number of pods targeted: %v", len(finalPods.Items))
+	return finalPods, nil
+}
+
+// getTargetPodsWhenNodeFilterSet will give the target pod when the node filter is setup
+func getTargetPodsWhenNodeFilterSet(podAffPerc int, clients clients.ClientSets, nonChaosPods core_v1.PodList, nodes []string, chaosDetails *types.ChaosDetails) (core_v1.PodList, error) {
+	filteredPods := core_v1.PodList{}
+	nodeFilteredPods := core_v1.PodList{}
+	realPods := core_v1.PodList{}
+	for _, pod := range nonChaosPods.Items {
+		switch chaosDetails.AppDetail.AnnotationCheck {
+		case true:
+			parentName, err := annotation.GetParentName(clients, pod, chaosDetails)
+			if err != nil {
+				return core_v1.PodList{}, err
+			}
+			isParentAnnotated, err := annotation.IsParentAnnotated(clients, parentName, chaosDetails)
+			if err != nil {
+				return core_v1.PodList{}, err
+			}
+			if isParentAnnotated {
+				filteredPods.Items = append(filteredPods.Items, pod)
+			}
+		default:
+			filteredPods.Items = append(filteredPods.Items, pod)
+		}
+	}
+
+	// add filter for pods which are on derived node list
+	for _, pod := range filteredPods.Items {
+		for _, itemIndex := range nodes {
+			if pod.Spec.NodeName == itemIndex {
+				nodeFilteredPods.Items = append(nodeFilteredPods.Items, pod)
+				break // a given pod obj is found in only one node, break and start checking next pod
+			}
+
+		}
+	}
+
+	if len(nodeFilteredPods.Items) == 0 {
+		return filteredPods, errors.Errorf("No pod found with desired attributes on specified node(s)")
+	}
+
+	newPodListLength := math.Maximum(1, math.Adjustment(math.Minimum(podAffPerc, 100), len(nodeFilteredPods.Items)))
+	rand.Seed(time.Now().UnixNano())
+
+	// it will generate the random podlist
+	// it starts from the random index and choose requirement no of pods next to that index in a circular way.
+	index := rand.Intn(len(nodeFilteredPods.Items))
+	for i := 0; i < newPodListLength; i++ {
+		realPods.Items = append(realPods.Items, nodeFilteredPods.Items[index])
+		index = (index + 1) % len(nodeFilteredPods.Items)
+	}
+	return realPods, nil
 }

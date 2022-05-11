@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"strings"
 
+	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/stress-chaos/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/stress-chaos/types"
@@ -21,12 +22,16 @@ import (
 // PreparePodIOStress contains prepration steps before chaos injection
 func PreparePodIOStress(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
+	//setup the tunables if provided in range
+	litmusLIB.SetChaosTunables(experimentsDetails)
+
 	// Get the target pod details for the chaos execution
 	// if the target pod is not defined it will derive the random target pod list using pod affected percentage
 	if experimentsDetails.TargetPods == "" && chaosDetails.AppDetail.Label == "" {
 		return errors.Errorf("please provide one of the appLabel or TARGET_PODS")
 	}
-	targetPodList, err := common.GetPodList(experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, clients, chaosDetails)
+	podsAffectedPerc, _ := strconv.Atoi(experimentsDetails.PodsAffectedPerc)
+	targetPodList, err := common.GetPodList(experimentsDetails.TargetPods, podsAffectedPerc, clients, chaosDetails)
 	if err != nil {
 		return err
 	}
@@ -261,18 +266,18 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 func getContainerArguments(experimentsDetails *experimentTypes.ExperimentDetails, appName string) []string {
 
 	var hddbytes string
-	if experimentsDetails.FilesystemUtilizationBytes == 0 {
-		if experimentsDetails.FilesystemUtilizationPercentage == 0 {
+	if experimentsDetails.FilesystemUtilizationBytes == "0" {
+		if experimentsDetails.FilesystemUtilizationPercentage == "0" {
 			hddbytes = "10%"
 			log.Info("Neither of FilesystemUtilizationPercentage or FilesystemUtilizationBytes provided, proceeding with a default FilesystemUtilizationPercentage value of 10%")
 		} else {
-			hddbytes = strconv.Itoa(experimentsDetails.FilesystemUtilizationPercentage) + "%"
+			hddbytes = experimentsDetails.FilesystemUtilizationPercentage + "%"
 		}
 	} else {
-		if experimentsDetails.FilesystemUtilizationPercentage == 0 {
-			hddbytes = strconv.Itoa(experimentsDetails.FilesystemUtilizationBytes) + "G"
+		if experimentsDetails.FilesystemUtilizationPercentage == "0" {
+			hddbytes = experimentsDetails.FilesystemUtilizationBytes + "G"
 		} else {
-			hddbytes = strconv.Itoa(experimentsDetails.FilesystemUtilizationPercentage) + "%"
+			hddbytes = experimentsDetails.FilesystemUtilizationPercentage + "%"
 			log.Warn("Both FsUtilPercentage & FsUtilBytes provided as inputs, using the FsUtilPercentage value to proceed with stress exp")
 		}
 	}
@@ -290,9 +295,9 @@ func getContainerArguments(experimentsDetails *experimentTypes.ExperimentDetails
 	}
 	args := stressArgs
 	if experimentsDetails.VolumeMountPath == "" {
-		args = append(args, "--cpu 1 --io "+strconv.Itoa(experimentsDetails.NumberOfWorkers)+" --hdd "+strconv.Itoa(experimentsDetails.NumberOfWorkers)+" --hdd-bytes "+hddbytes+" --timeout "+strconv.Itoa(experimentsDetails.ChaosDuration)+"s")
+		args = append(args, "--cpu 1 --io "+experimentsDetails.NumberOfWorkers+" --hdd "+experimentsDetails.NumberOfWorkers+" --hdd-bytes "+hddbytes+" --timeout "+strconv.Itoa(experimentsDetails.ChaosDuration)+"s")
 	} else {
-		args = append(args, "--cpu 1 --io "+strconv.Itoa(experimentsDetails.NumberOfWorkers)+" --hdd "+strconv.Itoa(experimentsDetails.NumberOfWorkers)+" --hdd-bytes "+hddbytes+" --temp-path "+experimentsDetails.VolumeMountPath+" --timeout "+strconv.Itoa(experimentsDetails.ChaosDuration)+"s")
+		args = append(args, "--cpu 1 --io "+experimentsDetails.NumberOfWorkers+" --hdd "+experimentsDetails.NumberOfWorkers+" --hdd-bytes "+hddbytes+" --temp-path "+experimentsDetails.VolumeMountPath+" --timeout "+strconv.Itoa(experimentsDetails.ChaosDuration)+"s")
 	}
 	return args
 }

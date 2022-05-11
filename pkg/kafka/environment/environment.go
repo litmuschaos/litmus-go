@@ -30,7 +30,7 @@ func GetENV(kafkaDetails *kafkaTypes.ExperimentDetails) {
 	ChaoslibDetail.InstanceID = types.Getenv("INSTANCE_ID", "")
 	ChaoslibDetail.ChaosPodName = types.Getenv("POD_NAME", "")
 	ChaoslibDetail.Sequence = types.Getenv("SEQUENCE", "parallel")
-	ChaoslibDetail.PodsAffectedPerc, _ = strconv.Atoi(types.Getenv("PODS_AFFECTED_PERC", "0"))
+	ChaoslibDetail.PodsAffectedPerc = types.Getenv("PODS_AFFECTED_PERC", "0")
 	ChaoslibDetail.Force, _ = strconv.ParseBool(types.Getenv("FORCE", "true"))
 	ChaoslibDetail.Delay, _ = strconv.Atoi(types.Getenv("STATUS_CHECK_DELAY", "2"))
 	ChaoslibDetail.Timeout, _ = strconv.Atoi(types.Getenv("STATUS_CHECK_TIMEOUT", "180"))

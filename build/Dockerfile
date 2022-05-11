@@ -1,6 +1,6 @@
 # Multi-stage docker build
 # Build stage
-FROM golang:alpine AS builder
+FROM golang:1.17 AS builder
 
 ARG TARGETOS=linux
 ARG TARGETARCH
@@ -14,7 +14,7 @@ RUN export GOOS=${TARGETOS} && \
 RUN CGO_ENABLED=0 go build -o /output/experiments ./bin/experiment
 RUN CGO_ENABLED=0 go build -o /output/helpers ./bin/helper
 
-FROM alpine:3.14.2 AS dep
+FROM alpine:3.15.0 AS dep
 
 # Install generally useful things
 RUN apk --update add \
@@ -33,4 +33,4 @@ COPY --from=dep /usr/bin/sudo /usr/bin/
 COPY --from=dep /sbin/tc /sbin/
 
 #Copying Necessary Files
-COPY ./pkg/cloud/aws/common/ssm-docs/LitmusChaos-AWS-SSM-Docs.yml ./litmus/LitmusChaos-AWS-SSM-Docs.yml
+COPY ./pkg/cloud/aws/common/ssm-docs/LitmusChaos-AWS-SSM-Docs.yml .

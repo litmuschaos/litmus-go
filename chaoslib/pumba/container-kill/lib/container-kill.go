@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/container-kill/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/container-kill/types"
@@ -28,7 +29,15 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 	if experimentsDetails.TargetPods == "" && chaosDetails.AppDetail.Label == "" {
 		return errors.Errorf("please provide one of the appLabel or TARGET_PODS")
 	}
-	targetPodList, err := common.GetPodList(experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, clients, chaosDetails)
+	//Setup the tunables if provided in range
+	litmusLIB.SetChaosTunables(experimentsDetails)
+
+	log.InfoWithValues("[Info]: The tunables are:", logrus.Fields{
+		"PodsAffectedPerc": experimentsDetails.PodsAffectedPerc,
+		"Sequence":         experimentsDetails.Sequence,
+	})
+	podsAffectedPerc, _ := strconv.Atoi(experimentsDetails.PodsAffectedPerc)
+	targetPodList, err := common.GetPodList(experimentsDetails.TargetPods, podsAffectedPerc, clients, chaosDetails)
 	if err != nil {
 		return err
 	}
@@ -45,14 +54,6 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 
-	//Get the target container name of the application pod
-	if experimentsDetails.TargetContainer == "" {
-		experimentsDetails.TargetContainer, err = common.GetTargetContainer(experimentsDetails.AppNS, targetPodList.Items[0].Name, clients)
-		if err != nil {
-			return errors.Errorf("unable to get the target container name, err: %v", err)
-		}
-	}
-
 	if experimentsDetails.EngineName != "" {
 		if err := common.SetHelperData(chaosDetails, clients); err != nil {
 			return err
@@ -65,6 +66,7 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 		events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 	}
 
+	experimentsDetails.IsTargetContainerProvided = (experimentsDetails.TargetContainer != "")
 	switch strings.ToLower(experimentsDetails.Sequence) {
 	case "serial":
 		if err = injectChaosInSerialMode(experimentsDetails, targetPodList, clients, chaosDetails, resultDetails, eventsDetails); err != nil {
@@ -90,7 +92,7 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
 
 	labelSuffix := common.GetRunID()
-
+	var err error
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
 		if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
@@ -106,6 +108,14 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		log.Infof("restartCount of target container before chaos injection: %v", restartCountBefore)
 
 		runID := common.GetRunID()
+
+		//Get the target container name of the application pod
+		if !experimentsDetails.IsTargetContainerProvided {
+			experimentsDetails.TargetContainer, err = common.GetTargetContainer(experimentsDetails.AppNS, pod.Name, clients)
+			if err != nil {
+				return errors.Errorf("unable to get the target container name, err: %v", err)
+			}
+		}
 
 		log.InfoWithValues("[Info]: Details of application under chaos injection", logrus.Fields{
 			"Target Pod":       pod.Name,
@@ -150,6 +160,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 // injectChaosInParallelMode kill the container of all target application in parallel mode (all at once)
 func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
 
+	var err error
 	//GetRestartCount return the restart count of target container
 	restartCountBefore := getRestartCountAll(targetPodList, experimentsDetails.TargetContainer)
 	log.Infof("restartCount of target containers before chaos injection: %v", restartCountBefore)
@@ -167,6 +178,14 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 	for _, pod := range targetPodList.Items {
 
 		runID := common.GetRunID()
+
+		//Get the target container name of the application pod
+		if !experimentsDetails.IsTargetContainerProvided {
+			experimentsDetails.TargetContainer, err = common.GetTargetContainer(experimentsDetails.AppNS, pod.Name, clients)
+			if err != nil {
+				return errors.Errorf("unable to get the target container name, err: %v", err)
+			}
+		}
 
 		log.InfoWithValues("[Info]: Details of application under chaos injection", logrus.Fields{
 			"Target Pod":       pod.Name,
