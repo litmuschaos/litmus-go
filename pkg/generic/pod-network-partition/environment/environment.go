@@ -33,4 +33,5 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.PodSelector = types.Getenv("POD_SELECTOR", "")
 	experimentDetails.NamespaceSelector = types.Getenv("NAMESPACE_SELECTOR", "")
 	experimentDetails.PORTS = types.Getenv("PORTS", "")
+
 }

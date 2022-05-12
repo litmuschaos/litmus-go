@@ -42,6 +42,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expType DNSCha
 	experimentDetails.SocketPath = types.Getenv("SOCKET_PATH", "/var/run/docker.sock")
 	experimentDetails.ChaosServiceAccount = types.Getenv("CHAOS_SERVICE_ACCOUNT", "")
 	experimentDetails.Sequence = types.Getenv("SEQUENCE", "parallel")
+	experimentDetails.SetHelperData = types.Getenv("SET_HELPER_DATA", "true")
 	experimentDetails.TerminationGracePeriodSeconds, _ = strconv.Atoi(types.Getenv("TERMINATION_GRACE_PERIOD_SECONDS", ""))
 	switch expType {
 	case Error:
