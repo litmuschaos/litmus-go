@@ -42,4 +42,5 @@ type ExperimentDetails struct {
 	StressType                      string
 	IsTargetContainerProvided       bool
 	NodeLabel                       string
+	SetHelperData                   string
 }

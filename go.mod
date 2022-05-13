@@ -18,6 +18,7 @@ require (
 	k8s.io/api v0.17.3
 	k8s.io/apimachinery v0.17.3
 	k8s.io/client-go v12.0.0+incompatible
+	k8s.io/klog v1.0.0
 	k8s.io/kubernetes v1.18.19
 )
 
@@ -75,7 +76,6 @@ require (
 	google.golang.org/grpc v1.38.0 // indirect
 	google.golang.org/protobuf v1.26.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
-	k8s.io/klog v1.0.0 // indirect
 	k8s.io/kube-openapi v0.0.0-20200410145947-61e04a5be9a6 // indirect
 	k8s.io/utils v0.0.0-20200414100711-2df71ebbae66 // indirect
 	sigs.k8s.io/controller-runtime v0.4.0 // indirect

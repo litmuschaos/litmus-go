@@ -30,4 +30,5 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.Timeout, _ = strconv.Atoi(types.Getenv("STATUS_CHECK_TIMEOUT", "180"))
 	experimentDetails.TargetContainer = types.Getenv("TARGET_CONTAINER", "")
 	experimentDetails.NodeLabel = types.Getenv("NODE_LABEL", "")
+
 }

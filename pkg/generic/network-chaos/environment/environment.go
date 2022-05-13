@@ -39,6 +39,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string
 	experimentDetails.SocketPath = types.Getenv("SOCKET_PATH", "/var/run/docker.sock")
 	experimentDetails.Sequence = types.Getenv("SEQUENCE", "parallel")
 	experimentDetails.TerminationGracePeriodSeconds, _ = strconv.Atoi(types.Getenv("TERMINATION_GRACE_PERIOD_SECONDS", ""))
+	experimentDetails.SetHelperData = types.Getenv("SET_HELPER_DATA", "true")
 
 	switch expName {
 	case "pod-network-loss":
