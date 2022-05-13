@@ -35,4 +35,5 @@ type ExperimentDetails struct {
 	Sequence                        string
 	TargetContainer                 string
 	NodeLabel                       string
+	SetHelperData                   string
 }
