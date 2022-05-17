@@ -103,7 +103,7 @@ func prepareK8sHttpChaos(experimentsDetails *experimentTypes.ExperimentDetails, 
 	log.Info("[Chaos]: Stopping the experiment")
 
 	// cleaning the netem process after chaos injection
-	if err = killProxy(targetPID, experimentsDetails); err != nil {
+	if err = revertChaos(experimentsDetails, targetPID); err != nil {
 		return err
 	}
 
@@ -138,9 +138,7 @@ func getContainerID(experimentDetails *experimentTypes.ExperimentDetails, client
 	return containerID, nil
 }
 
-// injectChaos inject the http chaos in target container
-// it is using nsenter command to enter into network namespace of target container
-// and execute the proxy related command inside it.
+// injectChaos inject the http chaos in target container and add ruleset to the iptables to redirect the ports
 func injectChaos(experimentDetails *experimentTypes.ExperimentDetails, pid int) error {
 
 	select {
@@ -148,50 +146,107 @@ func injectChaos(experimentDetails *experimentTypes.ExperimentDetails, pid int) 
 		// stopping the chaos execution, if abort signal received
 		os.Exit(1)
 	default:
-		addIPRuleSetCommand := fmt.Sprintf("(sudo nsenter -t %d -n iptables -t nat -A PREROUTING -i eth0 -p tcp --dport %d -j REDIRECT --to-port %d)", pid, experimentDetails.TargetPort, experimentDetails.DestinationPort)
-		startProxyServerCommand := fmt.Sprintf("(sudo nsenter -t %d -n /litmus/toxiproxy -host=0.0.0.0 > /dev/null 2>&1 &)", pid)
-		createProxyCommand := fmt.Sprintf("(sudo nsenter -t %d -n /litmus/toxiproxy-cli create -l 0.0.0.0:%d -u localhost:%d proxy)", pid, experimentDetails.DestinationPort, experimentDetails.TargetPort)
-		createToxicCommand := ""
-		switch experimentDetails.HttpChaosType {
-		// preparing command for toxic addition based on HttpChaosType chosen by user
-		case "http-latency":
-			createToxicCommand = fmt.Sprintf("(sudo nsenter -t %d -n /litmus/toxiproxy-cli toxic add -t latency -a latency=%d proxy)", pid, experimentDetails.HttpLatency)
+		// proceed for chaos injection
+		if err := startProxy(experimentDetails, pid); err != nil {
+			return errors.Errorf("failed to start proxy, err: %v", err)
 		}
-
-		// sleep 10 is added for proxy-server to be ready for creating proxy and adding toxics
-		chaosCommand := fmt.Sprintf("%s && sleep 10 && %s && %s && %s", startProxyServerCommand, createProxyCommand, createToxicCommand, addIPRuleSetCommand)
-		cmd := exec.Command("/bin/bash", "-c", chaosCommand)
-		out, err := cmd.CombinedOutput()
-		log.Info(cmd.String())
-		if err != nil {
-			log.Error(string(out))
-			return err
+		if err := addIPRuleSet(experimentDetails, pid); err != nil {
+			return errors.Errorf("failed to add ip rule set, err: %v", err)
 		}
 	}
 	return nil
 }
 
-// killnetem kill the netem process for all the target containers
-func killProxy(PID int, experimentDetails *experimentTypes.ExperimentDetails) error {
+// revertChaos revert the http chaos in target container
+func revertChaos(experimentDetails *experimentTypes.ExperimentDetails, pid int) error {
 
-	removeIPRuleSetCommand := fmt.Sprintf("sudo nsenter -t %d -n iptables -t nat -D PREROUTING -i eth0 -p tcp --dport %d -j REDIRECT --to-port %d", PID, experimentDetails.TargetPort, experimentDetails.DestinationPort)
-	stopProxyServerCommand := fmt.Sprintf("sudo nsenter -t %d -n sudo kill -9 $(ps aux | grep [t]oxiproxy | awk 'FNR==1{print $1}')", PID)
-	deleteProxyCommand := fmt.Sprintf("sudo nsenter -t %d -n /litmus/toxiproxy-cli delete proxy", PID)
-	killCommand := fmt.Sprintf("%s && %s && %s", removeIPRuleSetCommand, deleteProxyCommand, stopProxyServerCommand)
+	if err := removeIPRuleSet(experimentDetails, pid); err != nil {
+		return errors.Errorf("failed to remove ip rule set, err: %v", err)
+	}
+
+	if err := killProxy(experimentDetails, pid); err != nil {
+		return errors.Errorf("failed to kill proxy, err: %v", err)
+	}
+
+	return nil
+}
+
+// startProxy starts the proxy process inside the target container
+// it is using nsenter command to enter into network namespace of target container
+// and execute the proxy related command inside it.
+func startProxy(experimentDetails *experimentTypes.ExperimentDetails, pid int) error {
+	startProxyServerCommand := fmt.Sprintf("(sudo nsenter -t %d -n /litmus/toxiproxy -host=0.0.0.0 > /dev/null 2>&1 &)", pid)
+	createProxyCommand := fmt.Sprintf("(sudo nsenter -t %d -n /litmus/toxiproxy-cli create -l 0.0.0.0:%d -u %v:%d proxy)", pid, experimentDetails.ListenPort, experimentDetails.TargetHost, experimentDetails.TargetPort)
+	createToxicCommand := ""
+	switch experimentDetails.ExperimentName {
+	// preparing command for toxic addition based on HttpChaosType chosen by user
+	case "pod-http-latency":
+		createToxicCommand = fmt.Sprintf("(sudo nsenter -t %d -n /litmus/toxiproxy-cli toxic add -t latency -a latency=%d proxy)", pid, experimentDetails.Latency)
+	}
+
+	// sleep 10 is added for proxy-server to be ready for creating proxy and adding toxics
+	chaosCommand := fmt.Sprintf("%s && sleep 10 && %s && %s", startProxyServerCommand, createProxyCommand, createToxicCommand)
+
+	cmd := exec.Command("/bin/bash", "-c", chaosCommand)
+	out, err := cmd.CombinedOutput()
+	log.Info(cmd.String())
+	if err != nil {
+		log.Error(string(out))
+		return err
+	}
+	log.Info("Proxy started successfully")
+	return nil
+}
+
+// killProxy kills the proxy process inside the target container
+// it is using nsenter command to enter into network namespace of target container
+// and execute the proxy related command inside it.
+func killProxy(experimentDetails *experimentTypes.ExperimentDetails, pid int) error {
+	stopProxyServerCommand := fmt.Sprintf("sudo nsenter -t %d -n sudo kill -9 $(ps aux | grep [t]oxiproxy | awk 'FNR==1{print $1}')", pid)
+	deleteProxyCommand := fmt.Sprintf("sudo nsenter -t %d -n /litmus/toxiproxy-cli delete proxy", pid)
+	killCommand := fmt.Sprintf("%s && %s", deleteProxyCommand, stopProxyServerCommand)
 	cmd := exec.Command("/bin/bash", "-c", killCommand)
 	out, err := cmd.CombinedOutput()
 	log.Info(cmd.String())
 
 	if err != nil {
 		log.Error(string(out))
-		// ignoring err if qdisc process doesn't exist inside the target container
-		// if strings.Contains(string(out), qdiscNotFound) || strings.Contains(string(out), qdiscNoFileFound) {
-		// 	log.Warn("The http chaos process has already been removed")
-		// 	return nil
-		// }
 		return err
 	}
 
+	log.Info("Proxy stopped successfully")
+	return nil
+}
+
+// addIPRuleSet adds the ip rule set to iptables in target container
+// it is using nsenter command to enter into network namespace of target container
+// and execute the iptables related command inside it.
+func addIPRuleSet(experimentDetails *experimentTypes.ExperimentDetails, pid int) error {
+	addIPRuleSetCommand := fmt.Sprintf("(sudo nsenter -t %d -n iptables -t nat -A PREROUTING -i eth0 -p tcp --dport %d -j REDIRECT --to-port %d)", pid, experimentDetails.TargetPort, experimentDetails.ListenPort)
+	cmd := exec.Command("/bin/bash", "-c", addIPRuleSetCommand)
+	out, err := cmd.CombinedOutput()
+	log.Info(cmd.String())
+	if err != nil {
+		log.Error(string(out))
+		return err
+	}
+	log.Info("IP rule set added successfully")
+	return nil
+}
+
+// removeIPRuleSet removes the ip rule set from iptables in target container
+// it is using nsenter command to enter into network namespace of target container
+// and execute the iptables related command inside it.
+func removeIPRuleSet(experimentDetails *experimentTypes.ExperimentDetails, pid int) error {
+	removeIPRuleSetCommand := fmt.Sprintf("sudo nsenter -t %d -n iptables -t nat -D PREROUTING -i eth0 -p tcp --dport %d -j REDIRECT --to-port %d", pid, experimentDetails.TargetPort, experimentDetails.ListenPort)
+	cmd := exec.Command("/bin/bash", "-c", removeIPRuleSetCommand)
+	out, err := cmd.CombinedOutput()
+	log.Info(cmd.String())
+	if err != nil {
+		log.Error(string(out))
+		return err
+	}
+	log.Info("IP rule set removed successfully")
 	return nil
 }
 
@@ -203,18 +258,16 @@ func getENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.TargetContainer = types.Getenv("APP_CONTAINER", "")
 	experimentDetails.TargetPods = types.Getenv("APP_POD", "")
 	experimentDetails.AppLabel = types.Getenv("APP_LABEL", "")
-	experimentDetails.ChaosDuration, _ = strconv.Atoi(types.Getenv("TOTAL_CHAOS_DURATION", "30"))
+	experimentDetails.ChaosDuration, _ = strconv.Atoi(types.Getenv("TOTAL_CHAOS_DURATION", "60"))
 	experimentDetails.ChaosNamespace = types.Getenv("CHAOS_NAMESPACE", "litmus")
 	experimentDetails.EngineName = types.Getenv("CHAOSENGINE", "")
 	experimentDetails.ChaosUID = clientTypes.UID(types.Getenv("CHAOS_UID", ""))
 	experimentDetails.ChaosPodName = types.Getenv("POD_NAME", "")
 	experimentDetails.ContainerRuntime = types.Getenv("CONTAINER_RUNTIME", "")
-	experimentDetails.NetworkInterface = types.Getenv("NETWORK_INTERFACE", "eth0")
 	experimentDetails.SocketPath = types.Getenv("SOCKET_PATH", "")
-	experimentDetails.TargetPort, _ = strconv.Atoi(types.Getenv("TARGET_PORT", "8080"))
-	experimentDetails.DestinationPort, _ = strconv.Atoi(types.Getenv("DESTINATION_PORT", "9091"))
-	experimentDetails.HttpLatency, _ = strconv.Atoi(types.Getenv("HTTP_LATENCY", "0"))
-	experimentDetails.HttpChaosType = types.Getenv("HTTP_CHAOS_TYPE", "http-latency")
+	experimentDetails.TargetPort, _ = strconv.Atoi(types.Getenv("TARGET_PORT", ""))
+	experimentDetails.ListenPort, _ = strconv.Atoi(types.Getenv("LISTEN_PORT", ""))
+	experimentDetails.Latency, _ = strconv.Atoi(types.Getenv("LATENCY", "0"))
 }
 
 // abortWatcher continuously watch for the abort signals
@@ -226,13 +279,13 @@ func abortWatcher(targetPID int, resultName, chaosNS string, experimentDetails *
 	// retry thrice for the chaos revert
 	retry := 3
 	for retry > 0 {
-		if err = killProxy(targetPID, experimentDetails); err != nil {
-			log.Errorf("unable to kill proxy process, err :%v", err)
+		if err = revertChaos(experimentDetails, targetPID); err != nil {
+			log.Errorf("unable to revert http process, err :%v", err)
 		}
 		retry--
 		time.Sleep(1 * time.Second)
 	}
-	if err = result.AnnotateChaosResult(resultName, chaosNS, "reverted", "pod", experimentDetails.TargetPods); err != nil {
+	if err = result.AnnotateChaosResult(resultName, chaosNS, "reverted", "pod", experimentDetails.ChaosPodName); err != nil {
 		log.Errorf("unable to annotate the chaosresult, err :%v", err)
 	}
 	log.Info("Chaos Revert Completed")

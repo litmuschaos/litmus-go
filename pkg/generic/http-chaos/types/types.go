@@ -22,20 +22,19 @@ type ExperimentDetails struct {
 	ChaosPodName                  string
 	RunID                         string
 	TargetContainer               string
-	NetworkInterface              string
+	IsTargetContainerProvided     bool
 	Timeout                       int
 	Delay                         int
-	HttpLatency                   int
+	TerminationGracePeriodSeconds int
 	TargetPods                    string
 	PodsAffectedPerc              string
 	ContainerRuntime              string
 	ChaosServiceAccount           string
 	SocketPath                    string
 	Sequence                      string
-	TerminationGracePeriodSeconds int
-	HttpChaosType                 string
 	NodeLabel                     string
 	TargetPort                    int
-	DestinationPort               int
-	IsTargetContainerProvided     bool
+	ListenPort                    int
+	TargetHost                    string
+	Latency                       int
 }

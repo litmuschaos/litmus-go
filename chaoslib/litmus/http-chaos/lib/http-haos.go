@@ -17,8 +17,8 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-//PrepareAndInjectChaos contains the prepration & injection steps
-func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, args string) error {
+//PrepareAndInjectChaos contains the preparation & injection steps
+func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	targetPodList := apiv1.PodList{}
 	var err error
@@ -28,14 +28,14 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 	if experimentsDetails.TargetPods == "" && chaosDetails.AppDetail.Label == "" {
 		return errors.Errorf("please provide one of the appLabel or TARGET_PODS")
 	}
-	//setup the tunables if provided in range
+	//set up the tunables if provided in range
 	SetChaosTunables(experimentsDetails)
 
-	switch experimentsDetails.HttpChaosType {
+	switch experimentsDetails.ExperimentName {
 
-	case "http-latency":
+	case "pod-http-latency":
 		log.InfoWithValues("[Info]: The chaos tunables are:", logrus.Fields{
-			"HttpLatency":      strconv.Itoa(experimentsDetails.HttpLatency),
+			"HttpLatency":      strconv.Itoa(experimentsDetails.Latency),
 			"Sequence":         experimentsDetails.Sequence,
 			"PodsAffectedPerc": experimentsDetails.PodsAffectedPerc,
 		})
@@ -64,7 +64,7 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 		}
 	}
 
-	podNames := []string{}
+	var podNames []string
 	for _, pod := range targetPodList.Items {
 		podNames = append(podNames, pod.Name)
 	}
@@ -92,11 +92,11 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 
 	switch strings.ToLower(experimentsDetails.Sequence) {
 	case "serial":
-		if err = injectChaosInSerialMode(experimentsDetails, targetPodList, clients, chaosDetails, args, resultDetails, eventsDetails); err != nil {
+		if err = injectChaosInSerialMode(experimentsDetails, targetPodList, clients, chaosDetails, resultDetails, eventsDetails); err != nil {
 			return err
 		}
 	case "parallel":
-		if err = injectChaosInParallelMode(experimentsDetails, targetPodList, clients, chaosDetails, args, resultDetails, eventsDetails); err != nil {
+		if err = injectChaosInParallelMode(experimentsDetails, targetPodList, clients, chaosDetails, resultDetails, eventsDetails); err != nil {
 			return err
 		}
 	default:
@@ -107,7 +107,7 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 }
 
 // injectChaosInSerialMode inject the http chaos in all target application serially (one by one)
-func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, args string, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
+func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
 
 	var err error
 	labelSuffix := common.GetRunID()
@@ -135,7 +135,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 			"ContainerName": experimentsDetails.TargetContainer,
 		})
 		runID := common.GetRunID()
-		if err := createHelperPod(experimentsDetails, clients, chaosDetails, pod.Name, pod.Spec.NodeName, runID, args, labelSuffix); err != nil {
+		if err := createHelperPod(experimentsDetails, clients, chaosDetails, pod.Name, pod.Spec.NodeName, runID, labelSuffix); err != nil {
 			return errors.Errorf("unable to create the helper pod, err: %v", err)
 		}
 
@@ -168,7 +168,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 }
 
 // injectChaosInParallelMode inject the http chaos in all target application in parallel mode (all at once)
-func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, args string, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
+func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
 
 	labelSuffix := common.GetRunID()
 	var err error
@@ -197,7 +197,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 			"ContainerName": experimentsDetails.TargetContainer,
 		})
 		runID := common.GetRunID()
-		if err := createHelperPod(experimentsDetails, clients, chaosDetails, pod.Name, pod.Spec.NodeName, runID, args, labelSuffix); err != nil {
+		if err := createHelperPod(experimentsDetails, clients, chaosDetails, pod.Name, pod.Spec.NodeName, runID, labelSuffix); err != nil {
 			return errors.Errorf("unable to create the helper pod, err: %v", err)
 		}
 	}
@@ -230,7 +230,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 }
 
 // createHelperPod derive the attributes for helper pod and create the helper pod
-func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, podName, nodeName, runID, args, labelSuffix string) error {
+func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, podName, nodeName, runID, labelSuffix string) error {
 
 	privilegedEnable := true
 	terminationGracePeriodSeconds := int64(experimentsDetails.TerminationGracePeriodSeconds)
@@ -273,7 +273,7 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 						"./helpers -name http-chaos",
 					},
 					Resources: chaosDetails.Resources,
-					Env:       getPodEnv(experimentsDetails, podName, args),
+					Env:       getPodEnv(experimentsDetails, podName),
 					VolumeMounts: []apiv1.VolumeMount{
 						{
 							Name:      "cri-socket",
@@ -300,7 +300,7 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 }
 
 // getPodEnv derive all the env required for the helper pod
-func getPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, podName, args string) []apiv1.EnvVar {
+func getPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, podName string) []apiv1.EnvVar {
 
 	var envDetails common.ENVDetails
 	envDetails.SetEnv("APP_NAMESPACE", experimentsDetails.AppNS).
@@ -313,10 +313,10 @@ func getPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, podName, a
 		SetEnv("CONTAINER_RUNTIME", experimentsDetails.ContainerRuntime).
 		SetEnv("EXPERIMENT_NAME", experimentsDetails.ExperimentName).
 		SetEnv("SOCKET_PATH", experimentsDetails.SocketPath).
-		SetEnv("HTTP_LATENCY", strconv.Itoa(experimentsDetails.HttpLatency)).
+		SetEnv("LATENCY", strconv.Itoa(experimentsDetails.Latency)).
 		SetEnv("TARGET_PORT", strconv.Itoa(experimentsDetails.TargetPort)).
-		SetEnv("DESTINATION_PORT", strconv.Itoa(experimentsDetails.DestinationPort)).
-		SetEnv("HTTP_CHAOS_TYPE", experimentsDetails.HttpChaosType).
+		SetEnv("TARGET_HOST", experimentsDetails.TargetHost).
+		SetEnv("LISTEN_PORT", strconv.Itoa(experimentsDetails.ListenPort)).
 		SetEnvFromDownwardAPI("v1", "metadata.name")
 
 	return envDetails.ENV

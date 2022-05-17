@@ -30,18 +30,17 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string
 	experimentDetails.TargetPods = types.Getenv("TARGET_PODS", "")
 	experimentDetails.PodsAffectedPerc = types.Getenv("PODS_AFFECTED_PERC", "0")
 	experimentDetails.NodeLabel = types.Getenv("NODE_LABEL", "")
-	experimentDetails.NetworkInterface = types.Getenv("NETWORK_INTERFACE", "eth0")
+	experimentDetails.TerminationGracePeriodSeconds, _ = strconv.Atoi(types.Getenv("TERMINATION_GRACE_PERIOD_SECONDS", ""))
 	experimentDetails.ContainerRuntime = types.Getenv("CONTAINER_RUNTIME", "docker")
 	experimentDetails.ChaosServiceAccount = types.Getenv("CHAOS_SERVICE_ACCOUNT", "")
 	experimentDetails.SocketPath = types.Getenv("SOCKET_PATH", "/var/run/docker.sock")
 	experimentDetails.Sequence = types.Getenv("SEQUENCE", "parallel")
-	experimentDetails.TerminationGracePeriodSeconds, _ = strconv.Atoi(types.Getenv("TERMINATION_GRACE_PERIOD_SECONDS", ""))
+	experimentDetails.TargetPort, _ = strconv.Atoi(types.Getenv("TARGET_PORT", "8080"))
+	experimentDetails.ListenPort, _ = strconv.Atoi(types.Getenv("LISTEN_PORT", "8081"))
+	experimentDetails.TargetHost = types.Getenv("TARGET_HOST", "")
 
 	switch expName {
 	case "pod-http-latency":
-		experimentDetails.TargetPort, _ = strconv.Atoi(types.Getenv("TARGET_PORT", "8080"))
-		experimentDetails.DestinationPort, _ = strconv.Atoi(types.Getenv("DESTINATION_PORT", "8081"))
-		experimentDetails.HttpLatency, _ = strconv.Atoi(types.Getenv("HTTP_LATENCY", "6000"))
-		experimentDetails.HttpChaosType = "http-latency"
+		experimentDetails.Latency, _ = strconv.Atoi(types.Getenv("LATENCY", "6000"))
 	}
 }
