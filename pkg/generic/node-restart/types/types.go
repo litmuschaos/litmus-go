@@ -31,4 +31,5 @@ type ExperimentDetails struct {
 	TargetNodeIP                  string
 	TargetContainer               string
 	NodeLabel                     string
+	SetHelperData                 string
 }

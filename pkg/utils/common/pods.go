@@ -82,16 +82,12 @@ func getChaosPodResourceRequirements(podName, containerName, namespace string, c
 
 // SetHelperData derive the data from experiment pod and sets into experimentDetails struct
 // which can be used to create helper pod
-func SetHelperData(chaosDetails *types.ChaosDetails, clients clients.ClientSets) error {
-	pod, err := clients.KubeClient.CoreV1().Pods(chaosDetails.ChaosNamespace).Get(chaosDetails.ChaosPodName, v1.GetOptions{})
+func SetHelperData(chaosDetails *types.ChaosDetails, setHelperData string, clients clients.ClientSets) error {
+	var pod *core_v1.Pod
+	pod, err = clients.KubeClient.CoreV1().Pods(chaosDetails.ChaosNamespace).Get(chaosDetails.ChaosPodName, v1.GetOptions{})
 	if err != nil {
 		return err
 	}
-	// Get Chaos Pod Annotation
-	chaosDetails.Annotations = pod.Annotations
-
-	// Get ImagePullSecrets
-	chaosDetails.ImagePullSecrets = pod.Spec.ImagePullSecrets
 
 	// Get Labels
 	labels := pod.ObjectMeta.Labels
@@ -99,12 +95,25 @@ func SetHelperData(chaosDetails *types.ChaosDetails, clients clients.ClientSets)
 	delete(labels, "job-name")
 	chaosDetails.Labels = labels
 
-	// Get Resource Requirements
-	chaosDetails.Resources, err = getChaosPodResourceRequirements(chaosDetails.ChaosPodName, chaosDetails.ExperimentName, chaosDetails.ChaosNamespace, clients)
-	if err != nil {
-		return errors.Errorf("unable to get resource requirements, err: %v", err)
+	switch setHelperData {
+	case "false":
+		return nil
+
+	default:
+
+		// Get Chaos Pod Annotation
+		chaosDetails.Annotations = pod.Annotations
+
+		// Get ImagePullSecrets
+		chaosDetails.ImagePullSecrets = pod.Spec.ImagePullSecrets
+
+		// Get Resource Requirements
+		chaosDetails.Resources, err = getChaosPodResourceRequirements(chaosDetails.ChaosPodName, chaosDetails.ExperimentName, chaosDetails.ChaosNamespace, clients)
+		if err != nil {
+			return errors.Errorf("unable to get resource requirements, err: %v", err)
+		}
+		return nil
 	}
-	return nil
 }
 
 // GetHelperLabels return the labels of the helper pod
