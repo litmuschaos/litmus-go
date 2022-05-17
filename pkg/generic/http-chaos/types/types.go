@@ -31,6 +31,7 @@ type ExperimentDetails struct {
 	ContainerRuntime              string
 	ChaosServiceAccount           string
 	SocketPath                    string
+	SetHelperData                 string
 	Sequence                      string
 	NodeLabel                     string
 	TargetPort                    int
