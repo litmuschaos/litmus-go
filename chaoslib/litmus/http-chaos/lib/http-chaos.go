@@ -18,7 +18,7 @@ import (
 )
 
 //PrepareAndInjectChaos contains the preparation & injection steps
-func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, args string) error {
 
 	targetPodList := apiv1.PodList{}
 	var err error
@@ -96,11 +96,11 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 
 	switch strings.ToLower(experimentsDetails.Sequence) {
 	case "serial":
-		if err = injectChaosInSerialMode(experimentsDetails, targetPodList, clients, chaosDetails, resultDetails, eventsDetails); err != nil {
+		if err = injectChaosInSerialMode(experimentsDetails, targetPodList, args, clients, chaosDetails, resultDetails, eventsDetails); err != nil {
 			return err
 		}
 	case "parallel":
-		if err = injectChaosInParallelMode(experimentsDetails, targetPodList, clients, chaosDetails, resultDetails, eventsDetails); err != nil {
+		if err = injectChaosInParallelMode(experimentsDetails, targetPodList, args, clients, chaosDetails, resultDetails, eventsDetails); err != nil {
 			return err
 		}
 	default:
@@ -111,7 +111,7 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 }
 
 // injectChaosInSerialMode inject the http chaos in all target application serially (one by one)
-func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
+func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, args string, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
 
 	var err error
 	labelSuffix := common.GetRunID()
@@ -139,7 +139,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 			"ContainerName": experimentsDetails.TargetContainer,
 		})
 		runID := common.GetRunID()
-		if err := createHelperPod(experimentsDetails, clients, chaosDetails, pod.Name, pod.Spec.NodeName, runID, labelSuffix); err != nil {
+		if err := createHelperPod(experimentsDetails, clients, chaosDetails, pod.Name, pod.Spec.NodeName, runID, args, labelSuffix); err != nil {
 			return errors.Errorf("unable to create the helper pod, err: %v", err)
 		}
 
@@ -172,7 +172,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 }
 
 // injectChaosInParallelMode inject the http chaos in all target application in parallel mode (all at once)
-func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
+func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, args string, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
 
 	labelSuffix := common.GetRunID()
 	var err error
@@ -201,7 +201,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 			"ContainerName": experimentsDetails.TargetContainer,
 		})
 		runID := common.GetRunID()
-		if err := createHelperPod(experimentsDetails, clients, chaosDetails, pod.Name, pod.Spec.NodeName, runID, labelSuffix); err != nil {
+		if err := createHelperPod(experimentsDetails, clients, chaosDetails, pod.Name, pod.Spec.NodeName, runID, args, labelSuffix); err != nil {
 			return errors.Errorf("unable to create the helper pod, err: %v", err)
 		}
 	}
@@ -234,7 +234,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 }
 
 // createHelperPod derive the attributes for helper pod and create the helper pod
-func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, podName, nodeName, runID, labelSuffix string) error {
+func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, podName, nodeName, runID, args, labelSuffix string) error {
 
 	privilegedEnable := true
 	terminationGracePeriodSeconds := int64(experimentsDetails.TerminationGracePeriodSeconds)
@@ -277,7 +277,7 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 						"./helpers -name http-chaos",
 					},
 					Resources: chaosDetails.Resources,
-					Env:       getPodEnv(experimentsDetails, podName),
+					Env:       getPodEnv(experimentsDetails, podName, args),
 					VolumeMounts: []apiv1.VolumeMount{
 						{
 							Name:      "cri-socket",
@@ -304,7 +304,7 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 }
 
 // getPodEnv derive all the env required for the helper pod
-func getPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, podName string) []apiv1.EnvVar {
+func getPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, podName, args string) []apiv1.EnvVar {
 
 	var envDetails common.ENVDetails
 	envDetails.SetEnv("APP_NAMESPACE", experimentsDetails.AppNS).
@@ -317,7 +317,7 @@ func getPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, podName st
 		SetEnv("CONTAINER_RUNTIME", experimentsDetails.ContainerRuntime).
 		SetEnv("EXPERIMENT_NAME", experimentsDetails.ExperimentName).
 		SetEnv("SOCKET_PATH", experimentsDetails.SocketPath).
-		SetEnv("LATENCY", strconv.Itoa(experimentsDetails.Latency)).
+		SetEnv("TOXIC_COMMAND", args).
 		SetEnv("TARGET_PORT", strconv.Itoa(experimentsDetails.TargetPort)).
 		SetEnv("TARGET_HOST", experimentsDetails.TargetHost).
 		SetEnv("LISTEN_PORT", strconv.Itoa(experimentsDetails.ListenPort)).

@@ -175,20 +175,23 @@ func revertChaos(experimentDetails *experimentTypes.ExperimentDetails, pid int) 
 // it is using nsenter command to enter into network namespace of target container
 // and execute the proxy related command inside it.
 func startProxy(experimentDetails *experimentTypes.ExperimentDetails, pid int) error {
+
+	toxicCommands := os.Getenv("TOXIC_COMMAND")
+
 	startProxyServerCommand := fmt.Sprintf("(sudo nsenter -t %d -n /litmus/toxiproxy -host=0.0.0.0 > /dev/null 2>&1 &)", pid)
 	createProxyCommand := fmt.Sprintf("(sudo nsenter -t %d -n /litmus/toxiproxy-cli create -l 0.0.0.0:%d -u %v:%d proxy)", pid, experimentDetails.ListenPort, experimentDetails.TargetHost, experimentDetails.TargetPort)
 	createToxicCommand := ""
 	switch experimentDetails.ExperimentName {
 	// preparing command for toxic addition based on HttpChaosType chosen by user
 	case "pod-http-latency":
-		createToxicCommand = fmt.Sprintf("(sudo nsenter -t %d -n /litmus/toxiproxy-cli toxic add -t latency -a latency=%d proxy)", pid, experimentDetails.Latency)
+		createToxicCommand = fmt.Sprintf("(sudo nsenter -t %d -n /litmus/toxiproxy-cli toxic add %s proxy)", pid, toxicCommands)
 	}
 
 	// sleep 10 is added for proxy-server to be ready for creating proxy and adding toxics
 	chaosCommand := fmt.Sprintf("%s && sleep 10 && %s && %s", startProxyServerCommand, createProxyCommand, createToxicCommand)
 
 	cmd := exec.Command("/bin/bash", "-c", chaosCommand)
-	log.Infof("[Chaos]: Running command: %s", cmd.String())
+	log.Infof("[Chaos]: Starting proxy server: %s", cmd.String())
 
 	_, err := cmd.CombinedOutput()
 	if err != nil {
@@ -206,7 +209,7 @@ func killProxy(experimentDetails *experimentTypes.ExperimentDetails, pid int) er
 	deleteProxyCommand := fmt.Sprintf("sudo nsenter -t %d -n /litmus/toxiproxy-cli delete proxy", pid)
 	killCommand := fmt.Sprintf("%s && %s", deleteProxyCommand, stopProxyServerCommand)
 	cmd := exec.Command("/bin/bash", "-c", killCommand)
-	log.Infof("[Chaos]: Running command: %s", cmd.String())
+	log.Infof("[Chaos]: Stopping proxy server: %s", cmd.String())
 
 	_, err := cmd.CombinedOutput()
 	if err != nil {
@@ -223,7 +226,7 @@ func killProxy(experimentDetails *experimentTypes.ExperimentDetails, pid int) er
 func addIPRuleSet(experimentDetails *experimentTypes.ExperimentDetails, pid int) error {
 	addIPRuleSetCommand := fmt.Sprintf("(sudo nsenter -t %d -n iptables -t nat -A PREROUTING -i eth0 -p tcp --dport %d -j REDIRECT --to-port %d)", pid, experimentDetails.TargetPort, experimentDetails.ListenPort)
 	cmd := exec.Command("/bin/bash", "-c", addIPRuleSetCommand)
-	log.Infof("[Chaos]: Running command: %s", cmd.String())
+	log.Infof("[Chaos]: Adding IPtables ruleset: %s", cmd.String())
 
 	_, err := cmd.CombinedOutput()
 	if err != nil {
@@ -239,7 +242,7 @@ func addIPRuleSet(experimentDetails *experimentTypes.ExperimentDetails, pid int)
 func removeIPRuleSet(experimentDetails *experimentTypes.ExperimentDetails, pid int) error {
 	removeIPRuleSetCommand := fmt.Sprintf("sudo nsenter -t %d -n iptables -t nat -D PREROUTING -i eth0 -p tcp --dport %d -j REDIRECT --to-port %d", pid, experimentDetails.TargetPort, experimentDetails.ListenPort)
 	cmd := exec.Command("/bin/bash", "-c", removeIPRuleSetCommand)
-	log.Infof("[Chaos]: Running command: %s", cmd.String())
+	log.Infof("[Chaos]: Removing IPtables ruleset: %s", cmd.String())
 
 	_, err := cmd.CombinedOutput()
 	if err != nil {
@@ -266,7 +269,6 @@ func getENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.SocketPath = types.Getenv("SOCKET_PATH", "")
 	experimentDetails.TargetPort, _ = strconv.Atoi(types.Getenv("TARGET_PORT", ""))
 	experimentDetails.ListenPort, _ = strconv.Atoi(types.Getenv("LISTEN_PORT", ""))
-	experimentDetails.Latency, _ = strconv.Atoi(types.Getenv("LATENCY", "0"))
 }
 
 // abortWatcher continuously watch for the abort signals
@@ -284,7 +286,7 @@ func abortWatcher(targetPID int, resultName, chaosNS string, experimentDetails *
 		retry--
 		time.Sleep(1 * time.Second)
 	}
-	if err = result.AnnotateChaosResult(resultName, chaosNS, "reverted", "pod", experimentDetails.ChaosPodName); err != nil {
+	if err = result.AnnotateChaosResult(resultName, chaosNS, "reverted", "pod", experimentDetails.TargetPods); err != nil {
 		log.Errorf("unable to annotate the chaosresult, err :%v", err)
 	}
 	log.Info("[Abort]: Chaos Revert Completed")

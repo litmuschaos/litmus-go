@@ -4,7 +4,7 @@ import (
 	"os"
 
 	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
-	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/http-chaos/lib"
+	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/http-chaos/lib/latency"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/http-chaos/environment"
@@ -110,7 +110,7 @@ func PodHttpLatency(clients clients.ClientSets) {
 
 	switch {
 	case experimentsDetails.ChaosLib == "litmus":
-		if err := litmusLIB.PrepareAndInjectChaos(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
+		if err := litmusLIB.PodHttpLatencyChaos(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
 			log.Errorf("Chaos injection failed, err: %v", err)
 			failStep := "[chaos]: Failed inside the chaoslib, err: " + err.Error()
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
