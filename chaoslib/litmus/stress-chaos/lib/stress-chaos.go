@@ -100,7 +100,7 @@ func PrepareAndInjectStressChaos(experimentsDetails *experimentTypes.ExperimentD
 	}
 
 	if experimentsDetails.EngineName != "" {
-		if err := common.SetHelperData(chaosDetails, clients); err != nil {
+		if err := common.SetHelperData(chaosDetails, experimentsDetails.SetHelperData, clients); err != nil {
 			return err
 		}
 	}

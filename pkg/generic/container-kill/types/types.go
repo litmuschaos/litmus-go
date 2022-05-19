@@ -35,4 +35,5 @@ type ExperimentDetails struct {
 	Signal                        string
 	NodeLabel                     string
 	IsTargetContainerProvided     bool
+	SetHelperData                 string
 }

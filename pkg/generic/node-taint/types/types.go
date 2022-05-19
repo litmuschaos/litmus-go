@@ -26,4 +26,5 @@ type ExperimentDetails struct {
 	LIBImagePullPolicy string
 	TargetContainer    string
 	NodeLabel          string
+	SetHelperData      string
 }

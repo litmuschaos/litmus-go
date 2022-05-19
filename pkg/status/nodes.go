@@ -28,8 +28,7 @@ func CheckNodeStatus(nodes string, timeout, delay int, clients clients.ClientSet
 					node, err := clients.KubeClient.CoreV1().Nodes().Get(targetNodes[index], metav1.GetOptions{})
 					if err != nil {
 						if apierrors.IsNotFound(err) {
-							log.Infof("[Info]: The %v node is not exist", targetNodes[index])
-							continue
+							return errors.Errorf("[Info]: The node: %v does not exist", targetNodes[index])
 						} else {
 							return err
 						}

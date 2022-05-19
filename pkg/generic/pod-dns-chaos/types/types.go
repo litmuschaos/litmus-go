@@ -36,4 +36,5 @@ type ExperimentDetails struct {
 	SocketPath                    string
 	TerminationGracePeriodSeconds int
 	IsTargetContainerProvided     bool
+	SetHelperData                 string
 }
