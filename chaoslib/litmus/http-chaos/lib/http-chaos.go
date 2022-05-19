@@ -31,25 +31,29 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 	//set up the tunables if provided in range
 	SetChaosTunables(experimentsDetails)
 
+	log.InfoWithValues("[Info]: The chaos tunables are:", logrus.Fields{
+		"Target Host":      experimentsDetails.TargetHost,
+		"Target Port":      experimentsDetails.TargetPort,
+		"Listen Port":      experimentsDetails.ListenPort,
+		"Sequence":         experimentsDetails.Sequence,
+		"PodsAffectedPerc": experimentsDetails.PodsAffectedPerc,
+	})
+
 	switch experimentsDetails.ExperimentName {
 
 	case "pod-http-latency":
-		log.InfoWithValues("[Info]: The chaos tunables are:", logrus.Fields{
-			"HttpLatency":      strconv.Itoa(experimentsDetails.Latency),
-			"Sequence":         experimentsDetails.Sequence,
-			"PodsAffectedPerc": experimentsDetails.PodsAffectedPerc,
+		log.InfoWithValues("[Info]: ", logrus.Fields{
+			"Latency": strconv.Itoa(experimentsDetails.Latency),
 		})
 	}
 	podsAffectedPerc, _ = strconv.Atoi(experimentsDetails.PodsAffectedPerc)
 	if experimentsDetails.NodeLabel == "" {
 
-		//targetPodList, err := common.GetPodListFromSpecifiedNodes(experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, clients, chaosDetails)
 		targetPodList, err = common.GetPodList(experimentsDetails.TargetPods, podsAffectedPerc, clients, chaosDetails)
 		if err != nil {
 			return err
 		}
 	} else {
-		//targetPodList, err := common.GetPodList(experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, clients, chaosDetails)
 		if experimentsDetails.TargetPods == "" {
 			targetPodList, err = common.GetPodListFromSpecifiedNodes(experimentsDetails.TargetPods, podsAffectedPerc, experimentsDetails.NodeLabel, clients, chaosDetails)
 			if err != nil {
@@ -220,11 +224,11 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		return common.HelperFailedError(err)
 	}
 
-	//Deleting all the helper pod for container-kill chaos
-	// log.Info("[Cleanup]: Deleting all the helper pod")
-	// if err := common.DeleteAllPod(appLabel, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients); err != nil {
-	// 	return errors.Errorf("unable to delete the helper pods, err: %v", err)
-	// }
+	// Deleting all the helper pod for http chaos
+	log.Info("[Cleanup]: Deleting all the helper pod")
+	if err := common.DeleteAllPod(appLabel, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients); err != nil {
+		return errors.Errorf("unable to delete the helper pods, err: %v", err)
+	}
 
 	return nil
 }

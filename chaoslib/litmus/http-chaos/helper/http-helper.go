@@ -188,10 +188,10 @@ func startProxy(experimentDetails *experimentTypes.ExperimentDetails, pid int) e
 	chaosCommand := fmt.Sprintf("%s && sleep 10 && %s && %s", startProxyServerCommand, createProxyCommand, createToxicCommand)
 
 	cmd := exec.Command("/bin/bash", "-c", chaosCommand)
-	out, err := cmd.CombinedOutput()
-	log.Info(cmd.String())
+	log.Infof("[Chaos]: Running command: %s", cmd.String())
+
+	_, err := cmd.CombinedOutput()
 	if err != nil {
-		log.Error(string(out))
 		return err
 	}
 	log.Info("Proxy started successfully")
@@ -206,11 +206,10 @@ func killProxy(experimentDetails *experimentTypes.ExperimentDetails, pid int) er
 	deleteProxyCommand := fmt.Sprintf("sudo nsenter -t %d -n /litmus/toxiproxy-cli delete proxy", pid)
 	killCommand := fmt.Sprintf("%s && %s", deleteProxyCommand, stopProxyServerCommand)
 	cmd := exec.Command("/bin/bash", "-c", killCommand)
-	out, err := cmd.CombinedOutput()
-	log.Info(cmd.String())
+	log.Infof("[Chaos]: Running command: %s", cmd.String())
 
+	_, err := cmd.CombinedOutput()
 	if err != nil {
-		log.Error(string(out))
 		return err
 	}
 
@@ -224,10 +223,10 @@ func killProxy(experimentDetails *experimentTypes.ExperimentDetails, pid int) er
 func addIPRuleSet(experimentDetails *experimentTypes.ExperimentDetails, pid int) error {
 	addIPRuleSetCommand := fmt.Sprintf("(sudo nsenter -t %d -n iptables -t nat -A PREROUTING -i eth0 -p tcp --dport %d -j REDIRECT --to-port %d)", pid, experimentDetails.TargetPort, experimentDetails.ListenPort)
 	cmd := exec.Command("/bin/bash", "-c", addIPRuleSetCommand)
-	out, err := cmd.CombinedOutput()
-	log.Info(cmd.String())
+	log.Infof("[Chaos]: Running command: %s", cmd.String())
+
+	_, err := cmd.CombinedOutput()
 	if err != nil {
-		log.Error(string(out))
 		return err
 	}
 	log.Info("IP rule set added successfully")
@@ -240,10 +239,10 @@ func addIPRuleSet(experimentDetails *experimentTypes.ExperimentDetails, pid int)
 func removeIPRuleSet(experimentDetails *experimentTypes.ExperimentDetails, pid int) error {
 	removeIPRuleSetCommand := fmt.Sprintf("sudo nsenter -t %d -n iptables -t nat -D PREROUTING -i eth0 -p tcp --dport %d -j REDIRECT --to-port %d", pid, experimentDetails.TargetPort, experimentDetails.ListenPort)
 	cmd := exec.Command("/bin/bash", "-c", removeIPRuleSetCommand)
-	out, err := cmd.CombinedOutput()
-	log.Info(cmd.String())
+	log.Infof("[Chaos]: Running command: %s", cmd.String())
+
+	_, err := cmd.CombinedOutput()
 	if err != nil {
-		log.Error(string(out))
 		return err
 	}
 	log.Info("IP rule set removed successfully")
@@ -274,8 +273,8 @@ func getENV(experimentDetails *experimentTypes.ExperimentDetails) {
 func abortWatcher(targetPID int, resultName, chaosNS string, experimentDetails *experimentTypes.ExperimentDetails) {
 
 	<-abort
-	log.Info("[Chaos]: Killing process started because of terminated signal received")
-	log.Info("Chaos Revert Started")
+	log.Info("[Abort]: Killing process started because of terminated signal received")
+	log.Info("[Abort]: Chaos Revert Started")
 	// retry thrice for the chaos revert
 	retry := 3
 	for retry > 0 {
@@ -288,6 +287,6 @@ func abortWatcher(targetPID int, resultName, chaosNS string, experimentDetails *
 	if err = result.AnnotateChaosResult(resultName, chaosNS, "reverted", "pod", experimentDetails.ChaosPodName); err != nil {
 		log.Errorf("unable to annotate the chaosresult, err :%v", err)
 	}
-	log.Info("Chaos Revert Completed")
+	log.Info("[Abort]: Chaos Revert Completed")
 	os.Exit(1)
 }
