@@ -29,7 +29,7 @@ func PodNetworkLatency(clients clients.ClientSets) {
 
 	//Fetching all the ENV passed from the runner pod
 	log.Infof("[PreReq]: Getting the ENV for the %v experiment", os.Getenv("EXPERIMENT_NAME"))
-	experimentEnv.GetENV(&experimentsDetails)
+	experimentEnv.GetENV(&experimentsDetails, "pod-network-latency")
 
 	// Initialize events Parameters
 	types.InitialiseChaosVariables(&chaosDetails)

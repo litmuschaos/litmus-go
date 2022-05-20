@@ -39,6 +39,9 @@ spec:
           - name: RAMP_TIME
             value: '0'
 
+          - name: SEQUENCE
+            value: ''
+
           - name: POD_NAME
             valueFrom:
               fieldRef:

@@ -1,8 +1,10 @@
 package lib
 
 import (
+	"strconv"
 	"strings"
 
+	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/network-chaos/lib"
 	network_chaos "github.com/litmuschaos/litmus-go/chaoslib/litmus/network-chaos/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
@@ -26,7 +28,40 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 	if experimentsDetails.TargetPods == "" && chaosDetails.AppDetail.Label == "" {
 		return errors.Errorf("please provide one of the appLabel or TARGET_PODS")
 	}
-	targetPodList, err := common.GetPodList(experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, clients, chaosDetails)
+	//setup the tunables if provided in range
+	litmusLIB.SetChaosTunables(experimentsDetails)
+
+	switch experimentsDetails.NetworkChaosType {
+	case "network-loss":
+		log.InfoWithValues("[Info]: The chaos tunables are:", logrus.Fields{
+			"NetworkPacketLossPercentage": experimentsDetails.NetworkPacketLossPercentage,
+			"Sequence":                    experimentsDetails.Sequence,
+			"PodsAffectedPerc":            experimentsDetails.PodsAffectedPerc,
+		})
+	case "network-latency":
+		log.InfoWithValues("[Info]: The chaos tunables are:", logrus.Fields{
+			"NetworkLatency":   strconv.Itoa(experimentsDetails.NetworkLatency),
+			"Sequence":         experimentsDetails.Sequence,
+			"PodsAffectedPerc": experimentsDetails.PodsAffectedPerc,
+		})
+	case "network-corruption":
+		log.InfoWithValues("[Info]: The chaos tunables are:", logrus.Fields{
+			"NetworkPacketCorruptionPercentage": experimentsDetails.NetworkPacketCorruptionPercentage,
+			"Sequence":                          experimentsDetails.Sequence,
+			"PodsAffectedPerc":                  experimentsDetails.PodsAffectedPerc,
+		})
+	case "network-duplication":
+		log.InfoWithValues("[Info]: The chaos tunables are:", logrus.Fields{
+			"NetworkPacketDuplicationPercentage": experimentsDetails.NetworkPacketDuplicationPercentage,
+			"Sequence":                           experimentsDetails.Sequence,
+			"PodsAffectedPerc":                   experimentsDetails.PodsAffectedPerc,
+		})
+	default:
+		return errors.Errorf("invalid experiment, please check the environment.go")
+
+	}
+	podsAffectedPerc, _ := strconv.Atoi(experimentsDetails.PodsAffectedPerc)
+	targetPodList, err := common.GetPodList(experimentsDetails.TargetPods, podsAffectedPerc, clients, chaosDetails)
 	if err != nil {
 		return err
 	}
@@ -44,7 +79,7 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 	}
 
 	if experimentsDetails.EngineName != "" {
-		if err := common.SetHelperData(chaosDetails, clients); err != nil {
+		if err := common.SetHelperData(chaosDetails, experimentsDetails.SetHelperData, clients); err != nil {
 			return err
 		}
 	}

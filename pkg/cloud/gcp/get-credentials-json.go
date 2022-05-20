@@ -1,9 +1,15 @@
 package gcp
 
 import (
+	"context"
 	"encoding/json"
 	"io/ioutil"
+	"os"
 	"strings"
+
+	"github.com/litmuschaos/litmus-go/pkg/log"
+	"google.golang.org/api/compute/v1"
+	"google.golang.org/api/option"
 )
 
 // GCPServiceAccountCredentials stores the service account credentials
@@ -22,6 +28,7 @@ type GCPServiceAccountCredentials struct {
 
 // getFileContent reads the file content at the given file path
 func getFileContent(filePath string) (string, error) {
+
 	fileContentByteSlice, err := ioutil.ReadFile(filePath)
 	if err != nil {
 		return "", err
@@ -36,56 +43,57 @@ func getFileContent(filePath string) (string, error) {
 	return fileContentString, nil
 }
 
-// GetServiceAccountJSONFromSecret fetches the secrets mounted as volume and returns the json credentials byte slice
-func GetServiceAccountJSONFromSecret() ([]byte, error) {
+// getServiceAccountJSONFromSecret fetches the secrets mounted as volume and returns the json credentials byte slice
+func getServiceAccountJSONFromSecret() ([]byte, error) {
+
 	gcpType, err := getFileContent("/tmp/type")
 	if err != nil {
-		return []byte{}, err
+		return nil, err
 	}
 
 	gcpProjectID, err := getFileContent("/tmp/project_id")
 	if err != nil {
-		return []byte{}, err
+		return nil, err
 	}
 
 	gcpPrivateKeyID, err := getFileContent("/tmp/private_key_id")
 	if err != nil {
-		return []byte{}, err
+		return nil, err
 	}
 
 	gcpPrivateKey, err := getFileContent("/tmp/private_key")
 	if err != nil {
-		return []byte{}, err
+		return nil, err
 	}
 
 	gcpClientEmail, err := getFileContent("/tmp/client_email")
 	if err != nil {
-		return []byte{}, err
+		return nil, err
 	}
 
 	gcpClientID, err := getFileContent("/tmp/client_id")
 	if err != nil {
-		return []byte{}, err
+		return nil, err
 	}
 
 	gcpAuthURI, err := getFileContent("/tmp/auth_uri")
 	if err != nil {
-		return []byte{}, err
+		return nil, err
 	}
 
 	gcpTokenURI, err := getFileContent("/tmp/token_uri")
 	if err != nil {
-		return []byte{}, err
+		return nil, err
 	}
 
 	gcpAuthCertURL, err := getFileContent("/tmp/auth_provider_x509_cert_url")
 	if err != nil {
-		return []byte{}, err
+		return nil, err
 	}
 
 	gcpClientCertURL, err := getFileContent("/tmp/client_x509_cert_url")
 	if err != nil {
-		return []byte{}, err
+		return nil, err
 	}
 
 	credentials := GCPServiceAccountCredentials{gcpType, gcpProjectID, gcpPrivateKeyID, gcpPrivateKey, gcpClientEmail, gcpClientID, gcpAuthURI, gcpTokenURI, gcpAuthCertURL, gcpClientCertURL}
@@ -93,8 +101,55 @@ func GetServiceAccountJSONFromSecret() ([]byte, error) {
 
 	byteSliceJSONString, err := json.Marshal(credentials)
 	if err != nil {
-		return []byte{}, err
+		return nil, err
 	}
 
 	return byteSliceJSONString, nil
+}
+
+// doesFileExist checks if a file exists or not
+func doesFileExist(fileName string) bool {
+
+	_, err := os.Stat(fileName)
+
+	return err == nil
+}
+
+// GetGCPComputeService returns a new compute service created using the GCP Service Account credentials
+func GetGCPComputeService() (*compute.Service, error) {
+
+	// create an empty context
+	ctx := context.Background()
+
+	for _, fileName := range []string{"type", "project_id", "private_key_id", "private_key", "client_email", "client_id", "auth_uri", "token_uri", "auth_provider_x509_cert_url", "client_x509_cert_url"} {
+
+		if doesFileExist("/tmp/" + fileName) {
+
+			log.Info("[Info]: Using the GCP Service Account credentials from the secret")
+
+			// get service account credentials json
+			json, err := getServiceAccountJSONFromSecret()
+			if err != nil {
+				return nil, err
+			}
+
+			// create a new GCP Compute Service client using the GCP service account credentials provided through the secret
+			computeService, err := compute.NewService(ctx, option.WithCredentialsJSON(json))
+			if err != nil {
+				return nil, err
+			}
+
+			return computeService, nil
+		}
+	}
+
+	log.Info("[Info]: Using the default GCP Service Account credentials from Worflow Identity")
+
+	// create a new GCP Compute Service client using default GCP service account credentials (using Workload Identity)
+	computeService, err := compute.NewService(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return computeService, nil
 }

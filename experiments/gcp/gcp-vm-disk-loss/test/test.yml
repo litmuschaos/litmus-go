@@ -21,27 +21,10 @@ spec:
           - sleep
           - "3600"
         env:
-          # provide application namespace
-          - name: APP_NAMESPACE
-            value: 'default'
-
-          # provide application labels
-          - name: APP_LABEL
-            value: ''
- 
-          # provide application kind
-          - name: APP_KIND
-            value: '' 
-
           - name: TOTAL_CHAOS_DURATION
-            value: '30'
+            value: ''
 
           - name: CHAOS_INTERVAL
-            value: '10'
-
-          # provide auxiliary application details - namespace and labels of the applications
-          # sample input is - "ns1:app=percona,ns2:name=nginx"
-          - name: AUXILIARY_APPINFO
             value: ''
           
           ## Period to wait before injection of chaos in sec
@@ -70,12 +53,6 @@ spec:
           # of DISK_VOLUME_NAME 
           # eg. zone1,zone2,...
           - name: DISK_ZONES
-            value: ''
-                  
-          # set the device name(s) as comma seperated values in the corresponding order 
-          # of DISK_VOLUME_NAME 
-          # eg. device1,device2,...
-          - name: DEVICE_NAMES
             value: ''
         
           - name: POD_NAME

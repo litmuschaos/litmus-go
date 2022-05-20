@@ -21,6 +21,18 @@ import (
 // PrepareNodeIOStress contains prepration steps before chaos injection
 func PrepareNodeIOStress(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
+	//setup the tunables if provided in range
+	setChaosTunables(experimentsDetails)
+
+	log.InfoWithValues("[Info]: The details of chaos tunables are:", logrus.Fields{
+		"FilesystemUtilizationBytes":      experimentsDetails.FilesystemUtilizationBytes,
+		"FilesystemUtilizationPercentage": experimentsDetails.FilesystemUtilizationPercentage,
+		"CPU Core":                        experimentsDetails.CPU,
+		"NumberOfWorkers":                 experimentsDetails.NumberOfWorkers,
+		"Node Affce Perc":                 experimentsDetails.NodesAffectedPerc,
+		"Sequence":                        experimentsDetails.Sequence,
+	})
+
 	//Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
 		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", experimentsDetails.RampTime)
@@ -28,7 +40,8 @@ func PrepareNodeIOStress(experimentsDetails *experimentTypes.ExperimentDetails, 
 	}
 
 	//Select node for node-io-stress
-	targetNodeList, err := common.GetNodeList(experimentsDetails.TargetNodes, experimentsDetails.NodeLabel, experimentsDetails.NodesAffectedPerc, clients)
+	nodesAffectedPerc, _ := strconv.Atoi(experimentsDetails.NodesAffectedPerc)
+	targetNodeList, err := common.GetNodeList(experimentsDetails.TargetNodes, experimentsDetails.NodeLabel, nodesAffectedPerc, clients)
 	if err != nil {
 		return err
 	}
@@ -38,7 +51,7 @@ func PrepareNodeIOStress(experimentsDetails *experimentTypes.ExperimentDetails, 
 	})
 
 	if experimentsDetails.EngineName != "" {
-		if err := common.SetHelperData(chaosDetails, clients); err != nil {
+		if err := common.SetHelperData(chaosDetails, experimentsDetails.SetHelperData, clients); err != nil {
 			return err
 		}
 	}
@@ -230,31 +243,31 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, chao
 func getContainerArguments(experimentsDetails *experimentTypes.ExperimentDetails) []string {
 
 	var hddbytes string
-	if experimentsDetails.FilesystemUtilizationBytes == 0 {
-		if experimentsDetails.FilesystemUtilizationPercentage == 0 {
+	if experimentsDetails.FilesystemUtilizationBytes == "0" {
+		if experimentsDetails.FilesystemUtilizationPercentage == "0" {
 			hddbytes = "10%"
 			log.Info("Neither of FilesystemUtilizationPercentage or FilesystemUtilizationBytes provided, proceeding with a default FilesystemUtilizationPercentage value of 10%")
 		} else {
-			hddbytes = strconv.Itoa(experimentsDetails.FilesystemUtilizationPercentage) + "%"
+			hddbytes = experimentsDetails.FilesystemUtilizationPercentage + "%"
 		}
 	} else {
-		if experimentsDetails.FilesystemUtilizationPercentage == 0 {
-			hddbytes = strconv.Itoa(experimentsDetails.FilesystemUtilizationBytes) + "G"
+		if experimentsDetails.FilesystemUtilizationPercentage == "0" {
+			hddbytes = experimentsDetails.FilesystemUtilizationBytes + "G"
 		} else {
-			hddbytes = strconv.Itoa(experimentsDetails.FilesystemUtilizationPercentage) + "%"
+			hddbytes = experimentsDetails.FilesystemUtilizationPercentage + "%"
 			log.Warn("Both FsUtilPercentage & FsUtilBytes provided as inputs, using the FsUtilPercentage value to proceed with stress exp")
 		}
 	}
 
 	stressArgs := []string{
 		"--cpu",
-		strconv.Itoa(experimentsDetails.CPU),
+		experimentsDetails.CPU,
 		"--vm",
-		strconv.Itoa(experimentsDetails.VMWorkers),
+		experimentsDetails.VMWorkers,
 		"--io",
-		strconv.Itoa(experimentsDetails.NumberOfWorkers),
+		experimentsDetails.NumberOfWorkers,
 		"--hdd",
-		strconv.Itoa(experimentsDetails.NumberOfWorkers),
+		experimentsDetails.NumberOfWorkers,
 		"--hdd-bytes",
 		hddbytes,
 		"--timeout",
@@ -263,4 +276,16 @@ func getContainerArguments(experimentsDetails *experimentTypes.ExperimentDetails
 		"/tmp",
 	}
 	return stressArgs
+}
+
+//setChaosTunables will setup a random value within a given range of values
+//If the value is not provided in range it'll setup the initial provided value.
+func setChaosTunables(experimentsDetails *experimentTypes.ExperimentDetails) {
+	experimentsDetails.FilesystemUtilizationBytes = common.ValidateRange(experimentsDetails.FilesystemUtilizationBytes)
+	experimentsDetails.FilesystemUtilizationPercentage = common.ValidateRange(experimentsDetails.FilesystemUtilizationPercentage)
+	experimentsDetails.CPU = common.ValidateRange(experimentsDetails.CPU)
+	experimentsDetails.VMWorkers = common.ValidateRange(experimentsDetails.VMWorkers)
+	experimentsDetails.NumberOfWorkers = common.ValidateRange(experimentsDetails.NumberOfWorkers)
+	experimentsDetails.NodesAffectedPerc = common.ValidateRange(experimentsDetails.NodesAffectedPerc)
+	experimentsDetails.Sequence = common.GetRandomSequence(experimentsDetails.Sequence)
 }

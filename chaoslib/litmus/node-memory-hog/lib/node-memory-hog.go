@@ -21,6 +21,17 @@ import (
 // PrepareNodeMemoryHog contains prepration steps before chaos injection
 func PrepareNodeMemoryHog(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
+	//setup the tunables if provided in range
+	setChaosTunables(experimentsDetails)
+
+	log.InfoWithValues("[Info]: The details of chaos tunables are:", logrus.Fields{
+		"MemoryConsumptionMebibytes":  experimentsDetails.MemoryConsumptionMebibytes,
+		"MemoryConsumptionPercentage": experimentsDetails.MemoryConsumptionPercentage,
+		"NumberOfWorkers":             experimentsDetails.NumberOfWorkers,
+		"Node Affce Perc":             experimentsDetails.NodesAffectedPerc,
+		"Sequence":                    experimentsDetails.Sequence,
+	})
+
 	//Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
 		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", experimentsDetails.RampTime)
@@ -28,7 +39,8 @@ func PrepareNodeMemoryHog(experimentsDetails *experimentTypes.ExperimentDetails,
 	}
 
 	//Select node for node-memory-hog
-	targetNodeList, err := common.GetNodeList(experimentsDetails.TargetNodes, experimentsDetails.NodeLabel, experimentsDetails.NodesAffectedPerc, clients)
+	nodesAffectedPerc, _ := strconv.Atoi(experimentsDetails.NodesAffectedPerc)
+	targetNodeList, err := common.GetNodeList(experimentsDetails.TargetNodes, experimentsDetails.NodeLabel, nodesAffectedPerc, clients)
 	if err != nil {
 		return err
 	}
@@ -38,7 +50,7 @@ func PrepareNodeMemoryHog(experimentsDetails *experimentTypes.ExperimentDetails,
 	})
 
 	if experimentsDetails.EngineName != "" {
-		if err := common.SetHelperData(chaosDetails, clients); err != nil {
+		if err := common.SetHelperData(chaosDetails, experimentsDetails.SetHelperData, clients); err != nil {
 			return err
 		}
 	}
@@ -245,14 +257,14 @@ func calculateMemoryConsumption(experimentsDetails *experimentTypes.ExperimentDe
 	var MemoryConsumption string
 	var selector string
 
-	if experimentsDetails.MemoryConsumptionMebibytes == 0 {
-		if experimentsDetails.MemoryConsumptionPercentage == 0 {
+	if experimentsDetails.MemoryConsumptionMebibytes == "0" {
+		if experimentsDetails.MemoryConsumptionPercentage == "0" {
 			log.Info("Neither of MemoryConsumptionPercentage or MemoryConsumptionMebibytes provided, proceeding with a default MemoryConsumptionPercentage value of 30%%")
 			return "30%", nil
 		}
 		selector = "percentage"
 	} else {
-		if experimentsDetails.MemoryConsumptionPercentage == 0 {
+		if experimentsDetails.MemoryConsumptionPercentage == "0" {
 			selector = "mebibytes"
 		} else {
 			log.Warn("Both MemoryConsumptionPercentage & MemoryConsumptionMebibytes provided as inputs, using the MemoryConsumptionPercentage value to proceed with the experiment")
@@ -265,7 +277,8 @@ func calculateMemoryConsumption(experimentsDetails *experimentTypes.ExperimentDe
 	case "percentage":
 
 		//Getting the total memory under chaos
-		memoryForChaos := ((float64(experimentsDetails.MemoryConsumptionPercentage) / 100) * float64(memoryCapacity))
+		memoryConsumptionPercentage, _ := strconv.ParseFloat(experimentsDetails.MemoryConsumptionPercentage, 64)
+		memoryForChaos := ((memoryConsumptionPercentage / 100) * float64(memoryCapacity))
 
 		//Get the percentage of memory under chaos wrt allocatable memory
 		totalMemoryConsumption = int((float64(memoryForChaos) / float64(memoryAllocatable)) * 100)
@@ -282,7 +295,9 @@ func calculateMemoryConsumption(experimentsDetails *experimentTypes.ExperimentDe
 
 		// Bringing all the values in Ki unit to compare
 		// since 1Mi = 1025.390625Ki
-		TotalMemoryConsumption := float64(experimentsDetails.MemoryConsumptionMebibytes) * 1025.390625
+		memoryConsumptionMebibytes, _ := strconv.ParseFloat(experimentsDetails.MemoryConsumptionMebibytes, 64)
+
+		TotalMemoryConsumption := memoryConsumptionMebibytes * 1025.390625
 		// since 1Ki = 1024 bytes
 		memoryAllocatable := memoryAllocatable / 1024
 
@@ -290,7 +305,7 @@ func calculateMemoryConsumption(experimentsDetails *experimentTypes.ExperimentDe
 			MemoryConsumption = strconv.Itoa(memoryAllocatable) + "k"
 			log.Infof("[Info]: The memory for consumption %vKi is more than the available memory %vKi, so the experiment will hog the memory upto %vKi", int(TotalMemoryConsumption), memoryAllocatable, memoryAllocatable)
 		} else {
-			MemoryConsumption = strconv.Itoa(experimentsDetails.MemoryConsumptionMebibytes) + "m"
+			MemoryConsumption = experimentsDetails.MemoryConsumptionMebibytes + "m"
 		}
 		return MemoryConsumption, nil
 	}
@@ -324,7 +339,7 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, chao
 					},
 					Args: []string{
 						"--vm",
-						strconv.Itoa(experimentsDetails.NumberOfWorkers),
+						experimentsDetails.NumberOfWorkers,
 						"--vm-bytes",
 						MemoryConsumption,
 						"--timeout",
@@ -338,4 +353,14 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, chao
 
 	_, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Create(helperPod)
 	return err
+}
+
+//setChaosTunables will setup a random value within a given range of values
+//If the value is not provided in range it'll setup the initial provided value.
+func setChaosTunables(experimentsDetails *experimentTypes.ExperimentDetails) {
+	experimentsDetails.MemoryConsumptionMebibytes = common.ValidateRange(experimentsDetails.MemoryConsumptionMebibytes)
+	experimentsDetails.MemoryConsumptionPercentage = common.ValidateRange(experimentsDetails.MemoryConsumptionPercentage)
+	experimentsDetails.NumberOfWorkers = common.ValidateRange(experimentsDetails.NumberOfWorkers)
+	experimentsDetails.NodesAffectedPerc = common.ValidateRange(experimentsDetails.NodesAffectedPerc)
+	experimentsDetails.Sequence = common.GetRandomSequence(experimentsDetails.Sequence)
 }

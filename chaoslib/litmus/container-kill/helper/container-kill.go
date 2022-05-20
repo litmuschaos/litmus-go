@@ -101,7 +101,7 @@ func killContainer(experimentsDetails *experimentTypes.ExperimentDetails, client
 		}
 
 		//Check the status of restarted container
-		err = common.CheckContainerStatus(experimentsDetails.AppNS, experimentsDetails.TargetPods, clients)
+		err = common.CheckContainerStatus(experimentsDetails.AppNS, experimentsDetails.TargetPods, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 		if err != nil {
 			return errors.Errorf("application container is not in running state, %v", err)
 		}

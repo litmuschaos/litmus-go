@@ -37,7 +37,7 @@ func getContainerArguments(experimentsDetails *experimentTypes.ExperimentDetails
 	if err != nil {
 		return args, err
 	}
-	args = append(args, "corrupt", "--percent", strconv.Itoa(experimentsDetails.NetworkPacketCorruptionPercentage))
+	args = append(args, "corrupt", "--percent", experimentsDetails.NetworkPacketCorruptionPercentage)
 
 	return args, nil
 }
