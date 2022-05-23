@@ -148,6 +148,7 @@ func injectChaos(experimentDetails *experimentTypes.ExperimentDetails, pid int) 
 	default:
 		// proceed for chaos injection
 		if err := startProxy(experimentDetails, pid); err != nil {
+			_ = killProxy(experimentDetails, pid)
 			return errors.Errorf("failed to start proxy, err: %v", err)
 		}
 		if err := addIPRuleSet(experimentDetails, pid); err != nil {
@@ -206,9 +207,7 @@ func startProxy(experimentDetails *experimentTypes.ExperimentDetails, pid int) e
 // and execute the proxy related command inside it.
 func killProxy(experimentDetails *experimentTypes.ExperimentDetails, pid int) error {
 	stopProxyServerCommand := fmt.Sprintf("sudo nsenter -t %d -n sudo kill -9 $(ps aux | grep [t]oxiproxy | awk 'FNR==1{print $1}')", pid)
-	deleteProxyCommand := fmt.Sprintf("sudo nsenter -t %d -n /litmus/toxiproxy-cli delete proxy", pid)
-	killCommand := fmt.Sprintf("%s && %s", deleteProxyCommand, stopProxyServerCommand)
-	cmd := exec.Command("/bin/bash", "-c", killCommand)
+	cmd := exec.Command("/bin/bash", "-c", stopProxyServerCommand)
 	log.Infof("[Chaos]: Stopping proxy server: %s", cmd.String())
 
 	_, err := cmd.CombinedOutput()
@@ -281,14 +280,26 @@ func abortWatcher(targetPID int, resultName, chaosNS string, experimentDetails *
 	retry := 3
 	for retry > 0 {
 		if err = revertChaos(experimentDetails, targetPID); err != nil {
-			log.Errorf("unable to revert http process, err :%v", err)
+			retry--
+			if retry > 0 {
+				log.Errorf("[Abort]: Failed to remove Proxy and IPtables ruleset, retrying %d more times, err: %v", retry, err)
+			} else {
+				log.Errorf("[Abort]: Failed to remove Proxy and IPtables ruleset, err: %v", err)
+			}
+			time.Sleep(1 * time.Second)
+			continue
 		}
-		retry--
-		time.Sleep(1 * time.Second)
+		log.Infof("[Abort]: Proxy and IPtables ruleset removed successfully")
+		break
 	}
-	if err = result.AnnotateChaosResult(resultName, chaosNS, "reverted", "pod", experimentDetails.TargetPods); err != nil {
-		log.Errorf("unable to annotate the chaosresult, err :%v", err)
+
+	if retry > 0 {
+		if err = result.AnnotateChaosResult(resultName, chaosNS, "reverted", "pod", experimentDetails.TargetPods); err != nil {
+			log.Errorf("unable to annotate the chaosresult, err :%v", err)
+		}
+		log.Info("[Abort]: Chaos Revert Completed")
+		os.Exit(1)
 	}
-	log.Info("[Abort]: Chaos Revert Completed")
+	log.Errorf("[Abort]: Chaos Revert Failed")
 	os.Exit(1)
 }
