@@ -24,7 +24,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.InstanceID = types.Getenv("INSTANCE_ID", "")
 	experimentDetails.ChaosPodName = types.Getenv("POD_NAME", "")
 	experimentDetails.AuxiliaryAppInfo = types.Getenv("AUXILIARY_APPINFO", "")
-	experimentDetails.TargetNode = types.Getenv("TARGET_NODE", "")
+	experimentDetails.TargetNodes = types.Getenv("TARGET_NODES", "")
 	experimentDetails.Delay, _ = strconv.Atoi(types.Getenv("STATUS_CHECK_DELAY", "2"))
 	experimentDetails.Timeout, _ = strconv.Atoi(types.Getenv("STATUS_CHECK_TIMEOUT", "180"))
 	experimentDetails.TargetContainer = types.Getenv("TARGET_CONTAINER", "")

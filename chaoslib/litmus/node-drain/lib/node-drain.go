@@ -49,16 +49,16 @@ func PrepareNodeDrain(experimentsDetails *experimentTypes.ExperimentDetails, cli
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 
-	if experimentsDetails.TargetNode == "" {
+	if experimentsDetails.TargetNodes == "" {
 		//Select node for kubelet-service-kill
-		experimentsDetails.TargetNode, err = common.GetNodeName(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.NodeLabel, clients)
+		experimentsDetails.TargetNodes, err = common.GetNodeName(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.NodeLabel, clients)
 		if err != nil {
 			return err
 		}
 	}
 
 	if experimentsDetails.EngineName != "" {
-		msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on " + experimentsDetails.TargetNode + " node"
+		msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on " + experimentsDetails.TargetNodes + " node"
 		types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
 		events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 	}
@@ -114,37 +114,53 @@ func PrepareNodeDrain(experimentsDetails *experimentTypes.ExperimentDetails, cli
 // drainNode drain the application node
 func drainNode(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
 
-	select {
-	case <-inject:
-		// stopping the chaos execution, if abort signal received
-		os.Exit(0)
-	default:
-		log.Infof("[Inject]: Draining the %v node", experimentsDetails.TargetNode)
+	targetNodes := strings.Split(experimentsDetails.TargetNodes, ",")
+	if len(targetNodes) == 0 {
+		return errors.Errorf("No target nodes provided, expected the comma-separated names of one or more nodes")
+	}
 
-		command := exec.Command("kubectl", "drain", experimentsDetails.TargetNode, "--ignore-daemonsets", "--delete-local-data", "--force", "--timeout", strconv.Itoa(experimentsDetails.ChaosDuration)+"s")
-		var out, stderr bytes.Buffer
-		command.Stdout = &out
-		command.Stderr = &stderr
-		if err := command.Run(); err != nil {
-			log.Infof("Error String: %v", stderr.String())
-			return errors.Errorf("Unable to drain the %v node, err: %v", experimentsDetails.TargetNode, err)
+	log.Infof("Target nodes list: %v", targetNodes)
+	for _, targetNode := range targetNodes {
+
+		select {
+		case <-inject:
+			// stopping the chaos execution, if abort signal received
+			os.Exit(0)
+		default:
+			log.Infof("[Inject]: Draining the %v node", targetNode)
+
+			command := exec.Command("kubectl", "drain", targetNode, "--ignore-daemonsets", "--delete-emptydir-data", "--force", "--timeout", strconv.Itoa(experimentsDetails.ChaosDuration)+"s")
+			var out, stderr bytes.Buffer
+			command.Stdout = &out
+			command.Stderr = &stderr
+			if err := command.Run(); err != nil {
+				log.Infof("Error String: %v", stderr.String())
+				return errors.Errorf("Unable to drain the %v node, err: %v", targetNode, err)
+			}
+
+			common.SetTargets(targetNode, "injected", "node", chaosDetails)
+
+			err = retry.
+				Times(uint(experimentsDetails.Timeout / experimentsDetails.Delay)).
+				Wait(time.Duration(experimentsDetails.Delay) * time.Second).
+				Try(func(attempt uint) error {
+					nodeSpec, err := clients.KubeClient.CoreV1().Nodes().Get(targetNode, v1.GetOptions{})
+					if err != nil {
+						if apierrors.IsNotFound(err) {
+							return nil
+						} else {
+							return err
+						}
+					}
+					if !nodeSpec.Spec.Unschedulable {
+						return errors.Errorf("%v node is not in unschedulable state", targetNode)
+					}
+					return nil
+				})
+			if err != nil {
+				return err
+			}
 		}
-
-		common.SetTargets(experimentsDetails.TargetNode, "injected", "node", chaosDetails)
-
-		return retry.
-			Times(uint(experimentsDetails.Timeout / experimentsDetails.Delay)).
-			Wait(time.Duration(experimentsDetails.Delay) * time.Second).
-			Try(func(attempt uint) error {
-				nodeSpec, err := clients.KubeClient.CoreV1().Nodes().Get(experimentsDetails.TargetNode, v1.GetOptions{})
-				if err != nil {
-					return err
-				}
-				if !nodeSpec.Spec.Unschedulable {
-					return errors.Errorf("%v node is not in unschedulable state", experimentsDetails.TargetNode)
-				}
-				return nil
-			})
 	}
 	return nil
 }
@@ -152,7 +168,11 @@ func drainNode(experimentsDetails *experimentTypes.ExperimentDetails, clients cl
 // uncordonNode uncordon the application node
 func uncordonNode(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
 
-	targetNodes := strings.Split(experimentsDetails.TargetNode, ",")
+	targetNodes := strings.Split(experimentsDetails.TargetNodes, ",")
+	if len(targetNodes) == 0 {
+		return errors.Errorf("No target nodes provided, expected the comma-separated names of one or more nodes")
+	}
+
 	for _, targetNode := range targetNodes {
 
 		//Check node exist before uncordon the node
@@ -183,7 +203,11 @@ func uncordonNode(experimentsDetails *experimentTypes.ExperimentDetails, clients
 		Times(uint(experimentsDetails.Timeout / experimentsDetails.Delay)).
 		Wait(time.Duration(experimentsDetails.Delay) * time.Second).
 		Try(func(attempt uint) error {
-			targetNodes := strings.Split(experimentsDetails.TargetNode, ",")
+			targetNodes := strings.Split(experimentsDetails.TargetNodes, ",")
+			if len(targetNodes) == 0 {
+				return errors.Errorf("No target nodes provided, expected the comma-separated names of one or more nodes")
+			}
+
 			for _, targetNode := range targetNodes {
 				nodeSpec, err := clients.KubeClient.CoreV1().Nodes().Get(targetNode, v1.GetOptions{})
 				if err != nil {
@@ -194,7 +218,7 @@ func uncordonNode(experimentsDetails *experimentTypes.ExperimentDetails, clients
 					}
 				}
 				if nodeSpec.Spec.Unschedulable {
-					return errors.Errorf("%v node is in unschedulable state", experimentsDetails.TargetNode)
+					return errors.Errorf("%v node is in unschedulable state", targetNode)
 				}
 			}
 			return nil

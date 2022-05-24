@@ -2,6 +2,7 @@ package experiment
 
 import (
 	"os"
+	"strings"
 
 	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
 	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/node-drain/lib"
@@ -64,9 +65,17 @@ func NodeDrain(clients clients.ClientSets) {
 	//DISPLAY THE APP INFORMATION
 	log.InfoWithValues("[Info]: The application information is as follows", logrus.Fields{
 		"Node Label":     experimentsDetails.NodeLabel,
-		"Target Node":    experimentsDetails.TargetNode,
+		"Target Nodes":   experimentsDetails.TargetNodes,
 		"Chaos Duration": experimentsDetails.ChaosDuration,
 	})
+
+	targetNodes := strings.Split(experimentsDetails.TargetNodes, ",")
+	if len(targetNodes) == 0 {
+		log.Errorf("No target nodes provided, expected the comma-separated names of one or more nodes")
+		failStep := "[pre-chaos]: No target nodes provided, expected the comma-separated names of one or more nodes"
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+		return
+	}
 
 	// Calling AbortWatcher go routine, it will continuously watch for the abort signal and generate the required events and result
 	go common.AbortWatcherWithoutExit(experimentsDetails.ExperimentName, clients, &resultDetails, &chaosDetails, &eventsDetails)
@@ -93,13 +102,15 @@ func NodeDrain(clients clients.ClientSets) {
 
 	// Checking the status of target nodes
 	log.Info("[Status]: Getting the status of target nodes")
-	if err := status.CheckNodeStatus(experimentsDetails.TargetNode, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
-		log.Errorf("Target nodes are not in the ready state, err: %v", err)
-		failStep := "[pre-chaos]: Failed to verify the status of nodes, err: " + err.Error()
-		types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, "NUT: Not Ready", "Warning", &chaosDetails)
-		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
-		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-		return
+	for _, targetNode := range targetNodes {
+		if err := status.CheckNodeStatus(targetNode, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
+			log.Errorf("Target nodes are not in the ready state, err: %v", err)
+			failStep := "[pre-chaos]: Failed to verify the status of nodes, err: " + err.Error()
+			types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, "NUT: Not Ready", "Warning", &chaosDetails)
+			events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+			return
+		}
 	}
 
 	if experimentsDetails.EngineName != "" {
@@ -166,10 +177,12 @@ func NodeDrain(clients clients.ClientSets) {
 
 	// Checking the status of target nodes
 	log.Info("[Status]: Getting the status of target nodes")
-	if err := status.CheckNodeStatus(experimentsDetails.TargetNode, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
-		log.Warnf("Target nodes are not in the ready state, you may need to manually recover the node, err: %v", err)
-		types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, "NUT: Not Ready", "Warning", &chaosDetails)
-		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
+	for _, targetNode := range targetNodes {
+		if err := status.CheckNodeStatus(targetNode, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
+			log.Warnf("Target nodes are not in the ready state, you may need to manually recover the node, err: %v", err)
+			types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, "NUT: Not Ready", "Warning", &chaosDetails)
+			events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
+		}
 	}
 
 	if experimentsDetails.EngineName != "" {
