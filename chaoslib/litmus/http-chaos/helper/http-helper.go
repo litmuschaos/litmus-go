@@ -121,14 +121,14 @@ func getContainerID(experimentDetails *experimentTypes.ExperimentDetails, client
 		cmd := "sudo docker --host " + host + " ps | grep k8s_POD_" + experimentDetails.TargetPods + "_" + experimentDetails.AppNS + " | awk '{print $1}'"
 		out, err := exec.Command("/bin/sh", "-c", cmd).CombinedOutput()
 		if err != nil {
-			log.Error(fmt.Sprintf("[docker]: Failed to run docker ps command: %s", string(out)))
+			log.Errorf("[docker]: Failed to run docker ps command: %s", string(out))
 			return "", err
 		}
 		containerID = strings.TrimSpace(string(out))
 	case "containerd", "crio":
 		containerID, err = common.GetContainerID(experimentDetails.AppNS, experimentDetails.TargetPods, experimentDetails.TargetContainer, clients)
 		if err != nil {
-			return containerID, err
+			return "", err
 		}
 	default:
 		return "", errors.Errorf("%v container runtime not suported", experimentDetails.ContainerRuntime)
