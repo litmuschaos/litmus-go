@@ -76,7 +76,6 @@ func Experiment(clients clients.ClientSets) {
 	log.Infof("[PreCheck]: Get pod list")
 	if err := litmusLIB.SetTargetPodList(&experimentsDetails, clients, &chaosDetails); err != nil {
 		log.Errorf("Failed to get target pod list, err: %v", err)
-
 	}
 	podNames := make([]string, 0, 1)
 	for _, pod := range experimentsDetails.TargetPodList.Items {
@@ -86,7 +85,7 @@ func Experiment(clients clients.ClientSets) {
 
 	// Check that targeted pods have all the chaos monkey endpoint
 	log.Infof("[PreCheck]: Check pod list")
-	if _, err := litmusLIB.CheckChaosMonkey(&experimentsDetails); err != nil {
+	if _, err := litmusLIB.CheckChaosMonkey(experimentsDetails.ChaosMonkeyPort, experimentsDetails.ChaosMonkeyPath, experimentsDetails.TargetPodList); err != nil {
 		log.Errorf("Some target pods don't have the chaos monkey endpoint, err: %v", err)
 	}
 
@@ -107,7 +106,6 @@ func Experiment(clients clients.ClientSets) {
 
 		// run the probes in the pre-chaos check
 		if len(resultDetails.ProbeDetails) != 0 {
-
 			if err := probe.RunProbes(&chaosDetails, clients, &resultDetails, "PreChaos", &eventsDetails); err != nil {
 				log.Errorf("Probe Failed, err: %v", err)
 				failStep := "[pre-chaos]: Failed while running probes, err: " + err.Error()
