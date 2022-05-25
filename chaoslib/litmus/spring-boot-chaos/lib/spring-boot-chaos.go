@@ -133,7 +133,7 @@ func setChaosMonkeyWatchers(experimentsDetails *experimentTypes.ExperimentDetail
 }
 
 func setChaosMonkeyAssault(experimentsDetails *experimentTypes.ExperimentDetails, pod corev1.Pod) error {
-	log.Infof("[Check]: setting chaos monkey assault on pod %v", pod.Name)
+	log.Infof("[Check]: Setting Chaos Monkey assault on pod: %v", pod.Name)
 
 	assault := experimentsDetails.ChaosMonkeyAssault
 	jsonValue, err := json.Marshal(assault)
