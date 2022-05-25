@@ -7,7 +7,7 @@ metadata:
     name: spring-boot-chaos-sa
 ---
 apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
+kind: Role
 metadata:
   name: spring-boot-chaos-sa
   labels:
@@ -21,14 +21,14 @@ rules:
     verbs: [ "get","list" ]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
+kind: RoleBinding
 metadata:
   name: spring-boot-chaos-sa
   labels:
     name: spring-boot-chaos-sa
 roleRef:
   apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
+  kind: Role
   name: spring-boot-chaos-sa
 subjects:
   - kind: ServiceAccount
