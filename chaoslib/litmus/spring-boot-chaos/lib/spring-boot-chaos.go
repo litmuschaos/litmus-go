@@ -150,7 +150,7 @@ func setChaosMonkeyAssault(experimentsDetails *experimentTypes.ExperimentDetails
 		return errors.Errorf("failed to set assault on pod %v (status: %v)", pod.Name, resp.StatusCode)
 	}
 
-	log.Infof("[Check]: activating chaos monkey assault on pod %v", pod.Name)
+	log.Infof("[Check]: Activating Chaos Monkey assault on pod: %v", pod.Name)
 	resp, err = http.Post("http://"+pod.Status.PodIP+":"+experimentsDetails.ChaosMonkeyPort+experimentsDetails.ChaosMonkeyPath+"/assaults/runtime/attack", "", nil)
 	if err != nil {
 		return err
