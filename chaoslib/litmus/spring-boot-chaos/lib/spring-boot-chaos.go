@@ -112,7 +112,7 @@ func enableChaosMonkey(experimentsDetails *experimentTypes.ExperimentDetails, po
 }
 
 func setChaosMonkeyWatchers(experimentsDetails *experimentTypes.ExperimentDetails, pod corev1.Pod) error {
-	log.Infof("[Check]: setting chaos monkey watchers on pod %v", pod.Name)
+	log.Infof("[Check]: Setting Chaos Monkey watchers on pod: %v", pod.Name)
 
 	watchers := experimentsDetails.ChaosMonkeyWatchers
 	jsonValue, err := json.Marshal(watchers)
