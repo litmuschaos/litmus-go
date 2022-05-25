@@ -82,7 +82,7 @@ func PrepareChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients
 func CheckChaosMonkey(experimentsDetails *experimentTypes.ExperimentDetails) (bool, error) {
 	// Deleting the application pod
 	for _, pod := range experimentsDetails.TargetPodList.Items {
-		log.Infof("[Check]: checking pod %v", pod.Name)
+		log.Infof("[Check]: Checking pod: %v", pod.Name)
 		resp, err := http.Get("http://" + pod.Status.PodIP + ":" + experimentsDetails.ChaosMonkeyPort + experimentsDetails.ChaosMonkeyPath) //nolint:bodyclose
 		if err != nil {
 			return false, err
