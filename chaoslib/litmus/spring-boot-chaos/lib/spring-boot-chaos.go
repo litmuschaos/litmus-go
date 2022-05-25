@@ -3,7 +3,6 @@ package lib
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/litmuschaos/litmus-go/pkg/result"
 	corev1 "k8s.io/api/core/v1"
 	"net/http"
 	"os"
@@ -22,8 +21,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
-
-var inject chan os.Signal
 
 // SetTargetPodList selects the targeted pod and add them to the experimentDetails
 func SetTargetPodList(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
@@ -46,10 +43,6 @@ func SetTargetPodList(experimentsDetails *experimentTypes.ExperimentDetails, cli
 
 // PrepareChaos contains the preparation steps before chaos injection
 func PrepareChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	// inject channel is used to transmit signal notifications.
-	inject = make(chan os.Signal, 1)
-	// Catch and relay certain signal(s) to inject channel.
-	signal.Notify(inject, os.Interrupt, syscall.SIGTERM)
 
 	// Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
@@ -197,7 +190,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 	timeDelay := time.Duration(experimentsDetails.ChaosDuration) * time.Second
 
 	select {
-	case <-inject:
+	case <-signChan:
 		// stopping the chaos execution, if abort signal received
 		time.Sleep(10 * time.Second)
 		os.Exit(0)
@@ -215,33 +208,32 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 
 			if err := setChaosMonkeyWatchers(experimentsDetails, pod); err != nil {
 				log.Errorf("[Chaos]: Failed to set watchers, err: %v ", err)
+				return err
 			}
 
 			if err := setChaosMonkeyAssault(experimentsDetails, pod); err != nil {
 				log.Errorf("[Chaos]: Failed to set assault, err: %v ", err)
+				return err
 			}
 
 			if err := enableChaosMonkey(experimentsDetails, pod); err != nil {
 				log.Errorf("[Chaos]: Failed to enable chaos, err: %v ", err)
+				return err
 			}
 			common.SetTargets(pod.Name, "injected", "pod", chaosDetails)
 
 			log.Infof("[Chaos]:Waiting for: %vs", experimentsDetails.ChaosDuration)
 
+			endTime = time.After(timeDelay)
 		loop:
 			for {
-				endTime = time.After(timeDelay)
 				select {
 				case <-signChan:
 					log.Info("[Chaos]: Revert Started")
 					if err := disableChaosMonkey(experimentsDetails, pod); err != nil {
 						log.Errorf("Error in disable chaos monkey, err: %v", err)
 					}
-					// updating the chaosResult after stopped
-					failStep := "Chaos injection stopped!"
-					types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep)
-					_ = result.ChaosResult(chaosDetails, clients, resultDetails, "EOT")
-					log.Info("[Chaos]: Revert Completed")
+					common.SetTargets(pod.Name, "reverted", "pod", chaosDetails)
 					os.Exit(1)
 				case <-endTime:
 					log.Infof("[Chaos]: Time is up for experiment: %v", experimentsDetails.ExperimentName)
@@ -277,7 +269,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 	timeDelay := time.Duration(experimentsDetails.ChaosDuration) * time.Second
 
 	select {
-	case <-inject:
+	case <-signChan:
 		// stopping the chaos execution, if abort signal received
 		time.Sleep(10 * time.Second)
 		os.Exit(0)
@@ -295,14 +287,17 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 
 			if err := setChaosMonkeyWatchers(experimentsDetails, pod); err != nil {
 				log.Errorf("[Chaos]: Failed to set watchers, err: %v ", err)
+				return err
 			}
 
 			if err := setChaosMonkeyAssault(experimentsDetails, pod); err != nil {
 				log.Errorf("[Chaos]: Failed to set assault, err: %v ", err)
+				return err
 			}
 
 			if err := enableChaosMonkey(experimentsDetails, pod); err != nil {
 				log.Errorf("[Chaos]: Failed to enable chaos, err: %v ", err)
+				return err
 			}
 			common.SetTargets(pod.Name, "injected", "pod", chaosDetails)
 		}
@@ -318,12 +313,8 @@ loop:
 				if err := disableChaosMonkey(experimentsDetails, pod); err != nil {
 					log.Errorf("Error in disable chaos monkey, err: %v", err)
 				}
+				common.SetTargets(pod.Name, "reverted", "pod", chaosDetails)
 			}
-			// updating the chaosResult after stopped
-			failStep := "Chaos injection stopped!"
-			types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep)
-			_ = result.ChaosResult(chaosDetails, clients, resultDetails, "EOT")
-			log.Info("[Chaos]: Revert Completed")
 			os.Exit(1)
 		case <-endTime:
 			log.Infof("[Chaos]: Time is up for experiment: %v", experimentsDetails.ExperimentName)
