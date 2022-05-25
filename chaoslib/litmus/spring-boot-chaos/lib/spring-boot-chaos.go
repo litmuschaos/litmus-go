@@ -98,7 +98,7 @@ func CheckChaosMonkey(experimentsDetails *experimentTypes.ExperimentDetails) (bo
 
 // enableChaosMonkey enables chaos monkey on selected pods
 func enableChaosMonkey(experimentsDetails *experimentTypes.ExperimentDetails, pod corev1.Pod) error {
-	log.Infof("[Check]: enabling chaos monkey on pod %v", pod.Name)
+	log.Infof("[Check]: Enabling Chaos Monkey on pod: %v", pod.Name)
 	resp, err := http.Post("http://"+pod.Status.PodIP+":"+experimentsDetails.ChaosMonkeyPort+experimentsDetails.ChaosMonkeyPath+"/enable", "", nil) //nolint:bodyclose
 	if err != nil {
 		return err
