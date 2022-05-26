@@ -81,6 +81,9 @@ func PrepareNodeDrain(experimentsDetails *experimentTypes.ExperimentDetails, cli
 	// Verify the status of AUT after reschedule
 	log.Info("[Status]: Verify the status of AUT after reschedule")
 	if err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
+		if err := uncordonNode(experimentsDetails, clients, chaosDetails); err != nil {
+			log.Errorf("Unable to uncordon the node, err: %v", err)
+		}
 		return errors.Errorf("application status check failed, err: %v", err)
 	}
 
@@ -88,6 +91,9 @@ func PrepareNodeDrain(experimentsDetails *experimentTypes.ExperimentDetails, cli
 	if experimentsDetails.AuxiliaryAppInfo != "" {
 		log.Info("[Status]: Verify that the Auxiliary Applications are running")
 		if err = status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
+			if err := uncordonNode(experimentsDetails, clients, chaosDetails); err != nil {
+				log.Errorf("Unable to uncordon the node, err: %v", err)
+			}
 			return errors.Errorf("auxiliary Applications status check failed, err: %v", err)
 		}
 	}
