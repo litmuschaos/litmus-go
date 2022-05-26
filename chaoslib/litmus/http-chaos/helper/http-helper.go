@@ -276,30 +276,26 @@ func abortWatcher(targetPID int, resultName, chaosNS string, experimentDetails *
 	<-abort
 	log.Info("[Abort]: Killing process started because of terminated signal received")
 	log.Info("[Abort]: Chaos Revert Started")
-	// retry thrice for the chaos revert
+
 	retry := 3
 	for retry > 0 {
 		if err = revertChaos(experimentDetails, targetPID); err != nil {
 			retry--
+			// If retries are left
 			if retry > 0 {
-				log.Errorf("[Abort]: Failed to remove Proxy and IPtables ruleset, retrying %d more times, err: %v", retry, err)
-			} else {
-				log.Errorf("[Abort]: Failed to remove Proxy and IPtables ruleset, err: %v", err)
+				log.Errorf("[Abort]: Failed to revert chaos, retrying %d more times, err: %v", retry, err)
+				time.Sleep(1 * time.Second)
+				continue
 			}
-			time.Sleep(1 * time.Second)
-			continue
+			// else exit with error
+			log.Errorf("[Abort]: Chaos Revert Failed")
+			os.Exit(1)
 		}
-		log.Infof("[Abort]: Proxy and IPtables ruleset removed successfully")
-		break
-	}
 
-	if retry > 0 {
 		if err = result.AnnotateChaosResult(resultName, chaosNS, "reverted", "pod", experimentDetails.TargetPods); err != nil {
 			log.Errorf("unable to annotate the chaosresult, err :%v", err)
 		}
 		log.Info("[Abort]: Chaos Revert Completed")
 		os.Exit(1)
 	}
-	log.Errorf("[Abort]: Chaos Revert Failed")
-	os.Exit(1)
 }
