@@ -10,7 +10,6 @@ import (
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-network-partition/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
-	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
@@ -215,19 +214,32 @@ func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, clients
 	retry := 3
 	for retry > 0 {
 		if err := checkExistanceOfPolicy(experimentsDetails, clients, 2, 1, runID); err != nil {
-			log.Infof("no active network policy found, err: %v", err)
 			retry--
-			continue
+			// If retries are left
+			if retry > 0 {
+				log.Errorf("[Abort]: No active network policy found, retrying %d more times, err: %v", retry, err)
+				time.Sleep(1 * time.Second)
+				continue
+			}
+			// else exit with error
+			log.Errorf("[Abort]: Chaos Revert Failed")
+			os.Exit(1)
 		}
 
 		if err := deleteNetworkPolicy(experimentsDetails, clients, targetPodList, chaosDetails, 2, 1, runID); err != nil {
-			log.Errorf("unable to delete network policy, err: %v", err)
+			retry--
+			// If retries are left
+			if retry > 0 {
+				log.Errorf("[Abort]: Unable to delete network policy, retrying %d more times, err: %v", retry, err)
+				time.Sleep(1 * time.Second)
+				continue
+			}
+			// else exit with error
+			log.Errorf("[Abort]: Chaos Revert Failed")
+			os.Exit(1)
 		}
+
+		log.Info("[Abort]: Chaos Revert Completed")
+		os.Exit(1)
 	}
-	// updating the chaosresult after stopped
-	failStep := "Chaos injection stopped!"
-	types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep)
-	result.ChaosResult(chaosDetails, clients, resultDetails, "EOT")
-	log.Info("Chaos Revert Completed")
-	os.Exit(0)
 }

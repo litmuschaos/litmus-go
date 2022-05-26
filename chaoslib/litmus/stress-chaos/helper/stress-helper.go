@@ -523,18 +523,27 @@ func abortWatcher(targetPID int, resultName, chaosNS, targetPodName string) {
 	log.Info("[Abort]: Chaos Revert Started")
 	// retry thrice for the chaos revert
 	retry := 3
+
 	for retry > 0 {
 		if err = terminateProcess(targetPID); err != nil {
-			log.Errorf("unable to kill stress process, err :%v", err)
+			retry--
+			// If retries are left
+			if retry > 0 {
+				log.Errorf("[Abort]: Unable to kill stress process, retrying %d more times, err: %v", retry, err)
+				time.Sleep(1 * time.Second)
+				continue
+			}
+			// else exit with error
+			log.Errorf("[Abort]: Chaos Revert Failed")
+			os.Exit(1)
 		}
-		retry--
-		time.Sleep(1 * time.Second)
+
+		if err = result.AnnotateChaosResult(resultName, chaosNS, "reverted", "pod", targetPodName); err != nil {
+			log.Errorf("unable to annotate the chaosresult, err :%v", err)
+		}
+		log.Info("[Abort]: Chaos Revert Completed")
+		os.Exit(1)
 	}
-	if err = result.AnnotateChaosResult(resultName, chaosNS, "reverted", "pod", targetPodName); err != nil {
-		log.Errorf("unable to annotate the chaosresult, err :%v", err)
-	}
-	log.Info("[Abort]: Chaos Revert Completed")
-	os.Exit(1)
 }
 
 // getCGroupManager will return the cgroup for the given pid of the process

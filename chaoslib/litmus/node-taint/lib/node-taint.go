@@ -231,11 +231,19 @@ func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, clients
 	retry := 3
 	for retry > 0 {
 		if err := removeTaintFromNode(experimentsDetails, clients, chaosDetails); err != nil {
-			log.Errorf("Unable to untaint node, err: %v", err)
+			retry--
+			// If retries are left
+			if retry > 0 {
+				log.Errorf("[Abort]: Unable to untaint node, retrying %d more times, err: %v", retry, err)
+				time.Sleep(1 * time.Second)
+				continue
+			}
+			// else exit with error
+			log.Errorf("[Abort]: Chaos Revert Failed")
+			os.Exit(1)
 		}
-		retry--
-		time.Sleep(1 * time.Second)
+
+		log.Info("[Abort]: Chaos Revert Completed")
+		os.Exit(1)
 	}
-	log.Info("Chaos Revert Completed")
-	os.Exit(0)
 }
