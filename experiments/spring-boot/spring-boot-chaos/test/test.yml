@@ -70,7 +70,6 @@ spec:
             - name: CM_DETERMINISTIC
               value: 'true'
 
-
             # Comma separated list of watched Java services. Ex: com.example.application.controller.HelloController.sayHelle
             - name: CM_WATCHED_CUSTOM_SERVICES
               value: ''

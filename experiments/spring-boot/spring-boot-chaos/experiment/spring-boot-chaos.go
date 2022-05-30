@@ -69,13 +69,16 @@ func Experiment(clients clients.ClientSets) {
 	// Calling AbortWatcher go routine, it will continuously watch for the abort signal and generate the required events and result
 	go common.AbortWatcher(experimentsDetails.ExperimentName, clients, &resultDetails, &chaosDetails, &eventsDetails)
 
-	// ADD A PRE-CHAOS CHECK OF YOUR CHOICE HERE
-	// POD STATUS CHECKS FOR THE APPLICATION UNDER TEST AND AUXILIARY APPLICATIONS ARE ADDED BY DEFAULT
 
 	// Select targeted pods
-	log.Infof("[PreCheck]: Get pod list")
+	log.Infof("[PreCheck]: Geting targeted pods list")
 	if err := litmusLIB.SetTargetPodList(&experimentsDetails, clients, &chaosDetails); err != nil {
 		log.Errorf("Failed to get target pod list, err: %v", err)
+		failStep := "[pre-chaos]: Failed to get pod list, err: " + err.Error()
+ 		types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, "Pods: Not Found", "Warning", &chaosDetails)
+ 		_ = events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
+ 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+ 		return
 	}
 	podNames := make([]string, 0, 1)
 	for _, pod := range experimentsDetails.TargetPodList.Items {
@@ -83,8 +86,8 @@ func Experiment(clients clients.ClientSets) {
 	}
 	log.Infof("[PreCheck]: Target pods list for chaos, %v", podNames)
 
-	// Check that targeted pods have all the chaos monkey endpoint
-	log.Infof("[PreCheck]: Check pod list")
+	// Check if the targeted pods have the chaos monkey endpoint
+	log.Infof("[PreCheck]: Checking for ChaosMonkey endpoint in target pods")
 	if _, err := litmusLIB.CheckChaosMonkey(experimentsDetails.ChaosMonkeyPort, experimentsDetails.ChaosMonkeyPath, experimentsDetails.TargetPodList); err != nil {
 		log.Errorf("Some target pods don't have the chaos monkey endpoint, err: %v", err)
 	}
@@ -122,9 +125,6 @@ func Experiment(clients clients.ClientSets) {
 		_ = events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
-	// INVOKE THE CHAOSLIB OF YOUR CHOICE HERE, WHICH WILL CONTAIN
-	// THE BUSINESS LOGIC OF THE ACTUAL CHAOS
-	// IT CAN BE A NEW CHAOSLIB YOU HAVE CREATED SPECIALLY FOR THIS EXPERIMENT OR ANY EXISTING ONE
 
 	// Including the litmus lib
 	switch experimentsDetails.ChaosLib {
@@ -142,8 +142,6 @@ func Experiment(clients clients.ClientSets) {
 		return
 	}
 
-	// ADD A POST-CHAOS CHECK OF YOUR CHOICE HERE
-	// POD STATUS CHECKS FOR THE APPLICATION UNDER TEST AND AUXILIARY APPLICATIONS ARE ADDED BY DEFAULT
 
 	// POST-CHAOS APPLICATION STATUS CHECK
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (post-chaos)")

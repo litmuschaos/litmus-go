@@ -26,17 +26,14 @@ import (
 func SetTargetPodList(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
 	// Get the target pod details for the chaos execution
 	// if the target pod is not defined it will derive the random target pod list using pod affected percentage
-	var err error
 
 	if experimentsDetails.TargetPods == "" && chaosDetails.AppDetail.Label == "" {
 		return errors.Errorf("please provide one of the appLabel or TARGET_PODS")
 	}
 
-	experimentsDetails.TargetPodList, err = common.GetPodList(experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, clients, chaosDetails)
-	if err != nil {
+	if experimentsDetails.TargetPodList, err := common.GetPodList(experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, clients, chaosDetails); err != nil {
 		return err
 	}
-
 	return nil
 
 }
@@ -71,13 +68,12 @@ func PrepareChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients
 	return nil
 }
 
-// CheckChaosMonkey verifies if chaos monkey for spring boot is available in the selected pod
+// CheckChaosMonkey verifies if chaos monkey for spring boot is available in the selected pods
 func CheckChaosMonkey(chaosMonkeyPort string, chaosMonkeyPath string, targetPods corev1.PodList) (bool, error) {
 	// Deleting the application pod
 	for _, pod := range targetPods.Items {
 		log.Infof("[Check]: Checking pod: %v", pod.Name)
-		resp, err := http.Get("http://" + pod.Status.PodIP + ":" + chaosMonkeyPort + chaosMonkeyPath) //nolint:bodyclose
-		if err != nil {
+		if resp, err := http.Get("http://" + pod.Status.PodIP + ":" + chaosMonkeyPort + chaosMonkeyPath) err != nil {.   //nolint:bodyclose
 			return false, err
 		}
 
@@ -91,7 +87,7 @@ func CheckChaosMonkey(chaosMonkeyPort string, chaosMonkeyPath string, targetPods
 
 // enableChaosMonkey enables chaos monkey on selected pods
 func enableChaosMonkey(chaosMonkeyPort string, chaosMonkeyPath string, pod corev1.Pod) error {
-	log.Infof("[Check]: Enabling Chaos Monkey on pod: %v", pod.Name)
+	log.Infof("[Chaos]: Enabling Chaos Monkey on pod: %v", pod.Name)
 	resp, err := http.Post("http://"+pod.Status.PodIP+":"+chaosMonkeyPort+chaosMonkeyPath+"/enable", "", nil) //nolint:bodyclose
 	if err != nil {
 		return err
@@ -229,7 +225,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 				case <-signChan:
 					log.Info("[Chaos]: Revert Started")
 					if err := disableChaosMonkey(experimentsDetails.ChaosMonkeyPort, experimentsDetails.ChaosMonkeyPath, pod); err != nil {
-						log.Errorf("Error in disable chaos monkey, err: %v", err)
+						log.Errorf("Error in disabling chaos monkey, err: %v", err)
 					}
 					common.SetTargets(pod.Name, "reverted", "pod", chaosDetails)
 					os.Exit(1)
@@ -284,8 +280,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 			})
 
 			if err := setChaosMonkeyWatchers(experimentsDetails.ChaosMonkeyPort, experimentsDetails.ChaosMonkeyPath, experimentsDetails.ChaosMonkeyWatchers, pod); err != nil {
-				log.Errorf("[Chaos]: Failed to set watchers, err: %v ", err)
-				return err
+				return errors.Errorf("[Chaos]: Failed to set watchers, err: %v ", 
 			}
 
 			if err := setChaosMonkeyAssault(experimentsDetails.ChaosMonkeyPort, experimentsDetails.ChaosMonkeyPath, experimentsDetails.ChaosMonkeyAssault, pod); err != nil {
