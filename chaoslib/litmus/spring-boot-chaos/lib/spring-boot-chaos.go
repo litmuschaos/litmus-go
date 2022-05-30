@@ -45,6 +45,13 @@ func PrepareChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients
 		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", experimentsDetails.RampTime)
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
+	log.InfoWithValues("[Chaos]: Starting chaos with assaults ", logrus.Fields{
+		"CPU Assault":       experimentsDetails.ChaosMonkeyAssault.CPUActive,
+		"Memory Assault":    experimentsDetails.ChaosMonkeyAssault.MemoryActive,
+		"Kill App Assault":  experimentsDetails.ChaosMonkeyAssault.KillApplicationActive,
+		"Latency Assault":   experimentsDetails.ChaosMonkeyAssault.LatencyActive,
+		"Exception Assault": experimentsDetails.ChaosMonkeyAssault.ExceptionsActive,
+	})
 
 	switch strings.ToLower(experimentsDetails.Sequence) {
 	case "serial":
@@ -70,6 +77,7 @@ func PrepareChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients
 // CheckChaosMonkey verifies if chaos monkey for spring boot is available in the selected pods
 func CheckChaosMonkey(chaosMonkeyPort string, chaosMonkeyPath string, targetPods corev1.PodList) (bool, error) {
 	hasErrors := false
+
 	for _, pod := range targetPods.Items {
 		endpoint := "http://" + pod.Status.PodIP + ":" + chaosMonkeyPort + chaosMonkeyPath
 		log.Infof("[Check]: Checking pod: %v (endpoint: %v)", pod.Name, endpoint)
