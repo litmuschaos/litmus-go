@@ -46,7 +46,7 @@ func Experiment(clients clients.ClientSets) {
 	log.Infof("[PreReq]: Updating the chaos result of %v experiment (SOT)", experimentsDetails.ExperimentName)
 	if err := result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT"); err != nil {
 		log.Errorf("Unable to Create the Chaos Result, err: %v", err)
-		failStep := "[pre-chaos]: Failed to update the chaos result of pod-delete experiment (SOT), err: " + err.Error()
+		failStep := "[pre-chaos]: Failed to update the chaos result of spring-boot-chaos experiment (SOT), err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -69,16 +69,15 @@ func Experiment(clients clients.ClientSets) {
 	// Calling AbortWatcher go routine, it will continuously watch for the abort signal and generate the required events and result
 	go common.AbortWatcher(experimentsDetails.ExperimentName, clients, &resultDetails, &chaosDetails, &eventsDetails)
 
-
 	// Select targeted pods
 	log.Infof("[PreCheck]: Geting targeted pods list")
 	if err := litmusLIB.SetTargetPodList(&experimentsDetails, clients, &chaosDetails); err != nil {
 		log.Errorf("Failed to get target pod list, err: %v", err)
 		failStep := "[pre-chaos]: Failed to get pod list, err: " + err.Error()
- 		types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, "Pods: Not Found", "Warning", &chaosDetails)
- 		_ = events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
- 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
- 		return
+		types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, "Pods: Not Found", "Warning", &chaosDetails)
+		_ = events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+		return
 	}
 	podNames := make([]string, 0, 1)
 	for _, pod := range experimentsDetails.TargetPodList.Items {
@@ -125,7 +124,6 @@ func Experiment(clients clients.ClientSets) {
 		_ = events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
-
 	// Including the litmus lib
 	switch experimentsDetails.ChaosLib {
 	case "litmus":
@@ -141,7 +139,6 @@ func Experiment(clients clients.ClientSets) {
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
-
 
 	// POST-CHAOS APPLICATION STATUS CHECK
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (post-chaos)")
