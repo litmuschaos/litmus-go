@@ -45,7 +45,16 @@ func PrepareChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients
 		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", experimentsDetails.RampTime)
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
-	log.InfoWithValues("[Chaos]: Starting chaos with assaults ", logrus.Fields{
+
+	log.InfoWithValues("[Info]: Chaos monkeys watchers will be injected to the target pods as follows", logrus.Fields{
+		"WebClient":      experimentsDetails.ChaosMonkeyWatchers.WebClient,
+		"Service":        experimentsDetails.ChaosMonkeyWatchers.Service,
+		"Component":      experimentsDetails.ChaosMonkeyWatchers.Component,
+		"Repository":     experimentsDetails.ChaosMonkeyWatchers.Repository,
+		"Controller":     experimentsDetails.ChaosMonkeyWatchers.Controller,
+		"RestController": experimentsDetails.ChaosMonkeyWatchers.RestController,
+	})
+	log.InfoWithValues("[Info]: Chaos monkeys assaults will be injected to the target pods as follows", logrus.Fields{
 		"CPU Assault":       experimentsDetails.ChaosMonkeyAssault.CPUActive,
 		"Memory Assault":    experimentsDetails.ChaosMonkeyAssault.MemoryActive,
 		"Kill App Assault":  experimentsDetails.ChaosMonkeyAssault.KillApplicationActive,
@@ -116,7 +125,7 @@ func enableChaosMonkey(chaosMonkeyPort string, chaosMonkeyPath string, pod corev
 }
 
 func setChaosMonkeyWatchers(chaosMonkeyPort string, chaosMonkeyPath string, watchers experimentTypes.ChaosMonkeyWatchers, pod corev1.Pod) error {
-	log.Infof("[Check]: Setting Chaos Monkey watchers on pod: %v", pod.Name)
+	log.Infof("[Chaos]: Setting Chaos Monkey watchers on pod: %v", pod.Name)
 
 	jsonValue, err := json.Marshal(watchers)
 	if err != nil {
@@ -136,7 +145,7 @@ func setChaosMonkeyWatchers(chaosMonkeyPort string, chaosMonkeyPath string, watc
 }
 
 func setChaosMonkeyAssault(chaosMonkeyPort string, chaosMonkeyPath string, assault experimentTypes.ChaosMonkeyAssault, pod corev1.Pod) error {
-	log.Infof("[Check]: Setting Chaos Monkey assault on pod: %v", pod.Name)
+	log.Infof("[Chaos]: Setting Chaos Monkey assault on pod: %v", pod.Name)
 
 	jsonValue, err := json.Marshal(assault)
 	if err != nil {
@@ -152,7 +161,7 @@ func setChaosMonkeyAssault(chaosMonkeyPort string, chaosMonkeyPath string, assau
 		return errors.Errorf("failed to set assault on pod %v (status: %v)", pod.Name, resp.StatusCode)
 	}
 
-	log.Infof("[Check]: Activating Chaos Monkey assault on pod: %v", pod.Name)
+	log.Infof("[Chaos]: Activating Chaos Monkey assault on pod: %v", pod.Name)
 	resp, err = http.Post("http://"+pod.Status.PodIP+":"+chaosMonkeyPort+chaosMonkeyPath+"/assaults/runtime/attack", "", nil)
 	if err != nil {
 		return err
@@ -167,7 +176,7 @@ func setChaosMonkeyAssault(chaosMonkeyPort string, chaosMonkeyPath string, assau
 
 // disableChaosMonkey disables chaos monkey on selected pods
 func disableChaosMonkey(chaosMonkeyPort string, chaosMonkeyPath string, pod corev1.Pod) error {
-	log.Infof("[Check]: disabling chaos monkey on pods %v", pod.Name)
+	log.Infof("[Chaos]: disabling chaos monkey on pods %v", pod.Name)
 	resp, err := http.Post("http://"+pod.Status.PodIP+":"+chaosMonkeyPort+chaosMonkeyPath+"/disable", "", nil)
 	if err != nil {
 		return err
@@ -211,7 +220,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 				_ = events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 			}
 
-			log.InfoWithValues("[Chaos]: The Target application details", logrus.Fields{
+			log.InfoWithValues("[Chaos]: Injecting on target pod", logrus.Fields{
 				"Target Pod": pod.Name,
 			})
 
@@ -231,7 +240,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 			}
 			common.SetTargets(pod.Name, "injected", "pod", chaosDetails)
 
-			log.Infof("[Chaos]:Waiting for: %vs", experimentsDetails.ChaosDuration)
+			log.Infof("[Chaos]: Waiting for: %vs", experimentsDetails.ChaosDuration)
 
 			endTime = time.After(timeDelay)
 		loop:
@@ -311,7 +320,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 			}
 			common.SetTargets(pod.Name, "injected", "pod", chaosDetails)
 		}
-		log.Infof("[Chaos]:Waiting for: %vs", experimentsDetails.ChaosDuration)
+		log.Infof("[Chaos]: Waiting for: %vs", experimentsDetails.ChaosDuration)
 	}
 loop:
 	for {
