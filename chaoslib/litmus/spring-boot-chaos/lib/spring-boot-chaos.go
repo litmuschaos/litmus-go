@@ -69,17 +69,26 @@ func PrepareChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients
 
 // CheckChaosMonkey verifies if chaos monkey for spring boot is available in the selected pods
 func CheckChaosMonkey(chaosMonkeyPort string, chaosMonkeyPath string, targetPods corev1.PodList) (bool, error) {
+	hasErrors := false
 	for _, pod := range targetPods.Items {
-		log.Infof("[Check]: Checking pod: %v", pod.Name)
-		if resp, err := http.Get("http://" + pod.Status.PodIP + ":" + chaosMonkeyPort + chaosMonkeyPath) err != nil {.   //nolint:bodyclose
-			return false, err
+		endpoint := "http://" + pod.Status.PodIP + ":" + chaosMonkeyPort + chaosMonkeyPath
+		log.Infof("[Check]: Checking pod: %v (endpoint: %v)", pod.Name, endpoint)
+
+		resp, err := http.Get(endpoint)
+		if err != nil {
+			log.Errorf("failed to request chaos monkey endpoint on pod %v (err: %v)", pod.Name, resp.StatusCode)
+			hasErrors = true
 		}
 
 		if resp.StatusCode != 200 {
-			return false, errors.Errorf("failed to get chaos monkey endpoint on pod %v (status: %v)", pod.Name, resp.StatusCode)
+			log.Errorf("failed to get chaos monkey endpoint on pod %v (status: %v)", pod.Name, resp.StatusCode)
+			hasErrors = true
 		}
 	}
 
+	if hasErrors {
+		return false, errors.Errorf("failed to check chaos moonkey on at least one pod, check logs for details")
+	}
 	return true, nil
 }
 
