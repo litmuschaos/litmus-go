@@ -252,6 +252,8 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 			}
 			if err := disableChaosMonkey(experimentsDetails.ChaosMonkeyPort, experimentsDetails.ChaosMonkeyPath, pod); err != nil {
 				log.Errorf("Error in disabling chaos monkey, err: %v", err)
+			} else {
+				common.SetTargets(pod.Name, "reverted", "pod", chaosDetails)
 			}
 		}
 	}
@@ -334,6 +336,8 @@ loop:
 	for _, pod := range experimentsDetails.TargetPodList.Items {
 		if err := disableChaosMonkey(experimentsDetails.ChaosMonkeyPort, experimentsDetails.ChaosMonkeyPath, pod); err != nil {
 			log.Errorf("Error in disabling chaos monkey, err: %v", err)
+		} else {
+			common.SetTargets(pod.Name, "reverted", "pod", chaosDetails)
 		}
 	}
 	return nil
