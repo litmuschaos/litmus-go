@@ -81,7 +81,7 @@ func CPUStressExperiment(clients clients.ClientSets) {
 
 	// Check for experiment pre-requisites
 	log.Info("[Status]: Verify that stress-ng is available in the target machine")
-	if err := cpu.CheckPrerequisites(experimentsDetails.LoadPercentage, chaosDetails.WebsocketConnections); err != nil {
+	if err := cpu.CheckPrerequisites(experimentsDetails.CPUs, experimentsDetails.LoadPercentage, chaosDetails.WebsocketConnections); err != nil {
 		log.Errorf("Error occured during cpu steady-state validation, err: %v", err)
 		failStep := "[pre-chaos]: Failed to verify if stress-ng is present, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)

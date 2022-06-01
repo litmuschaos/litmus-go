@@ -10,7 +10,11 @@ import (
 )
 
 // CheckPrerequisites validates the pre-requisites for the experiment
-func CheckPrerequisites(loadPercentage string, connections []*websocket.Conn) error {
+func CheckPrerequisites(cpus, loadPercentage string, connections []*websocket.Conn) error {
+
+	if _, err := strconv.Atoi(cpus); err != nil {
+		return errors.Errorf("invalid number of CPUs, err: %v", err)
+	}
 
 	load, err := strconv.Atoi(loadPercentage)
 	if err != nil {
