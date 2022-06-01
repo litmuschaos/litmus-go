@@ -180,7 +180,7 @@ func startProxy(experimentDetails *experimentTypes.ExperimentDetails, pid int) e
 	toxicCommands := os.Getenv("TOXIC_COMMAND")
 
 	startProxyServerCommand := fmt.Sprintf("(sudo nsenter -t %d -n /litmus/toxiproxy -host=0.0.0.0 > /dev/null 2>&1 &)", pid)
-	createProxyCommand := fmt.Sprintf("(sudo nsenter -t %d -n /litmus/toxiproxy-cli create -l 0.0.0.0:%d -u %v:%d proxy)", pid, experimentDetails.ListenPort, experimentDetails.TargetHost, experimentDetails.TargetPort)
+	createProxyCommand := fmt.Sprintf("(sudo nsenter -t %d -n /litmus/toxiproxy-cli create -l 0.0.0.0:%d -u 0.0.0.0:%d proxy)", pid, experimentDetails.ListenPort, experimentDetails.TargetPort)
 	createToxicCommand := ""
 	switch experimentDetails.ExperimentName {
 	// preparing command for toxic addition based on HttpChaosType chosen by user

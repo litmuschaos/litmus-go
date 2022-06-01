@@ -38,7 +38,6 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string
 	experimentDetails.Sequence = types.Getenv("SEQUENCE", "parallel")
 	experimentDetails.TargetPort, _ = strconv.Atoi(types.Getenv("TARGET_PORT", "8080"))
 	experimentDetails.ListenPort, _ = strconv.Atoi(types.Getenv("LISTEN_PORT", "8081"))
-	experimentDetails.TargetHost = types.Getenv("TARGET_HOST", "")
 
 	switch expName {
 	case "pod-http-latency":

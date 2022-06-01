@@ -36,6 +36,5 @@ type ExperimentDetails struct {
 	NodeLabel                     string
 	TargetPort                    int
 	ListenPort                    int
-	TargetHost                    string
 	Latency                       int
 }
