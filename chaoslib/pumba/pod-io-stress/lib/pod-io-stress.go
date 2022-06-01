@@ -291,6 +291,8 @@ func getContainerArguments(experimentsDetails *experimentTypes.ExperimentDetails
 		"stress",
 		"--duration",
 		strconv.Itoa(experimentsDetails.ChaosDuration) + "s",
+		"--stress-image",
+		experimentsDetails.StressImage,
 		"--stressors",
 	}
 	args := stressArgs
