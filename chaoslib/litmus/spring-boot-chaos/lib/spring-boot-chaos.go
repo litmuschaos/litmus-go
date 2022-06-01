@@ -84,6 +84,7 @@ func PrepareChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients
 }
 
 // CheckChaosMonkey verifies if chaos monkey for spring boot is available in the selected pods
+// All pods are checked, even if some errors occur. But in case of one pod in error, the check will be in error
 func CheckChaosMonkey(chaosMonkeyPort string, chaosMonkeyPath string, targetPods corev1.PodList) (bool, error) {
 	hasErrors := false
 
@@ -95,6 +96,7 @@ func CheckChaosMonkey(chaosMonkeyPort string, chaosMonkeyPath string, targetPods
 		if err != nil {
 			log.Errorf("failed to request chaos monkey endpoint on pod %v (err: %v)", pod.Name, resp.StatusCode)
 			hasErrors = true
+			continue
 		}
 
 		if resp.StatusCode != 200 {
