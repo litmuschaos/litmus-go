@@ -152,6 +152,7 @@ func injectChaos(experimentDetails *experimentTypes.ExperimentDetails, pid int) 
 			return errors.Errorf("failed to start proxy, err: %v", err)
 		}
 		if err := addIPRuleSet(experimentDetails, pid); err != nil {
+			_ = killProxy(experimentDetails, pid)
 			return errors.Errorf("failed to add ip rule set, err: %v", err)
 		}
 	}
@@ -161,15 +162,21 @@ func injectChaos(experimentDetails *experimentTypes.ExperimentDetails, pid int) 
 // revertChaos revert the http chaos in target container
 func revertChaos(experimentDetails *experimentTypes.ExperimentDetails, pid int) error {
 
+	var revertError error
+	revertError = nil
+
 	if err := removeIPRuleSet(experimentDetails, pid); err != nil {
-		return errors.Errorf("failed to remove ip rule set, err: %v", err)
+		revertError = errors.Errorf("failed to remove ip rule set, err: %v", err)
 	}
 
 	if err := killProxy(experimentDetails, pid); err != nil {
-		return errors.Errorf("failed to kill proxy, err: %v", err)
+		if revertError != nil {
+			revertError = errors.Errorf("%v and failed to kill proxy server, err: %v", revertError, err)
+		} else {
+			revertError = errors.Errorf("failed to kill proxy server, err: %v", err)
+		}
 	}
-
-	return nil
+	return revertError
 }
 
 // startProxy starts the proxy process inside the target container
