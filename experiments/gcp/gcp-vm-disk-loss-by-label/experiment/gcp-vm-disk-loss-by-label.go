@@ -3,6 +3,7 @@ package experiment
 import (
 	"os"
 
+	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
 	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/gcp-vm-disk-loss-by-label/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/cloud/gcp"
@@ -141,6 +142,9 @@ func GCPVMDiskLossByLabel(clients clients.ClientSets) {
 			return
 		}
 	}
+
+	log.Infof("[Confirmation]: %v chaos has been injected successfully", experimentsDetails.ExperimentName)
+	resultDetails.Verdict = v1alpha1.ResultVerdictPassed
 
 	if experimentsDetails.EngineName != "" {
 		// marking AUT as running, as we already checked the status of application under test
