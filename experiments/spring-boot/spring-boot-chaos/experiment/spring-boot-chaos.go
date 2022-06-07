@@ -89,6 +89,10 @@ func Experiment(clients clients.ClientSets) {
 	log.Infof("[PreCheck]: Checking for ChaosMonkey endpoint in target pods")
 	if _, err := litmusLIB.CheckChaosMonkey(experimentsDetails.ChaosMonkeyPort, experimentsDetails.ChaosMonkeyPath, experimentsDetails.TargetPodList); err != nil {
 		log.Errorf("Some target pods don't have the chaos monkey endpoint, err: %v", err)
+		failStep := "[pre-chaos]: Some target pods don't have the chaos monkey endpoint, err: " + err.Error()
+		types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, "ChaosMonkey: Not Found", "Warning", &chaosDetails)
+		_ = events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
 
