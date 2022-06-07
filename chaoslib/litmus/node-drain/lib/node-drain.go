@@ -21,7 +21,6 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
 	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -81,6 +80,7 @@ func PrepareNodeDrain(experimentsDetails *experimentTypes.ExperimentDetails, cli
 	// Verify the status of AUT after reschedule
 	log.Info("[Status]: Verify the status of AUT after reschedule")
 	if err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
+		log.Info("Reverting chaos because application status check failed")
 		if uncordonErr := uncordonNode(experimentsDetails, clients, chaosDetails); uncordonErr != nil {
 			log.Errorf("Unable to uncordon the node, err: %v", uncordonErr)
 		}
@@ -91,6 +91,7 @@ func PrepareNodeDrain(experimentsDetails *experimentTypes.ExperimentDetails, cli
 	if experimentsDetails.AuxiliaryAppInfo != "" {
 		log.Info("[Status]: Verify that the Auxiliary Applications are running")
 		if err = status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
+			log.Info("Reverting chaos because auxiliary application status check failed")
 			if uncordonErr := uncordonNode(experimentsDetails, clients, chaosDetails); uncordonErr != nil {
 				log.Errorf("Unable to uncordon the node, err: %v", uncordonErr)
 			}
@@ -162,7 +163,7 @@ func uncordonNode(experimentsDetails *experimentTypes.ExperimentDetails, clients
 	for _, targetNode := range targetNodes {
 
 		//Check node exist before uncordon the node
-		_, err := clients.KubeClient.CoreV1().Nodes().Get(targetNode, metav1.GetOptions{})
+		_, err := clients.KubeClient.CoreV1().Nodes().Get(targetNode, v1.GetOptions{})
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				log.Infof("[Info]: The %v node is no longer exist, skip uncordon the node", targetNode)
