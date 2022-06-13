@@ -20,7 +20,7 @@ type ExperimentDetails struct {
 	ChaosPodName                  string
 	TargetContainer               string
 	AuxiliaryAppInfo              string
-	FillPercentage                int
+	FillPercentage                string
 	ContainerPath                 string
 	RunID                         string
 	Timeout                       int
@@ -28,10 +28,13 @@ type ExperimentDetails struct {
 	LIBImage                      string
 	LIBImagePullPolicy            string
 	TargetPods                    string
-	PodsAffectedPerc              int
+	PodsAffectedPerc              string
 	Sequence                      string
 	ChaosServiceAccount           string
-	EphemeralStorageMebibytes     int
+	EphemeralStorageMebibytes     string
 	TerminationGracePeriodSeconds int
 	DataBlockSize                 int
+	NodeLabel                     string
+	IsTargetContainerProvided     bool
+	SetHelperData                 string
 }

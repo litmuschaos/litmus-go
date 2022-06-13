@@ -90,7 +90,7 @@ func preparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetail
 	}
 
 	// watching for the abort signal and revert the chaos
-	go abortWatcher(targetPID, resultDetails.Name, chaosDetails.ChaosNamespace, experimentsDetails.TargetPods)
+	go abortWatcher(targetPID, experimentsDetails.NetworkInterface, resultDetails.Name, chaosDetails.ChaosNamespace, experimentsDetails.TargetPods)
 
 	// injecting network chaos inside target container
 	if err = injectChaos(experimentsDetails, targetPID); err != nil {
@@ -108,7 +108,7 @@ func preparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetail
 	log.Info("[Chaos]: Stopping the experiment")
 
 	// cleaning the netem process after chaos injection
-	if err = killnetem(targetPID); err != nil {
+	if err = killnetem(targetPID, experimentsDetails.NetworkInterface); err != nil {
 		return err
 	}
 
@@ -228,9 +228,9 @@ func injectChaos(experimentDetails *experimentTypes.ExperimentDetails, pid int) 
 }
 
 // killnetem kill the netem process for all the target containers
-func killnetem(PID int) error {
+func killnetem(PID int, networkInterface string) error {
 
-	tc := fmt.Sprintf("sudo nsenter -t %d -n tc qdisc delete dev eth0 root", PID)
+	tc := fmt.Sprintf("sudo nsenter -t %d -n tc qdisc delete dev %s root", PID, networkInterface)
 	cmd := exec.Command("/bin/bash", "-c", tc)
 	out, err := cmd.CombinedOutput()
 	log.Info(cmd.String())
@@ -268,7 +268,7 @@ func getENV(experimentDetails *experimentTypes.ExperimentDetails) {
 }
 
 // abortWatcher continuously watch for the abort signals
-func abortWatcher(targetPID int, resultName, chaosNS, targetPodName string) {
+func abortWatcher(targetPID int, networkInterface, resultName, chaosNS, targetPodName string) {
 
 	<-abort
 	log.Info("[Chaos]: Killing process started because of terminated signal received")
@@ -276,7 +276,7 @@ func abortWatcher(targetPID int, resultName, chaosNS, targetPodName string) {
 	// retry thrice for the chaos revert
 	retry := 3
 	for retry > 0 {
-		if err = killnetem(targetPID); err != nil {
+		if err = killnetem(targetPID, networkInterface); err != nil {
 			log.Errorf("unable to kill netem process, err :%v", err)
 		}
 		retry--

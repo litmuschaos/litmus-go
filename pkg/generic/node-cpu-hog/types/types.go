@@ -19,8 +19,8 @@ type ExperimentDetails struct {
 	InstanceID                    string
 	ChaosNamespace                string
 	ChaosPodName                  string
-	NodeCPUcores                  int
-	CPULoad                       int
+	NodeCPUcores                  string
+	CPULoad                       string
 	RunID                         string
 	LIBImage                      string
 	LIBImagePullPolicy            string
@@ -28,8 +28,9 @@ type ExperimentDetails struct {
 	Timeout                       int
 	Delay                         int
 	TargetNodes                   string
-	NodesAffectedPerc             int
+	NodesAffectedPerc             string
 	Sequence                      string
 	TargetContainer               string
 	NodeLabel                     string
+	SetHelperData                 string
 }

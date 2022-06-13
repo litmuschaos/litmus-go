@@ -26,13 +26,14 @@ type ExperimentDetails struct {
 	Timeout                         int
 	Delay                           int
 	TargetNodes                     string
-	FilesystemUtilizationPercentage int
-	FilesystemUtilizationBytes      int
-	CPU                             int
-	NumberOfWorkers                 int
-	VMWorkers                       int
-	NodesAffectedPerc               int
+	FilesystemUtilizationPercentage string
+	FilesystemUtilizationBytes      string
+	CPU                             string
+	NumberOfWorkers                 string
+	VMWorkers                       string
+	NodesAffectedPerc               string
 	Sequence                        string
 	TargetContainer                 string
 	NodeLabel                       string
+	SetHelperData                   string
 }

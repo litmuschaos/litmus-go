@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"strings"
 
+	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/stress-chaos/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/stress-chaos/types"
@@ -21,12 +22,16 @@ import (
 // PreparePodMemoryHog contains prepration steps before chaos injection
 func PreparePodMemoryHog(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
+	//setup the tunables if provided in range
+	litmusLIB.SetChaosTunables(experimentsDetails)
+
 	// Get the target pod details for the chaos execution
 	// if the target pod is not defined it will derive the random target pod list using pod affected percentage
 	if experimentsDetails.TargetPods == "" && chaosDetails.AppDetail.Label == "" {
 		return errors.Errorf("please provide one of the appLabel or TARGET_PODS")
 	}
-	targetPodList, err := common.GetPodList(experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, clients, chaosDetails)
+	podsAffectedPerc, _ := strconv.Atoi(experimentsDetails.PodsAffectedPerc)
+	targetPodList, err := common.GetPodList(experimentsDetails.TargetPods, podsAffectedPerc, clients, chaosDetails)
 	if err != nil {
 		return err
 	}
@@ -50,7 +55,7 @@ func PreparePodMemoryHog(experimentsDetails *experimentTypes.ExperimentDetails, 
 	}
 
 	if experimentsDetails.EngineName != "" {
-		if err := common.SetHelperData(chaosDetails, clients); err != nil {
+		if err := common.SetHelperData(chaosDetails, experimentsDetails.SetHelperData, clients); err != nil {
 			return err
 		}
 	}
@@ -269,7 +274,7 @@ func getContainerArguments(experimentsDetails *experimentTypes.ExperimentDetails
 		"--stress-image",
 		experimentsDetails.StressImage,
 		"--stressors",
-		"--cpu 1 --vm 1 --vm-bytes " + strconv.Itoa(experimentsDetails.MemoryConsumption) + "M --timeout " + strconv.Itoa(experimentsDetails.ChaosDuration) + "s",
+		"--cpu 1 --vm 1 --vm-bytes " + experimentsDetails.MemoryConsumption + "M --timeout " + strconv.Itoa(experimentsDetails.ChaosDuration) + "s",
 	}
 	return stressArgs
 }

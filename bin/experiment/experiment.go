@@ -17,7 +17,9 @@ import (
 	azureInstanceStop "github.com/litmuschaos/litmus-go/experiments/azure/instance-stop/experiment"
 	redfishNodeRestart "github.com/litmuschaos/litmus-go/experiments/baremetal/redfish-node-restart/experiment"
 	cassandraPodDelete "github.com/litmuschaos/litmus-go/experiments/cassandra/pod-delete/experiment"
+	gcpVMDiskLossByLabel "github.com/litmuschaos/litmus-go/experiments/gcp/gcp-vm-disk-loss-by-label/experiment"
 	gcpVMDiskLoss "github.com/litmuschaos/litmus-go/experiments/gcp/gcp-vm-disk-loss/experiment"
+	gcpVMInstanceStopByLabel "github.com/litmuschaos/litmus-go/experiments/gcp/gcp-vm-instance-stop-by-label/experiment"
 	gcpVMInstanceStop "github.com/litmuschaos/litmus-go/experiments/gcp/gcp-vm-instance-stop/experiment"
 	containerKill "github.com/litmuschaos/litmus-go/experiments/generic/container-kill/experiment"
 	diskFill "github.com/litmuschaos/litmus-go/experiments/generic/disk-fill/experiment"
@@ -163,6 +165,10 @@ func main() {
 		redfishNodeRestart.NodeRestart(clients)
 	case "process-kill":
 		processKill.ProcessKill(clients)
+	case "gcp-vm-instance-stop-by-label":
+		gcpVMInstanceStopByLabel.GCPVMInstanceStopByLabel(clients)
+	case "gcp-vm-disk-loss-by-label":
+		gcpVMDiskLossByLabel.GCPVMDiskLossByLabel(clients)
 
 	default:
 		log.Errorf("Unsupported -name %v, please provide the correct value of -name args", *experimentName)

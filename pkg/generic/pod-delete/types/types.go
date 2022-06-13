@@ -24,8 +24,9 @@ type ExperimentDetails struct {
 	Timeout             int
 	Delay               int
 	TargetPods          string
-	PodsAffectedPerc    int
+	PodsAffectedPerc    string
 	Sequence            string
 	LIBImagePullPolicy  string
 	TargetContainer     string
+	NodeLabel           string
 }
