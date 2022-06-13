@@ -6,7 +6,6 @@ import (
 	"os/exec"
 	"os/signal"
 	"strconv"
-	"strings"
 	"syscall"
 	"time"
 
@@ -67,7 +66,7 @@ func Helper(clients clients.ClientSets) {
 //prepareK8sHttpChaos contains the prepration steps before chaos injection
 func prepareK8sHttpChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails) error {
 
-	containerID, err := getContainerID(experimentsDetails, clients)
+	containerID, err := common.GetRuntimeBasedContainerID(experimentsDetails.ContainerRuntime, experimentsDetails.SocketPath, experimentsDetails.TargetPods, experimentsDetails.AppNS, experimentsDetails.TargetContainer, clients)
 	if err != nil {
 		return err
 	}
@@ -108,34 +107,6 @@ func prepareK8sHttpChaos(experimentsDetails *experimentTypes.ExperimentDetails, 
 	}
 
 	return result.AnnotateChaosResult(resultDetails.Name, chaosDetails.ChaosNamespace, "reverted", "pod", experimentsDetails.TargetPods)
-}
-
-//getContainerID extract out the container id of the target container
-func getContainerID(experimentDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) (string, error) {
-
-	var containerID string
-	switch experimentDetails.ContainerRuntime {
-	case "docker":
-		host := "unix://" + experimentDetails.SocketPath
-		// deriving the container id of the pause container
-		cmd := "sudo docker --host " + host + " ps | grep k8s_POD_" + experimentDetails.TargetPods + "_" + experimentDetails.AppNS + " | awk '{print $1}'"
-		out, err := exec.Command("/bin/sh", "-c", cmd).CombinedOutput()
-		if err != nil {
-			log.Errorf("[docker]: Failed to run docker ps command: %s", string(out))
-			return "", err
-		}
-		containerID = strings.TrimSpace(string(out))
-	case "containerd", "crio":
-		containerID, err = common.GetContainerID(experimentDetails.AppNS, experimentDetails.TargetPods, experimentDetails.TargetContainer, clients)
-		if err != nil {
-			return "", err
-		}
-	default:
-		return "", errors.Errorf("%v container runtime not suported", experimentDetails.ContainerRuntime)
-	}
-	log.Infof("Container ID: %v", containerID)
-
-	return containerID, nil
 }
 
 // injectChaos inject the http chaos in target container and add ruleset to the iptables to redirect the ports
@@ -232,7 +203,7 @@ func killProxy(experimentDetails *experimentTypes.ExperimentDetails, pid int) er
 // it is using nsenter command to enter into network namespace of target container
 // and execute the iptables related command inside it.
 func addIPRuleSet(experimentDetails *experimentTypes.ExperimentDetails, pid int) error {
-	addIPRuleSetCommand := fmt.Sprintf("(sudo nsenter -t %d -n iptables -t nat -A PREROUTING -i eth0 -p tcp --dport %d -j REDIRECT --to-port %d)", pid, experimentDetails.TargetPort, experimentDetails.ListenPort)
+	addIPRuleSetCommand := fmt.Sprintf("(sudo nsenter -t %d -n iptables -t nat -A PREROUTING -i %v -p tcp --dport %d -j REDIRECT --to-port %d)", pid, experimentDetails.NetworkInterface, experimentDetails.TargetPort, experimentDetails.ListenPort)
 	cmd := exec.Command("/bin/bash", "-c", addIPRuleSetCommand)
 	log.Infof("[Chaos]: Adding IPtables ruleset: %s", cmd.String())
 
@@ -248,7 +219,7 @@ func addIPRuleSet(experimentDetails *experimentTypes.ExperimentDetails, pid int)
 // it is using nsenter command to enter into network namespace of target container
 // and execute the iptables related command inside it.
 func removeIPRuleSet(experimentDetails *experimentTypes.ExperimentDetails, pid int) error {
-	removeIPRuleSetCommand := fmt.Sprintf("sudo nsenter -t %d -n iptables -t nat -D PREROUTING -i eth0 -p tcp --dport %d -j REDIRECT --to-port %d", pid, experimentDetails.TargetPort, experimentDetails.ListenPort)
+	removeIPRuleSetCommand := fmt.Sprintf("sudo nsenter -t %d -n iptables -t nat -D PREROUTING -i %v -p tcp --dport %d -j REDIRECT --to-port %d", pid, experimentDetails.NetworkInterface, experimentDetails.TargetPort, experimentDetails.ListenPort)
 	cmd := exec.Command("/bin/bash", "-c", removeIPRuleSetCommand)
 	log.Infof("[Chaos]: Removing IPtables ruleset: %s", cmd.String())
 

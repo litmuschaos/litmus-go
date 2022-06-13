@@ -2,6 +2,7 @@ package common
 
 import (
 	"math/rand"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -376,6 +377,34 @@ func GetContainerID(appNamespace, targetPod, targetContainer string, clients cli
 	}
 
 	log.Infof("container ID of %v container, containerID: %v", targetContainer, containerID)
+	return containerID, nil
+}
+
+//GetRuntimeBasedContainerID extract out the container id of the target container based on the container runtime
+func GetRuntimeBasedContainerID(containerRuntime, socketPath, targetPods, appNamespace, targetContainer string, clients clients.ClientSets) (string, error) {
+
+	var containerID string
+	switch containerRuntime {
+	case "docker":
+		host := "unix://" + socketPath
+		// deriving the container id of the pause container
+		cmd := "sudo docker --host " + host + " ps | grep k8s_POD_" + targetPods + "_" + appNamespace + " | awk '{print $1}'"
+		out, err := exec.Command("/bin/sh", "-c", cmd).CombinedOutput()
+		if err != nil {
+			log.Errorf("[docker]: Failed to run docker ps command: %s", string(out))
+			return "", err
+		}
+		containerID = strings.TrimSpace(string(out))
+	case "containerd", "crio":
+		containerID, err = GetContainerID(appNamespace, targetPods, targetContainer, clients)
+		if err != nil {
+			return "", err
+		}
+	default:
+		return "", errors.Errorf("%v container runtime not suported", containerRuntime)
+	}
+	log.Infof("Container ID: %v", containerID)
+
 	return containerID, nil
 }
 
