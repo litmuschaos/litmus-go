@@ -43,4 +43,5 @@ type ExperimentDetails struct {
 	NetworkChaosType                   string
 	NodeLabel                          string
 	IsTargetContainerProvided          bool
+	SetHelperData                      string
 }

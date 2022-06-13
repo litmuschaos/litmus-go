@@ -36,4 +36,5 @@ type ExperimentDetails struct {
 	DataBlockSize                 int
 	NodeLabel                     string
 	IsTargetContainerProvided     bool
+	SetHelperData                 string
 }
