@@ -186,13 +186,15 @@ func startProxy(experimentDetails *experimentTypes.ExperimentDetails, pid int) e
 
 	toxicCommands := os.Getenv("TOXIC_COMMAND")
 
-	startProxyServerCommand := fmt.Sprintf("(sudo nsenter -t %d -n /litmus/toxiproxy -host=0.0.0.0 > /dev/null 2>&1 &)", pid)
-	createProxyCommand := fmt.Sprintf("(sudo nsenter -t %d -n /litmus/toxiproxy-cli create -l 0.0.0.0:%d -u 0.0.0.0:%d proxy)", pid, experimentDetails.ListenPort, experimentDetails.TargetPort)
+	// starting toxiproxy server inside the target container
+	startProxyServerCommand := fmt.Sprintf("(sudo nsenter -t %d -n toxiproxy-server -host=0.0.0.0 > /dev/null 2>&1 &)", pid)
+	// Creating a proxy for the targetted service in the target container
+	createProxyCommand := fmt.Sprintf("(sudo nsenter -t %d -n toxiproxy-cli create -l 0.0.0.0:%d -u 0.0.0.0:%d proxy)", pid, experimentDetails.ListenPort, experimentDetails.TargetPort)
 	createToxicCommand := ""
 	switch experimentDetails.ExperimentName {
 	// preparing command for toxic addition based on HttpChaosType chosen by user
 	case "pod-http-latency":
-		createToxicCommand = fmt.Sprintf("(sudo nsenter -t %d -n /litmus/toxiproxy-cli toxic add %s proxy)", pid, toxicCommands)
+		createToxicCommand = fmt.Sprintf("(sudo nsenter -t %d -n toxiproxy-cli toxic add %s proxy)", pid, toxicCommands)
 	}
 
 	// sleep 10 is added for proxy-server to be ready for creating proxy and adding toxics
@@ -205,7 +207,7 @@ func startProxy(experimentDetails *experimentTypes.ExperimentDetails, pid int) e
 	if err != nil {
 		return err
 	}
-	log.Info("Proxy started successfully")
+	log.Info("[Info]: Proxy started successfully")
 	return nil
 }
 
@@ -222,7 +224,7 @@ func killProxy(experimentDetails *experimentTypes.ExperimentDetails, pid int) er
 		return err
 	}
 
-	log.Info("Proxy stopped successfully")
+	log.Info("[Info]: Proxy stopped successfully")
 	return nil
 }
 
@@ -238,7 +240,7 @@ func addIPRuleSet(experimentDetails *experimentTypes.ExperimentDetails, pid int)
 	if err != nil {
 		return err
 	}
-	log.Info("IP rule set added successfully")
+	log.Info("[Info]: IP rule set added successfully")
 	return nil
 }
 
@@ -254,7 +256,7 @@ func removeIPRuleSet(experimentDetails *experimentTypes.ExperimentDetails, pid i
 	if err != nil {
 		return err
 	}
-	log.Info("IP rule set removed successfully")
+	log.Info("[Info]: IP rule set removed successfully")
 	return nil
 }
 
@@ -273,6 +275,7 @@ func getENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.ChaosPodName = types.Getenv("POD_NAME", "")
 	experimentDetails.ContainerRuntime = types.Getenv("CONTAINER_RUNTIME", "")
 	experimentDetails.SocketPath = types.Getenv("SOCKET_PATH", "")
+	experimentDetails.NetworkInterface = types.Getenv("NETWORK_INTERFACE", "eth0")
 	experimentDetails.TargetPort, _ = strconv.Atoi(types.Getenv("TARGET_PORT", ""))
 	experimentDetails.ListenPort, _ = strconv.Atoi(types.Getenv("LISTEN_PORT", ""))
 }

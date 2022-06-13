@@ -36,6 +36,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string
 	experimentDetails.SocketPath = types.Getenv("SOCKET_PATH", "/var/run/docker.sock")
 	experimentDetails.SetHelperData = types.Getenv("SET_HELPER_DATA", "true")
 	experimentDetails.Sequence = types.Getenv("SEQUENCE", "parallel")
+	experimentDetails.NetworkInterface = types.Getenv("NETWORK_INTERFACE", "eth0")
 	experimentDetails.TargetPort, _ = strconv.Atoi(types.Getenv("TARGET_PORT", "8080"))
 	experimentDetails.ListenPort, _ = strconv.Atoi(types.Getenv("LISTEN_PORT", "8081"))
 

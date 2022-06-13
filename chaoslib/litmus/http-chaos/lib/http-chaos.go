@@ -41,9 +41,7 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 	switch experimentsDetails.ExperimentName {
 
 	case "pod-http-latency":
-		log.InfoWithValues("[Info]: ", logrus.Fields{
-			"Latency": strconv.Itoa(experimentsDetails.Latency),
-		})
+		log.Infof("[Info]: Latency=%v", strconv.Itoa(experimentsDetails.Latency))
 	}
 	podsAffectedPerc, _ = strconv.Atoi(experimentsDetails.PodsAffectedPerc)
 	if experimentsDetails.NodeLabel == "" {
@@ -317,6 +315,7 @@ func getPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, podName, a
 		SetEnv("EXPERIMENT_NAME", experimentsDetails.ExperimentName).
 		SetEnv("SOCKET_PATH", experimentsDetails.SocketPath).
 		SetEnv("TOXIC_COMMAND", args).
+		SetEnv("NETWORK_INTERFACE", experimentsDetails.NetworkInterface).
 		SetEnv("TARGET_PORT", strconv.Itoa(experimentsDetails.TargetPort)).
 		SetEnv("LISTEN_PORT", strconv.Itoa(experimentsDetails.ListenPort)).
 		SetEnvFromDownwardAPI("v1", "metadata.name")

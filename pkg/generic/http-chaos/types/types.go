@@ -34,6 +34,7 @@ type ExperimentDetails struct {
 	SetHelperData                 string
 	Sequence                      string
 	NodeLabel                     string
+	NetworkInterface              string
 	TargetPort                    int
 	ListenPort                    int
 	Latency                       int
