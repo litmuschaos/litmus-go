@@ -83,7 +83,7 @@ jobs:
           push: false
           file: build/Dockerfile
           platforms: linux/amd64,linux/arm64
-          tags: litmuschaos/go-runner:m-agent
+          tags: litmuschaos/go-runner:2.10.0-Beta1
 
   trivy:
     needs: pre-checks
