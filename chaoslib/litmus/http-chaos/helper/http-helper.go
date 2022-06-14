@@ -160,7 +160,7 @@ func startProxy(experimentDetails *experimentTypes.ExperimentDetails, pid int) e
 	// starting toxiproxy server inside the target container
 	startProxyServerCommand := fmt.Sprintf("(sudo nsenter -t %d -n toxiproxy-server -host=0.0.0.0 > /dev/null 2>&1 &)", pid)
 	// Creating a proxy for the targetted service in the target container
-	createProxyCommand := fmt.Sprintf("(sudo nsenter -t %d -n toxiproxy-cli create -l 0.0.0.0:%d -u 0.0.0.0:%d proxy)", pid, experimentDetails.ListenPort, experimentDetails.TargetPort)
+	createProxyCommand := fmt.Sprintf("(sudo nsenter -t %d -n toxiproxy-cli create -l 0.0.0.0:%d -u 0.0.0.0:%d proxy)", pid, experimentDetails.ProxyPort, experimentDetails.TargetServicePort)
 	createToxicCommand := ""
 	switch experimentDetails.ExperimentName {
 	// preparing command for toxic addition based on HttpChaosType chosen by user
@@ -203,7 +203,7 @@ func killProxy(experimentDetails *experimentTypes.ExperimentDetails, pid int) er
 // it is using nsenter command to enter into network namespace of target container
 // and execute the iptables related command inside it.
 func addIPRuleSet(experimentDetails *experimentTypes.ExperimentDetails, pid int) error {
-	addIPRuleSetCommand := fmt.Sprintf("(sudo nsenter -t %d -n iptables -t nat -A PREROUTING -i %v -p tcp --dport %d -j REDIRECT --to-port %d)", pid, experimentDetails.NetworkInterface, experimentDetails.TargetPort, experimentDetails.ListenPort)
+	addIPRuleSetCommand := fmt.Sprintf("(sudo nsenter -t %d -n iptables -t nat -A PREROUTING -i %v -p tcp --dport %d -j REDIRECT --to-port %d)", pid, experimentDetails.NetworkInterface, experimentDetails.TargetServicePort, experimentDetails.ProxyPort)
 	cmd := exec.Command("/bin/bash", "-c", addIPRuleSetCommand)
 	log.Infof("[Chaos]: Adding IPtables ruleset: %s", cmd.String())
 
@@ -219,7 +219,7 @@ func addIPRuleSet(experimentDetails *experimentTypes.ExperimentDetails, pid int)
 // it is using nsenter command to enter into network namespace of target container
 // and execute the iptables related command inside it.
 func removeIPRuleSet(experimentDetails *experimentTypes.ExperimentDetails, pid int) error {
-	removeIPRuleSetCommand := fmt.Sprintf("sudo nsenter -t %d -n iptables -t nat -D PREROUTING -i %v -p tcp --dport %d -j REDIRECT --to-port %d", pid, experimentDetails.NetworkInterface, experimentDetails.TargetPort, experimentDetails.ListenPort)
+	removeIPRuleSetCommand := fmt.Sprintf("sudo nsenter -t %d -n iptables -t nat -D PREROUTING -i %v -p tcp --dport %d -j REDIRECT --to-port %d", pid, experimentDetails.NetworkInterface, experimentDetails.TargetServicePort, experimentDetails.ProxyPort)
 	cmd := exec.Command("/bin/bash", "-c", removeIPRuleSetCommand)
 	log.Infof("[Chaos]: Removing IPtables ruleset: %s", cmd.String())
 
@@ -247,8 +247,8 @@ func getENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.ContainerRuntime = types.Getenv("CONTAINER_RUNTIME", "")
 	experimentDetails.SocketPath = types.Getenv("SOCKET_PATH", "")
 	experimentDetails.NetworkInterface = types.Getenv("NETWORK_INTERFACE", "eth0")
-	experimentDetails.TargetPort, _ = strconv.Atoi(types.Getenv("TARGET_PORT", ""))
-	experimentDetails.ListenPort, _ = strconv.Atoi(types.Getenv("LISTEN_PORT", ""))
+	experimentDetails.TargetServicePort, _ = strconv.Atoi(types.Getenv("TARGET_SERVICE_PORT", ""))
+	experimentDetails.ProxyPort, _ = strconv.Atoi(types.Getenv("PROXY_PORT", ""))
 }
 
 // abortWatcher continuously watch for the abort signals

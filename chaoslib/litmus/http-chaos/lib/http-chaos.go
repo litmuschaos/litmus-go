@@ -32,8 +32,8 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 	SetChaosTunables(experimentsDetails)
 
 	log.InfoWithValues("[Info]: The chaos tunables are:", logrus.Fields{
-		"Target Port":      experimentsDetails.TargetPort,
-		"Listen Port":      experimentsDetails.ListenPort,
+		"Target Port":      experimentsDetails.TargetServicePort,
+		"Listen Port":      experimentsDetails.ProxyPort,
 		"Sequence":         experimentsDetails.Sequence,
 		"PodsAffectedPerc": experimentsDetails.PodsAffectedPerc,
 	})
@@ -316,8 +316,8 @@ func getPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, podName, a
 		SetEnv("SOCKET_PATH", experimentsDetails.SocketPath).
 		SetEnv("TOXIC_COMMAND", args).
 		SetEnv("NETWORK_INTERFACE", experimentsDetails.NetworkInterface).
-		SetEnv("TARGET_PORT", strconv.Itoa(experimentsDetails.TargetPort)).
-		SetEnv("LISTEN_PORT", strconv.Itoa(experimentsDetails.ListenPort)).
+		SetEnv("TARGET_SERVICE_PORT", strconv.Itoa(experimentsDetails.TargetServicePort)).
+		SetEnv("PROXY_PORT", strconv.Itoa(experimentsDetails.ProxyPort)).
 		SetEnvFromDownwardAPI("v1", "metadata.name")
 
 	return envDetails.ENV

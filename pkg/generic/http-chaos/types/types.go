@@ -35,7 +35,7 @@ type ExperimentDetails struct {
 	Sequence                      string
 	NodeLabel                     string
 	NetworkInterface              string
-	TargetPort                    int
-	ListenPort                    int
+	TargetServicePort             int
+	ProxyPort                     int
 	Latency                       int
 }

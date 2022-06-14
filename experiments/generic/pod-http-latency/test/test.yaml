@@ -36,11 +36,11 @@ spec:
             value: "0.0.0.0"
 
           # port of the target service
-          - name: TARGET_PORT
+          - name: TARGET_SERVICE_PORT
             value: "80"
 
           # port on which the proxy will listen
-          - name: LISTEN_PORT
+          - name: PROXY_PORT
             value: "2002"
 
           - name: TOTAL_CHAOS_DURATION
