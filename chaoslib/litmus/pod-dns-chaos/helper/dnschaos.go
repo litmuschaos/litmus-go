@@ -6,7 +6,6 @@ import (
 	"os/exec"
 	"os/signal"
 	"strconv"
-	"strings"
 	"syscall"
 	"time"
 
@@ -17,12 +16,10 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
-	"github.com/pkg/errors"
 	clientTypes "k8s.io/apimachinery/pkg/types"
 )
 
 var (
-	err                error
 	abort, injectAbort chan os.Signal
 )
 
@@ -66,7 +63,7 @@ func Helper(clients clients.ClientSets) {
 //preparePodDNSChaos contains the preparation steps before chaos injection
 func preparePodDNSChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails) error {
 
-	containerID, err := getContainerID(experimentsDetails, clients)
+	containerID, err := common.GetRuntimeBasedContainerID(experimentsDetails.ContainerRuntime, experimentsDetails.SocketPath, experimentsDetails.TargetPods, experimentsDetails.AppNS, experimentsDetails.TargetContainer, clients)
 	if err != nil {
 		return err
 	}
@@ -145,34 +142,6 @@ func preparePodDNSChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 	}
 	log.Info("Chaos Revert Completed")
 	return nil
-}
-
-//getContainerID extract out the container id of the target container
-func getContainerID(experimentDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) (string, error) {
-
-	var containerID string
-	switch experimentDetails.ContainerRuntime {
-	case "docker":
-		host := "unix://" + experimentDetails.SocketPath
-		// deriving the container id of the pause container
-		cmd := "sudo docker --host " + host + " ps | grep k8s_POD_" + experimentDetails.TargetPods + "_" + experimentDetails.AppNS + " | awk '{print $1}'"
-		out, err := exec.Command("/bin/sh", "-c", cmd).CombinedOutput()
-		if err != nil {
-			log.Error(fmt.Sprintf("[docker]: Failed to run docker ps command: %s", string(out)))
-			return "", err
-		}
-		containerID = strings.TrimSpace(string(out))
-	case "containerd", "crio":
-		containerID, err = common.GetContainerID(experimentDetails.AppNS, experimentDetails.TargetPods, experimentDetails.TargetContainer, clients)
-		if err != nil {
-			return containerID, err
-		}
-	default:
-		return "", errors.Errorf("%v container runtime not suported", experimentDetails.ContainerRuntime)
-	}
-	log.Infof("Container ID: %v", containerID)
-
-	return containerID, nil
 }
 
 //getENV fetches all the env variables from the runner pod

@@ -19,7 +19,9 @@ FROM alpine:3.15.0 AS dep
 # Install generally useful things
 RUN apk --update add \
         sudo \
-        iproute2
+        iproute2 \
+        iptables
+
 
 # Packaging stage
 # Image source: https://github.com/litmuschaos/test-tools/blob/master/custom/hardened-alpine/experiment/Dockerfile
@@ -31,6 +33,7 @@ LABEL maintainer="LitmusChaos"
 COPY --from=builder /output/ /litmus
 COPY --from=dep /usr/bin/sudo /usr/bin/
 COPY --from=dep /sbin/tc /sbin/
+COPY --from=dep /sbin/iptables /sbin/
 
 #Copying Necessary Files
 COPY ./pkg/cloud/aws/common/ssm-docs/LitmusChaos-AWS-SSM-Docs.yml .
