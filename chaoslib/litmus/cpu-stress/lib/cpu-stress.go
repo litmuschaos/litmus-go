@@ -126,7 +126,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 
 			underChaosEndpoints = append(underChaosEndpoints, i)
 
-			common.SetTargets(agentEndpointList[i], "injected", "CPU", chaosDetails)
+			common.SetTargets(agentEndpointList[i], "injected", "machine", chaosDetails)
 
 			log.Infof("[Chaos]: CPU stress chaos injected successfully in %s agent endpoint", agentEndpointList[i])
 
@@ -167,7 +167,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 
 			underChaosEndpoints = underChaosEndpoints[:len(underChaosEndpoints)-1]
 
-			common.SetTargets(agentEndpointList[i], "reverted", "CPU", chaosDetails)
+			common.SetTargets(agentEndpointList[i], "reverted", "machine", chaosDetails)
 		}
 
 		duration = int(time.Since(ChaosStartTimeStamp).Seconds())
@@ -217,7 +217,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 
 			underChaosEndpoints = append(underChaosEndpoints, i)
 
-			common.SetTargets(agentEndpointList[i], "injected", "CPU", chaosDetails)
+			common.SetTargets(agentEndpointList[i], "injected", "machine", chaosDetails)
 
 			log.Infof("[Chaos]: CPU stress chaos injected successfully in %s agent endpoint", agentEndpointList[i])
 		}
@@ -259,7 +259,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 				return errors.Errorf("unintelligible feedback received from agent: %s", feedback)
 			}
 
-			common.SetTargets(agentEndpointList[i], "reverted", "CPU", chaosDetails)
+			common.SetTargets(agentEndpointList[i], "reverted", "machine", chaosDetails)
 
 			underChaosEndpoints = underChaosEndpoints[1:]
 		}
@@ -300,7 +300,7 @@ func AbortWatcher(connections []*websocket.Conn, agentEndpointList []string, abo
 			log.Errorf("unintelligible feedback received from agent: %s", feedback)
 		}
 
-		common.SetTargets(agentEndpointList[i], "reverted", "CPU", chaosDetails)
+		common.SetTargets(agentEndpointList[i], "reverted", "machine", chaosDetails)
 	}
 
 	log.Info("[Abort]: Chaos Revert Completed")
