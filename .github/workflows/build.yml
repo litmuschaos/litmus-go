@@ -67,7 +67,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v1
+        uses: docker/setup-qemu-action@v2
         with:
           platforms: all
 
@@ -83,7 +83,7 @@ jobs:
           push: false
           file: build/Dockerfile
           platforms: linux/amd64,linux/arm64
-          tags: litmuschaos/go-runner:m-agent
+          tags: litmuschaos/go-runner:2.10.0-Beta1
 
   trivy:
     needs: pre-checks

@@ -51,6 +51,7 @@ import (
 	ebsLossByTag "github.com/litmuschaos/litmus-go/experiments/kube-aws/ebs-loss-by-tag/experiment"
 	ec2TerminateByID "github.com/litmuschaos/litmus-go/experiments/kube-aws/ec2-terminate-by-id/experiment"
 	ec2TerminateByTag "github.com/litmuschaos/litmus-go/experiments/kube-aws/ec2-terminate-by-tag/experiment"
+	cpuStress "github.com/litmuschaos/litmus-go/experiments/os/cpu-stress/experiment"
 	processKill "github.com/litmuschaos/litmus-go/experiments/os/process-kill/experiment"
 	vmpoweroff "github.com/litmuschaos/litmus-go/experiments/vmware/vm-poweroff/experiment"
 
@@ -165,6 +166,8 @@ func main() {
 		redfishNodeRestart.NodeRestart(clients)
 	case "process-kill":
 		processKill.ProcessKill(clients)
+	case "cpu-stress":
+		cpuStress.CPUStressExperiment(clients)
 	case "gcp-vm-instance-stop-by-label":
 		gcpVMInstanceStopByLabel.GCPVMInstanceStopByLabel(clients)
 	case "gcp-vm-disk-loss-by-label":
