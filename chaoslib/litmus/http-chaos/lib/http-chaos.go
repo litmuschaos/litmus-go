@@ -42,6 +42,8 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 
 	case "pod-http-latency":
 		log.Infof("[Info]: Latency=%v", strconv.Itoa(experimentsDetails.Latency))
+	case "pod-http-reset-peer":
+		log.Infof("[Info]: Reset Timeout=%v", strconv.Itoa(experimentsDetails.ResetTimeout))
 	}
 	podsAffectedPerc, _ = strconv.Atoi(experimentsDetails.PodsAffectedPerc)
 	if experimentsDetails.NodeLabel == "" {

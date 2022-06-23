@@ -18,8 +18,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// Experiment contains steps to inject chaos
-func Experiment(clients clients.ClientSets) {
+// PodHttpResetPeer contains steps to inject chaos
+func PodHttpResetPeer(clients clients.ClientSets) {
 
 	experimentsDetails := experimentTypes.ExperimentDetails{}
 	resultDetails := types.ResultDetails{}
