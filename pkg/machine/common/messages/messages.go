@@ -126,3 +126,23 @@ func GetErrorMessage(payload []byte) (string, error) {
 
 	return agentError, nil
 }
+
+// ValidateAgentFeedback interprets the feedback received from the agent for an earlier sent message
+func ValidateAgentFeedback(feedback string, payload []byte) error {
+
+	if feedback != "ACTION_SUCCESSFUL" {
+		if feedback == "ERROR" || feedback == "PROBE_ERROR" {
+
+			agentError, err := GetErrorMessage(payload)
+			if err != nil {
+				return errors.Errorf("failed to interpret error message from agent, err: %v", err)
+			}
+
+			return errors.Errorf(agentError)
+		}
+
+		return errors.Errorf("unintelligible feedback received from agent: %s", feedback)
+	}
+
+	return nil
+}

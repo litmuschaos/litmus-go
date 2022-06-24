@@ -65,18 +65,8 @@ func WaitForDurationAndCheckLiveness(connections []*websocket.Conn, agentEndpoin
 					chaosRevert.Wait()
 
 				default:
-					if feedback != "ACTION_SUCCESSFUL" {
-						if feedback == "ERROR" {
-
-							agentError, err := messages.GetErrorMessage(payload)
-							if err != nil {
-								return errors.Errorf("failed to interpret error message from agent, err: %v", err)
-							}
-
-							return errors.Errorf("received error feedback from %s agent endpoint, err: %s", agentEndpointList[i], agentError)
-						}
-
-						return errors.Errorf("unintelligible feedback received from agent: %s", feedback)
+					if err := messages.ValidateAgentFeedback(feedback, payload); err != nil {
+						return errors.Errorf("error during liveness check for %s agent endpoint, err: %v", agentEndpointList[i], err)
 					}
 				}
 			}
