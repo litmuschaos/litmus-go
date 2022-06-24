@@ -109,19 +109,8 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 				return errors.Errorf("failed while sending message to agent, err: %v", err)
 			}
 
-			// ACTION_SUCCESSFUL feedback is received only if the cpu stress chaos has been injected successfully
-			if feedback != "ACTION_SUCCESSFUL" {
-				if feedback == "ERROR" {
-
-					agentError, err := messages.GetErrorMessage(payload)
-					if err != nil {
-						return errors.Errorf("failed to interpret error message from agent, err: %v", err)
-					}
-
-					return errors.Errorf("error occured while injecting CPU stress chaos for %s agent endpoint, err: %s", agentEndpointList[i], agentError)
-				}
-
-				return errors.Errorf("unintelligible feedback received from agent: %s", feedback)
+			if err := messages.ValidateAgentFeedback(feedback, payload); err != nil {
+				return errors.Errorf("error occured while injecting CPU stress chaos for %s agent endpoint, err: %v", agentEndpointList[i], err)
 			}
 
 			underChaosEndpoints = append(underChaosEndpoints, i)
@@ -150,19 +139,8 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 				return errors.Errorf("failed while sending message to agent, err: %v", err)
 			}
 
-			// ACTION_SUCCESSFUL feedback is received only if the cpu stress chaos has been injected successfully
-			if feedback != "ACTION_SUCCESSFUL" {
-				if feedback == "ERROR" {
-
-					agentError, err := messages.GetErrorMessage(payload)
-					if err != nil {
-						return errors.Errorf("failed to interpret error message from agent, err: %v", err)
-					}
-
-					return errors.Errorf("error occured while reverting CPU stress chaos for %s agent endpoint, err: %s", agentEndpointList[i], agentError)
-				}
-
-				return errors.Errorf("unintelligible feedback received from agent: %s", feedback)
+			if err := messages.ValidateAgentFeedback(feedback, payload); err != nil {
+				return errors.Errorf("error occured while reverting CPU stress chaos for %s agent endpoint, err: %v", agentEndpointList[i], err)
 			}
 
 			underChaosEndpoints = underChaosEndpoints[:len(underChaosEndpoints)-1]
@@ -200,19 +178,8 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 				return errors.Errorf("failed while sending message to agent, err: %v", err)
 			}
 
-			// ACTION_SUCCESSFUL feedback is received only if the cpu stress chaos has been injected successfully
-			if feedback != "ACTION_SUCCESSFUL" {
-				if feedback == "ERROR" {
-
-					agentError, err := messages.GetErrorMessage(payload)
-					if err != nil {
-						return errors.Errorf("failed to interpret error message from agent, err: %v", err)
-					}
-
-					return errors.Errorf("error occured while injecting CPU stress chaos for %s agent endpoint, err: %s", agentEndpointList[i], agentError)
-				}
-
-				return errors.Errorf("unintelligible feedback received from agent: %s", feedback)
+			if err := messages.ValidateAgentFeedback(feedback, payload); err != nil {
+				return errors.Errorf("error occured while injecting CPU stress chaos for %s agent endpoint, err: %v", agentEndpointList[i], err)
 			}
 
 			underChaosEndpoints = append(underChaosEndpoints, i)
@@ -244,19 +211,8 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 				return errors.Errorf("failed while sending message to agent, err: %v", err)
 			}
 
-			// ACTION_SUCCESSFUL feedback is received only if the cpu stress chaos has been injected successfully
-			if feedback != "ACTION_SUCCESSFUL" {
-				if feedback == "ERROR" {
-
-					agentError, err := messages.GetErrorMessage(payload)
-					if err != nil {
-						return errors.Errorf("failed to interpret error message from agent, err: %v", err)
-					}
-
-					return errors.Errorf("error occured while reverting CPU stress chaos for %s agent endpoint, err: %s", agentEndpointList[i], agentError)
-				}
-
-				return errors.Errorf("unintelligible feedback received from agent: %s", feedback)
+			if err := messages.ValidateAgentFeedback(feedback, payload); err != nil {
+				return errors.Errorf("error occured while reverting CPU stress chaos for %s agent endpoint, err: %v", agentEndpointList[i], err)
 			}
 
 			common.SetTargets(agentEndpointList[i], "reverted", "Machine", chaosDetails)
@@ -285,19 +241,8 @@ func AbortWatcher(connections []*websocket.Conn, agentEndpointList []string, abo
 			log.Errorf("unable to send abort chaos message to %s agent endpoint, err: %v", agentEndpointList[i], err)
 		}
 
-		// ACTION_SUCCESSFUL feedback is received only if the cpu stress chaos has been aborted successfully
-		if feedback != "ACTION_SUCCESSFUL" {
-			if feedback == "ERROR" {
-
-				agentError, err := messages.GetErrorMessage(payload)
-				if err != nil {
-					log.Errorf("failed to interpret error message from agent, err: %v", err)
-				}
-
-				log.Errorf("error occured while aborting the experiment for %s agent endpoint, err: %s", agentEndpointList[i], agentError)
-			}
-
-			log.Errorf("unintelligible feedback received from agent: %s", feedback)
+		if err := messages.ValidateAgentFeedback(feedback, payload); err != nil {
+			log.Errorf("error occured while aborting CPU stress chaos for %s agent endpoint, err: %v", agentEndpointList[i], err)
 		}
 
 		common.SetTargets(agentEndpointList[i], "reverted", "Machine", chaosDetails)

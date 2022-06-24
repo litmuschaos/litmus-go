@@ -33,19 +33,8 @@ func CheckPrerequisites(cpus, loadPercentage string, connections []*websocket.Co
 			return errors.Errorf("failed to send message to agent, err: %v", err)
 		}
 
-		// ACTION_SUCCESSFUL feedback is received only if all the processes exist in the target machine
-		if feedback != "ACTION_SUCCESSFUL" {
-			if feedback == "ERROR" {
-
-				agentError, err := messages.GetErrorMessage(payload)
-				if err != nil {
-					return errors.Errorf("failed to interpret error message from agent, err: %v", err)
-				}
-
-				return errors.Errorf("error during steady-state validation, err: %s", agentError)
-			}
-
-			return errors.Errorf("unintelligible feedback received from agent: %s", feedback)
+		if err := messages.ValidateAgentFeedback(feedback, payload); err != nil {
+			return errors.Errorf("error during steady-state validation, err: %v", err)
 		}
 	}
 
