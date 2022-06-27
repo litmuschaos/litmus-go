@@ -55,7 +55,7 @@ func AnnotatedApplicationsStatusCheck(appNs, appLabel, containerName string, tim
 			if err != nil {
 				return errors.Errorf("Unable to find the pods with matching labels, err: %v", err)
 			} else if len(podList.Items) == 0 {
-				errors.Errorf("Unable to find the pods with matching labels")
+				return errors.Errorf("Unable to find the pods with matching labels")
 			}
 			for _, pod := range podList.Items {
 				parentName, err := annotation.GetParentName(clients, pod, chaosDetails)
