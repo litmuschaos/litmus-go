@@ -28,7 +28,7 @@ func PodHttpModifyHeader(clients clients.ClientSets) {
 
 	//Fetching all the ENV passed from the runner pod
 	log.Infof("[PreReq]: Getting the ENV for the %v experiment", os.Getenv("EXPERIMENT_NAME"))
-	experimentEnv.GetENV(&experimentsDetails, "pod-http-latency")
+	experimentEnv.GetENV(&experimentsDetails, "pod-http-modify-header")
 
 	// Initialize events Parameters
 	types.InitialiseChaosVariables(&chaosDetails)

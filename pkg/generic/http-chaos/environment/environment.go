@@ -43,7 +43,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string
 	switch expName {
 	case "pod-http-latency":
 		experimentDetails.Latency, _ = strconv.Atoi(types.Getenv("LATENCY", "6000"))
-	case "pod-http-modify-headers":
+	case "pod-http-modify-header":
 		experimentDetails.HeadersMap = types.Getenv("HEADERS_MAP", "{}")
 		experimentDetails.HeaderMode = types.Getenv("HEADER_MODE", "response")
 	}
