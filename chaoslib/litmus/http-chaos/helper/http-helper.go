@@ -155,18 +155,13 @@ func revertChaos(experimentDetails *experimentTypes.ExperimentDetails, pid int) 
 // and execute the proxy related command inside it.
 func startProxy(experimentDetails *experimentTypes.ExperimentDetails, pid int) error {
 
-	toxicCommands := os.Getenv("TOXIC_COMMAND")
+	toxics := os.Getenv("TOXIC_COMMAND")
 
 	// starting toxiproxy server inside the target container
 	startProxyServerCommand := fmt.Sprintf("(sudo nsenter -t %d -n toxiproxy-server -host=0.0.0.0 > /dev/null 2>&1 &)", pid)
 	// Creating a proxy for the targetted service in the target container
 	createProxyCommand := fmt.Sprintf("(sudo nsenter -t %d -n toxiproxy-cli create -l 0.0.0.0:%d -u 0.0.0.0:%d proxy)", pid, experimentDetails.ProxyPort, experimentDetails.TargetServicePort)
-	createToxicCommand := ""
-	switch experimentDetails.ExperimentName {
-	// preparing command for toxic addition based on HttpChaosType chosen by user
-	case "pod-http-latency":
-		createToxicCommand = fmt.Sprintf("(sudo nsenter -t %d -n toxiproxy-cli toxic add %s proxy)", pid, toxicCommands)
-	}
+	createToxicCommand := fmt.Sprintf("(sudo nsenter -t %d -n toxiproxy-cli toxic add %s proxy)", pid, toxics)
 
 	// sleep 10 is added for proxy-server to be ready for creating proxy and adding toxics
 	chaosCommand := fmt.Sprintf("%s && sleep 10 && %s && %s", startProxyServerCommand, createProxyCommand, createToxicCommand)
