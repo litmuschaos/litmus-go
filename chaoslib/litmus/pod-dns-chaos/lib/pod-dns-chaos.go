@@ -1,6 +1,7 @@
 package lib
 
 import (
+	"context"
 	"strconv"
 	"strings"
 
@@ -254,7 +255,7 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 		},
 	}
 
-	_, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Create(helperPod)
+	_, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Create(context.Background(), helperPod, v1.CreateOptions{})
 	return err
 
 }

@@ -1,6 +1,7 @@
 package lib
 
 import (
+	"context"
 	"strconv"
 	"strings"
 
@@ -31,18 +32,6 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 	//set up the tunables if provided in range
 	SetChaosTunables(experimentsDetails)
 
-	log.InfoWithValues("[Info]: The chaos tunables are:", logrus.Fields{
-		"Target Port":      experimentsDetails.TargetServicePort,
-		"Listen Port":      experimentsDetails.ProxyPort,
-		"Sequence":         experimentsDetails.Sequence,
-		"PodsAffectedPerc": experimentsDetails.PodsAffectedPerc,
-	})
-
-	switch experimentsDetails.ExperimentName {
-
-	case "pod-http-latency":
-		log.Infof("[Info]: Latency=%v", strconv.Itoa(experimentsDetails.Latency))
-	}
 	podsAffectedPerc, _ = strconv.Atoi(experimentsDetails.PodsAffectedPerc)
 	if experimentsDetails.NodeLabel == "" {
 
@@ -295,7 +284,7 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 		},
 	}
 
-	_, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Create(helperPod)
+	_, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Create(context.Background(), helperPod, v1.CreateOptions{})
 	return err
 
 }

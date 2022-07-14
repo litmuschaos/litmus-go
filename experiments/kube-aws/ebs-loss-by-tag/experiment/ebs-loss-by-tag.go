@@ -3,7 +3,7 @@ package experiment
 import (
 	"os"
 
-	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
+	"github.com/litmuschaos/chaos-operator/api/litmuschaos/v1alpha1"
 	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/ebs-loss/lib/ebs-loss-by-tag/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	aws "github.com/litmuschaos/litmus-go/pkg/cloud/aws/ebs"

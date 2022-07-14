@@ -4,11 +4,11 @@ import (
 	"os"
 
 	"github.com/litmuschaos/chaos-operator/api/litmuschaos/v1alpha1"
-	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/pod-dns-chaos/lib"
-	"github.com/litmuschaos/litmus-go/pkg/clients"
+	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/http-chaos/lib/reset"
+	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
-	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/pod-dns-chaos/environment"
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-dns-chaos/types"
+	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/http-chaos/environment"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/http-chaos/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/result"
@@ -18,8 +18,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// PodDNSError contains steps to inject chaos
-func PodDNSError(clients clients.ClientSets) {
+// PodHttpResetPeer contains steps to inject chaos
+func PodHttpResetPeer(clients clients.ClientSets) {
 
 	experimentsDetails := experimentTypes.ExperimentDetails{}
 	resultDetails := types.ResultDetails{}
@@ -28,7 +28,7 @@ func PodDNSError(clients clients.ClientSets) {
 
 	//Fetching all the ENV passed from the runner pod
 	log.Infof("[PreReq]: Getting the ENV for the %v experiment", os.Getenv("EXPERIMENT_NAME"))
-	experimentEnv.GetENV(&experimentsDetails, experimentEnv.Error)
+	experimentEnv.GetENV(&experimentsDetails, "pod-http-reset-peer")
 
 	// Initialize the chaos attributes
 	types.InitialiseChaosVariables(&chaosDetails)
@@ -48,7 +48,7 @@ func PodDNSError(clients clients.ClientSets) {
 	log.Infof("[PreReq]: Updating the chaos result of %v experiment (SOT)", experimentsDetails.ExperimentName)
 	if err := result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT"); err != nil {
 		log.Errorf("Unable to Create the Chaos Result, err: %v", err)
-		failStep := "[pre-chaos]: Failed to update the chaos result of pod-dns-error experiment (SOT), err: " + err.Error()
+		failStep := "[pre-chaos]: Failed to update the chaos result of pod-http-reset-peer experiment (SOT), err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -63,10 +63,9 @@ func PodDNSError(clients clients.ClientSets) {
 
 	//DISPLAY THE APP INFORMATION
 	log.InfoWithValues("[Info]: The application information is as follows", logrus.Fields{
-		"Namespace":       experimentsDetails.AppNS,
-		"Label":           experimentsDetails.AppLabel,
-		"Chaos Duration":  experimentsDetails.ChaosDuration,
-		"TargetHostNames": experimentsDetails.TargetHostNames,
+		"Namespace":      experimentsDetails.AppNS,
+		"Label":          experimentsDetails.AppLabel,
+		"Chaos Duration": experimentsDetails.ChaosDuration,
 	})
 
 	// Calling AbortWatcher go routine, it will continuously watch for the abort signal and generate the required events and result
@@ -87,7 +86,7 @@ func PodDNSError(clients clients.ClientSets) {
 
 	if experimentsDetails.EngineName != "" {
 		// marking AUT as running, as we already checked the status of application under test
-		msg := common.GetStatusMessage(chaosDetails.DefaultAppHealthCheck, "AUT: Running", "")
+		msg := "AUT: Running"
 
 		// run the probes in the pre-chaos check
 		if len(resultDetails.ProbeDetails) != 0 {
@@ -95,13 +94,13 @@ func PodDNSError(clients clients.ClientSets) {
 			if err := probe.RunProbes(&chaosDetails, clients, &resultDetails, "PreChaos", &eventsDetails); err != nil {
 				log.Errorf("Probe Failed, err: %v", err)
 				failStep := "[pre-chaos]: Failed while running probes, err: " + err.Error()
-				msg := common.GetStatusMessage(chaosDetails.DefaultAppHealthCheck, "AUT: Running", "Unsuccessful")
+				msg := "AUT: Running, Probes: Unsuccessful"
 				types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, msg, "Warning", &chaosDetails)
 				events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 				result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 				return
 			}
-			msg = common.GetStatusMessage(chaosDetails.DefaultAppHealthCheck, "AUT: Running", "Successful")
+			msg = "AUT: Running, Probes: Successful"
 		}
 		// generating the events for the pre-chaos check
 		types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, msg, "Normal", &chaosDetails)
@@ -111,7 +110,7 @@ func PodDNSError(clients clients.ClientSets) {
 	// Including the litmus lib
 	switch experimentsDetails.ChaosLib {
 	case "litmus":
-		if err := litmusLIB.PrepareAndInjectChaos(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
+		if err := litmusLIB.PodHttpResetPeerChaos(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
 			log.Errorf("Chaos injection failed, err: %v", err)
 			failStep := "[chaos]: Failed inside the chaoslib, err: " + err.Error()
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
@@ -119,7 +118,7 @@ func PodDNSError(clients clients.ClientSets) {
 		}
 	default:
 		log.Error("[Invalid]: Please Provide the correct LIB")
-		failStep := "[chaos]: no match was found for the specified lib"
+		failStep := "[chaos]: no match found for specified lib"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -142,20 +141,20 @@ func PodDNSError(clients clients.ClientSets) {
 
 	if experimentsDetails.EngineName != "" {
 		// marking AUT as running, as we already checked the status of application under test
-		msg := common.GetStatusMessage(chaosDetails.DefaultAppHealthCheck, "AUT: Running", "")
+		msg := "AUT: Running"
 
 		// run the probes in the post-chaos check
 		if len(resultDetails.ProbeDetails) != 0 {
 			if err := probe.RunProbes(&chaosDetails, clients, &resultDetails, "PostChaos", &eventsDetails); err != nil {
 				log.Errorf("Probes Failed, err: %v", err)
 				failStep := "[post-chaos]: Failed while running probes, err: " + err.Error()
-				msg := common.GetStatusMessage(chaosDetails.DefaultAppHealthCheck, "AUT: Running", "Unsuccessful")
+				msg := "AUT: Running, Probes: Unsuccessful"
 				types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, msg, "Warning", &chaosDetails)
 				events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 				result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 				return
 			}
-			msg = common.GetStatusMessage(chaosDetails.DefaultAppHealthCheck, "AUT: Running", "Successful")
+			msg = "AUT: Running, Probes: Successful"
 		}
 
 		// generating post chaos event

@@ -1,10 +1,11 @@
 package probe
 
 import (
+	"context"
 	"strings"
 	"time"
 
-	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
+	"github.com/litmuschaos/chaos-operator/api/litmuschaos/v1alpha1"
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/math"
@@ -81,7 +82,7 @@ func triggerK8sProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets,
 					return err
 				}
 			case "present":
-				resourceList, err := clients.DynamicClient.Resource(gvr).Namespace(inputs.Namespace).List(v1.ListOptions{
+				resourceList, err := clients.DynamicClient.Resource(gvr).Namespace(inputs.Namespace).List(context.Background(), v1.ListOptions{
 					FieldSelector: inputs.FieldSelector,
 					LabelSelector: inputs.LabelSelector,
 				})
@@ -92,7 +93,7 @@ func triggerK8sProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets,
 					return errors.Errorf("no resource found with provided selectors")
 				}
 			case "absent":
-				resourceList, err := clients.DynamicClient.Resource(gvr).Namespace(inputs.Namespace).List(v1.ListOptions{
+				resourceList, err := clients.DynamicClient.Resource(gvr).Namespace(inputs.Namespace).List(context.Background(), v1.ListOptions{
 					FieldSelector: inputs.FieldSelector,
 					LabelSelector: inputs.LabelSelector,
 				})
@@ -158,14 +159,14 @@ func createResource(probe v1alpha1.ProbeAttributes, gvr schema.GroupVersionResou
 	if err != nil {
 		return err
 	}
-	_, err := clients.DynamicClient.Resource(gvr).Namespace(probe.K8sProbeInputs.Namespace).Create(data, v1.CreateOptions{})
+	_, err := clients.DynamicClient.Resource(gvr).Namespace(probe.K8sProbeInputs.Namespace).Create(context.Background(), data, v1.CreateOptions{})
 
 	return err
 }
 
 // deleteResource deletes the resource with matching label & field selector
 func deleteResource(probe v1alpha1.ProbeAttributes, gvr schema.GroupVersionResource, clients clients.ClientSets) error {
-	resourceList, err := clients.DynamicClient.Resource(gvr).Namespace(probe.K8sProbeInputs.Namespace).List(v1.ListOptions{
+	resourceList, err := clients.DynamicClient.Resource(gvr).Namespace(probe.K8sProbeInputs.Namespace).List(context.Background(), v1.ListOptions{
 		FieldSelector: probe.K8sProbeInputs.FieldSelector,
 		LabelSelector: probe.K8sProbeInputs.LabelSelector,
 	})
@@ -176,7 +177,7 @@ func deleteResource(probe v1alpha1.ProbeAttributes, gvr schema.GroupVersionResou
 	}
 
 	for index := range resourceList.Items {
-		if err = clients.DynamicClient.Resource(gvr).Namespace(probe.K8sProbeInputs.Namespace).Delete(resourceList.Items[index].GetName(), &v1.DeleteOptions{}); err != nil {
+		if err = clients.DynamicClient.Resource(gvr).Namespace(probe.K8sProbeInputs.Namespace).Delete(context.Background(), resourceList.Items[index].GetName(), v1.DeleteOptions{}); err != nil {
 			return err
 		}
 	}

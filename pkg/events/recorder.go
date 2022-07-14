@@ -1,6 +1,7 @@
 package events
 
 import (
+	"context"
 	"time"
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
@@ -14,7 +15,7 @@ import (
 	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/record"
 
-	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
+	"github.com/litmuschaos/chaos-operator/api/litmuschaos/v1alpha1"
 	litmuschaosScheme "github.com/litmuschaos/chaos-operator/pkg/client/clientset/versioned/scheme"
 )
 
@@ -77,7 +78,7 @@ func (r Recorder) Summary(ExperimentName string, resultDetails *types.ResultDeta
 
 // GetChaosEngine returns chaosEngine Object
 func GetChaosEngine(clients clients.ClientSets, ChaosNamespace string, EngineName string) (*v1alpha1.ChaosEngine, error) {
-	expEngine, err := clients.LitmusClient.ChaosEngines(ChaosNamespace).Get(EngineName, metav1.GetOptions{})
+	expEngine, err := clients.LitmusClient.ChaosEngines(ChaosNamespace).Get(context.Background(), EngineName, metav1.GetOptions{})
 	if err != nil {
 
 		return nil, errors.Wrapf(err, "Unable to get ChaosEngine Name: %v, in namespace: %v, due to error: %v", EngineName, ChaosNamespace, err)

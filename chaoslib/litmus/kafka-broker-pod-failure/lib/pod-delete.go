@@ -1,6 +1,7 @@
 package lib
 
 import (
+	"context"
 	"strconv"
 	"strings"
 	"time"
@@ -103,9 +104,9 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 				"PodName": pod.Name})
 
 			if experimentsDetails.ChaoslibDetail.Force {
-				err = clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaoslibDetail.AppNS).Delete(pod.Name, &v1.DeleteOptions{GracePeriodSeconds: &GracePeriod})
+				err = clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaoslibDetail.AppNS).Delete(context.Background(), pod.Name, v1.DeleteOptions{GracePeriodSeconds: &GracePeriod})
 			} else {
-				err = clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaoslibDetail.AppNS).Delete(pod.Name, &v1.DeleteOptions{})
+				err = clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaoslibDetail.AppNS).Delete(context.Background(), pod.Name, v1.DeleteOptions{})
 			}
 			if err != nil {
 				return err
@@ -192,9 +193,9 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 				"PodName": pod.Name})
 
 			if experimentsDetails.ChaoslibDetail.Force {
-				err = clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaoslibDetail.AppNS).Delete(pod.Name, &v1.DeleteOptions{GracePeriodSeconds: &GracePeriod})
+				err = clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaoslibDetail.AppNS).Delete(context.Background(), pod.Name, v1.DeleteOptions{GracePeriodSeconds: &GracePeriod})
 			} else {
-				err = clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaoslibDetail.AppNS).Delete(pod.Name, &v1.DeleteOptions{})
+				err = clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaoslibDetail.AppNS).Delete(context.Background(), pod.Name, v1.DeleteOptions{})
 			}
 			if err != nil {
 				return err

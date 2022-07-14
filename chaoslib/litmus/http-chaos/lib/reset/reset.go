@@ -1,4 +1,4 @@
-package latency
+package reset
 
 import (
 	"strconv"
@@ -11,17 +11,17 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-//PodHttpLatencyChaos contains the steps to prepare and inject http latency chaos
-func PodHttpLatencyChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+//PodHttpResetPeerChaos contains the steps to prepare and inject http latency chaos
+func PodHttpResetPeerChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	log.InfoWithValues("[Info]: The chaos tunables are:", logrus.Fields{
 		"Target Port":      experimentsDetails.TargetServicePort,
 		"Listen Port":      experimentsDetails.ProxyPort,
 		"Sequence":         experimentsDetails.Sequence,
 		"PodsAffectedPerc": experimentsDetails.PodsAffectedPerc,
-		"Latency":          experimentsDetails.Latency,
+		"Reset Timeout":    experimentsDetails.ResetTimeout,
 	})
 
-	args := "-t latency -a latency=" + strconv.Itoa(experimentsDetails.Latency)
+	args := "-t reset_peer -a timeout=" + strconv.Itoa(experimentsDetails.ResetTimeout)
 	return http_chaos.PrepareAndInjectChaos(experimentsDetails, clients, resultDetails, eventsDetails, chaosDetails, args)
 }

@@ -2,13 +2,14 @@ package probe
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"html/template"
 	"strings"
 	"time"
 
 	"github.com/kyokomi/emoji"
-	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
+	"github.com/litmuschaos/chaos-operator/api/litmuschaos/v1alpha1"
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/types"
@@ -110,7 +111,7 @@ func getProbesFromEngine(chaosDetails *types.ChaosDetails, clients clients.Clien
 		Times(uint(chaosDetails.Timeout / chaosDetails.Delay)).
 		Wait(time.Duration(chaosDetails.Delay) * time.Second).
 		Try(func(attempt uint) error {
-			engine, err := clients.LitmusClient.ChaosEngines(chaosDetails.ChaosNamespace).Get(chaosDetails.EngineName, v1.GetOptions{})
+			engine, err := clients.LitmusClient.ChaosEngines(chaosDetails.ChaosNamespace).Get(context.Background(), chaosDetails.EngineName, v1.GetOptions{})
 			if err != nil {
 				return fmt.Errorf("unable to Get the chaosengine, err: %v", err)
 			}
@@ -297,12 +298,12 @@ func stopChaosEngine(probe v1alpha1.ProbeAttributes, clients clients.ClientSets,
 	// failing the probe, if the success condition doesn't met after the retry & timeout combinations
 	markedVerdictInEnd(err, chaosresult, probe, "PostChaos")
 	//patch chaosengine's state to stop
-	engine, err := clients.LitmusClient.ChaosEngines(chaosDetails.ChaosNamespace).Get(chaosDetails.EngineName, v1.GetOptions{})
+	engine, err := clients.LitmusClient.ChaosEngines(chaosDetails.ChaosNamespace).Get(context.Background(), chaosDetails.EngineName, v1.GetOptions{})
 	if err != nil {
 		return err
 	}
 	engine.Spec.EngineState = v1alpha1.EngineStateStop
-	_, err = clients.LitmusClient.ChaosEngines(chaosDetails.ChaosNamespace).Update(engine)
+	_, err = clients.LitmusClient.ChaosEngines(chaosDetails.ChaosNamespace).Update(context.Background(), engine, v1.UpdateOptions{})
 	return err
 }
 

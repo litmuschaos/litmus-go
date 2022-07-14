@@ -1,6 +1,7 @@
 package lib
 
 import (
+	"context"
 	"strconv"
 	"time"
 
@@ -92,7 +93,7 @@ func PreparePodDelete(experimentsDetails *experimentTypes.ExperimentDetails, cli
 
 // GetServiceAccount find the serviceAccountName for the powerfulseal deployment
 func GetServiceAccount(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) error {
-	pod, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Get(experimentsDetails.ChaosPodName, v1.GetOptions{})
+	pod, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Get(context.Background(), experimentsDetails.ChaosPodName, v1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -120,7 +121,7 @@ func CreateConfigMap(experimentsDetails *experimentTypes.ExperimentDetails, clie
 		Data: data,
 	}
 
-	_, err := clients.KubeClient.CoreV1().ConfigMaps(experimentsDetails.ChaosNamespace).Create(configMap)
+	_, err := clients.KubeClient.CoreV1().ConfigMaps(experimentsDetails.ChaosNamespace).Create(context.Background(), configMap, v1.CreateOptions{})
 
 	return err
 }
@@ -219,7 +220,7 @@ func CreatePowerfulsealDeployment(experimentsDetails *experimentTypes.Experiment
 		},
 	}
 
-	_, err := clients.KubeClient.AppsV1().Deployments(experimentsDetails.ChaosNamespace).Create(deployment)
+	_, err := clients.KubeClient.AppsV1().Deployments(experimentsDetails.ChaosNamespace).Create(context.Background(), deployment, v1.CreateOptions{})
 	return err
 
 }
@@ -227,7 +228,7 @@ func CreatePowerfulsealDeployment(experimentsDetails *experimentTypes.Experiment
 //DeletePowerfulsealDeployment delete the powerfulseal deployment
 func DeletePowerfulsealDeployment(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, runID string) error {
 
-	err := clients.KubeClient.AppsV1().Deployments(experimentsDetails.ChaosNamespace).Delete("powerfulseal-"+runID, &v1.DeleteOptions{})
+	err := clients.KubeClient.AppsV1().Deployments(experimentsDetails.ChaosNamespace).Delete(context.Background(), "powerfulseal-"+runID, v1.DeleteOptions{})
 
 	if err != nil {
 		return err
@@ -237,7 +238,7 @@ func DeletePowerfulsealDeployment(experimentsDetails *experimentTypes.Experiment
 		Times(90).
 		Wait(1 * time.Second).
 		Try(func(attempt uint) error {
-			podSpec, err := clients.KubeClient.AppsV1().Deployments(experimentsDetails.ChaosNamespace).List(v1.ListOptions{LabelSelector: "name=powerfulseal-" + runID})
+			podSpec, err := clients.KubeClient.AppsV1().Deployments(experimentsDetails.ChaosNamespace).List(context.Background(), v1.ListOptions{LabelSelector: "name=powerfulseal-" + runID})
 			if err != nil || len(podSpec.Items) != 0 {
 				return errors.Errorf("Deployment is not deleted yet, err: %v", err)
 			}
@@ -250,7 +251,7 @@ func DeletePowerfulsealDeployment(experimentsDetails *experimentTypes.Experiment
 //DeletePowerfulsealConfigmap delete the powerfulseal configmap
 func DeletePowerfulsealConfigmap(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, runID string) error {
 
-	err := clients.KubeClient.CoreV1().ConfigMaps(experimentsDetails.ChaosNamespace).Delete("policy-"+runID, &v1.DeleteOptions{})
+	err := clients.KubeClient.CoreV1().ConfigMaps(experimentsDetails.ChaosNamespace).Delete(context.Background(), "policy-"+runID, v1.DeleteOptions{})
 
 	if err != nil {
 		return err
@@ -260,7 +261,7 @@ func DeletePowerfulsealConfigmap(experimentsDetails *experimentTypes.ExperimentD
 		Times(90).
 		Wait(1 * time.Second).
 		Try(func(attempt uint) error {
-			podSpec, err := clients.KubeClient.CoreV1().ConfigMaps(experimentsDetails.ChaosNamespace).List(v1.ListOptions{LabelSelector: "name=policy-" + runID})
+			podSpec, err := clients.KubeClient.CoreV1().ConfigMaps(experimentsDetails.ChaosNamespace).List(context.Background(), v1.ListOptions{LabelSelector: "name=policy-" + runID})
 			if err != nil || len(podSpec.Items) != 0 {
 				return errors.Errorf("configmap is not deleted yet, err: %v", err)
 			}
