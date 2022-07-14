@@ -3,7 +3,7 @@ package experiment
 import (
 	"os"
 
-	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
+	"github.com/litmuschaos/chaos-operator/api/litmuschaos/v1alpha1"
 	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/redfish-node-restart/lib"
 	redfishLib "github.com/litmuschaos/litmus-go/pkg/baremetal/redfish"
 	experimentEnv "github.com/litmuschaos/litmus-go/pkg/baremetal/redfish-node-restart/environment"

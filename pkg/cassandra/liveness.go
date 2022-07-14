@@ -1,6 +1,7 @@
 package cassandra
 
 import (
+	"context"
 	"io/ioutil"
 	"net/http"
 	"strconv"
@@ -93,7 +94,7 @@ func LivenessCleanup(experimentsDetails *experimentTypes.ExperimentDetails, clie
 // GetLivenessPodResourceVersion will return the resource version of the liveness pod
 func GetLivenessPodResourceVersion(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) (string, error) {
 
-	livenessPods, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaoslibDetail.AppNS).List(metav1.ListOptions{LabelSelector: "name=cassandra-liveness-deploy-" + experimentsDetails.RunID})
+	livenessPods, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaoslibDetail.AppNS).List(context.Background(), metav1.ListOptions{LabelSelector: "name=cassandra-liveness-deploy-" + experimentsDetails.RunID})
 	if err != nil {
 		return "", errors.Errorf("unable to get the liveness pod, err: %v", err)
 	} else if len(livenessPods.Items) == 0 {
@@ -107,7 +108,7 @@ func GetLivenessPodResourceVersion(experimentsDetails *experimentTypes.Experimen
 // GetServiceClusterIP will return the cluster IP of the liveness service
 func GetServiceClusterIP(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) (string, error) {
 
-	service, err := clients.KubeClient.CoreV1().Services(experimentsDetails.ChaoslibDetail.AppNS).Get("cassandra-liveness-service-"+experimentsDetails.RunID, metav1.GetOptions{})
+	service, err := clients.KubeClient.CoreV1().Services(experimentsDetails.ChaoslibDetail.AppNS).Get(context.Background(), "cassandra-liveness-service-"+experimentsDetails.RunID, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -156,7 +157,7 @@ func ResourceVersionCheck(ResourceVersionBefore, ResourceVersionAfter string) er
 func DeleteLivenessDeployment(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) error {
 
 	deletePolicy := metav1.DeletePropagationForeground
-	if err := clients.KubeClient.AppsV1().Deployments(experimentsDetails.ChaoslibDetail.AppNS).Delete("cassandra-liveness-deploy-"+experimentsDetails.RunID, &metav1.DeleteOptions{
+	if err := clients.KubeClient.AppsV1().Deployments(experimentsDetails.ChaoslibDetail.AppNS).Delete(context.Background(), "cassandra-liveness-deploy-"+experimentsDetails.RunID, metav1.DeleteOptions{
 		PropagationPolicy: &deletePolicy,
 	}); err != nil {
 		return err
@@ -165,7 +166,7 @@ func DeleteLivenessDeployment(experimentsDetails *experimentTypes.ExperimentDeta
 		Times(uint(experimentsDetails.ChaoslibDetail.Timeout / experimentsDetails.ChaoslibDetail.Delay)).
 		Wait(time.Duration(experimentsDetails.ChaoslibDetail.Delay) * time.Second).
 		Try(func(attempt uint) error {
-			podSpec, err := clients.KubeClient.AppsV1().Deployments(experimentsDetails.ChaoslibDetail.AppNS).List(metav1.ListOptions{LabelSelector: "name=cassandra-liveness-deploy-" + experimentsDetails.RunID})
+			podSpec, err := clients.KubeClient.AppsV1().Deployments(experimentsDetails.ChaoslibDetail.AppNS).List(context.Background(), metav1.ListOptions{LabelSelector: "name=cassandra-liveness-deploy-" + experimentsDetails.RunID})
 			if err != nil {
 				return errors.Errorf("liveness deployment is not deleted yet, err: %v", err)
 			} else if len(podSpec.Items) != 0 {
@@ -179,7 +180,7 @@ func DeleteLivenessDeployment(experimentsDetails *experimentTypes.ExperimentDeta
 func DeleteLivenessService(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) error {
 
 	deletePolicy := metav1.DeletePropagationForeground
-	if err := clients.KubeClient.CoreV1().Services(experimentsDetails.ChaoslibDetail.AppNS).Delete("cassandra-liveness-service-"+experimentsDetails.RunID, &metav1.DeleteOptions{
+	if err := clients.KubeClient.CoreV1().Services(experimentsDetails.ChaoslibDetail.AppNS).Delete(context.Background(), "cassandra-liveness-service-"+experimentsDetails.RunID, metav1.DeleteOptions{
 		PropagationPolicy: &deletePolicy,
 	}); err != nil {
 		return errors.Errorf("fail to delete liveness service, err: %v", err)
@@ -188,7 +189,7 @@ func DeleteLivenessService(experimentsDetails *experimentTypes.ExperimentDetails
 		Times(uint(experimentsDetails.ChaoslibDetail.Timeout / experimentsDetails.ChaoslibDetail.Delay)).
 		Wait(time.Duration(experimentsDetails.ChaoslibDetail.Delay) * time.Second).
 		Try(func(attempt uint) error {
-			svc, err := clients.KubeClient.CoreV1().Services(experimentsDetails.ChaoslibDetail.AppNS).List(metav1.ListOptions{LabelSelector: "name=cassandra-liveness-service-" + experimentsDetails.RunID})
+			svc, err := clients.KubeClient.CoreV1().Services(experimentsDetails.ChaoslibDetail.AppNS).List(context.Background(), metav1.ListOptions{LabelSelector: "name=cassandra-liveness-service-" + experimentsDetails.RunID})
 			if err != nil {
 				return errors.Errorf("liveness service is not deleted yet, err: %v", err)
 			} else if len(svc.Items) != 0 {
@@ -325,7 +326,7 @@ func CreateLivenessPod(experimentsDetails *experimentTypes.ExperimentDetails, cl
 	}
 
 	// Creating liveness deployment
-	_, err := clients.KubeClient.AppsV1().Deployments(experimentsDetails.ChaoslibDetail.AppNS).Create(liveness)
+	_, err := clients.KubeClient.AppsV1().Deployments(experimentsDetails.ChaoslibDetail.AppNS).Create(context.Background(), liveness, metav1.CreateOptions{})
 	if err != nil {
 		return err
 	}
@@ -363,7 +364,7 @@ func CreateLivenessService(experimentsDetails *experimentTypes.ExperimentDetails
 	}
 
 	// Creating liveness service
-	_, err := clients.KubeClient.CoreV1().Services(experimentsDetails.ChaoslibDetail.AppNS).Create(livenessSvc)
+	_, err := clients.KubeClient.CoreV1().Services(experimentsDetails.ChaoslibDetail.AppNS).Create(context.Background(), livenessSvc, metav1.CreateOptions{})
 	if err != nil {
 		return err
 	}

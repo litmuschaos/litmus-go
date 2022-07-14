@@ -1,6 +1,7 @@
 package kafka
 
 import (
+	"context"
 	"strconv"
 	"strings"
 
@@ -59,7 +60,7 @@ func LivenessStream(experimentsDetails *experimentTypes.ExperimentDetails, clien
 	}
 
 	log.Info("[Liveness]: Determine the leader broker pod name")
-	podList, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.KafkaNamespace).List(metav1.ListOptions{LabelSelector: experimentsDetails.KafkaLabel})
+	podList, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.KafkaNamespace).List(context.Background(), metav1.ListOptions{LabelSelector: experimentsDetails.KafkaLabel})
 	if err != nil {
 		return "", errors.Errorf("unable to find the pods with matching labels, err: %v", err)
 	}
@@ -182,7 +183,7 @@ func CreateLivenessPod(experimentsDetails *experimentTypes.ExperimentDetails, Ka
 		},
 	}
 
-	_, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.KafkaNamespace).Create(LivenessPod)
+	_, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.KafkaNamespace).Create(context.Background(), LivenessPod, metav1.CreateOptions{})
 	if err != nil {
 		return errors.Errorf("unable to create Liveness pod, err: %v", err)
 	}

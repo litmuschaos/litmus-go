@@ -38,8 +38,8 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string
 	experimentDetails.SetHelperData = types.Getenv("SET_HELPER_DATA", "true")
 	experimentDetails.Sequence = types.Getenv("SEQUENCE", "parallel")
 	experimentDetails.NetworkInterface = types.Getenv("NETWORK_INTERFACE", "eth0")
-	experimentDetails.TargetServicePort, _ = strconv.Atoi(types.Getenv("TARGET_SERVICE_PORT", "8080"))
-	experimentDetails.ProxyPort, _ = strconv.Atoi(types.Getenv("PROXY_PORT", "8081"))
+	experimentDetails.TargetServicePort, _ = strconv.Atoi(types.Getenv("TARGET_SERVICE_PORT", "80"))
+	experimentDetails.ProxyPort, _ = strconv.Atoi(types.Getenv("PROXY_PORT", "20000"))
 
 	switch expName {
 	case "pod-http-latency":
@@ -47,6 +47,10 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string
 	case "pod-http-status-code":
 		experimentDetails.StatusCode = utils.GetStatusCode(types.Getenv("STATUS_CODE", ""))
 		experimentDetails.ModifyResponseBody = stringBoolToInt(types.Getenv("MODIFY_RESPONSE_BODY", "true"))
+	case "pod-http-modify-body":
+		experimentDetails.ResponseBody = types.Getenv("RESPONSE_BODY", "")
+	case "pod-http-reset-peer":
+		experimentDetails.ResetTimeout, _ = strconv.Atoi(types.Getenv("RESET_TIMEOUT", "0"))
 	}
 }
 

@@ -21,6 +21,27 @@ spec:
           - sleep 
           - "3600"
         env:
+          # provide application namespace
+          - name: APP_NAMESPACE
+            value: ''
+
+          # provide application labels
+          - name: APP_LABEL
+            value: ''
+ 
+          # provide application kind
+          - name: APP_KIND
+            value: ''
+
+          # provide auxiliary application details - namespace and labels of the applications
+          # sample input is - "ns1:app=percona,ns2:name=nginx"
+          - name: AUXILIARY_APPINFO
+            value: ''
+          
+          # provide the chaos namespace
+          - name: CHAOS_NAMESPACE
+            value: ''
+
           - name: TARGET_CONTAINER
             value: ''
 
@@ -30,10 +51,6 @@ spec:
 
           - name: LATENCY
             value: '2000' #in ms
-
-          # hostname or IP of the target service
-          - name: TARGET_HOST
-            value: "0.0.0.0"
 
           # port of the target service
           - name: TARGET_SERVICE_PORT

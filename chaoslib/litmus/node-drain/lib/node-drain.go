@@ -2,6 +2,7 @@ package lib
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -143,7 +144,7 @@ func drainNode(experimentsDetails *experimentTypes.ExperimentDetails, clients cl
 			Times(uint(experimentsDetails.Timeout / experimentsDetails.Delay)).
 			Wait(time.Duration(experimentsDetails.Delay) * time.Second).
 			Try(func(attempt uint) error {
-				nodeSpec, err := clients.KubeClient.CoreV1().Nodes().Get(experimentsDetails.TargetNode, v1.GetOptions{})
+				nodeSpec, err := clients.KubeClient.CoreV1().Nodes().Get(context.Background(), experimentsDetails.TargetNode, v1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -163,7 +164,7 @@ func uncordonNode(experimentsDetails *experimentTypes.ExperimentDetails, clients
 	for _, targetNode := range targetNodes {
 
 		//Check node exist before uncordon the node
-		_, err := clients.KubeClient.CoreV1().Nodes().Get(targetNode, v1.GetOptions{})
+		_, err := clients.KubeClient.CoreV1().Nodes().Get(context.Background(), targetNode, v1.GetOptions{})
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				log.Infof("[Info]: The %v node is no longer exist, skip uncordon the node", targetNode)
@@ -192,7 +193,7 @@ func uncordonNode(experimentsDetails *experimentTypes.ExperimentDetails, clients
 		Try(func(attempt uint) error {
 			targetNodes := strings.Split(experimentsDetails.TargetNode, ",")
 			for _, targetNode := range targetNodes {
-				nodeSpec, err := clients.KubeClient.CoreV1().Nodes().Get(targetNode, v1.GetOptions{})
+				nodeSpec, err := clients.KubeClient.CoreV1().Nodes().Get(context.Background(), targetNode, v1.GetOptions{})
 				if err != nil {
 					if apierrors.IsNotFound(err) {
 						continue

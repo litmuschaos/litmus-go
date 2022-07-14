@@ -40,4 +40,6 @@ type ExperimentDetails struct {
 	Latency                       int
 	StatusCode                    int
 	ModifyResponseBody            int
+	ResponseBody                  string
+	ResetTimeout                  int
 }
