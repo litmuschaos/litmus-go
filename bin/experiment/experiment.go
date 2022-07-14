@@ -40,6 +40,7 @@ import (
 	podFioStress "github.com/litmuschaos/litmus-go/experiments/generic/pod-fio-stress/experiment"
 	podHttpLatency "github.com/litmuschaos/litmus-go/experiments/generic/pod-http-latency/experiment"
 	podHttpModifyHeader "github.com/litmuschaos/litmus-go/experiments/generic/pod-http-modify-header/experiment"
+	podHttpResetPeer "github.com/litmuschaos/litmus-go/experiments/generic/pod-http-reset-peer/experiment"
 	podIOStress "github.com/litmuschaos/litmus-go/experiments/generic/pod-io-stress/experiment"
 	podMemoryHogExec "github.com/litmuschaos/litmus-go/experiments/generic/pod-memory-hog-exec/experiment"
 	podMemoryHog "github.com/litmuschaos/litmus-go/experiments/generic/pod-memory-hog/experiment"
@@ -154,6 +155,8 @@ func main() {
 		podHttpLatency.PodHttpLatency(clients)
 	case "pod-http-modify-header":
 		podHttpModifyHeader.PodHttpModifyHeader(clients)
+	case "pod-http-reset-peer":
+		podHttpResetPeer.PodHttpResetPeer(clients)
 	case "vm-poweroff":
 		vmpoweroff.VMPoweroff(clients)
 	case "azure-instance-stop":

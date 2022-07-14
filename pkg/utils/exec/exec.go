@@ -2,6 +2,7 @@ package exec
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -25,7 +26,7 @@ type PodDetails struct {
 // Exec function will run the provide commands inside the target container
 func Exec(commandDetails *PodDetails, clients clients.ClientSets, command []string) (string, error) {
 
-	pod, err := clients.KubeClient.CoreV1().Pods(commandDetails.Namespace).Get(commandDetails.PodName, v1.GetOptions{})
+	pod, err := clients.KubeClient.CoreV1().Pods(commandDetails.Namespace).Get(context.Background(), commandDetails.PodName, v1.GetOptions{})
 	if err != nil {
 		return "", errors.Errorf("unable to get %v pod in %v namespace, err: %v", commandDetails.PodName, commandDetails.Namespace, err)
 	}

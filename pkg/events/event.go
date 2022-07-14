@@ -1,6 +1,7 @@
 package events
 
 import (
+	"context"
 	"time"
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
@@ -35,7 +36,7 @@ func CreateEvents(eventsDetails *types.EventDetails, clients clients.ClientSets,
 		},
 	}
 
-	_, err := clients.KubeClient.CoreV1().Events(chaosDetails.ChaosNamespace).Create(events)
+	_, err := clients.KubeClient.CoreV1().Events(chaosDetails.ChaosNamespace).Create(context.Background(), events, metav1.CreateOptions{})
 	return err
 }
 
@@ -51,7 +52,7 @@ func GenerateEvents(eventsDetails *types.EventDetails, clients clients.ClientSet
 		}
 	case "ChaosEngine":
 		eventName := eventsDetails.Reason + chaosDetails.ExperimentName + string(chaosDetails.ChaosUID)
-		event, err := clients.KubeClient.CoreV1().Events(chaosDetails.ChaosNamespace).Get(eventName, metav1.GetOptions{})
+		event, err := clients.KubeClient.CoreV1().Events(chaosDetails.ChaosNamespace).Get(context.Background(), eventName, metav1.GetOptions{})
 		if err != nil {
 			if k8serrors.IsNotFound(err) {
 				if err := CreateEvents(eventsDetails, clients, chaosDetails, kind, eventName); err != nil {
@@ -65,7 +66,7 @@ func GenerateEvents(eventsDetails *types.EventDetails, clients clients.ClientSet
 			event.Count = event.Count + 1
 			event.Source.Component = chaosDetails.ChaosPodName
 			event.Message = eventsDetails.Message
-			_, err = clients.KubeClient.CoreV1().Events(chaosDetails.ChaosNamespace).Update(event)
+			_, err = clients.KubeClient.CoreV1().Events(chaosDetails.ChaosNamespace).Update(context.Background(), event, metav1.UpdateOptions{})
 			if err != nil {
 				return err
 			}

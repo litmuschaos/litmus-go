@@ -1,6 +1,7 @@
 package lib
 
 import (
+	"context"
 	"strconv"
 	"strings"
 
@@ -234,7 +235,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 // getNodeMemoryDetails will return the total memory capacity and memory allocatable of an application node
 func getNodeMemoryDetails(appNodeName string, clients clients.ClientSets) (int, int, error) {
 
-	nodeDetails, err := clients.KubeClient.CoreV1().Nodes().Get(appNodeName, v1.GetOptions{})
+	nodeDetails, err := clients.KubeClient.CoreV1().Nodes().Get(context.Background(), appNodeName, v1.GetOptions{})
 	if err != nil {
 		return 0, 0, err
 	}
@@ -351,7 +352,7 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, chao
 		},
 	}
 
-	_, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Create(helperPod)
+	_, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Create(context.Background(), helperPod, v1.CreateOptions{})
 	return err
 }
 

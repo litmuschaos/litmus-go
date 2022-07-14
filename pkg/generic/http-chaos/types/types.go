@@ -40,4 +40,5 @@ type ExperimentDetails struct {
 	Latency                       int
 	HeadersMap                    string
 	HeaderMode                    string
+	ResetTimeout                  int
 }

@@ -1,6 +1,7 @@
 package lib
 
 import (
+	"context"
 	"os"
 	"os/signal"
 	"syscall"
@@ -43,7 +44,7 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 		return errors.Errorf("please provide the appLabel")
 	}
 	// Get the target pod details for the chaos execution
-	targetPodList, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).List(v1.ListOptions{LabelSelector: experimentsDetails.AppLabel})
+	targetPodList, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).List(context.Background(), v1.ListOptions{LabelSelector: experimentsDetails.AppLabel})
 	if err != nil {
 		return err
 	}
@@ -155,7 +156,7 @@ func createNetworkPolicy(experimentsDetails *experimentTypes.ExperimentDetails, 
 		},
 	}
 
-	_, err := clients.KubeClient.NetworkingV1().NetworkPolicies(experimentsDetails.AppNS).Create(np)
+	_, err := clients.KubeClient.NetworkingV1().NetworkPolicies(experimentsDetails.AppNS).Create(context.Background(), np, v1.CreateOptions{})
 	return err
 }
 
@@ -163,7 +164,7 @@ func createNetworkPolicy(experimentsDetails *experimentTypes.ExperimentDetails, 
 func deleteNetworkPolicy(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, targetPodList *corev1.PodList, chaosDetails *types.ChaosDetails, timeout, delay int, runID string) error {
 	name := experimentsDetails.ExperimentName + "-np-" + runID
 	labels := "name=" + experimentsDetails.ExperimentName + "-np-" + runID
-	if err := clients.KubeClient.NetworkingV1().NetworkPolicies(experimentsDetails.AppNS).Delete(name, &v1.DeleteOptions{}); err != nil {
+	if err := clients.KubeClient.NetworkingV1().NetworkPolicies(experimentsDetails.AppNS).Delete(context.Background(), name, v1.DeleteOptions{}); err != nil {
 		return err
 	}
 
@@ -171,7 +172,7 @@ func deleteNetworkPolicy(experimentsDetails *experimentTypes.ExperimentDetails, 
 		Times(uint(timeout / delay)).
 		Wait(time.Duration(delay) * time.Second).
 		Try(func(attempt uint) error {
-			npList, err := clients.KubeClient.NetworkingV1().NetworkPolicies(experimentsDetails.AppNS).List(v1.ListOptions{LabelSelector: labels})
+			npList, err := clients.KubeClient.NetworkingV1().NetworkPolicies(experimentsDetails.AppNS).List(context.Background(), v1.ListOptions{LabelSelector: labels})
 			if err != nil || len(npList.Items) != 0 {
 				return errors.Errorf("Unable to delete the network policy, err: %v", err)
 			}
@@ -196,7 +197,7 @@ func checkExistanceOfPolicy(experimentsDetails *experimentTypes.ExperimentDetail
 		Times(uint(timeout / delay)).
 		Wait(time.Duration(delay) * time.Second).
 		Try(func(attempt uint) error {
-			npList, err := clients.KubeClient.NetworkingV1().NetworkPolicies(experimentsDetails.AppNS).List(v1.ListOptions{LabelSelector: labels})
+			npList, err := clients.KubeClient.NetworkingV1().NetworkPolicies(experimentsDetails.AppNS).List(context.Background(), v1.ListOptions{LabelSelector: labels})
 			if err != nil || len(npList.Items) == 0 {
 				return errors.Errorf("no network policy found, err: %v", err)
 			}

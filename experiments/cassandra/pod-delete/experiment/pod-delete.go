@@ -3,7 +3,7 @@ package experiment
 import (
 	"os"
 
-	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
+	"github.com/litmuschaos/chaos-operator/api/litmuschaos/v1alpha1"
 	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/pod-delete/lib"
 	"github.com/litmuschaos/litmus-go/pkg/cassandra"
 	experimentEnv "github.com/litmuschaos/litmus-go/pkg/cassandra/pod-delete/environment"

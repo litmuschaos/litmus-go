@@ -1,6 +1,7 @@
 package lib
 
 import (
+	"context"
 	"strconv"
 	"strings"
 
@@ -217,7 +218,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 
 //setCPUCapacity fetch the node cpu capacity
 func setCPUCapacity(experimentsDetails *experimentTypes.ExperimentDetails, appNode string, clients clients.ClientSets) error {
-	node, err := clients.KubeClient.CoreV1().Nodes().Get(appNode, v1.GetOptions{})
+	node, err := clients.KubeClient.CoreV1().Nodes().Get(context.Background(), appNode, v1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -264,7 +265,7 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, chao
 		},
 	}
 
-	_, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Create(helperPod)
+	_, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Create(context.Background(), helperPod, v1.CreateOptions{})
 	return err
 }
 

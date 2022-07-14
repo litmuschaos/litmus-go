@@ -1,6 +1,7 @@
 package lib
 
 import (
+	"context"
 	"strconv"
 	"strings"
 	"time"
@@ -257,7 +258,7 @@ func verifyRestartCount(experimentsDetails *experimentTypes.ExperimentDetails, p
 		Times(90).
 		Wait(1 * time.Second).
 		Try(func(attempt uint) error {
-			pod, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Get(pod.Name, v1.GetOptions{})
+			pod, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Get(context.Background(), pod.Name, v1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -358,6 +359,6 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 		},
 	}
 
-	_, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Create(helperPod)
+	_, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Create(context.Background(), helperPod, v1.CreateOptions{})
 	return err
 }
