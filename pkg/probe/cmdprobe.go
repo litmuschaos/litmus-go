@@ -2,6 +2,7 @@ package probe
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"math/rand"
 	"os/exec"
@@ -9,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
+	"github.com/litmuschaos/chaos-operator/api/litmuschaos/v1alpha1"
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/math"
@@ -165,14 +166,14 @@ func createProbePod(clients clients.ClientSets, chaosDetails *types.ChaosDetails
 		},
 	}
 
-	_, err = clients.KubeClient.CoreV1().Pods(chaosDetails.ChaosNamespace).Create(cmdProbe)
+	_, err = clients.KubeClient.CoreV1().Pods(chaosDetails.ChaosNamespace).Create(context.Background(), cmdProbe, v1.CreateOptions{})
 	return err
 }
 
 //deleteProbePod deletes the probe pod and wait until it got terminated
 func deleteProbePod(chaosDetails *types.ChaosDetails, clients clients.ClientSets, runID string) error {
 
-	if err := clients.KubeClient.CoreV1().Pods(chaosDetails.ChaosNamespace).Delete(chaosDetails.ExperimentName+"-probe-"+runID, &v1.DeleteOptions{}); err != nil {
+	if err := clients.KubeClient.CoreV1().Pods(chaosDetails.ChaosNamespace).Delete(context.Background(), chaosDetails.ExperimentName+"-probe-"+runID, v1.DeleteOptions{}); err != nil {
 		return err
 	}
 
@@ -181,7 +182,7 @@ func deleteProbePod(chaosDetails *types.ChaosDetails, clients clients.ClientSets
 		Times(uint(chaosDetails.Timeout / chaosDetails.Delay)).
 		Wait(time.Duration(chaosDetails.Delay) * time.Second).
 		Try(func(attempt uint) error {
-			podSpec, err := clients.KubeClient.CoreV1().Pods(chaosDetails.ChaosNamespace).List(v1.ListOptions{LabelSelector: chaosDetails.ExperimentName + "-probe-" + runID})
+			podSpec, err := clients.KubeClient.CoreV1().Pods(chaosDetails.ChaosNamespace).List(context.Background(), v1.ListOptions{LabelSelector: chaosDetails.ExperimentName + "-probe-" + runID})
 			if err != nil {
 				return errors.Errorf("Probe Pod is not deleted yet, err: %v", err)
 			} else if len(podSpec.Items) != 0 {
@@ -638,7 +639,7 @@ func createHelperPod(probe v1alpha1.ProbeAttributes, resultDetails *types.Result
 
 // getServiceAccount derive the serviceAccountName for the probe pod
 func getServiceAccount(chaosNamespace, chaosPodName string, clients clients.ClientSets) (string, error) {
-	pod, err := clients.KubeClient.CoreV1().Pods(chaosNamespace).Get(chaosPodName, v1.GetOptions{})
+	pod, err := clients.KubeClient.CoreV1().Pods(chaosNamespace).Get(context.Background(), chaosPodName, v1.GetOptions{})
 	if err != nil {
 		return "", err
 	}

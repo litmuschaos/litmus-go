@@ -1,6 +1,7 @@
 package status
 
 import (
+	"context"
 	"strings"
 	"time"
 
@@ -25,7 +26,7 @@ func CheckNodeStatus(nodes string, timeout, delay int, clients clients.ClientSet
 			if nodes != "" {
 				targetNodes := strings.Split(nodes, ",")
 				for index := range targetNodes {
-					node, err := clients.KubeClient.CoreV1().Nodes().Get(targetNodes[index], metav1.GetOptions{})
+					node, err := clients.KubeClient.CoreV1().Nodes().Get(context.Background(), targetNodes[index], metav1.GetOptions{})
 					if err != nil {
 						if apierrors.IsNotFound(err) {
 							return errors.Errorf("[Info]: The node: %v does not exist", targetNodes[index])
@@ -36,7 +37,7 @@ func CheckNodeStatus(nodes string, timeout, delay int, clients clients.ClientSet
 					nodeList.Items = append(nodeList.Items, *node)
 				}
 			} else {
-				nodes, err := clients.KubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
+				nodes, err := clients.KubeClient.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
 				if err != nil {
 					return err
 				}
@@ -67,7 +68,7 @@ func CheckNodeNotReadyState(nodeName string, timeout, delay int, clients clients
 		Times(uint(timeout / delay)).
 		Wait(time.Duration(delay) * time.Second).
 		Try(func(attempt uint) error {
-			node, err := clients.KubeClient.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+			node, err := clients.KubeClient.CoreV1().Nodes().Get(context.Background(), nodeName, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}

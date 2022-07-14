@@ -1,6 +1,7 @@
 package helper
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -174,7 +175,7 @@ func fillDisk(containerID string, sizeTobeFilled, bs int) error {
 // getEphemeralStorageAttributes derive the ephemeral storage attributes from the target pod
 func getEphemeralStorageAttributes(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) (int64, error) {
 
-	pod, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Get(experimentsDetails.TargetPods, v1.GetOptions{})
+	pod, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Get(context.Background(), experimentsDetails.TargetPods, v1.GetOptions{})
 	if err != nil {
 		return 0, err
 	}
@@ -228,7 +229,7 @@ func getSizeToBeFilled(experimentsDetails *experimentTypes.ExperimentDetails, us
 // remedy will delete the target pod if target pod is evicted
 // if target pod is still running then it will delete the files, which was created during chaos execution
 func remedy(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, containerID string) error {
-	pod, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Get(experimentsDetails.TargetPods, v1.GetOptions{})
+	pod, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Get(context.Background(), experimentsDetails.TargetPods, v1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -236,7 +237,7 @@ func remedy(experimentsDetails *experimentTypes.ExperimentDetails, clients clien
 	podReason := pod.Status.Reason
 	if podReason == "Evicted" {
 		log.Warn("Target pod is evicted, deleting the pod")
-		if err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Delete(experimentsDetails.TargetPods, &v1.DeleteOptions{}); err != nil {
+		if err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Delete(context.Background(), experimentsDetails.TargetPods, v1.DeleteOptions{}); err != nil {
 			return err
 		}
 	} else {

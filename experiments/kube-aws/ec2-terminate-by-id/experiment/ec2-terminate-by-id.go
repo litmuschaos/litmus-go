@@ -4,7 +4,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
+	"github.com/litmuschaos/chaos-operator/api/litmuschaos/v1alpha1"
 	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/ec2-terminate-by-id/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	aws "github.com/litmuschaos/litmus-go/pkg/cloud/aws/ec2"

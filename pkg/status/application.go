@@ -1,6 +1,7 @@
 package status
 
 import (
+	"context"
 	"strings"
 	"time"
 
@@ -51,7 +52,7 @@ func AnnotatedApplicationsStatusCheck(appNs, appLabel, containerName string, tim
 		Times(uint(timeout / delay)).
 		Wait(time.Duration(delay) * time.Second).
 		Try(func(attempt uint) error {
-			podList, err := clients.KubeClient.CoreV1().Pods(appNs).List(metav1.ListOptions{LabelSelector: appLabel})
+			podList, err := clients.KubeClient.CoreV1().Pods(appNs).List(context.Background(), metav1.ListOptions{LabelSelector: appLabel})
 			if err != nil {
 				return errors.Errorf("Unable to find the pods with matching labels, err: %v", err)
 			} else if len(podList.Items) == 0 {
@@ -146,7 +147,7 @@ func CheckPodStatusPhase(appNs, appLabel string, timeout, delay int, clients cli
 		Times(uint(timeout / delay)).
 		Wait(time.Duration(delay) * time.Second).
 		Try(func(attempt uint) error {
-			podList, err := clients.KubeClient.CoreV1().Pods(appNs).List(metav1.ListOptions{LabelSelector: appLabel})
+			podList, err := clients.KubeClient.CoreV1().Pods(appNs).List(context.Background(), metav1.ListOptions{LabelSelector: appLabel})
 			if err != nil {
 				return errors.Errorf("Unable to find the pods with matching labels, err: %v", err)
 			} else if len(podList.Items) == 0 {
@@ -187,7 +188,7 @@ func CheckContainerStatus(appNs, appLabel, containerName string, timeout, delay 
 		Times(uint(timeout / delay)).
 		Wait(time.Duration(delay) * time.Second).
 		Try(func(attempt uint) error {
-			podList, err := clients.KubeClient.CoreV1().Pods(appNs).List(metav1.ListOptions{LabelSelector: appLabel})
+			podList, err := clients.KubeClient.CoreV1().Pods(appNs).List(context.Background(), metav1.ListOptions{LabelSelector: appLabel})
 			if err != nil {
 				return errors.Errorf("Unable to find the pods with matching labels, err: %v", err)
 			} else if len(podList.Items) == 0 {
@@ -246,7 +247,7 @@ func WaitForCompletion(appNs, appLabel string, clients clients.ClientSets, durat
 		Times(uint(duration)).
 		Wait(1 * time.Second).
 		Try(func(attempt uint) error {
-			podList, err := clients.KubeClient.CoreV1().Pods(appNs).List(metav1.ListOptions{LabelSelector: appLabel})
+			podList, err := clients.KubeClient.CoreV1().Pods(appNs).List(context.Background(), metav1.ListOptions{LabelSelector: appLabel})
 			if err != nil {
 				return errors.Errorf("Unable to find the pods with matching labels, err: %v", err)
 			} else if len(podList.Items) == 0 {
@@ -292,7 +293,7 @@ func CheckHelperStatus(appNs, appLabel string, timeout, delay int, clients clien
 		Times(uint(timeout / delay)).
 		Wait(time.Duration(delay) * time.Second).
 		Try(func(attempt uint) error {
-			podList, err := clients.KubeClient.CoreV1().Pods(appNs).List(metav1.ListOptions{LabelSelector: appLabel})
+			podList, err := clients.KubeClient.CoreV1().Pods(appNs).List(context.Background(), metav1.ListOptions{LabelSelector: appLabel})
 			if err != nil {
 				return errors.Errorf("unable to find the pods with matching labels, err: %v", err)
 			} else if len(podList.Items) == 0 {
