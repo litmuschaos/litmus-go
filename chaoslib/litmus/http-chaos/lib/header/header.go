@@ -21,11 +21,9 @@ func PodHttpModifyHeaderChaos(experimentsDetails *experimentTypes.ExperimentDeta
 		"Header Mode":      experimentsDetails.HeaderMode,
 	})
 
-	var stream string
+	stream := "downstream"
 	if experimentsDetails.HeaderMode == "request" {
 		stream = "upstream"
-	} else {
-		stream = "downstream"
 	}
 	args := "-t header --" + stream + " -a headers='" + (experimentsDetails.HeadersMap) + "' -a mode=" + experimentsDetails.HeaderMode
 	return http_chaos.PrepareAndInjectChaos(experimentsDetails, clients, resultDetails, eventsDetails, chaosDetails, args)
