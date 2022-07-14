@@ -152,7 +152,7 @@ func createProbePod(clients clients.ClientSets, chaosDetails *types.ChaosDetails
 				{
 					Name:            chaosDetails.ExperimentName + "-probe",
 					Image:           source.Image,
-					ImagePullPolicy: apiv1.PullPolicy(getProbeImagePullPolicy(source.ImagePullPolicy)),
+					ImagePullPolicy: apiv1.PullPolicy(getProbeImagePullPolicy(string(source.ImagePullPolicy), chaosDetails)),
 					Command:         getProbeCmd(source.Command),
 					Args:            getProbeArgs(source.Args),
 					Resources:       chaosDetails.Resources,
@@ -186,29 +186,26 @@ func getProbeLabels(sourceLabels map[string]string, chaosDetails *types.ChaosDet
 
 // getProbeArgs adding provided args to probePod
 func getProbeArgs(sourceArgs []string) []string {
-
 	if len(sourceArgs) == 0 {
 		return []string{"-c", "sleep 10000"}
 	}
 	return sourceArgs
 }
 
-// getProbeImagePullPolicy adding provided image pull policy to probePod
+// getProbeImagePullPolicy adds the image pull policy to the source pod
 func getProbeImagePullPolicy(policy string, chaosDetails *types.ChaosDetails) string {
-
-	if len(policy) == 0 {
+	if policy == "" {
 		return chaosDetails.ProbeImagePullPolicy
 	}
 	return policy
 }
 
 // getProbeCmd adding provided command to probePod
-func getProbeCmd(sourceCMD []string) []string {
-
-	if len(sourceCMD) == 0 {
+func getProbeCmd(sourceCmd []string) []string {
+	if len(sourceCmd) == 0 {
 		return []string{"/bin/sh"}
 	}
-	return sourceCMD
+	return sourceCmd
 }
 
 //deleteProbePod deletes the probe pod and wait until it got terminated
