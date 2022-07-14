@@ -1,6 +1,7 @@
 package annotation
 
 import (
+	"context"
 	"strings"
 
 	"github.com/litmuschaos/litmus-go/pkg/clients"
@@ -16,7 +17,7 @@ func IsParentAnnotated(clients clients.ClientSets, parentName string, chaosDetai
 
 	switch strings.ToLower(chaosDetails.AppDetail.Kind) {
 	case "deployment", "deployments":
-		deploy, err := clients.KubeClient.AppsV1().Deployments(chaosDetails.AppDetail.Namespace).Get(parentName, v1.GetOptions{})
+		deploy, err := clients.KubeClient.AppsV1().Deployments(chaosDetails.AppDetail.Namespace).Get(context.Background(), parentName, v1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -24,7 +25,7 @@ func IsParentAnnotated(clients clients.ClientSets, parentName string, chaosDetai
 			return true, nil
 		}
 	case "statefulset", "statefulsets":
-		sts, err := clients.KubeClient.AppsV1().StatefulSets(chaosDetails.AppDetail.Namespace).Get(parentName, v1.GetOptions{})
+		sts, err := clients.KubeClient.AppsV1().StatefulSets(chaosDetails.AppDetail.Namespace).Get(context.Background(), parentName, v1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -32,7 +33,7 @@ func IsParentAnnotated(clients clients.ClientSets, parentName string, chaosDetai
 			return true, nil
 		}
 	case "daemonset", "daemonsets":
-		ds, err := clients.KubeClient.AppsV1().DaemonSets(chaosDetails.AppDetail.Namespace).Get(parentName, v1.GetOptions{})
+		ds, err := clients.KubeClient.AppsV1().DaemonSets(chaosDetails.AppDetail.Namespace).Get(context.Background(), parentName, v1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -45,7 +46,7 @@ func IsParentAnnotated(clients clients.ClientSets, parentName string, chaosDetai
 			Version:  "v1",
 			Resource: "deploymentconfigs",
 		}
-		dc, err := clients.DynamicClient.Resource(gvrdc).Namespace(chaosDetails.AppDetail.Namespace).Get(parentName, v1.GetOptions{})
+		dc, err := clients.DynamicClient.Resource(gvrdc).Namespace(chaosDetails.AppDetail.Namespace).Get(context.Background(), parentName, v1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -59,7 +60,7 @@ func IsParentAnnotated(clients clients.ClientSets, parentName string, chaosDetai
 			Version:  "v1alpha1",
 			Resource: "rollouts",
 		}
-		ro, err := clients.DynamicClient.Resource(gvrro).Namespace(chaosDetails.AppDetail.Namespace).Get(parentName, v1.GetOptions{})
+		ro, err := clients.DynamicClient.Resource(gvrro).Namespace(chaosDetails.AppDetail.Namespace).Get(context.Background(), parentName, v1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -99,7 +100,7 @@ func getDeploymentName(clients clients.ClientSets, targetPod core_v1.Pod, chaosD
 	rsOwnerRef := targetPod.OwnerReferences
 	for _, own := range rsOwnerRef {
 		if own.Kind == "ReplicaSet" {
-			rs, err := clients.KubeClient.AppsV1().ReplicaSets(chaosDetails.AppDetail.Namespace).Get(own.Name, v1.GetOptions{})
+			rs, err := clients.KubeClient.AppsV1().ReplicaSets(chaosDetails.AppDetail.Namespace).Get(context.Background(), own.Name, v1.GetOptions{})
 			if err != nil {
 				return "", err
 			}
@@ -148,7 +149,7 @@ func getDeploymentConfigName(clients clients.ClientSets, targetPod core_v1.Pod, 
 	rcOwnerRef := targetPod.OwnerReferences
 	for _, own := range rcOwnerRef {
 		if own.Kind == "ReplicationController" {
-			rc, err := clients.KubeClient.CoreV1().ReplicationControllers(chaosDetails.AppDetail.Namespace).Get(own.Name, v1.GetOptions{})
+			rc, err := clients.KubeClient.CoreV1().ReplicationControllers(chaosDetails.AppDetail.Namespace).Get(context.Background(), own.Name, v1.GetOptions{})
 			if err != nil {
 				return "", err
 			}
@@ -170,7 +171,7 @@ func getRolloutName(clients clients.ClientSets, targetPod core_v1.Pod, chaosDeta
 	rsOwnerRef := targetPod.OwnerReferences
 	for _, own := range rsOwnerRef {
 		if own.Kind == "ReplicaSet" {
-			rs, err := clients.KubeClient.AppsV1().ReplicaSets(chaosDetails.AppDetail.Namespace).Get(own.Name, v1.GetOptions{})
+			rs, err := clients.KubeClient.AppsV1().ReplicaSets(chaosDetails.AppDetail.Namespace).Get(context.Background(), own.Name, v1.GetOptions{})
 			if err != nil {
 				return "", err
 			}

@@ -1,6 +1,7 @@
 package lib
 
 import (
+	"context"
 	"math"
 	"os"
 	"os/signal"
@@ -121,7 +122,7 @@ func getSliceOfTotalApplicationsTargeted(appList []experimentTypes.ApplicationUn
 //getDeploymentDetails is used to get the name and total number of replicas of the deployment
 func getDeploymentDetails(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) ([]experimentTypes.ApplicationUnderTest, error) {
 
-	deploymentList, err := appsv1DeploymentClient.List(metav1.ListOptions{LabelSelector: experimentsDetails.AppLabel})
+	deploymentList, err := appsv1DeploymentClient.List(context.Background(), metav1.ListOptions{LabelSelector: experimentsDetails.AppLabel})
 	if err != nil || len(deploymentList.Items) == 0 {
 		return nil, errors.Errorf("fail to get the deployments with matching labels, err: %v", err)
 	}
@@ -138,7 +139,7 @@ func getDeploymentDetails(experimentsDetails *experimentTypes.ExperimentDetails,
 //getStatefulsetDetails is used to get the name and total number of replicas of the statefulsets
 func getStatefulsetDetails(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) ([]experimentTypes.ApplicationUnderTest, error) {
 
-	statefulsetList, err := appsv1StatefulsetClient.List(metav1.ListOptions{LabelSelector: experimentsDetails.AppLabel})
+	statefulsetList, err := appsv1StatefulsetClient.List(context.Background(), metav1.ListOptions{LabelSelector: experimentsDetails.AppLabel})
 	if err != nil || len(statefulsetList.Items) == 0 {
 		return nil, errors.Errorf("fail to get the statefulsets with matching labels, err: %v", err)
 	}
@@ -160,14 +161,14 @@ func podAutoscalerChaosInDeployment(experimentsDetails *experimentTypes.Experime
 		for _, app := range appsUnderTest {
 			// Retrieve the latest version of Deployment before attempting update
 			// RetryOnConflict uses exponential backoff to avoid exhausting the apiserver
-			appUnderTest, err := appsv1DeploymentClient.Get(app.AppName, metav1.GetOptions{})
+			appUnderTest, err := appsv1DeploymentClient.Get(context.Background(), app.AppName, metav1.GetOptions{})
 			if err != nil {
 				return errors.Errorf("fail to get latest version of application deployment, err: %v", err)
 			}
 			// modifying the replica count
 			appUnderTest.Spec.Replicas = int32Ptr(int32(experimentsDetails.Replicas))
 			log.Infof("Updating deployment '%s' to number of replicas '%d'", appUnderTest.ObjectMeta.Name, experimentsDetails.Replicas)
-			_, err = appsv1DeploymentClient.Update(appUnderTest)
+			_, err = appsv1DeploymentClient.Update(context.Background(), appUnderTest, metav1.UpdateOptions{})
 			if err != nil {
 				return err
 			}
@@ -195,13 +196,13 @@ func podAutoscalerChaosInStatefulset(experimentsDetails *experimentTypes.Experim
 		for _, app := range appsUnderTest {
 			// Retrieve the latest version of Statefulset before attempting update
 			// RetryOnConflict uses exponential backoff to avoid exhausting the apiserver
-			appUnderTest, err := appsv1StatefulsetClient.Get(app.AppName, metav1.GetOptions{})
+			appUnderTest, err := appsv1StatefulsetClient.Get(context.Background(), app.AppName, metav1.GetOptions{})
 			if err != nil {
 				return errors.Errorf("fail to get latest version of the target statefulset application , err: %v", err)
 			}
 			// modifying the replica count
 			appUnderTest.Spec.Replicas = int32Ptr(int32(experimentsDetails.Replicas))
-			_, err = appsv1StatefulsetClient.Update(appUnderTest)
+			_, err = appsv1StatefulsetClient.Update(context.Background(), appUnderTest, metav1.UpdateOptions{})
 			if err != nil {
 				return err
 			}
@@ -233,7 +234,7 @@ func deploymentStatusCheck(experimentsDetails *experimentTypes.ExperimentDetails
 		Wait(time.Duration(experimentsDetails.Delay) * time.Second).
 		Try(func(attempt uint) error {
 			for _, app := range appsUnderTest {
-				deployment, err := appsv1DeploymentClient.Get(app.AppName, metav1.GetOptions{})
+				deployment, err := appsv1DeploymentClient.Get(context.Background(), app.AppName, metav1.GetOptions{})
 				if err != nil {
 					return errors.Errorf("fail to find the deployment with name %v, err: %v", app.AppName, err)
 				}
@@ -283,7 +284,7 @@ func statefulsetStatusCheck(experimentsDetails *experimentTypes.ExperimentDetail
 		Wait(time.Duration(experimentsDetails.Delay) * time.Second).
 		Try(func(attempt uint) error {
 			for _, app := range appsUnderTest {
-				statefulset, err := appsv1StatefulsetClient.Get(app.AppName, metav1.GetOptions{})
+				statefulset, err := appsv1StatefulsetClient.Get(context.Background(), app.AppName, metav1.GetOptions{})
 				if err != nil {
 					return errors.Errorf("fail to find the statefulset with name %v, err: %v", app.AppName, err)
 				}
@@ -330,13 +331,13 @@ func autoscalerRecoveryInDeployment(experimentsDetails *experimentTypes.Experime
 		// Retrieve the latest version of Deployment before attempting update
 		// RetryOnConflict uses exponential backoff to avoid exhausting the apiserver
 		for _, app := range appsUnderTest {
-			appUnderTest, err := appsv1DeploymentClient.Get(app.AppName, metav1.GetOptions{})
+			appUnderTest, err := appsv1DeploymentClient.Get(context.Background(), app.AppName, metav1.GetOptions{})
 			if err != nil {
 				return errors.Errorf("fail to find the latest version of Application Deployment with name %v, err: %v", app.AppName, err)
 			}
 
 			appUnderTest.Spec.Replicas = int32Ptr(int32(app.ReplicaCount)) // modify replica count
-			_, err = appsv1DeploymentClient.Update(appUnderTest)
+			_, err = appsv1DeploymentClient.Update(context.Background(), appUnderTest, metav1.UpdateOptions{})
 			if err != nil {
 				return err
 			}
@@ -354,7 +355,7 @@ func autoscalerRecoveryInDeployment(experimentsDetails *experimentTypes.Experime
 		Wait(time.Duration(experimentsDetails.Delay) * time.Second).
 		Try(func(attempt uint) error {
 			for _, app := range appsUnderTest {
-				applicationDeploy, err := appsv1DeploymentClient.Get(app.AppName, metav1.GetOptions{})
+				applicationDeploy, err := appsv1DeploymentClient.Get(context.Background(), app.AppName, metav1.GetOptions{})
 				if err != nil {
 					return errors.Errorf("fail to find the deployment with name %v, err: %v", app.AppName, err)
 				}
@@ -376,13 +377,13 @@ func autoscalerRecoveryInStatefulset(experimentsDetails *experimentTypes.Experim
 		for _, app := range appsUnderTest {
 			// Retrieve the latest version of Statefulset before attempting update
 			// RetryOnConflict uses exponential backoff to avoid exhausting the apiserver
-			appUnderTest, err := appsv1StatefulsetClient.Get(app.AppName, metav1.GetOptions{})
+			appUnderTest, err := appsv1StatefulsetClient.Get(context.Background(), app.AppName, metav1.GetOptions{})
 			if err != nil {
 				return errors.Errorf("failed to find the latest version of Statefulset with name %v, err: %v", app.AppName, err)
 			}
 
 			appUnderTest.Spec.Replicas = int32Ptr(int32(app.ReplicaCount)) // modify replica count
-			_, err = appsv1StatefulsetClient.Update(appUnderTest)
+			_, err = appsv1StatefulsetClient.Update(context.Background(), appUnderTest, metav1.UpdateOptions{})
 			if err != nil {
 				return err
 			}
@@ -400,7 +401,7 @@ func autoscalerRecoveryInStatefulset(experimentsDetails *experimentTypes.Experim
 		Wait(time.Duration(experimentsDetails.Delay) * time.Second).
 		Try(func(attempt uint) error {
 			for _, app := range appsUnderTest {
-				applicationDeploy, err := appsv1StatefulsetClient.Get(app.AppName, metav1.GetOptions{})
+				applicationDeploy, err := appsv1StatefulsetClient.Get(context.Background(), app.AppName, metav1.GetOptions{})
 				if err != nil {
 					return errors.Errorf("fail to get the statefulset with name %v, err: %v", app.AppName, err)
 				}

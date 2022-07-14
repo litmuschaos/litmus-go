@@ -1,6 +1,7 @@
 package lib
 
 import (
+	"context"
 	"os"
 	"os/signal"
 	"strings"
@@ -115,7 +116,7 @@ func taintNode(experimentsDetails *experimentTypes.ExperimentDetails, clients cl
 	log.Infof("Add %v taints to the %v node", taintKey+"="+taintValue+":"+taintEffect, experimentsDetails.TargetNode)
 
 	// get the node details
-	node, err := clients.KubeClient.CoreV1().Nodes().Get(experimentsDetails.TargetNode, v1.GetOptions{})
+	node, err := clients.KubeClient.CoreV1().Nodes().Get(context.Background(), experimentsDetails.TargetNode, v1.GetOptions{})
 	if err != nil || node == nil {
 		return errors.Errorf("failed to get %v node, err: %v", experimentsDetails.TargetNode, err)
 	}
@@ -141,7 +142,7 @@ func taintNode(experimentsDetails *experimentTypes.ExperimentDetails, clients cl
 				Effect: apiv1.TaintEffect(taintEffect),
 			})
 
-			updatedNodeWithTaint, err := clients.KubeClient.CoreV1().Nodes().Update(node)
+			updatedNodeWithTaint, err := clients.KubeClient.CoreV1().Nodes().Update(context.Background(), node, v1.UpdateOptions{})
 			if err != nil || updatedNodeWithTaint == nil {
 				return errors.Errorf("failed to update %v node after adding taints, err: %v", experimentsDetails.TargetNode, err)
 			}
@@ -162,7 +163,7 @@ func removeTaintFromNode(experimentsDetails *experimentTypes.ExperimentDetails, 
 	taintKey := strings.Split(taintLabel[0], "=")[0]
 
 	// get the node details
-	node, err := clients.KubeClient.CoreV1().Nodes().Get(experimentsDetails.TargetNode, v1.GetOptions{})
+	node, err := clients.KubeClient.CoreV1().Nodes().Get(context.Background(), experimentsDetails.TargetNode, v1.GetOptions{})
 	if err != nil || node == nil {
 		return errors.Errorf("failed to get %v node, err: %v", experimentsDetails.TargetNode, err)
 	}
@@ -185,7 +186,7 @@ func removeTaintFromNode(experimentsDetails *experimentTypes.ExperimentDetails, 
 			}
 		}
 		node.Spec.Taints = Newtaints
-		updatedNodeWithTaint, err := clients.KubeClient.CoreV1().Nodes().Update(node)
+		updatedNodeWithTaint, err := clients.KubeClient.CoreV1().Nodes().Update(context.Background(), node, v1.UpdateOptions{})
 		if err != nil || updatedNodeWithTaint == nil {
 			return errors.Errorf("failed to update %v node after removing taints, err: %v", experimentsDetails.TargetNode, err)
 		}

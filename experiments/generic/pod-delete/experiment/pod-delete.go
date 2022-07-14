@@ -3,7 +3,7 @@ package experiment
 import (
 	"os"
 
-	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
+	"github.com/litmuschaos/chaos-operator/api/litmuschaos/v1alpha1"
 	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/pod-delete/lib"
 	powerfulseal "github.com/litmuschaos/litmus-go/chaoslib/powerfulseal/pod-delete/lib"
 	"github.com/litmuschaos/litmus-go/pkg/clients"
