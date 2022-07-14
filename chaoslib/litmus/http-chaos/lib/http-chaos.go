@@ -31,18 +31,6 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 	//set up the tunables if provided in range
 	SetChaosTunables(experimentsDetails)
 
-	log.InfoWithValues("[Info]: The chaos tunables are:", logrus.Fields{
-		"Target Port":      experimentsDetails.TargetServicePort,
-		"Listen Port":      experimentsDetails.ProxyPort,
-		"Sequence":         experimentsDetails.Sequence,
-		"PodsAffectedPerc": experimentsDetails.PodsAffectedPerc,
-	})
-
-	switch experimentsDetails.ExperimentName {
-
-	case "pod-http-latency":
-		log.Infof("[Info]: Latency=%v", strconv.Itoa(experimentsDetails.Latency))
-	}
 	podsAffectedPerc, _ = strconv.Atoi(experimentsDetails.PodsAffectedPerc)
 	if experimentsDetails.NodeLabel == "" {
 
