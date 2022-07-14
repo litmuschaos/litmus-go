@@ -135,32 +135,32 @@ func createProbePod(clients clients.ClientSets, chaosDetails *types.ChaosDetails
 	if err != nil {
 		return errors.Errorf("unable to get the serviceAccountName, err: %v", err)
 	}
-
 	cmdProbe := &apiv1.Pod{
 		ObjectMeta: v1.ObjectMeta{
-			Name:      chaosDetails.ExperimentName + "-probe-" + runID,
-			Namespace: chaosDetails.ChaosNamespace,
-			Labels: map[string]string{
-				"name":     chaosDetails.ExperimentName + "-probe-" + runID,
-				"chaosUID": string(chaosDetails.ChaosUID),
-			},
+			Name:        chaosDetails.ExperimentName + "-probe-" + runID,
+			Namespace:   chaosDetails.ChaosNamespace,
+			Labels:      getProbeLabels(source.Labels, chaosDetails, runID),
+			Annotations: source.Annotations,
 		},
 		Spec: apiv1.PodSpec{
 			RestartPolicy:      apiv1.RestartPolicyNever,
 			HostNetwork:        source.HostNetwork,
 			ServiceAccountName: svcAccount,
+			Volumes:            source.Volumes,
+			NodeSelector:       source.NodeSelector,
 			Containers: []apiv1.Container{
 				{
 					Name:            chaosDetails.ExperimentName + "-probe",
 					Image:           source.Image,
-					ImagePullPolicy: apiv1.PullPolicy(chaosDetails.ProbeImagePullPolicy),
-					Command: []string{
-						"/bin/sh",
+					ImagePullPolicy: apiv1.PullPolicy(getProbeImagePullPolicy(string(source.ImagePullPolicy), chaosDetails)),
+					Command:         getProbeCmd(source.Command),
+					Args:            getProbeArgs(source.Args),
+					Resources:       chaosDetails.Resources,
+					Env:             source.ENVList,
+					SecurityContext: &apiv1.SecurityContext{
+						Privileged: &source.Privileged,
 					},
-					Args: []string{
-						"-c",
-						"sleep 10000",
-					},
+					VolumeMounts: source.VolumesMount,
 				},
 			},
 		},
@@ -168,6 +168,44 @@ func createProbePod(clients clients.ClientSets, chaosDetails *types.ChaosDetails
 
 	_, err = clients.KubeClient.CoreV1().Pods(chaosDetails.ChaosNamespace).Create(context.Background(), cmdProbe, v1.CreateOptions{})
 	return err
+}
+
+// getProbeLabels adding provided labels to probePod
+func getProbeLabels(sourceLabels map[string]string, chaosDetails *types.ChaosDetails, runID string) map[string]string {
+
+	envDetails := map[string]string{
+		"name":     chaosDetails.ExperimentName + "-probe-" + runID,
+		"chaosUID": string(chaosDetails.ChaosUID),
+	}
+
+	for key, element := range sourceLabels {
+		envDetails[key] = element
+	}
+	return envDetails
+}
+
+// getProbeArgs adding provided args to probePod
+func getProbeArgs(sourceArgs []string) []string {
+	if len(sourceArgs) == 0 {
+		return []string{"-c", "sleep 10000"}
+	}
+	return sourceArgs
+}
+
+// getProbeImagePullPolicy adds the image pull policy to the source pod
+func getProbeImagePullPolicy(policy string, chaosDetails *types.ChaosDetails) string {
+	if policy == "" {
+		return chaosDetails.ProbeImagePullPolicy
+	}
+	return policy
+}
+
+// getProbeCmd adding provided command to probePod
+func getProbeCmd(sourceCmd []string) []string {
+	if len(sourceCmd) == 0 {
+		return []string{"/bin/sh"}
+	}
+	return sourceCmd
 }
 
 //deleteProbePod deletes the probe pod and wait until it got terminated
