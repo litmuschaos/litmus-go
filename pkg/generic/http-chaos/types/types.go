@@ -38,5 +38,6 @@ type ExperimentDetails struct {
 	TargetServicePort             int
 	ProxyPort                     int
 	Latency                       int
+	ResponseBody                  string
 	ResetTimeout                  int
 }
