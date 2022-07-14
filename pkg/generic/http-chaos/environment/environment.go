@@ -4,6 +4,7 @@ import (
 	"strconv"
 
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/http-chaos/types"
+	"github.com/litmuschaos/litmus-go/pkg/generic/http-chaos/utils"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	clientTypes "k8s.io/apimachinery/pkg/types"
 )
@@ -44,7 +45,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string
 	case "pod-http-latency":
 		experimentDetails.Latency, _ = strconv.Atoi(types.Getenv("LATENCY", "6000"))
 	case "pod-http-status-code":
-		experimentDetails.StatusCode, _ = strconv.Atoi(types.Getenv("STATUS_CODE", "500"))
+		experimentDetails.StatusCode = utils.GetStatusCode(types.Getenv("STATUS_CODE", ""))
 		experimentDetails.ModifyResponseBody = stringBoolToInt(types.Getenv("MODIFY_RESPONSE_BODY", "true"))
 	}
 }

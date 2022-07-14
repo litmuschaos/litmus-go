@@ -9,6 +9,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/http-chaos/environment"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/http-chaos/types"
+	"github.com/litmuschaos/litmus-go/pkg/generic/http-chaos/utils"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/result"
@@ -71,6 +72,14 @@ func PodHttpStatusCode(clients clients.ClientSets) {
 
 	// Calling AbortWatcher go routine, it will continuously watch for the abort signal and generate the required events and result
 	go common.AbortWatcher(experimentsDetails.ExperimentName, clients, &resultDetails, &chaosDetails, &eventsDetails)
+
+	// PRE-CHAOS check to verify support for provided status code value
+	if _, err := utils.CheckStatusCode(experimentsDetails.StatusCode); err != nil {
+		log.Errorf("[Pre-Chaos]: Failed to verify status code support, err: %v", err)
+		failStep := "[pre-chaos]: Failed to verify status code support, err: " + err.Error()
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+		return
+	}
 
 	//PRE-CHAOS APPLICATION STATUS CHECK
 	if chaosDetails.DefaultAppHealthCheck {
