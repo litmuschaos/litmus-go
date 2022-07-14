@@ -126,8 +126,6 @@ func PodHttpResetPeer(clients clients.ClientSets) {
 	log.Infof("[Confirmation]: %v chaos has been injected successfully", experimentsDetails.ExperimentName)
 	resultDetails.Verdict = v1alpha1.ResultVerdictPassed
 
-	// @TODO: user POST-CHAOS-CHECK
-
 	//POST-CHAOS APPLICATION STATUS CHECK
 	if chaosDetails.DefaultAppHealthCheck {
 		log.Info("[Status]: Verify that the AUT (Application Under Test) is running (post-chaos)")
