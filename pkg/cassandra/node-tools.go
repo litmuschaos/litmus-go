@@ -1,6 +1,7 @@
 package cassandra
 
 import (
+	"context"
 	"strings"
 
 	litmusexec "github.com/litmuschaos/litmus-go/pkg/utils/exec"
@@ -44,7 +45,7 @@ func NodeToolStatusCheck(experimentsDetails *experimentTypes.ExperimentDetails, 
 
 //GetApplicationPodName will return the name of first application pod
 func GetApplicationPodName(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) (string, error) {
-	podList, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaoslibDetail.AppNS).List(metav1.ListOptions{LabelSelector: experimentsDetails.ChaoslibDetail.AppLabel})
+	podList, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaoslibDetail.AppNS).List(context.Background(), metav1.ListOptions{LabelSelector: experimentsDetails.ChaoslibDetail.AppLabel})
 	if err != nil {
 		return "", errors.Errorf("failed to get the application pod in %v namespace, err: %v", experimentsDetails.ChaoslibDetail.AppNS, err)
 	} else if len(podList.Items) == 0 {
@@ -56,7 +57,7 @@ func GetApplicationPodName(experimentsDetails *experimentTypes.ExperimentDetails
 
 //GetApplicationReplicaCount will return the replica count of the sts application
 func GetApplicationReplicaCount(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) (int, error) {
-	podList, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaoslibDetail.AppNS).List(metav1.ListOptions{LabelSelector: experimentsDetails.ChaoslibDetail.AppLabel})
+	podList, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaoslibDetail.AppNS).List(context.Background(), metav1.ListOptions{LabelSelector: experimentsDetails.ChaoslibDetail.AppLabel})
 	if err != nil {
 		return 0, errors.Errorf("failed to get the application pod in %v namespace, err: %v", experimentsDetails.ChaoslibDetail.AppNS, err)
 	} else if len(podList.Items) == 0 {
