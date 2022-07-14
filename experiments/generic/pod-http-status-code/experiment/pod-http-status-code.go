@@ -4,7 +4,7 @@ import (
 	"os"
 
 	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
-	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/http-chaos/lib/status-code"
+	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/http-chaos/lib/statuscode"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/http-chaos/environment"

@@ -37,6 +37,7 @@ type ExperimentDetails struct {
 	NetworkInterface              string
 	TargetServicePort             int
 	ProxyPort                     int
+	HttpChaosType                 string
 	Latency                       int
 	StatusCode                    int
 	ModifyResponseBody            int

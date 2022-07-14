@@ -38,11 +38,11 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 		"PodsAffectedPerc": experimentsDetails.PodsAffectedPerc,
 	})
 
-	switch experimentsDetails.ExperimentName {
+	switch experimentsDetails.HttpChaosType {
 
-	case "pod-http-latency":
+	case "latency":
 		log.Infof("[Info]: Latency=%v", strconv.Itoa(experimentsDetails.Latency))
-	case "pod-http-status-code":
+	case "status-code":
 		log.Infof("[Info]: StatusCode=%v ModifyResponseBody=%t", strconv.Itoa(experimentsDetails.StatusCode), experimentsDetails.ModifyResponseBody)
 	}
 	podsAffectedPerc, _ = strconv.Atoi(experimentsDetails.PodsAffectedPerc)

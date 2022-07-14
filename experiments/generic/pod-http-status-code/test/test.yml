@@ -34,11 +34,6 @@ spec:
           - name: APP_KIND
             value: '' 
 
-          # provide auxiliary application details - namespace and labels of the applications
-          # sample input is - "ns1:app=percona,ns2:name=nginx"
-          - name: AUXILIARY_APPINFO
-            value: ''
-
           - name: TARGET_CONTAINER
             value: ''
 
