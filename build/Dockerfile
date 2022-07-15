@@ -26,7 +26,7 @@ RUN apk --update add \
 # Packaging stage
 # Image source: https://github.com/litmuschaos/test-tools/blob/master/custom/hardened-alpine/experiment/Dockerfile
 # The base image is non-root (have litmus user) with default litmus directory.
-FROM litmuschaos/experiment-alpine
+FROM litmuschaos/experiment-alpine:2.11.0
 
 LABEL maintainer="LitmusChaos"
 

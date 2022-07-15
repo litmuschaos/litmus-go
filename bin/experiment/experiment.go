@@ -42,6 +42,7 @@ import (
 	podHttpModifyBody "github.com/litmuschaos/litmus-go/experiments/generic/pod-http-modify-body/experiment"
 	podHttpModifyHeader "github.com/litmuschaos/litmus-go/experiments/generic/pod-http-modify-header/experiment"
 	podHttpResetPeer "github.com/litmuschaos/litmus-go/experiments/generic/pod-http-reset-peer/experiment"
+	podHttpStatusCode "github.com/litmuschaos/litmus-go/experiments/generic/pod-http-status-code/experiment"
 	podIOStress "github.com/litmuschaos/litmus-go/experiments/generic/pod-io-stress/experiment"
 	podMemoryHogExec "github.com/litmuschaos/litmus-go/experiments/generic/pod-memory-hog-exec/experiment"
 	podMemoryHog "github.com/litmuschaos/litmus-go/experiments/generic/pod-memory-hog/experiment"
@@ -154,6 +155,8 @@ func main() {
 		podDNSSpoof.PodDNSSpoof(clients)
 	case "pod-http-latency":
 		podHttpLatency.PodHttpLatency(clients)
+	case "pod-http-status-code":
+		podHttpStatusCode.PodHttpStatusCode(clients)
 	case "pod-http-modify-header":
 		podHttpModifyHeader.PodHttpModifyHeader(clients)
 	case "pod-http-modify-body":
