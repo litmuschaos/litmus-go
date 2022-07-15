@@ -3,6 +3,7 @@ package statuscode
 import (
 	"fmt"
 	"math/rand"
+	"strconv"
 	"time"
 
 	http_chaos "github.com/litmuschaos/litmus-go/chaoslib/litmus/http-chaos/lib"
@@ -28,7 +29,7 @@ func PodHttpStatusCodeChaos(experimentsDetails *experimentTypes.ExperimentDetail
 		"ModifyResponseBody": experimentsDetails.ModifyResponseBody,
 	})
 
-	args := fmt.Sprintf("-t status_code -a status_code=%d -a modify_response_body=%d", experimentsDetails.StatusCode, experimentsDetails.ModifyResponseBody)
+	args := fmt.Sprintf("-t status_code -a status_code=%d -a modify_response_body=%d", experimentsDetails.StatusCode, stringBoolToInt(experimentsDetails.ModifyResponseBody))
 	return http_chaos.PrepareAndInjectChaos(experimentsDetails, clients, resultDetails, eventsDetails, chaosDetails, args)
 }
 
@@ -55,4 +56,16 @@ func checkStatusCode(statusCode int) bool {
 		}
 	}
 	return false
+}
+
+// stringBoolToInt will convert boolean string to int
+func stringBoolToInt(b string) int {
+	parsedBool, err := strconv.ParseBool(b)
+	if err != nil {
+		return 0
+	}
+	if parsedBool {
+		return 1
+	}
+	return 0
 }

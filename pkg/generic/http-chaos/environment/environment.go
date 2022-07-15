@@ -45,7 +45,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string
 		experimentDetails.Latency, _ = strconv.Atoi(types.Getenv("LATENCY", "6000"))
 	case "pod-http-status-code":
 		experimentDetails.StatusCode, _ = strconv.Atoi(types.Getenv("STATUS_CODE", ""))
-		experimentDetails.ModifyResponseBody = stringBoolToInt(types.Getenv("MODIFY_RESPONSE_BODY", "true"))
+		experimentDetails.ModifyResponseBody = types.Getenv("MODIFY_RESPONSE_BODY", "true")
 	case "pod-http-modify-header":
 		experimentDetails.HeadersMap = types.Getenv("HEADERS_MAP", "{}")
 		experimentDetails.HeaderMode = types.Getenv("HEADER_MODE", "response")
@@ -54,16 +54,4 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string
 	case "pod-http-reset-peer":
 		experimentDetails.ResetTimeout, _ = strconv.Atoi(types.Getenv("RESET_TIMEOUT", "0"))
 	}
-}
-
-// stringBoolToInt will convert boolean string to int
-func stringBoolToInt(b string) int {
-	parsedBool, err := strconv.ParseBool(b)
-	if err != nil {
-		return 0
-	}
-	if parsedBool {
-		return 1
-	}
-	return 0
 }

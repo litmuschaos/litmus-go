@@ -39,7 +39,7 @@ type ExperimentDetails struct {
 	ProxyPort                     int
 	Latency                       int
 	StatusCode                    int
-	ModifyResponseBody            int
+	ModifyResponseBody            string
 	HeadersMap                    string
 	HeaderMode                    string
 	ResponseBody                  string
