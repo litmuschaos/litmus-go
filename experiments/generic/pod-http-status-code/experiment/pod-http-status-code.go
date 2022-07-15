@@ -9,7 +9,6 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/http-chaos/environment"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/http-chaos/types"
-	"github.com/litmuschaos/litmus-go/pkg/generic/http-chaos/utils"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/result"
@@ -26,6 +25,7 @@ func PodHttpStatusCode(clients clients.ClientSets) {
 	resultDetails := types.ResultDetails{}
 	eventsDetails := types.EventDetails{}
 	chaosDetails := types.ChaosDetails{}
+	var err error
 
 	//Fetching all the ENV passed from the runner pod
 	log.Infof("[PreReq]: Getting the ENV for the %v experiment", os.Getenv("EXPERIMENT_NAME"))
@@ -74,9 +74,9 @@ func PodHttpStatusCode(clients clients.ClientSets) {
 	go common.AbortWatcher(experimentsDetails.ExperimentName, clients, &resultDetails, &chaosDetails, &eventsDetails)
 
 	// PRE-CHAOS check to verify support for provided status code value
-	if _, err := utils.CheckStatusCode(experimentsDetails.StatusCode); err != nil {
+	if experimentsDetails.StatusCode, err = litmusLIB.GetStatusCode(experimentsDetails.StatusCode); err != nil {
 		log.Errorf("[Pre-Chaos]: Failed to verify status code support, err: %v", err)
-		failStep := "[pre-chaos]: Failed to verify status code support, err: " + err.Error()
+		failStep := "[pre-chaos]: Status code not supported. Provide a valid status code"
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
