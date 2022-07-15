@@ -1,8 +1,6 @@
-package reset
+package header
 
 import (
-	"strconv"
-
 	http_chaos "github.com/litmuschaos/litmus-go/chaoslib/litmus/http-chaos/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/http-chaos/types"
@@ -11,17 +9,22 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-//PodHttpResetPeerChaos contains the steps to prepare and inject http reset peer chaos
-func PodHttpResetPeerChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+//PodHttpModifyHeaderChaos contains the steps to prepare and inject http modify header chaos
+func PodHttpModifyHeaderChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	log.InfoWithValues("[Info]: The chaos tunables are:", logrus.Fields{
 		"Target Port":      experimentsDetails.TargetServicePort,
 		"Listen Port":      experimentsDetails.ProxyPort,
 		"Sequence":         experimentsDetails.Sequence,
 		"PodsAffectedPerc": experimentsDetails.PodsAffectedPerc,
-		"Reset Timeout":    experimentsDetails.ResetTimeout,
+		"Headers":          experimentsDetails.HeadersMap,
+		"Header Mode":      experimentsDetails.HeaderMode,
 	})
 
-	args := "-t reset_peer -a timeout=" + strconv.Itoa(experimentsDetails.ResetTimeout)
+	stream := "downstream"
+	if experimentsDetails.HeaderMode == "request" {
+		stream = "upstream"
+	}
+	args := "-t header --" + stream + " -a headers='" + (experimentsDetails.HeadersMap) + "' -a mode=" + experimentsDetails.HeaderMode
 	return http_chaos.PrepareAndInjectChaos(experimentsDetails, clients, resultDetails, eventsDetails, chaosDetails, args)
 }
