@@ -11,7 +11,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-//PodHttpResetPeerChaos contains the steps to prepare and inject http latency chaos
+//PodHttpResetPeerChaos contains the steps to prepare and inject http reset peer chaos
 func PodHttpResetPeerChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	log.InfoWithValues("[Info]: The chaos tunables are:", logrus.Fields{

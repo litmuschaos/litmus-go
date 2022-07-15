@@ -18,7 +18,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// PodHttpModifyHeader inject the pod-http-latency chaos
+// PodHttpModifyHeader inject the pod-http-modify-header chaos
 func PodHttpModifyHeader(clients clients.ClientSets) {
 
 	experimentsDetails := experimentTypes.ExperimentDetails{}

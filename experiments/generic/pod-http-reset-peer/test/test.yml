@@ -36,11 +36,6 @@ spec:
           - name: TOTAL_CHAOS_DURATION
             value: ''
 
-          # provide auxiliary application details - namespace and labels of the applications
-          # sample input is - "ns1:app=percona,ns2:name=nginx"
-          - name: AUXILIARY_APPINFO
-            value: ''
-          
           ## Period to wait before injection of chaos in sec
           - name: RAMP_TIME
             value: ''

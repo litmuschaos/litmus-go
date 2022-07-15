@@ -21,6 +21,18 @@ spec:
           - sleep 
           - "3600"
         env:
+          # provide application namespace
+          - name: APP_NAMESPACE
+            value: ''
+
+          # provide application labels
+          - name: APP_LABEL
+            value: ''
+ 
+          # provide application kind
+          - name: APP_KIND
+            value: '' 
+
           - name: TARGET_CONTAINER
             value: ''
 
