@@ -161,7 +161,7 @@ func startProxy(experimentDetails *experimentTypes.ExperimentDetails, pid int) e
 	startProxyServerCommand := fmt.Sprintf("(sudo nsenter -t %d -n toxiproxy-server -host=0.0.0.0 > /dev/null 2>&1 &)", pid)
 	// Creating a proxy for the targetted service in the target container
 	createProxyCommand := fmt.Sprintf("(sudo nsenter -t %d -n toxiproxy-cli create -l 0.0.0.0:%d -u 0.0.0.0:%d proxy)", pid, experimentDetails.ProxyPort, experimentDetails.TargetServicePort)
-	createToxicCommand := fmt.Sprintf("(sudo nsenter -t %d -n toxiproxy-cli toxic add %s proxy)", pid, toxics)
+	createToxicCommand := fmt.Sprintf("(sudo nsenter -t %d -n toxiproxy-cli toxic add %s --toxicity %f proxy)", pid, toxics, float32(experimentDetails.Toxicity)/100.0)
 
 	// sleep 10 is added for proxy-server to be ready for creating proxy and adding toxics
 	chaosCommand := fmt.Sprintf("%s && sleep 10 && %s && %s", startProxyServerCommand, createProxyCommand, createToxicCommand)

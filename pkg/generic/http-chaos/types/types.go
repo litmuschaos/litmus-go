@@ -36,6 +36,7 @@ type ExperimentDetails struct {
 	NodeLabel                     string
 	NetworkInterface              string
 	TargetServicePort             int
+	Toxicity                      int
 	ProxyPort                     int
 	Latency                       int
 	StatusCode                    int
