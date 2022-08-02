@@ -19,6 +19,7 @@ func PodHttpModifyBodyChaos(experimentsDetails *experimentTypes.ExperimentDetail
 		"Listen Port":      experimentsDetails.ProxyPort,
 		"Sequence":         experimentsDetails.Sequence,
 		"PodsAffectedPerc": experimentsDetails.PodsAffectedPerc,
+		"Toxicity":         experimentsDetails.Toxicity,
 		"ResponseBody":     experimentsDetails.ResponseBody,
 	})
 

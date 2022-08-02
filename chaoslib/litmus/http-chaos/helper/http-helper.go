@@ -234,16 +234,17 @@ func getENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.TargetContainer = types.Getenv("APP_CONTAINER", "")
 	experimentDetails.TargetPods = types.Getenv("APP_POD", "")
 	experimentDetails.AppLabel = types.Getenv("APP_LABEL", "")
-	experimentDetails.ChaosDuration, _ = strconv.Atoi(types.Getenv("TOTAL_CHAOS_DURATION", "60"))
+	experimentDetails.ChaosDuration, _ = strconv.Atoi(types.Getenv("TOTAL_CHAOS_DURATION", ""))
 	experimentDetails.ChaosNamespace = types.Getenv("CHAOS_NAMESPACE", "litmus")
 	experimentDetails.EngineName = types.Getenv("CHAOSENGINE", "")
 	experimentDetails.ChaosUID = clientTypes.UID(types.Getenv("CHAOS_UID", ""))
 	experimentDetails.ChaosPodName = types.Getenv("POD_NAME", "")
 	experimentDetails.ContainerRuntime = types.Getenv("CONTAINER_RUNTIME", "")
 	experimentDetails.SocketPath = types.Getenv("SOCKET_PATH", "")
-	experimentDetails.NetworkInterface = types.Getenv("NETWORK_INTERFACE", "eth0")
+	experimentDetails.NetworkInterface = types.Getenv("NETWORK_INTERFACE", "")
 	experimentDetails.TargetServicePort, _ = strconv.Atoi(types.Getenv("TARGET_SERVICE_PORT", ""))
 	experimentDetails.ProxyPort, _ = strconv.Atoi(types.Getenv("PROXY_PORT", ""))
+	experimentDetails.Toxicity, _ = strconv.Atoi(types.Getenv("TOXICITY", "100"))
 }
 
 // abortWatcher continuously watch for the abort signals

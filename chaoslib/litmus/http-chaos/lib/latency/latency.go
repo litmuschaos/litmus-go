@@ -19,6 +19,7 @@ func PodHttpLatencyChaos(experimentsDetails *experimentTypes.ExperimentDetails, 
 		"Listen Port":      experimentsDetails.ProxyPort,
 		"Sequence":         experimentsDetails.Sequence,
 		"PodsAffectedPerc": experimentsDetails.PodsAffectedPerc,
+		"Toxicity":         experimentsDetails.Toxicity,
 		"Latency":          experimentsDetails.Latency,
 	})
 

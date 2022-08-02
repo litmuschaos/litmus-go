@@ -25,6 +25,7 @@ func PodHttpStatusCodeChaos(experimentsDetails *experimentTypes.ExperimentDetail
 		"Listen Port":        experimentsDetails.ProxyPort,
 		"Sequence":           experimentsDetails.Sequence,
 		"PodsAffectedPerc":   experimentsDetails.PodsAffectedPerc,
+		"Toxicity":           experimentsDetails.Toxicity,
 		"StatusCode":         experimentsDetails.StatusCode,
 		"ModifyResponseBody": experimentsDetails.ModifyResponseBody,
 	})
