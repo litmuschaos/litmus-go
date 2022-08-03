@@ -103,6 +103,7 @@ func runChaos(experimentsDetails *experimentTypes.ExperimentDetails, targetPodLi
 	return nil
 }
 
+//PrepareChaos contains the preparation steps before chaos injection
 func PrepareChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	//Waiting for the ramp time before chaos injection

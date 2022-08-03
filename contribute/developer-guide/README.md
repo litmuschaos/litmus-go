@@ -110,9 +110,9 @@ The *generate_experiment.go* script is a simple way to bootstrap your experiment
 
   **Note**: Replace the `<generate-type>` placeholder with the appropriate value based on the usecase: 
   - `experiment`: Chaos experiment artifacts belonging to an existing OR new experiment.
-      - Provide the type of chaos lib in the `-t` flag. It supports the following values:
-           - `exec`: It creates the exec based chaos lib(default type)
-           - `helper`: It creates the helper based chaos lib
+      - Provide the type of chaoslib in the `-t` flag. It supports the following values:
+           - `exec`: It creates the exec based chaoslib(default type)
+           - `helper`: It creates the helper based chaoslib
   - `chart`: Just the chaos-chart metadata, i.e., chartserviceversion.yaml
       - Provide the type of chart in the `-t` flag. It supports the following values:
            - `category`: It creates the chart metadata for the category i.e chartserviceversion, package manifests
