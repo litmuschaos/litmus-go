@@ -1,0 +1,160 @@
+package lib
+
+import (
+	"context"
+    clients "github.com/litmuschaos/litmus-go/pkg/clients"
+    "github.com/litmuschaos/litmus-go/pkg/events"
+    "github.com/litmuschaos/litmus-go/pkg/log"
+    "github.com/litmuschaos/litmus-go/pkg/probe"
+    experimentTypes "github.com/litmuschaos/litmus-go/pkg/{{ .Category }}/{{ .Name }}/types"
+    "github.com/litmuschaos/litmus-go/pkg/status"
+    "github.com/litmuschaos/litmus-go/pkg/types"
+    "github.com/litmuschaos/litmus-go/pkg/utils/common"
+    "github.com/pkg/errors"
+    "github.com/sirupsen/logrus"
+    corev1 "k8s.io/api/core/v1"
+    v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+func experimentExecution(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+
+	// Get the target pod details for the chaos execution
+	// if the target pod is not defined it will derive the random target pod list using pod affected percentage
+	targetPodList, err := common.GetPodList(experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, clients, chaosDetails)
+	if err != nil {
+		return err
+	}
+
+	podNames := []string{}
+	for _, pod := range targetPodList.Items {
+		podNames = append(podNames, pod.Name)
+	}
+	log.Infof("Target pods list for chaos, %v", podNames)
+
+	//Get the target container name of the application pod
+	if experimentsDetails.TargetContainer == "" {
+		experimentsDetails.TargetContainer, err = common.GetTargetContainer(experimentsDetails.AppNS, targetPodList.Items[0].Name, clients)
+		if err != nil {
+			return errors.Errorf("unable to get the target container name, err: %v", err)
+		}
+	}
+
+	if experimentsDetails.EngineName != "" {
+    		if err := common.SetHelperData(chaosDetails, experimentsDetails.SetHelperData, clients); err != nil {
+    			return err
+    		}
+    	}
+
+	return runChaos(experimentsDetails, targetPodList, clients, resultDetails, eventsDetails, chaosDetails)
+}
+
+func runChaos(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList corev1.PodList, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	if experimentsDetails.EngineName != "" {
+    		msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on target pod"
+    		types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
+    		events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
+    	}
+
+    labelSuffix := common.GetRunID()
+
+    // run the probes during chaos
+    if len(resultDetails.ProbeDetails) != 0 {
+        if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+            return err
+        }
+    }
+
+    // creating the helper pod to perform container kill chaos
+    for _, pod := range targetPodList.Items {
+
+        runID := common.GetRunID()
+
+        log.InfoWithValues("[Info]: Details of application under chaos injection", logrus.Fields{
+            "Target Pod":       pod.Name,
+            "NodeName":         pod.Spec.NodeName,
+            "Target Container": experimentsDetails.TargetContainer,
+        })
+
+        if err := createHelperPod(experimentsDetails, clients, chaosDetails, pod.Name, pod.Spec.NodeName, runID, labelSuffix); err != nil {
+            return errors.Errorf("unable to create the helper pod, err: %v", err)
+        }
+
+        common.SetTargets(pod.Name, "targeted", "pod", chaosDetails)
+
+        appLabel := "name=" + experimentsDetails.ExperimentName + "-helper-" + runID
+
+        //checking the status of the helper pod, wait till the pod comes to running state else fail the experiment
+        log.Info("[Status]: Checking the status of the helper pod")
+        if err := status.CheckHelperStatus(experimentsDetails.ChaosNamespace, appLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
+            common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-helper-"+runID, appLabel, chaosDetails, clients)
+            return errors.Errorf("helper pod is not in running state, err: %v", err)
+        }
+
+        log.Infof("[Wait]: Waiting for the %vs chaos duration", experimentsDetails.ChaosDuration)
+        common.WaitForDuration(experimentsDetails.ChaosDuration)
+
+        //Deleting the helper pod
+        log.Info("[Cleanup]: Deleting the helper pod")
+        if err := common.DeletePod(experimentsDetails.ExperimentName+"-helper-"+runID, appLabel, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients); err != nil {
+            return errors.Errorf("unable to delete the helper pod, err: %v", err)
+        }
+    }
+
+	return nil
+}
+
+func PrepareChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+
+	//Waiting for the ramp time before chaos injection
+	if experimentsDetails.RampTime != 0 {
+		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", experimentsDetails.RampTime)
+		common.WaitForDuration(experimentsDetails.RampTime)
+	}
+	//Starting the CPU stress experiment
+	if err := experimentExecution(experimentsDetails, clients, resultDetails, eventsDetails, chaosDetails);err != nil {
+		return err
+	}
+	//Waiting for the ramp time after chaos injection
+	if experimentsDetails.RampTime != 0 {
+		log.Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", experimentsDetails.RampTime)
+		common.WaitForDuration(experimentsDetails.RampTime)
+	}
+	return nil
+}
+
+// createHelperPod derive the attributes for helper pod and create the helper pod
+func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, appName, appNodeName, runID, labelSuffix string) error {
+
+	helperPod := &corev1.Pod{
+		ObjectMeta: v1.ObjectMeta{
+			Name:        experimentsDetails.ExperimentName + "-helper-" + runID,
+			Namespace:   experimentsDetails.ChaosNamespace,
+			Labels:      common.GetHelperLabels(chaosDetails.Labels, runID, labelSuffix, experimentsDetails.ExperimentName),
+			Annotations: chaosDetails.Annotations,
+		},
+		Spec: corev1.PodSpec{
+			RestartPolicy:    corev1.RestartPolicyNever,
+			ImagePullSecrets: chaosDetails.ImagePullSecrets,
+			NodeName:         appNodeName,
+			Containers: []corev1.Container{
+				{
+					Name:            experimentsDetails.ExperimentName,
+					Image:           experimentsDetails.LIBImage,
+					ImagePullPolicy: corev1.PullPolicy(experimentsDetails.LIBImagePullPolicy),
+					Command: []string{
+						"/bin/bash",
+						"-c",
+					},
+					Args: []string{
+					    "echo This is a sample pod",
+					    "sleep 10",
+					},
+					Resources: chaosDetails.Resources,
+				},
+			},
+		},
+	}
+
+	_, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Create(context.Background(), helperPod, v1.CreateOptions{})
+	return err
+}
