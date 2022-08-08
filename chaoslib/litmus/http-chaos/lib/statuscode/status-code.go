@@ -46,7 +46,7 @@ func GetStatusCode(statusCode string) (string, error) {
 
 	if statusCode == "" {
 		log.Info("[Info]: No status code provided. Selecting a status code randomly from supported status codes")
-		return acceptedStatusCodes[1+rand.Intn(len(acceptedStatusCodes))], nil
+		return acceptedStatusCodes[rand.Intn(len(acceptedStatusCodes))], nil
 	}
 
 	statusCodeList := strings.Split(statusCode, ",")
@@ -58,11 +58,11 @@ func GetStatusCode(statusCode string) (string, error) {
 	} else {
 		acceptedCodes := getAcceptedCodesInList(statusCodeList, acceptedStatusCodes)
 		if len(acceptedCodes) == 0 {
-			return "", errors.New("Invalid status code provided")
+			return "", errors.Errorf("invalid status code provided, code: %s", statusCode)
 		}
 		return acceptedCodes[rand.Intn(len(acceptedCodes))], nil
 	}
-	return "", errors.Errorf("status code %d is not supported. \nList of supported status code: %v", statusCode, acceptedStatusCodes)
+	return "", errors.Errorf("status code %s is not supported. \nList of supported status code: %v", statusCode, acceptedStatusCodes)
 }
 
 // getAcceptedCodesInList returns the list of accepted status codes from a list of status codes
