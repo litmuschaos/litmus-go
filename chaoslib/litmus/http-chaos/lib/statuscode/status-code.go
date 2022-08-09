@@ -62,7 +62,7 @@ func GetStatusCode(statusCode string) (string, error) {
 		}
 		return acceptedCodes[rand.Intn(len(acceptedCodes))], nil
 	}
-	return "", errors.Errorf("status code %s is not supported. \nList of supported status code: %v", statusCode, acceptedStatusCodes)
+	return "", errors.Errorf("status code %s is not supported. \nList of supported status codes: %v", statusCode, acceptedStatusCodes)
 }
 
 // getAcceptedCodesInList returns the list of accepted status codes from a list of status codes
