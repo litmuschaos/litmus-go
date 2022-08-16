@@ -148,6 +148,7 @@ func createProbePod(clients clients.ClientSets, chaosDetails *types.ChaosDetails
 			ServiceAccountName: svcAccount,
 			Volumes:            source.Volumes,
 			NodeSelector:       source.NodeSelector,
+			ImagePullSecrets:   source.ImagePullSecrets,
 			Containers: []apiv1.Container{
 				{
 					Name:            chaosDetails.ExperimentName + "-probe",
