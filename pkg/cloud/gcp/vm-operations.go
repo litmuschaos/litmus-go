@@ -24,7 +24,6 @@ func VMInstanceStop(computeService *compute.Service, instanceName string, gcpPro
 		"InstanceName": instanceName,
 		"InstanceZone": instanceZone,
 	})
-
 	return nil
 }
 
