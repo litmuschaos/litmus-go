@@ -39,7 +39,7 @@ type ExperimentDetails struct {
 	Toxicity                      int
 	ProxyPort                     int
 	Latency                       int
-	StatusCode                    int
+	StatusCode                    string
 	ModifyResponseBody            string
 	HeadersMap                    string
 	HeaderMode                    string
