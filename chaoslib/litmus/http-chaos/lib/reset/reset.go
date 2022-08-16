@@ -19,6 +19,7 @@ func PodHttpResetPeerChaos(experimentsDetails *experimentTypes.ExperimentDetails
 		"Listen Port":      experimentsDetails.ProxyPort,
 		"Sequence":         experimentsDetails.Sequence,
 		"PodsAffectedPerc": experimentsDetails.PodsAffectedPerc,
+		"Toxicity":         experimentsDetails.Toxicity,
 		"Reset Timeout":    experimentsDetails.ResetTimeout,
 	})
 

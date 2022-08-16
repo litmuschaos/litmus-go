@@ -307,6 +307,7 @@ func getPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, podName, a
 		SetEnv("NETWORK_INTERFACE", experimentsDetails.NetworkInterface).
 		SetEnv("TARGET_SERVICE_PORT", strconv.Itoa(experimentsDetails.TargetServicePort)).
 		SetEnv("PROXY_PORT", strconv.Itoa(experimentsDetails.ProxyPort)).
+		SetEnv("TOXICITY", strconv.Itoa(experimentsDetails.Toxicity)).
 		SetEnvFromDownwardAPI("v1", "metadata.name")
 
 	return envDetails.ENV

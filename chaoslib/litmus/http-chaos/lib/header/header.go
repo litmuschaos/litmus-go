@@ -17,6 +17,7 @@ func PodHttpModifyHeaderChaos(experimentsDetails *experimentTypes.ExperimentDeta
 		"Listen Port":      experimentsDetails.ProxyPort,
 		"Sequence":         experimentsDetails.Sequence,
 		"PodsAffectedPerc": experimentsDetails.PodsAffectedPerc,
+		"Toxicity":         experimentsDetails.Toxicity,
 		"Headers":          experimentsDetails.HeadersMap,
 		"Header Mode":      experimentsDetails.HeaderMode,
 	})
