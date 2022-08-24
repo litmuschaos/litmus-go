@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"os/exec"
-	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -97,7 +96,7 @@ func InitializeChaosResult(chaosDetails *types.ChaosDetails, clients clients.Cli
 				ProbeSuccessPercentage: "Awaited",
 			},
 			ProbeStatus: probeStatus,
-			History: v1alpha1.HistoryDetails{
+			History: &v1alpha1.HistoryDetails{
 				PassedRuns:  0,
 				FailedRuns:  0,
 				StoppedRuns: 0,
@@ -244,14 +243,13 @@ func RecordAfterFailure(chaosDetails *types.ChaosDetails, resultDetails *types.R
 
 // updateHistory initialise the history for the older results
 func updateHistory(result *v1alpha1.ChaosResult) {
-	if reflect.DeepEqual(result.Status.History, v1alpha1.HistoryDetails{}) {
-		history := v1alpha1.HistoryDetails{
+	if result.Status.History == nil {
+		result.Status.History = &v1alpha1.HistoryDetails{
 			PassedRuns:  0,
 			FailedRuns:  0,
 			StoppedRuns: 0,
 			Targets:     []v1alpha1.TargetDetails{},
 		}
-		result.Status.History = history
 	}
 }
 
