@@ -36,4 +36,5 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.LIBImagePullPolicy = types.Getenv("LIB_IMAGE_PULL_POLICY", "Always")
 	experimentDetails.LIBImage = types.Getenv("LIB_IMAGE", "litmuschaos/go-runner:latest")
 	experimentDetails.SetHelperData = types.Getenv("SET_HELPER_DATA", "true")
+	experimentDetails.ChaosServiceAccount = types.Getenv("CHAOS_SERVICE_ACCOUNT", "")
 }
