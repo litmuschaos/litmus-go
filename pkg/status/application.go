@@ -263,8 +263,13 @@ func WaitForCompletion(appNs, appLabel string, clients clients.ClientSets, durat
 				log.Infof("helper pod status: %v", podStatus)
 				if podStatus != "Succeeded" && podStatus != "Failed" {
 					for _, container := range pod.Status.ContainerStatuses {
-						if container.Name == containerName && container.Ready {
-							return errors.Errorf("Container is not completed yet")
+						if container.Name == containerName {
+							if container.Ready {
+								return errors.Errorf("Container is not completed yet")
+							} else if container.State.Terminated != nil && container.State.Terminated.ExitCode == 1 {
+								podStatus = "Failed"
+								break
+							}
 						}
 					}
 				}
