@@ -39,6 +39,14 @@ func experimentExecution(experimentsDetails *experimentTypes.ExperimentDetails, 
 		}
 	}
 
+	// Getting the serviceAccountName, need permission inside helper pod to create the events
+    if experimentsDetails.ChaosServiceAccount == "" {
+        experimentsDetails.ChaosServiceAccount, err = common.GetServiceAccount(experimentsDetails.ChaosNamespace, experimentsDetails.ChaosPodName, clients)
+        if err != nil {
+            return errors.Errorf("unable to get the serviceAccountName, err: %v", err)
+        }
+    }
+
 	if experimentsDetails.EngineName != "" {
     		if err := common.SetHelperData(chaosDetails, experimentsDetails.SetHelperData, clients); err != nil {
     			return err
@@ -90,8 +98,14 @@ func runChaos(experimentsDetails *experimentTypes.ExperimentDetails, targetPodLi
             return errors.Errorf("helper pod is not in running state, err: %v", err)
         }
 
-        log.Infof("[Wait]: Waiting for the %vs chaos duration", experimentsDetails.ChaosDuration)
-        common.WaitForDuration(experimentsDetails.ChaosDuration)
+        // Wait till the completion of the helper pod
+        // set an upper limit for the waiting time
+        log.Info("[Wait]: waiting till the completion of the helper pod")
+        podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, appLabel, clients, experimentsDetails.ChaosDuration+experimentsDetails.Timeout, experimentsDetails.ExperimentName)
+        if err != nil || podStatus == "Failed" {
+            common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-helper-"+runID, appLabel, chaosDetails, clients)
+            return common.HelperFailedError(err)
+        }
 
         //Deleting the helper pod
         log.Info("[Cleanup]: Deleting the helper pod")
@@ -134,9 +148,10 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 			Annotations: chaosDetails.Annotations,
 		},
 		Spec: corev1.PodSpec{
-			RestartPolicy:    corev1.RestartPolicyNever,
-			ImagePullSecrets: chaosDetails.ImagePullSecrets,
-			NodeName:         appNodeName,
+			RestartPolicy:      corev1.RestartPolicyNever,
+			ImagePullSecrets:   chaosDetails.ImagePullSecrets,
+			ServiceAccountName: experimentsDetails.ChaosServiceAccount,
+			NodeName:           appNodeName,
 			Containers: []corev1.Container{
 				{
 					Name:            experimentsDetails.ExperimentName,
@@ -147,8 +162,8 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 						"-c",
 					},
 					Args: []string{
-					    "echo This is a sample pod",
-					    "sleep 10",
+						"echo This is a sample pod",
+						"sleep 10",
 					},
 					Resources: chaosDetails.Resources,
 				},
