@@ -63,7 +63,7 @@ func Helper(clients clients.ClientSets) {
 
 }
 
-//prepareK8sHttpChaos contains the prepration steps before chaos injection
+// prepareK8sHttpChaos contains the prepration steps before chaos injection
 func prepareK8sHttpChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails) error {
 
 	containerID, err := common.GetRuntimeBasedContainerID(experimentsDetails.ContainerRuntime, experimentsDetails.SocketPath, experimentsDetails.TargetPods, experimentsDetails.AppNS, experimentsDetails.TargetContainer, clients)
@@ -167,7 +167,7 @@ func startProxy(experimentDetails *experimentTypes.ExperimentDetails, pid int) e
 	chaosCommand := fmt.Sprintf("%s && sleep 10 && %s && %s", startProxyServerCommand, createProxyCommand, createToxicCommand)
 
 	cmd := exec.Command("/bin/bash", "-c", chaosCommand)
-	log.Infof("[Chaos]: Starting proxy server: %s", cmd.String())
+	log.Infof("[Chaos]: Starting proxy server")
 
 	_, err := cmd.CombinedOutput()
 	if err != nil {
@@ -183,7 +183,7 @@ func startProxy(experimentDetails *experimentTypes.ExperimentDetails, pid int) e
 func killProxy(experimentDetails *experimentTypes.ExperimentDetails, pid int) error {
 	stopProxyServerCommand := fmt.Sprintf("sudo nsenter -t %d -n sudo kill -9 $(ps aux | grep [t]oxiproxy | awk 'FNR==1{print $1}')", pid)
 	cmd := exec.Command("/bin/bash", "-c", stopProxyServerCommand)
-	log.Infof("[Chaos]: Stopping proxy server: %s", cmd.String())
+	log.Infof("[Chaos]: Stopping proxy server")
 
 	_, err := cmd.CombinedOutput()
 	if err != nil {
@@ -200,7 +200,7 @@ func killProxy(experimentDetails *experimentTypes.ExperimentDetails, pid int) er
 func addIPRuleSet(experimentDetails *experimentTypes.ExperimentDetails, pid int) error {
 	addIPRuleSetCommand := fmt.Sprintf("(sudo nsenter -t %d -n iptables -t nat -A PREROUTING -i %v -p tcp --dport %d -j REDIRECT --to-port %d)", pid, experimentDetails.NetworkInterface, experimentDetails.TargetServicePort, experimentDetails.ProxyPort)
 	cmd := exec.Command("/bin/bash", "-c", addIPRuleSetCommand)
-	log.Infof("[Chaos]: Adding IPtables ruleset: %s", cmd.String())
+	log.Infof("[Chaos]: Adding IPtables ruleset")
 
 	_, err := cmd.CombinedOutput()
 	if err != nil {
@@ -216,7 +216,7 @@ func addIPRuleSet(experimentDetails *experimentTypes.ExperimentDetails, pid int)
 func removeIPRuleSet(experimentDetails *experimentTypes.ExperimentDetails, pid int) error {
 	removeIPRuleSetCommand := fmt.Sprintf("sudo nsenter -t %d -n iptables -t nat -D PREROUTING -i %v -p tcp --dport %d -j REDIRECT --to-port %d", pid, experimentDetails.NetworkInterface, experimentDetails.TargetServicePort, experimentDetails.ProxyPort)
 	cmd := exec.Command("/bin/bash", "-c", removeIPRuleSetCommand)
-	log.Infof("[Chaos]: Removing IPtables ruleset: %s", cmd.String())
+	log.Infof("[Chaos]: Removing IPtables ruleset")
 
 	_, err := cmd.CombinedOutput()
 	if err != nil {
@@ -226,7 +226,7 @@ func removeIPRuleSet(experimentDetails *experimentTypes.ExperimentDetails, pid i
 	return nil
 }
 
-//getENV fetches all the env variables from the runner pod
+// getENV fetches all the env variables from the runner pod
 func getENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.ExperimentName = types.Getenv("EXPERIMENT_NAME", "")
 	experimentDetails.InstanceID = types.Getenv("INSTANCE_ID", "")

@@ -8,7 +8,7 @@ import (
 	clientTypes "k8s.io/apimachinery/pkg/types"
 )
 
-//GetENV fetches all the env variables from the runner pod
+// GetENV fetches all the env variables from the runner pod
 func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string) {
 	experimentDetails.ExperimentName = types.Getenv("EXPERIMENT_NAME", "")
 	experimentDetails.ChaosNamespace = types.Getenv("CHAOS_NAMESPACE", "litmus")
@@ -47,11 +47,16 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string
 	case "pod-http-status-code":
 		experimentDetails.StatusCode = types.Getenv("STATUS_CODE", "")
 		experimentDetails.ModifyResponseBody = types.Getenv("MODIFY_RESPONSE_BODY", "true")
+		experimentDetails.ResponseBody = types.Getenv("RESPONSE_BODY", "")
+		experimentDetails.ContentType = types.Getenv("CONTENT_TYPE", "text/plain")
+		experimentDetails.ContentEncoding = types.Getenv("CONTENT_ENCODING", "")
 	case "pod-http-modify-header":
 		experimentDetails.HeadersMap = types.Getenv("HEADERS_MAP", "{}")
 		experimentDetails.HeaderMode = types.Getenv("HEADER_MODE", "response")
 	case "pod-http-modify-body":
 		experimentDetails.ResponseBody = types.Getenv("RESPONSE_BODY", "")
+		experimentDetails.ContentType = types.Getenv("CONTENT_TYPE", "text/plain")
+		experimentDetails.ContentEncoding = types.Getenv("CONTENT_ENCODING", "")
 	case "pod-http-reset-peer":
 		experimentDetails.ResetTimeout, _ = strconv.Atoi(types.Getenv("RESET_TIMEOUT", "0"))
 	}
