@@ -315,15 +315,6 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 					SecurityContext: &apiv1.SecurityContext{
 						Privileged: &privilegedEnable,
 						RunAsUser:  ptrint64(0),
-						Capabilities: &apiv1.Capabilities{
-							Add: []apiv1.Capability{
-								"SYS_PTRACE",
-								"SYS_ADMIN",
-								"MKNOD",
-								"SYS_CHROOT",
-								"KILL",
-							},
-						},
 					},
 				},
 			},
