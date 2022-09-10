@@ -22,7 +22,7 @@ func CheckNodeStatus(nodes string, timeout, delay int, clients clients.ClientSet
 		Times(uint(timeout / delay)).
 		Wait(time.Duration(delay) * time.Second).
 		Try(func(attempt uint) error {
-        		nodeList := apiv1.NodeList{}
+			nodeList := apiv1.NodeList{}
 			if nodes != "" {
 				targetNodes := strings.Split(nodes, ",")
 				for index := range targetNodes {
