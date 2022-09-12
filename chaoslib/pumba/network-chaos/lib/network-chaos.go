@@ -289,7 +289,7 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 // AddTargetIpsArgs inserts a comma-separated list of targetIPs (if provided by the user) into the pumba command/args
 func AddTargetIpsArgs(targetIPs, targetHosts string, args []string) ([]string, error) {
 
-	targetIPs, err := network_chaos.GetTargetIps(targetIPs, targetHosts)
+	targetIPs, err := network_chaos.GetTargetIps(targetIPs, targetHosts, clients.ClientSets{}, false)
 	if err != nil {
 		return nil, err
 	}
