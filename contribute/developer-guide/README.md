@@ -63,6 +63,7 @@ The *generate_experiment.go* script is a simple way to bootstrap your experiment
     - Minikube
   scope: "Namespaced"
   auxiliaryappcheck: false
+  cloudexperiment: false
   permissions:
     - apigroups:
         - ""
@@ -113,6 +114,7 @@ The *generate_experiment.go* script is a simple way to bootstrap your experiment
       - Provide the type of chaoslib in the `-t` flag. It supports the following values:
            - `exec`: It creates the exec based chaoslib(default type)
            - `helper`: It creates the helper based chaoslib
+           - `cloud`: It creates the chaoslib for cloud based experiments like aws, azure and more
   - `chart`: Just the chaos-chart metadata, i.e., chartserviceversion.yaml
       - Provide the type of chart in the `-t` flag. It supports the following values:
            - `category`: It creates the chart metadata for the category i.e chartserviceversion, package manifests

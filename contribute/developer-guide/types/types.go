@@ -34,6 +34,9 @@ type Experiment struct {
 	// This check define whether you want auxiliary status check or not
 	// while generating new chaos experiment
 	AuxiliaryAppCheck bool `json:"auxiliaryappcheck,omitempty"`
+	// This check define whether your experiment is a non-k8s experiment
+	// while generating new chaos experiment
+	CloudExperiment bool `json:"cloudexperiment,omitempty"`
 	// Permissions contains the list of all permission needed inside cluster-role to execute the experiment
 	// it contains list of all apigroups, resources and verbs
 	Permissions []Permission `json:"permissions"`

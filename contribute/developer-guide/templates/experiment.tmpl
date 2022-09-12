@@ -62,12 +62,24 @@ func Experiment(clients clients.ClientSets){
 	types.SetResultEventAttributes(&eventsDetails, types.AwaitedVerdict, msg, "Normal", &resultDetails)
 	events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosResult")
 
+{{ if eq .CloudExperiment false }}
 	//DISPLAY THE APP INFORMATION
 	log.InfoWithValues("[Info]: The application information is as follows", logrus.Fields{
 		"Namespace": experimentsDetails.AppNS,
 		"Label":     experimentsDetails.AppLabel,
 		"Chaos Duration":    experimentsDetails.ChaosDuration,
 	})
+{{- end }}
+
+{{ if eq .CloudExperiment true }}
+	//DISPLAY THE APP INFORMATION
+	log.InfoWithValues("[Info]: The application information is as follows", logrus.Fields{
+		"TargetIDs":         experimentsDetails.TargetID,
+		"Region":             experimentsDetails.Region,
+		"Chaos Duration":    experimentsDetails.ChaosDuration,
+	})
+{{- end }}
+
 
 	// Calling AbortWatcher go routine, it will continuously watch for the abort signal and generate the required events and result
 	go common.AbortWatcher(experimentsDetails.ExperimentName, clients, &resultDetails, &chaosDetails, &eventsDetails)
@@ -76,6 +88,7 @@ func Experiment(clients clients.ClientSets){
     // ADD A PRE-CHAOS CHECK OF YOUR CHOICE HERE
     // POD STATUS CHECKS FOR THE APPLICATION UNDER TEST AND AUXILIARY APPLICATIONS ARE ADDED BY DEFAULT 
 
+{{ if eq .CloudExperiment false }}
 	//PRE-CHAOS APPLICATION STATUS CHECK
 	if chaosDetails.DefaultAppHealthCheck {
 		log.Info("[Status]: Verify that the AUT (Application Under Test) is running (pre-chaos)")
@@ -88,6 +101,7 @@ func Experiment(clients clients.ClientSets){
 			return
 		}
 	}
+{{- end }}
 {{ if eq .AuxiliaryAppCheck true }}
 	//PRE-CHAOS AUXILIARY APPLICATION STATUS CHECK
 	if experimentsDetails.AuxiliaryAppInfo != "" {
@@ -152,6 +166,7 @@ func Experiment(clients clients.ClientSets){
 	// ADD A POST-CHAOS CHECK OF YOUR CHOICE HERE
     // POD STATUS CHECKS FOR THE APPLICATION UNDER TEST AND AUXILIARY APPLICATIONS ARE ADDED BY DEFAULT 
 
+{{ if eq .CloudExperiment false }}
 	//POST-CHAOS APPLICATION STATUS CHECK
 	if chaosDetails.DefaultAppHealthCheck {
 		log.Info("[Status]: Verify that the AUT (Application Under Test) is running (post-chaos)")
@@ -164,6 +179,7 @@ func Experiment(clients clients.ClientSets){
 			return
 		}
 	}
+{{- end }}
 {{ if eq .AuxiliaryAppCheck true }}
 	//POST-CHAOS AUXILIARY APPLICATION STATUS CHECK
 	if experimentsDetails.AuxiliaryAppInfo != "" {
