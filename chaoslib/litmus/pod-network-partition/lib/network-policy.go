@@ -1,6 +1,7 @@
 package lib
 
 import (
+	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"strings"
 
 	network_chaos "github.com/litmuschaos/litmus-go/chaoslib/litmus/network-chaos/lib"
@@ -179,7 +180,7 @@ func getPort(port int32, protocol corev1.Protocol) networkv1.NetworkPolicyPort {
 // for which traffic should be blocked
 func (np *NetworkPolicy) setExceptIPs(experimentsDetails *experimentTypes.ExperimentDetails) error {
 	// get all the target ips
-	destinationIPs, err := network_chaos.GetTargetIps(experimentsDetails.DestinationIPs, experimentsDetails.DestinationHosts)
+	destinationIPs, err := network_chaos.GetTargetIps(experimentsDetails.DestinationIPs, experimentsDetails.DestinationHosts, clients.ClientSets{}, false)
 	if err != nil {
 		return err
 	}
