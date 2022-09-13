@@ -11,7 +11,7 @@ import (
 //GetENV fetches all the env variables from the runner pod
 func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string) {
 	experimentDetails.ExperimentName = types.Getenv("EXPERIMENT_NAME", "")
-	experimentDetails.ChaosNamespace = types.Getenv("CHAOS_NAMESPACE", "")
+	experimentDetails.ChaosNamespace = types.Getenv("CHAOS_NAMESPACE", "litmus")
 	experimentDetails.EngineName = types.Getenv("CHAOSENGINE", "")
 	experimentDetails.ChaosDuration, _ = strconv.Atoi(types.Getenv("TOTAL_CHAOS_DURATION", "60"))
 	experimentDetails.RampTime, _ = strconv.Atoi(types.Getenv("RAMP_TIME", "0"))
@@ -30,7 +30,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string
 	experimentDetails.Delay, _ = strconv.Atoi(types.Getenv("STATUS_CHECK_DELAY", "2"))
 	experimentDetails.Timeout, _ = strconv.Atoi(types.Getenv("STATUS_CHECK_TIMEOUT", "180"))
 	experimentDetails.TargetPods = types.Getenv("TARGET_PODS", "")
-	experimentDetails.PodsAffectedPerc = types.Getenv("PODS_AFFECTED_PERC", "")
+	experimentDetails.PodsAffectedPerc = types.Getenv("PODS_AFFECTED_PERC", "0")
 	experimentDetails.NodeLabel = types.Getenv("NODE_LABEL", "")
 	experimentDetails.DestinationIPs = types.Getenv("DESTINATION_IPS", "")
 	experimentDetails.DestinationHosts = types.Getenv("DESTINATION_HOSTS", "")

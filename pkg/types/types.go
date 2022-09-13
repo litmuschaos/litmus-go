@@ -125,7 +125,7 @@ func InitialiseChaosVariables(chaosDetails *ChaosDetails) {
 	chaosDetails.Timeout, _ = strconv.Atoi(Getenv("STATUS_CHECK_TIMEOUT", "180"))
 	chaosDetails.Delay, _ = strconv.Atoi(Getenv("STATUS_CHECK_DELAY", "2"))
 	chaosDetails.AppDetail = appDetails
-	chaosDetails.DefaultAppHealthCheck, _ = strconv.ParseBool(Getenv("DEFAULT_APP_HEALTH_CHECK", ""))
+	chaosDetails.DefaultAppHealthCheck, _ = strconv.ParseBool(Getenv("DEFAULT_APP_HEALTH_CHECK", "true"))
 	chaosDetails.JobCleanupPolicy = Getenv("JOB_CLEANUP_POLICY", "retain")
 	chaosDetails.ProbeImagePullPolicy = Getenv("LIB_IMAGE_PULL_POLICY", "Always")
 	chaosDetails.ParentsResources = []string{}
