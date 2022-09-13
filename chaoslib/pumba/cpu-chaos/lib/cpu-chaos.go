@@ -204,7 +204,7 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 		ObjectMeta: v1.ObjectMeta{
 			Name:        experimentsDetails.ExperimentName + "-helper-" + runID,
 			Namespace:   experimentsDetails.ChaosNamespace,
-			Labels:      common.GetHelperLabels(chaosDetails.Labels, runID, labelSuffix, experimentsDetails.ExperimentName),
+			Labels:      common.GetHelperLabels(chaosDetails.Labels, runID, experimentsDetails.ExperimentName),
 			Annotations: chaosDetails.Annotations,
 		},
 		Spec: apiv1.PodSpec{
