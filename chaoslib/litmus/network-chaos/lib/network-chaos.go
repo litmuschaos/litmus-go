@@ -22,6 +22,8 @@ import (
 )
 
 var serviceMesh = []string{"istio", "envoy"}
+var destIpsSvcMesh string
+var destIps string
 
 //PrepareAndInjectChaos contains the prepration & injection steps
 func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, args string) error {
@@ -132,6 +134,7 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 
 // injectChaosInSerialMode inject the network chaos in all target application serially (one by one)
 func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, args string, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
+	var err error
 
 	labelSuffix := common.GetRunID()
 	// run the probes during chaos
@@ -141,10 +144,15 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		}
 	}
 
+	destIps, err = GetTargetIps(experimentsDetails.DestinationIPs, experimentsDetails.DestinationHosts, clients, false)
+	if err != nil {
+		return err
+	}
+
 	// creating the helper pod to perform network chaos
 	for _, pod := range targetPodList.Items {
 
-		destIPs, err := GetTargetIps(experimentsDetails.DestinationIPs, experimentsDetails.DestinationHosts, clients, isServiceMeshEnabledForPod(pod))
+		ips, err := getDestIps(pod, experimentsDetails, clients)
 		if err != nil {
 			return err
 		}
@@ -163,7 +171,8 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 			"ContainerName": experimentsDetails.TargetContainer,
 		})
 		runID := common.GetRunID()
-		if err := createHelperPod(experimentsDetails, clients, chaosDetails, pod.Name, pod.Spec.NodeName, runID, args, labelSuffix, destIPs); err != nil {
+
+		if err := createHelperPod(experimentsDetails, clients, chaosDetails, fmt.Sprintf("%s&%s&%s", pod.Name, pod.Namespace, ips), pod.Spec.NodeName, runID, args, labelSuffix); err != nil {
 			return errors.Errorf("unable to create the helper pod, err: %v", err)
 		}
 
@@ -195,11 +204,25 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 	return nil
 }
 
+func getDestIps(pod apiv1.Pod, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) (string, error) {
+	var err error
+	if isServiceMeshEnabledForPod(pod) {
+		if destIpsSvcMesh == "" {
+			destIpsSvcMesh, err = GetTargetIps(experimentsDetails.DestinationIPs, experimentsDetails.DestinationHosts, clients, true)
+			if err != nil {
+				return "", err
+			}
+		}
+		return destIpsSvcMesh, nil
+	}
+	return destIps, nil
+}
+
 // injectChaosInParallelMode inject the network chaos in all target application in parallel mode (all at once)
 func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, args string, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
+	var err error
 
 	labelSuffix := common.GetRunID()
-	var err error
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
 		if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
@@ -207,30 +230,44 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		}
 	}
 
-	// creating the helper pod to perform network chaos
-	for _, pod := range targetPodList.Items {
+	destIps, err = GetTargetIps(experimentsDetails.DestinationIPs, experimentsDetails.DestinationHosts, clients, false)
+	if err != nil {
+		return err
+	}
 
-		destIPs, err := GetTargetIps(experimentsDetails.DestinationIPs, experimentsDetails.DestinationHosts, clients, isServiceMeshEnabledForPod(pod))
+	target := make(map[string]*targets)
+
+	for _, pod := range targetPodList.Items {
+		ips, err := getDestIps(pod, experimentsDetails, clients)
 		if err != nil {
 			return err
 		}
 
-		//Get the target container name of the application pod
-		//It checks the empty target container for the first iteration only
-		if !experimentsDetails.IsTargetContainerProvided {
-			experimentsDetails.TargetContainer, err = common.GetTargetContainer(experimentsDetails.AppNS, pod.Name, clients)
-			if err != nil {
-				return errors.Errorf("unable to get the target container name, err: %v", err)
-			}
+		app1 := app{
+			Name:           pod.Name,
+			Namespace:      pod.Namespace,
+			DestinationIps: ips,
 		}
 
-		log.InfoWithValues("[Info]: Details of application under chaos injection", logrus.Fields{
-			"PodName":       pod.Name,
-			"NodeName":      pod.Spec.NodeName,
-			"ContainerName": experimentsDetails.TargetContainer,
-		})
+		if target[pod.Spec.NodeName] == nil {
+			target[pod.Spec.NodeName] = &targets{
+				App: []app{app1},
+			}
+		} else {
+			target[pod.Spec.NodeName].App = append(target[pod.Spec.NodeName].App, app1)
+		}
+	}
+
+	fmt.Println(target)
+
+	for node, t := range target {
+		var tar []string
+		for _, k := range t.App {
+			tar = append(tar, fmt.Sprintf("%s&%s&%s", k.Name, k.Namespace, k.DestinationIps))
+		}
+
 		runID := common.GetRunID()
-		if err := createHelperPod(experimentsDetails, clients, chaosDetails, pod.Name, pod.Spec.NodeName, runID, args, labelSuffix, destIPs); err != nil {
+		if err := createHelperPod(experimentsDetails, clients, chaosDetails, strings.Join(tar, ";"), node, runID, args, labelSuffix); err != nil {
 			return errors.Errorf("unable to create the helper pod, err: %v", err)
 		}
 	}
@@ -263,7 +300,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 }
 
 // createHelperPod derive the attributes for helper pod and create the helper pod
-func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, podName, nodeName, runID, args, labelSuffix, destIPs string) error {
+func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, targets string, nodeName, runID, args, labelSuffix string) error {
 
 	privilegedEnable := true
 	terminationGracePeriodSeconds := int64(experimentsDetails.TerminationGracePeriodSeconds)
@@ -306,7 +343,7 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 						"./helpers -name network-chaos",
 					},
 					Resources: chaosDetails.Resources,
-					Env:       getPodEnv(experimentsDetails, podName, args, destIPs),
+					Env:       getPodEnv(experimentsDetails, targets, args),
 					VolumeMounts: []apiv1.VolumeMount{
 						{
 							Name:      "cri-socket",
@@ -333,11 +370,10 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 }
 
 // getPodEnv derive all the env required for the helper pod
-func getPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, podName, args, destIPs string) []apiv1.EnvVar {
+func getPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, targets string, args string) []apiv1.EnvVar {
 
 	var envDetails common.ENVDetails
-	envDetails.SetEnv("APP_NAMESPACE", experimentsDetails.AppNS).
-		SetEnv("APP_POD", podName).
+	envDetails.SetEnv("TARGETS", targets).
 		SetEnv("APP_CONTAINER", experimentsDetails.TargetContainer).
 		SetEnv("TOTAL_CHAOS_DURATION", strconv.Itoa(experimentsDetails.ChaosDuration)).
 		SetEnv("CHAOS_NAMESPACE", experimentsDetails.ChaosNamespace).
@@ -348,11 +384,20 @@ func getPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, podName, a
 		SetEnv("NETWORK_INTERFACE", experimentsDetails.NetworkInterface).
 		SetEnv("EXPERIMENT_NAME", experimentsDetails.ExperimentName).
 		SetEnv("SOCKET_PATH", experimentsDetails.SocketPath).
-		SetEnv("DESTINATION_IPS", destIPs).
 		SetEnv("INSTANCE_ID", experimentsDetails.InstanceID).
 		SetEnvFromDownwardAPI("v1", "metadata.name")
 
 	return envDetails.ENV
+}
+
+type targets struct {
+	App []app
+}
+
+type app struct {
+	Namespace      string
+	Name           string
+	DestinationIps string
 }
 
 // GetTargetIps return the comma separated target ips

@@ -153,6 +153,8 @@ func PatchChaosResult(result *v1alpha1.ChaosResult, clients clients.ClientSets, 
 		return err
 	}
 
+	log.Infof("annotations: %v", annotations)
+
 	var isAllProbePassed bool
 	result.Status.ExperimentStatus.Phase = resultDetails.Phase
 	result.Spec.InstanceID = chaosDetails.InstanceID
