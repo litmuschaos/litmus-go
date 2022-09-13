@@ -19,8 +19,6 @@ import (
 	apiv1 "k8s.io/api/core/v1"
 )
 
-var Aborted os.Signal
-
 // ENVDetails contains the ENV details
 type ENVDetails struct {
 	ENV []apiv1.EnvVar
@@ -79,7 +77,7 @@ func AbortWatcherWithoutExit(expname string, clients clients.ClientSets, resultD
 	signal.Notify(signChan, os.Interrupt, syscall.SIGTERM)
 
 	// waiting until the abort signal received
-	Aborted = <-signChan
+	<-signChan
 
 	log.Info("[Chaos]: Chaos Experiment Abortion started because of terminated signal received")
 	// updating the chaosresult after stopped

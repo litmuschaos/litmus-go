@@ -110,27 +110,26 @@ func InitialiseChaosVariables(chaosDetails *ChaosDetails) {
 	appDetails.AnnotationCheck, _ = strconv.ParseBool(Getenv("ANNOTATION_CHECK", "false"))
 	appDetails.AnnotationKey = Getenv("ANNOTATION_KEY", "litmuschaos.io/chaos")
 	appDetails.AnnotationValue = "true"
-	appDetails.Kind = Getenv("APP_KIND", "deployment")
-	appDetails.Label = Getenv("APP_LABEL", "app=deploy1")
-	appDetails.Namespace = Getenv("APP_NAMESPACE", "shubham")
+	appDetails.Kind = Getenv("APP_KIND", "")
+	appDetails.Label = Getenv("APP_LABEL", "")
+	appDetails.Namespace = Getenv("APP_NAMESPACE", "")
 
-	chaosDetails.ChaosNamespace = Getenv("CHAOS_NAMESPACE", "shubham")
+	chaosDetails.ChaosNamespace = Getenv("CHAOS_NAMESPACE", "")
 	chaosDetails.ChaosPodName = Getenv("POD_NAME", "")
 	chaosDetails.Randomness, _ = strconv.ParseBool(Getenv("RANDOMNESS", ""))
-	chaosDetails.ChaosDuration, _ = strconv.Atoi(Getenv("TOTAL_CHAOS_DURATION", "30"))
+	chaosDetails.ChaosDuration, _ = strconv.Atoi(Getenv("TOTAL_CHAOS_DURATION", ""))
 	chaosDetails.ChaosUID = clientTypes.UID(Getenv("CHAOS_UID", ""))
 	chaosDetails.EngineName = Getenv("CHAOSENGINE", "")
-	chaosDetails.ExperimentName = Getenv("EXPERIMENT_NAME", "pod-network-loss")
+	chaosDetails.ExperimentName = Getenv("EXPERIMENT_NAME", "")
 	chaosDetails.InstanceID = Getenv("INSTANCE_ID", "")
 	chaosDetails.Timeout, _ = strconv.Atoi(Getenv("STATUS_CHECK_TIMEOUT", "180"))
 	chaosDetails.Delay, _ = strconv.Atoi(Getenv("STATUS_CHECK_DELAY", "2"))
 	chaosDetails.AppDetail = appDetails
-	chaosDetails.DefaultAppHealthCheck, _ = strconv.ParseBool(Getenv("DEFAULT_APP_HEALTH_CHECK", "false"))
+	chaosDetails.DefaultAppHealthCheck, _ = strconv.ParseBool(Getenv("DEFAULT_APP_HEALTH_CHECK", ""))
 	chaosDetails.JobCleanupPolicy = Getenv("JOB_CLEANUP_POLICY", "retain")
 	chaosDetails.ProbeImagePullPolicy = Getenv("LIB_IMAGE_PULL_POLICY", "Always")
 	chaosDetails.ParentsResources = []string{}
 	chaosDetails.Targets = []v1alpha1.TargetDetails{}
-	chaosDetails.Labels = map[string]string{}
 }
 
 //SetResultAttributes initialise all the chaos result ENV
