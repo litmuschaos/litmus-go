@@ -3,6 +3,7 @@ package modifybody
 import (
 	"fmt"
 	"math"
+	"strings"
 
 	http_chaos "github.com/litmuschaos/litmus-go/chaoslib/litmus/http-chaos/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
@@ -31,7 +32,14 @@ func PodHttpModifyBodyChaos(experimentsDetails *experimentTypes.ExperimentDetail
 	})
 
 	args := fmt.Sprintf(
-		"-t modify_body -a body=\"%v\" -a content_type=%v -a content_encoding=%v",
-		experimentsDetails.ResponseBody, experimentsDetails.ContentType, experimentsDetails.ContentEncoding)
+		`-t modify_body -a body="%v" -a content_type=%v -a content_encoding=%v`,
+		EscapeQuotes(experimentsDetails.ResponseBody), experimentsDetails.ContentType, experimentsDetails.ContentEncoding)
 	return http_chaos.PrepareAndInjectChaos(experimentsDetails, clients, resultDetails, eventsDetails, chaosDetails, args)
+}
+
+// EscapeQuotes escapes the quotes in the given string
+func EscapeQuotes(input string) string {
+	output := strings.ReplaceAll(input, `\`, `\\`)
+	output = strings.ReplaceAll(output, `"`, `\"`)
+	return output
 }

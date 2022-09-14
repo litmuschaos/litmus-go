@@ -9,6 +9,7 @@ import (
 	"time"
 
 	http_chaos "github.com/litmuschaos/litmus-go/chaoslib/litmus/http-chaos/lib"
+	body "github.com/litmuschaos/litmus-go/chaoslib/litmus/http-chaos/lib/modify-body"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/http-chaos/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
@@ -45,8 +46,8 @@ func PodHttpStatusCodeChaos(experimentsDetails *experimentTypes.ExperimentDetail
 	})
 
 	args := fmt.Sprintf(
-		"-t status_code -a status_code=%s -a modify_response_body=%d -a response_body=\"%v\" -a content_type=%s -a content_encoding=%s",
-		experimentsDetails.StatusCode, stringBoolToInt(experimentsDetails.ModifyResponseBody), experimentsDetails.ResponseBody,
+		`-t status_code -a status_code=%s -a modify_response_body=%d -a response_body="%v" -a content_type=%s -a content_encoding=%s`,
+		experimentsDetails.StatusCode, stringBoolToInt(experimentsDetails.ModifyResponseBody), body.EscapeQuotes(experimentsDetails.ResponseBody),
 		experimentsDetails.ContentType, experimentsDetails.ContentEncoding)
 	return http_chaos.PrepareAndInjectChaos(experimentsDetails, clients, resultDetails, eventsDetails, chaosDetails, args)
 }

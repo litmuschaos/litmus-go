@@ -1,6 +1,7 @@
 package helper
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"os/exec"
@@ -163,16 +164,15 @@ func startProxy(experimentDetails *experimentTypes.ExperimentDetails, pid int) e
 	createProxyCommand := fmt.Sprintf("(sudo nsenter -t %d -n toxiproxy-cli create -l 0.0.0.0:%d -u 0.0.0.0:%d proxy)", pid, experimentDetails.ProxyPort, experimentDetails.TargetServicePort)
 	createToxicCommand := fmt.Sprintf("(sudo nsenter -t %d -n toxiproxy-cli toxic add %s --toxicity %f proxy)", pid, toxics, float32(experimentDetails.Toxicity)/100.0)
 
-	// sleep 10 is added for proxy-server to be ready for creating proxy and adding toxics
-	chaosCommand := fmt.Sprintf("%s && sleep 10 && %s && %s", startProxyServerCommand, createProxyCommand, createToxicCommand)
+	// sleep 2 is added for proxy-server to be ready for creating proxy and adding toxics
+	chaosCommand := fmt.Sprintf("%s && sleep 2 && %s && %s", startProxyServerCommand, createProxyCommand, createToxicCommand)
 
-	cmd := exec.Command("/bin/bash", "-c", chaosCommand)
 	log.Infof("[Chaos]: Starting proxy server")
 
-	_, err := cmd.CombinedOutput()
-	if err != nil {
+	if err := runCommand(chaosCommand); err != nil {
 		return err
 	}
+
 	log.Info("[Info]: Proxy started successfully")
 	return nil
 }
@@ -182,11 +182,9 @@ func startProxy(experimentDetails *experimentTypes.ExperimentDetails, pid int) e
 // and execute the proxy related command inside it.
 func killProxy(experimentDetails *experimentTypes.ExperimentDetails, pid int) error {
 	stopProxyServerCommand := fmt.Sprintf("sudo nsenter -t %d -n sudo kill -9 $(ps aux | grep [t]oxiproxy | awk 'FNR==1{print $1}')", pid)
-	cmd := exec.Command("/bin/bash", "-c", stopProxyServerCommand)
 	log.Infof("[Chaos]: Stopping proxy server")
 
-	_, err := cmd.CombinedOutput()
-	if err != nil {
+	if err := runCommand(stopProxyServerCommand); err != nil {
 		return err
 	}
 
@@ -199,13 +197,12 @@ func killProxy(experimentDetails *experimentTypes.ExperimentDetails, pid int) er
 // and execute the iptables related command inside it.
 func addIPRuleSet(experimentDetails *experimentTypes.ExperimentDetails, pid int) error {
 	addIPRuleSetCommand := fmt.Sprintf("(sudo nsenter -t %d -n iptables -t nat -A PREROUTING -i %v -p tcp --dport %d -j REDIRECT --to-port %d)", pid, experimentDetails.NetworkInterface, experimentDetails.TargetServicePort, experimentDetails.ProxyPort)
-	cmd := exec.Command("/bin/bash", "-c", addIPRuleSetCommand)
 	log.Infof("[Chaos]: Adding IPtables ruleset")
 
-	_, err := cmd.CombinedOutput()
-	if err != nil {
+	if err := runCommand(addIPRuleSetCommand); err != nil {
 		return err
 	}
+
 	log.Info("[Info]: IP rule set added successfully")
 	return nil
 }
@@ -215,13 +212,12 @@ func addIPRuleSet(experimentDetails *experimentTypes.ExperimentDetails, pid int)
 // and execute the iptables related command inside it.
 func removeIPRuleSet(experimentDetails *experimentTypes.ExperimentDetails, pid int) error {
 	removeIPRuleSetCommand := fmt.Sprintf("sudo nsenter -t %d -n iptables -t nat -D PREROUTING -i %v -p tcp --dport %d -j REDIRECT --to-port %d", pid, experimentDetails.NetworkInterface, experimentDetails.TargetServicePort, experimentDetails.ProxyPort)
-	cmd := exec.Command("/bin/bash", "-c", removeIPRuleSetCommand)
 	log.Infof("[Chaos]: Removing IPtables ruleset")
 
-	_, err := cmd.CombinedOutput()
-	if err != nil {
+	if err := runCommand(removeIPRuleSetCommand); err != nil {
 		return err
 	}
+
 	log.Info("[Info]: IP rule set removed successfully")
 	return nil
 }
@@ -245,6 +241,25 @@ func getENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.TargetServicePort, _ = strconv.Atoi(types.Getenv("TARGET_SERVICE_PORT", ""))
 	experimentDetails.ProxyPort, _ = strconv.Atoi(types.Getenv("PROXY_PORT", ""))
 	experimentDetails.Toxicity, _ = strconv.Atoi(types.Getenv("TOXICITY", "100"))
+}
+
+func runCommand(chaosCommand string) error {
+	var stdout, stderr bytes.Buffer
+
+	cmd := exec.Command("/bin/bash", "-c", chaosCommand)
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	err = cmd.Run()
+	errStr := stderr.String()
+	if err != nil {
+		// if we get standard error then, return the same
+		if errStr != "" {
+			return errors.New(errStr)
+		}
+		// if not standard error found, return error
+		return err
+	}
+	return nil
 }
 
 // abortWatcher continuously watch for the abort signals
