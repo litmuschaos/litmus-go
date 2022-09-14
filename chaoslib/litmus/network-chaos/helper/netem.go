@@ -80,15 +80,15 @@ func preparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetail
 	var targets []targetDetails
 
 	for _, t := range strings.Split(targetEnv, ";") {
-		target := strings.Split(t, "&")
+		target := strings.Split(t, ":")
 		if len(target) != 3 {
-			return fmt.Errorf("unsupported target: '%v', provide target in '<name>&<namespace>&<destinationIps>", target)
+			return fmt.Errorf("unsupported target: '%v', provide target in '<name>&<namespace>&<serviceMesh>", target)
 		}
 		td := targetDetails{
 			Name:            target[0],
 			Namespace:       target[1],
-			DestinationIps:  target[2],
 			TargetContainer: experimentsDetails.TargetContainer,
+			DestinationIps:  getDestIps(target[2]),
 		}
 
 		if td.TargetContainer == "" {
@@ -107,6 +107,7 @@ func preparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetail
 		if err != nil {
 			return err
 		}
+
 		targets = append(targets, td)
 	}
 
@@ -120,12 +121,6 @@ func preparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetail
 	default:
 	}
 
-	if experimentsDetails.EngineName != "" {
-		msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on application pod"
-		types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
-		events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
-	}
-
 	for _, t := range targets {
 		// injecting network chaos inside target container
 		if err = injectChaos(experimentsDetails.NetworkInterface, t); err != nil {
@@ -137,11 +132,17 @@ func preparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetail
 		}
 	}
 
+	if experimentsDetails.EngineName != "" {
+		msg := "Injected " + experimentsDetails.ExperimentName + " chaos on application pods"
+		types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
+		events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
+	}
+
 	log.Infof("[Chaos]: Waiting for %vs", experimentsDetails.ChaosDuration)
 
 	common.WaitForDuration(experimentsDetails.ChaosDuration)
 
-	log.Info("[Chaos]: Stopping the experiment")
+	log.Info("[Chaos]: duration is over, reverting chaos")
 
 	var errList []string
 	for _, t := range targets {
@@ -159,7 +160,7 @@ func preparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetail
 	}
 
 	if len(errList) != 0 {
-		return fmt.Errorf("err: %v", strings.Join(errList, ","))
+		return fmt.Errorf(" failed to revert chaos, err: %v", strings.Join(errList, ","))
 	}
 
 	return nil
@@ -267,6 +268,7 @@ func killnetem(target targetDetails, networkInterface string) (bool, error) {
 type targetDetails struct {
 	Name            string
 	Namespace       string
+	ServiceMesh     string
 	DestinationIps  string
 	TargetContainer string
 	ContainerId     string
@@ -314,4 +316,10 @@ func abortWatcher(targets []targetDetails, networkInterface, resultName, chaosNS
 	}
 	log.Info("Chaos Revert Completed")
 	os.Exit(1)
+}
+func getDestIps(serviceMesh string) string {
+	if serviceMesh == "false" {
+		return os.Getenv("DESTINATION_IPS")
+	}
+	return os.Getenv("DESTINATION_IPS_SERVICE_MESH")
 }

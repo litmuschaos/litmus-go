@@ -109,8 +109,6 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 
 // injectChaosInSerialMode inject the network chaos in all target application serially (one by one)
 func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, args string, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
-	var err error
-
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
 		if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
@@ -118,15 +116,10 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		}
 	}
 
-	destIps, err = GetTargetIps(experimentsDetails.DestinationIPs, experimentsDetails.DestinationHosts, clients, false)
-	if err != nil {
-		return err
-	}
-
 	// creating the helper pod to perform network chaos
 	for _, pod := range targetPodList.Items {
 
-		ips, err := getDestIps(pod, experimentsDetails, clients)
+		serviceMesh, err := setDestIps(pod, experimentsDetails, clients)
 		if err != nil {
 			return err
 		}
@@ -141,7 +134,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 
 		runID := common.GetRunID()
 
-		if err := createHelperPod(experimentsDetails, clients, chaosDetails, fmt.Sprintf("%s&%s&%s", pod.Name, pod.Namespace, ips), pod.Spec.NodeName, runID, args); err != nil {
+		if err := createHelperPod(experimentsDetails, clients, chaosDetails, fmt.Sprintf("%s:%s:%s", pod.Name, pod.Namespace, serviceMesh), pod.Spec.NodeName, runID, args); err != nil {
 			return errors.Errorf("unable to create the helper pod, err: %v", err)
 		}
 
@@ -184,11 +177,6 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		}
 	}
 
-	destIps, err = GetTargetIps(experimentsDetails.DestinationIPs, experimentsDetails.DestinationHosts, clients, false)
-	if err != nil {
-		return err
-	}
-
 	targets, err := filterPodsForNodes(targetPodList, experimentsDetails, clients)
 	if err != nil {
 		return err
@@ -199,7 +187,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 	for node, tar := range targets {
 		var targetsPerNode []string
 		for _, k := range tar.Target {
-			targetsPerNode = append(targetsPerNode, fmt.Sprintf("%s&%s&%s", k.Name, k.Namespace, k.DestinationIps))
+			targetsPerNode = append(targetsPerNode, fmt.Sprintf("%s:%s:%s", k.Name, k.Namespace, k.ServiceMesh))
 		}
 
 		if err := createHelperPod(experimentsDetails, clients, chaosDetails, strings.Join(targetsPerNode, ";"), node, runID, args); err != nil {
@@ -320,6 +308,8 @@ func getPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, targets st
 		SetEnv("EXPERIMENT_NAME", experimentsDetails.ExperimentName).
 		SetEnv("SOCKET_PATH", experimentsDetails.SocketPath).
 		SetEnv("INSTANCE_ID", experimentsDetails.InstanceID).
+		SetEnv("DESTINATION_IPS", destIps).
+		SetEnv("DESTINATION_IPS_SERVICE_MESH", destIpsSvcMesh).
 		SetEnvFromDownwardAPI("v1", "metadata.name")
 
 	return envDetails.ENV
@@ -330,9 +320,9 @@ type targetsDetails struct {
 }
 
 type target struct {
-	Namespace      string
-	Name           string
-	DestinationIps string
+	Namespace   string
+	Name        string
+	ServiceMesh string
 }
 
 // GetTargetIps return the comma separated target ips
@@ -447,33 +437,37 @@ func isServiceMeshEnabledForPod(pod apiv1.Pod) bool {
 	return false
 }
 
-func getDestIps(pod apiv1.Pod, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) (string, error) {
+func setDestIps(pod apiv1.Pod, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) (string, error) {
 	var err error
 	if isServiceMeshEnabledForPod(pod) {
 		if destIpsSvcMesh == "" {
 			destIpsSvcMesh, err = GetTargetIps(experimentsDetails.DestinationIPs, experimentsDetails.DestinationHosts, clients, true)
 			if err != nil {
-				return "", err
+				return "false", err
 			}
 		}
-		return destIpsSvcMesh, nil
+		return "true", nil
 	}
-	return destIps, nil
+	destIps, err = GetTargetIps(experimentsDetails.DestinationIPs, experimentsDetails.DestinationHosts, clients, false)
+	if err != nil {
+		return "false", err
+	}
+	return "false", nil
 }
 
 func filterPodsForNodes(targetPodList apiv1.PodList, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) (map[string]*targetsDetails, error) {
 	targets := make(map[string]*targetsDetails)
 
 	for _, pod := range targetPodList.Items {
-		ips, err := getDestIps(pod, experimentsDetails, clients)
+		serviceMesh, err := setDestIps(pod, experimentsDetails, clients)
 		if err != nil {
 			return targets, err
 		}
 
 		td := target{
-			Name:           pod.Name,
-			Namespace:      pod.Namespace,
-			DestinationIps: ips,
+			Name:        pod.Name,
+			Namespace:   pod.Namespace,
+			ServiceMesh: serviceMesh,
 		}
 
 		if targets[pod.Spec.NodeName] == nil {

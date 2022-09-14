@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/litmuschaos/litmus-go/pkg/result"
+	"github.com/sirupsen/logrus"
 	"os"
 	"os/exec"
 	"strconv"
@@ -19,7 +20,6 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientTypes "k8s.io/apimachinery/pkg/types"
 )
@@ -97,22 +97,30 @@ func loop(targets []targetDetails, experimentsDetails *experimentTypes.Experimen
 
 	for duration < experimentsDetails.ChaosDuration {
 
+		var containerIds []string
+
 		for _, t := range targets {
 			t.RestartCountBefore, err = getRestartCount(t, clients)
 			if err != nil {
 				return err
 			}
 
-			t.ContainerId, err = common.GetContainerID(t.Namespace, t.Name, t.TargetContainer, clients)
+			containerId, err := common.GetContainerID(t.Namespace, t.Name, t.TargetContainer, clients)
 			if err != nil {
 				return err
 			}
+
+			log.InfoWithValues("[Info]: Details of application under chaos injection", logrus.Fields{
+				"PodName":            t.Name,
+				"ContainerName":      t.TargetContainer,
+				"RestartCountBefore": t.RestartCountBefore,
+			})
+
+			containerIds = append(containerIds, containerId)
 		}
 
-		for _, t := range targets {
-			if err := kill(experimentsDetails, t, clients, eventsDetails, chaosDetails); err != nil {
-				return err
-			}
+		if err := kill(experimentsDetails, containerIds, clients, eventsDetails, chaosDetails); err != nil {
+			return err
 		}
 
 		//Waiting for the chaos interval after chaos injection
@@ -135,13 +143,7 @@ func loop(targets []targetDetails, experimentsDetails *experimentTypes.Experimen
 	return nil
 }
 
-func kill(experimentsDetails *experimentTypes.ExperimentDetails, t targetDetails, clients clients.ClientSets, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-
-	log.InfoWithValues("[Info]: Details of application under chaos injection", logrus.Fields{
-		"PodName":            t.Name,
-		"ContainerName":      t.TargetContainer,
-		"RestartCountBefore": t.RestartCountBefore,
-	})
+func kill(experimentsDetails *experimentTypes.ExperimentDetails, containerIds []string, clients clients.ClientSets, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	// record the event inside chaosengine
 	if experimentsDetails.EngineName != "" {
@@ -152,11 +154,11 @@ func kill(experimentsDetails *experimentTypes.ExperimentDetails, t targetDetails
 
 	switch experimentsDetails.ContainerRuntime {
 	case "docker":
-		if err := stopDockerContainer(t.ContainerId, experimentsDetails.SocketPath, experimentsDetails.Signal); err != nil {
+		if err := stopDockerContainer(containerIds, experimentsDetails.SocketPath, experimentsDetails.Signal); err != nil {
 			return err
 		}
 	case "containerd", "crio":
-		if err := stopContainerdContainer(t.ContainerId, experimentsDetails.SocketPath, experimentsDetails.Signal); err != nil {
+		if err := stopContainerdContainer(containerIds, experimentsDetails.SocketPath, experimentsDetails.Signal); err != nil {
 			return err
 		}
 	default:
@@ -177,15 +179,15 @@ func validate(t targetDetails, timeout, delay int, clients clients.ClientSets) e
 }
 
 //stopContainerdContainer kill the application container
-func stopContainerdContainer(containerID, socketPath, signal string) error {
+func stopContainerdContainer(containerIDs []string, socketPath, signal string) error {
 	var errOut bytes.Buffer
 	var cmd *exec.Cmd
 	endpoint := "unix://" + socketPath
 	switch signal {
 	case "SIGKILL":
-		cmd = exec.Command("sudo", "crictl", "-i", endpoint, "-r", endpoint, "stop", "--timeout=0", string(containerID))
+		cmd = exec.Command("sudo", "crictl", "-i", endpoint, "-r", endpoint, "stop", "--timeout=0", strings.Join(containerIDs, " "))
 	case "SIGTERM":
-		cmd = exec.Command("sudo", "crictl", "-i", endpoint, "-r", endpoint, "stop", string(containerID))
+		cmd = exec.Command("sudo", "crictl", "-i", endpoint, "-r", endpoint, "stop", strings.Join(containerIDs, " "))
 	default:
 		return errors.Errorf("{%v} signal not supported, use either SIGTERM or SIGKILL", signal)
 	}
@@ -197,10 +199,10 @@ func stopContainerdContainer(containerID, socketPath, signal string) error {
 }
 
 //stopDockerContainer kill the application container
-func stopDockerContainer(containerID, socketPath, signal string) error {
+func stopDockerContainer(containerIDs []string, socketPath, signal string) error {
 	var errOut bytes.Buffer
 	host := "unix://" + socketPath
-	cmd := exec.Command("sudo", "docker", "--host", host, "kill", string(containerID), "--signal", signal)
+	cmd := exec.Command("sudo", "docker", "--host", host, "kill", strings.Join(containerIDs, " "), "--signal", signal)
 	cmd.Stderr = &errOut
 	if err := cmd.Run(); err != nil {
 		return errors.Errorf("Unable to run command, err: %v; error output: %v", err, errOut.String())
@@ -273,5 +275,4 @@ type targetDetails struct {
 	Namespace          string
 	TargetContainer    string
 	RestartCountBefore int
-	ContainerId        string
 }
