@@ -81,7 +81,7 @@ func killContainer(experimentsDetails *experimentTypes.ExperimentDetails, client
 		targets = append(targets, td)
 	}
 
-	if err := loop(targets, experimentsDetails, clients, eventsDetails, chaosDetails, resultDetails); err != nil {
+	if err := killIterations(targets, experimentsDetails, clients, eventsDetails, chaosDetails, resultDetails); err != nil {
 		return err
 	}
 
@@ -89,7 +89,7 @@ func killContainer(experimentsDetails *experimentTypes.ExperimentDetails, client
 	return nil
 }
 
-func loop(targets []targetDetails, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails) error {
+func killIterations(targets []targetDetails, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails) error {
 
 	//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
 	ChaosStartTimeStamp := time.Now()
@@ -133,7 +133,7 @@ func loop(targets []targetDetails, experimentsDetails *experimentTypes.Experimen
 			if err := validate(t, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
 				return err
 			}
-			if err := result.AnnotateChaosResult(resultDetails.Name, chaosDetails.ChaosNamespace, "targeted", "pod", experimentsDetails.TargetPods); err != nil {
+			if err := result.AnnotateChaosResult(resultDetails.Name, chaosDetails.ChaosNamespace, "targeted", "pod", t.Name); err != nil {
 				return err
 			}
 		}
@@ -180,17 +180,17 @@ func validate(t targetDetails, timeout, delay int, clients clients.ClientSets) e
 
 //stopContainerdContainer kill the application container
 func stopContainerdContainer(containerIDs []string, socketPath, signal string) error {
-	var errOut bytes.Buffer
-	var cmd *exec.Cmd
-	endpoint := "unix://" + socketPath
-	switch signal {
-	case "SIGKILL":
-		cmd = exec.Command("sudo", "crictl", "-i", endpoint, "-r", endpoint, "stop", "--timeout=0", strings.Join(containerIDs, " "))
-	case "SIGTERM":
-		cmd = exec.Command("sudo", "crictl", "-i", endpoint, "-r", endpoint, "stop", strings.Join(containerIDs, " "))
-	default:
+	if signal != "SIGKILL" && signal != "SIGTERM" {
 		return errors.Errorf("{%v} signal not supported, use either SIGTERM or SIGKILL", signal)
 	}
+
+	cmd := exec.Command("sudo", "crictl", "-i", fmt.Sprintf("unix://%s", socketPath), "-r", fmt.Sprintf("unix://%s", socketPath), "stop")
+	if signal == "SIGKILL" {
+		cmd.Args = append(cmd.Args, "--timeout=0")
+	}
+	cmd.Args = append(cmd.Args, containerIDs...)
+
+	var errOut bytes.Buffer
 	cmd.Stderr = &errOut
 	if err := cmd.Run(); err != nil {
 		return errors.Errorf("Unable to run command, err: %v; error output: %v", err, errOut.String())
@@ -201,8 +201,8 @@ func stopContainerdContainer(containerIDs []string, socketPath, signal string) e
 //stopDockerContainer kill the application container
 func stopDockerContainer(containerIDs []string, socketPath, signal string) error {
 	var errOut bytes.Buffer
-	host := "unix://" + socketPath
-	cmd := exec.Command("sudo", "docker", "--host", host, "kill", strings.Join(containerIDs, " "), "--signal", signal)
+	cmd := exec.Command("sudo", "docker", "--host", fmt.Sprintf("unix://%s", socketPath), "kill", "--signal", signal)
+	cmd.Args = append(cmd.Args, containerIDs...)
 	cmd.Stderr = &errOut
 	if err := cmd.Run(); err != nil {
 		return errors.Errorf("Unable to run command, err: %v; error output: %v", err, errOut.String())

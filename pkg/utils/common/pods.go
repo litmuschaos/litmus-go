@@ -372,8 +372,6 @@ func GetContainerID(appNamespace, targetPod, targetContainer string, clients cli
 			break
 		}
 	}
-
-	log.Infof("container ID of %v container, containerID: %v", targetContainer, containerID)
 	return containerID, nil
 }
 
