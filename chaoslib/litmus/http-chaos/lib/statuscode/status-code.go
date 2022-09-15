@@ -2,12 +2,14 @@ package statuscode
 
 import (
 	"fmt"
+	"math"
 	"math/rand"
 	"strconv"
 	"strings"
 	"time"
 
 	http_chaos "github.com/litmuschaos/litmus-go/chaoslib/litmus/http-chaos/lib"
+	body "github.com/litmuschaos/litmus-go/chaoslib/litmus/http-chaos/lib/modify-body"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/http-chaos/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
@@ -23,8 +25,12 @@ var acceptedStatusCodes = []string{
 	"500", "501", "502", "503", "504",
 }
 
-//PodHttpStatusCodeChaos contains the steps to prepare and inject http status code chaos
+// PodHttpStatusCodeChaos contains the steps to prepare and inject http status code chaos
 func PodHttpStatusCodeChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+
+	// responseBodyMaxLength defines the max length of response body string to be printed. It is taken as
+	// the min of length of body and 120 characters to avoid printing large response body.
+	responseBodyMaxLength := int(math.Min(float64(len(experimentsDetails.ResponseBody)), 120))
 
 	log.InfoWithValues("[Info]: The chaos tunables are:", logrus.Fields{
 		"Target Port":        experimentsDetails.TargetServicePort,
@@ -34,9 +40,15 @@ func PodHttpStatusCodeChaos(experimentsDetails *experimentTypes.ExperimentDetail
 		"Toxicity":           experimentsDetails.Toxicity,
 		"StatusCode":         experimentsDetails.StatusCode,
 		"ModifyResponseBody": experimentsDetails.ModifyResponseBody,
+		"ResponseBody":       experimentsDetails.ResponseBody[0:responseBodyMaxLength],
+		"Content Type":       experimentsDetails.ContentType,
+		"Content Encoding":   experimentsDetails.ContentEncoding,
 	})
 
-	args := fmt.Sprintf("-t status_code -a status_code=%s -a modify_response_body=%d", experimentsDetails.StatusCode, stringBoolToInt(experimentsDetails.ModifyResponseBody))
+	args := fmt.Sprintf(
+		`-t status_code -a status_code=%s -a modify_response_body=%d -a response_body="%v" -a content_type=%s -a content_encoding=%s`,
+		experimentsDetails.StatusCode, stringBoolToInt(experimentsDetails.ModifyResponseBody), body.EscapeQuotes(experimentsDetails.ResponseBody),
+		experimentsDetails.ContentType, experimentsDetails.ContentEncoding)
 	return http_chaos.PrepareAndInjectChaos(experimentsDetails, clients, resultDetails, eventsDetails, chaosDetails, args)
 }
 
