@@ -66,7 +66,7 @@ func GenerateExperiment(attributeFile, chartType, generationType, libType string
 	default:
 
 		// creating experiment dir & files
-		if err := createExperiment(experimentRootDIR, experimentDetails); err != nil {
+		if err := createExperiment(experimentRootDIR, experimentDetails, libType); err != nil {
 			return err
 		}
 
@@ -148,27 +148,37 @@ func copy(src, dest string) error {
 }
 
 // createExperimentFile creates the experiment file
-func createExperiment(experimentRootDIR string, experimentDetails types.Experiment) error {
+func createExperiment(experimentRootDIR string, experimentDetails types.Experiment, libType string) error {
+	var experimentTemplateName string
 	// create the experiment directory, if not present
 	experimentDIR := experimentRootDIR + "/experiment"
 	createDirectoryIfNotPresent(experimentDIR)
 
+	if libType == "helper" || libType == "exec" {
+		experimentTemplateName = "./templates/experiment_k8s.tmpl"
+	}
+	experimentTemplateName = fmt.Sprintf("./templates/experiment_%s.tmpl", libType)
 	// generating the experiement.go file
 	experimentFilePath := experimentDIR + "/" + experimentDetails.Name + ".go"
-	return generateFile(experimentDetails, experimentFilePath, "./templates/experiment.tmpl")
+	return generateFile(experimentDetails, experimentFilePath, experimentTemplateName)
 }
 
 // createChaosLib creates the chaoslib for the experiment
 func createChaosLib(litmusRootDir string, experimentDetails types.Experiment, libType string) error {
+	var chaosLibTemplateName string
 	// create the chaoslib directory, if not present
 	chaoslibRootDIR := litmusRootDir + "/chaoslib/litmus/" + experimentDetails.Name
 	createDirectoryIfNotPresent(chaoslibRootDIR)
 	chaoslibDIR := chaoslibRootDIR + "/lib"
 	createDirectoryIfNotPresent(chaoslibDIR)
 
+	if libType == "aws" || libType == "vmware" || libType == "gcp" || libType == "azure" {
+		chaosLibTemplateName = "./templates/chaoslib_non-k8s.tmpl"
+	}
+	chaosLibTemplateName = fmt.Sprintf("./templates/chaoslib_%s.tmpl", libType)
 	// generating the chaoslib file
 	chaoslibFilePath := chaoslibDIR + "/" + experimentDetails.Name + ".go"
-	return generateFile(experimentDetails, chaoslibFilePath, fmt.Sprintf("./templates/chaoslib_%s.tmpl", libType))
+	return generateFile(experimentDetails, chaoslibFilePath, chaosLibTemplateName)
 }
 
 // createENV creates the env getter and setter files
