@@ -82,17 +82,28 @@ func AbortWatcherWithoutExit(expname string, clients clients.ClientSets, resultD
 	log.Info("[Chaos]: Chaos Experiment Abortion started because of terminated signal received")
 	// updating the chaosresult after stopped
 	failStep := "Chaos injection stopped!"
+	log.Info("*********1********")
 	types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep)
-	result.ChaosResult(chaosDetails, clients, resultDetails, "EOT")
+	log.Infof("*********2********, result %v", *resultDetails)
+	if err := result.ChaosResult(chaosDetails, clients, resultDetails, "EOT"); err != nil {
+		log.Errorf("result err event, err: %v", err)
+	}
+	log.Info("chaosresult update successfully")
 
 	// generating summary event in chaosengine
 	msg := expname + " experiment has been aborted"
 	types.SetEngineEventAttributes(eventsDetails, types.Summary, msg, "Warning", chaosDetails)
-	events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
+	err := events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
+	if err != nil {
+		log.Errorf("engine event, err: %v", err)
+	}
 
 	// generating summary event in chaosresult
 	types.SetResultEventAttributes(eventsDetails, types.AbortVerdict, msg, "Warning", resultDetails)
-	events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosResult")
+	err = events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosResult")
+	if err != nil {
+		log.Errorf("result event, err: %v", err)
+	}
 }
 
 //GetIterations derive the iterations value from given parameters

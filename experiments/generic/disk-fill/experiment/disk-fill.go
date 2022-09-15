@@ -2,6 +2,8 @@ package experiment
 
 import (
 	"os"
+	"strconv"
+	"time"
 
 	"github.com/litmuschaos/chaos-operator/api/litmuschaos/v1alpha1"
 	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/disk-fill/lib"
@@ -209,4 +211,9 @@ func DiskFill(clients clients.ClientSets) {
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
+	log.Infof("sleep started")
+	s := types.Getenv("SLEEP", "10")
+	s1, _ := strconv.Atoi(s)
+	time.Sleep(time.Duration(s1) * time.Second)
+	log.Info("sleep over")
 }
