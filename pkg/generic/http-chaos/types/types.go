@@ -34,15 +34,19 @@ type ExperimentDetails struct {
 	SetHelperData                 string
 	Sequence                      string
 	NodeLabel                     string
-	NetworkInterface              string
-	TargetServicePort             int
-	Toxicity                      int
-	ProxyPort                     int
-	Latency                       int
-	StatusCode                    string
-	ModifyResponseBody            string
-	HeadersMap                    string
-	HeaderMode                    string
-	ResponseBody                  string
-	ResetTimeout                  int
+
+	NetworkInterface  string
+	TargetServicePort int
+	Toxicity          int
+	ProxyPort         int
+
+	Latency            int
+	ResetTimeout       int
+	StatusCode         string
+	ModifyResponseBody string
+	HeadersMap         string
+	HeaderMode         string
+	ResponseBody       string
+	ContentType        string
+	ContentEncoding    string
 }
