@@ -113,10 +113,10 @@ The *generate_experiment.go* script is a simple way to bootstrap your experiment
       - Provide the type of chaoslib in the `-t` flag. It supports the following values:
            - `exec`: It creates the exec based chaoslib(default type)
            - `helper`: It creates the helper based chaoslib
-           - `aws`: It creates experiment template for aws platform.
-           - `vmware`: It creates experiment template for vmware platform.
-           - `azure`: It creates experiment template for azure platform.
-           - `gcp`: It creates experiment template for gcp platform.
+           - `aws`: It creates sample experiment for aws platform.
+           - `vmware`: It creates sample experiment for vmware platform.
+           - `azure`: It creates sample experiment for azure platform.
+           - `gcp`: It creates sample experiment for gcp platform.
           
   - `chart`: Just the chaos-chart metadata, i.e., chartserviceversion.yaml
       - Provide the type of chart in the `-t` flag. It supports the following values:

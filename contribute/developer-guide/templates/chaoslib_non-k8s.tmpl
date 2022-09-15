@@ -174,8 +174,6 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 				// @TODO: user WAIT-FOR-CHAOS-INJECTION
 				// WAIT UNTIL THE CHAOS IS INJECTED COMPLETLY 
 
-                // @TODO: REPLACE THE TARGET WITH THE SERVICE UNDER CHAOS
-				common.SetTargets(id, "reverted", "TARGET", chaosDetails)
 			}
 
 			// run the probes during chaos
