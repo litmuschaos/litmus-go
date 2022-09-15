@@ -156,8 +156,9 @@ func createExperiment(experimentRootDIR string, experimentDetails types.Experime
 
 	if libType == "helper" || libType == "exec" {
 		experimentTemplateName = "./templates/experiment_k8s.tmpl"
+	} else {
+		experimentTemplateName = fmt.Sprintf("./templates/experiment_%s.tmpl", libType)
 	}
-	experimentTemplateName = fmt.Sprintf("./templates/experiment_%s.tmpl", libType)
 	// generating the experiement.go file
 	experimentFilePath := experimentDIR + "/" + experimentDetails.Name + ".go"
 	return generateFile(experimentDetails, experimentFilePath, experimentTemplateName)
@@ -174,8 +175,9 @@ func createChaosLib(litmusRootDir string, experimentDetails types.Experiment, li
 
 	if libType == "aws" || libType == "vmware" || libType == "gcp" || libType == "azure" {
 		chaosLibTemplateName = "./templates/chaoslib_non-k8s.tmpl"
+	} else {
+		chaosLibTemplateName = fmt.Sprintf("./templates/chaoslib_%s.tmpl", libType)
 	}
-	chaosLibTemplateName = fmt.Sprintf("./templates/chaoslib_%s.tmpl", libType)
 	// generating the chaoslib file
 	chaoslibFilePath := chaoslibDIR + "/" + experimentDetails.Name + ".go"
 	return generateFile(experimentDetails, chaoslibFilePath, chaosLibTemplateName)

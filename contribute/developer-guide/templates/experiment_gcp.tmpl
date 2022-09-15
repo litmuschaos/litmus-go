@@ -13,7 +13,6 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/cloud/gcp"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/result"
-	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/sirupsen/logrus"
@@ -73,7 +72,7 @@ func Experiment(clients clients.ClientSets){
 	go common.AbortWatcher(experimentsDetails.ExperimentName, clients, &resultDetails, &chaosDetails, &eventsDetails)
 
 	// Create a compute service to access the compute engine resources
-	computeService, err = gcp.GetGCPComputeService()
+	computeService, err := gcp.GetGCPComputeService()
 	if err != nil {
 		log.Errorf("failed to obtain a gcp compute service, err: %v", err)
 		failStep := "[pre-chaos]: Failed to obtain a gcp compute service, err: " + err.Error()

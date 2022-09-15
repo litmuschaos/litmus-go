@@ -9,10 +9,11 @@ import (
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/{{ .Category }}/{{ .Name }}/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/{{ .Category }}/{{ .Name }}/types"
 	"github.com/litmuschaos/litmus-go/pkg/types"
+	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/pkg/errors"
 )
 

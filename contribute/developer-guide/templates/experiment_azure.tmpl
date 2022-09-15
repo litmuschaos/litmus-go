@@ -14,7 +14,6 @@ import (
 	azureStatus "github.com/litmuschaos/litmus-go/pkg/cloud/azure/instance"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/result"
-	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/sirupsen/logrus"
@@ -28,6 +27,7 @@ func Experiment(clients clients.ClientSets){
 	eventsDetails := types.EventDetails{}
 	chaosDetails := types.ChaosDetails{}
 	
+	var err error
 	//Fetching all the ENV passed from the runner pod
 	log.Infof("[PreReq]: Getting the ENV for the %v experiment", os.Getenv("EXPERIMENT_NAME"))
 	experimentEnv.GetENV(&experimentsDetails)
@@ -87,7 +87,7 @@ func Experiment(clients clients.ClientSets){
     // POD STATUS CHECKS FOR THE APPLICATION UNDER TEST AND AUXILIARY APPLICATIONS ARE ADDED BY DEFAULT 
 
 	//Verify the azure target instance is running (pre-chaos)
-	if err = azureStatus.InstanceStatusCheckByName(experimentsDetails.TargetID, experimentsDetails.ScaleSet, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup); err != nil {
+	if err := azureStatus.InstanceStatusCheckByName(experimentsDetails.TargetID, experimentsDetails.ScaleSet, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup); err != nil {
 		log.Errorf("failed to get the azure instance status, err: %v", err)
 		failStep := "[pre-chaos]: Failed to verify the azure instance status, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
@@ -147,7 +147,7 @@ func Experiment(clients clients.ClientSets){
     // POD STATUS CHECKS FOR THE APPLICATION UNDER TEST AND AUXILIARY APPLICATIONS ARE ADDED BY DEFAULT 
 
 	//Verify the azure instance is running (post chaos)
-	if err = azureStatus.InstanceStatusCheckByName(experimentsDetails.TargetID, experimentsDetails.ScaleSet, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup); err != nil {
+	if err := azureStatus.InstanceStatusCheckByName(experimentsDetails.TargetID, experimentsDetails.ScaleSet, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup); err != nil {
 		log.Errorf("failed to get the azure instance status, err: %v", err)
 		failStep := "[pre-chaos]: Failed to update the azure instance status, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
