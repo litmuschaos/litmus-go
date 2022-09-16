@@ -251,7 +251,7 @@ func WaitForCompletion(appNs, appLabel string, clients clients.ClientSets, durat
 			if err != nil {
 				return errors.Errorf("Unable to find the pods with matching labels, err: %v", err)
 			} else if len(podList.Items) == 0 {
-				errors.Errorf("Unable to find the pods with matching labels")
+				return errors.Errorf("Unable to find the pods with matching labels")
 			}
 			// it will check for the status of helper pod, if it is Succeeded and target container is completed then it will marked it as completed and return
 			// if it is still running then it will check for the target container, as we can have multiple container inside helper pod (istio)
