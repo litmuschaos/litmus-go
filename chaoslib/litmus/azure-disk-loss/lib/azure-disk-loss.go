@@ -44,12 +44,11 @@ func PrepareChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients
 		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", experimentsDetails.RampTime)
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
-
-	//get the disk name  or list of disk names
-	diskNameList := strings.Split(experimentsDetails.VirtualDiskNames, ",")
-	if len(diskNameList) == 0 {
+	if experimentsDetails.VirtualDiskNames == "" {
 		return errors.Errorf("no volume names found to detach")
 	}
+	//get the disk name  or list of disk names
+	diskNameList := strings.Split(experimentsDetails.VirtualDiskNames, ",")
 	instanceNamesWithDiskNames, err := diskStatus.GetInstanceNameForDisks(diskNameList, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup)
 
 	if err != nil {

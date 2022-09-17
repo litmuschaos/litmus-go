@@ -50,11 +50,11 @@ func PrepareAWSSSMChaosByID(experimentsDetails *experimentTypes.ExperimentDetail
 	// watching for the abort signal and revert the chaos
 	go lib.AbortWatcher(experimentsDetails, abort)
 
-	//get the instance id or list of instance ids
-	instanceIDList := strings.Split(experimentsDetails.EC2InstanceID, ",")
-	if len(instanceIDList) == 0 {
+	if experimentsDetails.EC2InstanceID == "" {
 		return errors.Errorf("no instance id found for chaos injection")
 	}
+	//get the instance id or list of instance ids
+	instanceIDList := strings.Split(experimentsDetails.EC2InstanceID, ",")
 
 	switch strings.ToLower(experimentsDetails.Sequence) {
 	case "serial":

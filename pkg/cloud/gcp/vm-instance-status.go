@@ -26,16 +26,18 @@ func GetVMInstanceStatus(computeService *compute.Service, instanceName string, g
 // InstanceStatusCheckByName is used to check the status of all the VM instances under chaos
 func InstanceStatusCheckByName(computeService *compute.Service, managedInstanceGroup string, delay, timeout int, check string, instanceNames string, gcpProjectId string, instanceZones string) error {
 
+	if instanceNames == "" {
+		return errors.Errorf("no vm instance name found to stop")
+	}
 	instanceNamesList := strings.Split(instanceNames, ",")
 
+	if instanceZones == "" {
+		return errors.Errorf("no corresponding zones found for the instances")
+	}
 	instanceZonesList := strings.Split(instanceZones, ",")
 
 	if managedInstanceGroup != "enable" && managedInstanceGroup != "disable" {
 		return errors.Errorf("invalid value for MANAGED_INSTANCE_GROUP: %v", managedInstanceGroup)
-	}
-
-	if len(instanceNamesList) == 0 {
-		return errors.Errorf("no vm instance name found to stop")
 	}
 
 	if len(instanceNamesList) != len(instanceZonesList) {

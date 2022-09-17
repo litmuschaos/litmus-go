@@ -41,12 +41,11 @@ func PrepareEC2TerminateByID(experimentsDetails *experimentTypes.ExperimentDetai
 		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", experimentsDetails.RampTime)
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
-
-	//get the instance id or list of instance ids
-	instanceIDList := strings.Split(experimentsDetails.Ec2InstanceID, ",")
-	if len(instanceIDList) == 0 {
+	if experimentsDetails.Ec2InstanceID == "" {
 		return errors.Errorf("no instance id found to terminate")
 	}
+	//get the instance id or list of instance ids
+	instanceIDList := strings.Split(experimentsDetails.Ec2InstanceID, ",")
 
 	// watching for the abort signal and revert the chaos
 	go abortWatcher(experimentsDetails, instanceIDList, chaosDetails)

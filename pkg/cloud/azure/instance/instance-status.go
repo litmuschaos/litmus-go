@@ -71,10 +71,10 @@ func GetAzureScaleSetInstanceStatus(subscriptionID, resourceGroup, virtualMachin
 
 // InstanceStatusCheckByName is used to check the instance status of all the instance under chaos
 func InstanceStatusCheckByName(azureInstanceNames, scaleSet, subscriptionID, resourceGroup string) error {
-	instanceNameList := strings.Split(azureInstanceNames, ",")
-	if len(instanceNameList) == 0 {
+	if azureInstanceNames == "" {
 		return errors.Errorf("no instance found to check the status")
 	}
+	instanceNameList := strings.Split(azureInstanceNames, ",")
 	log.Infof("[Info]: The instance under chaos(IUC) are: %v", instanceNameList)
 	switch scaleSet {
 	case "enable":

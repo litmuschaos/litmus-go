@@ -103,15 +103,16 @@ func DiskVolumeStateCheck(computeService *compute.Service, experimentsDetails *e
 		return errors.Errorf("no gcp project id provided, please provide the project id")
 	}
 
-	diskNamesList := strings.Split(experimentsDetails.DiskVolumeNames, ",")
-	if len(diskNamesList) == 0 {
+	if experimentsDetails.DiskVolumeNames == "" {
 		return errors.Errorf("no disk name provided, please provide the name of the disk")
 	}
 
-	zonesList := strings.Split(experimentsDetails.Zones, ",")
-	if len(zonesList) == 0 {
+	diskNamesList := strings.Split(experimentsDetails.DiskVolumeNames, ",")
+	if experimentsDetails.Zones == "" {
 		return errors.Errorf("no zone provided, please provide the zone of the disk")
 	}
+
+	zonesList := strings.Split(experimentsDetails.Zones, ",")
 
 	if len(diskNamesList) != len(zonesList) {
 		return errors.Errorf("unequal number of disk names and zones found, please verify the input details")
