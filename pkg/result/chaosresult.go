@@ -92,7 +92,7 @@ func InitializeChaosResult(chaosDetails *types.ChaosDetails, clients clients.Cli
 				Verdict:                resultDetails.Verdict,
 				ProbeSuccessPercentage: "Awaited",
 			},
-			ProbeStatus: probeStatus,
+			ProbeStatuses: probeStatus,
 			History: &v1alpha1.HistoryDetails{
 				PassedRuns:  0,
 				FailedRuns:  0,
@@ -125,14 +125,15 @@ func InitializeChaosResult(chaosDetails *types.ChaosDetails, clients clients.Cli
 }
 
 //GetProbeStatus fetch status of all probes
-func GetProbeStatus(resultDetails *types.ResultDetails) (bool, []v1alpha1.ProbeStatus) {
+func GetProbeStatus(resultDetails *types.ResultDetails) (bool, []v1alpha1.ProbeStatuses) {
 	isAllProbePassed := true
 
-	probeStatus := []v1alpha1.ProbeStatus{}
+	probeStatus := []v1alpha1.ProbeStatuses{}
 	for _, probe := range resultDetails.ProbeDetails {
-		probes := v1alpha1.ProbeStatus{}
+		probes := v1alpha1.ProbeStatuses{}
 		probes.Name = probe.Name
 		probes.Type = probe.Type
+		probes.Mode = probe.Mode
 		probes.Status = probe.Status
 		probeStatus = append(probeStatus, probes)
 		if probe.Phase == "Failed" {
@@ -156,7 +157,7 @@ func updateResultAttributes(clients clients.ClientSets, chaosDetails *types.Chao
 	// for existing chaos result resource it will patch the label
 	result.ObjectMeta.Labels = chaosResultLabel
 	result.Status.History.Targets = chaosDetails.Targets
-	isAllProbePassed, result.Status.ProbeStatus = GetProbeStatus(resultDetails)
+	isAllProbePassed, result.Status.ProbeStatuses = GetProbeStatus(resultDetails)
 	result.Status.ExperimentStatus.Verdict = resultDetails.Verdict
 
 	switch strings.ToLower(string(resultDetails.Phase)) {
@@ -171,7 +172,7 @@ func updateResultAttributes(clients clients.ClientSets, chaosDetails *types.Chao
 			result.Status.History.PassedRuns++
 		case "fail":
 			result.Status.History.FailedRuns++
-			probe.SetProbeVerdictAfterFailure(resultDetails)
+			probe.SetProbeVerdictAfterFailure(result)
 			if len(resultDetails.ProbeDetails) != 0 {
 				result.Status.ExperimentStatus.ProbeSuccessPercentage = strconv.Itoa((resultDetails.PassedProbeCount * 100) / len(resultDetails.ProbeDetails))
 			} else {
@@ -179,7 +180,7 @@ func updateResultAttributes(clients clients.ClientSets, chaosDetails *types.Chao
 			}
 		case "stopped":
 			result.Status.History.StoppedRuns++
-			probe.SetProbeVerdictAfterFailure(resultDetails)
+			probe.SetProbeVerdictAfterFailure(result)
 			if len(resultDetails.ProbeDetails) != 0 {
 				result.Status.ExperimentStatus.ProbeSuccessPercentage = strconv.Itoa((resultDetails.PassedProbeCount * 100) / len(resultDetails.ProbeDetails))
 			} else {
