@@ -15,6 +15,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
+	"github.com/litmuschaos/litmus-go/pkg/result"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/spring-boot/spring-boot-chaos/types"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
@@ -252,15 +253,15 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 					log.Info("[Chaos]: Revert Started")
 					if err := disableChaosMonkey(experimentsDetails.ChaosMonkeyPort, experimentsDetails.ChaosMonkeyPath, pod); err != nil {
 						log.Errorf("Error in disabling chaos monkey, err: %v", err)
-					} else{
-					 common.SetTargets(pod.Name, "reverted", "pod", chaosDetails)
+					} else {
+						common.SetTargets(pod.Name, "reverted", "pod", chaosDetails)
 					}
-			    // updating the chaosresult after stopped
-			      failStep := "Chaos injection stopped!"
-			     types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep)
-			     result.ChaosResult(chaosDetails, clients, resultDetails, "EOT")
-			     log.Info("[Chaos]: Revert Completed")
-			    os.Exit(1)
+					// updating the chaosresult after stopped
+					failStep := "Chaos injection stopped!"
+					types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep)
+					result.ChaosResult(chaosDetails, clients, resultDetails, "EOT")
+					log.Info("[Chaos]: Revert Completed")
+					os.Exit(1)
 				case <-endTime:
 					log.Infof("[Chaos]: Time is up for experiment: %v", experimentsDetails.ExperimentName)
 					endTime = nil
@@ -344,11 +345,11 @@ loop:
 				}
 			}
 			// updating the chaosresult after stopped
-			      failStep := "Chaos injection stopped!"
-			     types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep)
-			     result.ChaosResult(chaosDetails, clients, resultDetails, "EOT")
-			     log.Info("[Chaos]: Revert Completed")
-			    os.Exit(1)
+			failStep := "Chaos injection stopped!"
+			types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep)
+			result.ChaosResult(chaosDetails, clients, resultDetails, "EOT")
+			log.Info("[Chaos]: Revert Completed")
+			os.Exit(1)
 		case <-endTime:
 			log.Infof("[Chaos]: Time is up for experiment: %v", experimentsDetails.ExperimentName)
 			endTime = nil
