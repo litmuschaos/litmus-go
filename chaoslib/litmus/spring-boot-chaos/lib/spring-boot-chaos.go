@@ -252,9 +252,15 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 					log.Info("[Chaos]: Revert Started")
 					if err := disableChaosMonkey(experimentsDetails.ChaosMonkeyPort, experimentsDetails.ChaosMonkeyPath, pod); err != nil {
 						log.Errorf("Error in disabling chaos monkey, err: %v", err)
-						os.Exit(1)
+					} else{
+					 common.SetTargets(pod.Name, "reverted", "pod", chaosDetails)
 					}
-					common.SetTargets(pod.Name, "reverted", "pod", chaosDetails)
+			    // updating the chaosresult after stopped
+			      failStep := "Chaos injection stopped!"
+			     types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep)
+			     result.ChaosResult(chaosDetails, clients, resultDetails, "EOT")
+			     log.Info("[Chaos]: Revert Completed")
+			    os.Exit(1)
 				case <-endTime:
 					log.Infof("[Chaos]: Time is up for experiment: %v", experimentsDetails.ExperimentName)
 					endTime = nil
@@ -337,7 +343,12 @@ loop:
 					common.SetTargets(pod.Name, "reverted", "pod", chaosDetails)
 				}
 			}
-			os.Exit(1)
+			// updating the chaosresult after stopped
+			      failStep := "Chaos injection stopped!"
+			     types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep)
+			     result.ChaosResult(chaosDetails, clients, resultDetails, "EOT")
+			     log.Info("[Chaos]: Revert Completed")
+			    os.Exit(1)
 		case <-endTime:
 			log.Infof("[Chaos]: Time is up for experiment: %v", experimentsDetails.ExperimentName)
 			endTime = nil

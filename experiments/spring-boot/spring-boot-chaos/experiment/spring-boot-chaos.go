@@ -68,7 +68,7 @@ func Experiment(clients clients.ClientSets) {
 	})
 
 	// Calling AbortWatcher go routine, it will continuously watch for the abort signal and generate the required events and result
-	go common.AbortWatcher(experimentsDetails.ExperimentName, clients, &resultDetails, &chaosDetails, &eventsDetails)
+	go common.AbortWatcherWithoutExit(experimentsDetails.ExperimentName, clients, &resultDetails, &chaosDetails, &eventsDetails)
 
 	// Select targeted pods
 	log.Infof("[PreCheck]: Geting targeted pods list")
@@ -98,6 +98,7 @@ func Experiment(clients clients.ClientSets) {
 	}
 
 	//PRE-CHAOS APPLICATION STATUS CHECK
+	if chaosDetails.DefaultAppHealthCheck {
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (pre-chaos)")
 	if err := status.AUTStatusCheck(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.TargetContainer, experimentsDetails.Timeout, experimentsDetails.Delay, clients, &chaosDetails); err != nil {
 		log.Errorf("Application status check failed, err: %v", err)
@@ -107,6 +108,7 @@ func Experiment(clients clients.ClientSets) {
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
+}
 
 	if experimentsDetails.EngineName != "" {
 		// marking AUT as running, as we already checked the status of application under test
@@ -150,6 +152,7 @@ func Experiment(clients clients.ClientSets) {
 	resultDetails.Verdict = v1alpha1.ResultVerdictPassed
 
 	// POST-CHAOS APPLICATION STATUS CHECK
+	if chaosDetails.DefaultAppHealthCheck {
 	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (post-chaos)")
 	if err := status.AUTStatusCheck(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.TargetContainer, experimentsDetails.Timeout, experimentsDetails.Delay, clients, &chaosDetails); err != nil {
 		log.Errorf("Application status check failed, err: %v", err)
@@ -158,6 +161,7 @@ func Experiment(clients clients.ClientSets) {
 		_ = events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
+	}
 	}
 
 	if experimentsDetails.EngineName != "" {
