@@ -3,6 +3,7 @@ package lib
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	corev1 "k8s.io/api/core/v1"
 	"net/http"
 	"os"
@@ -22,6 +23,14 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
+
+var revertAssault = experimentTypes.ChaosMonkeyAssaultRevert{
+	LatencyActive:         false,
+	KillApplicationActive: false,
+	CPUActive:             false,
+	MemoryActive:          false,
+	ExceptionsActive:      false,
+}
 
 // SetTargetPodList selects the targeted pod and add them to the experimentDetails
 func SetTargetPodList(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
@@ -147,25 +156,16 @@ func setChaosMonkeyWatchers(chaosMonkeyPort string, chaosMonkeyPath string, watc
 	return nil
 }
 
-func setChaosMonkeyAssault(chaosMonkeyPort string, chaosMonkeyPath string, assault experimentTypes.ChaosMonkeyAssault, pod corev1.Pod) error {
-	log.Infof("[Chaos]: Setting Chaos Monkey assault on pod: %v", pod.Name)
-
+func startAssault(chaosMonkeyPort string, chaosMonkeyPath string, assault experimentTypes.ChaosMonkeyAssault, pod corev1.Pod) error {
 	jsonValue, err := json.Marshal(assault)
 	if err != nil {
 		return err
 	}
-
-	resp, err := http.Post("http://"+pod.Status.PodIP+":"+chaosMonkeyPort+chaosMonkeyPath+"/assaults", "application/json", bytes.NewBuffer(jsonValue))
-	if err != nil {
+	if err := setChaosMonkeyAssault(chaosMonkeyPort, chaosMonkeyPath, jsonValue, pod); err != nil {
 		return err
 	}
-
-	if resp.StatusCode != 200 {
-		return errors.Errorf("failed to set assault on pod %v (status: %v)", pod.Name, resp.StatusCode)
-	}
-
 	log.Infof("[Chaos]: Activating Chaos Monkey assault on pod: %v", pod.Name)
-	resp, err = http.Post("http://"+pod.Status.PodIP+":"+chaosMonkeyPort+chaosMonkeyPath+"/assaults/runtime/attack", "", nil)
+	resp, err := http.Post("http://"+pod.Status.PodIP+":"+chaosMonkeyPort+chaosMonkeyPath+"/assaults/runtime/attack", "", nil)
 	if err != nil {
 		return err
 	}
@@ -173,13 +173,35 @@ func setChaosMonkeyAssault(chaosMonkeyPort string, chaosMonkeyPath string, assau
 	if resp.StatusCode != 200 {
 		return errors.Errorf("failed to activate runtime attack on pod %v (status: %v)", pod.Name, resp.StatusCode)
 	}
+	return nil
+}
 
+func setChaosMonkeyAssault(chaosMonkeyPort string, chaosMonkeyPath string, assault []byte, pod corev1.Pod) error {
+	log.Infof("[Chaos]: Setting Chaos Monkey assault on pod: %v", pod.Name)
+
+	resp, err := http.Post("http://"+pod.Status.PodIP+":"+chaosMonkeyPort+chaosMonkeyPath+"/assaults", "application/json", bytes.NewBuffer(assault))
+	if err != nil {
+		return err
+	}
+
+	if resp.StatusCode != 200 {
+		return errors.Errorf("failed to set assault on pod %v (status: %v)", pod.Name, resp.StatusCode)
+	}
 	return nil
 }
 
 // disableChaosMonkey disables chaos monkey on selected pods
 func disableChaosMonkey(chaosMonkeyPort string, chaosMonkeyPath string, pod corev1.Pod) error {
-	log.Infof("[Chaos]: disabling chaos monkey on pods %v", pod.Name)
+	log.Infof("[Chaos]: disabling assaults on pod %v", pod.Name)
+	jsonValue, err := json.Marshal(revertAssault)
+	if err != nil {
+		return err
+	}
+	if err := setChaosMonkeyAssault(chaosMonkeyPort, chaosMonkeyPath, jsonValue, pod); err != nil {
+		return err
+	}
+
+	log.Infof("[Chaos]: disabling chaos monkey on pod %v", pod.Name)
 	resp, err := http.Post("http://"+pod.Status.PodIP+":"+chaosMonkeyPort+chaosMonkeyPath+"/disable", "", nil)
 	if err != nil {
 		return err
@@ -232,7 +254,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 				return err
 			}
 
-			if err := setChaosMonkeyAssault(experimentsDetails.ChaosMonkeyPort, experimentsDetails.ChaosMonkeyPath, experimentsDetails.ChaosMonkeyAssault, pod); err != nil {
+			if err := startAssault(experimentsDetails.ChaosMonkeyPort, experimentsDetails.ChaosMonkeyPath, experimentsDetails.ChaosMonkeyAssault, pod); err != nil {
 				log.Errorf("[Chaos]: Failed to set assault, err: %v ", err)
 				return err
 			}
@@ -268,11 +290,12 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 					break loop
 				}
 			}
+
 			if err := disableChaosMonkey(experimentsDetails.ChaosMonkeyPort, experimentsDetails.ChaosMonkeyPath, pod); err != nil {
-				log.Errorf("Error in disabling chaos monkey, err: %v", err)
-			} else {
-				common.SetTargets(pod.Name, "reverted", "pod", chaosDetails)
+				return fmt.Errorf("error in disabling chaos monkey, err: %v", err)
 			}
+
+			common.SetTargets(pod.Name, "reverted", "pod", chaosDetails)
 		}
 	}
 	return nil
@@ -318,7 +341,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 				return errors.Errorf("[Chaos]: Failed to set watchers, err: %v ", err)
 			}
 
-			if err := setChaosMonkeyAssault(experimentsDetails.ChaosMonkeyPort, experimentsDetails.ChaosMonkeyPath, experimentsDetails.ChaosMonkeyAssault, pod); err != nil {
+			if err := startAssault(experimentsDetails.ChaosMonkeyPort, experimentsDetails.ChaosMonkeyPath, experimentsDetails.ChaosMonkeyAssault, pod); err != nil {
 				log.Errorf("[Chaos]: Failed to set assault, err: %v ", err)
 				return err
 			}
@@ -356,12 +379,18 @@ loop:
 			break loop
 		}
 	}
+
+	var errorList []string
 	for _, pod := range experimentsDetails.TargetPodList.Items {
 		if err := disableChaosMonkey(experimentsDetails.ChaosMonkeyPort, experimentsDetails.ChaosMonkeyPath, pod); err != nil {
-			log.Errorf("Error in disabling chaos monkey, err: %v", err)
-		} else {
-			common.SetTargets(pod.Name, "reverted", "pod", chaosDetails)
+			errorList = append(errorList, err.Error())
+			continue
 		}
+		common.SetTargets(pod.Name, "reverted", "pod", chaosDetails)
+	}
+
+	if len(errorList) != 0 {
+		return fmt.Errorf("error in disabling chaos monkey, err: %v", strings.Join(errorList, ", "))
 	}
 	return nil
 }

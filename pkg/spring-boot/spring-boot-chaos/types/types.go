@@ -36,6 +36,14 @@ type ExperimentDetails struct {
 	ChaosMonkeyPort     string
 }
 
+type ChaosMonkeyAssaultRevert struct {
+	LatencyActive         bool `json:"latencyActive"`
+	KillApplicationActive bool `json:"killApplicationActive"`
+	MemoryActive          bool `json:"memoryActive"`
+	CPUActive             bool `json:"cpuActive"`
+	ExceptionsActive      bool `json:"exceptionsActive"`
+}
+
 type ChaosMonkeyAssault struct {
 	Level                              int              `json:"level"`
 	Deterministic                      bool             `json:"deterministic"`
