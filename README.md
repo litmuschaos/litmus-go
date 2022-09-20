@@ -36,4 +36,5 @@ Head over to the [Contribution guide](CONTRIBUTING.md)
 ## License
 Here is a copy of the License: [`License`](LICENSE) 
 
+## License Status and Vulnerability Check
 [![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Flitmuschaos%2Flitmus-go.svg?type=large)](https://app.fossa.io/projects/git%2Bgithub.com%2Flitmuschaos%2Flitmus-go?ref=badge_large)
