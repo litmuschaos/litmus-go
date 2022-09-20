@@ -136,7 +136,7 @@ func GetProbeStatus(resultDetails *types.ResultDetails) (bool, []v1alpha1.ProbeS
 		probes.Mode = probe.Mode
 		probes.Status = probe.Status
 		probeStatus = append(probeStatus, probes)
-		if probe.Phase == "Failed" {
+		if probe.Status.Verdict == v1alpha1.ProbeVerdictFailed {
 			isAllProbePassed = false
 		}
 	}

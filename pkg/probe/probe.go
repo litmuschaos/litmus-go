@@ -137,7 +137,6 @@ func InitializeProbesInChaosResultDetails(chaosDetails *types.ChaosDetails, clie
 		tempProbe.Name = probe.Name
 		tempProbe.Type = probe.Type
 		tempProbe.Mode = probe.Mode
-		tempProbe.Phase = "N/A"
 		tempProbe.RunCount = 0
 		tempProbe.Status = v1alpha1.ProbeStatus{
 			Verdict: "Awaited",
