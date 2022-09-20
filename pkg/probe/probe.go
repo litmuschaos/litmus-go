@@ -58,8 +58,10 @@ func RunProbes(chaosDetails *types.ChaosDetails, clients clients.ClientSets, res
 		}
 		// executes the eot and edge modes
 		for _, probe := range probes {
-			if err := execute(probe, chaosDetails, clients, resultDetails, phase); err != nil {
-				return err
+			if strings.ToLower(probe.Mode) != "onchaos" && strings.ToLower(probe.Mode) != "continuous" {
+				if err := execute(probe, chaosDetails, clients, resultDetails, phase); err != nil {
+					return err
+				}
 			}
 		}
 	}
