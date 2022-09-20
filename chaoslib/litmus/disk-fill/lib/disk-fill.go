@@ -135,7 +135,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		}
 
 		runID := common.GetRunID()
-		if err := createHelperPod(experimentsDetails, clients, chaosDetails, fmt.Sprintf("%s:%s", pod.Name, pod.Namespace), pod.Spec.NodeName, runID); err != nil {
+		if err := createHelperPod(experimentsDetails, clients, chaosDetails, fmt.Sprintf("%s:%s:%s", pod.Name, pod.Namespace, experimentsDetails.TargetContainer), pod.Spec.NodeName, runID); err != nil {
 			return errors.Errorf("unable to create the helper pod, err: %v", err)
 		}
 
@@ -180,12 +180,12 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 	}
 
 	runID := common.GetRunID()
-	targets := common.FilterPodsForNodes(targetPodList)
+	targets := common.FilterPodsForNodes(targetPodList, experimentsDetails.TargetContainer)
 
 	for node, tar := range targets {
 		var targetsPerNode []string
 		for _, k := range tar.Target {
-			targetsPerNode = append(targetsPerNode, fmt.Sprintf("%s:%s", k.Name, k.Namespace))
+			targetsPerNode = append(targetsPerNode, fmt.Sprintf("%s:%s:%s", k.Name, k.Namespace, k.TargetContainer))
 		}
 
 		if err := createHelperPod(experimentsDetails, clients, chaosDetails, strings.Join(targetsPerNode, ";"), node, runID); err != nil {

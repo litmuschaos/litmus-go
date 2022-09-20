@@ -515,15 +515,21 @@ func getTargetPodsWhenNodeFilterSet(podAffPerc int, clients clients.ClientSets, 
 	return realPods, nil
 }
 
-func FilterPodsForNodes(targetPodList core_v1.PodList) map[string]*TargetsDetails {
+func FilterPodsForNodes(targetPodList core_v1.PodList, containerName string) map[string]*TargetsDetails {
 	targets := make(map[string]*TargetsDetails)
 
 	for _, pod := range targetPodList.Items {
 
 		td := target{
-			Name:      pod.Name,
-			Namespace: pod.Namespace,
+			Name:            pod.Name,
+			Namespace:       pod.Namespace,
+			TargetContainer: containerName,
 		}
+
+		if td.TargetContainer == "" {
+			td.TargetContainer = pod.Spec.Containers[0].Name
+		}
+
 		if targets[pod.Spec.NodeName] == nil {
 			targets[pod.Spec.NodeName] = &TargetsDetails{
 				Target: []target{td},
@@ -540,6 +546,7 @@ type TargetsDetails struct {
 }
 
 type target struct {
-	Namespace string
-	Name      string
+	Namespace       string
+	Name            string
+	TargetContainer string
 }

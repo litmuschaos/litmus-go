@@ -134,7 +134,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 
 		runID := common.GetRunID()
 
-		if err := createHelperPod(experimentsDetails, clients, chaosDetails, fmt.Sprintf("%s:%s:%s", pod.Name, pod.Namespace, serviceMesh), pod.Spec.NodeName, runID, args); err != nil {
+		if err := createHelperPod(experimentsDetails, clients, chaosDetails, fmt.Sprintf("%s:%s:%s:%s", pod.Name, pod.Namespace, experimentsDetails.TargetContainer, serviceMesh), pod.Spec.NodeName, runID, args); err != nil {
 			return errors.Errorf("unable to create the helper pod, err: %v", err)
 		}
 
@@ -187,7 +187,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 	for node, tar := range targets {
 		var targetsPerNode []string
 		for _, k := range tar.Target {
-			targetsPerNode = append(targetsPerNode, fmt.Sprintf("%s:%s:%s", k.Name, k.Namespace, k.ServiceMesh))
+			targetsPerNode = append(targetsPerNode, fmt.Sprintf("%s:%s:%s:%s", k.Name, k.Namespace, k.TargetContainer, k.ServiceMesh))
 		}
 
 		if err := createHelperPod(experimentsDetails, clients, chaosDetails, strings.Join(targetsPerNode, ";"), node, runID, args); err != nil {
@@ -297,7 +297,6 @@ func getPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, targets st
 
 	var envDetails common.ENVDetails
 	envDetails.SetEnv("TARGETS", targets).
-		SetEnv("APP_CONTAINER", experimentsDetails.TargetContainer).
 		SetEnv("TOTAL_CHAOS_DURATION", strconv.Itoa(experimentsDetails.ChaosDuration)).
 		SetEnv("CHAOS_NAMESPACE", experimentsDetails.ChaosNamespace).
 		SetEnv("CHAOSENGINE", experimentsDetails.EngineName).
@@ -320,9 +319,10 @@ type targetsDetails struct {
 }
 
 type target struct {
-	Namespace   string
-	Name        string
-	ServiceMesh string
+	Namespace       string
+	Name            string
+	TargetContainer string
+	ServiceMesh     string
 }
 
 // GetTargetIps return the comma separated target ips
@@ -457,6 +457,7 @@ func setDestIps(pod apiv1.Pod, experimentsDetails *experimentTypes.ExperimentDet
 
 func filterPodsForNodes(targetPodList apiv1.PodList, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) (map[string]*targetsDetails, error) {
 	targets := make(map[string]*targetsDetails)
+	targetContainer := experimentsDetails.TargetContainer
 
 	for _, pod := range targetPodList.Items {
 		serviceMesh, err := setDestIps(pod, experimentsDetails, clients)
@@ -464,10 +465,15 @@ func filterPodsForNodes(targetPodList apiv1.PodList, experimentsDetails *experim
 			return targets, err
 		}
 
+		if targetContainer == "" {
+			targetContainer = pod.Spec.Containers[0].Name
+		}
+
 		td := target{
-			Name:        pod.Name,
-			Namespace:   pod.Namespace,
-			ServiceMesh: serviceMesh,
+			Name:            pod.Name,
+			Namespace:       pod.Namespace,
+			TargetContainer: targetContainer,
+			ServiceMesh:     serviceMesh,
 		}
 
 		if targets[pod.Spec.NodeName] == nil {

@@ -237,7 +237,6 @@ func PatchChaosResult(clients clients.ClientSets, chaosDetails *types.ChaosDetai
 		Times(90).
 		Wait(2 * time.Second).
 		Try(func(attempt uint) error {
-			log.Info("*********21********")
 			_, err := clients.LitmusClient.ChaosResults(result.Namespace).Update(context.Background(), result, v1.UpdateOptions{})
 			if err != nil {
 				log.Errorf("err: %v", err)

@@ -77,20 +77,13 @@ func diskFill(experimentsDetails *experimentTypes.ExperimentDetails, clients cli
 
 	for _, t := range strings.Split(targetEnv, ";") {
 		target := strings.Split(t, ":")
-		if len(target) != 2 {
-			return fmt.Errorf("unsupported target: '%v', provide target in '<name>:<namespace>", target)
+		if len(target) != 3 {
+			return fmt.Errorf("unsupported target: '%v', provide target in '<name>:<namespace>:<containerName>", target)
 		}
 		td := targetDetails{
 			Name:            target[0],
 			Namespace:       target[1],
-			TargetContainer: experimentsDetails.TargetContainer,
-		}
-
-		if td.TargetContainer == "" {
-			td.TargetContainer, err = common.GetTargetContainer(td.Namespace, td.Name, clients)
-			if err != nil {
-				return errors.Errorf("unable to get the target container name, err: %v", err)
-			}
+			TargetContainer: target[2],
 		}
 
 		// Derive the container id of the target container
@@ -273,7 +266,6 @@ func remedy(t targetDetails, clients clients.ClientSets) error {
 func getENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.ExperimentName = types.Getenv("EXPERIMENT_NAME", "")
 	experimentDetails.InstanceID = types.Getenv("INSTANCE_ID", "")
-	experimentDetails.TargetContainer = types.Getenv("APP_CONTAINER", "")
 	experimentDetails.ChaosDuration, _ = strconv.Atoi(types.Getenv("TOTAL_CHAOS_DURATION", "30"))
 	experimentDetails.ChaosNamespace = types.Getenv("CHAOS_NAMESPACE", "litmus")
 	experimentDetails.EngineName = types.Getenv("CHAOSENGINE", "")
