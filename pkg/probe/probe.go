@@ -68,36 +68,27 @@ func RunProbes(chaosDetails *types.ChaosDetails, clients clients.ClientSets, res
 
 //setProbeVerdict mark the verdict of the probe in the chaosresult as passed
 // on the basis of phase(pre/post chaos)
-func setProbeVerdict(resultDetails *types.ResultDetails, probe v1alpha1.ProbeAttributes, verdict, phase string) {
-
+func setProbeVerdict(resultDetails *types.ResultDetails, probe v1alpha1.ProbeAttributes, verdict v1alpha1.ProbeVerdict, description string) {
 	for index, probes := range resultDetails.ProbeDetails {
 		if probes.Name == probe.Name && probes.Type == probe.Type {
-			switch strings.ToLower(probe.Mode) {
-			case "sot", "edge", "eot":
-				if verdict == "Passed" {
-					resultDetails.ProbeDetails[index].Status[phase] = verdict + emoji.Sprint(" :thumbsup:")
-				} else {
-					resultDetails.ProbeDetails[index].Status[phase] = "Better Luck Next Time" + emoji.Sprint(" :thumbsdown:")
-				}
-			case "continuous", "onchaos":
-				if verdict == "Passed" {
-					resultDetails.ProbeDetails[index].Status[probe.Mode] = verdict + emoji.Sprint(" :thumbsup:")
-				} else {
-					resultDetails.ProbeDetails[index].Status[probe.Mode] = "Better Luck Next Time" + emoji.Sprint(" :thumbsdown:")
-				}
+			if probes.Mode == "Edge" && probes.Status.Verdict == v1alpha1.ProbeVerdictFailed {
+				return
 			}
-			resultDetails.ProbeDetails[index].Phase = verdict
+			resultDetails.ProbeDetails[index].Status = v1alpha1.ProbeStatus{
+				Verdict:     verdict,
+				Description: description,
+			}
+			break
 		}
 	}
 }
 
 //SetProbeVerdictAfterFailure mark the verdict of all the failed/unrun probes as failed
-func SetProbeVerdictAfterFailure(resultDetails *types.ResultDetails) {
-	for index := range resultDetails.ProbeDetails {
-		for _, phase := range []string{"PreChaos", "PostChaos", "Continuous", "OnChaos"} {
-			if resultDetails.ProbeDetails[index].Status[phase] == "Awaited" {
-				resultDetails.ProbeDetails[index].Status[phase] = "N/A" + emoji.Sprint(" :prohibited:")
-			}
+func SetProbeVerdictAfterFailure(result *v1alpha1.ChaosResult) {
+	for index := range result.Status.ProbeStatuses {
+		if result.Status.ProbeStatuses[index].Status.Verdict == v1alpha1.ProbeVerdictAwaited {
+			result.Status.ProbeStatuses[index].Status.Verdict = v1alpha1.ProbeVerdictNA
+			result.Status.ProbeStatuses[index].Status.Description = "either probe is not executed or not evaluated"
 		}
 	}
 }
@@ -133,7 +124,7 @@ func getProbesFromEngine(chaosDetails *types.ChaosDetails, clients clients.Clien
 // it fetch the probe details from the chaosengine and set into the chaosresult
 func InitializeProbesInChaosResultDetails(chaosDetails *types.ChaosDetails, clients clients.ClientSets, chaosresult *types.ResultDetails) error {
 
-	probeDetails := []types.ProbeDetails{}
+	var probeDetails []types.ProbeDetails
 	// get the probes from the chaosengine
 	probes, err := getProbesFromEngine(chaosDetails, clients)
 	if err != nil {
@@ -145,9 +136,12 @@ func InitializeProbesInChaosResultDetails(chaosDetails *types.ChaosDetails, clie
 		tempProbe := types.ProbeDetails{}
 		tempProbe.Name = probe.Name
 		tempProbe.Type = probe.Type
+		tempProbe.Mode = probe.Mode
 		tempProbe.Phase = "N/A"
 		tempProbe.RunCount = 0
-		setProbeInitialStatus(&tempProbe, probe.Mode)
+		tempProbe.Status = v1alpha1.ProbeStatus{
+			Verdict: "Awaited",
+		}
 		probeDetails = append(probeDetails, tempProbe)
 	}
 
@@ -165,33 +159,6 @@ func getAndIncrementRunCount(resultDetails *types.ResultDetails, probeName strin
 		}
 	}
 	return 0
-}
-
-//setProbeInitialStatus sets the initial status inside chaosresult
-func setProbeInitialStatus(probeDetails *types.ProbeDetails, mode string) {
-	switch strings.ToLower(mode) {
-	case "sot":
-		probeDetails.Status = map[string]string{
-			"PreChaos": "Awaited",
-		}
-	case "eot":
-		probeDetails.Status = map[string]string{
-			"PostChaos": "Awaited",
-		}
-	case "edge":
-		probeDetails.Status = map[string]string{
-			"PreChaos":  "Awaited",
-			"PostChaos": "Awaited",
-		}
-	case "continuous":
-		probeDetails.Status = map[string]string{
-			"Continuous": "Awaited",
-		}
-	case "onchaos":
-		probeDetails.Status = map[string]string{
-			"OnChaos": "Awaited",
-		}
-	}
 }
 
 //getRunIDFromProbe return the run_id for the dedicated probe
@@ -220,13 +187,14 @@ func setRunIDForProbe(resultDetails *types.ResultDetails, probeName, probeType, 
 
 // markedVerdictInEnd add the probe status in the chaosresult
 func markedVerdictInEnd(err error, resultDetails *types.ResultDetails, probe v1alpha1.ProbeAttributes, phase string) error {
-	probeVerdict := "Passed"
+	probeVerdict := v1alpha1.ProbeVerdictPassed
+	var description string
 	if err != nil {
-		probeVerdict = "Failed"
+		probeVerdict = v1alpha1.ProbeVerdictFailed
 	}
 
 	switch probeVerdict {
-	case "Passed":
+	case v1alpha1.ProbeVerdictPassed:
 		log.InfoWithValues("[Probe]: "+probe.Name+" probe has been Passed "+emoji.Sprint(":smile:"), logrus.Fields{
 			"ProbeName":     probe.Name,
 			"ProbeType":     probe.Type,
@@ -254,13 +222,23 @@ func markedVerdictInEnd(err error, resultDetails *types.ResultDetails, probe v1a
 			"ProbeInstance": phase,
 			"ProbeStatus":   probeVerdict,
 		})
+		description = getDescription(strings.ToLower(probe.Mode), phase)
 	}
 
-	setProbeVerdict(resultDetails, probe, probeVerdict, phase)
+	setProbeVerdict(resultDetails, probe, probeVerdict, description)
 	if !probe.RunProperties.StopOnFailure {
 		return nil
 	}
 	return err
+}
+
+func getDescription(mode, phase string) string {
+	switch mode {
+	case "edge":
+		return fmt.Sprintf("'%v' Probe didn't met the passing criteria", phase)
+	default:
+		return "Probe didn't met the passing criteria"
+	}
 }
 
 //CheckForErrorInContinuousProbe check for the error in the continuous probes
