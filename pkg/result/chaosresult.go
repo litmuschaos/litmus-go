@@ -165,6 +165,7 @@ func updateResultAttributes(clients clients.ClientSets, chaosDetails *types.Chao
 		if !isAllProbePassed {
 			resultDetails.Verdict = "Fail"
 			result.Status.ExperimentStatus.Verdict = "Fail"
+			result.Status.ExperimentStatus.FailStep = "Probe execution result didn't met the passing criteria"
 		}
 		switch strings.ToLower(string(resultDetails.Verdict)) {
 		case "pass":
