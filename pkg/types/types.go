@@ -53,9 +53,10 @@ type RegisterDetails struct {
 // ProbeDetails is for collecting all the probe details
 type ProbeDetails struct {
 	Name                   string
-	Phase                  string
 	Type                   string
-	Status                 map[string]string
+	Mode                   string
+	Phase                  string
+	Status                 v1alpha1.ProbeStatus
 	IsProbeFailedWithError error
 	RunID                  string
 	RunCount               int
