@@ -147,6 +147,7 @@ func injectChaos(experimentDetails *experimentTypes.ExperimentDetails, pid int) 
 				for j := range uniqueIps {
 					if ips[i] == uniqueIps[j] {
 						isPresent = true
+						break
 					}
 				}
 				if !isPresent {
