@@ -35,9 +35,9 @@ jobs:
           fi
 
       - name: golangci-lint
-          uses: reviewdog/action-golangci-lint@v2
-          with:
-            go_version: "1.18"
+        uses: reviewdog/action-golangci-lint@v2
+        with:
+          go_version: "1.18"
 
   security:
     container:

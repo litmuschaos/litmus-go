@@ -37,8 +37,8 @@ jobs:
 
       - name: golangci-lint
         uses: reviewdog/action-golangci-lint@v2
-          with:
-            go_version: "1.18"
+        with:
+          go_version: "1.18"
 
   push:
     needs: pre-checks
