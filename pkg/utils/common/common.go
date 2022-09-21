@@ -1,9 +1,11 @@
 package common
 
 import (
+	"fmt"
 	"math/rand"
 	"os"
 	"os/signal"
+	"reflect"
 	"strconv"
 	"strings"
 	"syscall"
@@ -222,8 +224,8 @@ func getRandomValue(a, b int) int {
 	return (a + rand.Intn(b-a+1))
 }
 
-// StringExistsInSlice checks the existence of element in slice
-func StringExistsInSlice(val string, slice []string) bool {
+// SubStringExistsInSlice checks the existence of sub string in slice
+func SubStringExistsInSlice(val string, slice []string) bool {
 	for _, v := range slice {
 		if strings.Contains(val, v) {
 			return true
@@ -232,30 +234,14 @@ func StringExistsInSlice(val string, slice []string) bool {
 	return false
 }
 
-// UniqueElementsTypeConstraint has data types for which unique elements can be found
-type UniqueElementsTypeConstraint interface {
-	int | int8 | int16 | int32 | int64 | float32 | float64 | string
-}
-
-// GetUniqueElements returns the unique elements from a given slice of elements
-func GetUniqueElements[T UniqueElementsTypeConstraint](elements []T) []T {
-
-	uniqueElements := []T{}
-
-	for _, element := range elements {
-
-		found := false
-		for _, uniqueElement := range uniqueElements {
-			if element == uniqueElement {
-				found = true
-				break
-			}
-		}
-
-		if !found {
-			uniqueElements = append(uniqueElements, element)
+func Contains(val interface{}, slice interface{}) bool {
+	if slice == nil {
+		return false
+	}
+	for i := 0; i < reflect.ValueOf(slice).Len(); i++ {
+		if fmt.Sprintf("%v", reflect.ValueOf(val).Interface()) == fmt.Sprintf("%v", reflect.ValueOf(slice).Index(i).Interface()) {
+			return true
 		}
 	}
-
-	return uniqueElements
+	return false
 }

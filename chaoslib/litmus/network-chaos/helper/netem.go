@@ -178,8 +178,14 @@ func injectChaos(netInterface string, target targetDetails) error {
 	} else {
 
 		ips := strings.Split(target.DestinationIps, ",")
+		var uniqueIps []string
+
 		// removing duplicates ips from the list, if any
-		uniqueIps := common.GetUniqueElements(ips)
+		for i := range ips {
+			if !common.Contains(ips[i], uniqueIps) {
+				uniqueIps = append(uniqueIps, ips[i])
+			}
+		}
 
 		// Create a priority-based queue
 		// This instantly creates classes 1:1, 1:2, 1:3

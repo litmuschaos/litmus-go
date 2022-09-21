@@ -430,7 +430,7 @@ func SetChaosTunables(experimentsDetails *experimentTypes.ExperimentDetails) {
 // It checks if pod contains service mesh sidecar
 func isServiceMeshEnabledForPod(pod apiv1.Pod) bool {
 	for _, c := range pod.Spec.Containers {
-		if common.StringExistsInSlice(c.Name, serviceMesh) {
+		if common.SubStringExistsInSlice(c.Name, serviceMesh) {
 			return true
 		}
 	}

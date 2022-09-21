@@ -12,7 +12,7 @@ jobs:
       # Install golang
       - uses: actions/setup-go@v2
         with:
-          go-version: 1.18
+          go-version: 1.17
 
       - uses: actions/checkout@v2
         with:
@@ -35,9 +35,7 @@ jobs:
           fi
 
       - name: golangci-lint
-        uses: reviewdog/action-golangci-lint@v2
-        with:
-          go_version: "1.18"
+        uses: reviewdog/action-golangci-lint@v1
 
   security:
     container:
@@ -62,7 +60,7 @@ jobs:
       # Install golang
       - uses: actions/setup-go@v2
         with:
-          go-version: 1.18
+          go-version: 1.17
 
       - uses: actions/checkout@v2
         with:
