@@ -32,11 +32,23 @@ func RunProbes(chaosDetails *types.ChaosDetails, clients clients.ClientSets, res
 	}
 
 	switch strings.ToLower(phase) {
-	//execute probes for the prechaos & duringchaos phase
-	case "prechaos", "duringchaos":
+	//execute probes for the prechaos phase
+	case "prechaos":
 		for _, probe := range probes {
-			if err := execute(probe, chaosDetails, clients, resultDetails, phase); err != nil {
-				return err
+			switch strings.ToLower(probe.Mode) {
+			case "sot", "edge", "continuous":
+				if err := execute(probe, chaosDetails, clients, resultDetails, phase); err != nil {
+					return err
+				}
+			}
+		}
+	//execute probes for the duringchaos phase
+	case "duringchaos":
+		for _, probe := range probes {
+			if strings.ToLower(probe.Mode) == "onchaos" {
+				if err := execute(probe, chaosDetails, clients, resultDetails, phase); err != nil {
+					return err
+				}
 			}
 		}
 	default:
@@ -58,8 +70,11 @@ func RunProbes(chaosDetails *types.ChaosDetails, clients clients.ClientSets, res
 		}
 		// executes the eot and edge modes
 		for _, probe := range probes {
-			if err := execute(probe, chaosDetails, clients, resultDetails, phase); err != nil {
-				return err
+			switch strings.ToLower(probe.Mode) {
+			case "eot", "edge":
+				if err := execute(probe, chaosDetails, clients, resultDetails, phase); err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -137,7 +152,6 @@ func InitializeProbesInChaosResultDetails(chaosDetails *types.ChaosDetails, clie
 		tempProbe.Name = probe.Name
 		tempProbe.Type = probe.Type
 		tempProbe.Mode = probe.Mode
-		tempProbe.Phase = "N/A"
 		tempProbe.RunCount = 0
 		tempProbe.Status = v1alpha1.ProbeStatus{
 			Verdict: "Awaited",
@@ -204,12 +218,8 @@ func markedVerdictInEnd(err error, resultDetails *types.ResultDetails, probe v1a
 		// counting the passed probes count to generate the score and mark the verdict as passed
 		// for edge, probe is marked as Passed if passed in both pre/post chaos checks
 		switch strings.ToLower(probe.Mode) {
-		case "edge", "continuous":
-			if phase != "PreChaos" {
-				resultDetails.PassedProbeCount++
-			}
-		case "onchaos":
-			if phase != "DuringChaos" {
+		case "edge":
+			if phase == "PostChaos" && getProbeVerdict(resultDetails, probe.Name, probe.Type) != v1alpha1.ProbeVerdictFailed {
 				resultDetails.PassedProbeCount++
 			}
 		default:
@@ -312,4 +322,13 @@ func execute(probe v1alpha1.ProbeAttributes, chaosDetails *types.ChaosDetails, c
 		return errors.Errorf("No supported probe type found, type: %v", probe.Type)
 	}
 	return nil
+}
+
+func getProbeVerdict(resultDetails *types.ResultDetails, name, probeType string) v1alpha1.ProbeVerdict {
+	for _, probe := range resultDetails.ProbeDetails {
+		if probe.Name == name && probe.Type == probeType {
+			return probe.Status.Verdict
+		}
+	}
+	return v1alpha1.ProbeVerdictNA
 }

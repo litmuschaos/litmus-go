@@ -55,7 +55,6 @@ type ProbeDetails struct {
 	Name                   string
 	Type                   string
 	Mode                   string
-	Phase                  string
 	Status                 v1alpha1.ProbeStatus
 	IsProbeFailedWithError error
 	RunID                  string
