@@ -32,11 +32,23 @@ func RunProbes(chaosDetails *types.ChaosDetails, clients clients.ClientSets, res
 	}
 
 	switch strings.ToLower(phase) {
-	//execute probes for the prechaos & duringchaos phase
-	case "prechaos", "duringchaos":
+	//execute probes for the prechaos phase
+	case "prechaos":
 		for _, probe := range probes {
-			if err := execute(probe, chaosDetails, clients, resultDetails, phase); err != nil {
-				return err
+			switch strings.ToLower(probe.Mode) {
+			case "sot", "edge", "continuous":
+				if err := execute(probe, chaosDetails, clients, resultDetails, phase); err != nil {
+					return err
+				}
+			}
+		}
+	//execute probes for the duringchaos phase
+	case "duringchaos":
+		for _, probe := range probes {
+			if strings.ToLower(probe.Mode) == "onchaos" {
+				if err := execute(probe, chaosDetails, clients, resultDetails, phase); err != nil {
+					return err
+				}
 			}
 		}
 	default:
@@ -58,7 +70,8 @@ func RunProbes(chaosDetails *types.ChaosDetails, clients clients.ClientSets, res
 		}
 		// executes the eot and edge modes
 		for _, probe := range probes {
-			if strings.ToLower(probe.Mode) != "onchaos" && strings.ToLower(probe.Mode) != "continuous" {
+			switch strings.ToLower(probe.Mode) {
+			case "eot", "edge":
 				if err := execute(probe, chaosDetails, clients, resultDetails, phase); err != nil {
 					return err
 				}
