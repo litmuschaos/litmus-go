@@ -231,3 +231,31 @@ func StringExistsInSlice(val string, slice []string) bool {
 	}
 	return false
 }
+
+// UniqueElementsTypeConstraint has data types for which unique elements can be found
+type UniqueElementsTypeConstraint interface {
+	int | int8 | int16 | int32 | int64 | float32 | float64 | string
+}
+
+// GetUniqueElements returns the unique elements from a given slice of elements
+func GetUniqueElements[T UniqueElementsTypeConstraint](elements []T) []T {
+
+	uniqueElements := []T{}
+
+	for _, element := range elements {
+
+		found := false
+		for _, uniqueElement := range uniqueElements {
+			if element == uniqueElement {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			uniqueElements = append(uniqueElements, element)
+		}
+	}
+
+	return uniqueElements
+}

@@ -32,7 +32,7 @@ func RunProbes(chaosDetails *types.ChaosDetails, clients clients.ClientSets, res
 	}
 
 	switch strings.ToLower(phase) {
-	//execute probes for the prechaos & duringchaos phase
+	//execute probes for the prechaos phase
 	case "prechaos":
 		for _, probe := range probes {
 			switch strings.ToLower(probe.Mode) {
@@ -42,6 +42,7 @@ func RunProbes(chaosDetails *types.ChaosDetails, clients clients.ClientSets, res
 				}
 			}
 		}
+	//execute probes for the duringchaos phase
 	case "duringchaos":
 		for _, probe := range probes {
 			if strings.ToLower(probe.Mode) == "onchaos" {

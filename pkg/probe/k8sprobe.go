@@ -297,7 +297,7 @@ func triggerOnChaosK8sProbe(probe v1alpha1.ProbeAttributes, clients clients.Clie
 
 	endTime := time.After(time.Duration(duration) * time.Second)
 
-	// it trigger the k8s probe for the entire duration of chaos and it fails, if any error encounter
+	// it triggers the k8s probe for the entire duration of chaos and it fails, if any error encounter
 	// marked the error for the probes, if any
 loop:
 	for {
