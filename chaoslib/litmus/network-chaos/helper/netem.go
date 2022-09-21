@@ -186,6 +186,7 @@ func injectChaos(netInterface string, target targetDetails) error {
 			for j := range uniqueIps {
 				if ips[i] == uniqueIps[j] {
 					isPresent = true
+					break
 				}
 			}
 			if !isPresent {
