@@ -330,14 +330,12 @@ func triggerOnChaosHTTPProbe(probe v1alpha1.ProbeAttributes, clients clients.Cli
 		duration = math.Maximum(0, duration-probe.RunProperties.InitialDelaySeconds)
 	}
 
-	var endTime <-chan time.Time
-	timeDelay := time.Duration(duration) * time.Second
+	endTime := time.After(time.Duration(duration) * time.Second)
 
 	// it trigger the http probe for the entire duration of chaos and it fails, if any error encounter
 	// it marked the error for the probes, if any
 loop:
 	for {
-		endTime = time.After(timeDelay)
 		select {
 		case <-endTime:
 			log.Infof("[Chaos]: Time is up for the %v probe", probe.Name)
