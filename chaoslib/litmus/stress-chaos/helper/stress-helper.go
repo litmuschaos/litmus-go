@@ -45,7 +45,8 @@ var (
 const (
 	// ProcessAlreadyFinished contains error code when process is finished
 	ProcessAlreadyFinished = "os: process already finished"
-	ProcessAlreadyKilled   = "no such process"
+	// ProcessAlreadyKilled contains error code when process is already killed
+	ProcessAlreadyKilled = "no such process"
 )
 
 // Helper injects the stress chaos
@@ -126,6 +127,7 @@ func prepareStressChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 
 		// launch the stress-ng process on the target container in paused mode
 		cmd := exec.Command("/bin/bash", "-c", stressCommand)
+		// enables the process group id
 		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 		var buf bytes.Buffer
 		cmd.Stdout = &buf
