@@ -2,6 +2,7 @@ package helper
 
 import (
 	"fmt"
+	"github.com/pkg/errors"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -25,6 +26,13 @@ var (
 )
 
 var err error
+
+const (
+	// ProcessAlreadyFinished contains error code when process is finished
+	ProcessAlreadyFinished = "os: process already finished"
+	// ProcessAlreadyKilled contains error code when process is already killed
+	ProcessAlreadyKilled = "no such process"
+)
 
 // Helper injects the dns chaos
 func Helper(clients clients.ClientSets) {
@@ -98,28 +106,29 @@ func preparePodDNSChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 		targets = append(targets, td)
 	}
 
-	// prepare dns interceptor
-	commandTemplate := fmt.Sprintf("sudo TARGET_PID=%d CHAOS_TYPE=%s SPOOF_MAP='%s' TARGET_HOSTNAMES='%s' CHAOS_DURATION=%d MATCH_SCHEME=%s nsutil -p -n -t %d -- dns_interceptor", 0, experimentsDetails.ChaosType, experimentsDetails.SpoofMap, experimentsDetails.TargetHostNames, experimentsDetails.ChaosDuration, experimentsDetails.MatchScheme, 0)
-	cmd := exec.Command("/bin/bash", "-c", commandTemplate)
-	log.Info(cmd.String())
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	// watching for the abort signal and revert the chaos if an abort signal is received
+	go abortWatcher(targets, resultDetails.Name, chaosDetails.ChaosNamespace)
 
-	// injecting dns chaos inside target container
-	go func() {
-		select {
-		case <-injectAbort:
-			log.Info("[Chaos]: Abort received, skipping chaos injection")
-		default:
-			err = cmd.Run()
-			if err != nil {
-				log.Fatalf("dns interceptor failed : %v", err)
-			}
+	select {
+	case <-injectAbort:
+		// stopping the chaos execution, if abort signal received
+		os.Exit(1)
+	default:
+	}
+
+	done := make(chan bool, 1)
+
+	for index, t := range targets {
+		targets[index].Cmd, err = injectChaos(experimentsDetails, t.Pid)
+		if err != nil {
+			return err
 		}
-	}()
-
-	if err = result.AnnotateChaosResult(resultDetails.Name, chaosDetails.ChaosNamespace, "injected", "pod", experimentsDetails.TargetPods); err != nil {
-		return err
+		if err = result.AnnotateChaosResult(resultDetails.Name, chaosDetails.ChaosNamespace, "injected", "pod", t.Name); err != nil {
+			if revertErr := terminateProcess(t.Cmd); revertErr != nil {
+				return fmt.Errorf("failed to revert and annotate the result, err: %v", fmt.Sprintf("%s, %s", err.Error(), revertErr.Error()))
+			}
+			return err
+		}
 	}
 
 	// record the event inside chaosengine
@@ -129,44 +138,122 @@ func preparePodDNSChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 		events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 	}
 
-	timeChan := time.Tick(time.Duration(experimentsDetails.ChaosDuration) * time.Second)
-	log.Infof("[Chaos]: Waiting for %vs", experimentsDetails.ChaosDuration)
+	log.Info("[Wait]: Waiting for chaos completion")
+	// channel to check the completion of the stress process
+	go func() {
+		var errList []string
+		for _, t := range targets {
+			if err := t.Cmd.Wait(); err != nil {
+				log.Errorf("err -- %v", err.Error())
+				errList = append(errList, err.Error())
+			}
+		}
+		if len(errList) != 0 {
+			log.Errorf("err: %v", strings.Join(errList, ", "))
+		}
+		done <- true
+	}()
 
-	// either wait for abort signal or chaos duration
+	// check the timeout for the command
+	// Note: timeout will occur when process didn't complete even after 10s of chaos duration
+	timeout := time.After((time.Duration(experimentsDetails.ChaosDuration) + 30) * time.Second)
+
 	select {
-	case <-abort:
-		log.Info("[Chaos]: Killing process started because of terminated signal received")
-	case <-timeChan:
-		log.Info("[Chaos]: Stopping the experiment, chaos duration over")
+	case <-timeout:
+		// the stress process gets timeout before completion
+		log.Infof("[Chaos] The stress process is not yet completed after the chaos duration of %vs", experimentsDetails.ChaosDuration+30)
+		log.Info("[Timeout]: Killing the stress process")
+		var errList []string
+		for _, t := range targets {
+			if err = terminateProcess(t.Cmd); err != nil {
+				errList = append(errList, err.Error())
+				continue
+			}
+			if err = result.AnnotateChaosResult(resultDetails.Name, chaosDetails.ChaosNamespace, "reverted", "pod", t.Name); err != nil {
+				errList = append(errList, err.Error())
+			}
+		}
+		if len(errList) != 0 {
+			return fmt.Errorf("err: %v", strings.Join(errList, ", "))
+		}
+	case <-done:
+		select {
+		case <-injectAbort:
+			// wait for the completion of abort handler
+			time.Sleep(10 * time.Second)
+		default:
+			log.Info("[Info]: Reverting Chaos")
+			var errList []string
+			for _, t := range targets {
+				if err := terminateProcess(t.Cmd); err != nil {
+					errList = append(errList, err.Error())
+					continue
+				}
+				if err := result.AnnotateChaosResult(resultDetails.Name, chaosDetails.ChaosNamespace, "reverted", "pod", t.Name); err != nil {
+					errList = append(errList, err.Error())
+				}
+			}
+			if len(errList) != 0 {
+				return fmt.Errorf("err: %v", strings.Join(errList, ", "))
+			}
+		}
 	}
 
-	log.Info("Chaos Revert Started")
-	// retry thrice for the chaos revert
+	return nil
+}
 
+func injectChaos(experimentsDetails *experimentTypes.ExperimentDetails, pid int) (*exec.Cmd, error) {
+
+	// prepare dns interceptor
+	commandTemplate := fmt.Sprintf("sudo TARGET_PID=%d CHAOS_TYPE=%s SPOOF_MAP='%s' TARGET_HOSTNAMES='%s' CHAOS_DURATION=%d MATCH_SCHEME=%s nsutil -p -n -t %d -- dns_interceptor", pid, experimentsDetails.ChaosType, experimentsDetails.SpoofMap, experimentsDetails.TargetHostNames, experimentsDetails.ChaosDuration, experimentsDetails.MatchScheme, pid)
+	cmd := exec.Command("/bin/bash", "-c", commandTemplate)
+	log.Info(cmd.String())
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	err = cmd.Start()
+	if err != nil {
+		return nil, errors.Errorf("fail to start the dns process, err: %v", err)
+	}
+	return cmd, nil
+}
+
+func terminateProcess(cmd *exec.Cmd) error {
+	// kill command
+	killTemplate := fmt.Sprintf("sudo kill %d", cmd.Process.Pid)
+	kill := exec.Command("/bin/bash", "-c", killTemplate)
+	if err = kill.Run(); err != nil {
+		log.Errorf("unable to kill dns interceptor process cry, err :%v", err)
+	} else {
+		log.Errorf("dns interceptor process stopped")
+	}
+	return nil
+}
+
+// abortWatcher continuously watch for the abort signals
+func abortWatcher(targets []targetDetails, resultName, chaosNS string) {
+
+	<-abort
+
+	log.Info("[Chaos]: Killing process started because of terminated signal received")
+	log.Info("[Abort]: Chaos Revert Started")
+	// retry thrice for the chaos revert
 	retry := 3
 	for retry > 0 {
-		if cmd.Process == nil {
-			log.Infof("cannot kill dns interceptor, process not started. Retrying in 1sec...")
-		} else {
-			log.Infof("killing dns interceptor with pid %v", cmd.Process.Pid)
-			// kill command
-			killTemplate := fmt.Sprintf("sudo kill %d", cmd.Process.Pid)
-			kill := exec.Command("/bin/bash", "-c", killTemplate)
-			if err = kill.Run(); err != nil {
-				log.Errorf("unable to kill dns interceptor process cry, err :%v", err)
-			} else {
-				log.Errorf("dns interceptor process stopped")
-				break
+		for _, t := range targets {
+			if err = terminateProcess(t.Cmd); err != nil {
+				log.Errorf("unable to revert for %v pod, err :%v", t.Name, err)
+				continue
+			}
+			if err = result.AnnotateChaosResult(resultName, chaosNS, "reverted", "pod", t.Name); err != nil {
+				log.Errorf("unable to annotate the chaosresult for %v pod, err :%v", t.Name, err)
 			}
 		}
 		retry--
 		time.Sleep(1 * time.Second)
 	}
-	if err = result.AnnotateChaosResult(resultDetails.Name, chaosDetails.ChaosNamespace, "reverted", "pod", experimentsDetails.TargetPods); err != nil {
-		return err
-	}
-	log.Info("Chaos Revert Completed")
-	return nil
+	log.Info("[Abort]: Chaos Revert Completed")
+	os.Exit(1)
 }
 
 //getENV fetches all the env variables from the runner pod
