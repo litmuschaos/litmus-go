@@ -167,6 +167,7 @@ func prepareStressChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 		var exitErr error
 		for _, t := range targets {
 			if err := t.Cmd.Wait(); err != nil {
+				log.Errorf("err -- %v", err.Error())
 				if _, ok := err.(*exec.ExitError); ok {
 					exitErr = err
 					continue
@@ -210,7 +211,7 @@ func prepareStressChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 			exitErr, ok := err.(*exec.ExitError)
 			if ok {
 				status := exitErr.Sys().(syscall.WaitStatus)
-				if status.Signaled() && status.Signal() == syscall.SIGTERM {
+				if status.Signaled() && status.Signal() == syscall.SIGKILL {
 					// wait for the completion of abort handler
 					time.Sleep(10 * time.Second)
 					return errors.Errorf("process stopped with SIGTERM signal")
@@ -243,11 +244,24 @@ func terminateProcess(pid int) error {
 	if err != nil {
 		return errors.Errorf("unreachable path, err: %v", err)
 	}
-	if err = process.Signal(syscall.SIGTERM); err != nil && err.Error() != ProcessAlreadyFinished {
+	if err = process.Signal(syscall.SIGKILL); err != nil && err.Error() != ProcessAlreadyFinished {
 		return errors.Errorf("error while killing process, err: %v", err)
 	}
 	log.Info("[Info]: Stress process removed successfully")
 	return nil
+}
+
+func kill(pid int) error {
+	//killTemplate := fmt.Sprintf("sudo kill %d", pid)
+	//kill := exec.Command("/bin/bash", "-c", killTemplate)
+	//if err = kill.Run(); err != nil {
+	//	log.Errorf("unable to kill dns interceptor process cry, err :%v", err)
+	//	return err
+	//} else {
+	//	log.Errorf("dns interceptor process stopped")
+	//}
+
+	return syscall.Kill(-pid, syscall.SIGKILL)
 }
 
 //prepareStressor will set the required stressors for the given experiment
@@ -558,7 +572,7 @@ func abortWatcher(targets []targetDetails, resultName, chaosNS string) {
 	retry := 3
 	for retry > 0 {
 		for _, t := range targets {
-			if err = terminateProcess(t.Cmd.Process.Pid); err != nil {
+			if err = kill(t.Cmd.Process.Pid); err != nil {
 				log.Errorf("unable to revert for %v pod, err :%v", t.Name, err)
 				continue
 			}
@@ -617,6 +631,7 @@ func injectChaos(t targetDetails, stressors string) (*exec.Cmd, error) {
 
 	// launch the stress-ng process on the target container in paused mode
 	cmd := exec.Command("/bin/bash", "-c", stressCommand)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	var buf bytes.Buffer
 	cmd.Stdout = &buf
 	err = cmd.Start()
@@ -651,6 +666,5 @@ type targetDetails struct {
 	ContainerId     string
 	Pid             int
 	CGroupManager   interface{}
-	CommandPid      int
 	Cmd             *exec.Cmd
 }
