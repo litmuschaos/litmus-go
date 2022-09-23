@@ -45,6 +45,8 @@ var (
 const (
 	// ProcessAlreadyFinished contains error code when process is finished
 	ProcessAlreadyFinished = "os: process already finished"
+	// ProcessAlreadyKilled contains error code when process is already killed
+	ProcessAlreadyKilled = "no such process"
 )
 
 // Helper injects the stress chaos
@@ -240,28 +242,14 @@ func prepareStressChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 
 //terminateProcess will remove the stress process from the target container after chaos completion
 func terminateProcess(pid int) error {
-	process, err := os.FindProcess(pid)
-	if err != nil {
-		return errors.Errorf("unreachable path, err: %v", err)
-	}
-	if err = process.Signal(syscall.SIGKILL); err != nil && err.Error() != ProcessAlreadyFinished {
-		return errors.Errorf("error while killing process, err: %v", err)
+	if err := syscall.Kill(-pid, syscall.SIGKILL); err != nil {
+		if strings.Contains(err.Error(), ProcessAlreadyKilled) || strings.Contains(err.Error(), ProcessAlreadyFinished) {
+			return nil
+		}
+		return err
 	}
 	log.Info("[Info]: Stress process removed successfully")
 	return nil
-}
-
-func kill(pid int) error {
-	//killTemplate := fmt.Sprintf("sudo kill %d", pid)
-	//kill := exec.Command("/bin/bash", "-c", killTemplate)
-	//if err = kill.Run(); err != nil {
-	//	log.Errorf("unable to kill dns interceptor process cry, err :%v", err)
-	//	return err
-	//} else {
-	//	log.Errorf("dns interceptor process stopped")
-	//}
-
-	return syscall.Kill(-pid, syscall.SIGKILL)
 }
 
 //prepareStressor will set the required stressors for the given experiment
@@ -572,7 +560,7 @@ func abortWatcher(targets []targetDetails, resultName, chaosNS string) {
 	retry := 3
 	for retry > 0 {
 		for _, t := range targets {
-			if err = kill(t.Cmd.Process.Pid); err != nil {
+			if err = terminateProcess(t.Cmd.Process.Pid); err != nil {
 				log.Errorf("unable to revert for %v pod, err :%v", t.Name, err)
 				continue
 			}
