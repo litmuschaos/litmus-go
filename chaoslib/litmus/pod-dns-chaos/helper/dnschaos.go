@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -22,6 +23,8 @@ import (
 var (
 	abort, injectAbort chan os.Signal
 )
+
+var err error
 
 // Helper injects the dns chaos
 func Helper(clients clients.ClientSets) {
@@ -63,25 +66,40 @@ func Helper(clients clients.ClientSets) {
 //preparePodDNSChaos contains the preparation steps before chaos injection
 func preparePodDNSChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails) error {
 
-	containerID, err := common.GetRuntimeBasedContainerID(experimentsDetails.ContainerRuntime, experimentsDetails.SocketPath, experimentsDetails.TargetPods, experimentsDetails.AppNS, experimentsDetails.TargetContainer, clients)
-	if err != nil {
-		return err
-	}
-	// extract out the pid of the target container
-	pid, err := common.GetPID(experimentsDetails.ContainerRuntime, containerID, experimentsDetails.SocketPath)
-	if err != nil {
-		return err
+	targetEnv := os.Getenv("TARGETS")
+	if targetEnv == "" {
+		return fmt.Errorf("no target found, provide atleast one target")
 	}
 
-	// record the event inside chaosengine
-	if experimentsDetails.EngineName != "" {
-		msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on application pod"
-		types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
-		events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
+	var targets []targetDetails
+
+	for _, t := range strings.Split(targetEnv, ";") {
+		target := strings.Split(t, ":")
+		if len(target) != 3 {
+			return fmt.Errorf("unsupported target: '%v', provide target in '<name>:<namespace>:<containerName>", target)
+		}
+		td := targetDetails{
+			Name:            target[0],
+			Namespace:       target[1],
+			TargetContainer: target[2],
+		}
+
+		td.ContainerId, err = common.GetRuntimeBasedContainerID(experimentsDetails.ContainerRuntime, experimentsDetails.SocketPath, td.Name, td.Namespace, td.TargetContainer, clients)
+		if err != nil {
+			return err
+		}
+
+		// extract out the pid of the target container
+		td.Pid, err = common.GetPID(experimentsDetails.ContainerRuntime, td.ContainerId, experimentsDetails.SocketPath)
+		if err != nil {
+			return err
+		}
+
+		targets = append(targets, td)
 	}
 
 	// prepare dns interceptor
-	commandTemplate := fmt.Sprintf("sudo TARGET_PID=%d CHAOS_TYPE=%s SPOOF_MAP='%s' TARGET_HOSTNAMES='%s' CHAOS_DURATION=%d MATCH_SCHEME=%s nsutil -p -n -t %d -- dns_interceptor", pid, experimentsDetails.ChaosType, experimentsDetails.SpoofMap, experimentsDetails.TargetHostNames, experimentsDetails.ChaosDuration, experimentsDetails.MatchScheme, pid)
+	commandTemplate := fmt.Sprintf("sudo TARGET_PID=%d CHAOS_TYPE=%s SPOOF_MAP='%s' TARGET_HOSTNAMES='%s' CHAOS_DURATION=%d MATCH_SCHEME=%s nsutil -p -n -t %d -- dns_interceptor", 0, experimentsDetails.ChaosType, experimentsDetails.SpoofMap, experimentsDetails.TargetHostNames, experimentsDetails.ChaosDuration, experimentsDetails.MatchScheme, 0)
 	cmd := exec.Command("/bin/bash", "-c", commandTemplate)
 	log.Info(cmd.String())
 	cmd.Stdout = os.Stdout
@@ -102,6 +120,13 @@ func preparePodDNSChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 
 	if err = result.AnnotateChaosResult(resultDetails.Name, chaosDetails.ChaosNamespace, "injected", "pod", experimentsDetails.TargetPods); err != nil {
 		return err
+	}
+
+	// record the event inside chaosengine
+	if experimentsDetails.EngineName != "" {
+		msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on application pod"
+		types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
+		events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 	}
 
 	timeChan := time.Tick(time.Duration(experimentsDetails.ChaosDuration) * time.Second)
@@ -148,9 +173,6 @@ func preparePodDNSChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 func getENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.ExperimentName = types.Getenv("EXPERIMENT_NAME", "")
 	experimentDetails.InstanceID = types.Getenv("INSTANCE_ID", "")
-	experimentDetails.AppNS = types.Getenv("APP_NAMESPACE", "")
-	experimentDetails.TargetContainer = types.Getenv("APP_CONTAINER", "")
-	experimentDetails.TargetPods = types.Getenv("APP_POD", "")
 	experimentDetails.ChaosDuration, _ = strconv.Atoi(types.Getenv("TOTAL_CHAOS_DURATION", "60"))
 	experimentDetails.ChaosNamespace = types.Getenv("CHAOS_NAMESPACE", "litmus")
 	experimentDetails.EngineName = types.Getenv("CHAOSENGINE", "")
@@ -162,4 +184,14 @@ func getENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.MatchScheme = types.Getenv("MATCH_SCHEME", "exact")
 	experimentDetails.ChaosType = types.Getenv("CHAOS_TYPE", "error")
 	experimentDetails.SocketPath = types.Getenv("SOCKET_PATH", "")
+}
+
+type targetDetails struct {
+	Name            string
+	Namespace       string
+	TargetContainer string
+	ContainerId     string
+	Pid             int
+	CommandPid      int
+	Cmd             *exec.Cmd
 }
