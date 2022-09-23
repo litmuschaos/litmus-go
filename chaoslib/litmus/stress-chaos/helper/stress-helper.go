@@ -45,6 +45,8 @@ var (
 const (
 	// ProcessAlreadyFinished contains error code when process is finished
 	ProcessAlreadyFinished = "os: process already finished"
+	// ProcessAlreadyKilled contains error code when process is already killed
+	ProcessAlreadyKilled = "no such process"
 )
 
 // Helper injects the stress chaos
@@ -125,6 +127,8 @@ func prepareStressChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 
 		// launch the stress-ng process on the target container in paused mode
 		cmd := exec.Command("/bin/bash", "-c", stressCommand)
+		// enables the process group id
+		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 		var buf bytes.Buffer
 		cmd.Stdout = &buf
 		err = cmd.Start()
@@ -183,16 +187,18 @@ func prepareStressChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 				err, ok := err.(*exec.ExitError)
 				if ok {
 					status := err.Sys().(syscall.WaitStatus)
-					if status.Signaled() && status.Signal() == syscall.SIGTERM {
+					if status.Signaled() && status.Signal() == syscall.SIGKILL {
 						// wait for the completion of abort handler
 						time.Sleep(10 * time.Second)
-						return errors.Errorf("process stopped with SIGTERM signal")
+						return errors.Errorf("process stopped with SIGKILL signal")
 					}
 				}
 				return errors.Errorf("process exited before the actual cleanup, err: %v", err)
 			}
 			log.Info("[Info]: Chaos injection completed")
-			terminateProcess(cmd.Process.Pid)
+			if err := terminateProcess(cmd.Process.Pid); err != nil {
+				return err
+			}
 			if err = result.AnnotateChaosResult(resultDetails.Name, chaosDetails.ChaosNamespace, "reverted", "pod", experimentsDetails.TargetPods); err != nil {
 				return err
 			}
@@ -203,12 +209,11 @@ func prepareStressChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 
 //terminateProcess will remove the stress process from the target container after chaos completion
 func terminateProcess(pid int) error {
-	process, err := os.FindProcess(pid)
-	if err != nil {
-		return errors.Errorf("unreachable path, err: %v", err)
-	}
-	if err = process.Signal(syscall.SIGTERM); err != nil && err.Error() != ProcessAlreadyFinished {
-		return errors.Errorf("error while killing process, err: %v", err)
+	if err := syscall.Kill(-pid, syscall.SIGKILL); err != nil {
+		if strings.Contains(err.Error(), ProcessAlreadyKilled) || strings.Contains(err.Error(), ProcessAlreadyFinished) {
+			return nil
+		}
+		return err
 	}
 	log.Info("[Info]: Stress process removed successfully")
 	return nil
