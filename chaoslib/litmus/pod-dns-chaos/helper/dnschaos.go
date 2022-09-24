@@ -1,7 +1,9 @@
 package helper
 
 import (
+	"bytes"
 	"fmt"
+	"github.com/kyokomi/emoji"
 	"github.com/pkg/errors"
 	"os"
 	"os/exec"
@@ -28,10 +30,8 @@ var (
 var err error
 
 const (
-	// ProcessAlreadyFinished contains error code when process is finished
-	ProcessAlreadyFinished = "os: process already finished"
 	// ProcessAlreadyKilled contains error code when process is already killed
-	ProcessAlreadyKilled = "no such process"
+	ProcessAlreadyKilled = "No such process"
 )
 
 // Helper injects the dns chaos
@@ -74,22 +74,18 @@ func Helper(clients clients.ClientSets) {
 //preparePodDNSChaos contains the preparation steps before chaos injection
 func preparePodDNSChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails) error {
 
-	targetEnv := os.Getenv("TARGETS")
-	if targetEnv == "" {
-		return fmt.Errorf("no target found, provide atleast one target")
+	targetList, err := common.ParseTargets()
+	if err != nil {
+		return err
 	}
 
 	var targets []targetDetails
 
-	for _, t := range strings.Split(targetEnv, ";") {
-		target := strings.Split(t, ":")
-		if len(target) != 3 {
-			return fmt.Errorf("unsupported target: '%v', provide target in '<name>:<namespace>:<containerName>", target)
-		}
+	for _, t := range targetList.Target {
 		td := targetDetails{
-			Name:            target[0],
-			Namespace:       target[1],
-			TargetContainer: target[2],
+			Name:            t.Name,
+			Namespace:       t.Namespace,
+			TargetContainer: t.TargetContainer,
 		}
 
 		td.ContainerId, err = common.GetRuntimeBasedContainerID(experimentsDetails.ContainerRuntime, experimentsDetails.SocketPath, td.Name, td.Namespace, td.TargetContainer, clients)
@@ -144,7 +140,6 @@ func preparePodDNSChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 		var errList []string
 		for _, t := range targets {
 			if err := t.Cmd.Wait(); err != nil {
-				log.Errorf("err -- %v", err.Error())
 				errList = append(errList, err.Error())
 			}
 		}
@@ -222,8 +217,13 @@ func terminateProcess(cmd *exec.Cmd) error {
 	// kill command
 	killTemplate := fmt.Sprintf("sudo kill %d", cmd.Process.Pid)
 	kill := exec.Command("/bin/bash", "-c", killTemplate)
+	var stderr bytes.Buffer
+	kill.Stderr = &stderr
 	if err = kill.Run(); err != nil {
-		log.Errorf("unable to kill dns interceptor process cry, err :%v", err)
+		if strings.Contains(stderr.String(), ProcessAlreadyKilled) {
+			return nil
+		}
+		log.Errorf("unable to kill dns interceptor process %v, err :%v", emoji.Sprint(":cry:"), err)
 	} else {
 		log.Errorf("dns interceptor process stopped")
 	}

@@ -2,7 +2,9 @@ package common
 
 import (
 	"context"
+	"fmt"
 	"math/rand"
+	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -549,4 +551,25 @@ type target struct {
 	Namespace       string
 	Name            string
 	TargetContainer string
+}
+
+func ParseTargets() (*TargetsDetails, error) {
+	var targets TargetsDetails
+	targetEnv := os.Getenv("TARGETS")
+	if targetEnv == "" {
+		return nil, fmt.Errorf("no target found, provide atleast one target")
+	}
+
+	for _, t := range strings.Split(targetEnv, ";") {
+		targetList := strings.Split(t, ":")
+		if len(targetList) != 3 {
+			return nil, fmt.Errorf("unsupported target: '%v', provide target in '<name>:<namespace>:<containerName>", targetList)
+		}
+		targets.Target = append(targets.Target, target{
+			Name:            targetList[0],
+			Namespace:       targetList[1],
+			TargetContainer: targetList[2],
+		})
+	}
+	return &targets, nil
 }

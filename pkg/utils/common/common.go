@@ -86,33 +86,24 @@ func AbortWatcherWithoutExit(expname string, clients clients.ClientSets, resultD
 	failStep := "Chaos injection stopped!"
 	types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep)
 	if err := result.ChaosResult(chaosDetails, clients, resultDetails, "EOT"); err != nil {
-		log.Errorf("result err event, err: %v", err)
+		log.Errorf("[ABORT]: Failed to update result, err: %v", err)
 	}
-	log.Info("chaosresult update successfully")
+	log.Info("[ABORT]: Updated chaosresult post stop")
 
 	// generating summary event in chaosengine
 	msg := expname + " experiment has been aborted"
 	types.SetEngineEventAttributes(eventsDetails, types.Summary, msg, "Warning", chaosDetails)
 	err := events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 	if err != nil {
-		log.Errorf("engine event, err: %v", err)
+		log.Errorf("[ABORT]: Failed to create chaosengine summary event, err: %v", err)
 	}
 
 	// generating summary event in chaosresult
 	types.SetResultEventAttributes(eventsDetails, types.AbortVerdict, msg, "Warning", resultDetails)
 	err = events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosResult")
 	if err != nil {
-		log.Errorf("result event, err: %v", err)
+		log.Errorf("[ABORT]: Failed to create chaosresult abort event, err: %v", err)
 	}
-}
-
-//GetIterations derive the iterations value from given parameters
-func GetIterations(duration, interval int) int {
-	var iterations int
-	if interval != 0 {
-		iterations = duration / interval
-	}
-	return math.Maximum(iterations, 1)
 }
 
 //FilterBasedOnPercentage return the slice of list based on the the provided percentage

@@ -94,22 +94,18 @@ func prepareStressChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 	}
 	stressors := strings.Join(stressorList, " ")
 
-	targetEnv := os.Getenv("TARGETS")
-	if targetEnv == "" {
-		return fmt.Errorf("no target found, provide atleast one target")
+	targetList, err := common.ParseTargets()
+	if err != nil {
+		return err
 	}
 
 	var targets []targetDetails
 
-	for _, t := range strings.Split(targetEnv, ";") {
-		target := strings.Split(t, ":")
-		if len(target) != 3 {
-			return fmt.Errorf("unsupported target: '%v', provide target in '<name>:<namespace>:<containerName>", target)
-		}
+	for _, t := range targetList.Target {
 		td := targetDetails{
-			Name:            target[0],
-			Namespace:       target[1],
-			TargetContainer: target[2],
+			Name:            t.Name,
+			Namespace:       t.Namespace,
+			TargetContainer: t.TargetContainer,
 		}
 
 		td.ContainerId, err = common.GetContainerID(td.Namespace, td.Name, td.TargetContainer, clients)
@@ -169,7 +165,6 @@ func prepareStressChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 		var exitErr error
 		for _, t := range targets {
 			if err := t.Cmd.Wait(); err != nil {
-				log.Errorf("err -- %v", err.Error())
 				if _, ok := err.(*exec.ExitError); ok {
 					exitErr = err
 					continue
@@ -561,11 +556,11 @@ func abortWatcher(targets []targetDetails, resultName, chaosNS string) {
 	for retry > 0 {
 		for _, t := range targets {
 			if err = terminateProcess(t.Cmd.Process.Pid); err != nil {
-				log.Errorf("unable to revert for %v pod, err :%v", t.Name, err)
+				log.Errorf("[Abort]: unable to revert for %v pod, err :%v", t.Name, err)
 				continue
 			}
 			if err = result.AnnotateChaosResult(resultName, chaosNS, "reverted", "pod", t.Name); err != nil {
-				log.Errorf("unable to annotate the chaosresult for %v pod, err :%v", t.Name, err)
+				log.Errorf("[Abort]: Unable to annotate the chaosresult for %v pod, err :%v", t.Name, err)
 			}
 		}
 		retry--

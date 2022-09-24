@@ -87,7 +87,7 @@ func preparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetail
 			Name:            target[0],
 			Namespace:       target[1],
 			TargetContainer: target[2],
-			DestinationIps:  getDestIps(target[2]),
+			DestinationIps:  getDestIps(target[3]),
 		}
 
 		td.ContainerId, err = common.GetRuntimeBasedContainerID(experimentsDetails.ContainerRuntime, experimentsDetails.SocketPath, td.Name, td.Namespace, td.TargetContainer, clients)
@@ -120,7 +120,9 @@ func preparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetail
 			return err
 		}
 		if err = result.AnnotateChaosResult(resultDetails.Name, chaosDetails.ChaosNamespace, "injected", "pod", t.Name); err != nil {
-			_, err := killnetem(t, experimentsDetails.NetworkInterface)
+			if _, killErr := killnetem(t, experimentsDetails.NetworkInterface); killErr != nil {
+				return fmt.Errorf("unable to revert and annotate chaosresult, err: [%v, %v]", killErr, err)
+			}
 			return err
 		}
 	}

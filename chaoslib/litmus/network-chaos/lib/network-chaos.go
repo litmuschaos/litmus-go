@@ -143,7 +143,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		//checking the status of the helper pods, wait till the pod comes to running state else fail the experiment
 		log.Info("[Status]: Checking the status of the helper pods")
 		if err := status.CheckHelperStatus(experimentsDetails.ChaosNamespace, appLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
-			common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-helper-"+runID, appLabel, chaosDetails, clients)
+			common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
 			return errors.Errorf("helper pods are not in running state, err: %v", err)
 		}
 
@@ -152,14 +152,14 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		log.Info("[Wait]: waiting till the completion of the helper pod")
 		podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, appLabel, clients, experimentsDetails.ChaosDuration+experimentsDetails.Timeout, experimentsDetails.ExperimentName)
 		if err != nil || podStatus == "Failed" {
-			common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-helper-"+runID, appLabel, chaosDetails, clients)
+			common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
 			return common.HelperFailedError(err)
 		}
 
-		//Deleting all the helper pod for container-kill chaos
-		log.Info("[Cleanup]: Deleting the the helper pod")
+		//Deleting all the helper pod for network chaos
+		log.Info("[Cleanup]: Deleting the helper pod")
 		if err := common.DeleteAllPod(appLabel, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients); err != nil {
-			return errors.Errorf("unable to delete the helper pods, err: %v", err)
+			return errors.Errorf("unable to delete the helper pod, err: %v", err)
 		}
 	}
 
@@ -448,9 +448,11 @@ func setDestIps(pod apiv1.Pod, experimentsDetails *experimentTypes.ExperimentDet
 		}
 		return "true", nil
 	}
-	destIps, err = GetTargetIps(experimentsDetails.DestinationIPs, experimentsDetails.DestinationHosts, clients, false)
-	if err != nil {
-		return "false", err
+	if destIps == "" {
+		destIps, err = GetTargetIps(experimentsDetails.DestinationIPs, experimentsDetails.DestinationHosts, clients, false)
+		if err != nil {
+			return "false", err
+		}
 	}
 	return "false", nil
 }
@@ -498,6 +500,7 @@ func logExperimentFields(experimentsDetails *experimentTypes.ExperimentDetails) 
 	case "network-latency":
 		log.InfoWithValues("[Info]: The chaos tunables are:", logrus.Fields{
 			"NetworkLatency":   strconv.Itoa(experimentsDetails.NetworkLatency),
+			"Jitter":           experimentsDetails.Jitter,
 			"Sequence":         experimentsDetails.Sequence,
 			"PodsAffectedPerc": experimentsDetails.PodsAffectedPerc,
 		})

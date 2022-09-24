@@ -68,22 +68,18 @@ func Helper(clients clients.ClientSets) {
 //diskFill contains steps to inject disk-fill chaos
 func diskFill(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails) error {
 
-	targetEnv := os.Getenv("TARGETS")
-	if targetEnv == "" {
-		return fmt.Errorf("no target found, provide atleast one target")
+	targetList, err := common.ParseTargets()
+	if err != nil {
+		return err
 	}
 
 	var targets []targetDetails
 
-	for _, t := range strings.Split(targetEnv, ";") {
-		target := strings.Split(t, ":")
-		if len(target) != 3 {
-			return fmt.Errorf("unsupported target: '%v', provide target in '<name>:<namespace>:<containerName>", target)
-		}
+	for _, t := range targetList.Target {
 		td := targetDetails{
-			Name:            target[0],
-			Namespace:       target[1],
-			TargetContainer: target[2],
+			Name:            t.Name,
+			Namespace:       t.Namespace,
+			TargetContainer: t.TargetContainer,
 		}
 
 		// Derive the container id of the target container
@@ -92,7 +88,7 @@ func diskFill(experimentsDetails *experimentTypes.ExperimentDetails, clients cli
 			return err
 		}
 
-		td.SizeToFill, err = help(td, experimentsDetails, clients)
+		td.SizeToFill, err = getDiskSizeToFill(td, experimentsDetails, clients)
 		if err != nil {
 			return err
 		}
@@ -137,7 +133,7 @@ func diskFill(experimentsDetails *experimentTypes.ExperimentDetails, clients cli
 				return err
 			}
 		} else {
-			log.Warn("No required free space found!, It's Houseful")
+			log.Warn("No required free space found!")
 		}
 	}
 
@@ -303,7 +299,7 @@ func abortWatcher(targets []targetDetails, experimentsDetails *experimentTypes.E
 	os.Exit(1)
 }
 
-func help(t targetDetails, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) (int, error) {
+func getDiskSizeToFill(t targetDetails, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) (int, error) {
 	usedEphemeralStorageSize, err := getUsedEphemeralStorage(t.ContainerId)
 
 	// GetEphemeralStorageAttributes derive the ephemeral storage attributes from the target container

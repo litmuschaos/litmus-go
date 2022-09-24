@@ -68,22 +68,18 @@ func Helper(clients clients.ClientSets) {
 // prepareK8sHttpChaos contains the prepration steps before chaos injection
 func prepareK8sHttpChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails) error {
 
-	targetEnv := os.Getenv("TARGETS")
-	if targetEnv == "" {
-		return fmt.Errorf("no target found, provide atleast one target")
+	targetList, err := common.ParseTargets()
+	if err != nil {
+		return err
 	}
 
 	var targets []targetDetails
 
-	for _, t := range strings.Split(targetEnv, ";") {
-		target := strings.Split(t, ":")
-		if len(target) != 3 {
-			return fmt.Errorf("unsupported target: '%v', provide target in '<name>:<namespace>:<containerName>", target)
-		}
+	for _, t := range targetList.Target {
 		td := targetDetails{
-			Name:            target[0],
-			Namespace:       target[1],
-			TargetContainer: target[2],
+			Name:            t.Name,
+			Namespace:       t.Namespace,
+			TargetContainer: t.TargetContainer,
 		}
 
 		td.ContainerId, err = common.GetRuntimeBasedContainerID(experimentsDetails.ContainerRuntime, experimentsDetails.SocketPath, td.Name, td.Namespace, td.TargetContainer, clients)
@@ -133,7 +129,7 @@ func prepareK8sHttpChaos(experimentsDetails *experimentTypes.ExperimentDetails, 
 
 	common.WaitForDuration(experimentsDetails.ChaosDuration)
 
-	log.Info("[Chaos]: duration is over, reverting chaos")
+	log.Info("[Chaos]: chaos duration is over, reverting chaos")
 
 	var errList []string
 	for _, t := range targets {
@@ -149,7 +145,7 @@ func prepareK8sHttpChaos(experimentsDetails *experimentTypes.ExperimentDetails, 
 	}
 
 	if len(errList) != 0 {
-		return fmt.Errorf(" failed to revert chaos, err: %v", strings.Join(errList, ","))
+		return fmt.Errorf("failed to revert chaos, err: %v", strings.Join(errList, ","))
 	}
 	return nil
 }
@@ -157,7 +153,6 @@ func prepareK8sHttpChaos(experimentsDetails *experimentTypes.ExperimentDetails, 
 // injectChaos inject the http chaos in target container and add ruleset to the iptables to redirect the ports
 func injectChaos(experimentDetails *experimentTypes.ExperimentDetails, pid int) error {
 
-	// proceed for chaos injection
 	if err := startProxy(experimentDetails, pid); err != nil {
 		_ = killProxy(pid)
 		return errors.Errorf("failed to start proxy, err: %v", err)
