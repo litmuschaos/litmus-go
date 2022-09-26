@@ -18,11 +18,11 @@ import (
 // CheckNodeStatus checks the status of the node
 func CheckNodeStatus(nodes string, timeout, delay int, clients clients.ClientSets) error {
 
-	nodeList := apiv1.NodeList{}
 	return retry.
 		Times(uint(timeout / delay)).
 		Wait(time.Duration(delay) * time.Second).
 		Try(func(attempt uint) error {
+			nodeList := apiv1.NodeList{}
 			if nodes != "" {
 				targetNodes := strings.Split(nodes, ",")
 				for index := range targetNodes {
