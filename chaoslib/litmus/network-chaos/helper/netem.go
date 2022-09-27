@@ -171,7 +171,6 @@ func injectChaos(experimentDetails *experimentTypes.ExperimentDetails, pid int) 
 				out, err = cmd.CombinedOutput()
 				log.Info(cmd.String())
 				if err != nil {
-					log.Info(cmd.String())
 					log.Error(string(out))
 					return err
 				}
