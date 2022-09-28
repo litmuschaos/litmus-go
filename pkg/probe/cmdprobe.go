@@ -136,7 +136,7 @@ func createProbePod(clients clients.ClientSets, chaosDetails *types.ChaosDetails
 		return errors.Errorf("unable to get the serviceAccountName, err: %v", err)
 	}
 
-	expEnv, expVolumeMount, volume := getEnvAndVolumeMountFromExperiment(clients, chaosDetails.ChaosNamespace, chaosDetails.ChaosPodName, source.VolumesMount)
+	expEnv, expVolumeMount, volume := getEnvAndVolumeMountFromExperiment(clients, chaosDetails.ChaosNamespace, chaosDetails.ChaosPodName)
 
 	expEnv = append(expEnv, source.ENVList...)
 	expVolumeMount = append(expVolumeMount, source.VolumesMount...)
@@ -178,18 +178,24 @@ func createProbePod(clients clients.ClientSets, chaosDetails *types.ChaosDetails
 	return err
 }
 
-func getEnvAndVolumeMountFromExperiment(clients clients.ClientSets, chaosNamespace, podName string, sourceVolumeMount []apiv1.VolumeMount) ([]apiv1.EnvVar, []apiv1.VolumeMount, []apiv1.Volume) {
+func getEnvAndVolumeMountFromExperiment(clients clients.ClientSets, chaosNamespace, podName string) ([]apiv1.EnvVar, []apiv1.VolumeMount, []apiv1.Volume) {
+
+	envVarList := make([]apiv1.EnvVar, 0)
+	volumeMountList := make([]apiv1.VolumeMount, 0)
+	volumeList := make([]apiv1.Volume, 0)
+
 	expPod, err := clients.KubeClient.CoreV1().Pods(chaosNamespace).Get(context.Background(), podName, v1.GetOptions{})
 	if err != nil {
 		log.Errorf("Unable to get the experiment pod, err: %v", err)
 		return nil, nil, nil
 	}
-	envVarList := make([]apiv1.EnvVar, 0)
-	volumeMountList := make([]apiv1.VolumeMount, 0)
-	volumeList := make([]apiv1.Volume, 0)
+
+	expContainerName := expPod.Labels["job-name"]
 
 	for _, container := range expPod.Spec.Containers {
-		envVarList = append(envVarList, container.Env...)
+		if container.Name == expContainerName {
+			envVarList = append(envVarList, container.Env...)
+		}
 		for _, volumeMount := range container.VolumeMounts {
 			// NOTE: one can add custom volume mount from probe spec
 			if volumeMount.Name == "cloud-secret" {
@@ -199,7 +205,7 @@ func getEnvAndVolumeMountFromExperiment(clients clients.ClientSets, chaosNamespa
 	}
 
 	for _, vol := range expPod.Spec.Volumes {
-		// NOTE: one can add custom volume mount from probe spec
+		// NOTE: one can add custom volume from probe spec
 		if vol.Name == "cloud-secret" {
 			volumeList = append(volumeList, vol)
 		}
@@ -246,7 +252,7 @@ func getProbeCmd(sourceCmd []string) []string {
 	return sourceCmd
 }
 
-// deleteProbePod deletes the probe pod and wait until it got terminated
+//deleteProbePod deletes the probe pod and wait until it got terminated
 func deleteProbePod(chaosDetails *types.ChaosDetails, clients clients.ClientSets, runID string) error {
 
 	if err := clients.KubeClient.CoreV1().Pods(chaosDetails.ChaosNamespace).Delete(context.Background(), chaosDetails.ExperimentName+"-probe-"+runID, v1.DeleteOptions{}); err != nil {
@@ -379,14 +385,12 @@ func triggerSourceOnChaosCmdProbe(probe v1alpha1.ProbeAttributes, execCommandDet
 		duration = math.Maximum(0, duration-probe.RunProperties.InitialDelaySeconds)
 	}
 
-	var endTime <-chan time.Time
-	timeDelay := time.Duration(duration) * time.Second
+	endTime := time.After(time.Duration(duration) * time.Second)
 
 	// it trigger the cmd probe for the entire duration of chaos and it fails, if any err encounter
 	// it marked the error for the probes, if any
 loop:
 	for {
-		endTime = time.After(timeDelay)
 		select {
 		case <-endTime:
 			log.Infof("[Chaos]: Time is up for the %v probe", probe.Name)
@@ -486,7 +490,7 @@ func validateResult(comparator v1alpha1.ComparatorInfo, cmdOutput string, rc int
 	return nil
 }
 
-// preChaosCmdProbe trigger the cmd probe for prechaos phase
+//preChaosCmdProbe trigger the cmd probe for prechaos phase
 func preChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
 
 	switch probe.Mode {
@@ -572,7 +576,7 @@ func preChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 	return nil
 }
 
-// postChaosCmdProbe trigger cmd probe for post chaos phase
+//postChaosCmdProbe trigger cmd probe for post chaos phase
 func postChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
 
 	switch probe.Mode {
@@ -656,7 +660,7 @@ func postChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resu
 	return nil
 }
 
-// onChaosCmdProbe trigger the cmd probe for DuringChaos phase
+//onChaosCmdProbe trigger the cmd probe for DuringChaos phase
 func onChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
 
 	switch probe.Mode {
