@@ -136,11 +136,7 @@ func createProbePod(clients clients.ClientSets, chaosDetails *types.ChaosDetails
 		return errors.Errorf("unable to get the serviceAccountName, err: %v", err)
 	}
 
-	expEnv, expVolumeMount, volume := getEnvAndVolumeMountFromExperiment(clients, chaosDetails.ChaosNamespace, chaosDetails.ChaosPodName)
-
-	expEnv = append(expEnv, source.ENVList...)
-	expVolumeMount = append(expVolumeMount, source.VolumesMount...)
-	volume = append(volume, source.Volumes...)
+	expEnv, volume, expVolumeMount := inheritInputs(clients, chaosDetails.ChaosNamespace, chaosDetails.ChaosPodName, source)
 
 	cmdProbe := &apiv1.Pod{
 		ObjectMeta: v1.ObjectMeta{
@@ -178,6 +174,23 @@ func createProbePod(clients clients.ClientSets, chaosDetails *types.ChaosDetails
 	return err
 }
 
+// inheritInputs will inherit the experiment details(ENVs and volumes) to the probe pod based on inheritInputs flag
+func inheritInputs(clients clients.ClientSets, chaosNS, chaosPodName string, source v1alpha1.SourceDetails) ([]apiv1.EnvVar, []apiv1.Volume, []apiv1.VolumeMount) {
+
+	if !source.InheritInputs {
+		return source.ENVList, source.Volumes, source.VolumesMount
+	}
+	expEnv, expVolumeMount, volume := getEnvAndVolumeMountFromExperiment(clients, chaosNS, chaosPodName)
+
+	expEnv = append(expEnv, source.ENVList...)
+	expVolumeMount = append(expVolumeMount, source.VolumesMount...)
+	volume = append(volume, source.Volumes...)
+
+	return expEnv, volume, expVolumeMount
+
+}
+
+// getEnvAndVolumeMountFromExperiment get the env and volumeMount from the experiment pod and add in the probe pod
 func getEnvAndVolumeMountFromExperiment(clients clients.ClientSets, chaosNamespace, podName string) ([]apiv1.EnvVar, []apiv1.VolumeMount, []apiv1.Volume) {
 
 	envVarList := make([]apiv1.EnvVar, 0)
