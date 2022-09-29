@@ -8,7 +8,7 @@ import (
 	clientTypes "k8s.io/apimachinery/pkg/types"
 )
 
-//GetENV fetches all the env variables from the runner pod
+// GetENV fetches all the env variables from the runner pod
 func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string) {
 	experimentDetails.ExperimentName = types.Getenv("EXPERIMENT_NAME", "")
 	experimentDetails.ChaosNamespace = types.Getenv("CHAOS_NAMESPACE", "litmus")
@@ -47,7 +47,8 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string
 		experimentDetails.NetworkChaosType = "network-loss"
 
 	case "pod-network-latency":
-		experimentDetails.NetworkLatency, _ = strconv.Atoi(types.Getenv("NETWORK_LATENCY", "60000"))
+		experimentDetails.NetworkLatency, _ = strconv.Atoi(types.Getenv("NETWORK_LATENCY", "2000"))
+		experimentDetails.Jitter, _ = strconv.Atoi(types.Getenv("JITTER", "0"))
 		experimentDetails.NetworkChaosType = "network-latency"
 
 	case "pod-network-corruption":
