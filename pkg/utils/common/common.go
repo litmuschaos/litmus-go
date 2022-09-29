@@ -1,9 +1,11 @@
 package common
 
 import (
+	"fmt"
 	"math/rand"
 	"os"
 	"os/signal"
+	"reflect"
 	"strconv"
 	"strings"
 	"syscall"
@@ -217,6 +219,18 @@ func getRandomValue(a, b int) int {
 func StringExistsInSlice(val string, slice []string) bool {
 	for _, v := range slice {
 		if strings.Contains(val, v) {
+			return true
+		}
+	}
+	return false
+}
+
+func Contains(val interface{}, slice interface{}) bool {
+	if slice == nil {
+		return false
+	}
+	for i := 0; i < reflect.ValueOf(slice).Len(); i++ {
+		if fmt.Sprintf("%v", reflect.ValueOf(val).Interface()) == fmt.Sprintf("%v", reflect.ValueOf(slice).Index(i).Interface()) {
 			return true
 		}
 	}
