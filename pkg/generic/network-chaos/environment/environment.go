@@ -40,6 +40,8 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string
 	experimentDetails.Sequence = types.Getenv("SEQUENCE", "parallel")
 	experimentDetails.TerminationGracePeriodSeconds, _ = strconv.Atoi(types.Getenv("TERMINATION_GRACE_PERIOD_SECONDS", ""))
 	experimentDetails.SetHelperData = types.Getenv("SET_HELPER_DATA", "true")
+	experimentDetails.SourcePorts = types.Getenv("SOURCE_PORTS", "")
+	experimentDetails.DestinationPorts = types.Getenv("DESTINATION_PORTS", "")
 
 	switch expName {
 	case "pod-network-loss":
