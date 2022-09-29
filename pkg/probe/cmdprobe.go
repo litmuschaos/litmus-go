@@ -135,6 +135,9 @@ func createProbePod(clients clients.ClientSets, chaosDetails *types.ChaosDetails
 	if err != nil {
 		return errors.Errorf("unable to get the serviceAccountName, err: %v", err)
 	}
+
+	expEnv, volume, expVolumeMount := inheritInputs(clients, chaosDetails.ChaosNamespace, chaosDetails.ChaosPodName, source)
+
 	cmdProbe := &apiv1.Pod{
 		ObjectMeta: v1.ObjectMeta{
 			Name:        chaosDetails.ExperimentName + "-probe-" + runID,
@@ -146,7 +149,7 @@ func createProbePod(clients clients.ClientSets, chaosDetails *types.ChaosDetails
 			RestartPolicy:      apiv1.RestartPolicyNever,
 			HostNetwork:        source.HostNetwork,
 			ServiceAccountName: svcAccount,
-			Volumes:            source.Volumes,
+			Volumes:            volume,
 			NodeSelector:       source.NodeSelector,
 			ImagePullSecrets:   source.ImagePullSecrets,
 			Containers: []apiv1.Container{
@@ -157,11 +160,11 @@ func createProbePod(clients clients.ClientSets, chaosDetails *types.ChaosDetails
 					Command:         getProbeCmd(source.Command),
 					Args:            getProbeArgs(source.Args),
 					Resources:       chaosDetails.Resources,
-					Env:             source.ENVList,
+					Env:             expEnv,
 					SecurityContext: &apiv1.SecurityContext{
 						Privileged: &source.Privileged,
 					},
-					VolumeMounts: source.VolumesMount,
+					VolumeMounts: expVolumeMount,
 				},
 			},
 		},
@@ -169,6 +172,59 @@ func createProbePod(clients clients.ClientSets, chaosDetails *types.ChaosDetails
 
 	_, err = clients.KubeClient.CoreV1().Pods(chaosDetails.ChaosNamespace).Create(context.Background(), cmdProbe, v1.CreateOptions{})
 	return err
+}
+
+// inheritInputs will inherit the experiment details(ENVs and volumes) to the probe pod based on inheritInputs flag
+func inheritInputs(clients clients.ClientSets, chaosNS, chaosPodName string, source v1alpha1.SourceDetails) ([]apiv1.EnvVar, []apiv1.Volume, []apiv1.VolumeMount) {
+
+	if !source.InheritInputs {
+		return source.ENVList, source.Volumes, source.VolumesMount
+	}
+	expEnv, expVolumeMount, volume := getEnvAndVolumeMountFromExperiment(clients, chaosNS, chaosPodName)
+
+	expEnv = append(expEnv, source.ENVList...)
+	expVolumeMount = append(expVolumeMount, source.VolumesMount...)
+	volume = append(volume, source.Volumes...)
+
+	return expEnv, volume, expVolumeMount
+
+}
+
+// getEnvAndVolumeMountFromExperiment get the env and volumeMount from the experiment pod and add in the probe pod
+func getEnvAndVolumeMountFromExperiment(clients clients.ClientSets, chaosNamespace, podName string) ([]apiv1.EnvVar, []apiv1.VolumeMount, []apiv1.Volume) {
+
+	envVarList := make([]apiv1.EnvVar, 0)
+	volumeMountList := make([]apiv1.VolumeMount, 0)
+	volumeList := make([]apiv1.Volume, 0)
+
+	expPod, err := clients.KubeClient.CoreV1().Pods(chaosNamespace).Get(context.Background(), podName, v1.GetOptions{})
+	if err != nil {
+		log.Errorf("Unable to get the experiment pod, err: %v", err)
+		return nil, nil, nil
+	}
+
+	expContainerName := expPod.Labels["job-name"]
+
+	for _, container := range expPod.Spec.Containers {
+		if container.Name == expContainerName {
+			envVarList = append(envVarList, container.Env...)
+		}
+		for _, volumeMount := range container.VolumeMounts {
+			// NOTE: one can add custom volume mount from probe spec
+			if volumeMount.Name == "cloud-secret" {
+				volumeMountList = append(volumeMountList, volumeMount)
+			}
+		}
+	}
+
+	for _, vol := range expPod.Spec.Volumes {
+		// NOTE: one can add custom volume from probe spec
+		if vol.Name == "cloud-secret" {
+			volumeList = append(volumeList, vol)
+		}
+	}
+
+	return envVarList, volumeMountList, volumeList
 }
 
 // getProbeLabels adding provided labels to probePod
