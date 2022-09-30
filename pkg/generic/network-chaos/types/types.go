@@ -44,4 +44,6 @@ type ExperimentDetails struct {
 	NodeLabel                          string
 	IsTargetContainerProvided          bool
 	SetHelperData                      string
+	SourcePorts                        string
+	DestinationPorts                   string
 }

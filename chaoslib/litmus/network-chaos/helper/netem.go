@@ -30,6 +30,8 @@ var (
 	inject, abort chan os.Signal
 )
 
+var destIps, sPorts, dPorts []string
+
 // Helper injects the network chaos
 func Helper(clients clients.ClientSets) {
 
@@ -120,14 +122,13 @@ func preparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetail
 func injectChaos(experimentDetails *experimentTypes.ExperimentDetails, pid int) error {
 
 	netemCommands := os.Getenv("NETEM_COMMAND")
-	destinationIPs := os.Getenv("DESTINATION_IPS")
 
 	select {
 	case <-inject:
 		// stopping the chaos execution, if abort signal received
 		os.Exit(1)
 	default:
-		if destinationIPs == "" {
+		if len(destIps) == 0 && len(sPorts) == 0 && len(dPorts) == 0 {
 			tc := fmt.Sprintf("sudo nsenter -t %d -n tc qdisc replace dev %s root netem %v", pid, experimentDetails.NetworkInterface, netemCommands)
 			cmd := exec.Command("/bin/bash", "-c", tc)
 			out, err := cmd.CombinedOutput()
@@ -137,24 +138,6 @@ func injectChaos(experimentDetails *experimentTypes.ExperimentDetails, pid int) 
 				return err
 			}
 		} else {
-
-			ips := strings.Split(destinationIPs, ",")
-			var uniqueIps []string
-
-			// removing duplicates ips from the list, if any
-			for i := range ips {
-				isPresent := false
-				for j := range uniqueIps {
-					if ips[i] == uniqueIps[j] {
-						isPresent = true
-						break
-					}
-				}
-				if !isPresent {
-					uniqueIps = append(uniqueIps, ips[i])
-				}
-
-			}
 
 			// Create a priority-based queue
 			// This instantly creates classes 1:1, 1:2, 1:3
@@ -178,8 +161,7 @@ func injectChaos(experimentDetails *experimentTypes.ExperimentDetails, pid int) 
 				return err
 			}
 
-			for _, ip := range uniqueIps {
-
+			for _, ip := range destIps {
 				// redirect traffic to specific IP through band 3
 				tc := fmt.Sprintf("sudo nsenter -t %v -n tc filter add dev %v protocol ip parent 1:0 prio 3 u32 match ip dst %v flowid 1:3", pid, experimentDetails.NetworkInterface, ip)
 				if strings.Contains(ip, ":") {
@@ -193,8 +175,31 @@ func injectChaos(experimentDetails *experimentTypes.ExperimentDetails, pid int) 
 					return err
 				}
 			}
-		}
 
+			for _, port := range sPorts {
+				//redirect traffic to specific sport through band 3
+				tc := fmt.Sprintf("sudo nsenter -t %v -n tc filter add dev %v protocol ip parent 1:0 prio 3 u32 match ip sport %v 0xffff flowid 1:3", pid, experimentDetails.NetworkInterface, port)
+				cmd = exec.Command("/bin/bash", "-c", tc)
+				out, err = cmd.CombinedOutput()
+				log.Info(cmd.String())
+				if err != nil {
+					log.Error(string(out))
+					return err
+				}
+			}
+
+			for _, port := range dPorts {
+				//redirect traffic to specific dport through band 3
+				tc := fmt.Sprintf("sudo nsenter -t %v -n tc filter add dev %v protocol ip parent 1:0 prio 3 u32 match ip dport %v 0xffff flowid 1:3", pid, experimentDetails.NetworkInterface, port)
+				cmd = exec.Command("/bin/bash", "-c", tc)
+				out, err = cmd.CombinedOutput()
+				log.Info(cmd.String())
+				if err != nil {
+					log.Error(string(out))
+					return err
+				}
+			}
+		}
 	}
 	return nil
 }
@@ -237,6 +242,32 @@ func getENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.NetworkInterface = types.Getenv("NETWORK_INTERFACE", "eth0")
 	experimentDetails.SocketPath = types.Getenv("SOCKET_PATH", "")
 	experimentDetails.DestinationIPs = types.Getenv("DESTINATION_IPS", "")
+	experimentDetails.SourcePorts = types.Getenv("SOURCE_PORTS", "")
+	experimentDetails.DestinationPorts = types.Getenv("DESTINATION_PORTS", "")
+
+	destIps = getDestinationIPs(experimentDetails.DestinationIPs)
+	if strings.TrimSpace(experimentDetails.DestinationPorts) != "" {
+		dPorts = strings.Split(strings.TrimSpace(experimentDetails.DestinationPorts), ",")
+	}
+	if strings.TrimSpace(experimentDetails.SourcePorts) != "" {
+		sPorts = strings.Split(strings.TrimSpace(experimentDetails.SourcePorts), ",")
+	}
+}
+
+func getDestinationIPs(ips string) []string {
+	if strings.TrimSpace(ips) == "" {
+		return nil
+	}
+	destIPs := strings.Split(strings.TrimSpace(ips), ",")
+	var uniqueIps []string
+
+	// removing duplicates ips from the list, if any
+	for i := range destIPs {
+		if !common.Contains(destIPs[i], uniqueIps) {
+			uniqueIps = append(uniqueIps, destIPs[i])
+		}
+	}
+	return uniqueIps
 }
 
 // abortWatcher continuously watch for the abort signals
