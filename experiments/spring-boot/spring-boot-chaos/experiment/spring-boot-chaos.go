@@ -1,6 +1,8 @@
 package experiment
 
 import (
+	"os"
+
 	"github.com/litmuschaos/chaos-operator/api/litmuschaos/v1alpha1"
 	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/spring-boot-chaos/lib"
 	"github.com/litmuschaos/litmus-go/pkg/clients"
@@ -14,7 +16,6 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/sirupsen/logrus"
-	"os"
 )
 
 // Experiment contains steps to inject chaos
@@ -98,7 +99,7 @@ func Experiment(clients clients.ClientSets) {
 	}
 
 	//PRE-CHAOS APPLICATION STATUS CHECK
-	if chaosDetails.DefaultAppHealthCheck {
+	if chaosDetails.DefaultHealthCheck {
 		log.Info("[Status]: Verify that the AUT (Application Under Test) is running (pre-chaos)")
 		if err := status.AUTStatusCheck(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.TargetContainer, experimentsDetails.Timeout, experimentsDetails.Delay, clients, &chaosDetails); err != nil {
 			log.Errorf("Application status check failed, err: %v", err)
@@ -152,7 +153,7 @@ func Experiment(clients clients.ClientSets) {
 	resultDetails.Verdict = v1alpha1.ResultVerdictPassed
 
 	// POST-CHAOS APPLICATION STATUS CHECK
-	if chaosDetails.DefaultAppHealthCheck {
+	if chaosDetails.DefaultHealthCheck {
 		log.Info("[Status]: Verify that the AUT (Application Under Test) is running (post-chaos)")
 		if err := status.AUTStatusCheck(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.TargetContainer, experimentsDetails.Timeout, experimentsDetails.Delay, clients, &chaosDetails); err != nil {
 			log.Errorf("Application status check failed, err: %v", err)
