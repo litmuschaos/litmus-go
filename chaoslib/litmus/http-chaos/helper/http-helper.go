@@ -120,11 +120,11 @@ func injectChaos(experimentDetails *experimentTypes.ExperimentDetails, pid int) 
 	default:
 		// proceed for chaos injection
 		if err := startProxy(experimentDetails, pid); err != nil {
-			_ = killProxy(experimentDetails, pid)
+			_ = killProxy(pid)
 			return errors.Errorf("failed to start proxy, err: %v", err)
 		}
 		if err := addIPRuleSet(experimentDetails, pid); err != nil {
-			_ = killProxy(experimentDetails, pid)
+			_ = killProxy(pid)
 			return errors.Errorf("failed to add ip rule set, err: %v", err)
 		}
 	}
@@ -141,7 +141,7 @@ func revertChaos(experimentDetails *experimentTypes.ExperimentDetails, pid int) 
 		revertError = errors.Errorf("failed to remove ip rule set, err: %v", err)
 	}
 
-	if err := killProxy(experimentDetails, pid); err != nil {
+	if err := killProxy(pid); err != nil {
 		if revertError != nil {
 			revertError = errors.Errorf("%v and failed to kill proxy server, err: %v", revertError, err)
 		} else {
@@ -160,7 +160,7 @@ func startProxy(experimentDetails *experimentTypes.ExperimentDetails, pid int) e
 
 	// starting toxiproxy server inside the target container
 	startProxyServerCommand := fmt.Sprintf("(sudo nsenter -t %d -n toxiproxy-server -host=0.0.0.0 > /dev/null 2>&1 &)", pid)
-	// Creating a proxy for the targetted service in the target container
+	// Creating a proxy for the targeted service in the target container
 	createProxyCommand := fmt.Sprintf("(sudo nsenter -t %d -n toxiproxy-cli create -l 0.0.0.0:%d -u 0.0.0.0:%d proxy)", pid, experimentDetails.ProxyPort, experimentDetails.TargetServicePort)
 	createToxicCommand := fmt.Sprintf("(sudo nsenter -t %d -n toxiproxy-cli toxic add %s --toxicity %f proxy)", pid, toxics, float32(experimentDetails.Toxicity)/100.0)
 
@@ -180,7 +180,7 @@ func startProxy(experimentDetails *experimentTypes.ExperimentDetails, pid int) e
 // killProxy kills the proxy process inside the target container
 // it is using nsenter command to enter into network namespace of target container
 // and execute the proxy related command inside it.
-func killProxy(experimentDetails *experimentTypes.ExperimentDetails, pid int) error {
+func killProxy(pid int) error {
 	stopProxyServerCommand := fmt.Sprintf("sudo nsenter -t %d -n sudo kill -9 $(ps aux | grep [t]oxiproxy | awk 'FNR==1{print $1}')", pid)
 	log.Infof("[Chaos]: Stopping proxy server")
 
@@ -196,7 +196,10 @@ func killProxy(experimentDetails *experimentTypes.ExperimentDetails, pid int) er
 // it is using nsenter command to enter into network namespace of target container
 // and execute the iptables related command inside it.
 func addIPRuleSet(experimentDetails *experimentTypes.ExperimentDetails, pid int) error {
-	addIPRuleSetCommand := fmt.Sprintf("(sudo nsenter -t %d -n iptables -t nat -A PREROUTING -i %v -p tcp --dport %d -j REDIRECT --to-port %d)", pid, experimentDetails.NetworkInterface, experimentDetails.TargetServicePort, experimentDetails.ProxyPort)
+	// it adds the proxy port REDIRECT iprule in the beginning of the PREROUTING table
+	// so that it always matches all the incoming packets for the matching target port filters and
+	// if matches then it redirect the request to the proxy port
+	addIPRuleSetCommand := fmt.Sprintf("(sudo nsenter -t %d -n iptables -t nat -I PREROUTING -i %v -p tcp --dport %d -j REDIRECT --to-port %d)", pid, experimentDetails.NetworkInterface, experimentDetails.TargetServicePort, experimentDetails.ProxyPort)
 	log.Infof("[Chaos]: Adding IPtables ruleset")
 
 	if err := runCommand(addIPRuleSetCommand); err != nil {
