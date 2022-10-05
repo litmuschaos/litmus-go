@@ -73,6 +73,16 @@ func EBSLossByID(clients clients.ClientSets) {
 		"Sequence":       experimentsDetails.Sequence,
 	})
 
+	//Verify the aws ec2 instance is attached to ebs volume
+	if chaosDetails.DefaultHealthCheck {
+		if err = aws.EBSStateCheckByID(experimentsDetails.EBSVolumeID, experimentsDetails.Region); err != nil {
+			log.Errorf("volume status check failed pre chaos, err: %v", err)
+			failStep := "[pre-chaos]: Failed to verify if the ebs volume is attached to ec2 instance, err: " + err.Error()
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+			return
+		}
+	}
+
 	if experimentsDetails.EngineName != "" {
 		// marking AUT as running, as we already checked the status of application under test
 		msg := "AUT: Running"
@@ -96,17 +106,6 @@ func EBSLossByID(clients clients.ClientSets) {
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
-	if chaosDetails.DefaultHealthCheck {
-
-		//Verify the aws ec2 instance is attached to ebs volume
-		if err = aws.EBSStateCheckByID(experimentsDetails.EBSVolumeID, experimentsDetails.Region); err != nil {
-			log.Errorf("volume status check failed pre chaos, err: %v", err)
-			failStep := "[pre-chaos]: Failed to verify if the ebs volume is attached to ec2 instance, err: " + err.Error()
-			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-			return
-		}
-	}
-
 	// Including the litmus lib for ebs-loss
 	switch experimentsDetails.ChaosLib {
 	case "litmus":
@@ -128,7 +127,6 @@ func EBSLossByID(clients clients.ClientSets) {
 
 	//POST-CHAOS APPLICATION STATUS CHECK
 	if chaosDetails.DefaultHealthCheck {
-
 		//Verify the aws ec2 instance is attached to ebs volume
 		if err = aws.EBSStateCheckByID(experimentsDetails.EBSVolumeID, experimentsDetails.Region); err != nil {
 			log.Errorf("volume status check failed post chaos, err: %v", err)

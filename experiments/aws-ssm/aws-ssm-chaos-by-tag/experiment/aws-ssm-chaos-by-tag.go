@@ -73,14 +73,12 @@ func AWSSSMChaosByTag(clients clients.ClientSets) {
 		"Sequence":             experimentsDetails.Sequence,
 	})
 
-	if chaosDetails.DefaultHealthCheck {
-		//Verify that the instance should have permission to perform ssm api calls
-		if err := ssm.CheckInstanceInformation(&experimentsDetails); err != nil {
-			log.Errorf("target instance status check failed, err: %v", err)
-			failStep := "[pre-chaos]: Failed to verify the AWS ec2 instance status, err: " + err.Error()
-			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-			return
-		}
+	//Verify that the instance should have permission to perform ssm api calls
+	if err := ssm.CheckInstanceInformation(&experimentsDetails); err != nil {
+		log.Errorf("target instance status check failed, err: %v", err)
+		failStep := "[pre-chaos]: Failed to verify the AWS ec2 instance status, err: " + err.Error()
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+		return
 	}
 
 	if experimentsDetails.EngineName != "" {
@@ -134,7 +132,7 @@ func AWSSSMChaosByTag(clients clients.ClientSets) {
 
 	if chaosDetails.DefaultHealthCheck {
 		//Verify the aws ec2 instance is running (post chaos)
-		if err := ec2.InstanceStatusCheckByTag(experimentsDetails.EC2InstanceTag, experimentsDetails.Region); err != nil {
+		if err := ec2.InstanceStatusCheck(experimentsDetails.TargetInstanceIDList, experimentsDetails.Region); err != nil {
 			log.Errorf("failed to get the ec2 instance status, err: %v", err)
 			failStep := "[post-chaos]: Failed to verify the AWS ec2 instance status, err: " + err.Error()
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)

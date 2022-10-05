@@ -12,10 +12,11 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/types"
+	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/pkg/errors"
 )
 
-//InjectChaosInSerialMode will inject the aws ssm chaos in serial mode that is one after other
+// InjectChaosInSerialMode will inject the aws ssm chaos in serial mode that is one after other
 func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, instanceIDList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, inject chan os.Signal) error {
 
 	select {
@@ -55,6 +56,7 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 				if err := ssm.WaitForCommandStatus("InProgress", commandId, ec2ID, experimentsDetails.Region, experimentsDetails.ChaosDuration+experimentsDetails.Timeout, experimentsDetails.Delay); err != nil {
 					return errors.Errorf("fail to start ssm command, err: %v", err)
 				}
+				common.SetTargets(ec2ID, "injected", "EC2", chaosDetails)
 
 				// run the probes during chaos
 				if len(resultDetails.ProbeDetails) != 0 && i == 0 {
@@ -68,6 +70,7 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 				if err := ssm.WaitForCommandStatus("Success", commandId, ec2ID, experimentsDetails.Region, experimentsDetails.ChaosDuration+experimentsDetails.Timeout, experimentsDetails.Delay); err != nil {
 					return errors.Errorf("fail to send ssm command, err: %v", err)
 				}
+				common.SetTargets(ec2ID, "reverted", "EC2", chaosDetails)
 
 				//Wait for chaos interval
 				log.Infof("[Wait]: Waiting for chaos interval of %vs", experimentsDetails.ChaosInterval)
