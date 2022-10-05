@@ -80,6 +80,8 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 		}
 	}
 
+	experimentsDetails.IsTargetContainerProvided = (experimentsDetails.TargetContainer != "")
+
 	switch strings.ToLower(experimentsDetails.Sequence) {
 	case "serial":
 		if err = injectChaosInSerialMode(experimentsDetails, targetPodList, args, clients, chaosDetails, resultDetails, eventsDetails); err != nil {
