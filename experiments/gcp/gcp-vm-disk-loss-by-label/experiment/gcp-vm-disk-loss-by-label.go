@@ -133,18 +133,20 @@ func GCPVMDiskLossByLabel(clients clients.ClientSets) {
 		return
 	}
 
-	for i := range experimentsDetails.TargetDiskVolumeNamesList {
-		instanceName, err := gcp.GetVolumeAttachmentDetails(computeService, experimentsDetails.GCPProjectID, experimentsDetails.DiskZones, experimentsDetails.TargetDiskVolumeNamesList[i])
-		if err != nil || instanceName == "" {
-			log.Errorf("Failed to verify disk volume attachment status, err: %v", err)
-			failStep := "[post-chaos]: Failed to verify disk volume attachment status, err: " + err.Error()
-			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-			return
-		}
-	}
-
 	log.Infof("[Confirmation]: %v chaos has been injected successfully", experimentsDetails.ExperimentName)
 	resultDetails.Verdict = v1alpha1.ResultVerdictPassed
+
+	if chaosDetails.DefaultHealthCheck {
+		for i := range experimentsDetails.TargetDiskVolumeNamesList {
+			instanceName, err := gcp.GetVolumeAttachmentDetails(computeService, experimentsDetails.GCPProjectID, experimentsDetails.DiskZones, experimentsDetails.TargetDiskVolumeNamesList[i])
+			if err != nil || instanceName == "" {
+				log.Errorf("Failed to verify disk volume attachment status, err: %v", err)
+				failStep := "[post-chaos]: Failed to verify disk volume attachment status, err: " + err.Error()
+				result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+				return
+			}
+		}
+	}
 
 	if experimentsDetails.EngineName != "" {
 		// marking AUT as running, as we already checked the status of application under test

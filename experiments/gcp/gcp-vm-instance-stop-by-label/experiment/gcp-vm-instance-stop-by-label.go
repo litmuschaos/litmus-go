@@ -138,11 +138,19 @@ func GCPVMInstanceStopByLabel(clients clients.ClientSets) {
 	resultDetails.Verdict = v1alpha1.ResultVerdictPassed
 
 	// Verify that GCP VM instance is running (post-chaos)
-	if experimentsDetails.ManagedInstanceGroup != "enable" {
+	if chaosDetails.DefaultHealthCheck && experimentsDetails.ManagedInstanceGroup != "enable" {
 		for _, instanceName := range experimentsDetails.TargetVMInstanceNameList {
-			if err := gcp.WaitForVMInstanceUp(computeService, experimentsDetails.Timeout, experimentsDetails.Delay, instanceName, experimentsDetails.GCPProjectID, experimentsDetails.InstanceZone); err != nil {
-				log.Errorf("failed to get the VM instance status as RUNNING post chaos, err: %v", err)
-				failStep := "[post-chaos]: Failed to verify the VM instance status, err: " + err.Error()
+			instanceState, err := gcp.GetVMInstanceStatus(computeService, instanceName, experimentsDetails.GCPProjectID, experimentsDetails.InstanceZone)
+			if err != nil {
+				log.Errorf("Failed to get %s VM instance status, err: %v", instanceName, err)
+				failStep := "[post-chaos]: Failed to get " + instanceName + " VM instance status, err: " + err.Error()
+				result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+				return
+			}
+
+			if instanceState != "RUNNING" {
+				log.Errorf("%s VM is not in a RUNNING state post chaos", instanceName)
+				failStep := "[post-chaos]: " + instanceName + " VM is not in a RUNNING state post chaos"
 				result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 				return
 			}

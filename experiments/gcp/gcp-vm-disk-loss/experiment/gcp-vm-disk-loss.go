@@ -19,7 +19,7 @@ import (
 	"google.golang.org/api/compute/v1"
 )
 
-//VMDiskLoss injects the disk volume loss chaos
+// VMDiskLoss injects the disk volume loss chaos
 func VMDiskLoss(clients clients.ClientSets) {
 
 	var (
@@ -110,11 +110,13 @@ func VMDiskLoss(clients clients.ClientSets) {
 	}
 
 	//Verify the vm instance is attached to disk volume
-	if err := gcp.DiskVolumeStateCheck(computeService, &experimentsDetails, "pre-chaos"); err != nil {
-		log.Errorf("volume status check failed pre chaos, err: %v", err)
-		failStep := "[pre-chaos]: Failed to verify if the disk volume is attached to an instance, err: " + err.Error()
-		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-		return
+	if chaosDetails.DefaultHealthCheck {
+		if err := gcp.DiskVolumeStateCheck(computeService, &experimentsDetails, "pre-chaos"); err != nil {
+			log.Errorf("volume status check failed pre chaos, err: %v", err)
+			failStep := "[pre-chaos]: Failed to verify if the disk volume is attached to an instance, err: " + err.Error()
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+			return
+		}
 	}
 
 	// Including the litmus lib for disk-loss
@@ -137,11 +139,13 @@ func VMDiskLoss(clients clients.ClientSets) {
 	resultDetails.Verdict = v1alpha1.ResultVerdictPassed
 
 	//Verify the vm instance is attached to disk volume
-	if err := gcp.DiskVolumeStateCheck(computeService, &experimentsDetails, "post-chaos"); err != nil {
-		log.Errorf("volume status check failed post chaos, err: %v", err)
-		failStep := "[post-chaos]: Failed to verify if the disk volume is attached to an instance, err: " + err.Error()
-		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-		return
+	if chaosDetails.DefaultHealthCheck {
+		if err := gcp.DiskVolumeStateCheck(computeService, &experimentsDetails, "post-chaos"); err != nil {
+			log.Errorf("volume status check failed post chaos, err: %v", err)
+			failStep := "[post-chaos]: Failed to verify if the disk volume is attached to an instance, err: " + err.Error()
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+			return
+		}
 	}
 
 	if experimentsDetails.EngineName != "" {
