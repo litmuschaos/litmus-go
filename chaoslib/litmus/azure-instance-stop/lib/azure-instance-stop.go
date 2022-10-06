@@ -43,7 +43,7 @@ func PrepareAzureStop(experimentsDetails *experimentTypes.ExperimentDetails, cli
 	}
 
 	//  get the instance name or list of instance names
-	instanceNameList := strings.Split(experimentsDetails.AzureInstanceName, ",")
+	instanceNameList := strings.Split(experimentsDetails.AzureInstanceNames, ",")
 	if len(instanceNameList) == 0 {
 		return errors.Errorf("no instance name found to stop")
 	}

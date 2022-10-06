@@ -9,7 +9,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/types"
 )
 
-//GetENV fetches all the env variables from the runner pod
+// GetENV fetches all the env variables from the runner pod
 func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.ExperimentName = types.Getenv("EXPERIMENT_NAME", "azure-instance-stop")
 	experimentDetails.ChaosNamespace = types.Getenv("CHAOS_NAMESPACE", "litmus")
@@ -28,7 +28,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.ChaosPodName = types.Getenv("POD_NAME", "")
 	experimentDetails.Delay, _ = strconv.Atoi(types.Getenv("STATUS_CHECK_DELAY", "2"))
 	experimentDetails.Timeout, _ = strconv.Atoi(types.Getenv("STATUS_CHECK_TIMEOUT", "180"))
-	experimentDetails.AzureInstanceName = types.Getenv("AZURE_INSTANCE_NAME", "")
+	experimentDetails.AzureInstanceNames = types.Getenv("AZURE_INSTANCE_NAMES", "")
 	experimentDetails.ResourceGroup = types.Getenv("RESOURCE_GROUP", "")
 	experimentDetails.ScaleSet = types.Getenv("SCALE_SET", "disable")
 	experimentDetails.Sequence = types.Getenv("SEQUENCE", "parallel")
