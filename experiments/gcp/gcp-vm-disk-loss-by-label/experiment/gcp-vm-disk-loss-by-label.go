@@ -117,6 +117,8 @@ func GCPVMDiskLossByLabel(clients clients.ClientSets) {
 		return
 	}
 
+	log.Info("[Status]: Disk volumes are attached to the VM instances (pre-chaos)")
+
 	// Including the litmus lib
 	switch experimentsDetails.ChaosLib {
 	case "litmus":
@@ -142,6 +144,8 @@ func GCPVMDiskLossByLabel(clients clients.ClientSets) {
 			return
 		}
 	}
+
+	log.Info("[Status]: Disk volumes are attached to the VM instances (post-chaos)")
 
 	log.Infof("[Confirmation]: %v chaos has been injected successfully", experimentsDetails.ExperimentName)
 	resultDetails.Verdict = v1alpha1.ResultVerdictPassed

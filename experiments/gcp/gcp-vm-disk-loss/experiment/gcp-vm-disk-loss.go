@@ -19,7 +19,7 @@ import (
 	"google.golang.org/api/compute/v1"
 )
 
-//VMDiskLoss injects the disk volume loss chaos
+// VMDiskLoss injects the disk volume loss chaos
 func VMDiskLoss(clients clients.ClientSets) {
 
 	var (
@@ -117,6 +117,8 @@ func VMDiskLoss(clients clients.ClientSets) {
 		return
 	}
 
+	log.Info("[Status]: Disk volumes are attached to the VM instances (pre-chaos)")
+
 	// Including the litmus lib for disk-loss
 	switch experimentsDetails.ChaosLib {
 	case "litmus":
@@ -143,6 +145,8 @@ func VMDiskLoss(clients clients.ClientSets) {
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
+
+	log.Info("[Status]: Disk volumes are attached to the VM instances (post-chaos)")
 
 	if experimentsDetails.EngineName != "" {
 		// marking AUT as running, as we already checked the status of application under test
