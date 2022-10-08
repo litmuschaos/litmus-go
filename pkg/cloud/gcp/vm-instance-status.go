@@ -29,12 +29,12 @@ func InstanceStatusCheckByName(computeService *compute.Service, managedInstanceG
 	if instanceNames == "" {
 		return errors.Errorf("no vm instance name found to stop")
 	}
-	instanceNamesList := strings.Split(instanceNames, ",")
+	instanceNamesList := strings.Split(strings.TrimSpace(instanceNames), ",")
 
 	if instanceZones == "" {
 		return errors.Errorf("no corresponding zones found for the instances")
 	}
-	instanceZonesList := strings.Split(instanceZones, ",")
+	instanceZonesList := strings.Split(strings.TrimSpace(instanceZones), ",")
 
 	if managedInstanceGroup != "enable" && managedInstanceGroup != "disable" {
 		return errors.Errorf("invalid value for MANAGED_INSTANCE_GROUP: %v", managedInstanceGroup)

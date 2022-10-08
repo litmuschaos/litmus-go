@@ -74,7 +74,7 @@ func InstanceStatusCheckByName(azureInstanceNames, scaleSet, subscriptionID, res
 	if azureInstanceNames == "" {
 		return errors.Errorf("no instance found to check the status")
 	}
-	instanceNameList := strings.Split(azureInstanceNames, ",")
+	instanceNameList := strings.Split(strings.TrimSpace(azureInstanceNames), ",")
 	log.Infof("[Info]: The instance under chaos(IUC) are: %v", instanceNameList)
 	switch scaleSet {
 	case "enable":

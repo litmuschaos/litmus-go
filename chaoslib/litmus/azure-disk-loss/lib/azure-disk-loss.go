@@ -48,7 +48,7 @@ func PrepareChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients
 		return errors.Errorf("no volume names found to detach")
 	}
 	//get the disk name  or list of disk names
-	diskNameList := strings.Split(experimentsDetails.VirtualDiskNames, ",")
+	diskNameList := strings.Split(strings.TrimSpace(experimentsDetails.VirtualDiskNames), ",")
 	instanceNamesWithDiskNames, err := diskStatus.GetInstanceNameForDisks(diskNameList, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup)
 
 	if err != nil {

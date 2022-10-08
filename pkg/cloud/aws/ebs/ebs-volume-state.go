@@ -104,7 +104,7 @@ func EBSStateCheckByID(volumeIDs, region string) error {
 	if volumeIDs == "" {
 		return errors.Errorf("no volumeID provided, please provide a volume to detach")
 	}
-	volumeIDList := strings.Split(volumeIDs, ",")
+	volumeIDList := strings.Split(strings.TrimSpace(volumeIDs), ",")
 	for _, id := range volumeIDList {
 		instanceID, _, err := GetVolumeAttachmentDetails(id, "", region)
 		if err != nil {

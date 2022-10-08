@@ -107,12 +107,12 @@ func DiskVolumeStateCheck(computeService *compute.Service, experimentsDetails *e
 		return errors.Errorf("no disk name provided, please provide the name of the disk")
 	}
 
-	diskNamesList := strings.Split(experimentsDetails.DiskVolumeNames, ",")
+	diskNamesList := strings.Split(strings.TrimSpace(experimentsDetails.DiskVolumeNames), ",")
 	if experimentsDetails.Zones == "" {
 		return errors.Errorf("no zone provided, please provide the zone of the disk")
 	}
 
-	zonesList := strings.Split(experimentsDetails.Zones, ",")
+	zonesList := strings.Split(strings.TrimSpace(experimentsDetails.Zones), ",")
 
 	if len(diskNamesList) != len(zonesList) {
 		return errors.Errorf("unequal number of disk names and zones found, please verify the input details")

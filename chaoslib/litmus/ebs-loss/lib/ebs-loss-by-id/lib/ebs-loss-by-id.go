@@ -48,7 +48,7 @@ func PrepareEBSLossByID(experimentsDetails *experimentTypes.ExperimentDetails, c
 			return errors.Errorf("no volume id found to detach")
 		}
 		//get the volume id or list of instance ids
-		volumeIDList := strings.Split(experimentsDetails.EBSVolumeID, ",")
+		volumeIDList := strings.Split(strings.TrimSpace(experimentsDetails.EBSVolumeID), ",")
 		// watching for the abort signal and revert the chaos
 		go ebsloss.AbortWatcher(experimentsDetails, volumeIDList, abort, chaosDetails)
 

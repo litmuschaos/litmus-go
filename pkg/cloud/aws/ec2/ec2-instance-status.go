@@ -44,7 +44,7 @@ func InstanceStatusCheckByID(instanceID, region string) error {
 	if instanceID == "" {
 		return errors.Errorf("no instance id found to terminate")
 	}
-	instanceIDList := strings.Split(instanceID, ",")
+	instanceIDList := strings.Split(strings.TrimSpace(instanceID), ",")
 	log.Infof("[Info]: The instances under chaos(IUC) are: %v", instanceIDList)
 	return InstanceStatusCheck(instanceIDList, region)
 }

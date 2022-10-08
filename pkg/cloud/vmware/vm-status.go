@@ -61,7 +61,7 @@ func VMStatusCheck(vcenterServer, vmIds, cookie string) error {
 	if vmIds == "" {
 		return errors.Errorf("no vm received, please input the target VMMoids")
 	}
-	vmIdList := strings.Split(vmIds, ",")
+	vmIdList := strings.Split(strings.TrimSpace(vmIds), ",")
 
 	for _, vmId := range vmIdList {
 

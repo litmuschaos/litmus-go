@@ -45,7 +45,7 @@ func PrepareEC2TerminateByID(experimentsDetails *experimentTypes.ExperimentDetai
 		return errors.Errorf("no instance id found to terminate")
 	}
 	//get the instance id or list of instance ids
-	instanceIDList := strings.Split(experimentsDetails.Ec2InstanceID, ",")
+	instanceIDList := strings.Split(strings.TrimSpace(experimentsDetails.Ec2InstanceID), ",")
 
 	// watching for the abort signal and revert the chaos
 	go abortWatcher(experimentsDetails, instanceIDList, chaosDetails)
