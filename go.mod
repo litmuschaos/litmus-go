@@ -19,7 +19,7 @@ require (
 	k8s.io/apimachinery v0.22.1
 	k8s.io/client-go v12.0.0+incompatible
 	k8s.io/klog v1.0.0
-	k8s.io/kubernetes v1.18.19
+	k8s.io/kubernetes v1.25.2
 )
 
 require (
