@@ -112,7 +112,7 @@ func preparePodDNSChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 	default:
 	}
 
-	done := make(chan bool, 1)
+	done := make(chan error, 1)
 
 	for index, t := range targets {
 		targets[index].Cmd, err = injectChaos(experimentsDetails, t.Pid)
@@ -145,8 +145,9 @@ func preparePodDNSChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 		}
 		if len(errList) != 0 {
 			log.Errorf("err: %v", strings.Join(errList, ", "))
+			done <- fmt.Errorf("err: %v", strings.Join(errList, ", "))
 		}
-		done <- true
+		done <- nil
 	}()
 
 	// check the timeout for the command
@@ -171,7 +172,7 @@ func preparePodDNSChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 		if len(errList) != 0 {
 			return fmt.Errorf("err: %v", strings.Join(errList, ", "))
 		}
-	case <-done:
+	case doneErr := <-done:
 		select {
 		case <-injectAbort:
 			// wait for the completion of abort handler
@@ -191,6 +192,7 @@ func preparePodDNSChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 			if len(errList) != 0 {
 				return fmt.Errorf("err: %v", strings.Join(errList, ", "))
 			}
+			return doneErr
 		}
 	}
 
