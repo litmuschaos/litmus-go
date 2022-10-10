@@ -88,7 +88,7 @@ func prepareK8sHttpChaos(experimentsDetails *experimentTypes.ExperimentDetails, 
 		}
 
 		// extract out the pid of the target container
-		td.Pid, err = common.GetPID(experimentsDetails.ContainerRuntime, td.ContainerId, experimentsDetails.SocketPath)
+		td.Pid, err = common.GetPauseAndSandboxPID(experimentsDetails.ContainerRuntime, td.ContainerId, experimentsDetails.SocketPath)
 		if err != nil {
 			return err
 		}
@@ -152,7 +152,6 @@ func prepareK8sHttpChaos(experimentsDetails *experimentTypes.ExperimentDetails, 
 
 // injectChaos inject the http chaos in target container and add ruleset to the iptables to redirect the ports
 func injectChaos(experimentDetails *experimentTypes.ExperimentDetails, pid int) error {
-
 	if err := startProxy(experimentDetails, pid); err != nil {
 		_ = killProxy(pid)
 		return errors.Errorf("failed to start proxy, err: %v", err)
@@ -192,7 +191,7 @@ func startProxy(experimentDetails *experimentTypes.ExperimentDetails, pid int) e
 
 	// starting toxiproxy server inside the target container
 	startProxyServerCommand := fmt.Sprintf("(sudo nsenter -t %d -n toxiproxy-server -host=0.0.0.0 > /dev/null 2>&1 &)", pid)
-	// Creating a proxy for the targetted service in the target container
+	// Creating a proxy for the targeted service in the target container
 	createProxyCommand := fmt.Sprintf("(sudo nsenter -t %d -n toxiproxy-cli create -l 0.0.0.0:%d -u 0.0.0.0:%d proxy)", pid, experimentDetails.ProxyPort, experimentDetails.TargetServicePort)
 	createToxicCommand := fmt.Sprintf("(sudo nsenter -t %d -n toxiproxy-cli toxic add %s --toxicity %f proxy)", pid, toxics, float32(experimentDetails.Toxicity)/100.0)
 
@@ -230,7 +229,10 @@ func killProxy(pid int) error {
 // it is using nsenter command to enter into network namespace of target container
 // and execute the iptables related command inside it.
 func addIPRuleSet(experimentDetails *experimentTypes.ExperimentDetails, pid int) error {
-	addIPRuleSetCommand := fmt.Sprintf("(sudo nsenter -t %d -n iptables -t nat -A PREROUTING -i %v -p tcp --dport %d -j REDIRECT --to-port %d)", pid, experimentDetails.NetworkInterface, experimentDetails.TargetServicePort, experimentDetails.ProxyPort)
+	// it adds the proxy port REDIRECT iprule in the beginning of the PREROUTING table
+	// so that it always matches all the incoming packets for the matching target port filters and
+	// if matches then it redirect the request to the proxy port
+	addIPRuleSetCommand := fmt.Sprintf("(sudo nsenter -t %d -n iptables -t nat -I PREROUTING -i %v -p tcp --dport %d -j REDIRECT --to-port %d)", pid, experimentDetails.NetworkInterface, experimentDetails.TargetServicePort, experimentDetails.ProxyPort)
 	log.Infof("[Chaos]: Adding IPtables ruleset")
 
 	if err := runCommand(addIPRuleSetCommand); err != nil {

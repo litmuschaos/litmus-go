@@ -3,7 +3,6 @@ package helper
 import (
 	"bufio"
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -114,7 +113,7 @@ func prepareStressChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 		}
 
 		// extract out the pid of the target container
-		td.Pid, err = getPID(experimentsDetails, td.ContainerId)
+		td.Pid, err = common.GetPID(experimentsDetails.ContainerRuntime, td.ContainerId, experimentsDetails.SocketPath)
 		if err != nil {
 			return err
 		}
@@ -315,51 +314,6 @@ func prepareStressor(experimentDetails *experimentTypes.ExperimentDetails) []str
 	return stressArgs
 }
 
-//getPID extract out the PID of the target container
-func getPID(experimentDetails *experimentTypes.ExperimentDetails, containerID string) (int, error) {
-	var PID int
-
-	switch experimentDetails.ContainerRuntime {
-	case "docker":
-		host := "unix://" + experimentDetails.SocketPath
-		// deriving pid from the inspect out of target container
-		out, err := exec.Command("sudo", "docker", "--host", host, "inspect", containerID).CombinedOutput()
-		if err != nil {
-			log.Error(fmt.Sprintf("[docker]: Failed to run docker inspect: %s", string(out)))
-			return 0, err
-		}
-
-		// parsing data from the json output of inspect command
-		PID, err = parsePIDFromJSON(out, experimentDetails.ContainerRuntime)
-		if err != nil {
-			log.Error(fmt.Sprintf("[docker]: Failed to parse json from docker inspect output: %s", string(out)))
-			return 0, err
-		}
-
-	case "containerd", "crio":
-		// deriving pid from the inspect out of target container
-		endpoint := "unix://" + experimentDetails.SocketPath
-		out, err := exec.Command("sudo", "crictl", "-i", endpoint, "-r", endpoint, "inspect", containerID).CombinedOutput()
-		if err != nil {
-			log.Error(fmt.Sprintf("[cri]: Failed to run crictl: %s", string(out)))
-			return 0, err
-		}
-
-		// parsing data from the json output of inspect command
-		PID, err = parsePIDFromJSON(out, experimentDetails.ContainerRuntime)
-		if err != nil {
-			log.Errorf(fmt.Sprintf("[cri]: Failed to parse json from crictl output: %s", string(out)))
-			return 0, err
-		}
-	default:
-		return 0, errors.Errorf("%v container runtime not suported", experimentDetails.ContainerRuntime)
-	}
-
-	log.Info(fmt.Sprintf("[Info]: Container ID=%s has process PID=%d", containerID, PID))
-
-	return PID, nil
-}
-
 //pidPath will get the pid path of the container
 func pidPath(pid int) cgroups.Path {
 	processPath := "/proc/" + strconv.Itoa(pid) + "/cgroup"
@@ -480,47 +434,6 @@ func findValidCgroup(path cgroups.Path, target string) (string, error) {
 		}
 	}
 	return "", errors.Errorf("never found valid cgroup for %s", target)
-}
-
-//parsePIDFromJSON extract the pid from the json output
-func parsePIDFromJSON(j []byte, runtime string) (int, error) {
-	var pid int
-	switch runtime {
-	case "docker":
-		// in docker, pid is present inside state.pid attribute of inspect output
-		var resp []common.DockerInspectResponse
-		if err := json.Unmarshal(j, &resp); err != nil {
-			return 0, err
-		}
-		pid = resp[0].State.PID
-	case "containerd":
-		var resp common.CrictlInspectResponse
-		if err := json.Unmarshal(j, &resp); err != nil {
-			return 0, err
-		}
-		pid = resp.Info.PID
-
-	case "crio":
-		var info common.InfoDetails
-		if err := json.Unmarshal(j, &info); err != nil {
-			return 0, err
-		}
-		pid = info.PID
-		if pid == 0 {
-			var resp common.CrictlInspectResponse
-			if err := json.Unmarshal(j, &resp); err != nil {
-				return 0, err
-			}
-			pid = resp.Info.PID
-		}
-	default:
-		return 0, errors.Errorf("[cri]: No supported container runtime, runtime: %v", runtime)
-	}
-	if pid == 0 {
-		return 0, errors.Errorf("[cri]: No running target container found, pid: %d", pid)
-	}
-
-	return pid, nil
 }
 
 //getENV fetches all the env variables from the runner pod

@@ -30,6 +30,8 @@ var (
 	inject, abort chan os.Signal
 )
 
+var destIps, sPorts, dPorts []string
+
 // Helper injects the network chaos
 func Helper(clients clients.ClientSets) {
 
@@ -172,8 +174,8 @@ func injectChaos(netInterface string, target targetDetails) error {
 		tc := fmt.Sprintf("sudo nsenter -t %d -n tc qdisc replace dev %s root netem %v", target.Pid, netInterface, netemCommands)
 		cmd := exec.Command("/bin/bash", "-c", tc)
 		out, err := cmd.CombinedOutput()
+		log.Info(cmd.String())
 		if err != nil {
-			log.Info(cmd.String())
 			log.Error(string(out))
 			return err
 		}
@@ -194,8 +196,8 @@ func injectChaos(netInterface string, target targetDetails) error {
 		priority := fmt.Sprintf("sudo nsenter -t %v -n tc qdisc replace dev %v root handle 1: prio", target.Pid, netInterface)
 		cmd := exec.Command("/bin/bash", "-c", priority)
 		out, err := cmd.CombinedOutput()
+		log.Info(cmd.String())
 		if err != nil {
-			log.Info(cmd.String())
 			log.Error(string(out))
 			return err
 		}
@@ -205,8 +207,8 @@ func injectChaos(netInterface string, target targetDetails) error {
 		traffic := fmt.Sprintf("sudo nsenter -t %v -n tc qdisc replace dev %v parent 1:3 netem %v", target.Pid, netInterface, netemCommands)
 		cmd = exec.Command("/bin/bash", "-c", traffic)
 		out, err = cmd.CombinedOutput()
+		log.Info(cmd.String())
 		if err != nil {
-			log.Info(cmd.String())
 			log.Error(string(out))
 			return err
 		}
@@ -220,10 +222,34 @@ func injectChaos(netInterface string, target targetDetails) error {
 			}
 			cmd = exec.Command("/bin/bash", "-c", tc)
 			out, err = cmd.CombinedOutput()
+			log.Info(cmd.String())
 			if err != nil {
-				log.Info(cmd.String())
 				log.Error(string(out))
 				return err
+			}
+
+			for _, port := range sPorts {
+				//redirect traffic to specific sport through band 3
+				tc := fmt.Sprintf("sudo nsenter -t %v -n tc filter add dev %v protocol ip parent 1:0 prio 3 u32 match ip sport %v 0xffff flowid 1:3", target.Pid, netInterface, port)
+				cmd = exec.Command("/bin/bash", "-c", tc)
+				out, err = cmd.CombinedOutput()
+				log.Info(cmd.String())
+				if err != nil {
+					log.Error(string(out))
+					return err
+				}
+			}
+
+			for _, port := range dPorts {
+				//redirect traffic to specific dport through band 3
+				tc := fmt.Sprintf("sudo nsenter -t %v -n tc filter add dev %v protocol ip parent 1:0 prio 3 u32 match ip dport %v 0xffff flowid 1:3", target.Pid, netInterface, port)
+				cmd = exec.Command("/bin/bash", "-c", tc)
+				out, err = cmd.CombinedOutput()
+				log.Info(cmd.String())
+				if err != nil {
+					log.Error(string(out))
+					return err
+				}
 			}
 		}
 	}
@@ -275,6 +301,33 @@ func getENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.ContainerRuntime = types.Getenv("CONTAINER_RUNTIME", "")
 	experimentDetails.NetworkInterface = types.Getenv("NETWORK_INTERFACE", "")
 	experimentDetails.SocketPath = types.Getenv("SOCKET_PATH", "")
+	experimentDetails.DestinationIPs = types.Getenv("DESTINATION_IPS", "")
+	experimentDetails.SourcePorts = types.Getenv("SOURCE_PORTS", "")
+	experimentDetails.DestinationPorts = types.Getenv("DESTINATION_PORTS", "")
+
+	destIps = getDestinationIPs(experimentDetails.DestinationIPs)
+	if strings.TrimSpace(experimentDetails.DestinationPorts) != "" {
+		dPorts = strings.Split(strings.TrimSpace(experimentDetails.DestinationPorts), ",")
+	}
+	if strings.TrimSpace(experimentDetails.SourcePorts) != "" {
+		sPorts = strings.Split(strings.TrimSpace(experimentDetails.SourcePorts), ",")
+	}
+}
+
+func getDestinationIPs(ips string) []string {
+	if strings.TrimSpace(ips) == "" {
+		return nil
+	}
+	destIPs := strings.Split(strings.TrimSpace(ips), ",")
+	var uniqueIps []string
+
+	// removing duplicates ips from the list, if any
+	for i := range destIPs {
+		if !common.Contains(destIPs[i], uniqueIps) {
+			uniqueIps = append(uniqueIps, destIPs[i])
+		}
+	}
+	return uniqueIps
 }
 
 // abortWatcher continuously watch for the abort signals

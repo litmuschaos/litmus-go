@@ -307,8 +307,13 @@ func getPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, targets st
 		SetEnv("EXPERIMENT_NAME", experimentsDetails.ExperimentName).
 		SetEnv("SOCKET_PATH", experimentsDetails.SocketPath).
 		SetEnv("INSTANCE_ID", experimentsDetails.InstanceID).
+<<<<<<< HEAD
 		SetEnv("DESTINATION_IPS", destIps).
 		SetEnv("DESTINATION_IPS_SERVICE_MESH", destIpsSvcMesh).
+=======
+		SetEnv("SOURCE_PORTS", experimentsDetails.SourcePorts).
+		SetEnv("DESTINATION_PORTS", experimentsDetails.DestinationPorts).
+>>>>>>> master
 		SetEnvFromDownwardAPI("v1", "metadata.name")
 
 	return envDetails.ENV

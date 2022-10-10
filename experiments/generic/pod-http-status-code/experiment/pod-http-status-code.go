@@ -82,7 +82,7 @@ func PodHttpStatusCode(clients clients.ClientSets) {
 	}
 
 	//PRE-CHAOS APPLICATION STATUS CHECK
-	if chaosDetails.DefaultAppHealthCheck {
+	if chaosDetails.DefaultHealthCheck {
 		log.Info("[Status]: Verify that the AUT (Application Under Test) is running (pre-chaos)")
 		if err := status.AUTStatusCheck(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.TargetContainer, experimentsDetails.Timeout, experimentsDetails.Delay, clients, &chaosDetails); err != nil {
 			log.Errorf("Application status check failed, err: %v", err)
@@ -137,7 +137,7 @@ func PodHttpStatusCode(clients clients.ClientSets) {
 	resultDetails.Verdict = v1alpha1.ResultVerdictPassed
 
 	//POST-CHAOS APPLICATION STATUS CHECK
-	if chaosDetails.DefaultAppHealthCheck {
+	if chaosDetails.DefaultHealthCheck {
 		log.Info("[Status]: Verify that the AUT (Application Under Test) is running (post-chaos)")
 		if err := status.AUTStatusCheck(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.TargetContainer, experimentsDetails.Timeout, experimentsDetails.Delay, clients, &chaosDetails); err != nil {
 			log.Errorf("Application status check failed, err: %v", err)

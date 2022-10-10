@@ -88,7 +88,7 @@ func preparePodDNSChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 			TargetContainer: t.TargetContainer,
 		}
 
-		td.ContainerId, err = common.GetRuntimeBasedContainerID(experimentsDetails.ContainerRuntime, experimentsDetails.SocketPath, td.Name, td.Namespace, td.TargetContainer, clients)
+		td.ContainerId, err = common.GetContainerID(td.Namespace, td.Name, td.TargetContainer, clients)
 		if err != nil {
 			return err
 		}
