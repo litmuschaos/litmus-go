@@ -98,7 +98,7 @@ func preparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetail
 		}
 
 		// extract out the pid of the target container
-		td.Pid, err = common.GetPID(experimentsDetails.ContainerRuntime, td.ContainerId, experimentsDetails.SocketPath)
+		td.Pid, err = common.GetPauseAndSandboxPID(experimentsDetails.ContainerRuntime, td.ContainerId, experimentsDetails.SocketPath)
 		if err != nil {
 			return err
 		}
@@ -170,7 +170,7 @@ func injectChaos(netInterface string, target targetDetails) error {
 
 	netemCommands := os.Getenv("NETEM_COMMAND")
 
-	if target.DestinationIps == "" {
+	if len(destIps) == 0 && len(sPorts) == 0 && len(dPorts) == 0 {
 		tc := fmt.Sprintf("sudo nsenter -t %d -n tc qdisc replace dev %s root netem %v", target.Pid, netInterface, netemCommands)
 		cmd := exec.Command("/bin/bash", "-c", tc)
 		out, err := cmd.CombinedOutput()
@@ -214,7 +214,6 @@ func injectChaos(netInterface string, target targetDetails) error {
 		}
 
 		for _, ip := range uniqueIps {
-
 			// redirect traffic to specific IP through band 3
 			tc := fmt.Sprintf("sudo nsenter -t %v -n tc filter add dev %v protocol ip parent 1:0 prio 3 u32 match ip dst %v flowid 1:3", target.Pid, netInterface, ip)
 			if strings.Contains(ip, ":") {
@@ -227,32 +226,33 @@ func injectChaos(netInterface string, target targetDetails) error {
 				log.Error(string(out))
 				return err
 			}
+		}
 
-			for _, port := range sPorts {
-				//redirect traffic to specific sport through band 3
-				tc := fmt.Sprintf("sudo nsenter -t %v -n tc filter add dev %v protocol ip parent 1:0 prio 3 u32 match ip sport %v 0xffff flowid 1:3", target.Pid, netInterface, port)
-				cmd = exec.Command("/bin/bash", "-c", tc)
-				out, err = cmd.CombinedOutput()
-				log.Info(cmd.String())
-				if err != nil {
-					log.Error(string(out))
-					return err
-				}
+		for _, port := range sPorts {
+			//redirect traffic to specific sport through band 3
+			tc := fmt.Sprintf("sudo nsenter -t %v -n tc filter add dev %v protocol ip parent 1:0 prio 3 u32 match ip sport %v 0xffff flowid 1:3", target.Pid, netInterface, port)
+			cmd = exec.Command("/bin/bash", "-c", tc)
+			out, err = cmd.CombinedOutput()
+			log.Info(cmd.String())
+			if err != nil {
+				log.Error(string(out))
+				return err
 			}
+		}
 
-			for _, port := range dPorts {
-				//redirect traffic to specific dport through band 3
-				tc := fmt.Sprintf("sudo nsenter -t %v -n tc filter add dev %v protocol ip parent 1:0 prio 3 u32 match ip dport %v 0xffff flowid 1:3", target.Pid, netInterface, port)
-				cmd = exec.Command("/bin/bash", "-c", tc)
-				out, err = cmd.CombinedOutput()
-				log.Info(cmd.String())
-				if err != nil {
-					log.Error(string(out))
-					return err
-				}
+		for _, port := range dPorts {
+			//redirect traffic to specific dport through band 3
+			tc := fmt.Sprintf("sudo nsenter -t %v -n tc filter add dev %v protocol ip parent 1:0 prio 3 u32 match ip dport %v 0xffff flowid 1:3", target.Pid, netInterface, port)
+			cmd = exec.Command("/bin/bash", "-c", tc)
+			out, err = cmd.CombinedOutput()
+			log.Info(cmd.String())
+			if err != nil {
+				log.Error(string(out))
+				return err
 			}
 		}
 	}
+
 	log.Infof("chaos injected successfully on {pod: %v, container: %v}", target.Name, target.TargetContainer)
 	return nil
 }
