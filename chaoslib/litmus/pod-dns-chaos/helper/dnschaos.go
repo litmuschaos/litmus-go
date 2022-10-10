@@ -1,11 +1,14 @@
 package helper
 
 import (
+	"bytes"
 	"fmt"
+	"github.com/kyokomi/emoji"
 	"os"
 	"os/exec"
 	"os/signal"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -21,6 +24,11 @@ import (
 
 var (
 	abort, injectAbort chan os.Signal
+)
+
+const (
+	// ProcessAlreadyKilled contains error code when process is already killed
+	ProcessAlreadyKilled = "no such process"
 )
 
 // Helper injects the dns chaos
@@ -102,6 +110,9 @@ func preparePodDNSChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 	}()
 
 	if err = result.AnnotateChaosResult(resultDetails.Name, chaosDetails.ChaosNamespace, "injected", "pod", experimentsDetails.TargetPods); err != nil {
+		if revertErr := terminateProcess(cmd); revertErr != nil {
+			return fmt.Errorf("failed to revert and annotate the result, err: %v", fmt.Sprintf("%s, %s", err.Error(), revertErr.Error()))
+		}
 		return err
 	}
 
@@ -125,14 +136,8 @@ func preparePodDNSChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 			log.Infof("cannot kill dns interceptor, process not started. Retrying in 1sec...")
 		} else {
 			log.Infof("killing dns interceptor with pid %v", cmd.Process.Pid)
-			// kill command
-			killTemplate := fmt.Sprintf("sudo kill %d", cmd.Process.Pid)
-			kill := exec.Command("/bin/bash", "-c", killTemplate)
-			if err = kill.Run(); err != nil {
-				log.Errorf("unable to kill dns interceptor process cry, err :%v", err)
-			} else {
-				log.Errorf("dns interceptor process stopped")
-				break
+			if err := terminateProcess(cmd); err != nil {
+				return err
 			}
 		}
 		retry--
@@ -142,6 +147,23 @@ func preparePodDNSChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 		return err
 	}
 	log.Info("Chaos Revert Completed")
+	return nil
+}
+
+func terminateProcess(cmd *exec.Cmd) error {
+	// kill command
+	killTemplate := fmt.Sprintf("sudo kill %d", cmd.Process.Pid)
+	kill := exec.Command("/bin/bash", "-c", killTemplate)
+	var stderr bytes.Buffer
+	kill.Stderr = &stderr
+	if err := kill.Run(); err != nil {
+		if strings.Contains(strings.ToLower(stderr.String()), ProcessAlreadyKilled) {
+			return nil
+		}
+		log.Errorf("unable to kill dns interceptor process %v, err :%v", emoji.Sprint(":cry:"), err)
+	} else {
+		log.Errorf("dns interceptor process stopped")
+	}
 	return nil
 }
 
