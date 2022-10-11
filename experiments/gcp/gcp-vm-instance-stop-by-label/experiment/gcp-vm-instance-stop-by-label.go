@@ -138,7 +138,7 @@ func GCPVMInstanceStopByLabel(clients clients.ClientSets) {
 	resultDetails.Verdict = v1alpha1.ResultVerdictPassed
 
 	// Verify that GCP VM instance is running (post-chaos)
-	if chaosDetails.DefaultHealthCheck && experimentsDetails.ManagedInstanceGroup != "enable" {
+	if experimentsDetails.ManagedInstanceGroup != "enable" {
 		for _, instanceName := range experimentsDetails.TargetVMInstanceNameList {
 			instanceState, err := gcp.GetVMInstanceStatus(computeService, instanceName, experimentsDetails.GCPProjectID, experimentsDetails.InstanceZone)
 			if err != nil {
