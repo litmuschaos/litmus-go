@@ -101,26 +101,23 @@ func EC2TerminateByTag(clients clients.ClientSets) {
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
-	if chaosDetails.DefaultHealthCheck {
+	//selecting the target instance (pre chaos)
+	if err = litmusLIB.SetTargetInstance(&experimentsDetails); err != nil {
+		log.Errorf("failed to get the target ec2 instance, err: %v", err)
+		failStep := "[pre-chaos]: Failed to select the target AWS ec2 instance from tag, err: " + err.Error()
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+		return
+	}
 
-		//selecting the target instance (pre chaos)
-		if err = litmusLIB.SetTargetInstance(&experimentsDetails); err != nil {
-			log.Errorf("failed to get the target ec2 instance, err: %v", err)
-			failStep := "[pre-chaos]: Failed to select the target AWS ec2 instance from tag, err: " + err.Error()
+	//PRE-CHAOS NODE STATUS CHECK
+	if experimentsDetails.ManagedNodegroup == "enable" {
+		log.Info("[Status]: Counting number of active nodes in the node group (pre-chaos)")
+		activeNodeCount, autoScalingGroupName, err = aws.PreChaosNodeCountCheck(experimentsDetails.TargetInstanceIDList, experimentsDetails.Region)
+		if err != nil {
+			log.Errorf("Pre chaos node status check failed, err: %v", err)
+			failStep := "[pre-chaos]: Failed to verify that the NUT (Node Under Test) is running, err: " + err.Error()
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
-		}
-
-		//PRE-CHAOS NODE STATUS CHECK
-		if experimentsDetails.ManagedNodegroup == "enable" {
-			log.Info("[Status]: Counting number of active nodes in the node group (pre-chaos)")
-			activeNodeCount, autoScalingGroupName, err = aws.PreChaosNodeCountCheck(experimentsDetails.TargetInstanceIDList, experimentsDetails.Region)
-			if err != nil {
-				log.Errorf("Pre chaos node status check failed, err: %v", err)
-				failStep := "[pre-chaos]: Failed to verify that the NUT (Node Under Test) is running, err: " + err.Error()
-				result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-				return
-			}
 		}
 	}
 
@@ -143,31 +140,28 @@ func EC2TerminateByTag(clients clients.ClientSets) {
 	log.Infof("[Confirmation]: %v chaos has been injected successfully", experimentsDetails.ExperimentName)
 	resultDetails.Verdict = v1alpha1.ResultVerdictPassed
 
-	if chaosDetails.DefaultHealthCheck {
-		// POST-CHAOS ACTIVE NODE COUNT TEST
-		if experimentsDetails.ManagedNodegroup == "enable" {
-			log.Info("[Status]: Counting and verifying number of active nodes in the node group (post-chaos)")
-			if err = aws.PostChaosNodeCountCheck(activeNodeCount, autoScalingGroupName, experimentsDetails.Region); err != nil {
-				log.Errorf("Post chaos active node count check failed, err: %v", err)
-				failStep := "[post-chaos]: Failed to verify the active number of nodes, err: " + err.Error()
-				result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-				return
-			}
+	//Verify the aws ec2 instance is running (post chaos)
+	if chaosDetails.DefaultHealthCheck && experimentsDetails.ManagedNodegroup != "enable" {
+		log.Info("[Status]: Verify that the aws ec2 instances are in running state (post-chaos)")
+		if err = aws.InstanceStatusCheck(experimentsDetails.TargetInstanceIDList, experimentsDetails.Region); err != nil {
+			log.Errorf("failed to get the ec2 instance status as running post chaos, err: %v", err)
+			failStep := "[post-chaos]: Failed to verify the AWS ec2 instance status, err: " + err.Error()
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+			return
 		}
-
-		//Verify the aws ec2 instance is running (post chaos)
-		if experimentsDetails.ManagedNodegroup != "enable" {
-			log.Info("[Status]: Verify that the aws ec2 instances are in running state (post-chaos)")
-			if err = aws.InstanceStatusCheck(experimentsDetails.TargetInstanceIDList, experimentsDetails.Region); err != nil {
-				log.Errorf("failed to get the ec2 instance status as running post chaos, err: %v", err)
-				failStep := "[post-chaos]: Failed to verify the AWS ec2 instance status, err: " + err.Error()
-				result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-				return
-			}
-			log.Info("[Status]: EC2 instance is in running state (post chaos)")
-		}
+		log.Info("[Status]: EC2 instance is in running state (post chaos)")
 	}
 
+	// POST-CHAOS ACTIVE NODE COUNT TEST
+	if experimentsDetails.ManagedNodegroup == "enable" {
+		log.Info("[Status]: Counting and verifying number of active nodes in the node group (post-chaos)")
+		if err = aws.PostChaosNodeCountCheck(activeNodeCount, autoScalingGroupName, experimentsDetails.Region); err != nil {
+			log.Errorf("Post chaos active node count check failed, err: %v", err)
+			failStep := "[post-chaos]: Failed to verify the active number of nodes, err: " + err.Error()
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+			return
+		}
+	}
 	if experimentsDetails.EngineName != "" {
 		// marking AUT as running, as we already checked the status of application under test
 		msg := "AUT: Running"

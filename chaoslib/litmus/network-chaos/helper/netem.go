@@ -78,7 +78,7 @@ func preparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetail
 		return err
 	}
 	// extract out the pid of the target container
-	targetPID, err := common.GetPID(experimentsDetails.ContainerRuntime, containerID, experimentsDetails.SocketPath)
+	targetPID, err := common.GetPauseAndSandboxPID(experimentsDetails.ContainerRuntime, containerID, experimentsDetails.SocketPath)
 	if err != nil {
 		return err
 	}

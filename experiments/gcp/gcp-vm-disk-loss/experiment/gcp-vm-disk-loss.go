@@ -117,6 +117,7 @@ func VMDiskLoss(clients clients.ClientSets) {
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}
+		log.Info("[Status]: Disk volumes are attached to the VM instances (pre-chaos)")
 	}
 
 	// Fetch target disk instance names
@@ -154,6 +155,7 @@ func VMDiskLoss(clients clients.ClientSets) {
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}
+		log.Info("[Status]: Disk volumes are attached to the VM instances (post-chaos)")
 	}
 
 	if experimentsDetails.EngineName != "" {

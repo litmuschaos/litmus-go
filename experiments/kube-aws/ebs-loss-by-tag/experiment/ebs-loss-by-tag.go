@@ -72,6 +72,15 @@ func EBSLossByTag(clients clients.ClientSets) {
 		"Sequence":       experimentsDetails.Sequence,
 	})
 
+	//selecting the target volumes (pre chaos)
+	//if no volumes found in attached state then this check will fail
+	if err := aws.SetTargetVolumeIDs(&experimentsDetails); err != nil {
+		log.Errorf("failed to set the volumes under chaos, err: %v", err)
+		failStep := "[pre-chaos]: Failed to select the target EBS volumes from tag, err: " + err.Error()
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+		return
+	}
+
 	if experimentsDetails.EngineName != "" {
 		// marking AUT as running, as we already checked the status of application under test
 		msg := "AUT: Running"
@@ -95,18 +104,6 @@ func EBSLossByTag(clients clients.ClientSets) {
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
-	if chaosDetails.DefaultHealthCheck {
-
-		//selecting the target volumes (pre chaos)
-		//if no volumes found in attached state then this check will fail
-		if err := aws.SetTargetVolumeIDs(&experimentsDetails); err != nil {
-			log.Errorf("failed to set the volumes under chaos, err: %v", err)
-			failStep := "[pre-chaos]: Failed to select the target EBS volumes from tag, err: " + err.Error()
-			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-			return
-		}
-	}
-
 	// Including the litmus lib for ebs-loss
 	switch experimentsDetails.ChaosLib {
 	case "litmus":
@@ -127,7 +124,6 @@ func EBSLossByTag(clients clients.ClientSets) {
 	resultDetails.Verdict = v1alpha1.ResultVerdictPassed
 
 	if chaosDetails.DefaultHealthCheck {
-
 		//Verify the aws ec2 instance is attached to ebs volume
 		if err := aws.PostChaosVolumeStatusCheck(&experimentsDetails); err != nil {
 			log.Errorf("failed to verify the ebs volume is attached to an instance, err: %v", err)
@@ -135,7 +131,6 @@ func EBSLossByTag(clients clients.ClientSets) {
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}
-
 	}
 
 	if experimentsDetails.EngineName != "" {

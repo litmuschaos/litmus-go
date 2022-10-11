@@ -103,7 +103,7 @@ func VMInstanceStop(clients clients.ClientSets) {
 	// Create a compute service to access the compute engine resources
 	computeService, err = gcp.GetGCPComputeService()
 	if err != nil {
-		log.Errorf("failed to obtain a gcp compute service, err: %v", err)
+		log.Errorf("Failed to obtain a gcp compute service, err: %v", err)
 		failStep := "[pre-chaos]: Failed to obtain a gcp compute service, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return

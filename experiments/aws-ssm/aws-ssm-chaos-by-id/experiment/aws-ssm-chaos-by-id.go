@@ -142,7 +142,6 @@ func AWSSSMChaosByID(clients clients.ClientSets) {
 	resultDetails.Verdict = v1alpha1.ResultVerdictPassed
 
 	if chaosDetails.DefaultHealthCheck {
-
 		//Verify the aws ec2 instance is running (post chaos)
 		if err := ec2.InstanceStatusCheckByID(experimentsDetails.EC2InstanceID, experimentsDetails.Region); err != nil {
 			log.Errorf("failed to get the ec2 instance status, err: %v", err)
