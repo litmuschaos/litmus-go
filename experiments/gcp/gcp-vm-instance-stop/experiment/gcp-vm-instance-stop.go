@@ -103,7 +103,7 @@ func VMInstanceStop(clients clients.ClientSets) {
 	// Create a compute service to access the compute engine resources
 	computeService, err = gcp.GetGCPComputeService()
 	if err != nil {
-		log.Errorf("failed to obtain a gcp compute service, err: %v", err)
+		log.Errorf("Failed to obtain a gcp compute service, err: %v", err)
 		failStep := "[pre-chaos]: Failed to obtain a gcp compute service, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
@@ -111,13 +111,13 @@ func VMInstanceStop(clients clients.ClientSets) {
 
 	// Verify that the GCP VM instance(s) is in RUNNING state (pre-chaos)
 	if err := gcp.InstanceStatusCheckByName(computeService, experimentsDetails.ManagedInstanceGroup, experimentsDetails.Delay, experimentsDetails.Timeout, "pre-chaos", experimentsDetails.VMInstanceName, experimentsDetails.GCPProjectID, experimentsDetails.InstanceZone); err != nil {
-		log.Errorf("failed to get the vm instance status, err: %v", err)
+		log.Errorf("Failed to get the vm instance status, err: %v", err)
 		failStep := "[pre-chaos]: Failed to verify the GCP VM instance status, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
 
-	log.Info("[Status]: VM instance is in running state (pre-chaos)")
+	log.Info("[Status]: VM instances are in a running state (pre-chaos)")
 
 	// Including the litmus lib for GCP vm-instance-stop
 	switch experimentsDetails.ChaosLib {
@@ -140,13 +140,13 @@ func VMInstanceStop(clients clients.ClientSets) {
 
 	//Verify the GCP VM instance is in RUNNING status (post-chaos)
 	if err := gcp.InstanceStatusCheckByName(computeService, experimentsDetails.ManagedInstanceGroup, experimentsDetails.Delay, experimentsDetails.Timeout, "post-chaos", experimentsDetails.VMInstanceName, experimentsDetails.GCPProjectID, experimentsDetails.InstanceZone); err != nil {
-		log.Errorf("failed to get the vm instance status, err: %v", err)
+		log.Errorf("Failed to get the vm instance status, err: %v", err)
 		failStep := "[post-chaos]: Failed to verify the GCP VM instance status, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
 
-	log.Info("[Status]: VM instance is in running state (post-chaos)")
+	log.Info("[Status]: VM instances are in a running state (post-chaos)")
 
 	if experimentsDetails.EngineName != "" {
 		// marking AUT as running, as we already checked the status of application under test
