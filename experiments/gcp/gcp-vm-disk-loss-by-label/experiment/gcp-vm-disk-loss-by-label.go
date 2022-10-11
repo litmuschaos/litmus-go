@@ -70,7 +70,7 @@ func GCPVMDiskLossByLabel(clients clients.ClientSets) {
 	//DISPLAY THE APP INFORMATION
 	log.InfoWithValues("[Info]: The disk information is as follows", logrus.Fields{
 		"Disk Volume Label": experimentsDetails.DiskVolumeLabel,
-		"Zones":             experimentsDetails.DiskZones,
+		"Zones":             experimentsDetails.Zones,
 		"Sequence":          experimentsDetails.Sequence,
 	})
 
@@ -137,7 +137,7 @@ func GCPVMDiskLossByLabel(clients clients.ClientSets) {
 	resultDetails.Verdict = v1alpha1.ResultVerdictPassed
 
 	for i := range experimentsDetails.TargetDiskVolumeNamesList {
-		instanceName, err := gcp.GetVolumeAttachmentDetails(computeService, experimentsDetails.GCPProjectID, experimentsDetails.DiskZones, experimentsDetails.TargetDiskVolumeNamesList[i])
+		instanceName, err := gcp.GetVolumeAttachmentDetails(computeService, experimentsDetails.GCPProjectID, experimentsDetails.Zones, experimentsDetails.TargetDiskVolumeNamesList[i])
 		if err != nil || instanceName == "" {
 			log.Errorf("Failed to verify disk volume attachment status, err: %v", err)
 			failStep := "[post-chaos]: Failed to verify disk volume attachment status, err: " + err.Error()

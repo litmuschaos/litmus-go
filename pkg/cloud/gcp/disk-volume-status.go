@@ -108,7 +108,7 @@ func DiskVolumeStateCheck(computeService *compute.Service, experimentsDetails *e
 		return errors.Errorf("no disk name provided, please provide the name of the disk")
 	}
 
-	zonesList := strings.Split(experimentsDetails.DiskZones, ",")
+	zonesList := strings.Split(experimentsDetails.Zones, ",")
 	if len(zonesList) == 0 {
 		return errors.Errorf("no zone provided, please provide the zone of the disk")
 	}
@@ -131,7 +131,7 @@ func DiskVolumeStateCheck(computeService *compute.Service, experimentsDetails *e
 func SetTargetDiskInstanceNames(computeService *compute.Service, experimentsDetails *experimentTypes.ExperimentDetails) error {
 
 	diskNamesList := strings.Split(experimentsDetails.DiskVolumeNames, ",")
-	zonesList := strings.Split(experimentsDetails.DiskZones, ",")
+	zonesList := strings.Split(experimentsDetails.Zones, ",")
 
 	for i := range diskNamesList {
 		instanceName, err := GetVolumeAttachmentDetails(computeService, experimentsDetails.GCPProjectID, zonesList[i], diskNamesList[i])

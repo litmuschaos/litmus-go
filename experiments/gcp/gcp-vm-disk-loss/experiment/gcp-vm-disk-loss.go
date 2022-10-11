@@ -73,7 +73,7 @@ func VMDiskLoss(clients clients.ClientSets) {
 	//DISPLAY THE VOLUME INFORMATION
 	log.InfoWithValues("The volume information is as follows", logrus.Fields{
 		"Volume IDs": experimentsDetails.DiskVolumeNames,
-		"Zones":      experimentsDetails.DiskZones,
+		"Zones":      experimentsDetails.Zones,
 		"Sequence":   experimentsDetails.Sequence,
 	})
 

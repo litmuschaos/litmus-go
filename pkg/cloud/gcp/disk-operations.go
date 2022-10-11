@@ -54,7 +54,7 @@ func DiskVolumeAttach(computeService *compute.Service, instanceName string, gcpP
 	return nil
 }
 
-//GetVolumeAttachmentDetails returns the name of the VM instance attached to a disk volume
+// GetVolumeAttachmentDetails returns the name of the VM instance attached to a disk volume
 func GetVolumeAttachmentDetails(computeService *compute.Service, gcpProjectID string, zone string, diskName string) (string, error) {
 
 	diskDetails, err := computeService.Disks.Get(gcpProjectID, zone, diskName).Do()
@@ -100,7 +100,7 @@ func GetDiskDeviceNameForVM(computeService *compute.Service, targetDiskName, gcp
 // SetTargetDiskVolumes will select the target disk volumes which are attached to some VM instance and filtered from the given label
 func SetTargetDiskVolumes(computeService *compute.Service, experimentsDetails *experimentTypes.ExperimentDetails) error {
 
-	response, err := computeService.Disks.List(experimentsDetails.GCPProjectID, experimentsDetails.DiskZones).Filter("labels." + experimentsDetails.DiskVolumeLabel).Do()
+	response, err := computeService.Disks.List(experimentsDetails.GCPProjectID, experimentsDetails.Zones).Filter("labels." + experimentsDetails.DiskVolumeLabel).Do()
 	if err != nil {
 		return err
 	}

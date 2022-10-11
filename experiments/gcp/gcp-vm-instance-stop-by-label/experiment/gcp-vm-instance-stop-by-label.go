@@ -71,7 +71,7 @@ func GCPVMInstanceStopByLabel(clients clients.ClientSets) {
 	log.InfoWithValues("The vm instance information is as follows", logrus.Fields{
 		"Instance Label":               experimentsDetails.InstanceLabel,
 		"Instance Affected Percentage": experimentsDetails.InstanceAffectedPerc,
-		"Zone":                         experimentsDetails.InstanceZone,
+		"Zone":                         experimentsDetails.Zones,
 		"Sequence":                     experimentsDetails.Sequence,
 	})
 
@@ -140,7 +140,7 @@ func GCPVMInstanceStopByLabel(clients clients.ClientSets) {
 	// Verify that GCP VM instance is running (post-chaos)
 	if experimentsDetails.ManagedInstanceGroup != "enable" {
 		for _, instanceName := range experimentsDetails.TargetVMInstanceNameList {
-			instanceState, err := gcp.GetVMInstanceStatus(computeService, instanceName, experimentsDetails.GCPProjectID, experimentsDetails.InstanceZone)
+			instanceState, err := gcp.GetVMInstanceStatus(computeService, instanceName, experimentsDetails.GCPProjectID, experimentsDetails.Zones)
 			if err != nil {
 				log.Errorf("Failed to get %s VM instance status, err: %v", instanceName, err)
 				failStep := "[post-chaos]: Failed to get " + instanceName + " VM instance status, err: " + err.Error()

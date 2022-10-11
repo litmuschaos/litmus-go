@@ -73,7 +73,7 @@ func VMInstanceStop(clients clients.ClientSets) {
 	//DISPLAY THE INSTANCE INFORMATION
 	log.InfoWithValues("The vm instance information is as follows", logrus.Fields{
 		"Instance Names": experimentsDetails.VMInstanceName,
-		"Zones":          experimentsDetails.InstanceZone,
+		"Zones":          experimentsDetails.Zones,
 		"Sequence":       experimentsDetails.Sequence,
 	})
 
@@ -111,7 +111,7 @@ func VMInstanceStop(clients clients.ClientSets) {
 
 	// Verify that the GCP VM instance(s) is in RUNNING state (pre-chaos)
 	if chaosDetails.DefaultHealthCheck {
-		if err := gcp.InstanceStatusCheckByName(computeService, experimentsDetails.ManagedInstanceGroup, experimentsDetails.Delay, experimentsDetails.Timeout, "pre-chaos", experimentsDetails.VMInstanceName, experimentsDetails.GCPProjectID, experimentsDetails.InstanceZone); err != nil {
+		if err := gcp.InstanceStatusCheckByName(computeService, experimentsDetails.ManagedInstanceGroup, experimentsDetails.Delay, experimentsDetails.Timeout, "pre-chaos", experimentsDetails.VMInstanceName, experimentsDetails.GCPProjectID, experimentsDetails.Zones); err != nil {
 			log.Errorf("failed to get the vm instance status, err: %v", err)
 			failStep := "[pre-chaos]: Failed to verify the GCP VM instance status, err: " + err.Error()
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
@@ -142,7 +142,7 @@ func VMInstanceStop(clients clients.ClientSets) {
 
 	//Verify the GCP VM instance is in RUNNING status (post-chaos)
 	if chaosDetails.DefaultHealthCheck {
-		if err := gcp.InstanceStatusCheckByName(computeService, experimentsDetails.ManagedInstanceGroup, experimentsDetails.Delay, experimentsDetails.Timeout, "post-chaos", experimentsDetails.VMInstanceName, experimentsDetails.GCPProjectID, experimentsDetails.InstanceZone); err != nil {
+		if err := gcp.InstanceStatusCheckByName(computeService, experimentsDetails.ManagedInstanceGroup, experimentsDetails.Delay, experimentsDetails.Timeout, "post-chaos", experimentsDetails.VMInstanceName, experimentsDetails.GCPProjectID, experimentsDetails.Zones); err != nil {
 			log.Errorf("failed to get the vm instance status, err: %v", err)
 			failStep := "[post-chaos]: Failed to verify the GCP VM instance status, err: " + err.Error()
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)

@@ -24,7 +24,7 @@ var (
 	inject, abort chan os.Signal
 )
 
-//PrepareVMStop contains the prepration and injection steps for the experiment
+// PrepareVMStop contains the prepration and injection steps for the experiment
 func PrepareVMStop(computeService *compute.Service, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	// inject channel is used to transmit signal notifications.
@@ -50,7 +50,7 @@ func PrepareVMStop(computeService *compute.Service, experimentsDetails *experime
 	}
 
 	// get the zone name or list of corresponding zones for the instances
-	instanceZonesList := strings.Split(experimentsDetails.InstanceZone, ",")
+	instanceZonesList := strings.Split(experimentsDetails.Zones, ",")
 	if len(instanceZonesList) == 0 {
 		return errors.Errorf("no corresponding zones found for the instances")
 	}
@@ -83,7 +83,7 @@ func PrepareVMStop(computeService *compute.Service, experimentsDetails *experime
 	return nil
 }
 
-//injectChaosInSerialMode stops VM instances in serial mode i.e. one after the other
+// injectChaosInSerialMode stops VM instances in serial mode i.e. one after the other
 func injectChaosInSerialMode(computeService *compute.Service, experimentsDetails *experimentTypes.ExperimentDetails, instanceNamesList []string, instanceZonesList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	select {
