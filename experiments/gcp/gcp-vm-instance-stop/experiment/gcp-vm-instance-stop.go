@@ -117,9 +117,9 @@ func VMInstanceStop(clients clients.ClientSets) {
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}
-	}
 
-	log.Info("[Status]: VM instance is in running state (pre-chaos)")
+		log.Info("[Status]: VM instance is in running state (pre-chaos)")
+	}
 
 	// Including the litmus lib for GCP vm-instance-stop
 	switch experimentsDetails.ChaosLib {
@@ -148,9 +148,9 @@ func VMInstanceStop(clients clients.ClientSets) {
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}
-	}
 
-	log.Info("[Status]: VM instance is in running state (post-chaos)")
+		log.Info("[Status]: VM instance is in running state (post-chaos)")
+	}
 
 	if experimentsDetails.EngineName != "" {
 		// marking AUT as running, as we already checked the status of application under test
