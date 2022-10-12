@@ -100,7 +100,7 @@ func GetDiskDeviceNameForVM(computeService *compute.Service, targetDiskName, gcp
 // SetTargetDiskVolumes will select the target disk volumes which are attached to some VM instance and filtered from the given label
 func SetTargetDiskVolumes(computeService *compute.Service, experimentsDetails *experimentTypes.ExperimentDetails) error {
 
-	response, err := computeService.Disks.List(experimentsDetails.GCPProjectID, experimentsDetails.Zones).Filter("labels." + experimentsDetails.DiskVolumeLabel).Do()
+	response, err := computeService.Disks.List(experimentsDetails.GCPProjectID, experimentsDetails.Zones).Filter("labels." + experimentsDetails.DiskVolumeLabel + ":*").Do()
 	if err != nil {
 		return err
 	}

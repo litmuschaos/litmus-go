@@ -101,7 +101,7 @@ func SetTargetInstance(computeService *compute.Service, experimentsDetails *expe
 		return errors.Errorf("label not found, please provide a valid label")
 	}
 
-	response, err := computeService.Instances.List(experimentsDetails.GCPProjectID, experimentsDetails.Zones).Filter("labels." + experimentsDetails.InstanceLabel).Do()
+	response, err := computeService.Instances.List(experimentsDetails.GCPProjectID, experimentsDetails.Zones).Filter("labels." + experimentsDetails.InstanceLabel + ":*").Do()
 	if err != nil {
 		return (err)
 	}
