@@ -19,7 +19,7 @@ import (
 	"google.golang.org/api/compute/v1"
 )
 
-//VMDiskLoss injects the disk volume loss chaos
+// VMDiskLoss injects the disk volume loss chaos
 func VMDiskLoss(clients clients.ClientSets) {
 
 	var (
@@ -103,7 +103,7 @@ func VMDiskLoss(clients clients.ClientSets) {
 	// Create a compute service to access the compute engine resources
 	computeService, err = gcp.GetGCPComputeService()
 	if err != nil {
-		log.Errorf("failed to obtain a gcp compute service, err: %v", err)
+		log.Errorf("Failed to obtain a gcp compute service, err: %v", err)
 		failStep := "[pre-chaos]: Failed to obtain a gcp compute service, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
@@ -111,11 +111,13 @@ func VMDiskLoss(clients clients.ClientSets) {
 
 	//Verify the vm instance is attached to disk volume
 	if err := gcp.DiskVolumeStateCheck(computeService, &experimentsDetails, "pre-chaos"); err != nil {
-		log.Errorf("volume status check failed pre chaos, err: %v", err)
+		log.Errorf("Volume status check failed pre chaos, err: %v", err)
 		failStep := "[pre-chaos]: Failed to verify if the disk volume is attached to an instance, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
+
+	log.Info("[Status]: Disk volumes are attached to the VM instances (pre-chaos)")
 
 	// Including the litmus lib for disk-loss
 	switch experimentsDetails.ChaosLib {
@@ -138,11 +140,13 @@ func VMDiskLoss(clients clients.ClientSets) {
 
 	//Verify the vm instance is attached to disk volume
 	if err := gcp.DiskVolumeStateCheck(computeService, &experimentsDetails, "post-chaos"); err != nil {
-		log.Errorf("volume status check failed post chaos, err: %v", err)
+		log.Errorf("Volume status check failed post chaos, err: %v", err)
 		failStep := "[post-chaos]: Failed to verify if the disk volume is attached to an instance, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
+
+	log.Info("[Status]: Disk volumes are attached to the VM instances (post-chaos)")
 
 	if experimentsDetails.EngineName != "" {
 		// marking AUT as running, as we already checked the status of application under test
