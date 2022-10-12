@@ -45,19 +45,9 @@ func PrepareVMStop(computeService *compute.Service, experimentsDetails *experime
 
 	// get the instance name or list of instance names
 	instanceNamesList := strings.Split(experimentsDetails.VMInstanceName, ",")
-	if len(instanceNamesList) == 0 {
-		return errors.Errorf("no instance name found to stop")
-	}
 
 	// get the zone name or list of corresponding zones for the instances
 	instanceZonesList := strings.Split(experimentsDetails.Zones, ",")
-	if len(instanceZonesList) == 0 {
-		return errors.Errorf("no corresponding zones found for the instances")
-	}
-
-	if len(instanceNamesList) != len(instanceZonesList) {
-		return errors.Errorf("number of instances is not equal to the number of zones")
-	}
 
 	go abortWatcher(computeService, experimentsDetails, instanceNamesList, instanceZonesList, chaosDetails)
 
