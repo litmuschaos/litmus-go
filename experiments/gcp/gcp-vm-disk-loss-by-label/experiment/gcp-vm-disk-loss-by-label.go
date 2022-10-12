@@ -70,7 +70,7 @@ func GCPVMDiskLossByLabel(clients clients.ClientSets) {
 	//DISPLAY THE APP INFORMATION
 	log.InfoWithValues("[Info]: The disk information is as follows", logrus.Fields{
 		"Disk Volume Label": experimentsDetails.DiskVolumeLabel,
-		"Zones":             experimentsDetails.DiskZones,
+		"Zones":             experimentsDetails.Zones,
 		"Sequence":          experimentsDetails.Sequence,
 	})
 
@@ -135,8 +135,12 @@ func GCPVMDiskLossByLabel(clients clients.ClientSets) {
 		return
 	}
 
+	log.Infof("[Confirmation]: %v chaos has been injected successfully", experimentsDetails.ExperimentName)
+	resultDetails.Verdict = v1alpha1.ResultVerdictPassed
+
+	// Checking disk volume attachment post-chaos
 	for i := range experimentsDetails.TargetDiskVolumeNamesList {
-		instanceName, err := gcp.GetVolumeAttachmentDetails(computeService, experimentsDetails.GCPProjectID, experimentsDetails.DiskZones, experimentsDetails.TargetDiskVolumeNamesList[i])
+		instanceName, err := gcp.GetVolumeAttachmentDetails(computeService, experimentsDetails.GCPProjectID, experimentsDetails.Zones, experimentsDetails.TargetDiskVolumeNamesList[i])
 		if err != nil || instanceName == "" {
 			log.Errorf("Failed to verify disk volume attachment status, err: %v", err)
 			failStep := "[post-chaos]: Failed to verify disk volume attachment status, err: " + err.Error()
@@ -146,9 +150,6 @@ func GCPVMDiskLossByLabel(clients clients.ClientSets) {
 	}
 
 	log.Info("[Status]: Disk volumes are attached to the VM instances (post-chaos)")
-
-	log.Infof("[Confirmation]: %v chaos has been injected successfully", experimentsDetails.ExperimentName)
-	resultDetails.Verdict = v1alpha1.ResultVerdictPassed
 
 	if experimentsDetails.EngineName != "" {
 		// marking AUT as running, as we already checked the status of application under test

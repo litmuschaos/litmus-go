@@ -3,7 +3,6 @@ package gcp
 import (
 	"context"
 	"encoding/json"
-	"io/ioutil"
 	"os"
 	"strings"
 
@@ -29,7 +28,7 @@ type GCPServiceAccountCredentials struct {
 // getFileContent reads the file content at the given file path
 func getFileContent(filePath string) (string, error) {
 
-	fileContentByteSlice, err := ioutil.ReadFile(filePath)
+	fileContentByteSlice, err := os.ReadFile(filePath)
 	if err != nil {
 		return "", err
 	}

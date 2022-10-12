@@ -66,7 +66,7 @@ func AzureInstanceStop(clients clients.ClientSets) {
 	log.InfoWithValues("The instance information is as follows", logrus.Fields{
 		"Chaos Duration": experimentsDetails.ChaosDuration,
 		"Resource Group": experimentsDetails.ResourceGroup,
-		"Instance Name":  experimentsDetails.AzureInstanceName,
+		"Instance Name":  experimentsDetails.AzureInstanceNames,
 		"Sequence":       experimentsDetails.Sequence,
 	})
 
@@ -76,17 +76,6 @@ func AzureInstanceStop(clients clients.ClientSets) {
 		failStep := "[pre-chaos]: Failed to get the subscription ID for authentication, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
-	}
-
-	//Verify the azure target instance is running (pre-chaos)
-	if chaosDetails.DefaultHealthCheck {
-		if err = azureStatus.InstanceStatusCheckByName(experimentsDetails.AzureInstanceName, experimentsDetails.ScaleSet, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup); err != nil {
-			log.Errorf("failed to get the azure instance status, err: %v", err)
-			failStep := "[pre-chaos]: Failed to verify the azure instance status, err: " + err.Error()
-			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-			return
-		}
-		log.Info("[Status]: Azure instance(s) is in running state (pre-chaos)")
 	}
 
 	// generating the event in chaosresult to marked the verdict as awaited
@@ -118,6 +107,17 @@ func AzureInstanceStop(clients clients.ClientSets) {
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
+	//Verify the azure target instance is running (pre-chaos)
+	if chaosDetails.DefaultHealthCheck {
+		if err = azureStatus.InstanceStatusCheckByName(experimentsDetails.AzureInstanceNames, experimentsDetails.ScaleSet, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup); err != nil {
+			log.Errorf("failed to get the azure instance status, err: %v", err)
+			failStep := "[pre-chaos]: Failed to verify the azure instance status, err: " + err.Error()
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+			return
+		}
+		log.Info("[Status]: Azure instance(s) is in running state (pre-chaos)")
+	}
+
 	// Including the litmus lib for azure instance stopping
 	switch experimentsDetails.ChaosLib {
 	case "litmus":
@@ -139,7 +139,7 @@ func AzureInstanceStop(clients clients.ClientSets) {
 
 	//Verify the azure instance is running (post chaos)
 	if chaosDetails.DefaultHealthCheck {
-		if err = azureStatus.InstanceStatusCheckByName(experimentsDetails.AzureInstanceName, experimentsDetails.ScaleSet, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup); err != nil {
+		if err = azureStatus.InstanceStatusCheckByName(experimentsDetails.AzureInstanceNames, experimentsDetails.ScaleSet, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup); err != nil {
 			log.Errorf("failed to get the azure instance status, err: %v", err)
 			failStep := "[pre-chaos]: Failed to update the azure instance status, err: " + err.Error()
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)

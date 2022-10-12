@@ -47,7 +47,7 @@ func PrepareVMStop(computeService *compute.Service, experimentsDetails *experime
 	instanceNamesList := strings.Split(experimentsDetails.VMInstanceName, ",")
 
 	// get the zone name or list of corresponding zones for the instances
-	instanceZonesList := strings.Split(experimentsDetails.InstanceZone, ",")
+	instanceZonesList := strings.Split(experimentsDetails.Zones, ",")
 
 	go abortWatcher(computeService, experimentsDetails, instanceNamesList, instanceZonesList, chaosDetails)
 

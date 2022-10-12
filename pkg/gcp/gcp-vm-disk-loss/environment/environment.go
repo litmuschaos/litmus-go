@@ -9,7 +9,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/types"
 )
 
-//GetENV fetches all the env variables from the runner pod
+// GetENV fetches all the env variables from the runner pod
 func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.ExperimentName = types.Getenv("EXPERIMENT_NAME", "")
 	experimentDetails.ChaosNamespace = types.Getenv("CHAOS_NAMESPACE", "litmus")
@@ -28,6 +28,6 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.DiskVolumeNames = types.Getenv("DISK_VOLUME_NAMES", "")
 	experimentDetails.DiskVolumeLabel = types.Getenv("DISK_VOLUME_LABEL", "")
 	experimentDetails.Sequence = types.Getenv("SEQUENCE", "parallel")
-	experimentDetails.DiskZones = types.Getenv("DISK_ZONES", "")
+	experimentDetails.Zones = types.Getenv("ZONES", "")
 	experimentDetails.DiskAffectedPerc, _ = strconv.Atoi(types.Getenv("DISK_AFFECTED_PERC", "0"))
 }
