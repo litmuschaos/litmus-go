@@ -4,39 +4,40 @@ on:
   push:
     branches:
       - master
+      - add-default-healthcheck
     tags-ignore:
       - '**'
 jobs:
-  pre-checks:
-    runs-on: ubuntu-latest
-    steps:
-      # Install golang
-      - uses: actions/setup-go@v2
-        with:
-          go-version: 1.17
-      - uses: actions/checkout@v2
+  # pre-checks:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     # Install golang
+  #     - uses: actions/setup-go@v2
+  #       with:
+  #         go-version: 1.17
+  #     - uses: actions/checkout@v2
 
-      #TODO: Add Dockerfile linting
-      # Running go-lint
-      - name: Checking Go-Lint
-        run : |
-          sudo apt-get update && sudo apt-get install golint
-          make gotasks
+  #     #TODO: Add Dockerfile linting
+  #     # Running go-lint
+  #     - name: Checking Go-Lint
+  #       run : |
+  #         sudo apt-get update && sudo apt-get install golint
+  #         make gotasks
 
-      - name: gofmt check
-        run: |
-          if [ "$(gofmt -s -l . | wc -l)" -ne 0 ]
-          then
-           echo "The following files were found to be not go formatted:"
-           gofmt -s -l .
-           exit 1
-          fi
+  #     - name: gofmt check
+  #       run: |
+  #         if [ "$(gofmt -s -l . | wc -l)" -ne 0 ]
+  #         then
+  #          echo "The following files were found to be not go formatted:"
+  #          gofmt -s -l .
+  #          exit 1
+  #         fi
           
-      - name: golangci-lint
-        uses: reviewdog/action-golangci-lint@v1       
+  #     - name: golangci-lint
+  #       uses: reviewdog/action-golangci-lint@v1       
 
   push:
-    needs: pre-checks
+    # needs: pre-checks
     runs-on: ubuntu-latest
     steps:
 
@@ -68,5 +69,5 @@ jobs:
         with:
           push: true
           file: build/Dockerfile
-          platforms: linux/amd64,linux/arm64
-          tags: litmuschaos/go-runner:ci
+          platforms: linux/amd64
+          tags: neelanjan00/go-runner:gcp-probe-and-changes
