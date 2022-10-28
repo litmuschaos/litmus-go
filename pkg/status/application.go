@@ -134,7 +134,7 @@ func CheckAuxiliaryApplicationStatus(AuxiliaryAppDetails string, timeout, delay 
 
 	for _, val := range AuxiliaryAppInfo {
 		AppInfo := strings.Split(val, ":")
-		if err := CheckApplicationStatus(AppInfo[0], AppInfo[1], timeout, delay, clients); err != nil {
+		if err := CheckApplicationStatus(AppInfo[1], AppInfo[0], timeout, delay, clients); err != nil {
 			return err
 		}
 	}
