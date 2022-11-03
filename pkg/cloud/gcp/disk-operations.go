@@ -108,15 +108,12 @@ func SetTargetDiskVolumes(computeService *compute.Service, experimentsDetails *e
 	if strings.Contains(experimentsDetails.DiskVolumeLabel, ":") {
 		// the label is of format key:value
 		response, err = computeService.Disks.List(experimentsDetails.GCPProjectID, experimentsDetails.Zones).Filter("labels." + experimentsDetails.DiskVolumeLabel).Do()
-		if err != nil {
-			return err
-		}
 	} else {
 		// the label only has key
 		response, err = computeService.Disks.List(experimentsDetails.GCPProjectID, experimentsDetails.Zones).Filter("labels." + experimentsDetails.DiskVolumeLabel + ":*").Do()
-		if err != nil {
-			return err
-		}
+	}
+	if err != nil {
+		return err
 	}
 
 	for _, disk := range response.Items {

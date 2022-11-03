@@ -110,15 +110,12 @@ func SetTargetInstance(computeService *compute.Service, experimentsDetails *expe
 	if strings.Contains(experimentsDetails.InstanceLabel, ":") {
 		// the label is of format key:value
 		response, err = computeService.Instances.List(experimentsDetails.GCPProjectID, experimentsDetails.Zones).Filter("labels." + experimentsDetails.InstanceLabel).Do()
-		if err != nil {
-			return err
-		}
 	} else {
 		// the label only has key
 		response, err = computeService.Instances.List(experimentsDetails.GCPProjectID, experimentsDetails.Zones).Filter("labels." + experimentsDetails.InstanceLabel + ":*").Do()
-		if err != nil {
-			return err
-		}
+	}
+	if err != nil {
+		return err
 	}
 
 	for _, instance := range response.Items {
