@@ -66,6 +66,7 @@ func killContainer(experimentsDetails *experimentTypes.ExperimentDetails, client
 			TargetContainer: t.TargetContainer,
 		}
 		targets = append(targets, td)
+		log.Infof("Injecting chaos on target: {name: %s, namespace: %v, container: %v}", t.Name, t.Namespace, t.TargetContainer)
 	}
 
 	if err := killIterations(targets, experimentsDetails, clients, eventsDetails, chaosDetails, resultDetails); err != nil {

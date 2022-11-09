@@ -119,8 +119,9 @@ func preparePodDNSChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 		if err != nil {
 			return err
 		}
+		log.Infof("successfully injected chaos on target: {name: %s, namespace: %v, container: %v}", t.Name, t.Namespace, t.TargetContainer)
 		if err = result.AnnotateChaosResult(resultDetails.Name, chaosDetails.ChaosNamespace, "injected", "pod", t.Name); err != nil {
-			if revertErr := terminateProcess(t.Cmd); revertErr != nil {
+			if revertErr := terminateProcess(t); revertErr != nil {
 				return fmt.Errorf("failed to revert and annotate the result, err: %v", fmt.Sprintf("%s, %s", err.Error(), revertErr.Error()))
 			}
 			return err
@@ -161,7 +162,7 @@ func preparePodDNSChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 		log.Info("[Timeout]: Killing the stress process")
 		var errList []string
 		for _, t := range targets {
-			if err = terminateProcess(t.Cmd); err != nil {
+			if err = terminateProcess(t); err != nil {
 				errList = append(errList, err.Error())
 				continue
 			}
@@ -181,7 +182,7 @@ func preparePodDNSChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 			log.Info("[Info]: Reverting Chaos")
 			var errList []string
 			for _, t := range targets {
-				if err := terminateProcess(t.Cmd); err != nil {
+				if err := terminateProcess(t); err != nil {
 					errList = append(errList, err.Error())
 					continue
 				}
@@ -215,9 +216,9 @@ func injectChaos(experimentsDetails *experimentTypes.ExperimentDetails, pid int)
 	return cmd, nil
 }
 
-func terminateProcess(cmd *exec.Cmd) error {
+func terminateProcess(t targetDetails) error {
 	// kill command
-	killTemplate := fmt.Sprintf("sudo kill %d", cmd.Process.Pid)
+	killTemplate := fmt.Sprintf("sudo kill %d", t.Cmd.Process.Pid)
 	kill := exec.Command("/bin/bash", "-c", killTemplate)
 	var stderr bytes.Buffer
 	kill.Stderr = &stderr
@@ -228,6 +229,7 @@ func terminateProcess(cmd *exec.Cmd) error {
 		log.Errorf("unable to kill dns interceptor process %v, err :%v", emoji.Sprint(":cry:"), err)
 	} else {
 		log.Errorf("dns interceptor process stopped")
+		log.Infof("successfully injected chaos on target: {name: %s, namespace: %v, container: %v}", t.Name, t.Namespace, t.TargetContainer)
 	}
 	return nil
 }
@@ -243,7 +245,7 @@ func abortWatcher(targets []targetDetails, resultName, chaosNS string) {
 	retry := 3
 	for retry > 0 {
 		for _, t := range targets {
-			if err = terminateProcess(t.Cmd); err != nil {
+			if err = terminateProcess(t); err != nil {
 				log.Errorf("unable to revert for %v pod, err :%v", t.Name, err)
 				continue
 			}

@@ -121,6 +121,7 @@ func preparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetail
 		if err = injectChaos(experimentsDetails.NetworkInterface, t); err != nil {
 			return err
 		}
+		log.Infof("successfully injected chaos on target: {name: %s, namespace: %v, container: %v}", t.Name, t.Namespace, t.TargetContainer)
 		if err = result.AnnotateChaosResult(resultDetails.Name, chaosDetails.ChaosNamespace, "injected", "pod", t.Name); err != nil {
 			if _, killErr := killnetem(t, experimentsDetails.NetworkInterface); killErr != nil {
 				return fmt.Errorf("unable to revert and annotate chaosresult, err: [%v, %v]", killErr, err)
@@ -274,8 +275,7 @@ func killnetem(target targetDetails, networkInterface string) (bool, error) {
 		log.Error(string(out))
 		return false, err
 	}
-	log.Infof("chaos reverted successfully on {pod: %v, container: %v}", target.Name, target.TargetContainer)
-
+	log.Infof("successfully reverted chaos on target: {name: %s, namespace: %v, container: %v}", target.Name, target.Namespace, target.TargetContainer)
 	return true, nil
 }
 

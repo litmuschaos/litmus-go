@@ -107,11 +107,12 @@ func prepareK8sHttpChaos(experimentsDetails *experimentTypes.ExperimentDetails, 
 
 	for _, t := range targets {
 		// injecting http chaos inside target container
-		if err = injectChaos(experimentsDetails, t.Pid); err != nil {
+		if err = injectChaos(experimentsDetails, t); err != nil {
 			return err
 		}
+		log.Infof("successfully injected chaos on target: {name: %s, namespace: %v, container: %v}", t.Name, t.Namespace, t.TargetContainer)
 		if err = result.AnnotateChaosResult(resultDetails.Name, chaosDetails.ChaosNamespace, "injected", "pod", t.Name); err != nil {
-			if revertErr := revertChaos(experimentsDetails, t.Pid); err != nil {
+			if revertErr := revertChaos(experimentsDetails, t); err != nil {
 				return fmt.Errorf("failed to revert and annotate the result, err: %v", fmt.Sprintf("%s, %s", err.Error(), revertErr.Error()))
 			}
 			return fmt.Errorf("failed to annotate the result, err: %v", err)
@@ -134,7 +135,7 @@ func prepareK8sHttpChaos(experimentsDetails *experimentTypes.ExperimentDetails, 
 	var errList []string
 	for _, t := range targets {
 		// cleaning the netem process after chaos injection
-		err := revertChaos(experimentsDetails, t.Pid)
+		err := revertChaos(experimentsDetails, t)
 		if err != nil {
 			errList = append(errList, err.Error())
 			continue
@@ -151,35 +152,39 @@ func prepareK8sHttpChaos(experimentsDetails *experimentTypes.ExperimentDetails, 
 }
 
 // injectChaos inject the http chaos in target container and add ruleset to the iptables to redirect the ports
-func injectChaos(experimentDetails *experimentTypes.ExperimentDetails, pid int) error {
-	if err := startProxy(experimentDetails, pid); err != nil {
-		_ = killProxy(pid)
+func injectChaos(experimentDetails *experimentTypes.ExperimentDetails, t targetDetails) error {
+	if err := startProxy(experimentDetails, t.Pid); err != nil {
+		_ = killProxy(t.Pid)
 		return errors.Errorf("failed to start proxy, err: %v", err)
 	}
-	if err := addIPRuleSet(experimentDetails, pid); err != nil {
-		_ = killProxy(pid)
+	if err := addIPRuleSet(experimentDetails, t.Pid); err != nil {
+		_ = killProxy(t.Pid)
 		return errors.Errorf("failed to add ip rule set, err: %v", err)
 	}
 	return nil
 }
 
 // revertChaos revert the http chaos in target container
-func revertChaos(experimentDetails *experimentTypes.ExperimentDetails, pid int) error {
+func revertChaos(experimentDetails *experimentTypes.ExperimentDetails, t targetDetails) error {
 
 	var revertError error
 
-	if err := removeIPRuleSet(experimentDetails, pid); err != nil {
+	if err := removeIPRuleSet(experimentDetails, t.Pid); err != nil {
 		revertError = errors.Errorf("failed to remove ip rule set, err: %v", err)
 	}
 
-	if err := killProxy(pid); err != nil {
+	if err := killProxy(t.Pid); err != nil {
 		if revertError != nil {
 			revertError = errors.Errorf("%v and failed to kill proxy server, err: %v", revertError, err)
 		} else {
 			revertError = errors.Errorf("failed to kill proxy server, err: %v", err)
 		}
 	}
-	return revertError
+	if revertError != nil {
+		return revertError
+	}
+	log.Infof("successfully reverted chaos on target: {name: %s, namespace: %v, container: %v}", t.Name, t.Namespace, t.TargetContainer)
+	return nil
 }
 
 // startProxy starts the proxy process inside the target container
@@ -306,7 +311,7 @@ func abortWatcher(targets []targetDetails, resultName, chaosNS string, experimen
 	retry := 3
 	for retry > 0 {
 		for _, t := range targets {
-			if err = revertChaos(experimentDetails, t.Pid); err != nil {
+			if err = revertChaos(experimentDetails, t); err != nil {
 				if strings.Contains(err.Error(), NoIPRulesetToRemove) && strings.Contains(err.Error(), NoProxyToKill) {
 					continue
 				}

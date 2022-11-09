@@ -125,7 +125,7 @@ func diskFill(experimentsDetails *experimentTypes.ExperimentDetails, clients cli
 			if err := fillDisk(t.ContainerId, t.SizeToFill, experimentsDetails.DataBlockSize); err != nil {
 				return err
 			}
-
+			log.Infof("successfully injected chaos on target: {name: %s, namespace: %v, container: %v}", t.Name, t.Namespace, t.TargetContainer)
 			if err = result.AnnotateChaosResult(resultDetails.Name, chaosDetails.ChaosNamespace, "injected", "pod", t.Name); err != nil {
 				if remedyErr := remedy(t, clients); remedyErr != nil {
 					return remedyErr
@@ -255,6 +255,7 @@ func remedy(t targetDetails, clients clients.ClientSets) error {
 			return err
 		}
 	}
+	log.Infof("successfully reverted chaos on target: {name: %s, namespace: %v, container: %v}", t.Name, t.Namespace, t.TargetContainer)
 	return nil
 }
 
