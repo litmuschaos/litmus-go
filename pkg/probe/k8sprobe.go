@@ -57,7 +57,7 @@ func triggerK8sProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets,
 		return err
 	}
 
-	inputs.ResourceNames, err = parseCommand(inputs.Resource, resultDetails)
+	inputs.ResourceNames, err = parseCommand(inputs.ResourceNames, resultDetails)
 	if err != nil {
 		return err
 	}
@@ -65,6 +65,9 @@ func triggerK8sProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets,
 	parsedResourceNames := []string{}
 	if inputs.ResourceNames != "" {
 		parsedResourceNames = strings.Split(inputs.ResourceNames, ",")
+		for i := range parsedResourceNames {
+			parsedResourceNames[i] = strings.TrimSpace(parsedResourceNames[i])
+		}
 	}
 
 	// it will retry for some retry count, in each iterations of try it contains following things
