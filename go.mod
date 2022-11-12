@@ -105,3 +105,5 @@ replace (
 )
 
 replace github.com/docker/docker => github.com/moby/moby v0.7.3-0.20190826074503-38ab9da00309 // Required by Helm
+
+replace github.com/litmuschaos/chaos-operator => ../chaos-operator
