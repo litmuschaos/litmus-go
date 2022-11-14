@@ -175,7 +175,7 @@ func deleteResource(probe v1alpha1.ProbeAttributes, gvr schema.GroupVersionResou
 			if err != nil {
 				return errors.Errorf("unable to get the resources with name %v, err: %v", res, err)
 			} else if resource == nil {
-				return errors.Errorf("unable to get the resources with name %v, err: %v", res, err)
+				return errors.Errorf("unable to get the resources with name %v", res)
 			}
 		}
 		// delete resources
@@ -213,7 +213,7 @@ func resourcesPresent(probe v1alpha1.ProbeAttributes, gvr schema.GroupVersionRes
 			if err != nil {
 				return errors.Errorf("unable to get the resources with name %v, err: %v", res, err)
 			} else if resource == nil {
-				return errors.Errorf("unable to get the resources with name %v, err: %v", res, err)
+				return errors.Errorf("unable to get the resources with name %v", res)
 			}
 		}
 	} else {
