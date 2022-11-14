@@ -170,13 +170,8 @@ func deleteResource(probe v1alpha1.ProbeAttributes, gvr schema.GroupVersionResou
 	// resource name has higher priority
 	if len(parsedResourceNames) > 0 {
 		// check if all resources are available
-		for _, res := range parsedResourceNames {
-			resource, err := clients.DynamicClient.Resource(gvr).Namespace(probe.K8sProbeInputs.Namespace).Get(context.Background(), res, v1.GetOptions{})
-			if err != nil {
-				return errors.Errorf("unable to get the resources with name %v, err: %v", res, err)
-			} else if resource == nil {
-				return errors.Errorf("unable to get the resources with name %v", res)
-			}
+		if err := areResourcesWithNamePresent(probe, gvr, parsedResourceNames, clients); err != nil {
+			return err
 		}
 		// delete resources
 		for _, res := range parsedResourceNames {
@@ -208,13 +203,8 @@ func resourcesPresent(probe v1alpha1.ProbeAttributes, gvr schema.GroupVersionRes
 	// resource name has higher priority
 	if len(parsedResourceNames) > 0 {
 		// check if all resources are available
-		for _, res := range parsedResourceNames {
-			resource, err := clients.DynamicClient.Resource(gvr).Namespace(probe.K8sProbeInputs.Namespace).Get(context.Background(), res, v1.GetOptions{})
-			if err != nil {
-				return errors.Errorf("unable to get the resources with name %v, err: %v", res, err)
-			} else if resource == nil {
-				return errors.Errorf("unable to get the resources with name %v", res)
-			}
+		if err := areResourcesWithNamePresent(probe, gvr, parsedResourceNames, clients); err != nil {
+			return err
 		}
 	} else {
 		resourceList, err := clients.DynamicClient.Resource(gvr).Namespace(probe.K8sProbeInputs.Namespace).List(context.Background(), v1.ListOptions{
@@ -226,6 +216,18 @@ func resourcesPresent(probe v1alpha1.ProbeAttributes, gvr schema.GroupVersionRes
 			return errors.Errorf("unable to list the resources with matching selector, err: %v", err)
 		} else if len(resourceList.Items) == 0 {
 			return errors.Errorf("no resource found with provided selectors")
+		}
+	}
+	return nil
+}
+
+func areResourcesWithNamePresent(probe v1alpha1.ProbeAttributes, gvr schema.GroupVersionResource, parsedResourceNames []string, clients clients.ClientSets) error {
+	for _, res := range parsedResourceNames {
+		resource, err := clients.DynamicClient.Resource(gvr).Namespace(probe.K8sProbeInputs.Namespace).Get(context.Background(), res, v1.GetOptions{})
+		if err != nil {
+			return errors.Errorf("unable to get the resources with name %v, err: %v", res, err)
+		} else if resource == nil {
+			return errors.Errorf("unable to get the resources with name %v", res)
 		}
 	}
 	return nil
@@ -243,7 +245,7 @@ func resourcesAbsent(probe v1alpha1.ProbeAttributes, gvr schema.GroupVersionReso
 					return errors.Errorf("unable to get the resources with name %v from k8s, err: %v", res, err)
 				}
 			} else if resource != nil {
-				return errors.Errorf("resource %v is not deleted yet", res)
+				return errors.Errorf("resource '%v' still exists but is expected to be absent", res)
 			}
 		}
 	} else {
@@ -255,7 +257,7 @@ func resourcesAbsent(probe v1alpha1.ProbeAttributes, gvr schema.GroupVersionReso
 			return errors.Errorf("unable to list the resources with matching selector, err: %v", err)
 		}
 		if len(resourceList.Items) != 0 {
-			return errors.Errorf("resource with provided selectors is not deleted yet, found %v matching resources still active", len(resourceList.Items))
+			return errors.Errorf("resource with provided selectors still exists, found %v resources with matching selectors", len(resourceList.Items))
 		}
 	}
 	return nil
