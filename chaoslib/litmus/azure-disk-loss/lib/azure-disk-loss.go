@@ -275,7 +275,7 @@ func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, attache
 			}
 			if diskStatusString != "Attached" {
 				if err := diskStatus.AttachDisk(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, instanceName, experimentsDetails.ScaleSet, diskList); err != nil {
-					log.Errorf("failed to attach disk '%v, manual revert required, err: %v", err)
+					log.Errorf("failed to attach disk, manual revert required, err: %v", err)
 				} else {
 					common.SetTargets(*disk.Name, "re-attached", "VirtualDisk", chaosDetails)
 				}
