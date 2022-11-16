@@ -767,8 +767,8 @@ github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de/go.mod h1:zAbeS9
 github.com/lightstep/lightstep-tracer-common/golang/gogo v0.0.0-20190605223551-bc2310a04743/go.mod h1:qklhhLq1aX+mtWk9cPHPzaBjWImj5ULL6C7HFJtXQMM=
 github.com/lightstep/lightstep-tracer-go v0.18.0/go.mod h1:jlF1pusYV4pidLvZ+XD0UBX0ZE6WURAspgAczcDHrL4=
 github.com/lithammer/dedent v1.1.0/go.mod h1:jrXYCQtgg0nJiN+StA2KgR7w6CiQNv9Fd/Z9BP0jIOc=
-github.com/litmuschaos/chaos-operator v0.0.0-20221114055503-3d12d34d2032 h1:VeVpXvz5JVj28rQZs4DI101b+vVKHIKlUNWGfbDF6V0=
-github.com/litmuschaos/chaos-operator v0.0.0-20221114055503-3d12d34d2032/go.mod h1:CJGiHqC06PQkIBySk/JroB7B2zFebDbkhQ1A6ZbYmHA=
+github.com/litmuschaos/chaos-operator v0.0.0-20221116055729-e069388bd0c6 h1:WvplxDaULK3rQwpdXgBcNXz8rA/pAyUZdBt81DOvxvo=
+github.com/litmuschaos/chaos-operator v0.0.0-20221116055729-e069388bd0c6/go.mod h1:CJGiHqC06PQkIBySk/JroB7B2zFebDbkhQ1A6ZbYmHA=
 github.com/litmuschaos/elves v0.0.0-20201107015738-552d74669e3c/go.mod h1:DsbHGNUq/78NZozWVVI9Q6eBei4I+JjlkkD5aibJ3MQ=
 github.com/logrusorgru/aurora v0.0.0-20181002194514-a7b3b318ed4e/go.mod h1:7rIyQOR62GCctdiQpZ/zOJlFyk6y+94wXzv6RNZgaR4=
 github.com/lovoo/gcloud-opentracing v0.3.0/go.mod h1:ZFqk2y38kMDDikZPAK7ynTTGuyt17nSPdS3K5e+ZTBY=
