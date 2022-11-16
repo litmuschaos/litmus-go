@@ -20,7 +20,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-//PrepareDiskFill contains the prepration steps before chaos injection
+// PrepareDiskFill contains the prepration steps before chaos injection
 func PrepareDiskFill(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	var err error
@@ -199,7 +199,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 // createHelperPod derive the attributes for helper pod and create the helper pod
 func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, targets, appNodeName, runID string) error {
 
-	mountPropagationMode := apiv1.MountPropagationHostToContainer
+	privilegedEnable := true
 	terminationGracePeriodSeconds := int64(experimentsDetails.TerminationGracePeriodSeconds)
 
 	helperPod := &apiv1.Pod{
@@ -210,17 +210,19 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 			Annotations:  chaosDetails.Annotations,
 		},
 		Spec: apiv1.PodSpec{
+			HostPID:                       true,
 			RestartPolicy:                 apiv1.RestartPolicyNever,
 			ImagePullSecrets:              chaosDetails.ImagePullSecrets,
 			NodeName:                      appNodeName,
 			ServiceAccountName:            experimentsDetails.ChaosServiceAccount,
 			TerminationGracePeriodSeconds: &terminationGracePeriodSeconds,
+
 			Volumes: []apiv1.Volume{
 				{
-					Name: "udev",
+					Name: "socket-path",
 					VolumeSource: apiv1.VolumeSource{
 						HostPath: &apiv1.HostPathVolumeSource{
-							Path: experimentsDetails.ContainerPath,
+							Path: experimentsDetails.SocketPath,
 						},
 					},
 				},
@@ -241,10 +243,12 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 					Env:       getPodEnv(experimentsDetails, targets),
 					VolumeMounts: []apiv1.VolumeMount{
 						{
-							Name:             "udev",
-							MountPath:        "/diskfill",
-							MountPropagation: &mountPropagationMode,
+							Name:      "socket-path",
+							MountPath: experimentsDetails.SocketPath,
 						},
+					},
+					SecurityContext: &apiv1.SecurityContext{
+						Privileged: &privilegedEnable,
 					},
 				},
 			},
@@ -270,13 +274,15 @@ func getPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, targets st
 		SetEnv("EPHEMERAL_STORAGE_MEBIBYTES", experimentsDetails.EphemeralStorageMebibytes).
 		SetEnv("DATA_BLOCK_SIZE", strconv.Itoa(experimentsDetails.DataBlockSize)).
 		SetEnv("INSTANCE_ID", experimentsDetails.InstanceID).
+		SetEnv("SOCKET_PATH", experimentsDetails.SocketPath).
+		SetEnv("CONTAINER_RUNTIME", experimentsDetails.ContainerRuntime).
 		SetEnvFromDownwardAPI("v1", "metadata.name")
 
 	return envDetails.ENV
 }
 
-//setChaosTunables will setup a random value within a given range of values
-//If the value is not provided in range it'll setup the initial provided value.
+// setChaosTunables will setup a random value within a given range of values
+// If the value is not provided in range it'll setup the initial provided value.
 func setChaosTunables(experimentsDetails *experimentTypes.ExperimentDetails) {
 	experimentsDetails.FillPercentage = common.ValidateRange(experimentsDetails.FillPercentage)
 	experimentsDetails.EphemeralStorageMebibytes = common.ValidateRange(experimentsDetails.EphemeralStorageMebibytes)

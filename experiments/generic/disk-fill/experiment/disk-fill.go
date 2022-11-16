@@ -83,17 +83,6 @@ func DiskFill(clients clients.ClientSets) {
 		}
 	}
 
-	//PRE-CHAOS AUXILIARY APPLICATION STATUS CHECK
-	if experimentsDetails.AuxiliaryAppInfo != "" {
-		log.Info("[Status]: Verify that the Auxiliary Applications are running (pre-chaos)")
-		if err := status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
-			log.Errorf("Auxiliary Application status check failed, err: %v", err)
-			failStep := "[pre-chaos]: Failed to verify that the Auxiliary Applications are in running state, err: " + err.Error()
-			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-			return
-		}
-	}
-
 	if experimentsDetails.EngineName != "" {
 		// marking AUT as running, as we already checked the status of application under test
 		msg := common.GetStatusMessage(chaosDetails.DefaultHealthCheck, "AUT: Running", "")
@@ -144,17 +133,6 @@ func DiskFill(clients clients.ClientSets) {
 			failStep := "[post-chaos]: Failed to verify that the AUT (Application Under Test) is running, err: " + err.Error()
 			types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, "AUT: Not Running", "Warning", &chaosDetails)
 			events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
-			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-			return
-		}
-	}
-
-	//POST-CHAOS AUXILIARY APPLICATION STATUS CHECK
-	if experimentsDetails.AuxiliaryAppInfo != "" {
-		log.Info("[Status]: Verify that the Auxiliary Applications are running (post-chaos)")
-		if err := status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
-			log.Errorf("Auxiliary Application status check failed, err: %v", err)
-			failStep := "[post-chaos]: Failed to verify that the Auxiliary Applications are running, err: " + err.Error()
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}
