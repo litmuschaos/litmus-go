@@ -3,7 +3,7 @@ name: Push
 on:
   push:
     branches:
-      - dev-3.x
+      - master
     tags-ignore:
       - '**'
 jobs:
@@ -69,4 +69,4 @@ jobs:
           push: true
           file: build/Dockerfile
           platforms: linux/amd64,linux/arm64
-          tags: litmuschaos/go-runner:dev-3.x
+          tags: litmuschaos/go-runner:ci

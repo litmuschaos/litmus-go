@@ -11,7 +11,7 @@ IS_DOCKER_INSTALLED = $(shell which docker >> /dev/null 2>&1; echo $$?)
 DOCKER_REGISTRY ?= docker.io
 DOCKER_REPO ?= litmuschaos
 DOCKER_IMAGE ?= go-runner
-DOCKER_TAG ?= dev-3.x
+DOCKER_TAG ?= ci
 
 .PHONY: help
 help:
