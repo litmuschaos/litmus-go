@@ -85,25 +85,25 @@ func AbortWatcherWithoutExit(expname string, clients clients.ClientSets, resultD
 	// updating the chaosresult after stopped
 	failStep := "Chaos injection stopped!"
 	types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep)
-	result.ChaosResult(chaosDetails, clients, resultDetails, "EOT")
+	if err := result.ChaosResult(chaosDetails, clients, resultDetails, "EOT"); err != nil {
+		log.Errorf("[ABORT]: Failed to update result, err: %v", err)
+	}
+	log.Info("[ABORT]: Updated chaosresult post stop")
 
 	// generating summary event in chaosengine
 	msg := expname + " experiment has been aborted"
 	types.SetEngineEventAttributes(eventsDetails, types.Summary, msg, "Warning", chaosDetails)
-	events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
+	err := events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
+	if err != nil {
+		log.Errorf("[ABORT]: Failed to create chaosengine summary event, err: %v", err)
+	}
 
 	// generating summary event in chaosresult
 	types.SetResultEventAttributes(eventsDetails, types.AbortVerdict, msg, "Warning", resultDetails)
-	events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosResult")
-}
-
-//GetIterations derive the iterations value from given parameters
-func GetIterations(duration, interval int) int {
-	var iterations int
-	if interval != 0 {
-		iterations = duration / interval
+	err = events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosResult")
+	if err != nil {
+		log.Errorf("[ABORT]: Failed to create chaosresult abort event, err: %v", err)
 	}
-	return math.Maximum(iterations, 1)
 }
 
 //FilterBasedOnPercentage return the slice of list based on the the provided percentage
@@ -215,8 +215,8 @@ func getRandomValue(a, b int) int {
 	return (a + rand.Intn(b-a+1))
 }
 
-// StringExistsInSlice checks the existence of element in slice
-func StringExistsInSlice(val string, slice []string) bool {
+// SubStringExistsInSlice checks the existence of sub string in slice
+func SubStringExistsInSlice(val string, slice []string) bool {
 	for _, v := range slice {
 		if strings.Contains(val, v) {
 			return true
