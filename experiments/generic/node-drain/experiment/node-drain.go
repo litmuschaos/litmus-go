@@ -155,7 +155,7 @@ func NodeDrain(clients clients.ClientSets) {
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}
-		
+
 		//POST-CHAOS AUXILIARY APPLICATION STATUS CHECK
 		if experimentsDetails.AuxiliaryAppInfo != "" {
 			log.Info("[Status]: Verify that the Auxiliary Applications are running (post-chaos)")
