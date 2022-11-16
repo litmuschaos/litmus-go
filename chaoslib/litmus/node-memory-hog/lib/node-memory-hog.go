@@ -284,7 +284,7 @@ func calculateMemoryConsumption(experimentsDetails *experimentTypes.ExperimentDe
 		//Get the percentage of memory under chaos wrt allocatable memory
 		totalMemoryConsumption = int((float64(memoryForChaos) / float64(memoryAllocatable)) * 100)
 		if totalMemoryConsumption > 100 {
-			log.Infof("[Info]: PercentageOfMemoryCapacity To Be Used: %d percent, which is more than 100 percent (%d percent) of Allocatable Memory, so the experiment will only consume upto 100 percent of Allocatable Memory", experimentsDetails.MemoryConsumptionPercentage, totalMemoryConsumption)
+			log.Infof("[Info]: PercentageOfMemoryCapacity To Be Used: %v percent, which is more than 100 percent (%d percent) of Allocatable Memory, so the experiment will only consume upto 100 percent of Allocatable Memory", experimentsDetails.MemoryConsumptionPercentage, totalMemoryConsumption)
 			MemoryConsumption = "100%"
 		} else {
 			log.Infof("[Info]: PercentageOfMemoryCapacity To Be Used: %v percent, which is %d percent of Allocatable Memory", experimentsDetails.MemoryConsumptionPercentage, totalMemoryConsumption)

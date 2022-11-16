@@ -64,13 +64,6 @@ func PrepareChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients
 		"Controller":     experimentsDetails.ChaosMonkeyWatchers.Controller,
 		"RestController": experimentsDetails.ChaosMonkeyWatchers.RestController,
 	})
-	log.InfoWithValues("[Info]: Chaos monkeys assaults will be injected to the target pods as follows", logrus.Fields{
-		"CPU Assault":       experimentsDetails.ChaosMonkeyAssault.CPUActive,
-		"Memory Assault":    experimentsDetails.ChaosMonkeyAssault.MemoryActive,
-		"Kill App Assault":  experimentsDetails.ChaosMonkeyAssault.KillApplicationActive,
-		"Latency Assault":   experimentsDetails.ChaosMonkeyAssault.LatencyActive,
-		"Exception Assault": experimentsDetails.ChaosMonkeyAssault.ExceptionsActive,
-	})
 
 	switch strings.ToLower(experimentsDetails.Sequence) {
 	case "serial":
@@ -156,12 +149,8 @@ func setChaosMonkeyWatchers(chaosMonkeyPort string, chaosMonkeyPath string, watc
 	return nil
 }
 
-func startAssault(chaosMonkeyPort string, chaosMonkeyPath string, assault experimentTypes.ChaosMonkeyAssault, pod corev1.Pod) error {
-	jsonValue, err := json.Marshal(assault)
-	if err != nil {
-		return err
-	}
-	if err := setChaosMonkeyAssault(chaosMonkeyPort, chaosMonkeyPath, jsonValue, pod); err != nil {
+func startAssault(chaosMonkeyPort string, chaosMonkeyPath string, assault []byte, pod corev1.Pod) error {
+	if err := setChaosMonkeyAssault(chaosMonkeyPort, chaosMonkeyPath, assault, pod); err != nil {
 		return err
 	}
 	log.Infof("[Chaos]: Activating Chaos Monkey assault on pod: %v", pod.Name)
