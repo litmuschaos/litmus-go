@@ -329,7 +329,7 @@ func GetTargetPodsWhenTargetPodsENVNotSet(podAffPerc int, clients clients.Client
 
 func filterPodsByPercentage(finalPods core_v1.PodList, podAffPerc int) core_v1.PodList {
 	finalPods = removeDuplicatePods(finalPods)
-	
+
 	newPodListLength := math.Maximum(1, math.Adjustment(math.Minimum(podAffPerc, 100), len(finalPods.Items)))
 	rand.Seed(time.Now().UnixNano())
 
