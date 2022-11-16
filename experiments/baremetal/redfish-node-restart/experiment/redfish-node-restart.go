@@ -72,7 +72,7 @@ func NodeRestart(clients clients.ClientSets) {
 	go common.AbortWatcher(experimentsDetails.ExperimentName, clients, &resultDetails, &chaosDetails, &eventsDetails)
 
 	//PRE-CHAOS APPLICATION STATUS CHECK
-	if chaosDetails.DefaultAppHealthCheck {
+	if chaosDetails.DefaultHealthCheck {
 		log.Info("[Status]: Verify that the AUT (Application Under Test) is running (pre-chaos)")
 		if err := status.AUTStatusCheck(clients, &chaosDetails); err != nil {
 			log.Errorf("Application status check failed, err: %v", err)
@@ -153,7 +153,7 @@ func NodeRestart(clients clients.ClientSets) {
 	resultDetails.Verdict = v1alpha1.ResultVerdictPassed
 
 	//POST-CHAOS APPLICATION STATUS CHECK
-	if chaosDetails.DefaultAppHealthCheck {
+	if chaosDetails.DefaultHealthCheck {
 		log.Info("[Status]: Verify that the AUT (Application Under Test) is running (post-chaos)")
 		if err = status.AUTStatusCheck(clients, &chaosDetails); err != nil {
 			log.Errorf("Application status check failed, err: %v", err)
