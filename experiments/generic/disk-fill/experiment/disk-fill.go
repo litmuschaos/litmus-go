@@ -62,8 +62,7 @@ func DiskFill(clients clients.ClientSets) {
 
 	//DISPLAY THE APP INFORMATION
 	log.InfoWithValues("The application information is as follows", logrus.Fields{
-		"Namespace":       experimentsDetails.AppNS,
-		"Label":           experimentsDetails.AppLabel,
+		"AppDetails":      chaosDetails.AppDetail,
 		"Fill Percentage": experimentsDetails.FillPercentage,
 		"Chaos Duration":  experimentsDetails.ChaosDuration,
 	})
@@ -74,7 +73,7 @@ func DiskFill(clients clients.ClientSets) {
 	//PRE-CHAOS APPLICATION STATUS CHECK
 	if chaosDetails.DefaultHealthCheck {
 		log.Info("[Status]: Verify that the AUT (Application Under Test) is running (pre-chaos)")
-		if err := status.AUTStatusCheck(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.TargetContainer, experimentsDetails.Timeout, experimentsDetails.Delay, clients, &chaosDetails); err != nil {
+		if err := status.AUTStatusCheck(clients, &chaosDetails); err != nil {
 			log.Errorf("Application status check failed, err: %v", err)
 			failStep := "[pre-chaos]: Failed to verify that the AUT (Application Under Test) is in running state, err: " + err.Error()
 			types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, "AUT: Not Running", "Warning", &chaosDetails)
@@ -140,7 +139,7 @@ func DiskFill(clients clients.ClientSets) {
 	//POST-CHAOS APPLICATION STATUS CHECK
 	if chaosDetails.DefaultHealthCheck {
 		log.Info("[Status]: Verify that the AUT (Application Under Test) is running (post-chaos)")
-		if err := status.AUTStatusCheck(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.TargetContainer, experimentsDetails.Timeout, experimentsDetails.Delay, clients, &chaosDetails); err != nil {
+		if err := status.AUTStatusCheck(clients, &chaosDetails); err != nil {
 			log.Errorf("Application status check failed, err: %v", err)
 			failStep := "[post-chaos]: Failed to verify that the AUT (Application Under Test) is running, err: " + err.Error()
 			types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, "AUT: Not Running", "Warning", &chaosDetails)

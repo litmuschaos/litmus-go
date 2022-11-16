@@ -60,7 +60,7 @@ func PreparePodDelete(experimentsDetails *experimentTypes.ExperimentDetails, cli
 
 	//checking the status of the powerfulseal pod, wait till the powerfulseal pod comes to running state else fail the experiment
 	log.Info("[Status]: Checking the status of the helper pod")
-	err = status.CheckApplicationStatus(experimentsDetails.ChaosNamespace, "name=powerfulseal-"+runID, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
+	err = status.CheckApplicationStatusesByLabels(experimentsDetails.ChaosNamespace, "name=powerfulseal-"+runID, experimentsDetails.Timeout, experimentsDetails.Delay, clients)
 	if err != nil {
 		return errors.Errorf("powerfulseal pod is not in running state, err: %v", err)
 	}

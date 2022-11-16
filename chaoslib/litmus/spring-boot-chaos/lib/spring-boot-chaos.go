@@ -38,7 +38,7 @@ func SetTargetPodList(experimentsDetails *experimentTypes.ExperimentDetails, cli
 	// if the target pod is not defined it will derive the random target pod list using pod affected percentage
 	var err error
 
-	if experimentsDetails.TargetPods == "" && chaosDetails.AppDetail.Label == "" {
+	if experimentsDetails.TargetPods == "" && chaosDetails.AppDetail == nil {
 		return errors.Errorf("please provide one of the appLabel or TARGET_PODS")
 	}
 	if experimentsDetails.TargetPodList, err = common.GetPodList(experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, clients, chaosDetails); err != nil {

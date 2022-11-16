@@ -186,7 +186,7 @@ func KafkaBrokerPodFailure(clients clients.ClientSets) {
 	switch strings.ToLower(experimentsDetails.KafkaLivenessStream) {
 	case "enable":
 		log.Info("[Status]: Verify that the Kafka liveness pod is running(post-chaos)")
-		if err := status.CheckApplicationStatus(experimentsDetails.ChaoslibDetail.AppNS, "name=kafka-liveness-"+experimentsDetails.RunID, experimentsDetails.ChaoslibDetail.Timeout, experimentsDetails.ChaoslibDetail.Delay, clients); err != nil {
+		if err := status.CheckApplicationStatusesByLabels(experimentsDetails.ChaoslibDetail.AppNS, "name=kafka-liveness-"+experimentsDetails.RunID, experimentsDetails.ChaoslibDetail.Timeout, experimentsDetails.ChaoslibDetail.Delay, clients); err != nil {
 			log.Errorf("Application liveness status check failed, err: %v", err)
 			failStep := "[post-chaos]: Failed to verify that the liveness pod is running, err: " + err.Error()
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)

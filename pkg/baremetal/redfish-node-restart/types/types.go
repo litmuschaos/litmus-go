@@ -11,9 +11,6 @@ type ExperimentDetails struct {
 	ChaosDuration      int
 	RampTime           int
 	ChaosLib           string
-	AppNS              string
-	AppLabel           string
-	AppKind            string
 	TargetContainer    string
 	ChaosUID           clientTypes.UID
 	InstanceID         string

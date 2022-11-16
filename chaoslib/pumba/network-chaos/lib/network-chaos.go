@@ -27,7 +27,7 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 
 	// Get the target pod details for the chaos execution
 	// if the target pod is not defined it will derive the random target pod list using pod affected percentage
-	if experimentsDetails.TargetPods == "" && chaosDetails.AppDetail.Label == "" {
+	if experimentsDetails.TargetPods == "" && chaosDetails.AppDetail == nil {
 		return errors.Errorf("please provide one of the appLabel or TARGET_PODS")
 	}
 	//setup the tunables if provided in range
@@ -135,7 +135,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		// args contains details of the specific chaos injection
 		// constructing `argsWithRegex` based on updated regex with a diff pod name
 		// without extending/concatenating the args var itself
-		argsWithRegex := append(args, "re2:k8s_POD_"+pod.Name+"_"+experimentsDetails.AppNS)
+		argsWithRegex := append(args, "re2:k8s_POD_"+pod.Name+"_"+pod.Namespace)
 		log.Infof("Arguments for running %v are %v", experimentsDetails.ExperimentName, argsWithRegex)
 		if err := createHelperPod(experimentsDetails, clients, chaosDetails, pod.Spec.NodeName, runID, argsWithRegex); err != nil {
 			return errors.Errorf("unable to create the helper pod, err: %v", err)
@@ -191,7 +191,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		// args contains details of the specific chaos injection
 		// constructing `argsWithRegex` based on updated regex with a diff pod name
 		// without extending/concatenating the args var itself
-		argsWithRegex := append(args, "re2:k8s_POD_"+pod.Name+"_"+experimentsDetails.AppNS)
+		argsWithRegex := append(args, "re2:k8s_POD_"+pod.Name+"_"+pod.Namespace)
 		log.Infof("Arguments for running %v are %v", experimentsDetails.ExperimentName, argsWithRegex)
 		if err := createHelperPod(experimentsDetails, clients, chaosDetails, pod.Spec.NodeName, runID, argsWithRegex); err != nil {
 			return errors.Errorf("unable to create the helper pod, err: %v", err)
