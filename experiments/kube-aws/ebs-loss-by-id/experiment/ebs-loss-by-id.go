@@ -125,7 +125,6 @@ func EBSLossByID(clients clients.ClientSets) {
 	log.Infof("[Confirmation]: %v chaos has been injected successfully", experimentsDetails.ExperimentName)
 	resultDetails.Verdict = v1alpha1.ResultVerdictPassed
 
-	//POST-CHAOS APPLICATION STATUS CHECK
 	if chaosDetails.DefaultHealthCheck {
 		//Verify the aws ec2 instance is attached to ebs volume
 		if err = aws.EBSStateCheckByID(experimentsDetails.EBSVolumeID, experimentsDetails.Region); err != nil {

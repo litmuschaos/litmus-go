@@ -28,47 +28,20 @@ var destIps string
 //PrepareAndInjectChaos contains the prepration & injection steps
 func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, args string) error {
 
-	targetPodList := apiv1.PodList{}
 	var err error
-	var podsAffectedPerc int
 	// Get the target pod details for the chaos execution
 	// if the target pod is not defined it will derive the random target pod list using pod affected percentage
-	if experimentsDetails.TargetPods == "" && chaosDetails.AppDetail.Label == "" {
+	if experimentsDetails.TargetPods == "" && chaosDetails.AppDetail == nil {
 		return errors.Errorf("please provide one of the appLabel or TARGET_PODS")
 	}
 	//setup the tunables if provided in range
 	SetChaosTunables(experimentsDetails)
 	logExperimentFields(experimentsDetails)
 
-	podsAffectedPerc, _ = strconv.Atoi(experimentsDetails.PodsAffectedPerc)
-	if experimentsDetails.NodeLabel == "" {
-
-		//targetPodList, err := common.GetPodListFromSpecifiedNodes(experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, clients, chaosDetails)
-		targetPodList, err = common.GetPodList(experimentsDetails.TargetPods, podsAffectedPerc, clients, chaosDetails)
-		if err != nil {
-			return err
-		}
-	} else {
-		//targetPodList, err := common.GetPodList(experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, clients, chaosDetails)
-		if experimentsDetails.TargetPods == "" {
-			targetPodList, err = common.GetPodListFromSpecifiedNodes(experimentsDetails.TargetPods, podsAffectedPerc, experimentsDetails.NodeLabel, clients, chaosDetails)
-			if err != nil {
-				return err
-			}
-		} else {
-			log.Infof("TARGET_PODS env is provided, overriding the NODE_LABEL input")
-			targetPodList, err = common.GetPodList(experimentsDetails.TargetPods, podsAffectedPerc, clients, chaosDetails)
-			if err != nil {
-				return err
-			}
-		}
+	targetPodList, err := common.GetTargetPods(experimentsDetails.NodeLabel, experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, clients, chaosDetails)
+	if err != nil {
+		return err
 	}
-
-	podNames := []string{}
-	for _, pod := range targetPodList.Items {
-		podNames = append(podNames, pod.Name)
-	}
-	log.Infof("Target pods list for chaos, %v", podNames)
 
 	//Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
@@ -126,7 +99,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 
 		//Get the target container name of the application pod
 		if !experimentsDetails.IsTargetContainerProvided {
-			experimentsDetails.TargetContainer, err = common.GetTargetContainer(experimentsDetails.AppNS, pod.Name, clients)
+			experimentsDetails.TargetContainer, err = common.GetTargetContainer(pod.Namespace, pod.Name, clients)
 			if err != nil {
 				return errors.Errorf("unable to get the target container name, err: %v", err)
 			}

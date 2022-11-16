@@ -40,11 +40,11 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 	signal.Notify(abort, os.Interrupt, syscall.SIGTERM)
 
 	// validate the appLabels
-	if chaosDetails.AppDetail.Label == "" {
+	if chaosDetails.AppDetail == nil {
 		return errors.Errorf("please provide the appLabel")
 	}
 	// Get the target pod details for the chaos execution
-	targetPodList, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).List(context.Background(), v1.ListOptions{LabelSelector: experimentsDetails.AppLabel})
+	targetPodList, err := common.GetPodList("", 100, clients, chaosDetails)
 	if err != nil {
 		return err
 	}
@@ -81,7 +81,7 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 	})
 
 	// watching for the abort signal and revert the chaos
-	go abortWatcher(experimentsDetails, clients, chaosDetails, resultDetails, targetPodList, runID)
+	go abortWatcher(experimentsDetails, clients, chaosDetails, resultDetails, &targetPodList, runID)
 
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
@@ -114,7 +114,7 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 	common.WaitForDuration(experimentsDetails.ChaosDuration)
 
 	// deleting the network policy after chaos duration over
-	if err := deleteNetworkPolicy(experimentsDetails, clients, targetPodList, chaosDetails, experimentsDetails.Timeout, experimentsDetails.Delay, runID); err != nil {
+	if err := deleteNetworkPolicy(experimentsDetails, clients, &targetPodList, chaosDetails, experimentsDetails.Timeout, experimentsDetails.Delay, runID); err != nil {
 		return err
 	}
 

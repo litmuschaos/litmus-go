@@ -49,7 +49,7 @@ func experimentMemory(experimentsDetails *experimentTypes.ExperimentDetails, cli
 
 	// Get the target pod details for the chaos execution
 	// if the target pod is not defined it will derive the random target pod list using pod affected percentage
-	if experimentsDetails.TargetPods == "" && chaosDetails.AppDetail.Label == "" {
+	if experimentsDetails.TargetPods == "" && chaosDetails.AppDetail == nil {
 		return errors.Errorf("please provide one of the appLabel or TARGET_PODS")
 	}
 	targetPodList, err := common.GetPodList(experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, clients, chaosDetails)
@@ -118,7 +118,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 
 			//Get the target container name of the application pod
 			if !experimentsDetails.IsTargetContainerProvided {
-				experimentsDetails.TargetContainer, err = common.GetTargetContainer(experimentsDetails.AppNS, pod.Name, clients)
+				experimentsDetails.TargetContainer, err = common.GetTargetContainer(pod.Namespace, pod.Name, clients)
 				if err != nil {
 					return errors.Errorf("unable to get the target container name, err: %v", err)
 				}
@@ -129,7 +129,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 				"Target Pod":             pod.Name,
 				"Memory Consumption(MB)": experimentsDetails.MemoryConsumption,
 			})
-			go stressMemory(strconv.Itoa(experimentsDetails.MemoryConsumption), experimentsDetails.TargetContainer, pod.Name, experimentsDetails.AppNS, clients, stressErr)
+			go stressMemory(strconv.Itoa(experimentsDetails.MemoryConsumption), experimentsDetails.TargetContainer, pod.Name, pod.Namespace, clients, stressErr)
 
 			common.SetTargets(pod.Name, "injected", "pod", chaosDetails)
 
@@ -152,7 +152,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 					}
 				case <-signChan:
 					log.Info("[Chaos]: Revert Started")
-					if err := killStressMemorySerial(experimentsDetails.TargetContainer, pod.Name, experimentsDetails.AppNS, experimentsDetails.ChaosKillCmd, clients, chaosDetails); err != nil {
+					if err := killStressMemorySerial(experimentsDetails.TargetContainer, pod.Name, pod.Namespace, experimentsDetails.ChaosKillCmd, clients, chaosDetails); err != nil {
 						log.Errorf("Error in Kill stress after abortion, err: %v", err)
 					}
 					// updating the chaosresult after stopped
@@ -167,7 +167,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 					break loop
 				}
 			}
-			if err := killStressMemorySerial(experimentsDetails.TargetContainer, pod.Name, experimentsDetails.AppNS, experimentsDetails.ChaosKillCmd, clients, chaosDetails); err != nil {
+			if err := killStressMemorySerial(experimentsDetails.TargetContainer, pod.Name, pod.Namespace, experimentsDetails.ChaosKillCmd, clients, chaosDetails); err != nil {
 				return err
 			}
 		}
@@ -212,7 +212,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 			//Get the target container name of the application pod
 			//It checks the empty target container for the first iteration only
 			if !experimentsDetails.IsTargetContainerProvided {
-				experimentsDetails.TargetContainer, err = common.GetTargetContainer(experimentsDetails.AppNS, pod.Name, clients)
+				experimentsDetails.TargetContainer, err = common.GetTargetContainer(pod.Namespace, pod.Name, clients)
 				if err != nil {
 					return errors.Errorf("unable to get the target container name, err: %v", err)
 				}
@@ -224,7 +224,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 				"Memory Consumption(MB)": experimentsDetails.MemoryConsumption,
 			})
 
-			go stressMemory(strconv.Itoa(experimentsDetails.MemoryConsumption), experimentsDetails.TargetContainer, pod.Name, experimentsDetails.AppNS, clients, stressErr)
+			go stressMemory(strconv.Itoa(experimentsDetails.MemoryConsumption), experimentsDetails.TargetContainer, pod.Name, pod.Namespace, clients, stressErr)
 		}
 	}
 
@@ -247,7 +247,7 @@ loop:
 			}
 		case <-signChan:
 			log.Info("[Chaos]: Revert Started")
-			if err := killStressMemoryParallel(experimentsDetails.TargetContainer, targetPodList, experimentsDetails.AppNS, experimentsDetails.ChaosKillCmd, clients, chaosDetails); err != nil {
+			if err := killStressMemoryParallel(experimentsDetails.TargetContainer, targetPodList, experimentsDetails.ChaosKillCmd, clients, chaosDetails); err != nil {
 				log.Errorf("Error in Kill stress after abortion, err: %v", err)
 			}
 			log.Info("[Chaos]: Revert Completed")
@@ -257,7 +257,7 @@ loop:
 			break loop
 		}
 	}
-	return killStressMemoryParallel(experimentsDetails.TargetContainer, targetPodList, experimentsDetails.AppNS, experimentsDetails.ChaosKillCmd, clients, chaosDetails)
+	return killStressMemoryParallel(experimentsDetails.TargetContainer, targetPodList, experimentsDetails.ChaosKillCmd, clients, chaosDetails)
 }
 
 //PrepareMemoryExecStress contains the chaos prepration and injection steps
@@ -304,11 +304,11 @@ func killStressMemorySerial(containerName, podName, namespace, memFreeCmd string
 
 // killStressMemoryParallel function to kill all the stress process running inside target container
 // Triggered by either timeout of chaos duration or termination of the experiment
-func killStressMemoryParallel(containerName string, targetPodList corev1.PodList, namespace, memFreeCmd string, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
+func killStressMemoryParallel(containerName string, targetPodList corev1.PodList, memFreeCmd string, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
 
 	for _, pod := range targetPodList.Items {
 
-		if err := killStressMemorySerial(containerName, pod.Name, namespace, memFreeCmd, clients, chaosDetails); err != nil {
+		if err := killStressMemorySerial(containerName, pod.Name, pod.Namespace, memFreeCmd, clients, chaosDetails); err != nil {
 			return err
 		}
 	}

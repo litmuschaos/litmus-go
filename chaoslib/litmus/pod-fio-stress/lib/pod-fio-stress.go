@@ -24,7 +24,7 @@ import (
 // stressStorage uses the REST API to exec into the target container of the target pod
 // The function will be constantly increasing the storage utilisation until it reaches the maximum available or allowed number.
 // Using the TOTAL_CHAOS_DURATION we will need to specify for how long this experiment will last
-func stressStorage(experimentDetails *experimentTypes.ExperimentDetails, podName string, clients clients.ClientSets, stressErr chan error) {
+func stressStorage(experimentDetails *experimentTypes.ExperimentDetails, podName, ns string, clients clients.ClientSets, stressErr chan error) {
 
 	log.Infof("The storage consumption is: %vM", experimentDetails.Size)
 
@@ -37,7 +37,7 @@ func stressStorage(experimentDetails *experimentTypes.ExperimentDetails, podName
 	log.Infof("Running the command:\n%v", fioCmd)
 	command := []string{"/bin/sh", "-c", fioCmd}
 
-	litmusexec.SetExecCommandAttributes(&execCommandDetails, podName, experimentDetails.TargetContainer, experimentDetails.AppNS)
+	litmusexec.SetExecCommandAttributes(&execCommandDetails, podName, experimentDetails.TargetContainer, ns)
 	_, err := litmusexec.Exec(&execCommandDetails, clients, command)
 
 	stressErr <- err
@@ -48,7 +48,7 @@ func experimentExecution(experimentsDetails *experimentTypes.ExperimentDetails, 
 
 	// Get the target pod details for the chaos execution
 	// if the target pod is not defined it will derive the random target pod list using pod affected percentage
-	if experimentsDetails.TargetPods == "" && chaosDetails.AppDetail.Label == "" {
+	if experimentsDetails.TargetPods == "" && chaosDetails.AppDetail == nil {
 		return errors.Errorf("please provide either of the appLabel or TARGET_PODS")
 	}
 	targetPodList, err := common.GetPodList(experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, clients, chaosDetails)
@@ -103,7 +103,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		}
 		//Get the target container name of the application pod
 		if !experimentsDetails.IsTargetContainerProvided {
-			experimentsDetails.TargetContainer, err = common.GetTargetContainer(experimentsDetails.AppNS, pod.Name, clients)
+			experimentsDetails.TargetContainer, err = common.GetTargetContainer(pod.Namespace, pod.Name, clients)
 			if err != nil {
 				return errors.Errorf("unable to get the target container name, err: %v", err)
 			}
@@ -114,7 +114,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 			"Target Pod":            pod.Name,
 			"Space Consumption(MB)": experimentsDetails.Size,
 		})
-		go stressStorage(experimentsDetails, pod.Name, clients, stressErr)
+		go stressStorage(experimentsDetails, pod.Name, pod.Namespace, clients, stressErr)
 
 		log.Infof("[Chaos]:Waiting for: %vs", experimentsDetails.ChaosDuration)
 
@@ -140,7 +140,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 				}
 			case <-signChan:
 				log.Info("[Chaos]: Revert Started")
-				if err := killStressSerial(experimentsDetails.TargetContainer, pod.Name, experimentsDetails.AppNS, experimentsDetails.ChaosKillCmd, clients); err != nil {
+				if err := killStressSerial(experimentsDetails.TargetContainer, pod.Name, pod.Namespace, experimentsDetails.ChaosKillCmd, clients); err != nil {
 					log.Errorf("Error in Kill stress after abortion, err: %v", err)
 				}
 				log.Info("[Chaos]: Revert Completed")
@@ -151,7 +151,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 				break loop
 			}
 		}
-		if err := killStressSerial(experimentsDetails.TargetContainer, pod.Name, experimentsDetails.AppNS, experimentsDetails.ChaosKillCmd, clients); err != nil {
+		if err := killStressSerial(experimentsDetails.TargetContainer, pod.Name, pod.Namespace, experimentsDetails.ChaosKillCmd, clients); err != nil {
 			return err
 		}
 	}
@@ -182,7 +182,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		}
 		//Get the target container name of the application pod
 		if !experimentsDetails.IsTargetContainerProvided {
-			experimentsDetails.TargetContainer, err = common.GetTargetContainer(experimentsDetails.AppNS, pod.Name, clients)
+			experimentsDetails.TargetContainer, err = common.GetTargetContainer(pod.Namespace, pod.Name, clients)
 			if err != nil {
 				return errors.Errorf("unable to get the target container name, err: %v", err)
 			}
@@ -193,7 +193,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 			"Target Pod":              pod.Name,
 			"Storage Consumption(MB)": experimentsDetails.Size,
 		})
-		go stressStorage(experimentsDetails, pod.Name, clients, stressErr)
+		go stressStorage(experimentsDetails, pod.Name, pod.Namespace, clients, stressErr)
 	}
 
 	log.Infof("[Chaos]:Waiting for: %vs", experimentsDetails.ChaosDuration)
@@ -219,7 +219,7 @@ loop:
 			}
 		case <-signChan:
 			log.Info("[Chaos]: Revert Started")
-			if err := killStressParallel(experimentsDetails.TargetContainer, targetPodList, experimentsDetails.AppNS, experimentsDetails.ChaosKillCmd, clients); err != nil {
+			if err := killStressParallel(experimentsDetails.TargetContainer, targetPodList, experimentsDetails.ChaosKillCmd, clients); err != nil {
 				log.Errorf("Error in Kill stress after abortion, err: %v", err)
 			}
 			log.Info("[Chaos]: Revert Completed")
@@ -229,7 +229,7 @@ loop:
 			break loop
 		}
 	}
-	if err := killStressParallel(experimentsDetails.TargetContainer, targetPodList, experimentsDetails.AppNS, experimentsDetails.ChaosKillCmd, clients); err != nil {
+	if err := killStressParallel(experimentsDetails.TargetContainer, targetPodList, experimentsDetails.ChaosKillCmd, clients); err != nil {
 		return err
 	}
 
@@ -274,11 +274,11 @@ func killStressSerial(containerName, podName, namespace, KillCmd string, clients
 
 // killStressParallel function to kill all the stress process running inside target container
 // Triggered by either timeout of chaos duration or termination of the experiment
-func killStressParallel(containerName string, targetPodList corev1.PodList, namespace, KillCmd string, clients clients.ClientSets) error {
+func killStressParallel(containerName string, targetPodList corev1.PodList, KillCmd string, clients clients.ClientSets) error {
 
 	for _, pod := range targetPodList.Items {
 
-		if err := killStressSerial(containerName, pod.Name, namespace, KillCmd, clients); err != nil {
+		if err := killStressSerial(containerName, pod.Name, pod.Namespace, KillCmd, clients); err != nil {
 			return err
 		}
 	}
