@@ -2,7 +2,9 @@ package common
 
 import (
 	"context"
+	"fmt"
 	"math/rand"
+	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -119,12 +121,8 @@ func SetHelperData(chaosDetails *types.ChaosDetails, setHelperData string, clien
 }
 
 // GetHelperLabels return the labels of the helper pod
-func GetHelperLabels(labels map[string]string, runID, labelSuffix, experimentName string) map[string]string {
-	labels["name"] = experimentName + "-helper-" + runID
-	labels["app"] = experimentName + "-helper"
-	if labelSuffix != "" {
-		labels["app"] = experimentName + "-helper-" + labelSuffix
-	}
+func GetHelperLabels(labels map[string]string, runID, experimentName string) map[string]string {
+	labels["app"] = experimentName + "-helper-" + runID
 	return labels
 }
 
@@ -376,8 +374,6 @@ func GetContainerID(appNamespace, targetPod, targetContainer string, clients cli
 			break
 		}
 	}
-
-	log.Infof("container ID of %v container, containerID: %v", targetContainer, containerID)
 	return containerID, nil
 }
 
@@ -519,4 +515,61 @@ func getTargetPodsWhenNodeFilterSet(podAffPerc int, clients clients.ClientSets, 
 		index = (index + 1) % len(nodeFilteredPods.Items)
 	}
 	return realPods, nil
+}
+
+func FilterPodsForNodes(targetPodList core_v1.PodList, containerName string) map[string]*TargetsDetails {
+	targets := make(map[string]*TargetsDetails)
+
+	for _, pod := range targetPodList.Items {
+
+		td := target{
+			Name:            pod.Name,
+			Namespace:       pod.Namespace,
+			TargetContainer: containerName,
+		}
+
+		if td.TargetContainer == "" {
+			td.TargetContainer = pod.Spec.Containers[0].Name
+		}
+
+		if targets[pod.Spec.NodeName] == nil {
+			targets[pod.Spec.NodeName] = &TargetsDetails{
+				Target: []target{td},
+			}
+		} else {
+			targets[pod.Spec.NodeName].Target = append(targets[pod.Spec.NodeName].Target, td)
+		}
+	}
+	return targets
+}
+
+type TargetsDetails struct {
+	Target []target
+}
+
+type target struct {
+	Namespace       string
+	Name            string
+	TargetContainer string
+}
+
+func ParseTargets() (*TargetsDetails, error) {
+	var targets TargetsDetails
+	targetEnv := os.Getenv("TARGETS")
+	if targetEnv == "" {
+		return nil, fmt.Errorf("no target found, provide atleast one target")
+	}
+
+	for _, t := range strings.Split(targetEnv, ";") {
+		targetList := strings.Split(t, ":")
+		if len(targetList) != 3 {
+			return nil, fmt.Errorf("unsupported target: '%v', provide target in '<name>:<namespace>:<containerName>", targetList)
+		}
+		targets.Target = append(targets.Target, target{
+			Name:            targetList[0],
+			Namespace:       targetList[1],
+			TargetContainer: targetList[2],
+		})
+	}
+	return &targets, nil
 }
