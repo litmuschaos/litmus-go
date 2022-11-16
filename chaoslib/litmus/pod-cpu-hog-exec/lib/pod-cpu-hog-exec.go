@@ -26,11 +26,11 @@ var inject chan os.Signal
 // stressCPU Uses the REST API to exec into the target container of the target pod
 // The function will be constantly increasing the CPU utilisation until it reaches the maximum available or allowed number.
 // Using the TOTAL_CHAOS_DURATION we will need to specify for how long this experiment will last
-func stressCPU(experimentsDetails *experimentTypes.ExperimentDetails, podName string, clients clients.ClientSets, stressErr chan error) {
+func stressCPU(experimentsDetails *experimentTypes.ExperimentDetails, podName, ns string, clients clients.ClientSets, stressErr chan error) {
 	// It will contains all the pod & container details required for exec command
 	execCommandDetails := litmusexec.PodDetails{}
 	command := []string{"/bin/sh", "-c", experimentsDetails.ChaosInjectCmd}
-	litmusexec.SetExecCommandAttributes(&execCommandDetails, podName, experimentsDetails.TargetContainer, experimentsDetails.AppNS)
+	litmusexec.SetExecCommandAttributes(&execCommandDetails, podName, experimentsDetails.TargetContainer, ns)
 	_, err := litmusexec.Exec(&execCommandDetails, clients, command)
 	stressErr <- err
 }
@@ -40,7 +40,7 @@ func experimentCPU(experimentsDetails *experimentTypes.ExperimentDetails, client
 
 	// Get the target pod details for the chaos execution
 	// if the target pod is not defined it will derive the random target pod list using pod affected percentage
-	if experimentsDetails.TargetPods == "" && chaosDetails.AppDetail.Label == "" {
+	if experimentsDetails.TargetPods == "" && chaosDetails.AppDetail == nil {
 		return errors.Errorf("please provide one of the appLabel or TARGET_PODS")
 	}
 	targetPodList, err := common.GetPodList(experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, clients, chaosDetails)
@@ -109,7 +109,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 
 			//Get the target container name of the application pod
 			if !experimentsDetails.IsTargetContainerProvided {
-				experimentsDetails.TargetContainer, err = common.GetTargetContainer(experimentsDetails.AppNS, pod.Name, clients)
+				experimentsDetails.TargetContainer, err = common.GetTargetContainer(pod.Namespace, pod.Name, clients)
 				if err != nil {
 					return errors.Errorf("unable to get the target container name, err: %v", err)
 				}
@@ -122,7 +122,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 			})
 
 			for i := 0; i < experimentsDetails.CPUcores; i++ {
-				go stressCPU(experimentsDetails, pod.Name, clients, stressErr)
+				go stressCPU(experimentsDetails, pod.Name, pod.Namespace, clients, stressErr)
 			}
 
 			common.SetTargets(pod.Name, "injected", "pod", chaosDetails)
@@ -146,7 +146,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 					}
 				case <-signChan:
 					log.Info("[Chaos]: Revert Started")
-					err := killStressCPUSerial(experimentsDetails, pod.Name, clients, chaosDetails)
+					err := killStressCPUSerial(experimentsDetails, pod.Name, pod.Namespace, clients, chaosDetails)
 					if err != nil {
 						log.Errorf("Error in Kill stress after abortion, err: %v", err)
 					}
@@ -162,7 +162,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 					break loop
 				}
 			}
-			if err := killStressCPUSerial(experimentsDetails, pod.Name, clients, chaosDetails); err != nil {
+			if err := killStressCPUSerial(experimentsDetails, pod.Name, pod.Namespace, clients, chaosDetails); err != nil {
 				return err
 			}
 		}
@@ -205,7 +205,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 			}
 			//Get the target container name of the application pod
 			if !experimentsDetails.IsTargetContainerProvided {
-				experimentsDetails.TargetContainer, err = common.GetTargetContainer(experimentsDetails.AppNS, pod.Name, clients)
+				experimentsDetails.TargetContainer, err = common.GetTargetContainer(pod.Namespace, pod.Name, clients)
 				if err != nil {
 					return errors.Errorf("unable to get the target container name, err: %v", err)
 				}
@@ -217,7 +217,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 				"CPU CORE":         experimentsDetails.CPUcores,
 			})
 			for i := 0; i < experimentsDetails.CPUcores; i++ {
-				go stressCPU(experimentsDetails, pod.Name, clients, stressErr)
+				go stressCPU(experimentsDetails, pod.Name, pod.Namespace, clients, stressErr)
 			}
 			common.SetTargets(pod.Name, "injected", "pod", chaosDetails)
 		}
@@ -287,13 +287,13 @@ func PrepareCPUExecStress(experimentsDetails *experimentTypes.ExperimentDetails,
 
 // killStressCPUSerial function to kill a stress process running inside target container
 //  Triggered by either timeout of chaos duration or termination of the experiment
-func killStressCPUSerial(experimentsDetails *experimentTypes.ExperimentDetails, podName string, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
+func killStressCPUSerial(experimentsDetails *experimentTypes.ExperimentDetails, podName, ns string, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
 	// It will contains all the pod & container details required for exec command
 	execCommandDetails := litmusexec.PodDetails{}
 
 	command := []string{"/bin/sh", "-c", experimentsDetails.ChaosKillCmd}
 
-	litmusexec.SetExecCommandAttributes(&execCommandDetails, podName, experimentsDetails.TargetContainer, experimentsDetails.AppNS)
+	litmusexec.SetExecCommandAttributes(&execCommandDetails, podName, experimentsDetails.TargetContainer, ns)
 	_, err := litmusexec.Exec(&execCommandDetails, clients, command)
 	if err != nil {
 		return errors.Errorf("Unable to kill the stress process in %v pod, err: %v", podName, err)
@@ -308,7 +308,7 @@ func killStressCPUParallel(experimentsDetails *experimentTypes.ExperimentDetails
 
 	for _, pod := range targetPodList.Items {
 
-		if err := killStressCPUSerial(experimentsDetails, pod.Name, clients, chaosDetails); err != nil {
+		if err := killStressCPUSerial(experimentsDetails, pod.Name, pod.Namespace, clients, chaosDetails); err != nil {
 			return err
 		}
 	}

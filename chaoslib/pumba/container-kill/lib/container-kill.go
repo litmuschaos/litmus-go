@@ -28,7 +28,7 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 
 	// Get the target pod details for the chaos execution
 	// if the target pod is not defined it will derive the random target pod list using pod affected percentage
-	if experimentsDetails.TargetPods == "" && chaosDetails.AppDetail.Label == "" {
+	if experimentsDetails.TargetPods == "" && chaosDetails.AppDetail == nil {
 		return errors.Errorf("please provide one of the appLabel or TARGET_PODS")
 	}
 	//Setup the tunables if provided in range
@@ -112,7 +112,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 
 		//Get the target container name of the application pod
 		if !experimentsDetails.IsTargetContainerProvided {
-			experimentsDetails.TargetContainer, err = common.GetTargetContainer(experimentsDetails.AppNS, pod.Name, clients)
+			experimentsDetails.TargetContainer, err = common.GetTargetContainer(pod.Namespace, pod.Name, clients)
 			if err != nil {
 				return errors.Errorf("unable to get the target container name, err: %v", err)
 			}
@@ -180,7 +180,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 
 		//Get the target container name of the application pod
 		if !experimentsDetails.IsTargetContainerProvided {
-			experimentsDetails.TargetContainer, err = common.GetTargetContainer(experimentsDetails.AppNS, pod.Name, clients)
+			experimentsDetails.TargetContainer, err = common.GetTargetContainer(pod.Namespace, pod.Name, clients)
 			if err != nil {
 				return errors.Errorf("unable to get the target container name, err: %v", err)
 			}
@@ -256,7 +256,7 @@ func verifyRestartCount(experimentsDetails *experimentTypes.ExperimentDetails, p
 		Times(90).
 		Wait(1 * time.Second).
 		Try(func(attempt uint) error {
-			pod, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Get(context.Background(), pod.Name, v1.GetOptions{})
+			pod, err := clients.KubeClient.CoreV1().Pods(pod.Namespace).Get(context.Background(), pod.Name, v1.GetOptions{})
 			if err != nil {
 				return err
 			}

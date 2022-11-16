@@ -34,4 +34,14 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.NamespaceSelector = types.Getenv("NAMESPACE_SELECTOR", "")
 	experimentDetails.PORTS = types.Getenv("PORTS", "")
 
+	experimentDetails.AppNS, experimentDetails.AppKind, experimentDetails.AppLabel = getAppDetails()
+}
+
+func getAppDetails() (string, string, string) {
+	targets := types.Getenv("TARGETS", "")
+	app := types.GetTargets(targets)
+	if len(app) != 0 {
+		return app[0].Namespace, app[0].Kind, app[0].Labels[0]
+	}
+	return "", "", ""
 }
