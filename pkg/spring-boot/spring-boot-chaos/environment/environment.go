@@ -40,7 +40,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string
 	experimentDetails.ChaosMonkeyPort = types.Getenv("CM_PORT", "8080")
 
 	level, _ := strconv.Atoi(types.Getenv("CM_LEVEL", "1"))
-	deterministic, _ := strconv.ParseBool(types.Getenv("CM_DETERMINISTIC", "true"))
+	deterministic := true
 	watchedCustomServices := strings.Split(types.Getenv("CM_WATCHED_CUSTOM_SERVICES", ""), ",")
 
 	switch expName {
@@ -51,64 +51,48 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string
 			Deterministic:         deterministic,
 			WatchedCustomServices: watchedCustomServices,
 			KillApplicationActive: true,
+			KillApplicationCron:   "*/1 * * * * ?",
 		}
-		assault.KillApplicationCron = types.Getenv("CM_KILL_APPLICATION_CRON", "OFF")
-		log.InfoWithValues("[Info]: Chaos monkeys app-kill assaults details", logrus.Fields{
-			"KillApplicationCron": assault.KillApplicationCron,
-		})
 		experimentDetails.ChaosMonkeyAssault, _ = json.Marshal(assault)
 	case "spring-boot-latency":
+		latency, _ := strconv.Atoi(types.Getenv("LATENCY", "2000"))
 		// Latency assault
 		assault := experimentTypes.LatencyAssault{
 			Level:                 level,
 			Deterministic:         deterministic,
 			WatchedCustomServices: watchedCustomServices,
 			LatencyActive:         true,
+			LatencyRangeStart:     latency,
+			LatencyRangeEnd:       latency,
 		}
-		assault.LatencyRangeStart, _ = strconv.Atoi(types.Getenv("CM_LATENCY_RANGE_START", "500"))
-		assault.LatencyRangeEnd, _ = strconv.Atoi(types.Getenv("CM_LATENCY_RANGE_END", "500"))
-		log.InfoWithValues("[Info]: Chaos monkeys latency assaults details", logrus.Fields{
-			"LatencyRangeStart": assault.LatencyRangeStart,
-			"LatencyRangeEnd":   assault.LatencyRangeEnd,
-		})
 		experimentDetails.ChaosMonkeyAssault, _ = json.Marshal(assault)
 	case "spring-boot-memory-stress":
+		memoryFillPercentage, _ := strconv.ParseFloat(types.Getenv("MEMORY_FILL_FRACTION", "0.7"), 64)
 		// Memory assault
 		assault := experimentTypes.MemoryStressAssault{
-			Level:                 level,
-			Deterministic:         deterministic,
-			WatchedCustomServices: watchedCustomServices,
-			MemoryActive:          true,
+			Level:                              level,
+			Deterministic:                      deterministic,
+			WatchedCustomServices:              watchedCustomServices,
+			MemoryActive:                       true,
+			MemoryMillisecondsHoldFilledMemory: experimentDetails.ChaosDuration * 1000,
+			MemoryMillisecondsWaitNextIncrease: 1000,
+			MemoryFillIncrementFraction:        1.0,
+			MemoryCron:                         "*/1 * * * * ?",
+			MemoryFillTargetFraction:           memoryFillPercentage,
 		}
-		assault.MemoryMillisecondsHoldFilledMemory, _ = strconv.Atoi(types.Getenv("CM_MEMORY_MS_HOLD_FILLED_MEM", "90000"))
-		assault.MemoryMillisecondsWaitNextIncrease, _ = strconv.Atoi(types.Getenv("CM_MEMORY_MS_NEXT_INCREASE", "1000"))
-		assault.MemoryFillIncrementFraction, _ = strconv.ParseFloat(types.Getenv("CM_MEMORY_FILL_INC_FRACTION", "0.15"), 64)
-		assault.MemoryFillTargetFraction, _ = strconv.ParseFloat(types.Getenv("CM_MEMORY_FILL_TARGET_FRACTION", "0.25"), 64)
-		assault.MemoryCron = types.Getenv("CM_MEMORY_CRON", "OFF")
-		log.InfoWithValues("[Info]: Chaos monkeys memory-stress assaults details", logrus.Fields{
-			"MemoryMillisecondsHoldFilledMemory": assault.MemoryMillisecondsHoldFilledMemory,
-			"MemoryMillisecondsWaitNextIncrease": assault.MemoryMillisecondsWaitNextIncrease,
-			"MemoryFillIncrementFraction":        assault.MemoryFillIncrementFraction,
-			"MemoryFillTargetFraction":           assault.MemoryFillTargetFraction,
-			"MemoryCron":                         assault.MemoryCron,
-		})
 		experimentDetails.ChaosMonkeyAssault, _ = json.Marshal(assault)
 	case "spring-boot-cpu-stress":
+		cpuLoadTargetFraction, _ := strconv.ParseFloat(types.Getenv("CPU_LOAD_FRACTION", "0.9"), 64)
 		// CPU assault
 		assault := experimentTypes.CPUStressAssault{
-			Level:                 level,
-			Deterministic:         deterministic,
-			WatchedCustomServices: watchedCustomServices,
-			CPUActive:             true,
+			Level:                   level,
+			Deterministic:           deterministic,
+			WatchedCustomServices:   watchedCustomServices,
+			CPUActive:               true,
+			CPUMillisecondsHoldLoad: experimentDetails.ChaosDuration * 1000,
+			CPULoadTargetFraction:   cpuLoadTargetFraction,
+			CPUCron:                 "*/1 * * * * ?",
 		}
-		assault.CPUMillisecondsHoldLoad, _ = strconv.Atoi(types.Getenv("CM_CPU_MS_HOLD_LOAD", "90000"))
-		assault.CPULoadTargetFraction, _ = strconv.ParseFloat(types.Getenv("CM_CPU_LOAD_TARGET_FRACTION", "0.9"), 64)
-		assault.CPUCron = types.Getenv("CM_CPU_CRON", "OFF")
-		log.InfoWithValues("[Info]: Chaos monkeys cpu-stress assaults details", logrus.Fields{
-			"CPUMillisecondsHoldLoad": assault.CPUMillisecondsHoldLoad,
-			"CPULoadTargetFraction":   assault.CPULoadTargetFraction,
-			"CPUCron":                 assault.CPUCron,
-		})
 		experimentDetails.ChaosMonkeyAssault, _ = json.Marshal(assault)
 	case "spring-boot-exceptions":
 		// Exception assault
