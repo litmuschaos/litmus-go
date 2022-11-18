@@ -1,11 +1,13 @@
 package common
 
 import (
+	"context"
 	"math/rand"
+	"os/exec"
 	"strings"
 	"time"
 
-	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
+	"github.com/litmuschaos/chaos-operator/api/litmuschaos/v1alpha1"
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/math"
@@ -22,7 +24,7 @@ import (
 //DeletePod deletes the specified pod and wait until it got terminated
 func DeletePod(podName, podLabel, namespace string, timeout, delay int, clients clients.ClientSets) error {
 
-	if err := clients.KubeClient.CoreV1().Pods(namespace).Delete(podName, &v1.DeleteOptions{}); err != nil {
+	if err := clients.KubeClient.CoreV1().Pods(namespace).Delete(context.Background(), podName, v1.DeleteOptions{}); err != nil {
 		return err
 	}
 
@@ -31,7 +33,7 @@ func DeletePod(podName, podLabel, namespace string, timeout, delay int, clients 
 		Times(uint(timeout / delay)).
 		Wait(time.Duration(delay) * time.Second).
 		Try(func(attempt uint) error {
-			podSpec, err := clients.KubeClient.CoreV1().Pods(namespace).List(v1.ListOptions{LabelSelector: podLabel})
+			podSpec, err := clients.KubeClient.CoreV1().Pods(namespace).List(context.Background(), v1.ListOptions{LabelSelector: podLabel})
 			if err != nil {
 				return errors.Errorf("Unable to delete the pod, err: %v", err)
 			} else if len(podSpec.Items) != 0 {
@@ -44,7 +46,7 @@ func DeletePod(podName, podLabel, namespace string, timeout, delay int, clients 
 //DeleteAllPod deletes all the pods with matching labels and wait until all the pods got terminated
 func DeleteAllPod(podLabel, namespace string, timeout, delay int, clients clients.ClientSets) error {
 
-	if err := clients.KubeClient.CoreV1().Pods(namespace).DeleteCollection(&v1.DeleteOptions{}, v1.ListOptions{LabelSelector: podLabel}); err != nil {
+	if err := clients.KubeClient.CoreV1().Pods(namespace).DeleteCollection(context.Background(), v1.DeleteOptions{}, v1.ListOptions{LabelSelector: podLabel}); err != nil {
 		return err
 	}
 
@@ -53,7 +55,7 @@ func DeleteAllPod(podLabel, namespace string, timeout, delay int, clients client
 		Times(uint(timeout / delay)).
 		Wait(time.Duration(delay) * time.Second).
 		Try(func(attempt uint) error {
-			podSpec, err := clients.KubeClient.CoreV1().Pods(namespace).List(v1.ListOptions{LabelSelector: podLabel})
+			podSpec, err := clients.KubeClient.CoreV1().Pods(namespace).List(context.Background(), v1.ListOptions{LabelSelector: podLabel})
 			if err != nil {
 				return errors.Errorf("Unable to delete the pods, err: %v", err)
 			} else if len(podSpec.Items) != 0 {
@@ -66,7 +68,7 @@ func DeleteAllPod(podLabel, namespace string, timeout, delay int, clients client
 // getChaosPodResourceRequirements will return the resource requirements on chaos pod
 func getChaosPodResourceRequirements(podName, containerName, namespace string, clients clients.ClientSets) (core_v1.ResourceRequirements, error) {
 
-	pod, err := clients.KubeClient.CoreV1().Pods(namespace).Get(podName, v1.GetOptions{})
+	pod, err := clients.KubeClient.CoreV1().Pods(namespace).Get(context.Background(), podName, v1.GetOptions{})
 	if err != nil {
 		return core_v1.ResourceRequirements{}, err
 	}
@@ -84,7 +86,7 @@ func getChaosPodResourceRequirements(podName, containerName, namespace string, c
 // which can be used to create helper pod
 func SetHelperData(chaosDetails *types.ChaosDetails, setHelperData string, clients clients.ClientSets) error {
 	var pod *core_v1.Pod
-	pod, err = clients.KubeClient.CoreV1().Pods(chaosDetails.ChaosNamespace).Get(chaosDetails.ChaosPodName, v1.GetOptions{})
+	pod, err = clients.KubeClient.CoreV1().Pods(chaosDetails.ChaosNamespace).Get(context.Background(), chaosDetails.ChaosPodName, v1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -185,7 +187,7 @@ func CheckForAvailibiltyOfPod(namespace, name string, clients clients.ClientSets
 	if name == "" {
 		return false, nil
 	}
-	_, err := clients.KubeClient.CoreV1().Pods(namespace).Get(name, v1.GetOptions{})
+	_, err := clients.KubeClient.CoreV1().Pods(namespace).Get(context.Background(), name, v1.GetOptions{})
 
 	if err != nil && k8serrors.IsNotFound(err) {
 		return false, nil
@@ -198,7 +200,7 @@ func CheckForAvailibiltyOfPod(namespace, name string, clients clients.ClientSets
 //FilterNonChaosPods remove the chaos pods(operator, runner) for the podList
 // it filter when the applabels are not defined and it will select random pods from appns
 func FilterNonChaosPods(clients clients.ClientSets, chaosDetails *types.ChaosDetails) (core_v1.PodList, error) {
-	podList, err := clients.KubeClient.CoreV1().Pods(chaosDetails.AppDetail.Namespace).List(v1.ListOptions{LabelSelector: chaosDetails.AppDetail.Label})
+	podList, err := clients.KubeClient.CoreV1().Pods(chaosDetails.AppDetail.Namespace).List(context.Background(), v1.ListOptions{LabelSelector: chaosDetails.AppDetail.Label})
 	if err != nil {
 		return core_v1.PodList{}, err
 	} else if len(podList.Items) == 0 {
@@ -221,7 +223,7 @@ func GetTargetPodsWhenTargetPodsENVSet(targetPods string, clients clients.Client
 	realPods := core_v1.PodList{}
 
 	for index := range targetPodsList {
-		pod, err := clients.KubeClient.CoreV1().Pods(chaosDetails.AppDetail.Namespace).Get(strings.TrimSpace(targetPodsList[index]), v1.GetOptions{})
+		pod, err := clients.KubeClient.CoreV1().Pods(chaosDetails.AppDetail.Namespace).Get(context.Background(), strings.TrimSpace(targetPodsList[index]), v1.GetOptions{})
 		if err != nil {
 			return core_v1.PodList{}, errors.Wrapf(err, "Failed to get %v pod in %v namespace", targetPodsList[index], chaosDetails.AppDetail.Namespace)
 		}
@@ -339,7 +341,7 @@ func DeleteAllHelperPodBasedOnJobCleanupPolicy(podLabel string, chaosDetails *ty
 
 // GetServiceAccount derive the serviceAccountName for the helper pod
 func GetServiceAccount(chaosNamespace, chaosPodName string, clients clients.ClientSets) (string, error) {
-	pod, err := clients.KubeClient.CoreV1().Pods(chaosNamespace).Get(chaosPodName, v1.GetOptions{})
+	pod, err := clients.KubeClient.CoreV1().Pods(chaosNamespace).Get(context.Background(), chaosPodName, v1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -349,7 +351,7 @@ func GetServiceAccount(chaosNamespace, chaosPodName string, clients clients.Clie
 //GetTargetContainer will fetch the container name from application pod
 //This container will be used as target container
 func GetTargetContainer(appNamespace, appName string, clients clients.ClientSets) (string, error) {
-	pod, err := clients.KubeClient.CoreV1().Pods(appNamespace).Get(appName, v1.GetOptions{})
+	pod, err := clients.KubeClient.CoreV1().Pods(appNamespace).Get(context.Background(), appName, v1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -359,7 +361,7 @@ func GetTargetContainer(appNamespace, appName string, clients clients.ClientSets
 //GetContainerID  derive the container id of the application container
 func GetContainerID(appNamespace, targetPod, targetContainer string, clients clients.ClientSets) (string, error) {
 
-	pod, err := clients.KubeClient.CoreV1().Pods(appNamespace).Get(targetPod, v1.GetOptions{})
+	pod, err := clients.KubeClient.CoreV1().Pods(appNamespace).Get(context.Background(), targetPod, v1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -379,13 +381,41 @@ func GetContainerID(appNamespace, targetPod, targetContainer string, clients cli
 	return containerID, nil
 }
 
+//GetRuntimeBasedContainerID extract out the container id of the target container based on the container runtime
+func GetRuntimeBasedContainerID(containerRuntime, socketPath, targetPods, appNamespace, targetContainer string, clients clients.ClientSets) (string, error) {
+
+	var containerID string
+	switch containerRuntime {
+	case "docker":
+		host := "unix://" + socketPath
+		// deriving the container id of the pause container
+		cmd := "sudo docker --host " + host + " ps | grep k8s_POD_" + targetPods + "_" + appNamespace + " | awk '{print $1}'"
+		out, err := exec.Command("/bin/sh", "-c", cmd).CombinedOutput()
+		if err != nil {
+			log.Errorf("[docker]: Failed to run docker ps command: %s", string(out))
+			return "", err
+		}
+		containerID = strings.TrimSpace(string(out))
+	case "containerd", "crio":
+		containerID, err = GetContainerID(appNamespace, targetPods, targetContainer, clients)
+		if err != nil {
+			return "", err
+		}
+	default:
+		return "", errors.Errorf("%v container runtime not suported", containerRuntime)
+	}
+	log.Infof("Container ID: %v", containerID)
+
+	return containerID, nil
+}
+
 // CheckContainerStatus checks the status of the application container
 func CheckContainerStatus(appNamespace, appName string, timeout, delay int, clients clients.ClientSets) error {
 	return retry.
 		Times(uint(timeout / delay)).
 		Wait(time.Duration(delay) * time.Second).
 		Try(func(attempt uint) error {
-			pod, err := clients.KubeClient.CoreV1().Pods(appNamespace).Get(appName, v1.GetOptions{})
+			pod, err := clients.KubeClient.CoreV1().Pods(appNamespace).Get(context.Background(), appName, v1.GetOptions{})
 			if err != nil {
 				return errors.Errorf("unable to find the pod with name %v, err: %v", appName, err)
 			}
@@ -411,7 +441,7 @@ func GetPodListFromSpecifiedNodes(targetPods string, podAffPerc int, nodeLabel s
 		}*/
 
 	// identify node list from the provided node label
-	nodes, err = clients.KubeClient.CoreV1().Nodes().List(v1.ListOptions{LabelSelector: nodeLabel})
+	nodes, err = clients.KubeClient.CoreV1().Nodes().List(context.Background(), v1.ListOptions{LabelSelector: nodeLabel})
 	if err != nil {
 		return core_v1.PodList{}, errors.Errorf("Failed to find the nodes with matching label, err: %v", err)
 	} else if len(nodes.Items) == 0 {

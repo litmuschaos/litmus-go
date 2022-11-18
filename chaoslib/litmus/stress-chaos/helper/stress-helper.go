@@ -3,7 +3,6 @@ package helper
 import (
 	"bufio"
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -45,6 +44,8 @@ var (
 const (
 	// ProcessAlreadyFinished contains error code when process is finished
 	ProcessAlreadyFinished = "os: process already finished"
+	// ProcessAlreadyKilled contains error code when process is already killed
+	ProcessAlreadyKilled = "no such process"
 )
 
 // Helper injects the stress chaos
@@ -97,7 +98,7 @@ func prepareStressChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 			return err
 		}
 		// extract out the pid of the target container
-		targetPID, err := getPID(experimentsDetails, containerID)
+		targetPID, err := common.GetPID(experimentsDetails.ContainerRuntime, containerID, experimentsDetails.SocketPath)
 		if err != nil {
 			return err
 		}
@@ -125,6 +126,8 @@ func prepareStressChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 
 		// launch the stress-ng process on the target container in paused mode
 		cmd := exec.Command("/bin/bash", "-c", stressCommand)
+		// enables the process group id
+		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 		var buf bytes.Buffer
 		cmd.Stdout = &buf
 		err = cmd.Start()
@@ -183,16 +186,18 @@ func prepareStressChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 				err, ok := err.(*exec.ExitError)
 				if ok {
 					status := err.Sys().(syscall.WaitStatus)
-					if status.Signaled() && status.Signal() == syscall.SIGTERM {
+					if status.Signaled() && status.Signal() == syscall.SIGKILL {
 						// wait for the completion of abort handler
 						time.Sleep(10 * time.Second)
-						return errors.Errorf("process stopped with SIGTERM signal")
+						return errors.Errorf("process stopped with SIGKILL signal")
 					}
 				}
 				return errors.Errorf("process exited before the actual cleanup, err: %v", err)
 			}
 			log.Info("[Info]: Chaos injection completed")
-			terminateProcess(cmd.Process.Pid)
+			if err := terminateProcess(cmd.Process.Pid); err != nil {
+				return err
+			}
 			if err = result.AnnotateChaosResult(resultDetails.Name, chaosDetails.ChaosNamespace, "reverted", "pod", experimentsDetails.TargetPods); err != nil {
 				return err
 			}
@@ -203,12 +208,11 @@ func prepareStressChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 
 //terminateProcess will remove the stress process from the target container after chaos completion
 func terminateProcess(pid int) error {
-	process, err := os.FindProcess(pid)
-	if err != nil {
-		return errors.Errorf("unreachable path, err: %v", err)
-	}
-	if err = process.Signal(syscall.SIGTERM); err != nil && err.Error() != ProcessAlreadyFinished {
-		return errors.Errorf("error while killing process, err: %v", err)
+	if err := syscall.Kill(-pid, syscall.SIGKILL); err != nil {
+		if strings.Contains(err.Error(), ProcessAlreadyKilled) || strings.Contains(err.Error(), ProcessAlreadyFinished) {
+			return nil
+		}
+		return err
 	}
 	log.Info("[Info]: Stress process removed successfully")
 	return nil
@@ -280,51 +284,6 @@ func prepareStressor(experimentDetails *experimentTypes.ExperimentDetails) []str
 		log.Fatalf("stressor for %v experiment is not suported", experimentDetails.ExperimentName)
 	}
 	return stressArgs
-}
-
-//getPID extract out the PID of the target container
-func getPID(experimentDetails *experimentTypes.ExperimentDetails, containerID string) (int, error) {
-	var PID int
-
-	switch experimentDetails.ContainerRuntime {
-	case "docker":
-		host := "unix://" + experimentDetails.SocketPath
-		// deriving pid from the inspect out of target container
-		out, err := exec.Command("sudo", "docker", "--host", host, "inspect", containerID).CombinedOutput()
-		if err != nil {
-			log.Error(fmt.Sprintf("[docker]: Failed to run docker inspect: %s", string(out)))
-			return 0, err
-		}
-
-		// parsing data from the json output of inspect command
-		PID, err = parsePIDFromJSON(out, experimentDetails.ContainerRuntime)
-		if err != nil {
-			log.Error(fmt.Sprintf("[docker]: Failed to parse json from docker inspect output: %s", string(out)))
-			return 0, err
-		}
-
-	case "containerd", "crio":
-		// deriving pid from the inspect out of target container
-		endpoint := "unix://" + experimentDetails.SocketPath
-		out, err := exec.Command("sudo", "crictl", "-i", endpoint, "-r", endpoint, "inspect", containerID).CombinedOutput()
-		if err != nil {
-			log.Error(fmt.Sprintf("[cri]: Failed to run crictl: %s", string(out)))
-			return 0, err
-		}
-
-		// parsing data from the json output of inspect command
-		PID, err = parsePIDFromJSON(out, experimentDetails.ContainerRuntime)
-		if err != nil {
-			log.Errorf(fmt.Sprintf("[cri]: Failed to parse json from crictl output: %s", string(out)))
-			return 0, err
-		}
-	default:
-		return 0, errors.Errorf("%v container runtime not suported", experimentDetails.ContainerRuntime)
-	}
-
-	log.Info(fmt.Sprintf("[Info]: Container ID=%s has process PID=%d", containerID, PID))
-
-	return PID, nil
 }
 
 //pidPath will get the pid path of the container
@@ -447,47 +406,6 @@ func findValidCgroup(path cgroups.Path, target string) (string, error) {
 		}
 	}
 	return "", errors.Errorf("never found valid cgroup for %s", target)
-}
-
-//parsePIDFromJSON extract the pid from the json output
-func parsePIDFromJSON(j []byte, runtime string) (int, error) {
-	var pid int
-	switch runtime {
-	case "docker":
-		// in docker, pid is present inside state.pid attribute of inspect output
-		var resp []common.DockerInspectResponse
-		if err := json.Unmarshal(j, &resp); err != nil {
-			return 0, err
-		}
-		pid = resp[0].State.PID
-	case "containerd":
-		var resp common.CrictlInspectResponse
-		if err := json.Unmarshal(j, &resp); err != nil {
-			return 0, err
-		}
-		pid = resp.Info.PID
-
-	case "crio":
-		var info common.InfoDetails
-		if err := json.Unmarshal(j, &info); err != nil {
-			return 0, err
-		}
-		pid = info.PID
-		if pid == 0 {
-			var resp common.CrictlInspectResponse
-			if err := json.Unmarshal(j, &resp); err != nil {
-				return 0, err
-			}
-			pid = resp.Info.PID
-		}
-	default:
-		return 0, errors.Errorf("[cri]: No supported container runtime, runtime: %v", runtime)
-	}
-	if pid == 0 {
-		return 0, errors.Errorf("[cri]: No running target container found, pid: %d", pid)
-	}
-
-	return pid, nil
 }
 
 //getENV fetches all the env variables from the runner pod

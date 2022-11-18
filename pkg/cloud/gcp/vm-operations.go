@@ -24,7 +24,6 @@ func VMInstanceStop(computeService *compute.Service, instanceName string, gcpPro
 		"InstanceName": instanceName,
 		"InstanceZone": instanceZone,
 	})
-
 	return nil
 }
 
@@ -95,14 +94,14 @@ func WaitForVMInstanceUp(computeService *compute.Service, timeout int, delay int
 		})
 }
 
-//SetTargetInstance will select the target vm instances which are in RUNNING state and filtered from the given label
+// SetTargetInstance will select the target vm instances which are in RUNNING state and filtered from the given label
 func SetTargetInstance(computeService *compute.Service, experimentsDetails *experimentTypes.ExperimentDetails) error {
 
 	if experimentsDetails.InstanceLabel == "" {
 		return errors.Errorf("label not found, please provide a valid label")
 	}
 
-	response, err := computeService.Instances.List(experimentsDetails.GCPProjectID, experimentsDetails.InstanceZone).Filter("labels." + experimentsDetails.InstanceLabel).Do()
+	response, err := computeService.Instances.List(experimentsDetails.GCPProjectID, experimentsDetails.Zones).Filter("labels." + experimentsDetails.InstanceLabel + ":*").Do()
 	if err != nil {
 		return (err)
 	}

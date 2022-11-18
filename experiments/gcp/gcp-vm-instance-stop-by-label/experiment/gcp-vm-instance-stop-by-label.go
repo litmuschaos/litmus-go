@@ -3,7 +3,7 @@ package experiment
 import (
 	"os"
 
-	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
+	"github.com/litmuschaos/chaos-operator/api/litmuschaos/v1alpha1"
 	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/gcp-vm-instance-stop-by-label/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/cloud/gcp"
@@ -71,7 +71,7 @@ func GCPVMInstanceStopByLabel(clients clients.ClientSets) {
 	log.InfoWithValues("The vm instance information is as follows", logrus.Fields{
 		"Instance Label":               experimentsDetails.InstanceLabel,
 		"Instance Affected Percentage": experimentsDetails.InstanceAffectedPerc,
-		"Zone":                         experimentsDetails.InstanceZone,
+		"Zone":                         experimentsDetails.Zones,
 		"Sequence":                     experimentsDetails.Sequence,
 	})
 
@@ -104,7 +104,7 @@ func GCPVMInstanceStopByLabel(clients clients.ClientSets) {
 	// Create a compute service to access the compute engine resources
 	computeService, err = gcp.GetGCPComputeService()
 	if err != nil {
-		log.Errorf("failed to obtain a gcp compute service, err: %v", err)
+		log.Errorf("Failed to obtain a gcp compute service, err: %v", err)
 		failStep := "[pre-chaos]: Failed to obtain a gcp compute service, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
@@ -117,6 +117,8 @@ func GCPVMInstanceStopByLabel(clients clients.ClientSets) {
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
+
+	log.Info("[Status]: VM instances are in a running state (pre-chaos)")
 
 	// Including the litmus lib
 	switch experimentsDetails.ChaosLib {
@@ -139,15 +141,15 @@ func GCPVMInstanceStopByLabel(clients clients.ClientSets) {
 
 	// Verify that GCP VM instance is running (post-chaos)
 	if experimentsDetails.ManagedInstanceGroup != "enable" {
-		for _, instanceName := range experimentsDetails.TargetVMInstanceNameList {
-			if err := gcp.WaitForVMInstanceUp(computeService, experimentsDetails.Timeout, experimentsDetails.Delay, instanceName, experimentsDetails.GCPProjectID, experimentsDetails.InstanceZone); err != nil {
-				log.Errorf("failed to get the VM instance status as RUNNING post chaos, err: %v", err)
-				failStep := "[post-chaos]: Failed to verify the VM instance status, err: " + err.Error()
-				result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-				return
-			}
+		if err := gcp.InstanceStatusCheck(computeService, experimentsDetails.TargetVMInstanceNameList, experimentsDetails.GCPProjectID, []string{experimentsDetails.Zones}); err != nil {
+			log.Errorf("Failed to get VM instance status, err: %v", err)
+			failStep := "[post-chaos]: Failed to get VM instance status, err: " + err.Error()
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+			return
 		}
 	}
+
+	log.Info("[Status]: VM instances are in a running state (post-chaos)")
 
 	if experimentsDetails.EngineName != "" {
 		// marking AUT as running, as we already checked the status of application under test

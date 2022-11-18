@@ -12,7 +12,7 @@ import (
 	"crypto/tls"
 	"net/http"
 
-	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
+	"github.com/litmuschaos/chaos-operator/api/litmuschaos/v1alpha1"
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/math"
@@ -58,7 +58,7 @@ func triggerHTTPProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 	method := getHTTPMethodType(probe.HTTPProbeInputs.Method)
 
 	// initialize simple http client with default attributes
-	timeout := time.Duration(probe.HTTPProbeInputs.ResponseTimeout) * time.Millisecond
+	timeout := time.Duration(probe.RunProperties.ProbeTimeout) * time.Millisecond
 	client := &http.Client{Timeout: timeout}
 	// impose properties to http client with cert check disabled
 	if probe.HTTPProbeInputs.InsecureSkipVerify {
@@ -75,7 +75,7 @@ func triggerHTTPProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 			"URL":             probe.HTTPProbeInputs.URL,
 			"Criteria":        probe.HTTPProbeInputs.Method.Get.Criteria,
 			"ResponseCode":    probe.HTTPProbeInputs.Method.Get.ResponseCode,
-			"ResponseTimeout": probe.HTTPProbeInputs.ResponseTimeout,
+			"ResponseTimeout": probe.RunProperties.ProbeTimeout,
 		})
 		if err := httpGet(probe, client, resultDetails); err != nil {
 			return err
@@ -87,7 +87,7 @@ func triggerHTTPProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 			"Body":            probe.HTTPProbeInputs.Method.Post.Body,
 			"BodyPath":        probe.HTTPProbeInputs.Method.Post.BodyPath,
 			"ContentType":     probe.HTTPProbeInputs.Method.Post.ContentType,
-			"ResponseTimeout": probe.HTTPProbeInputs.ResponseTimeout,
+			"ResponseTimeout": probe.RunProperties.ProbeTimeout,
 		})
 		if err := httpPost(probe, client, resultDetails); err != nil {
 			return err
@@ -111,9 +111,8 @@ func httpGet(probe v1alpha1.ProbeAttributes, client *http.Client, resultDetails 
 	// it contains a timeout per iteration of retry. if the timeout expires without success then it will go to next try
 	// for a timeout, it will run the command, if it fails wait for the interval and again execute the command until timeout expires
 	return retry.Times(uint(probe.RunProperties.Retry)).
-		Timeout(int64(probe.RunProperties.ProbeTimeout)).
 		Wait(time.Duration(probe.RunProperties.Interval) * time.Second).
-		TryWithTimeout(func(attempt uint) error {
+		Try(func(attempt uint) error {
 			// getting the response from the given url
 			resp, err := client.Get(probe.HTTPProbeInputs.URL)
 			if err != nil {
@@ -146,9 +145,8 @@ func httpPost(probe v1alpha1.ProbeAttributes, client *http.Client, resultDetails
 	// it contains a timeout per iteration of retry. if the timeout expires without success then it will go to next try
 	// for a timeout, it will run the command, if it fails wait for the interval and again execute the command until timeout expires
 	return retry.Times(uint(probe.RunProperties.Retry)).
-		Timeout(int64(probe.RunProperties.ProbeTimeout)).
 		Wait(time.Duration(probe.RunProperties.Interval) * time.Second).
-		TryWithTimeout(func(attempt uint) error {
+		Try(func(attempt uint) error {
 			resp, err := client.Post(probe.HTTPProbeInputs.URL, probe.HTTPProbeInputs.Method.Post.ContentType, strings.NewReader(body))
 			if err != nil {
 				return err
@@ -330,14 +328,12 @@ func triggerOnChaosHTTPProbe(probe v1alpha1.ProbeAttributes, clients clients.Cli
 		duration = math.Maximum(0, duration-probe.RunProperties.InitialDelaySeconds)
 	}
 
-	var endTime <-chan time.Time
-	timeDelay := time.Duration(duration) * time.Second
+	endTime := time.After(time.Duration(duration) * time.Second)
 
 	// it trigger the http probe for the entire duration of chaos and it fails, if any error encounter
 	// it marked the error for the probes, if any
 loop:
 	for {
-		endTime = time.After(timeDelay)
 		select {
 		case <-endTime:
 			log.Infof("[Chaos]: Time is up for the %v probe", probe.Name)

@@ -83,7 +83,7 @@ func buildConfigFromFlags(masterUrl, kubeconfigPath string) (*restclient.Config,
 		if err == nil {
 			return kubeconfig, nil
 		}
-		klog.Warningf("Neither --kubeconfig nor --master was specified.  Using the inClusterConfig. Error creating inClusterConfig: ", err)
+		klog.Warningf("Neither --kubeconfig nor --master was specified.  Using the inClusterConfig. Error creating inClusterConfig: %v", err)
 	}
 	return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
 		&clientcmd.ClientConfigLoadingRules{ExplicitPath: kubeconfigPath},

@@ -24,7 +24,7 @@ var (
 	inject, abort chan os.Signal
 )
 
-//PrepareVMStop contains the prepration and injection steps for the experiment
+// PrepareVMStop contains the prepration and injection steps for the experiment
 func PrepareVMStop(computeService *compute.Service, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	// inject channel is used to transmit signal notifications.
@@ -45,19 +45,9 @@ func PrepareVMStop(computeService *compute.Service, experimentsDetails *experime
 
 	// get the instance name or list of instance names
 	instanceNamesList := strings.Split(experimentsDetails.VMInstanceName, ",")
-	if len(instanceNamesList) == 0 {
-		return errors.Errorf("no instance name found to stop")
-	}
 
 	// get the zone name or list of corresponding zones for the instances
-	instanceZonesList := strings.Split(experimentsDetails.InstanceZone, ",")
-	if len(instanceZonesList) == 0 {
-		return errors.Errorf("no corresponding zones found for the instances")
-	}
-
-	if len(instanceNamesList) != len(instanceZonesList) {
-		return errors.Errorf("number of instances is not equal to the number of zones")
-	}
+	instanceZonesList := strings.Split(experimentsDetails.Zones, ",")
 
 	go abortWatcher(computeService, experimentsDetails, instanceNamesList, instanceZonesList, chaosDetails)
 
@@ -83,7 +73,7 @@ func PrepareVMStop(computeService *compute.Service, experimentsDetails *experime
 	return nil
 }
 
-//injectChaosInSerialMode stops VM instances in serial mode i.e. one after the other
+// injectChaosInSerialMode stops VM instances in serial mode i.e. one after the other
 func injectChaosInSerialMode(computeService *compute.Service, experimentsDetails *experimentTypes.ExperimentDetails, instanceNamesList []string, instanceZonesList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	select {

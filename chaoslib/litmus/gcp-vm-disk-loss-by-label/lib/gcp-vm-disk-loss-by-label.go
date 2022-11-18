@@ -57,15 +57,15 @@ func PrepareDiskVolumeLossByLabel(computeService *compute.Service, experimentsDe
 
 	default:
 		// watching for the abort signal and revert the chaos
-		go abortWatcher(computeService, experimentsDetails, diskVolumeNamesList, experimentsDetails.TargetDiskInstanceNamesList, experimentsDetails.DiskZones, abort, chaosDetails)
+		go abortWatcher(computeService, experimentsDetails, diskVolumeNamesList, experimentsDetails.TargetDiskInstanceNamesList, experimentsDetails.Zones, abort, chaosDetails)
 
 		switch strings.ToLower(experimentsDetails.Sequence) {
 		case "serial":
-			if err = injectChaosInSerialMode(computeService, experimentsDetails, diskVolumeNamesList, experimentsDetails.TargetDiskInstanceNamesList, experimentsDetails.DiskZones, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+			if err = injectChaosInSerialMode(computeService, experimentsDetails, diskVolumeNamesList, experimentsDetails.TargetDiskInstanceNamesList, experimentsDetails.Zones, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
 				return err
 			}
 		case "parallel":
-			if err = injectChaosInParallelMode(computeService, experimentsDetails, diskVolumeNamesList, experimentsDetails.TargetDiskInstanceNamesList, experimentsDetails.DiskZones, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+			if err = injectChaosInParallelMode(computeService, experimentsDetails, diskVolumeNamesList, experimentsDetails.TargetDiskInstanceNamesList, experimentsDetails.Zones, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
 				return err
 			}
 		default:
@@ -82,7 +82,7 @@ func PrepareDiskVolumeLossByLabel(computeService *compute.Service, experimentsDe
 	return nil
 }
 
-//injectChaosInSerialMode will inject the disk loss chaos in serial mode which means one after the other
+// injectChaosInSerialMode will inject the disk loss chaos in serial mode which means one after the other
 func injectChaosInSerialMode(computeService *compute.Service, experimentsDetails *experimentTypes.ExperimentDetails, targetDiskVolumeNamesList, instanceNamesList []string, zone string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
@@ -157,7 +157,7 @@ func injectChaosInSerialMode(computeService *compute.Service, experimentsDetails
 	return nil
 }
 
-//injectChaosInParallelMode will inject the disk loss chaos in parallel mode that means all at once
+// injectChaosInParallelMode will inject the disk loss chaos in parallel mode that means all at once
 func injectChaosInParallelMode(computeService *compute.Service, experimentsDetails *experimentTypes.ExperimentDetails, targetDiskVolumeNamesList, instanceNamesList []string, zone string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
@@ -283,12 +283,12 @@ func getDeviceNamesAndVMInstanceNames(diskVolumeNamesList []string, computeServi
 
 	for i := range diskVolumeNamesList {
 
-		instanceName, err := gcp.GetVolumeAttachmentDetails(computeService, experimentsDetails.GCPProjectID, experimentsDetails.DiskZones, diskVolumeNamesList[i])
+		instanceName, err := gcp.GetVolumeAttachmentDetails(computeService, experimentsDetails.GCPProjectID, experimentsDetails.Zones, diskVolumeNamesList[i])
 		if err != nil || instanceName == "" {
 			return errors.Errorf("failed to get the attachment info, err: %v", err)
 		}
 
-		deviceName, err := gcp.GetDiskDeviceNameForVM(computeService, diskVolumeNamesList[i], experimentsDetails.GCPProjectID, experimentsDetails.DiskZones, instanceName)
+		deviceName, err := gcp.GetDiskDeviceNameForVM(computeService, diskVolumeNamesList[i], experimentsDetails.GCPProjectID, experimentsDetails.Zones, instanceName)
 		if err != nil {
 			return err
 		}

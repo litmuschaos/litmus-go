@@ -1,7 +1,9 @@
 package helper
 
 import (
+	"bytes"
 	"fmt"
+	"github.com/kyokomi/emoji"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -17,13 +19,16 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
-	"github.com/pkg/errors"
 	clientTypes "k8s.io/apimachinery/pkg/types"
 )
 
 var (
-	err                error
 	abort, injectAbort chan os.Signal
+)
+
+const (
+	// ProcessAlreadyKilled contains error code when process is already killed
+	ProcessAlreadyKilled = "no such process"
 )
 
 // Helper injects the dns chaos
@@ -66,10 +71,11 @@ func Helper(clients clients.ClientSets) {
 //preparePodDNSChaos contains the preparation steps before chaos injection
 func preparePodDNSChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails) error {
 
-	containerID, err := getContainerID(experimentsDetails, clients)
+	containerID, err := common.GetContainerID(experimentsDetails.AppNS, experimentsDetails.TargetPods, experimentsDetails.TargetContainer, clients)
 	if err != nil {
 		return err
 	}
+
 	// extract out the pid of the target container
 	pid, err := common.GetPID(experimentsDetails.ContainerRuntime, containerID, experimentsDetails.SocketPath)
 	if err != nil {
@@ -104,6 +110,9 @@ func preparePodDNSChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 	}()
 
 	if err = result.AnnotateChaosResult(resultDetails.Name, chaosDetails.ChaosNamespace, "injected", "pod", experimentsDetails.TargetPods); err != nil {
+		if revertErr := terminateProcess(cmd); revertErr != nil {
+			return fmt.Errorf("failed to revert and annotate the result, err: %v", fmt.Sprintf("%s, %s", err.Error(), revertErr.Error()))
+		}
 		return err
 	}
 
@@ -127,14 +136,8 @@ func preparePodDNSChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 			log.Infof("cannot kill dns interceptor, process not started. Retrying in 1sec...")
 		} else {
 			log.Infof("killing dns interceptor with pid %v", cmd.Process.Pid)
-			// kill command
-			killTemplate := fmt.Sprintf("sudo kill %d", cmd.Process.Pid)
-			kill := exec.Command("/bin/bash", "-c", killTemplate)
-			if err = kill.Run(); err != nil {
-				log.Errorf("unable to kill dns interceptor process cry, err :%v", err)
-			} else {
-				log.Errorf("dns interceptor process stopped")
-				break
+			if err := terminateProcess(cmd); err != nil {
+				return err
 			}
 		}
 		retry--
@@ -147,32 +150,21 @@ func preparePodDNSChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 	return nil
 }
 
-//getContainerID extract out the container id of the target container
-func getContainerID(experimentDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) (string, error) {
-
-	var containerID string
-	switch experimentDetails.ContainerRuntime {
-	case "docker":
-		host := "unix://" + experimentDetails.SocketPath
-		// deriving the container id of the pause container
-		cmd := "sudo docker --host " + host + " ps | grep k8s_POD_" + experimentDetails.TargetPods + "_" + experimentDetails.AppNS + " | awk '{print $1}'"
-		out, err := exec.Command("/bin/sh", "-c", cmd).CombinedOutput()
-		if err != nil {
-			log.Error(fmt.Sprintf("[docker]: Failed to run docker ps command: %s", string(out)))
-			return "", err
+func terminateProcess(cmd *exec.Cmd) error {
+	// kill command
+	killTemplate := fmt.Sprintf("sudo kill %d", cmd.Process.Pid)
+	kill := exec.Command("/bin/bash", "-c", killTemplate)
+	var stderr bytes.Buffer
+	kill.Stderr = &stderr
+	if err := kill.Run(); err != nil {
+		if strings.Contains(strings.ToLower(stderr.String()), ProcessAlreadyKilled) {
+			return nil
 		}
-		containerID = strings.TrimSpace(string(out))
-	case "containerd", "crio":
-		containerID, err = common.GetContainerID(experimentDetails.AppNS, experimentDetails.TargetPods, experimentDetails.TargetContainer, clients)
-		if err != nil {
-			return containerID, err
-		}
-	default:
-		return "", errors.Errorf("%v container runtime not suported", experimentDetails.ContainerRuntime)
+		log.Errorf("unable to kill dns interceptor process %v, err :%v", emoji.Sprint(":cry:"), err)
+	} else {
+		log.Errorf("dns interceptor process stopped")
 	}
-	log.Infof("Container ID: %v", containerID)
-
-	return containerID, nil
+	return nil
 }
 
 //getENV fetches all the env variables from the runner pod

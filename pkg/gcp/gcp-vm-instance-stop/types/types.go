@@ -20,7 +20,7 @@ type ExperimentDetails struct {
 	Delay                    int
 	VMInstanceName           string
 	GCPProjectID             string
-	InstanceZone             string
+	Zones                    string
 	ManagedInstanceGroup     string
 	Sequence                 string
 	TargetContainer          string

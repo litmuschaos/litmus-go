@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
+	"github.com/litmuschaos/chaos-operator/api/litmuschaos/v1alpha1"
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/math"
@@ -264,14 +264,12 @@ func triggerOnChaosPromProbe(probe v1alpha1.ProbeAttributes, clients clients.Cli
 		duration = math.Maximum(0, duration-probe.RunProperties.InitialDelaySeconds)
 	}
 
-	var endTime <-chan time.Time
-	timeDelay := time.Duration(duration) * time.Second
+	endTime := time.After(time.Duration(duration) * time.Second)
 
 	// it trigger the prom probe for the entire duration of chaos and it fails, if any err encounter
 	// it marked the error for the probes, if any
 loop:
 	for {
-		endTime = time.After(timeDelay)
 		select {
 		case <-endTime:
 			log.Infof("[Chaos]: Time is up for the %v probe", probe.Name)

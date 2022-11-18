@@ -2,6 +2,7 @@ package helper
 
 import (
 	"bytes"
+	"context"
 	"os/exec"
 	"strconv"
 	"time"
@@ -154,7 +155,7 @@ func stopDockerContainer(containerID, socketPath, signal string) error {
 
 //getRestartCount return the restart count of target container
 func getRestartCount(experimentsDetails *experimentTypes.ExperimentDetails, podName string, clients clients.ClientSets) (int, error) {
-	pod, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Get(podName, v1.GetOptions{})
+	pod, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Get(context.Background(), podName, v1.GetOptions{})
 	if err != nil {
 		return 0, err
 	}
@@ -176,7 +177,7 @@ func verifyRestartCount(experimentsDetails *experimentTypes.ExperimentDetails, p
 		Times(uint(experimentsDetails.Timeout / experimentsDetails.Delay)).
 		Wait(time.Duration(experimentsDetails.Delay) * time.Second).
 		Try(func(attempt uint) error {
-			pod, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Get(podName, v1.GetOptions{})
+			pod, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Get(context.Background(), podName, v1.GetOptions{})
 			if err != nil {
 				return errors.Errorf("Unable to find the pod with name %v, err: %v", podName, err)
 			}

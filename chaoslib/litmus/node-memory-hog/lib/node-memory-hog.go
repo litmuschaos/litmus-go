@@ -1,6 +1,7 @@
 package lib
 
 import (
+	"context"
 	"strconv"
 	"strings"
 
@@ -234,7 +235,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 // getNodeMemoryDetails will return the total memory capacity and memory allocatable of an application node
 func getNodeMemoryDetails(appNodeName string, clients clients.ClientSets) (int, int, error) {
 
-	nodeDetails, err := clients.KubeClient.CoreV1().Nodes().Get(appNodeName, v1.GetOptions{})
+	nodeDetails, err := clients.KubeClient.CoreV1().Nodes().Get(context.Background(), appNodeName, v1.GetOptions{})
 	if err != nil {
 		return 0, 0, err
 	}
@@ -283,7 +284,7 @@ func calculateMemoryConsumption(experimentsDetails *experimentTypes.ExperimentDe
 		//Get the percentage of memory under chaos wrt allocatable memory
 		totalMemoryConsumption = int((float64(memoryForChaos) / float64(memoryAllocatable)) * 100)
 		if totalMemoryConsumption > 100 {
-			log.Infof("[Info]: PercentageOfMemoryCapacity To Be Used: %d percent, which is more than 100 percent (%d percent) of Allocatable Memory, so the experiment will only consume upto 100 percent of Allocatable Memory", experimentsDetails.MemoryConsumptionPercentage, totalMemoryConsumption)
+			log.Infof("[Info]: PercentageOfMemoryCapacity To Be Used: %v percent, which is more than 100 percent (%d percent) of Allocatable Memory, so the experiment will only consume upto 100 percent of Allocatable Memory", experimentsDetails.MemoryConsumptionPercentage, totalMemoryConsumption)
 			MemoryConsumption = "100%"
 		} else {
 			log.Infof("[Info]: PercentageOfMemoryCapacity To Be Used: %v percent, which is %d percent of Allocatable Memory", experimentsDetails.MemoryConsumptionPercentage, totalMemoryConsumption)
@@ -351,7 +352,7 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, chao
 		},
 	}
 
-	_, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Create(helperPod)
+	_, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Create(context.Background(), helperPod, v1.CreateOptions{})
 	return err
 }
 

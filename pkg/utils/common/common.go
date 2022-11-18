@@ -1,9 +1,11 @@
 package common
 
 import (
+	"fmt"
 	"math/rand"
 	"os"
 	"os/signal"
+	"reflect"
 	"strconv"
 	"strings"
 	"syscall"
@@ -211,4 +213,26 @@ func ValidateRange(a string) string {
 func getRandomValue(a, b int) int {
 	rand.Seed(time.Now().Unix())
 	return (a + rand.Intn(b-a+1))
+}
+
+// StringExistsInSlice checks the existence of element in slice
+func StringExistsInSlice(val string, slice []string) bool {
+	for _, v := range slice {
+		if strings.Contains(val, v) {
+			return true
+		}
+	}
+	return false
+}
+
+func Contains(val interface{}, slice interface{}) bool {
+	if slice == nil {
+		return false
+	}
+	for i := 0; i < reflect.ValueOf(slice).Len(); i++ {
+		if fmt.Sprintf("%v", reflect.ValueOf(val).Interface()) == fmt.Sprintf("%v", reflect.ValueOf(slice).Index(i).Interface()) {
+			return true
+		}
+	}
+	return false
 }

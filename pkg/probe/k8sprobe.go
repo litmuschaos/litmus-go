@@ -1,10 +1,12 @@
 package probe
 
 import (
+	"context"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"strings"
 	"time"
 
-	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
+	"github.com/litmuschaos/chaos-operator/api/litmuschaos/v1alpha1"
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/math"
@@ -41,7 +43,7 @@ func prepareK8sProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Result
 // triggerK8sProbe run the k8s probe command
 func triggerK8sProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets, resultDetails *types.ResultDetails) error {
 
-	inputs := probe.K8sProbeInputs
+	inputs := &probe.K8sProbeInputs
 
 	// It parse the templated command and return normal string
 	// if command doesn't have template, it will return the same command
@@ -53,6 +55,19 @@ func triggerK8sProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets,
 	inputs.LabelSelector, err = parseCommand(inputs.LabelSelector, resultDetails)
 	if err != nil {
 		return err
+	}
+
+	inputs.ResourceNames, err = parseCommand(inputs.ResourceNames, resultDetails)
+	if err != nil {
+		return err
+	}
+
+	parsedResourceNames := []string{}
+	if inputs.ResourceNames != "" {
+		parsedResourceNames = strings.Split(inputs.ResourceNames, ",")
+		for i := range parsedResourceNames {
+			parsedResourceNames[i] = strings.TrimSpace(parsedResourceNames[i])
+		}
 	}
 
 	// it will retry for some retry count, in each iterations of try it contains following things
@@ -76,32 +91,19 @@ func triggerK8sProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets,
 					return err
 				}
 			case "delete":
-				if err = deleteResource(probe, gvr, clients); err != nil {
+				if err = deleteResource(probe, gvr, parsedResourceNames, clients); err != nil {
 					log.Errorf("the %v k8s probe has Failed, err: %v", probe.Name, err)
 					return err
 				}
 			case "present":
-				resourceList, err := clients.DynamicClient.Resource(gvr).Namespace(inputs.Namespace).List(v1.ListOptions{
-					FieldSelector: inputs.FieldSelector,
-					LabelSelector: inputs.LabelSelector,
-				})
-				if err != nil {
+				if err = resourcesPresent(probe, gvr, parsedResourceNames, clients); err != nil {
 					log.Errorf("the %v k8s probe has Failed, err: %v", probe.Name, err)
-					return errors.Errorf("unable to list the resources with matching selector, err: %v", err)
-				} else if len(resourceList.Items) == 0 {
-					return errors.Errorf("no resource found with provided selectors")
+					return err
 				}
 			case "absent":
-				resourceList, err := clients.DynamicClient.Resource(gvr).Namespace(inputs.Namespace).List(v1.ListOptions{
-					FieldSelector: inputs.FieldSelector,
-					LabelSelector: inputs.LabelSelector,
-				})
-				if err != nil {
-					return errors.Errorf("unable to list the resources with matching selector, err: %v", err)
-				}
-				if len(resourceList.Items) != 0 {
+				if err = resourcesAbsent(probe, gvr, parsedResourceNames, clients); err != nil {
 					log.Errorf("the %v k8s probe has Failed, err: %v", probe.Name, err)
-					return errors.Errorf("resource is not deleted yet due to, err: %v", err)
+					return err
 				}
 			default:
 				return errors.Errorf("operation type '%s' not supported in the k8s probe", inputs.Operation)
@@ -158,26 +160,104 @@ func createResource(probe v1alpha1.ProbeAttributes, gvr schema.GroupVersionResou
 	if err != nil {
 		return err
 	}
-	_, err := clients.DynamicClient.Resource(gvr).Namespace(probe.K8sProbeInputs.Namespace).Create(data, v1.CreateOptions{})
+	_, err := clients.DynamicClient.Resource(gvr).Namespace(probe.K8sProbeInputs.Namespace).Create(context.Background(), data, v1.CreateOptions{})
 
 	return err
 }
 
 // deleteResource deletes the resource with matching label & field selector
-func deleteResource(probe v1alpha1.ProbeAttributes, gvr schema.GroupVersionResource, clients clients.ClientSets) error {
-	resourceList, err := clients.DynamicClient.Resource(gvr).Namespace(probe.K8sProbeInputs.Namespace).List(v1.ListOptions{
-		FieldSelector: probe.K8sProbeInputs.FieldSelector,
-		LabelSelector: probe.K8sProbeInputs.LabelSelector,
-	})
-	if err != nil {
-		return errors.Errorf("unable to list the resources with matching selector, err: %v", err)
-	} else if len(resourceList.Items) == 0 {
-		return errors.Errorf("no resource found with provided selectors")
-	}
-
-	for index := range resourceList.Items {
-		if err = clients.DynamicClient.Resource(gvr).Namespace(probe.K8sProbeInputs.Namespace).Delete(resourceList.Items[index].GetName(), &v1.DeleteOptions{}); err != nil {
+func deleteResource(probe v1alpha1.ProbeAttributes, gvr schema.GroupVersionResource, parsedResourceNames []string, clients clients.ClientSets) error {
+	// resource name has higher priority
+	if len(parsedResourceNames) > 0 {
+		// check if all resources are available
+		if err := areResourcesWithNamePresent(probe, gvr, parsedResourceNames, clients); err != nil {
 			return err
+		}
+		// delete resources
+		for _, res := range parsedResourceNames {
+			if err = clients.DynamicClient.Resource(gvr).Namespace(probe.K8sProbeInputs.Namespace).Delete(context.Background(), res, v1.DeleteOptions{}); err != nil {
+				return err
+			}
+		}
+	} else {
+		resourceList, err := clients.DynamicClient.Resource(gvr).Namespace(probe.K8sProbeInputs.Namespace).List(context.Background(), v1.ListOptions{
+			FieldSelector: probe.K8sProbeInputs.FieldSelector,
+			LabelSelector: probe.K8sProbeInputs.LabelSelector,
+		})
+		if err != nil {
+			return errors.Errorf("unable to list the resources with matching selector, err: %v", err)
+		} else if len(resourceList.Items) == 0 {
+			return errors.Errorf("no resource found with provided selectors")
+		}
+
+		for index := range resourceList.Items {
+			if err = clients.DynamicClient.Resource(gvr).Namespace(probe.K8sProbeInputs.Namespace).Delete(context.Background(), resourceList.Items[index].GetName(), v1.DeleteOptions{}); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func resourcesPresent(probe v1alpha1.ProbeAttributes, gvr schema.GroupVersionResource, parsedResourceNames []string, clients clients.ClientSets) error {
+	// resource name has higher priority
+	if len(parsedResourceNames) > 0 {
+		// check if all resources are available
+		if err := areResourcesWithNamePresent(probe, gvr, parsedResourceNames, clients); err != nil {
+			return err
+		}
+	} else {
+		resourceList, err := clients.DynamicClient.Resource(gvr).Namespace(probe.K8sProbeInputs.Namespace).List(context.Background(), v1.ListOptions{
+			FieldSelector: probe.K8sProbeInputs.FieldSelector,
+			LabelSelector: probe.K8sProbeInputs.LabelSelector,
+		})
+		if err != nil {
+			log.Errorf("the %v k8s probe has Failed, err: %v", probe.Name, err)
+			return errors.Errorf("unable to list the resources with matching selector, err: %v", err)
+		} else if len(resourceList.Items) == 0 {
+			return errors.Errorf("no resource found with provided selectors")
+		}
+	}
+	return nil
+}
+
+func areResourcesWithNamePresent(probe v1alpha1.ProbeAttributes, gvr schema.GroupVersionResource, parsedResourceNames []string, clients clients.ClientSets) error {
+	for _, res := range parsedResourceNames {
+		resource, err := clients.DynamicClient.Resource(gvr).Namespace(probe.K8sProbeInputs.Namespace).Get(context.Background(), res, v1.GetOptions{})
+		if err != nil {
+			return errors.Errorf("unable to get the resources with name %v, err: %v", res, err)
+		} else if resource == nil {
+			return errors.Errorf("unable to get the resources with name %v", res)
+		}
+	}
+	return nil
+}
+
+func resourcesAbsent(probe v1alpha1.ProbeAttributes, gvr schema.GroupVersionResource, parsedResourceNames []string, clients clients.ClientSets) error {
+	// resource name has higher priority
+	if len(parsedResourceNames) > 0 {
+		// check if all resources are absent
+		for _, res := range parsedResourceNames {
+			resource, err := clients.DynamicClient.Resource(gvr).Namespace(probe.K8sProbeInputs.Namespace).Get(context.Background(), res, v1.GetOptions{})
+			if err != nil {
+				// ignore not found error, that is the expected outcome
+				if !k8serrors.IsNotFound(err) {
+					return errors.Errorf("unable to get the resources with name %v from k8s, err: %v", res, err)
+				}
+			} else if resource != nil {
+				return errors.Errorf("resource '%v' still exists but is expected to be absent", res)
+			}
+		}
+	} else {
+		resourceList, err := clients.DynamicClient.Resource(gvr).Namespace(probe.K8sProbeInputs.Namespace).List(context.Background(), v1.ListOptions{
+			FieldSelector: probe.K8sProbeInputs.FieldSelector,
+			LabelSelector: probe.K8sProbeInputs.LabelSelector,
+		})
+		if err != nil {
+			return errors.Errorf("unable to list the resources with matching selector, err: %v", err)
+		}
+		if len(resourceList.Items) != 0 {
+			return errors.Errorf("resource with provided selectors still exists, found %v resources with matching selectors", len(resourceList.Items))
 		}
 	}
 	return nil
@@ -294,14 +374,12 @@ func triggerOnChaosK8sProbe(probe v1alpha1.ProbeAttributes, clients clients.Clie
 		duration = math.Maximum(0, duration-probe.RunProperties.InitialDelaySeconds)
 	}
 
-	var endTime <-chan time.Time
-	timeDelay := time.Duration(duration) * time.Second
+	endTime := time.After(time.Duration(duration) * time.Second)
 
-	// it trigger the k8s probe for the entire duration of chaos and it fails, if any error encounter
+	// it triggers the k8s probe for the entire duration of chaos and it fails, if any error encounter
 	// marked the error for the probes, if any
 loop:
 	for {
-		endTime = time.After(timeDelay)
 		select {
 		case <-endTime:
 			log.Infof("[Chaos]: Time is up for the %v probe", probe.Name)

@@ -22,7 +22,7 @@ type ExperimentDetails struct {
 	TargetContainer             string
 	GCPProjectID                string
 	DiskVolumeNames             string
-	DiskZones                   string
+	Zones                       string
 	DiskVolumeLabel             string
 	TargetDiskVolumeNamesList   []string
 	TargetDiskInstanceNamesList []string

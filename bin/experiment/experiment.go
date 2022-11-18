@@ -38,6 +38,11 @@ import (
 	podDNSError "github.com/litmuschaos/litmus-go/experiments/generic/pod-dns-error/experiment"
 	podDNSSpoof "github.com/litmuschaos/litmus-go/experiments/generic/pod-dns-spoof/experiment"
 	podFioStress "github.com/litmuschaos/litmus-go/experiments/generic/pod-fio-stress/experiment"
+	podHttpLatency "github.com/litmuschaos/litmus-go/experiments/generic/pod-http-latency/experiment"
+	podHttpModifyBody "github.com/litmuschaos/litmus-go/experiments/generic/pod-http-modify-body/experiment"
+	podHttpModifyHeader "github.com/litmuschaos/litmus-go/experiments/generic/pod-http-modify-header/experiment"
+	podHttpResetPeer "github.com/litmuschaos/litmus-go/experiments/generic/pod-http-reset-peer/experiment"
+	podHttpStatusCode "github.com/litmuschaos/litmus-go/experiments/generic/pod-http-status-code/experiment"
 	podIOStress "github.com/litmuschaos/litmus-go/experiments/generic/pod-io-stress/experiment"
 	podMemoryHogExec "github.com/litmuschaos/litmus-go/experiments/generic/pod-memory-hog-exec/experiment"
 	podMemoryHog "github.com/litmuschaos/litmus-go/experiments/generic/pod-memory-hog/experiment"
@@ -51,6 +56,11 @@ import (
 	ebsLossByTag "github.com/litmuschaos/litmus-go/experiments/kube-aws/ebs-loss-by-tag/experiment"
 	ec2TerminateByID "github.com/litmuschaos/litmus-go/experiments/kube-aws/ec2-terminate-by-id/experiment"
 	ec2TerminateByTag "github.com/litmuschaos/litmus-go/experiments/kube-aws/ec2-terminate-by-tag/experiment"
+	springBootAppKill "github.com/litmuschaos/litmus-go/experiments/spring-boot/spring-boot-app-kill/experiment"
+	springBootCpuStress "github.com/litmuschaos/litmus-go/experiments/spring-boot/spring-boot-cpu-stress/experiment"
+	springBootExceptions "github.com/litmuschaos/litmus-go/experiments/spring-boot/spring-boot-exceptions/experiment"
+	springBootLatency "github.com/litmuschaos/litmus-go/experiments/spring-boot/spring-boot-latency/experiment"
+	springBootMemoryStress "github.com/litmuschaos/litmus-go/experiments/spring-boot/spring-boot-memory-stress/experiment"
 	vmpoweroff "github.com/litmuschaos/litmus-go/experiments/vmware/vm-poweroff/experiment"
 
 	"github.com/litmuschaos/litmus-go/pkg/clients"
@@ -148,6 +158,16 @@ func main() {
 		podDNSError.PodDNSError(clients)
 	case "pod-dns-spoof":
 		podDNSSpoof.PodDNSSpoof(clients)
+	case "pod-http-latency":
+		podHttpLatency.PodHttpLatency(clients)
+	case "pod-http-status-code":
+		podHttpStatusCode.PodHttpStatusCode(clients)
+	case "pod-http-modify-header":
+		podHttpModifyHeader.PodHttpModifyHeader(clients)
+	case "pod-http-modify-body":
+		podHttpModifyBody.PodHttpModifyBody(clients)
+	case "pod-http-reset-peer":
+		podHttpResetPeer.PodHttpResetPeer(clients)
 	case "vm-poweroff":
 		vmpoweroff.VMPoweroff(clients)
 	case "azure-instance-stop":
@@ -166,7 +186,16 @@ func main() {
 		gcpVMInstanceStopByLabel.GCPVMInstanceStopByLabel(clients)
 	case "gcp-vm-disk-loss-by-label":
 		gcpVMDiskLossByLabel.GCPVMDiskLossByLabel(clients)
-
+	case "spring-boot-cpu-stress":
+		springBootCpuStress.Experiment(clients)
+	case "spring-boot-memory-stress":
+		springBootMemoryStress.Experiment(clients)
+	case "spring-boot-latency":
+		springBootLatency.Experiment(clients)
+	case "spring-boot-exceptions":
+		springBootExceptions.Experiment(clients)
+	case "spring-boot-app-kill":
+		springBootAppKill.Experiment(clients)
 	default:
 		log.Errorf("Unsupported -name %v, please provide the correct value of -name args", *experimentName)
 		return

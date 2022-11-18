@@ -17,7 +17,6 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
-	"github.com/pkg/errors"
 	clientTypes "k8s.io/apimachinery/pkg/types"
 )
 
@@ -30,6 +29,8 @@ var (
 	err           error
 	inject, abort chan os.Signal
 )
+
+var destIps, sPorts, dPorts []string
 
 // Helper injects the network chaos
 func Helper(clients clients.ClientSets) {
@@ -72,12 +73,12 @@ func Helper(clients clients.ClientSets) {
 //preparePodNetworkChaos contains the prepration steps before chaos injection
 func preparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails) error {
 
-	containerID, err := getContainerID(experimentsDetails, clients)
+	containerID, err := common.GetRuntimeBasedContainerID(experimentsDetails.ContainerRuntime, experimentsDetails.SocketPath, experimentsDetails.TargetPods, experimentsDetails.AppNS, experimentsDetails.TargetContainer, clients)
 	if err != nil {
 		return err
 	}
 	// extract out the pid of the target container
-	targetPID, err := common.GetPID(experimentsDetails.ContainerRuntime, containerID, experimentsDetails.SocketPath)
+	targetPID, err := common.GetPauseAndSandboxPID(experimentsDetails.ContainerRuntime, containerID, experimentsDetails.SocketPath)
 	if err != nil {
 		return err
 	}
@@ -115,48 +116,19 @@ func preparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetail
 	return result.AnnotateChaosResult(resultDetails.Name, chaosDetails.ChaosNamespace, "reverted", "pod", experimentsDetails.TargetPods)
 }
 
-//getContainerID extract out the container id of the target container
-func getContainerID(experimentDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) (string, error) {
-
-	var containerID string
-	switch experimentDetails.ContainerRuntime {
-	case "docker":
-		host := "unix://" + experimentDetails.SocketPath
-		// deriving the container id of the pause container
-		cmd := "sudo docker --host " + host + " ps | grep k8s_POD_" + experimentDetails.TargetPods + "_" + experimentDetails.AppNS + " | awk '{print $1}'"
-		out, err := exec.Command("/bin/sh", "-c", cmd).CombinedOutput()
-		if err != nil {
-			log.Error(fmt.Sprintf("[docker]: Failed to run docker ps command: %s", string(out)))
-			return "", err
-		}
-		containerID = strings.TrimSpace(string(out))
-	case "containerd", "crio":
-		containerID, err = common.GetContainerID(experimentDetails.AppNS, experimentDetails.TargetPods, experimentDetails.TargetContainer, clients)
-		if err != nil {
-			return containerID, err
-		}
-	default:
-		return "", errors.Errorf("%v container runtime not suported", experimentDetails.ContainerRuntime)
-	}
-	log.Infof("Container ID: %v", containerID)
-
-	return containerID, nil
-}
-
 // injectChaos inject the network chaos in target container
 // it is using nsenter command to enter into network namespace of target container
 // and execute the netem command inside it.
 func injectChaos(experimentDetails *experimentTypes.ExperimentDetails, pid int) error {
 
 	netemCommands := os.Getenv("NETEM_COMMAND")
-	destinationIPs := os.Getenv("DESTINATION_IPS")
 
 	select {
 	case <-inject:
 		// stopping the chaos execution, if abort signal received
 		os.Exit(1)
 	default:
-		if destinationIPs == "" {
+		if len(destIps) == 0 && len(sPorts) == 0 && len(dPorts) == 0 {
 			tc := fmt.Sprintf("sudo nsenter -t %d -n tc qdisc replace dev %s root netem %v", pid, experimentDetails.NetworkInterface, netemCommands)
 			cmd := exec.Command("/bin/bash", "-c", tc)
 			out, err := cmd.CombinedOutput()
@@ -166,23 +138,6 @@ func injectChaos(experimentDetails *experimentTypes.ExperimentDetails, pid int) 
 				return err
 			}
 		} else {
-
-			ips := strings.Split(destinationIPs, ",")
-			var uniqueIps []string
-
-			// removing duplicates ips from the list, if any
-			for i := range ips {
-				isPresent := false
-				for j := range uniqueIps {
-					if ips[i] == uniqueIps[j] {
-						isPresent = true
-					}
-				}
-				if !isPresent {
-					uniqueIps = append(uniqueIps, ips[i])
-				}
-
-			}
 
 			// Create a priority-based queue
 			// This instantly creates classes 1:1, 1:2, 1:3
@@ -206,8 +161,7 @@ func injectChaos(experimentDetails *experimentTypes.ExperimentDetails, pid int) 
 				return err
 			}
 
-			for _, ip := range uniqueIps {
-
+			for _, ip := range destIps {
 				// redirect traffic to specific IP through band 3
 				tc := fmt.Sprintf("sudo nsenter -t %v -n tc filter add dev %v protocol ip parent 1:0 prio 3 u32 match ip dst %v flowid 1:3", pid, experimentDetails.NetworkInterface, ip)
 				if strings.Contains(ip, ":") {
@@ -221,8 +175,31 @@ func injectChaos(experimentDetails *experimentTypes.ExperimentDetails, pid int) 
 					return err
 				}
 			}
-		}
 
+			for _, port := range sPorts {
+				//redirect traffic to specific sport through band 3
+				tc := fmt.Sprintf("sudo nsenter -t %v -n tc filter add dev %v protocol ip parent 1:0 prio 3 u32 match ip sport %v 0xffff flowid 1:3", pid, experimentDetails.NetworkInterface, port)
+				cmd = exec.Command("/bin/bash", "-c", tc)
+				out, err = cmd.CombinedOutput()
+				log.Info(cmd.String())
+				if err != nil {
+					log.Error(string(out))
+					return err
+				}
+			}
+
+			for _, port := range dPorts {
+				//redirect traffic to specific dport through band 3
+				tc := fmt.Sprintf("sudo nsenter -t %v -n tc filter add dev %v protocol ip parent 1:0 prio 3 u32 match ip dport %v 0xffff flowid 1:3", pid, experimentDetails.NetworkInterface, port)
+				cmd = exec.Command("/bin/bash", "-c", tc)
+				out, err = cmd.CombinedOutput()
+				log.Info(cmd.String())
+				if err != nil {
+					log.Error(string(out))
+					return err
+				}
+			}
+		}
 	}
 	return nil
 }
@@ -265,6 +242,32 @@ func getENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.NetworkInterface = types.Getenv("NETWORK_INTERFACE", "eth0")
 	experimentDetails.SocketPath = types.Getenv("SOCKET_PATH", "")
 	experimentDetails.DestinationIPs = types.Getenv("DESTINATION_IPS", "")
+	experimentDetails.SourcePorts = types.Getenv("SOURCE_PORTS", "")
+	experimentDetails.DestinationPorts = types.Getenv("DESTINATION_PORTS", "")
+
+	destIps = getDestinationIPs(experimentDetails.DestinationIPs)
+	if strings.TrimSpace(experimentDetails.DestinationPorts) != "" {
+		dPorts = strings.Split(strings.TrimSpace(experimentDetails.DestinationPorts), ",")
+	}
+	if strings.TrimSpace(experimentDetails.SourcePorts) != "" {
+		sPorts = strings.Split(strings.TrimSpace(experimentDetails.SourcePorts), ",")
+	}
+}
+
+func getDestinationIPs(ips string) []string {
+	if strings.TrimSpace(ips) == "" {
+		return nil
+	}
+	destIPs := strings.Split(strings.TrimSpace(ips), ",")
+	var uniqueIps []string
+
+	// removing duplicates ips from the list, if any
+	for i := range destIPs {
+		if !common.Contains(destIPs[i], uniqueIps) {
+			uniqueIps = append(uniqueIps, destIPs[i])
+		}
+	}
+	return uniqueIps
 }
 
 // abortWatcher continuously watch for the abort signals

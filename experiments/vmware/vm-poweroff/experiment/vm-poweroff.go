@@ -3,7 +3,7 @@ package experiment
 import (
 	"os"
 
-	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
+	"github.com/litmuschaos/chaos-operator/api/litmuschaos/v1alpha1"
 	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/vm-poweroff/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/cloud/vmware"
@@ -11,7 +11,6 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/result"
-	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	experimentEnv "github.com/litmuschaos/litmus-go/pkg/vmware/vm-poweroff/environment"
@@ -83,33 +82,17 @@ func VMPoweroff(clients clients.ClientSets) {
 	}
 
 	//PRE-CHAOS APPLICATION STATUS CHECK
-	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (pre-chaos)")
-	if err = status.AUTStatusCheck(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.TargetContainer, experimentsDetails.Timeout, experimentsDetails.Delay, clients, &chaosDetails); err != nil {
-		log.Errorf("Application status check failed, err: %v", err)
-		failStep := "[pre-chaos]: Failed to verify that the AUT (Application Under Test) is in running state, err: " + err.Error()
-		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-		return
-	}
+	if chaosDetails.DefaultHealthCheck {
 
-	//PRE-CHAOS AUXILIARY APPLICATION STATUS CHECK
-	if experimentsDetails.AuxiliaryAppInfo != "" {
-		log.Info("[Status]: Verify that the Auxiliary Applications are running (pre-chaos)")
-		if err := status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
-			log.Errorf("Auxiliary Application status check failed, err: %v", err)
-			failStep := "[pre-chaos]: Failed to verify that the Auxiliary Applications are in running state, err: " + err.Error()
+		// PRE-CHAOS VM STATUS CHECK
+		if err := vmware.VMStatusCheck(experimentsDetails.VcenterServer, experimentsDetails.VMIds, cookie); err != nil {
+			log.Errorf("Failed to get the VM status, err: %v", err)
+			failStep := "[pre-chaos]: Failed to verify the VM status, err: " + err.Error()
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}
+		log.Info("[Verification]: VMs are in running state (pre-chaos)")
 	}
-
-	// PRE-CHAOS VM STATUS CHECK
-	if err := vmware.VMStatusCheck(experimentsDetails.VcenterServer, experimentsDetails.VMIds, cookie); err != nil {
-		log.Errorf("Failed to get the VM status, err: %v", err)
-		failStep := "[pre-chaos]: Failed to verify the VM status, err: " + err.Error()
-		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-		return
-	}
-	log.Info("[Verification]: VMs are in running state (pre-chaos)")
 
 	if experimentsDetails.EngineName != "" {
 		// marking IUT as running, as we already checked the status of instance under test
@@ -154,34 +137,18 @@ func VMPoweroff(clients clients.ClientSets) {
 	resultDetails.Verdict = v1alpha1.ResultVerdictPassed
 
 	//POST-CHAOS APPLICATION STATUS CHECK
-	log.Info("[Status]: Verify that the AUT (Application Under Test) is running (post-chaos)")
-	if err = status.AUTStatusCheck(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.TargetContainer, experimentsDetails.Timeout, experimentsDetails.Delay, clients, &chaosDetails); err != nil {
-		log.Errorf("Application status check failed, err: %v", err)
-		failStep := "[post-chaos]: Failed to verify that the AUT (Application Under Test) is running, err: " + err.Error()
-		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-		return
-	}
+	if chaosDetails.DefaultHealthCheck {
 
-	//POST-CHAOS AUXILIARY APPLICATION STATUS CHECK
-	if experimentsDetails.AuxiliaryAppInfo != "" {
-		log.Info("[Status]: Verify that the Auxiliary Applications are running (post-chaos)")
-		if err = status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
-			log.Errorf("Auxiliary Application status check failed, err: %v", err)
-			failStep := "[post-chaos]: Failed to verify that the Auxiliary Applications are running, err: " + err.Error()
+		//POST-CHAOS VM STATUS CHECK
+		log.Info("[Status]: Verify that the IUT (Instance Under Test) is running (post-chaos)")
+		if err := vmware.VMStatusCheck(experimentsDetails.VcenterServer, experimentsDetails.VMIds, cookie); err != nil {
+			log.Errorf("Failed to get the VM status, err: %v", err)
+			failStep := "[post-chaos]: Failed to get the VM status, err: " + err.Error()
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}
+		log.Info("[Verification]: VMs are in running state (post-chaos)")
 	}
-
-	//POST-CHAOS VM STATUS CHECK
-	log.Info("[Status]: Verify that the IUT (Instance Under Test) is running (post-chaos)")
-	if err := vmware.VMStatusCheck(experimentsDetails.VcenterServer, experimentsDetails.VMIds, cookie); err != nil {
-		log.Errorf("Failed to get the VM status, err: %v", err)
-		failStep := "[post-chaos]: Failed to get the VM status, err: " + err.Error()
-		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-		return
-	}
-	log.Info("[Verification]: VMs are in running state (post-chaos)")
 
 	if experimentsDetails.EngineName != "" {
 		// marking IUT as running, as we already checked the status of instance under test

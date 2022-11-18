@@ -24,7 +24,7 @@ var (
 	inject, abort chan os.Signal
 )
 
-//PrepareDiskVolumeLoss contains the prepration and injection steps for the experiment
+// PrepareDiskVolumeLoss contains the prepration and injection steps for the experiment
 func PrepareDiskVolumeLoss(computeService *compute.Service, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	// inject channel is used to transmit signal notifications.
@@ -47,7 +47,7 @@ func PrepareDiskVolumeLoss(computeService *compute.Service, experimentsDetails *
 	diskNamesList := strings.Split(experimentsDetails.DiskVolumeNames, ",")
 
 	//get the disk zones list
-	diskZonesList := strings.Split(experimentsDetails.DiskZones, ",")
+	diskZonesList := strings.Split(experimentsDetails.Zones, ",")
 
 	//get the device names for the given disks
 	if err := getDeviceNamesList(computeService, experimentsDetails, diskNamesList, diskZonesList); err != nil {
@@ -86,7 +86,7 @@ func PrepareDiskVolumeLoss(computeService *compute.Service, experimentsDetails *
 	return nil
 }
 
-//injectChaosInSerialMode will inject the disk loss chaos in serial mode which means one after the other
+// injectChaosInSerialMode will inject the disk loss chaos in serial mode which means one after the other
 func injectChaosInSerialMode(computeService *compute.Service, experimentsDetails *experimentTypes.ExperimentDetails, targetDiskVolumeNamesList, diskZonesList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
@@ -157,7 +157,7 @@ func injectChaosInSerialMode(computeService *compute.Service, experimentsDetails
 	return nil
 }
 
-//injectChaosInParallelMode will inject the disk loss chaos in parallel mode that means all at once
+// injectChaosInParallelMode will inject the disk loss chaos in parallel mode that means all at once
 func injectChaosInParallelMode(computeService *compute.Service, experimentsDetails *experimentTypes.ExperimentDetails, targetDiskVolumeNamesList, diskZonesList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin

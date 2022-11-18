@@ -2,6 +2,7 @@ package probe
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"math/rand"
 	"os/exec"
@@ -9,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
+	"github.com/litmuschaos/chaos-operator/api/litmuschaos/v1alpha1"
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/math"
@@ -135,44 +136,139 @@ func createProbePod(clients clients.ClientSets, chaosDetails *types.ChaosDetails
 		return errors.Errorf("unable to get the serviceAccountName, err: %v", err)
 	}
 
+	expEnv, volume, expVolumeMount := inheritInputs(clients, chaosDetails.ChaosNamespace, chaosDetails.ChaosPodName, source)
+
 	cmdProbe := &apiv1.Pod{
 		ObjectMeta: v1.ObjectMeta{
-			Name:      chaosDetails.ExperimentName + "-probe-" + runID,
-			Namespace: chaosDetails.ChaosNamespace,
-			Labels: map[string]string{
-				"name":     chaosDetails.ExperimentName + "-probe-" + runID,
-				"chaosUID": string(chaosDetails.ChaosUID),
-			},
+			Name:        chaosDetails.ExperimentName + "-probe-" + runID,
+			Namespace:   chaosDetails.ChaosNamespace,
+			Labels:      getProbeLabels(source.Labels, chaosDetails, runID),
+			Annotations: source.Annotations,
 		},
 		Spec: apiv1.PodSpec{
 			RestartPolicy:      apiv1.RestartPolicyNever,
 			HostNetwork:        source.HostNetwork,
 			ServiceAccountName: svcAccount,
+			Volumes:            volume,
+			NodeSelector:       source.NodeSelector,
+			ImagePullSecrets:   source.ImagePullSecrets,
 			Containers: []apiv1.Container{
 				{
 					Name:            chaosDetails.ExperimentName + "-probe",
 					Image:           source.Image,
-					ImagePullPolicy: apiv1.PullPolicy(chaosDetails.ProbeImagePullPolicy),
-					Command: []string{
-						"/bin/sh",
+					ImagePullPolicy: apiv1.PullPolicy(getProbeImagePullPolicy(string(source.ImagePullPolicy), chaosDetails)),
+					Command:         getProbeCmd(source.Command),
+					Args:            getProbeArgs(source.Args),
+					Resources:       chaosDetails.Resources,
+					Env:             expEnv,
+					SecurityContext: &apiv1.SecurityContext{
+						Privileged: &source.Privileged,
 					},
-					Args: []string{
-						"-c",
-						"sleep 10000",
-					},
+					VolumeMounts: expVolumeMount,
 				},
 			},
 		},
 	}
 
-	_, err = clients.KubeClient.CoreV1().Pods(chaosDetails.ChaosNamespace).Create(cmdProbe)
+	_, err = clients.KubeClient.CoreV1().Pods(chaosDetails.ChaosNamespace).Create(context.Background(), cmdProbe, v1.CreateOptions{})
 	return err
+}
+
+// inheritInputs will inherit the experiment details(ENVs and volumes) to the probe pod based on inheritInputs flag
+func inheritInputs(clients clients.ClientSets, chaosNS, chaosPodName string, source v1alpha1.SourceDetails) ([]apiv1.EnvVar, []apiv1.Volume, []apiv1.VolumeMount) {
+
+	if !source.InheritInputs {
+		return source.ENVList, source.Volumes, source.VolumesMount
+	}
+	expEnv, expVolumeMount, volume := getEnvAndVolumeMountFromExperiment(clients, chaosNS, chaosPodName)
+
+	expEnv = append(expEnv, source.ENVList...)
+	expVolumeMount = append(expVolumeMount, source.VolumesMount...)
+	volume = append(volume, source.Volumes...)
+
+	return expEnv, volume, expVolumeMount
+
+}
+
+// getEnvAndVolumeMountFromExperiment get the env and volumeMount from the experiment pod and add in the probe pod
+func getEnvAndVolumeMountFromExperiment(clients clients.ClientSets, chaosNamespace, podName string) ([]apiv1.EnvVar, []apiv1.VolumeMount, []apiv1.Volume) {
+
+	envVarList := make([]apiv1.EnvVar, 0)
+	volumeMountList := make([]apiv1.VolumeMount, 0)
+	volumeList := make([]apiv1.Volume, 0)
+
+	expPod, err := clients.KubeClient.CoreV1().Pods(chaosNamespace).Get(context.Background(), podName, v1.GetOptions{})
+	if err != nil {
+		log.Errorf("Unable to get the experiment pod, err: %v", err)
+		return nil, nil, nil
+	}
+
+	expContainerName := expPod.Labels["job-name"]
+
+	for _, container := range expPod.Spec.Containers {
+		if container.Name == expContainerName {
+			envVarList = append(envVarList, container.Env...)
+		}
+		for _, volumeMount := range container.VolumeMounts {
+			// NOTE: one can add custom volume mount from probe spec
+			if volumeMount.Name == "cloud-secret" {
+				volumeMountList = append(volumeMountList, volumeMount)
+			}
+		}
+	}
+
+	for _, vol := range expPod.Spec.Volumes {
+		// NOTE: one can add custom volume from probe spec
+		if vol.Name == "cloud-secret" {
+			volumeList = append(volumeList, vol)
+		}
+	}
+
+	return envVarList, volumeMountList, volumeList
+}
+
+// getProbeLabels adding provided labels to probePod
+func getProbeLabels(sourceLabels map[string]string, chaosDetails *types.ChaosDetails, runID string) map[string]string {
+
+	envDetails := map[string]string{
+		"name":     chaosDetails.ExperimentName + "-probe-" + runID,
+		"chaosUID": string(chaosDetails.ChaosUID),
+	}
+
+	for key, element := range sourceLabels {
+		envDetails[key] = element
+	}
+	return envDetails
+}
+
+// getProbeArgs adding provided args to probePod
+func getProbeArgs(sourceArgs []string) []string {
+	if len(sourceArgs) == 0 {
+		return []string{"-c", "sleep 10000"}
+	}
+	return sourceArgs
+}
+
+// getProbeImagePullPolicy adds the image pull policy to the source pod
+func getProbeImagePullPolicy(policy string, chaosDetails *types.ChaosDetails) string {
+	if policy == "" {
+		return chaosDetails.ProbeImagePullPolicy
+	}
+	return policy
+}
+
+// getProbeCmd adding provided command to probePod
+func getProbeCmd(sourceCmd []string) []string {
+	if len(sourceCmd) == 0 {
+		return []string{"/bin/sh"}
+	}
+	return sourceCmd
 }
 
 //deleteProbePod deletes the probe pod and wait until it got terminated
 func deleteProbePod(chaosDetails *types.ChaosDetails, clients clients.ClientSets, runID string) error {
 
-	if err := clients.KubeClient.CoreV1().Pods(chaosDetails.ChaosNamespace).Delete(chaosDetails.ExperimentName+"-probe-"+runID, &v1.DeleteOptions{}); err != nil {
+	if err := clients.KubeClient.CoreV1().Pods(chaosDetails.ChaosNamespace).Delete(context.Background(), chaosDetails.ExperimentName+"-probe-"+runID, v1.DeleteOptions{}); err != nil {
 		return err
 	}
 
@@ -181,7 +277,7 @@ func deleteProbePod(chaosDetails *types.ChaosDetails, clients clients.ClientSets
 		Times(uint(chaosDetails.Timeout / chaosDetails.Delay)).
 		Wait(time.Duration(chaosDetails.Delay) * time.Second).
 		Try(func(attempt uint) error {
-			podSpec, err := clients.KubeClient.CoreV1().Pods(chaosDetails.ChaosNamespace).List(v1.ListOptions{LabelSelector: chaosDetails.ExperimentName + "-probe-" + runID})
+			podSpec, err := clients.KubeClient.CoreV1().Pods(chaosDetails.ChaosNamespace).List(context.Background(), v1.ListOptions{LabelSelector: chaosDetails.ExperimentName + "-probe-" + runID})
 			if err != nil {
 				return errors.Errorf("Probe Pod is not deleted yet, err: %v", err)
 			} else if len(podSpec.Items) != 0 {
@@ -302,14 +398,12 @@ func triggerSourceOnChaosCmdProbe(probe v1alpha1.ProbeAttributes, execCommandDet
 		duration = math.Maximum(0, duration-probe.RunProperties.InitialDelaySeconds)
 	}
 
-	var endTime <-chan time.Time
-	timeDelay := time.Duration(duration) * time.Second
+	endTime := time.After(time.Duration(duration) * time.Second)
 
 	// it trigger the cmd probe for the entire duration of chaos and it fails, if any err encounter
 	// it marked the error for the probes, if any
 loop:
 	for {
-		endTime = time.After(timeDelay)
 		select {
 		case <-endTime:
 			log.Infof("[Chaos]: Time is up for the %v probe", probe.Name)
@@ -638,7 +732,7 @@ func createHelperPod(probe v1alpha1.ProbeAttributes, resultDetails *types.Result
 
 // getServiceAccount derive the serviceAccountName for the probe pod
 func getServiceAccount(chaosNamespace, chaosPodName string, clients clients.ClientSets) (string, error) {
-	pod, err := clients.KubeClient.CoreV1().Pods(chaosNamespace).Get(chaosPodName, v1.GetOptions{})
+	pod, err := clients.KubeClient.CoreV1().Pods(chaosNamespace).Get(context.Background(), chaosPodName, v1.GetOptions{})
 	if err != nil {
 		return "", err
 	}

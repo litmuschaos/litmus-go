@@ -23,7 +23,7 @@ type ExperimentDetails struct {
 	TargetContainer    string
 	Timeout            int
 	Delay              int
-	AzureInstanceName  string
+	AzureInstanceNames string
 	ResourceGroup      string
 	SubscriptionID     string
 	ScaleSet           string

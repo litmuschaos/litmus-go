@@ -60,7 +60,7 @@ func WaitForVolumeAttachment(computeService *compute.Service, diskName, gcpProje
 		})
 }
 
-//GetDiskVolumeState will verify and give the VM instance details along with the disk volume details
+// GetDiskVolumeState will verify and give the VM instance details along with the disk volume details
 func GetDiskVolumeState(computeService *compute.Service, diskName, gcpProjectID, instanceName, zone string) (string, error) {
 
 	diskDetails, err := computeService.Disks.Get(gcpProjectID, zone, diskName).Do()
@@ -96,8 +96,8 @@ func GetDiskVolumeState(computeService *compute.Service, diskName, gcpProjectID,
 	return "detached", nil
 }
 
-//DiskVolumeStateCheck will check the attachment state of the given volume
-func DiskVolumeStateCheck(computeService *compute.Service, experimentsDetails *experimentTypes.ExperimentDetails, stage string) error {
+// DiskVolumeStateCheck will check the attachment state of the given volume
+func DiskVolumeStateCheck(computeService *compute.Service, experimentsDetails *experimentTypes.ExperimentDetails) error {
 
 	if experimentsDetails.GCPProjectID == "" {
 		return errors.Errorf("no gcp project id provided, please provide the project id")
@@ -108,7 +108,7 @@ func DiskVolumeStateCheck(computeService *compute.Service, experimentsDetails *e
 		return errors.Errorf("no disk name provided, please provide the name of the disk")
 	}
 
-	zonesList := strings.Split(experimentsDetails.DiskZones, ",")
+	zonesList := strings.Split(experimentsDetails.Zones, ",")
 	if len(zonesList) == 0 {
 		return errors.Errorf("no zone provided, please provide the zone of the disk")
 	}
@@ -118,15 +118,28 @@ func DiskVolumeStateCheck(computeService *compute.Service, experimentsDetails *e
 	}
 
 	for i := range diskNamesList {
+		instanceName, err := GetVolumeAttachmentDetails(computeService, experimentsDetails.GCPProjectID, zonesList[i], diskNamesList[i])
+		if err != nil || instanceName == "" {
+			return errors.Errorf("failed to get the vm instance name for %s disk volume, err: %v", diskNamesList[i], err)
+		}
+	}
 
+	return nil
+}
+
+// SetTargetDiskInstanceNames fetches the vm instances to which the disks are attached
+func SetTargetDiskInstanceNames(computeService *compute.Service, experimentsDetails *experimentTypes.ExperimentDetails) error {
+
+	diskNamesList := strings.Split(experimentsDetails.DiskVolumeNames, ",")
+	zonesList := strings.Split(experimentsDetails.Zones, ",")
+
+	for i := range diskNamesList {
 		instanceName, err := GetVolumeAttachmentDetails(computeService, experimentsDetails.GCPProjectID, zonesList[i], diskNamesList[i])
 		if err != nil || instanceName == "" {
 			return errors.Errorf("failed to get the vm instance name for %s disk volume, err: %v", diskNamesList[i], err)
 		}
 
-		if stage == "pre-chaos" {
-			experimentsDetails.TargetDiskInstanceNamesList = append(experimentsDetails.TargetDiskInstanceNamesList, instanceName)
-		}
+		experimentsDetails.TargetDiskInstanceNamesList = append(experimentsDetails.TargetDiskInstanceNamesList, instanceName)
 	}
 
 	return nil

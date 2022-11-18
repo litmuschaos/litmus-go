@@ -3,7 +3,7 @@ package experiment
 import (
 	"os"
 
-	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
+	"github.com/litmuschaos/chaos-operator/api/litmuschaos/v1alpha1"
 	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/gcp-vm-disk-loss/lib"
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	gcp "github.com/litmuschaos/litmus-go/pkg/cloud/gcp"
@@ -19,7 +19,7 @@ import (
 	"google.golang.org/api/compute/v1"
 )
 
-//VMDiskLoss injects the disk volume loss chaos
+// VMDiskLoss injects the disk volume loss chaos
 func VMDiskLoss(clients clients.ClientSets) {
 
 	var (
@@ -45,7 +45,7 @@ func VMDiskLoss(clients clients.ClientSets) {
 	if experimentsDetails.EngineName != "" {
 		// Initialize the probe details. Bail out upon error, as we haven't entered exp business logic yet
 		if err = probe.InitializeProbesInChaosResultDetails(&chaosDetails, clients, &resultDetails); err != nil {
-			log.Errorf("unable to initialize the probes, err: %v", err)
+			log.Errorf("Unable to initialize the probes, err: %v", err)
 			return
 		}
 	}
@@ -53,7 +53,7 @@ func VMDiskLoss(clients clients.ClientSets) {
 	//Updating the chaos result in the beginning of experiment
 	log.Infof("[PreReq]: Updating the chaos result of %v experiment (SOT)", experimentsDetails.ExperimentName)
 	if err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT"); err != nil {
-		log.Errorf("unable to Create the Chaos Result, err: %v", err)
+		log.Errorf("Unable to create the Chaos Result, err: %v", err)
 		failStep := "[pre-chaos]: Failed to update the chaos result of gcp disk loss experiment (SOT), err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
@@ -73,7 +73,7 @@ func VMDiskLoss(clients clients.ClientSets) {
 	//DISPLAY THE VOLUME INFORMATION
 	log.InfoWithValues("The volume information is as follows", logrus.Fields{
 		"Volume IDs": experimentsDetails.DiskVolumeNames,
-		"Zones":      experimentsDetails.DiskZones,
+		"Zones":      experimentsDetails.Zones,
 		"Sequence":   experimentsDetails.Sequence,
 	})
 
@@ -103,16 +103,27 @@ func VMDiskLoss(clients clients.ClientSets) {
 	// Create a compute service to access the compute engine resources
 	computeService, err = gcp.GetGCPComputeService()
 	if err != nil {
-		log.Errorf("failed to obtain a gcp compute service, err: %v", err)
+		log.Errorf("Failed to obtain a gcp compute service, err: %v", err)
 		failStep := "[pre-chaos]: Failed to obtain a gcp compute service, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
 
-	//Verify the vm instance is attached to disk volume
-	if err := gcp.DiskVolumeStateCheck(computeService, &experimentsDetails, "pre-chaos"); err != nil {
-		log.Errorf("volume status check failed pre chaos, err: %v", err)
-		failStep := "[pre-chaos]: Failed to verify if the disk volume is attached to an instance, err: " + err.Error()
+	// Verify the vm instance is attached to disk volume
+	if chaosDetails.DefaultHealthCheck {
+		if err := gcp.DiskVolumeStateCheck(computeService, &experimentsDetails); err != nil {
+			log.Errorf("Volume status check failed pre chaos, err: %v", err)
+			failStep := "[pre-chaos]: Failed to verify if the disk volume is attached to an instance, err: " + err.Error()
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+			return
+		}
+		log.Info("[Status]: Disk volumes are attached to the VM instances (pre-chaos)")
+	}
+
+	// Fetch target disk instance names
+	if err := gcp.SetTargetDiskInstanceNames(computeService, &experimentsDetails); err != nil {
+		log.Errorf("Failed to fetch the disk instance names, err: %v", err)
+		failStep := "[pre-chaos]: Failed to fetch the disk instance names, err: " + err.Error()
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -137,11 +148,14 @@ func VMDiskLoss(clients clients.ClientSets) {
 	resultDetails.Verdict = v1alpha1.ResultVerdictPassed
 
 	//Verify the vm instance is attached to disk volume
-	if err := gcp.DiskVolumeStateCheck(computeService, &experimentsDetails, "post-chaos"); err != nil {
-		log.Errorf("volume status check failed post chaos, err: %v", err)
-		failStep := "[post-chaos]: Failed to verify if the disk volume is attached to an instance, err: " + err.Error()
-		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-		return
+	if chaosDetails.DefaultHealthCheck {
+		if err := gcp.DiskVolumeStateCheck(computeService, &experimentsDetails); err != nil {
+			log.Errorf("Volume status check failed post chaos, err: %v", err)
+			failStep := "[post-chaos]: Failed to verify if the disk volume is attached to an instance, err: " + err.Error()
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+			return
+		}
+		log.Info("[Status]: Disk volumes are attached to the VM instances (post-chaos)")
 	}
 
 	if experimentsDetails.EngineName != "" {
