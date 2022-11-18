@@ -112,7 +112,7 @@ func DiskFill(clients clients.ClientSets) {
 				result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 				return
 			}
-			common.GetStatusMessage(chaosDetails.DefaultHealthCheck, "AUT: Running", "Successful")
+			msg = common.GetStatusMessage(chaosDetails.DefaultHealthCheck, "AUT: Running", "Successful")
 		}
 		// generating the events for the pre-chaos check
 		types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, msg, "Normal", &chaosDetails)
@@ -177,7 +177,7 @@ func DiskFill(clients clients.ClientSets) {
 				result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 				return
 			}
-			common.GetStatusMessage(chaosDetails.DefaultHealthCheck, "AUT: Running", "Successful")
+			msg = common.GetStatusMessage(chaosDetails.DefaultHealthCheck, "AUT: Running", "Successful")
 		}
 
 		// generating post chaos event
