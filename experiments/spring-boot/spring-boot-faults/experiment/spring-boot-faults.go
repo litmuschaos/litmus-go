@@ -19,7 +19,7 @@ import (
 )
 
 // Experiment contains steps to inject chaos
-func Experiment(clients clients.ClientSets) {
+func Experiment(clients clients.ClientSets, expName string) {
 
 	experimentsDetails := experimentTypes.ExperimentDetails{}
 	resultDetails := types.ResultDetails{}
@@ -28,7 +28,7 @@ func Experiment(clients clients.ClientSets) {
 
 	//Fetching all the ENV passed from the runner pod
 	log.Infof("[PreReq]: Getting the ENV for the %v experiment", os.Getenv("EXPERIMENT_NAME"))
-	experimentEnv.GetENV(&experimentsDetails, "spring-boot-latency")
+	experimentEnv.GetENV(&experimentsDetails, expName)
 
 	// Initialize the chaos attributes
 	types.InitialiseChaosVariables(&chaosDetails)

@@ -44,51 +44,56 @@ type ChaosMonkeyAssaultRevert struct {
 	ExceptionsActive      bool `json:"exceptionsActive"`
 }
 
+type AllAssault struct {
+	CommonAssault
+	CPUStressAssault
+	MemoryStressAssault
+	LatencyAssault
+	AppKillAssault
+	ExceptionAssault
+}
+
+type CommonAssault struct {
+	Level                 int      `json:"level"`
+	Deterministic         bool     `json:"deterministic"`
+	WatchedCustomServices []string `json:"watchedCustomServices"`
+}
+
 type CPUStressAssault struct {
-	Level                   int      `json:"level"`
-	Deterministic           bool     `json:"deterministic"`
-	WatchedCustomServices   []string `json:"watchedCustomServices"`
-	CPUActive               bool     `json:"cpuActive"`
-	CPUMillisecondsHoldLoad int      `json:"cpuMillisecondsHoldLoad"`
-	CPULoadTargetFraction   float64  `json:"cpuLoadTargetFraction"`
-	CPUCron                 string   `json:"cpuCronExpression"`
+	CommonAssault
+	CPUActive               bool    `json:"cpuActive"`
+	CPUMillisecondsHoldLoad int     `json:"cpuMillisecondsHoldLoad"`
+	CPULoadTargetFraction   float64 `json:"cpuLoadTargetFraction"`
+	CPUCron                 string  `json:"cpuCronExpression"`
 }
 
 type MemoryStressAssault struct {
-	Level                              int      `json:"level"`
-	Deterministic                      bool     `json:"deterministic"`
-	WatchedCustomServices              []string `json:"watchedCustomServices"`
-	MemoryActive                       bool     `json:"memoryActive"`
-	MemoryMillisecondsHoldFilledMemory int      `json:"memoryMillisecondsHoldFilledMemory"`
-	MemoryMillisecondsWaitNextIncrease int      `json:"memoryMillisecondsWaitNextIncrease"`
-	MemoryFillIncrementFraction        float64  `json:"memoryFillIncrementFraction"`
-	MemoryFillTargetFraction           float64  `json:"memoryFillTargetFraction"`
-	MemoryCron                         string   `json:"memoryCronExpression"`
+	CommonAssault
+	MemoryActive                       bool    `json:"memoryActive"`
+	MemoryMillisecondsHoldFilledMemory int     `json:"memoryMillisecondsHoldFilledMemory"`
+	MemoryMillisecondsWaitNextIncrease int     `json:"memoryMillisecondsWaitNextIncrease"`
+	MemoryFillIncrementFraction        float64 `json:"memoryFillIncrementFraction"`
+	MemoryFillTargetFraction           float64 `json:"memoryFillTargetFraction"`
+	MemoryCron                         string  `json:"memoryCronExpression"`
 }
 
 type LatencyAssault struct {
-	Level                 int      `json:"level"`
-	Deterministic         bool     `json:"deterministic"`
-	WatchedCustomServices []string `json:"watchedCustomServices"`
-	LatencyRangeStart     int      `json:"latencyRangeStart"`
-	LatencyRangeEnd       int      `json:"latencyRangeEnd"`
-	LatencyActive         bool     `json:"latencyActive"`
+	CommonAssault
+	LatencyRangeStart int  `json:"latencyRangeStart"`
+	LatencyRangeEnd   int  `json:"latencyRangeEnd"`
+	LatencyActive     bool `json:"latencyActive"`
 }
 
 type AppKillAssault struct {
-	Level                 int      `json:"level"`
-	Deterministic         bool     `json:"deterministic"`
-	WatchedCustomServices []string `json:"watchedCustomServices"`
-	KillApplicationActive bool     `json:"killApplicationActive"`
-	KillApplicationCron   string   `json:"killApplicationCronExpression"`
+	CommonAssault
+	KillApplicationActive bool   `json:"killApplicationActive"`
+	KillApplicationCron   string `json:"killApplicationCronExpression"`
 }
 
 type ExceptionAssault struct {
-	Level                 int              `json:"level"`
-	Deterministic         bool             `json:"deterministic"`
-	WatchedCustomServices []string         `json:"watchedCustomServices"`
-	ExceptionsActive      bool             `json:"exceptionsActive"`
-	Exception             AssaultException `json:"exceptions"`
+	CommonAssault
+	ExceptionsActive bool             `json:"exceptionsActive"`
+	Exception        AssaultException `json:"exceptions"`
 }
 
 type ChaosMonkeyWatchers struct {
