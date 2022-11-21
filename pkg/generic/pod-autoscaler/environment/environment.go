@@ -10,15 +10,13 @@ import (
 
 //GetENV fetches all the env variables from the runner pod
 func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
+
 	experimentDetails.ExperimentName = types.Getenv("EXPERIMENT_NAME", "pod-autoscaler")
 	experimentDetails.ChaosNamespace = types.Getenv("CHAOS_NAMESPACE", "litmus")
 	experimentDetails.EngineName = types.Getenv("CHAOSENGINE", "")
 	experimentDetails.ChaosDuration, _ = strconv.Atoi(types.Getenv("TOTAL_CHAOS_DURATION", "60"))
 	experimentDetails.RampTime, _ = strconv.Atoi(types.Getenv("RAMP_TIME", "0"))
 	experimentDetails.ChaosLib = types.Getenv("LIB", "litmus")
-	experimentDetails.AppNS = types.Getenv("APP_NAMESPACE", "")
-	experimentDetails.AppLabel = types.Getenv("APP_LABEL", "")
-	experimentDetails.AppKind = types.Getenv("APP_KIND", "")
 	experimentDetails.AppAffectPercentage, _ = strconv.Atoi(types.Getenv("APP_AFFECT_PERC", "100"))
 	experimentDetails.Replicas, _ = strconv.Atoi(types.Getenv("REPLICA_COUNT", ""))
 	experimentDetails.ChaosUID = clientTypes.UID(types.Getenv("CHAOS_UID", ""))
@@ -28,4 +26,15 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.Delay, _ = strconv.Atoi(types.Getenv("STATUS_CHECK_DELAY", "2"))
 	experimentDetails.Timeout, _ = strconv.Atoi(types.Getenv("STATUS_CHECK_TIMEOUT", "180"))
 	experimentDetails.TargetContainer = types.Getenv("TARGET_CONTAINER", "")
+
+	experimentDetails.AppNS, experimentDetails.AppKind, experimentDetails.AppLabel = getAppDetails()
+}
+
+func getAppDetails() (string, string, string) {
+	targets := types.Getenv("TARGETS", "")
+	app := types.GetTargets(targets)
+	if len(app) != 0 && (app[0].Kind == "deployment" || app[0].Kind == "statefulset") {
+		return app[0].Namespace, app[0].Kind, app[0].Labels[0]
+	}
+	return "", "", ""
 }

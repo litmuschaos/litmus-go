@@ -383,7 +383,6 @@ loop:
 		select {
 		case <-endTime:
 			log.Infof("[Chaos]: Time is up for the %v probe", probe.Name)
-			endTime = nil
 			break loop
 		default:
 			err = triggerK8sProbe(probe, clients, chaosresult)

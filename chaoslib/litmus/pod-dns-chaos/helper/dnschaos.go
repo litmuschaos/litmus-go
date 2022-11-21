@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/kyokomi/emoji"
+	"github.com/pkg/errors"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -24,6 +25,7 @@ import (
 
 var (
 	abort, injectAbort chan os.Signal
+	err                error
 )
 
 const (
@@ -71,15 +73,58 @@ func Helper(clients clients.ClientSets) {
 //preparePodDNSChaos contains the preparation steps before chaos injection
 func preparePodDNSChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails) error {
 
-	containerID, err := common.GetContainerID(experimentsDetails.AppNS, experimentsDetails.TargetPods, experimentsDetails.TargetContainer, clients)
+	targetList, err := common.ParseTargets()
 	if err != nil {
 		return err
 	}
 
-	// extract out the pid of the target container
-	pid, err := common.GetPID(experimentsDetails.ContainerRuntime, containerID, experimentsDetails.SocketPath)
-	if err != nil {
-		return err
+	var targets []targetDetails
+
+	for _, t := range targetList.Target {
+		td := targetDetails{
+			Name:            t.Name,
+			Namespace:       t.Namespace,
+			TargetContainer: t.TargetContainer,
+		}
+
+		td.ContainerId, err = common.GetContainerID(td.Namespace, td.Name, td.TargetContainer, clients)
+		if err != nil {
+			return err
+		}
+
+		// extract out the pid of the target container
+		td.Pid, err = common.GetPID(experimentsDetails.ContainerRuntime, td.ContainerId, experimentsDetails.SocketPath)
+		if err != nil {
+			return err
+		}
+
+		targets = append(targets, td)
+	}
+
+	// watching for the abort signal and revert the chaos if an abort signal is received
+	go abortWatcher(targets, resultDetails.Name, chaosDetails.ChaosNamespace)
+
+	select {
+	case <-injectAbort:
+		// stopping the chaos execution, if abort signal received
+		os.Exit(1)
+	default:
+	}
+
+	done := make(chan error, 1)
+
+	for index, t := range targets {
+		targets[index].Cmd, err = injectChaos(experimentsDetails, t.Pid)
+		if err != nil {
+			return err
+		}
+		log.Infof("successfully injected chaos on target: {name: %s, namespace: %v, container: %v}", t.Name, t.Namespace, t.TargetContainer)
+		if err = result.AnnotateChaosResult(resultDetails.Name, chaosDetails.ChaosNamespace, "injected", "pod", t.Name); err != nil {
+			if revertErr := terminateProcess(t); revertErr != nil {
+				return fmt.Errorf("failed to revert and annotate the result, err: %v", fmt.Sprintf("%s, %s", err.Error(), revertErr.Error()))
+			}
+			return err
+		}
 	}
 
 	// record the event inside chaosengine
@@ -89,6 +134,73 @@ func preparePodDNSChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 		events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 	}
 
+	log.Info("[Wait]: Waiting for chaos completion")
+	// channel to check the completion of the stress process
+	go func() {
+		var errList []string
+		for _, t := range targets {
+			if err := t.Cmd.Wait(); err != nil {
+				errList = append(errList, err.Error())
+			}
+		}
+		if len(errList) != 0 {
+			log.Errorf("err: %v", strings.Join(errList, ", "))
+			done <- fmt.Errorf("err: %v", strings.Join(errList, ", "))
+		}
+		done <- nil
+	}()
+
+	// check the timeout for the command
+	// Note: timeout will occur when process didn't complete even after 10s of chaos duration
+	timeout := time.After((time.Duration(experimentsDetails.ChaosDuration) + 30) * time.Second)
+
+	select {
+	case <-timeout:
+		// the stress process gets timeout before completion
+		log.Infof("[Chaos] The stress process is not yet completed after the chaos duration of %vs", experimentsDetails.ChaosDuration+30)
+		log.Info("[Timeout]: Killing the stress process")
+		var errList []string
+		for _, t := range targets {
+			if err = terminateProcess(t); err != nil {
+				errList = append(errList, err.Error())
+				continue
+			}
+			if err = result.AnnotateChaosResult(resultDetails.Name, chaosDetails.ChaosNamespace, "reverted", "pod", t.Name); err != nil {
+				errList = append(errList, err.Error())
+			}
+		}
+		if len(errList) != 0 {
+			return fmt.Errorf("err: %v", strings.Join(errList, ", "))
+		}
+	case doneErr := <-done:
+		select {
+		case <-injectAbort:
+			// wait for the completion of abort handler
+			time.Sleep(10 * time.Second)
+		default:
+			log.Info("[Info]: Reverting Chaos")
+			var errList []string
+			for _, t := range targets {
+				if err := terminateProcess(t); err != nil {
+					errList = append(errList, err.Error())
+					continue
+				}
+				if err := result.AnnotateChaosResult(resultDetails.Name, chaosDetails.ChaosNamespace, "reverted", "pod", t.Name); err != nil {
+					errList = append(errList, err.Error())
+				}
+			}
+			if len(errList) != 0 {
+				return fmt.Errorf("err: %v", strings.Join(errList, ", "))
+			}
+			return doneErr
+		}
+	}
+
+	return nil
+}
+
+func injectChaos(experimentsDetails *experimentTypes.ExperimentDetails, pid int) (*exec.Cmd, error) {
+
 	// prepare dns interceptor
 	commandTemplate := fmt.Sprintf("sudo TARGET_PID=%d CHAOS_TYPE=%s SPOOF_MAP='%s' TARGET_HOSTNAMES='%s' CHAOS_DURATION=%d MATCH_SCHEME=%s nsutil -p -n -t %d -- dns_interceptor", pid, experimentsDetails.ChaosType, experimentsDetails.SpoofMap, experimentsDetails.TargetHostNames, experimentsDetails.ChaosDuration, experimentsDetails.MatchScheme, pid)
 	cmd := exec.Command("/bin/bash", "-c", commandTemplate)
@@ -96,84 +208,61 @@ func preparePodDNSChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
-	// injecting dns chaos inside target container
-	go func() {
-		select {
-		case <-injectAbort:
-			log.Info("[Chaos]: Abort received, skipping chaos injection")
-		default:
-			err = cmd.Run()
-			if err != nil {
-				log.Fatalf("dns interceptor failed : %v", err)
-			}
-		}
-	}()
-
-	if err = result.AnnotateChaosResult(resultDetails.Name, chaosDetails.ChaosNamespace, "injected", "pod", experimentsDetails.TargetPods); err != nil {
-		if revertErr := terminateProcess(cmd); revertErr != nil {
-			return fmt.Errorf("failed to revert and annotate the result, err: %v", fmt.Sprintf("%s, %s", err.Error(), revertErr.Error()))
-		}
-		return err
+	err = cmd.Start()
+	if err != nil {
+		return nil, errors.Errorf("fail to start the dns process, err: %v", err)
 	}
-
-	timeChan := time.Tick(time.Duration(experimentsDetails.ChaosDuration) * time.Second)
-	log.Infof("[Chaos]: Waiting for %vs", experimentsDetails.ChaosDuration)
-
-	// either wait for abort signal or chaos duration
-	select {
-	case <-abort:
-		log.Info("[Chaos]: Killing process started because of terminated signal received")
-	case <-timeChan:
-		log.Info("[Chaos]: Stopping the experiment, chaos duration over")
-	}
-
-	log.Info("Chaos Revert Started")
-	// retry thrice for the chaos revert
-
-	retry := 3
-	for retry > 0 {
-		if cmd.Process == nil {
-			log.Infof("cannot kill dns interceptor, process not started. Retrying in 1sec...")
-		} else {
-			log.Infof("killing dns interceptor with pid %v", cmd.Process.Pid)
-			if err := terminateProcess(cmd); err != nil {
-				return err
-			}
-		}
-		retry--
-		time.Sleep(1 * time.Second)
-	}
-	if err = result.AnnotateChaosResult(resultDetails.Name, chaosDetails.ChaosNamespace, "reverted", "pod", experimentsDetails.TargetPods); err != nil {
-		return err
-	}
-	log.Info("Chaos Revert Completed")
-	return nil
+	return cmd, nil
 }
 
-func terminateProcess(cmd *exec.Cmd) error {
+func terminateProcess(t targetDetails) error {
 	// kill command
-	killTemplate := fmt.Sprintf("sudo kill %d", cmd.Process.Pid)
+	killTemplate := fmt.Sprintf("sudo kill %d", t.Cmd.Process.Pid)
 	kill := exec.Command("/bin/bash", "-c", killTemplate)
 	var stderr bytes.Buffer
 	kill.Stderr = &stderr
-	if err := kill.Run(); err != nil {
+	if err = kill.Run(); err != nil {
 		if strings.Contains(strings.ToLower(stderr.String()), ProcessAlreadyKilled) {
 			return nil
 		}
 		log.Errorf("unable to kill dns interceptor process %v, err :%v", emoji.Sprint(":cry:"), err)
 	} else {
 		log.Errorf("dns interceptor process stopped")
+		log.Infof("successfully injected chaos on target: {name: %s, namespace: %v, container: %v}", t.Name, t.Namespace, t.TargetContainer)
 	}
 	return nil
+}
+
+// abortWatcher continuously watch for the abort signals
+func abortWatcher(targets []targetDetails, resultName, chaosNS string) {
+
+	<-abort
+
+	log.Info("[Chaos]: Killing process started because of terminated signal received")
+	log.Info("[Abort]: Chaos Revert Started")
+	// retry thrice for the chaos revert
+	retry := 3
+	for retry > 0 {
+		for _, t := range targets {
+			if err = terminateProcess(t); err != nil {
+				log.Errorf("unable to revert for %v pod, err :%v", t.Name, err)
+				continue
+			}
+			if err = result.AnnotateChaosResult(resultName, chaosNS, "reverted", "pod", t.Name); err != nil {
+				log.Errorf("unable to annotate the chaosresult for %v pod, err :%v", t.Name, err)
+			}
+		}
+		retry--
+		time.Sleep(1 * time.Second)
+	}
+	log.Info("[Abort]: Chaos Revert Completed")
+	os.Exit(1)
 }
 
 //getENV fetches all the env variables from the runner pod
 func getENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.ExperimentName = types.Getenv("EXPERIMENT_NAME", "")
 	experimentDetails.InstanceID = types.Getenv("INSTANCE_ID", "")
-	experimentDetails.AppNS = types.Getenv("APP_NAMESPACE", "")
-	experimentDetails.TargetContainer = types.Getenv("APP_CONTAINER", "")
-	experimentDetails.TargetPods = types.Getenv("APP_POD", "")
 	experimentDetails.ChaosDuration, _ = strconv.Atoi(types.Getenv("TOTAL_CHAOS_DURATION", "60"))
 	experimentDetails.ChaosNamespace = types.Getenv("CHAOS_NAMESPACE", "litmus")
 	experimentDetails.EngineName = types.Getenv("CHAOSENGINE", "")
@@ -185,4 +274,14 @@ func getENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.MatchScheme = types.Getenv("MATCH_SCHEME", "exact")
 	experimentDetails.ChaosType = types.Getenv("CHAOS_TYPE", "error")
 	experimentDetails.SocketPath = types.Getenv("SOCKET_PATH", "")
+}
+
+type targetDetails struct {
+	Name            string
+	Namespace       string
+	TargetContainer string
+	ContainerId     string
+	Pid             int
+	CommandPid      int
+	Cmd             *exec.Cmd
 }

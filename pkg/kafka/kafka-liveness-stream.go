@@ -33,7 +33,7 @@ func LivenessStream(experimentsDetails *experimentTypes.ExperimentDetails, clien
 	}
 
 	log.Info("[Liveness]: Confirm that the kafka liveness pod is running")
-	if err := status.CheckApplicationStatus(experimentsDetails.KafkaNamespace, "name=kafka-liveness-"+experimentsDetails.RunID, experimentsDetails.ChaoslibDetail.Timeout, experimentsDetails.ChaoslibDetail.Delay, clients); err != nil {
+	if err := status.CheckApplicationStatusesByLabels(experimentsDetails.KafkaNamespace, "name=kafka-liveness-"+experimentsDetails.RunID, experimentsDetails.ChaoslibDetail.Timeout, experimentsDetails.ChaoslibDetail.Delay, clients); err != nil {
 		return "", errors.Errorf("liveness pod status check failed, err: %v", err)
 	}
 

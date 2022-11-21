@@ -719,7 +719,7 @@ func createHelperPod(probe v1alpha1.ProbeAttributes, resultDetails *types.Result
 
 	// verify the running status of external probe pod
 	log.Info("[Status]: Checking the status of the probe pod")
-	if err = status.CheckApplicationStatus(chaosDetails.ChaosNamespace, "name="+chaosDetails.ExperimentName+"-probe-"+runID, chaosDetails.Timeout, chaosDetails.Delay, clients); err != nil {
+	if err = status.CheckApplicationStatusesByLabels(chaosDetails.ChaosNamespace, "name="+chaosDetails.ExperimentName+"-probe-"+runID, chaosDetails.Timeout, chaosDetails.Delay, clients); err != nil {
 		return litmusexec.PodDetails{}, errors.Errorf("probe pod is not in running state, err: %v", err)
 	}
 

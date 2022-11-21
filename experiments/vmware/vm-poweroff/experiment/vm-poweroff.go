@@ -81,9 +81,7 @@ func VMPoweroff(clients clients.ClientSets) {
 		return
 	}
 
-	//PRE-CHAOS APPLICATION STATUS CHECK
 	if chaosDetails.DefaultHealthCheck {
-
 		// PRE-CHAOS VM STATUS CHECK
 		if err := vmware.VMStatusCheck(experimentsDetails.VcenterServer, experimentsDetails.VMIds, cookie); err != nil {
 			log.Errorf("Failed to get the VM status, err: %v", err)
@@ -136,9 +134,7 @@ func VMPoweroff(clients clients.ClientSets) {
 	log.Infof("[Confirmation]: %v chaos has been injected successfully", experimentsDetails.ExperimentName)
 	resultDetails.Verdict = v1alpha1.ResultVerdictPassed
 
-	//POST-CHAOS APPLICATION STATUS CHECK
 	if chaosDetails.DefaultHealthCheck {
-
 		//POST-CHAOS VM STATUS CHECK
 		log.Info("[Status]: Verify that the IUT (Instance Under Test) is running (post-chaos)")
 		if err := vmware.VMStatusCheck(experimentsDetails.VcenterServer, experimentsDetails.VMIds, cookie); err != nil {
