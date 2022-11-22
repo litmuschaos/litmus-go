@@ -2,6 +2,7 @@ package lib
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
@@ -59,7 +60,7 @@ func PrepareDockerServiceKill(experimentsDetails *experimentTypes.ExperimentDeta
 		return errors.Errorf("unable to create the helper pod, err: %v", err)
 	}
 
-	appLabel := "name=" + experimentsDetails.ExperimentName + "-helper-" + experimentsDetails.RunID
+	appLabel := fmt.Sprintf("app=%s-helper-%s", experimentsDetails.ExperimentName, experimentsDetails.RunID)
 
 	//Checking the status of helper pod
 	log.Info("[Status]: Checking the status of the helper pod")
@@ -116,7 +117,7 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 		ObjectMeta: v1.ObjectMeta{
 			Name:        experimentsDetails.ExperimentName + "-helper-" + experimentsDetails.RunID,
 			Namespace:   experimentsDetails.ChaosNamespace,
-			Labels:      common.GetHelperLabels(chaosDetails.Labels, experimentsDetails.RunID, "", experimentsDetails.ExperimentName),
+			Labels:      common.GetHelperLabels(chaosDetails.Labels, experimentsDetails.RunID, experimentsDetails.ExperimentName),
 			Annotations: chaosDetails.Annotations,
 		},
 		Spec: apiv1.PodSpec{

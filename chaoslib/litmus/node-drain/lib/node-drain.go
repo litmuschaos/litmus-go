@@ -80,7 +80,7 @@ func PrepareNodeDrain(experimentsDetails *experimentTypes.ExperimentDetails, cli
 
 	// Verify the status of AUT after reschedule
 	log.Info("[Status]: Verify the status of AUT after reschedule")
-	if err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
+	if err = status.AUTStatusCheck(clients, chaosDetails); err != nil {
 		log.Info("[Revert]: Reverting chaos because application status check failed")
 		if uncordonErr := uncordonNode(experimentsDetails, clients, chaosDetails); uncordonErr != nil {
 			log.Errorf("Unable to uncordon the node, err: %v", uncordonErr)
