@@ -136,7 +136,7 @@ func getProbesFromEngine(chaosDetails *types.ChaosDetails, clients clients.Clien
 }
 
 // InitializeProbesInChaosResultDetails set the probe inside chaos result
-// it fetch the probe details from the chaosengine and set into the chaosresult
+// it fetches the probe details from the chaosengine and set into the chaosresult
 func InitializeProbesInChaosResultDetails(chaosDetails *types.ChaosDetails, clients clients.ClientSets, chaosresult *types.ResultDetails) error {
 
 	var probeDetails []types.ProbeDetails

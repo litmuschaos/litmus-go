@@ -10,6 +10,7 @@ require (
 	github.com/containerd/cgroups v1.0.1
 	github.com/kyokomi/emoji v2.2.4+incompatible
 	github.com/litmuschaos/chaos-operator v0.0.0-20221121155030-e5b440b5cd82
+	github.com/palantir/stacktrace v0.0.0-20161112013806-78658fd2d177
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.7.0
 	github.com/spf13/cobra v1.1.1

@@ -2,6 +2,7 @@ package common
 
 import (
 	"fmt"
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	"math/rand"
 	"os"
 	"os/signal"
@@ -43,7 +44,7 @@ func RandomInterval(interval string) error {
 		lowerBound, _ = strconv.Atoi(intervals[0])
 		upperBound, _ = strconv.Atoi(intervals[1])
 	default:
-		return errors.Errorf("unable to parse CHAOS_INTERVAL, provide in valid format")
+		return cerrors.Generic{Phase: "ChaosInject", Reason: "could not parse CHAOS_INTERVAL env, invalid format"}
 	}
 	rand.Seed(time.Now().UnixNano())
 	waitTime := lowerBound + rand.Intn(upperBound-lowerBound)
