@@ -1,126 +1,110 @@
+// Package workloads implements utility to derive the pods from the parent workloads
 package workloads
 
 import (
 	"context"
 	"github.com/litmuschaos/litmus-go/pkg/clients"
+	"github.com/litmuschaos/litmus-go/pkg/types"
+	"strings"
+
+	kcorev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
 )
 
-type Workloads interface {
-	GetPodsFromDeployment(deployName string) ([]string, error)
-	GetPodsFromDaemonSet(daemonName string) ([]string, error)
-	GetPodsFromStatefulSet(stsName string) ([]string, error)
-	GetPodsFromDeploymentConfig(dcName string) ([]string, error)
-	GetPodsFromRollout(roName string) ([]string, error)
-}
-
 type Workload struct {
-	ctx       context.Context
-	namespace string
-	client    clients.ClientSets
+	Name      string `json:"name"`
+	Kind      string `json:"kind"`
+	Namespace string `json:"namespace"`
 }
 
-func NewWorkload(ctx context.Context, namespace string, client clients.ClientSets) Workloads {
-	return &Workload{
-		ctx:       ctx,
-		namespace: namespace,
-		client:    client,
+var (
+	gvrrc = schema.GroupVersionResource{
+		Group:    "",
+		Version:  "v1",
+		Resource: "replicacontrollers",
 	}
+
+	gvrrs = schema.GroupVersionResource{
+		Group:    "apps",
+		Version:  "v1",
+		Resource: "replicasets",
+	}
+)
+
+// GetPodsFromWorkloads derives the pods from the parent workloads
+func GetPodsFromWorkloads(target types.AppDetails, client clients.ClientSets) (kcorev1.PodList, error) {
+
+	allPods, err := getAllPods(target.Namespace, client)
+	if err != nil {
+		return kcorev1.PodList{}, err
+	}
+	return getPodsFromWorkload(target, allPods, client.DynamicClient)
 }
 
-func (w *Workload) GetPodsFromDeployment(deployName string) ([]string, error) {
-	var pods []string
-
-	allRS, err := getAllReplicaSets(w.namespace, w.client)
-	if err != nil {
-		return nil, err
-	}
-
-	allPods, err := getAllPods(w.namespace, w.client)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, rs := range getRSFromDeployment(allRS, deployName) {
-		pods = append(pods, getPodsFromRS(allPods, rs)...)
-	}
-
-	return pods, nil
-}
-
-func (w *Workload) GetPodsFromDaemonSet(daemonName string) ([]string, error) {
-	var pods []string
-
-	allPods, err := getAllPods(w.namespace, w.client)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, p := range allPods.Items {
-		for _, owner := range p.OwnerReferences {
-			if owner.Name == daemonName && owner.Kind == DaemonSet {
-				pods = append(pods, p.Name)
-				break
-			}
+func getPodsFromWorkload(target types.AppDetails, allPods *kcorev1.PodList, dynamicClient dynamic.Interface) (kcorev1.PodList, error) {
+	var pods kcorev1.PodList
+	for _, r := range allPods.Items {
+		ownerType, ownerName, err := GetPodOwnerTypeAndName(&r, dynamicClient)
+		if err != nil {
+			return pods, err
+		}
+		if ownerName == "" || ownerType == "" {
+			continue
+		}
+		if matchPodOwnerWithWorkloads(ownerName, ownerType, target) {
+			pods.Items = append(pods.Items, r)
 		}
 	}
 	return pods, nil
 }
 
-func (w *Workload) GetPodsFromStatefulSet(stsName string) ([]string, error) {
-	var pods []string
+func GetPodOwnerTypeAndName(pod *kcorev1.Pod, dynamicClient dynamic.Interface) (parentType, parentName string, err error) {
+	for _, owner := range pod.GetOwnerReferences() {
+		parentName = owner.Name
+		if owner.Kind == "StatefulSet" || owner.Kind == "DaemonSet" {
+			return strings.ToLower(owner.Kind), parentName, nil
+		}
 
-	allPods, err := getAllPods(w.namespace, w.client)
-	if err != nil {
-		return nil, err
-	}
+		if owner.Kind == "ReplicaSet" && strings.HasSuffix(owner.Name, pod.Labels["pod-template-hash"]) {
+			return getParent(owner.Name, pod.Namespace, gvrrs, dynamicClient)
+		}
 
-	for _, p := range allPods.Items {
-		for _, owner := range p.OwnerReferences {
-			if owner.Name == stsName && owner.Kind == StatefulSet {
-				pods = append(pods, p.Name)
-				break
-			}
+		if owner.Kind == "ReplicaController" {
+			return getParent(owner.Name, pod.Namespace, gvrrc, dynamicClient)
 		}
 	}
-	return pods, nil
+	return parentType, parentName, nil
 }
 
-func (w *Workload) GetPodsFromDeploymentConfig(dcName string) ([]string, error) {
-	var pods []string
-
-	allRC, err := getAllReplicaControllers(w.namespace, w.client)
+func getParent(name, namespace string, gvr schema.GroupVersionResource, dynamicClient dynamic.Interface) (string, string, error) {
+	res, err := dynamicClient.Resource(gvr).Namespace(namespace).Get(context.Background(), name, v1.GetOptions{})
 	if err != nil {
-		return nil, err
+		return "", "", err
 	}
 
-	allPods, err := getAllPods(w.namespace, w.client)
-	if err != nil {
-		return nil, err
+	for _, v := range res.GetOwnerReferences() {
+		kind := strings.ToLower(v.Kind)
+		if kind == "deployment" || kind == "rollout" || kind == "deploymentconfig" {
+			return kind, v.Name, nil
+		}
 	}
-
-	for _, rc := range getRCFromDeploymentConfig(allRC, dcName) {
-		pods = append(pods, getPodsFromRC(allPods, rc)...)
-	}
-
-	return pods, nil
+	return "", "", nil
 }
 
-func (w *Workload) GetPodsFromRollout(roName string) ([]string, error) {
-	var pods []string
-
-	allRS, err := getAllReplicaSets(w.namespace, w.client)
-	if err != nil {
-		return nil, err
+func matchPodOwnerWithWorkloads(name, kind string, target types.AppDetails) bool {
+	if kind != target.Kind {
+		return false
 	}
-
-	allPods, err := getAllPods(w.namespace, w.client)
-	if err != nil {
-		return nil, err
+	for _, t := range target.Names {
+		if t == name {
+			return true
+		}
 	}
+	return false
+}
 
-	for _, rs := range getRSFromRollout(allRS, roName) {
-		pods = append(pods, getPodsFromRS(allPods, rs)...)
-	}
-
-	return pods, nil
+func getAllPods(namespace string, client clients.ClientSets) (*kcorev1.PodList, error) {
+	return client.KubeClient.CoreV1().Pods(namespace).List(context.Background(), v1.ListOptions{})
 }

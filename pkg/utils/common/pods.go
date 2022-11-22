@@ -292,19 +292,11 @@ func GetTargetPodsWhenTargetPodsENVNotSet(podAffPerc int, clients clients.Client
 			podKind = true
 		default:
 			if target.Names != nil {
-				for _, name := range target.Names {
-					pods, err := workloads.GetPodsFromWorkload(target.Namespace, target.Kind, name, clients)
-					if err != nil {
-						return finalPods, err
-					}
-					for _, name := range pods {
-						pod, err := clients.KubeClient.CoreV1().Pods(target.Namespace).Get(context.Background(), name, v1.GetOptions{})
-						if err != nil {
-							return finalPods, err
-						}
-						finalPods.Items = append(finalPods.Items, *pod)
-					}
+				pods, err := workloads.GetPodsFromWorkloads(target, clients)
+				if err != nil {
+					return finalPods, err
 				}
+				finalPods.Items = append(finalPods.Items, pods.Items...)
 			} else {
 				for _, label := range target.Labels {
 					pods, err := clients.KubeClient.CoreV1().Pods(target.Namespace).List(context.Background(), v1.ListOptions{LabelSelector: label})
