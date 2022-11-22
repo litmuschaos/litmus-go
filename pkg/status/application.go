@@ -42,12 +42,9 @@ func AUTStatusCheck(clients clients.ClientSets, chaosDetails *types.ChaosDetails
 					}
 				}
 			} else {
-				for _, name := range target.Names {
-					if err := CheckApplicationStatusesByWorkloadName(target.Namespace, name, target.Kind, chaosDetails.Timeout, chaosDetails.Delay, clients); err != nil {
-						return err
-					}
+				if err := CheckApplicationStatusesByWorkloadName(target, chaosDetails.Timeout, chaosDetails.Delay, clients); err != nil {
+					return err
 				}
-
 			}
 		}
 	}
@@ -308,15 +305,31 @@ func CheckAllContainerStatusesByPodName(appNs, appName string, timeout, delay in
 		})
 }
 
-func CheckApplicationStatusesByWorkloadName(appNs, appName, kind string, timeout, delay int, clients clients.ClientSets) error {
+func CheckApplicationStatusesByWorkloadName(target types.AppDetails, timeout, delay int, clients clients.ClientSets) error {
 
-	pods, err := workloads.GetPodsFromWorkload(appNs, kind, appName, clients)
+	pods, err := workloads.GetPodsFromWorkloads(target, clients)
 	if err != nil {
 		return err
 	}
-	for _, pod := range pods {
-		if err := CheckApplicationStatusesByPodName(appNs, pod, timeout, delay, clients); err != nil {
+	for _, pod := range pods.Items {
+		if err := CheckApplicationStatusesByPodName(target.Namespace, pod.Name, timeout, delay, clients); err != nil {
 			return err
+		}
+	}
+	return nil
+}
+
+func CheckUnTerminatedPodStatusesByWorkloadName(target types.AppDetails, timeout, delay int, clients clients.ClientSets) error {
+
+	pods, err := workloads.GetPodsFromWorkloads(target, clients)
+	if err != nil {
+		return err
+	}
+	for _, pod := range pods.Items {
+		if pod.DeletionTimestamp == nil {
+			if err := CheckApplicationStatusesByPodName(target.Namespace, pod.Name, timeout, delay, clients); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

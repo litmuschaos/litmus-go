@@ -87,7 +87,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 
 		// deriving the parent name of the target resources
 		for _, pod := range targetPodList.Items {
-			parentName, kind, err := workloads.GetParentNameAndKind(clients, pod)
+			kind, parentName, err := workloads.GetPodOwnerTypeAndName(&pod, clients.DynamicClient)
 			if err != nil {
 				return err
 			}
@@ -134,8 +134,13 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 
 			//Verify the status of pod after the chaos injection
 			log.Info("[Status]: Verification for the recreation of application pod")
-			for _, target := range chaosDetails.ParentsResources {
-				if err = status.CheckApplicationStatusesByWorkloadName(target.Namespace, target.Name, strings.ToLower(target.Kind), experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
+			for _, parent := range chaosDetails.ParentsResources {
+				target := types.AppDetails{
+					Names:     []string{parent.Name},
+					Kind:      parent.Kind,
+					Namespace: parent.Namespace,
+				}
+				if err = status.CheckUnTerminatedPodStatusesByWorkloadName(target, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
 					return err
 				}
 			}
@@ -178,7 +183,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 
 		// deriving the parent name of the target resources
 		for _, pod := range targetPodList.Items {
-			parentName, kind, err := workloads.GetParentNameAndKind(clients, pod)
+			kind, parentName, err := workloads.GetPodOwnerTypeAndName(&pod, clients.DynamicClient)
 			if err != nil {
 				return err
 			}
@@ -226,8 +231,13 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 
 		//Verify the status of pod after the chaos injection
 		log.Info("[Status]: Verification for the recreation of application pod")
-		for _, target := range chaosDetails.ParentsResources {
-			if err = status.CheckApplicationStatusesByWorkloadName(target.Namespace, target.Name, strings.ToLower(target.Kind), experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
+		for _, parent := range chaosDetails.ParentsResources {
+			target := types.AppDetails{
+				Names:     []string{parent.Name},
+				Kind:      parent.Kind,
+				Namespace: parent.Namespace,
+			}
+			if err = status.CheckUnTerminatedPodStatusesByWorkloadName(target, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
 				return err
 			}
 		}
