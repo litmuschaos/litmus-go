@@ -1,12 +1,10 @@
 package experiment
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/litmuschaos/chaos-operator/api/litmuschaos/v1alpha1"
 	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/network-chaos/lib/corruption"
-	pumbaLIB "github.com/litmuschaos/litmus-go/chaoslib/pumba/network-chaos/lib/corruption"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/network-chaos/environment"
@@ -108,23 +106,8 @@ func PodNetworkCorruption(clients clients.ClientSets) {
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
-	// Including the pumba lib for pod-network-corruption
-	switch {
-	case experimentsDetails.ChaosLib == "pumba" && experimentsDetails.ContainerRuntime == "docker":
-		if err := pumbaLIB.PodNetworkCorruptionChaos(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
-			log.Errorf("Chaos injection failed, err: %v", err)
-			result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
-			return
-		}
-	case experimentsDetails.ChaosLib == "litmus":
-		if err := litmusLIB.PodNetworkCorruptionChaos(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
-			log.Errorf("Chaos injection failed, err: %v", err)
-			result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
-			return
-		}
-	default:
-		log.Error("[Invalid]: Please Provide the correct LIB")
-		err := fmt.Errorf("[chaos]: no match was found for the specified lib")
+	if err := litmusLIB.PodNetworkCorruptionChaos(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
+		log.Errorf("Chaos injection failed, err: %v", err)
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 		return
 	}

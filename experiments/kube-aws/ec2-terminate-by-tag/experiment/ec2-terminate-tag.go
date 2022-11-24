@@ -1,7 +1,6 @@
 package experiment
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/litmuschaos/chaos-operator/api/litmuschaos/v1alpha1"
@@ -118,17 +117,8 @@ func EC2TerminateByTag(clients clients.ClientSets) {
 		}
 	}
 
-	// Including the litmus lib for ec2-terminate
-	switch experimentsDetails.ChaosLib {
-	case "litmus":
-		if err = litmusLIB.PrepareEC2TerminateByTag(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
-			log.Errorf("Chaos injection failed, err: %v", err)
-			result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
-			return
-		}
-	default:
-		log.Error("[Invalid]: Please Provide the correct LIB")
-		err := fmt.Errorf("[chaos]: no match was found for the specified lib")
+	if err = litmusLIB.PrepareEC2TerminateByTag(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
+		log.Errorf("Chaos injection failed, err: %v", err)
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 		return
 	}

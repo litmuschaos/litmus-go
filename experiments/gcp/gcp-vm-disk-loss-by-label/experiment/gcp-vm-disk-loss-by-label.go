@@ -115,16 +115,8 @@ func GCPVMDiskLossByLabel(clients clients.ClientSets) {
 
 	log.Info("[Status]: Disk volumes are attached to the VM instances (pre-chaos)")
 
-	// Including the litmus lib
-	switch experimentsDetails.ChaosLib {
-	case "litmus":
-		if err := litmusLIB.PrepareDiskVolumeLossByLabel(computeService, &experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
-			log.Errorf("Chaos injection failed, err: %v", err)
-			result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
-			return
-		}
-	default:
-		log.Error("[Invalid]: Please Provide the correct LIB")
+	if err := litmusLIB.PrepareDiskVolumeLossByLabel(computeService, &experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
+		log.Errorf("Chaos injection failed, err: %v", err)
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 		return
 	}

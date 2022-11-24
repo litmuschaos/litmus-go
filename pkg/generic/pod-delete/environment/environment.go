@@ -17,7 +17,6 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.ChaosDuration, _ = strconv.Atoi(types.Getenv("TOTAL_CHAOS_DURATION", "30"))
 	experimentDetails.ChaosInterval = types.Getenv("CHAOS_INTERVAL", "10")
 	experimentDetails.RampTime, _ = strconv.Atoi(types.Getenv("RAMP_TIME", "0"))
-	experimentDetails.ChaosLib = types.Getenv("LIB", "litmus")
 	experimentDetails.ChaosServiceAccount = types.Getenv("CHAOS_SERVICE_ACCOUNT", "")
 	experimentDetails.ChaosUID = clientTypes.UID(types.Getenv("CHAOS_UID", ""))
 	experimentDetails.InstanceID = types.Getenv("INSTANCE_ID", "")

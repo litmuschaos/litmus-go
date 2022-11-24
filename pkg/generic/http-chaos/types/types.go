@@ -12,7 +12,6 @@ type ExperimentDetails struct {
 	LIBImage                      string
 	LIBImagePullPolicy            string
 	RampTime                      int
-	ChaosLib                      string
 	AppNS                         string
 	AppLabel                      string
 	AppKind                       string

@@ -1,7 +1,6 @@
 package experiment
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/litmuschaos/chaos-operator/api/litmuschaos/v1alpha1"
@@ -118,17 +117,8 @@ func VMInstanceStop(clients clients.ClientSets) {
 		log.Info("[Status]: VM instance is in running state (pre-chaos)")
 	}
 
-	// Including the litmus lib for GCP vm-instance-stop
-	switch experimentsDetails.ChaosLib {
-	case "litmus":
-		if err := litmusLIB.PrepareVMStop(computeService, &experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
-			log.Errorf("Chaos injection failed, err: %v", err)
-			result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
-			return
-		}
-	default:
-		log.Error("[Invalid]: Please Provide the correct LIB")
-		err := fmt.Errorf("[chaos]: no match was found for the specified lib")
+	if err := litmusLIB.PrepareVMStop(computeService, &experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
+		log.Errorf("Chaos injection failed, err: %v", err)
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 		return
 	}

@@ -1,11 +1,8 @@
 package experiment
 
 import (
-	"fmt"
 	"github.com/litmuschaos/chaos-operator/api/litmuschaos/v1alpha1"
 	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/pod-delete/lib"
-	powerfulseal "github.com/litmuschaos/litmus-go/chaoslib/powerfulseal/pod-delete/lib"
-	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/pod-delete/environment"
@@ -115,23 +112,8 @@ func PodDelete(clients clients.ClientSets) {
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
-	// Including the litmus lib for pod-delete
-	switch experimentsDetails.ChaosLib {
-	case "litmus":
-		if err := litmusLIB.PreparePodDelete(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
-			log.Errorf("Chaos injection failed, err: %v", err)
-			result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
-			return
-		}
-	case "powerfulseal":
-		if err := powerfulseal.PreparePodDelete(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
-			log.Errorf("Chaos injection failed, err: %v", err)
-			result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
-			return
-		}
-	default:
-		log.Error("[Invalid]: Please Provide the correct LIB")
-		err := cerrors.Generic{Phase: "ChaosInject", Reason: fmt.Sprintf("no match found for specified lib: %s", experimentsDetails.ChaosLib)}
+	if err := litmusLIB.PreparePodDelete(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
+		log.Errorf("Chaos injection failed, err: %v", err)
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 		return
 	}
