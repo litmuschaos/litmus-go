@@ -50,16 +50,14 @@ func PodDelete(clients clients.ClientSets) {
 	log.Infof("[PreReq]: Updating the chaos result of %v experiment (SOT)", experimentsDetails.ExperimentName)
 	if err := result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT"); err != nil {
 		log.Errorf("Unable to create the chaosresult, err: %v", err)
-		failStep, _ := cerrors.GetRootCauseAndErrorCode(err)
-		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 		return
 	}
 
 	// Set the chaos result uid
 	if err := result.SetResultUID(&resultDetails, clients, &chaosDetails); err != nil {
 		log.Errorf("Unable to set the result uid, err: %v", err)
-		failStep, _ := cerrors.GetRootCauseAndErrorCode(err)
-		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 		return
 	}
 
@@ -88,8 +86,7 @@ func PodDelete(clients clients.ClientSets) {
 			if eventErr := events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine"); eventErr != nil {
 				log.Errorf("failed to create %v event inside chaosengine", types.PreChaosCheck)
 			}
-			failStep, _ := cerrors.GetRootCauseAndErrorCode(err)
-			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 			return
 		}
 	}
@@ -108,8 +105,7 @@ func PodDelete(clients clients.ClientSets) {
 				if eventErr := events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine"); eventErr != nil {
 					log.Errorf("failed to create %v event inside chaosengine", types.PreChaosCheck)
 				}
-				failStep := fmt.Sprintf("[PreChaos]: unable to run the probes, %s" + err.Error())
-				result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+				result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 				return
 			}
 			msg = common.GetStatusMessage(chaosDetails.DefaultHealthCheck, "AUT: Running", "Successful")
@@ -124,22 +120,19 @@ func PodDelete(clients clients.ClientSets) {
 	case "litmus":
 		if err := litmusLIB.PreparePodDelete(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
 			log.Errorf("Chaos injection failed, err: %v", err)
-			failStep, _ := cerrors.GetRootCauseAndErrorCode(err)
-			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 			return
 		}
 	case "powerfulseal":
 		if err := powerfulseal.PreparePodDelete(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
 			log.Errorf("Chaos injection failed, err: %v", err)
-			failStep := fmt.Sprintf("[ChaosInject]: Failed inside the chaoslib, %s", err.Error())
-			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 			return
 		}
 	default:
 		log.Error("[Invalid]: Please Provide the correct LIB")
 		err := cerrors.Generic{Phase: "ChaosInject", Reason: fmt.Sprintf("no match found for specified lib: %s", experimentsDetails.ChaosLib)}
-		failStep, _ := cerrors.GetRootCauseAndErrorCode(err)
-		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 		return
 	}
 
@@ -153,8 +146,7 @@ func PodDelete(clients clients.ClientSets) {
 			log.Errorf("Application status check failed, err: %v", err)
 			types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, "AUT: Not Running", "Warning", &chaosDetails)
 			events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
-			failStep, _ := cerrors.GetRootCauseAndErrorCode(err)
-			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 			return
 		}
 	}
@@ -172,8 +164,7 @@ func PodDelete(clients clients.ClientSets) {
 				if eventErr := events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine"); eventErr != nil {
 					log.Errorf("failed to create %v event inside chaosengine", types.PostChaosCheck)
 				}
-				failStep := fmt.Sprintf("[PostChaos]: unable to run the probes, err: %s", err.Error())
-				result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+				result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 				return
 			}
 			msg = common.GetStatusMessage(chaosDetails.DefaultHealthCheck, "AUT: Running", "Successful")
@@ -188,8 +179,7 @@ func PodDelete(clients clients.ClientSets) {
 	log.Infof("[The End]: Updating the chaos result of %v experiment (EOT)", experimentsDetails.ExperimentName)
 	if err := result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT"); err != nil {
 		log.Errorf("Unable to update the chaosresult, err: %v", err)
-		failStep, _ := cerrors.GetRootCauseAndErrorCode(err)
-		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 		return
 	}
 

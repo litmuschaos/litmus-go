@@ -2,6 +2,7 @@ package lib
 
 import (
 	"context"
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	"os"
 	"os/signal"
 	"syscall"
@@ -227,7 +228,7 @@ func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, clients
 	}
 	// updating the chaosresult after stopped
 	failStep := "Chaos injection stopped!"
-	types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep)
+	types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep, cerrors.ErrorTypeExperimentAborted)
 	result.ChaosResult(chaosDetails, clients, resultDetails, "EOT")
 	log.Info("Chaos Revert Completed")
 	os.Exit(0)

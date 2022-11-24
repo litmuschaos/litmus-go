@@ -156,8 +156,8 @@ func updateResultAttributes(clients clients.ClientSets, chaosDetails *types.Chao
 	var isAllProbePassed bool
 	result.Status.ExperimentStatus.Phase = resultDetails.Phase
 	result.Spec.InstanceID = chaosDetails.InstanceID
-	result.Status.ExperimentStatus.FailStep = resultDetails.FailStep
-	result.Status.ExperimentStatus.ErrorCode = resultDetails.ErrorCode
+	result.Status.ExperimentStatus.FailureOutput = resultDetails.FailureOutput
+
 	// for existing chaos result resource it will patch the label
 	result.ObjectMeta.Labels = chaosResultLabel
 	result.Status.History.Targets = chaosDetails.Targets
@@ -169,7 +169,10 @@ func updateResultAttributes(clients clients.ClientSets, chaosDetails *types.Chao
 		if !isAllProbePassed {
 			resultDetails.Verdict = "Fail"
 			result.Status.ExperimentStatus.Verdict = "Fail"
-			result.Status.ExperimentStatus.FailStep = "Probe execution result didn't met the passing criteria"
+			result.Status.ExperimentStatus.FailureOutput = &v1alpha1.FailureOutput{
+				FailedStep: "Probe execution result didn't met the passing criteria",
+				ErrorCode:  string(cerrors.ErrorTypeGeneric),
+			}
 		}
 		switch strings.ToLower(string(resultDetails.Verdict)) {
 		case "pass":
@@ -239,9 +242,11 @@ func SetResultUID(resultDetails *types.ResultDetails, clients clients.ClientSets
 }
 
 //RecordAfterFailure update the chaosresult and create the summary events
-func RecordAfterFailure(chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, failStep string, clients clients.ClientSets, eventsDetails *types.EventDetails) {
+func RecordAfterFailure(chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, err error, clients clients.ClientSets, eventsDetails *types.EventDetails) {
+	failStep, errorCode := cerrors.GetRootCauseAndErrorCode(err)
+
 	// update the chaos result
-	types.SetResultAfterCompletion(resultDetails, "Fail", "Completed", failStep, cerrors.ErrorTypeGeneric)
+	types.SetResultAfterCompletion(resultDetails, "Fail", "Completed", failStep, errorCode)
 	if err := ChaosResult(chaosDetails, clients, resultDetails, "EOT"); err != nil {
 		log.Errorf("failed to update chaosresult, err: %v", err)
 	}

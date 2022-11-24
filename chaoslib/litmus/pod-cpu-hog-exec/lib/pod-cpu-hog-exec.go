@@ -1,6 +1,7 @@
 package lib
 
 import (
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	"os"
 	"os/signal"
 	"strings"
@@ -152,7 +153,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 					}
 					// updating the chaosresult after stopped
 					failStep := "Chaos injection stopped!"
-					types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep)
+					types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep, cerrors.ErrorTypeExperimentAborted)
 					result.ChaosResult(chaosDetails, clients, resultDetails, "EOT")
 					log.Info("[Chaos]: Revert Completed")
 					os.Exit(1)
@@ -247,7 +248,7 @@ loop:
 			}
 			// updating the chaosresult after stopped
 			failStep := "Chaos injection stopped!"
-			types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep)
+			types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep, cerrors.ErrorTypeExperimentAborted)
 			result.ChaosResult(chaosDetails, clients, resultDetails, "EOT")
 			log.Info("[Chaos]: Revert Completed")
 			os.Exit(1)
