@@ -103,12 +103,12 @@ func PodDelete(clients clients.ClientSets) {
 
 			if err := probe.RunProbes(&chaosDetails, clients, &resultDetails, "PreChaos", &eventsDetails); err != nil {
 				log.Errorf("Probe Failed, err: %v", err)
-				failStep := "[PreChaos]: unable to run the probes, err: " + err.Error()
 				msg = common.GetStatusMessage(chaosDetails.DefaultHealthCheck, "AUT: Running", "Unsuccessful")
 				types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, msg, "Warning", &chaosDetails)
 				if eventErr := events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine"); eventErr != nil {
 					log.Errorf("failed to create %v event inside chaosengine", types.PreChaosCheck)
 				}
+				failStep := fmt.Sprintf("[PreChaos]: unable to run the probes, %s" + err.Error())
 				result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 				return
 			}
@@ -131,13 +131,14 @@ func PodDelete(clients clients.ClientSets) {
 	case "powerfulseal":
 		if err := powerfulseal.PreparePodDelete(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
 			log.Errorf("Chaos injection failed, err: %v", err)
-			failStep := "[chaos]: Failed inside the chaoslib, err: " + err.Error()
+			failStep := fmt.Sprintf("[ChaosInject]: Failed inside the chaoslib, %s", err.Error())
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 			return
 		}
 	default:
 		log.Error("[Invalid]: Please Provide the correct LIB")
-		failStep := fmt.Sprintf("[ChaosInject]: no match found for specified lib: %s", experimentsDetails.ChaosLib)
+		err := cerrors.Generic{Phase: "ChaosInject", Reason: fmt.Sprintf("no match found for specified lib: %s", experimentsDetails.ChaosLib)}
+		failStep, _ := cerrors.GetRootCauseAndErrorCode(err)
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 		return
 	}
@@ -166,12 +167,12 @@ func PodDelete(clients clients.ClientSets) {
 		if len(resultDetails.ProbeDetails) != 0 {
 			if err := probe.RunProbes(&chaosDetails, clients, &resultDetails, "PostChaos", &eventsDetails); err != nil {
 				log.Errorf("Probes Failed, err: %v", err)
-				failStep := "[PostChaos]: unable to run the probes, err: " + err.Error()
 				msg = common.GetStatusMessage(chaosDetails.DefaultHealthCheck, "AUT: Running", "Unsuccessful")
 				types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, msg, "Warning", &chaosDetails)
 				if eventErr := events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine"); eventErr != nil {
 					log.Errorf("failed to create %v event inside chaosengine", types.PostChaosCheck)
 				}
+				failStep := fmt.Sprintf("[PostChaos]: unable to run the probes, err: %s", err.Error())
 				result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
 				return
 			}

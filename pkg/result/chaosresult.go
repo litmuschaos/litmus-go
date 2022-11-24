@@ -157,6 +157,7 @@ func updateResultAttributes(clients clients.ClientSets, chaosDetails *types.Chao
 	result.Status.ExperimentStatus.Phase = resultDetails.Phase
 	result.Spec.InstanceID = chaosDetails.InstanceID
 	result.Status.ExperimentStatus.FailStep = resultDetails.FailStep
+	result.Status.ExperimentStatus.ErrorCode = resultDetails.ErrorCode
 	// for existing chaos result resource it will patch the label
 	result.ObjectMeta.Labels = chaosResultLabel
 	result.Status.History.Targets = chaosDetails.Targets
@@ -239,9 +240,8 @@ func SetResultUID(resultDetails *types.ResultDetails, clients clients.ClientSets
 
 //RecordAfterFailure update the chaosresult and create the summary events
 func RecordAfterFailure(chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, failStep string, clients clients.ClientSets, eventsDetails *types.EventDetails) {
-
 	// update the chaos result
-	types.SetResultAfterCompletion(resultDetails, "Fail", "Completed", failStep)
+	types.SetResultAfterCompletion(resultDetails, "Fail", "Completed", failStep, cerrors.ErrorTypeGeneric)
 	if err := ChaosResult(chaosDetails, clients, resultDetails, "EOT"); err != nil {
 		log.Errorf("failed to update chaosresult, err: %v", err)
 	}

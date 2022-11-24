@@ -10,6 +10,7 @@ const (
 	ErrorTypeChaosResultCRUD         ErrorType = "CHAOS_RESULT_CRUD_ERROR"
 	ErrorTypeApplicationStatusChecks ErrorType = "APPLICATION_STATUS_CHECKS_ERROR"
 	ErrorTypeTargetSelection         ErrorType = "TARGET_SELECTION_ERROR"
+	ErrorTypeExperimentAborted       ErrorType = "EXPERIMENT_ABORTED"
 )
 
 type userFriendly interface {

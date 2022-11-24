@@ -312,7 +312,7 @@ func GetTargetPodsWhenTargetPodsENVNotSet(podAffPerc int, clients clients.Client
 	}
 
 	if len(finalPods.Items) == 0 {
-		return finalPods, cerrors.TargetPodSelection{Target: "none", Reason: "no target pods founds"}
+		return finalPods, cerrors.TargetPodSelection{Target: GetAppDetailsForLogging(chaosDetails.AppDetail), Reason: "no target pods founds"}
 	}
 
 	if podKind {

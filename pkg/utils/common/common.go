@@ -85,7 +85,7 @@ func AbortWatcherWithoutExit(expname string, clients clients.ClientSets, resultD
 	log.Info("[Chaos]: Chaos Experiment Abortion started because of terminated signal received")
 	// updating the chaosresult after stopped
 	failStep := "Chaos injection stopped!"
-	types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep)
+	types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep, cerrors.ErrorTypeExperimentAborted)
 	if err := result.ChaosResult(chaosDetails, clients, resultDetails, "EOT"); err != nil {
 		log.Errorf("[ABORT]: Failed to update result, err: %v", err)
 	}

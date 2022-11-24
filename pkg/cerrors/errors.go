@@ -67,6 +67,9 @@ type TargetPodSelection struct {
 }
 
 func (e TargetPodSelection) Error() string {
+	if e.Target == "" {
+		return fmt.Sprintf("target selection failed, %s", e.Reason)
+	}
 	return fmt.Sprintf("target '%s' selection failed, %s", e.Target, e.Reason)
 }
 

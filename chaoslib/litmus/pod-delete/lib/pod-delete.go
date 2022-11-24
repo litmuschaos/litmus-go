@@ -79,7 +79,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		// Get the target pod details for the chaos execution
 		// if the target pod is not defined it will derive the random target pod list using pod affected percentage
 		if experimentsDetails.TargetPods == "" && chaosDetails.AppDetail == nil {
-			return cerrors.TargetPodSelection{Target: "none", Reason: "please provide one of the appLabel or TARGET_PODS"}
+			return cerrors.TargetPodSelection{Reason: "please provide one of the appLabel or TARGET_PODS"}
 		}
 
 		targetPodList, err := common.GetTargetPods(experimentsDetails.NodeLabel, experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, clients, chaosDetails)
@@ -176,7 +176,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		// Get the target pod details for the chaos execution
 		// if the target pod is not defined it will derive the random target pod list using pod affected percentage
 		if experimentsDetails.TargetPods == "" && chaosDetails.AppDetail == nil {
-			return cerrors.TargetPodSelection{Target: "none", Reason: "please provide one of the appLabel or TARGET_PODS"}
+			return cerrors.TargetPodSelection{Reason: "please provide one of the appLabel or TARGET_PODS"}
 		}
 		targetPodList, err := common.GetTargetPods(experimentsDetails.NodeLabel, experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, clients, chaosDetails)
 		if err != nil {
