@@ -127,17 +127,9 @@ func NodeRestart(clients clients.ClientSets) {
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
-	// Including the litmus lib
-	switch experimentsDetails.ChaosLib {
-	case "litmus":
-		if err := litmusLIB.PrepareChaos(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
-			result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
-			log.Errorf("Chaos injection failed, err: %v", err)
-			return
-		}
-	default:
+	if err := litmusLIB.PrepareChaos(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
-		log.Error("lib not supported, provide the correct value of lib")
+		log.Errorf("Chaos injection failed, err: %v", err)
 		return
 	}
 

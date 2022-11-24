@@ -20,7 +20,6 @@ func GetENV(kafkaDetails *kafkaTypes.ExperimentDetails) {
 	ChaoslibDetail.ChaosDuration, _ = strconv.Atoi(types.Getenv("TOTAL_CHAOS_DURATION", "60"))
 	ChaoslibDetail.ChaosInterval = types.Getenv("CHAOS_INTERVAL", "10")
 	ChaoslibDetail.RampTime, _ = strconv.Atoi(types.Getenv("RAMP_TIME", "0"))
-	ChaoslibDetail.ChaosLib = types.Getenv("LIB", "litmus")
 	ChaoslibDetail.ChaosServiceAccount = types.Getenv("CHAOS_SERVICE_ACCOUNT", "")
 	ChaoslibDetail.TargetContainer = types.Getenv("TARGET_CONTAINER", "")
 	ChaoslibDetail.ChaosUID = clientTypes.UID(types.Getenv("CHAOS_UID", ""))

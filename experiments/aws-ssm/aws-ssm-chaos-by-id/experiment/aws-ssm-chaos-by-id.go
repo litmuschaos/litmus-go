@@ -1,7 +1,6 @@
 package experiment
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/litmuschaos/chaos-operator/api/litmuschaos/v1alpha1"
@@ -112,25 +111,16 @@ func AWSSSMChaosByID(clients clients.ClientSets) {
 		log.Info("[Status]: EC2 instance is in running state")
 	}
 
-	// Including the litmus lib for aws-ssm-chaos-by-id
-	switch experimentsDetails.ChaosLib {
-	case "litmus":
-		if err := litmusLIB.PrepareAWSSSMChaosByID(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
-			log.Errorf("Chaos injection failed, err: %v", err)
-			result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
-			//Delete the ssm document on the given aws service monitoring docs
-			if experimentsDetails.IsDocsUploaded {
-				log.Info("[Recovery]: Delete the uploaded aws ssm docs")
-				if err := ssm.SSMDeleteDocument(experimentsDetails.DocumentName, experimentsDetails.Region); err != nil {
-					log.Errorf("fail to delete ssm doc, err: %v", err)
-				}
-			}
-			return
-		}
-	default:
-		log.Error("[Invalid]: Please Provide the correct LIB")
-		err := fmt.Errorf("[chaos]: no match was found for the specified lib")
+	if err := litmusLIB.PrepareAWSSSMChaosByID(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
+		log.Errorf("Chaos injection failed, err: %v", err)
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
+		//Delete the ssm document on the given aws service monitoring docs
+		if experimentsDetails.IsDocsUploaded {
+			log.Info("[Recovery]: Delete the uploaded aws ssm docs")
+			if err := ssm.SSMDeleteDocument(experimentsDetails.DocumentName, experimentsDetails.Region); err != nil {
+				log.Errorf("fail to delete ssm doc, err: %v", err)
+			}
+		}
 		return
 	}
 
