@@ -1,6 +1,7 @@
 package gcp
 
 import (
+	"strings"
 	"time"
 
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/gcp/gcp-vm-instance-stop/types"
@@ -97,13 +98,24 @@ func WaitForVMInstanceUp(computeService *compute.Service, timeout int, delay int
 // SetTargetInstance will select the target vm instances which are in RUNNING state and filtered from the given label
 func SetTargetInstance(computeService *compute.Service, experimentsDetails *experimentTypes.ExperimentDetails) error {
 
+	var (
+		response *compute.InstanceList
+		err      error
+	)
+
 	if experimentsDetails.InstanceLabel == "" {
 		return errors.Errorf("label not found, please provide a valid label")
 	}
 
-	response, err := computeService.Instances.List(experimentsDetails.GCPProjectID, experimentsDetails.Zones).Filter("labels." + experimentsDetails.InstanceLabel + ":*").Do()
+	if strings.Contains(experimentsDetails.InstanceLabel, ":") {
+		// the label is of format key:value
+		response, err = computeService.Instances.List(experimentsDetails.GCPProjectID, experimentsDetails.Zones).Filter("labels." + experimentsDetails.InstanceLabel).Do()
+	} else {
+		// the label only has key
+		response, err = computeService.Instances.List(experimentsDetails.GCPProjectID, experimentsDetails.Zones).Filter("labels." + experimentsDetails.InstanceLabel + ":*").Do()
+	}
 	if err != nil {
-		return (err)
+		return err
 	}
 
 	for _, instance := range response.Items {
