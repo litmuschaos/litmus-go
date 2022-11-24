@@ -80,3 +80,23 @@ func (e TargetPodSelection) UserFriendly() bool {
 func (e TargetPodSelection) ErrorType() ErrorType {
 	return ErrorTypeTargetSelection
 }
+
+type TargetDiskSelection struct {
+	Target string
+	Reason string
+}
+
+func (e TargetDiskSelection) Error() string {
+	if e.Target == "" {
+		return fmt.Sprintf("target selection failed, %s", e.Reason)
+	}
+	return fmt.Sprintf("target '%s' selection failed, %s", e.Target, e.Reason)
+}
+
+func (e TargetDiskSelection) UserFriendly() bool {
+	return true
+}
+
+func (e TargetDiskSelection) ErrorType() ErrorType {
+	return ErrorTypeTargetSelection
+}
