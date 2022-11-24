@@ -10,7 +10,6 @@ type ExperimentDetails struct {
 	EngineName                      string
 	ChaosDuration                   int
 	RampTime                        int
-	ChaosLib                        string
 	ChaosUID                        clientTypes.UID
 	InstanceID                      string
 	TerminationGracePeriodSeconds   int

@@ -10,7 +10,6 @@ type ExperimentDetails struct {
 	EngineName           string
 	RampTime             int
 	AuxiliaryAppInfo     string
-	ChaosLib             string
 	ChaosDuration        int
 	ChaosInterval        int
 	ChaosUID             clientTypes.UID
@@ -24,7 +23,6 @@ type ExperimentDetails struct {
 	Region               string
 	InstanceAffectedPerc int
 	Sequence             string
-	LIBImagePullPolicy   string
 	TargetContainer      string
 	Cpu                  int
 	NumberOfWorkers      int

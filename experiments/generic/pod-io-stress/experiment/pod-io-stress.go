@@ -1,12 +1,10 @@
 package experiment
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/litmuschaos/chaos-operator/api/litmuschaos/v1alpha1"
 	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/stress-chaos/lib"
-	pumbaLIB "github.com/litmuschaos/litmus-go/chaoslib/pumba/pod-io-stress/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/stress-chaos/environment"
@@ -105,23 +103,8 @@ func PodIOStress(clients clients.ClientSets) {
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
-	// Including the litmus lib for pod-io-stress
-	switch experimentsDetails.ChaosLib {
-	case "litmus":
-		if err := litmusLIB.PrepareAndInjectStressChaos(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
-			log.Errorf("[Error]: Pod IO Stress failed, err: %v", err)
-			result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
-			return
-		}
-	case "pumba":
-		if err := pumbaLIB.PreparePodIOStress(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
-			log.Errorf("[Error]: pod io stress chaos failed, err: %v", err)
-			result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
-			return
-		}
-	default:
-		log.Error("[Invalid]: Please Provide the correct LIB")
-		err := fmt.Errorf("[chaos]: no match was found for the specified lib")
+	if err := litmusLIB.PrepareAndInjectStressChaos(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
+		log.Errorf("[Error]: Pod IO Stress failed, err: %v", err)
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 		return
 	}

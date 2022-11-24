@@ -1,7 +1,6 @@
 package experiment
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/litmuschaos/chaos-operator/api/litmuschaos/v1alpha1"
@@ -105,17 +104,8 @@ func PodMemoryHogExec(clients clients.ClientSets) {
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
-	// Including the litmus lib for pod-memory-hog-exec
-	switch experimentsDetails.ChaosLib {
-	case "litmus":
-		if err := litmusLIB.PrepareMemoryExecStress(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
-			log.Errorf("[Error]: pod memory hog failed, err: %v", err)
-			result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
-			return
-		}
-	default:
-		log.Error("[Invalid]: Please Provide the correct LIB")
-		err := fmt.Errorf("[chaos]: no match was found for the specified lib")
+	if err := litmusLIB.PrepareMemoryExecStress(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
+		log.Errorf("[Error]: pod memory hog failed, err: %v", err)
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 		return
 	}

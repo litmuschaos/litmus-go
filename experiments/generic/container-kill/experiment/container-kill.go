@@ -1,12 +1,10 @@
 package experiment
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/litmuschaos/chaos-operator/api/litmuschaos/v1alpha1"
 	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/container-kill/lib"
-	pumbaLIB "github.com/litmuschaos/litmus-go/chaoslib/pumba/container-kill/lib"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/container-kill/environment"
@@ -108,24 +106,9 @@ func ContainerKill(clients clients.ClientSets) {
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
-	// Including the litmus lib for container-kill
-	switch {
-	case experimentsDetails.ChaosLib == "litmus":
-		if err := litmusLIB.PrepareContainerKill(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
-			result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
-			log.Errorf("Chaos injection failed, err: %v", err)
-			return
-		}
-	case experimentsDetails.ChaosLib == "pumba" && experimentsDetails.ContainerRuntime == "docker":
-		if err := pumbaLIB.PrepareContainerKill(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
-			result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
-			log.Errorf("Chaos injection failed, err: %v", err)
-			return
-		}
-	default:
-		err := fmt.Errorf("[chaos]: no match was found for the specified lib")
+	if err := litmusLIB.PrepareContainerKill(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
-		log.Error("lib and container-runtime combination not supported, provide the correct value of lib & container-runtime")
+		log.Errorf("Chaos injection failed, err: %v", err)
 		return
 	}
 
