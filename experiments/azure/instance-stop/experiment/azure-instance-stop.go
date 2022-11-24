@@ -114,16 +114,8 @@ func AzureInstanceStop(clients clients.ClientSets) {
 		log.Info("[Status]: Azure instance(s) is in running state (pre-chaos)")
 	}
 
-	// Including the litmus lib for azure instance stopping
-	switch experimentsDetails.ChaosLib {
-	case "litmus":
-		if err = litmusLIB.PrepareAzureStop(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
-			log.Errorf("Chaos injection failed, err: %v", err)
-			result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
-			return
-		}
-	default:
-		log.Error("[Invalid]: Please Provide the correct LIB")
+	if err = litmusLIB.PrepareAzureStop(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
+		log.Errorf("Chaos injection failed, err: %v", err)
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 		return
 	}

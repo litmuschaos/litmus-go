@@ -1,7 +1,6 @@
 package experiment
 
 import (
-	"fmt"
 	"os"
 	"strings"
 
@@ -124,17 +123,8 @@ func KafkaBrokerPodFailure(clients clients.ClientSets) {
 
 	kafka.DisplayKafkaBroker(&experimentsDetails)
 
-	// Including the litmus lib for kafka-broker-pod-failure
-	switch experimentsDetails.ChaoslibDetail.ChaosLib {
-	case "litmus":
-		if err := kafkaPodDelete.PreparePodDelete(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
-			log.Errorf("Chaos injection failed, err: %v", err)
-			result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
-			return
-		}
-	default:
-		log.Error("[Invalid]: Please Provide the correct LIB")
-		err := fmt.Errorf("[chaos]: no match was found for the specified lib")
+	if err := kafkaPodDelete.PreparePodDelete(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
+		log.Errorf("Chaos injection failed, err: %v", err)
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 		return
 	}

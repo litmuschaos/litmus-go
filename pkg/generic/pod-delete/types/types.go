@@ -12,7 +12,6 @@ type ExperimentDetails struct {
 	ChaosInterval       string
 	RampTime            int
 	Force               bool
-	ChaosLib            string
 	ChaosServiceAccount string
 	AppNS               string
 	AppLabel            string
