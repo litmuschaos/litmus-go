@@ -3,6 +3,8 @@ package common
 import (
 	"context"
 	"fmt"
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
+	"github.com/palantir/stacktrace"
 	"math/rand"
 	"os"
 	"os/exec"
@@ -141,7 +143,7 @@ func VerifyExistanceOfPods(namespace, pods string, clients clients.ClientSets) (
 			return false, err
 		}
 		if !isPodsAvailable {
-			return isPodsAvailable, errors.Errorf("%v pod is not available in %v namespace", podList[index], namespace)
+			return isPodsAvailable, cerrors.TargetPodSelection{Target: fmt.Sprintf("{podName: %s, namespace: %s}", podList[index], namespace), Reason: "pod doesn't exist set by TARGET_PODS ENV"}
 		}
 	}
 	return true, nil
@@ -160,7 +162,7 @@ func GetPodList(targetPods string, podAffPerc int, clients clients.ClientSets, c
 
 	isPodsAvailable, err := VerifyExistanceOfPods(namespace, targetPods, clients)
 	if err != nil {
-		return core_v1.PodList{}, err
+		return core_v1.PodList{}, stacktrace.Propagate(err, "could not verify existence of TARGET_PODS")
 	}
 
 	// getting the pod, if the target pods is defined
@@ -169,13 +171,13 @@ func GetPodList(targetPods string, podAffPerc int, clients clients.ClientSets, c
 	case true:
 		podList, err := GetTargetPodsWhenTargetPodsENVSet(targetPods, namespace, clients, chaosDetails)
 		if err != nil {
-			return core_v1.PodList{}, err
+			return core_v1.PodList{}, stacktrace.Propagate(err, "could not get target pods when TARGET_PODS env set")
 		}
 		finalPods.Items = append(finalPods.Items, podList.Items...)
 	default:
 		podList, err := GetTargetPodsWhenTargetPodsENVNotSet(podAffPerc, clients, chaosDetails)
 		if err != nil {
-			return core_v1.PodList{}, err
+			return core_v1.PodList{}, stacktrace.Propagate(err, "could not get target pods when TARGET_PODS env not set")
 		}
 		finalPods.Items = append(finalPods.Items, podList.Items...)
 	}
@@ -193,7 +195,7 @@ func CheckForAvailibiltyOfPod(namespace, name string, clients clients.ClientSets
 	if err != nil && k8serrors.IsNotFound(err) {
 		return false, nil
 	} else if err != nil {
-		return false, err
+		return false, cerrors.TargetPodSelection{Target: fmt.Sprintf("{podName: %s, namespace: %s}", name, namespace), Reason: err.Error()}
 	}
 	return true, nil
 }
@@ -203,9 +205,9 @@ func CheckForAvailibiltyOfPod(namespace, name string, clients clients.ClientSets
 func FilterNonChaosPods(ns, labels string, clients clients.ClientSets, chaosDetails *types.ChaosDetails) (core_v1.PodList, error) {
 	podList, err := clients.KubeClient.CoreV1().Pods(ns).List(context.Background(), v1.ListOptions{LabelSelector: labels})
 	if err != nil {
-		return core_v1.PodList{}, err
+		return core_v1.PodList{}, cerrors.TargetPodSelection{Target: fmt.Sprintf("{podLabel: %s, namespace: %s}", labels, ns), Reason: err.Error()}
 	} else if len(podList.Items) == 0 {
-		return core_v1.PodList{}, errors.Wrapf(err, "Failed to find the pod with matching labels in %v namespace", ns)
+		return core_v1.PodList{}, cerrors.TargetPodSelection{Target: fmt.Sprintf("{podLabel: %s, namespace: %s}", labels, ns), Reason: "could not find pods with matching labels"}
 	}
 	nonChaosPods := core_v1.PodList{}
 	// ignore chaos pods
@@ -225,7 +227,7 @@ func GetTargetPodsWhenTargetPodsENVSet(targetPods, namespace string, clients cli
 	for index := range targetPodsList {
 		pod, err := clients.KubeClient.CoreV1().Pods(namespace).Get(context.Background(), strings.TrimSpace(targetPodsList[index]), v1.GetOptions{})
 		if err != nil {
-			return core_v1.PodList{}, errors.Wrapf(err, "Failed to get %v pod in %v namespace", targetPodsList[index], namespace)
+			return core_v1.PodList{}, cerrors.TargetPodSelection{Target: fmt.Sprintf("{podName: %s, namespace: %s}", targetPodsList[index], namespace), Reason: err.Error()}
 		}
 		realPods.Items = append(realPods.Items, *pod)
 	}
@@ -274,7 +276,7 @@ func GetTargetPodsWhenTargetPodsENVNotSet(podAffPerc int, clients clients.Client
 		// select random pod from ns
 		pods, err := FilterNonChaosPods(chaosDetails.AppDetail[0].Namespace, "", clients, chaosDetails)
 		if err != nil {
-			return finalPods, err
+			return finalPods, stacktrace.Propagate(err, "could not filter non chaos pods")
 		}
 		return filterPodsByPercentage(pods, podAffPerc), nil
 	}
@@ -285,7 +287,7 @@ func GetTargetPodsWhenTargetPodsENVNotSet(podAffPerc int, clients clients.Client
 			for _, name := range target.Names {
 				pod, err := clients.KubeClient.CoreV1().Pods(target.Namespace).Get(context.Background(), name, v1.GetOptions{})
 				if err != nil {
-					return finalPods, err
+					return finalPods, cerrors.TargetPodSelection{Target: fmt.Sprintf("{podName: %s, namespace: %s}", name, target.Namespace), Reason: err.Error()}
 				}
 				finalPods.Items = append(finalPods.Items, *pod)
 			}
@@ -294,14 +296,14 @@ func GetTargetPodsWhenTargetPodsENVNotSet(podAffPerc int, clients clients.Client
 			if target.Names != nil {
 				pods, err := workloads.GetPodsFromWorkloads(target, clients)
 				if err != nil {
-					return finalPods, err
+					return finalPods, stacktrace.Propagate(err, "could not get pods from workloads")
 				}
 				finalPods.Items = append(finalPods.Items, pods.Items...)
 			} else {
 				for _, label := range target.Labels {
 					pods, err := clients.KubeClient.CoreV1().Pods(target.Namespace).List(context.Background(), v1.ListOptions{LabelSelector: label})
 					if err != nil {
-						return finalPods, err
+						return finalPods, cerrors.TargetPodSelection{Target: fmt.Sprintf("{podLabel: %s, namespace: %s}", label, target.Namespace), Reason: err.Error()}
 					}
 					finalPods.Items = append(finalPods.Items, pods.Items...)
 				}
@@ -310,7 +312,7 @@ func GetTargetPodsWhenTargetPodsENVNotSet(podAffPerc int, clients clients.Client
 	}
 
 	if len(finalPods.Items) == 0 {
-		return finalPods, errors.Errorf("No target pod found")
+		return finalPods, cerrors.TargetPodSelection{Target: GetAppDetailsForLogging(chaosDetails.AppDetail), Reason: "no target pods founds"}
 	}
 
 	if podKind {
@@ -454,9 +456,9 @@ func GetPodListFromSpecifiedNodes(podAffPerc int, nodeLabel string, clients clie
 	// identify node list from the provided node label
 	nodes, err = clients.KubeClient.CoreV1().Nodes().List(context.Background(), v1.ListOptions{LabelSelector: nodeLabel})
 	if err != nil {
-		return core_v1.PodList{}, errors.Errorf("Failed to find the nodes with matching label, err: %v", err)
+		return core_v1.PodList{}, cerrors.TargetPodSelection{Target: fmt.Sprintf("{nodeLabel: %s}", nodeLabel), Reason: err.Error()}
 	} else if len(nodes.Items) == 0 {
-		return core_v1.PodList{}, errors.Errorf("Failed to find the nodes with matching label")
+		return core_v1.PodList{}, cerrors.TargetPodSelection{Target: fmt.Sprintf("{nodeLabel: %s}", nodeLabel), Reason: "no nodes found with matching labels"}
 	}
 	nodeNames := []string{}
 	for _, node := range nodes.Items {
@@ -489,7 +491,7 @@ func getTargetPodsWhenNodeFilterSet(podAffPerc int, pods core_v1.PodList, nodes 
 	}
 
 	if len(nodeFilteredPods.Items) == 0 {
-		return nodeFilteredPods, errors.Errorf("No pod found with desired attributes on specified node(s)")
+		return nodeFilteredPods, cerrors.TargetPodSelection{Target: fmt.Sprintf("{nodes: %v}", nodes), Reason: "no pod found on specified node(s)"}
 	}
 
 	return filterPodsByPercentage(nodeFilteredPods, podAffPerc), nil
@@ -504,7 +506,7 @@ func GetTargetPods(nodeLabel, targetPods, podsAffectedPerc string, clients clien
 	if nodeLabel != "" && targetPods == "" {
 		pods, err = GetPodListFromSpecifiedNodes(podAffectedPerc, nodeLabel, clients, chaosDetails)
 		if err != nil {
-			return core_v1.PodList{}, err
+			return core_v1.PodList{}, stacktrace.Propagate(err, "could not list pods from specified nodes")
 		}
 	} else {
 		if targetPods != "" && nodeLabel != "" {
@@ -600,4 +602,19 @@ func ParseTargets() (*TargetsDetails, error) {
 		})
 	}
 	return &targets, nil
+}
+
+func GetAppDetailsForLogging(appDetails []types.AppDetails) string {
+	var result []string
+	for _, k := range appDetails {
+		if k.Labels != nil {
+			result = append(result, fmt.Sprintf("{namespace: %s, kind: %s, labels: %s}", k.Namespace, k.Kind, k.Labels))
+			continue
+		}
+		result = append(result, fmt.Sprintf("{namespace: %s, kind: %s, names: %s}", k.Namespace, k.Kind, k.Names))
+	}
+	if len(result) != 0 {
+		return fmt.Sprintf("[%v]", strings.Join(result, ","))
+	}
+	return ""
 }

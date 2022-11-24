@@ -1,6 +1,7 @@
 package types
 
 import (
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	"os"
 	"strconv"
 	"strings"
@@ -34,6 +35,7 @@ type ResultDetails struct {
 	Name             string
 	Verdict          v1alpha1.ResultVerdict
 	FailStep         string
+	ErrorCode        string
 	Phase            v1alpha1.ResultPhase
 	ResultUID        clientTypes.UID
 	ProbeDetails     []ProbeDetails
@@ -182,10 +184,11 @@ func SetResultAttributes(resultDetails *ResultDetails, chaosDetails ChaosDetails
 }
 
 //SetResultAfterCompletion set all the chaos result ENV in the EOT
-func SetResultAfterCompletion(resultDetails *ResultDetails, verdict v1alpha1.ResultVerdict, phase v1alpha1.ResultPhase, failStep string) {
+func SetResultAfterCompletion(resultDetails *ResultDetails, verdict v1alpha1.ResultVerdict, phase v1alpha1.ResultPhase, failStep string, errorCode cerrors.ErrorType) {
 	resultDetails.Verdict = verdict
 	resultDetails.Phase = phase
 	resultDetails.FailStep = failStep
+	resultDetails.ErrorCode = string(errorCode)
 }
 
 //SetEngineEventAttributes initialise attributes for event generation in chaos engine
