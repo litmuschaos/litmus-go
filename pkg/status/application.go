@@ -2,6 +2,9 @@ package status
 
 import (
 	"context"
+	"fmt"
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
+	"github.com/palantir/stacktrace"
 	"strings"
 	"time"
 
@@ -31,19 +34,19 @@ func AUTStatusCheck(clients clients.ClientSets, chaosDetails *types.ChaosDetails
 		case "pod":
 			for _, name := range target.Names {
 				if err := CheckApplicationStatusesByPodName(target.Namespace, name, chaosDetails.Timeout, chaosDetails.Delay, clients); err != nil {
-					return err
+					return stacktrace.Propagate(err, "could not check application status by pod names")
 				}
 			}
 		default:
 			if target.Labels != nil {
 				for _, label := range target.Labels {
 					if err := CheckApplicationStatusesByLabels(target.Namespace, label, chaosDetails.Timeout, chaosDetails.Delay, clients); err != nil {
-						return err
+						return stacktrace.Propagate(err, "could not check application status by labels")
 					}
 				}
 			} else {
 				if err := CheckApplicationStatusesByWorkloadName(target, chaosDetails.Timeout, chaosDetails.Delay, clients); err != nil {
-					return err
+					return stacktrace.Propagate(err, "could not check application status by workload names")
 				}
 			}
 		}
@@ -63,12 +66,12 @@ func CheckApplicationStatusesByLabels(appNs, appLabel string, timeout, delay int
 		// Checking whether application containers are in ready state
 		log.Info("[Status]: Checking whether application containers are in ready state")
 		if err := CheckContainerStatus(appNs, appLabel, "", timeout, delay, clients); err != nil {
-			return err
+			return stacktrace.Propagate(err, "could not check container status")
 		}
 		// Checking whether application pods are in running state
 		log.Info("[Status]: Checking whether application pods are in running state")
 		if err := CheckPodStatus(appNs, appLabel, timeout, delay, clients); err != nil {
-			return err
+			return stacktrace.Propagate(err, "could not check pod status")
 		}
 	}
 	return nil
@@ -96,15 +99,15 @@ func CheckPodStatusPhase(appNs, appLabel string, timeout, delay int, clients cli
 		Try(func(attempt uint) error {
 			podList, err := clients.KubeClient.CoreV1().Pods(appNs).List(context.Background(), metav1.ListOptions{LabelSelector: appLabel})
 			if err != nil {
-				return errors.Errorf("Unable to find the pods with matching labels, err: %v", err)
+				return cerrors.ApplicationStatusChecks{Target: fmt.Sprintf("{podLabels: %s, namespace: %s}", appLabel, appNs), Reason: err.Error()}
 			} else if len(podList.Items) == 0 {
-				errors.Errorf("Unable to find the pods with matching labels")
+				return cerrors.ApplicationStatusChecks{Target: fmt.Sprintf("{podLabels: %s, namespace: %s}", appLabel, appNs), Reason: "no pod found with matching labels"}
 			}
 
 			for _, pod := range podList.Items {
 				isInState := isOneOfState(string(pod.Status.Phase), states)
 				if !isInState {
-					return errors.Errorf("Pod is not yet in %v state(s)", states)
+					return cerrors.ApplicationStatusChecks{Target: fmt.Sprintf("{podName: %s, namespace: %s}", pod.Name, appNs), Reason: fmt.Sprintf("pod is not in [%v] states", states)}
 				}
 				log.InfoWithValues("[Status]: The status of Pods are as follows", logrus.Fields{
 					"Pod": pod.Name, "Status": pod.Status.Phase})
@@ -137,9 +140,9 @@ func CheckContainerStatus(appNs, appLabel, containerName string, timeout, delay 
 		Try(func(attempt uint) error {
 			podList, err := clients.KubeClient.CoreV1().Pods(appNs).List(context.Background(), metav1.ListOptions{LabelSelector: appLabel})
 			if err != nil {
-				return errors.Errorf("Unable to find the pods with matching labels, err: %v", err)
+				return cerrors.ApplicationStatusChecks{Target: fmt.Sprintf("{podLabels: %s, namespace: %v}", appLabel, appNs), Reason: err.Error()}
 			} else if len(podList.Items) == 0 {
-				return errors.Errorf("Unable to find the pods with matching labels")
+				return cerrors.ApplicationStatusChecks{Target: fmt.Sprintf("{podLabels: %s, namespace: %v}", appLabel, appNs), Reason: "no pod found with matching labels"}
 			}
 			for _, pod := range podList.Items {
 				switch containerName {
@@ -162,10 +165,10 @@ func validateContainerStatus(containerName, podName string, ContainerStatuses []
 	for _, container := range ContainerStatuses {
 		if container.Name == containerName {
 			if container.State.Terminated != nil {
-				return errors.Errorf("container is in terminated state")
+				return cerrors.ApplicationStatusChecks{Target: fmt.Sprintf("podName: %s, containerName: %s", podName, containerName), Reason: "container is in terminated state"}
 			}
 			if !container.Ready {
-				return errors.Errorf("containers are not yet in running state")
+				return cerrors.ApplicationStatusChecks{Target: fmt.Sprintf("podName: %s, containerName: %s", podName, containerName), Reason: "container is not in running state"}
 			}
 			log.InfoWithValues("[Status]: The Container status are as follows", logrus.Fields{
 				"container": container.Name, "Pod": podName, "Readiness": container.Ready})
@@ -276,11 +279,11 @@ func CheckPodStatusByPodName(appNs, appName string, timeout, delay int, clients 
 		Try(func(attempt uint) error {
 			pod, err := clients.KubeClient.CoreV1().Pods(appNs).Get(context.Background(), appName, metav1.GetOptions{})
 			if err != nil {
-				return errors.Errorf("Unable to find the pods with matching labels, err: %v", err)
+				return cerrors.ApplicationStatusChecks{Target: fmt.Sprintf("podName: %v, namespace: %v", appName, appNs), Reason: err.Error()}
 			}
 
 			if pod.Status.Phase != v1.PodRunning {
-				return errors.Errorf("Pod is not yet in %v state(s)", v1.PodRunning)
+				return cerrors.ApplicationStatusChecks{Target: fmt.Sprintf("podName: %v, namespace: %v", appName, appNs), Reason: "pod is not in Running state"}
 			}
 			log.InfoWithValues("[Status]: The status of Pods are as follows", logrus.Fields{
 				"Pod": pod.Name, "Status": pod.Status.Phase})
@@ -296,7 +299,7 @@ func CheckAllContainerStatusesByPodName(appNs, appName string, timeout, delay in
 		Try(func(attempt uint) error {
 			pod, err := clients.KubeClient.CoreV1().Pods(appNs).Get(context.Background(), appName, metav1.GetOptions{})
 			if err != nil {
-				return errors.Errorf("Unable to find the pods with matching labels, err: %v", err)
+				return cerrors.ApplicationStatusChecks{Target: fmt.Sprintf("podName: %v, namespace: %v", appName, appNs), Reason: err.Error()}
 			}
 			if err := validateAllContainerStatus(pod.Name, pod.Status.ContainerStatuses); err != nil {
 				return err
@@ -309,11 +312,11 @@ func CheckApplicationStatusesByWorkloadName(target types.AppDetails, timeout, de
 
 	pods, err := workloads.GetPodsFromWorkloads(target, clients)
 	if err != nil {
-		return err
+		return stacktrace.Propagate(err, "could not get pods from workloads")
 	}
 	for _, pod := range pods.Items {
 		if err := CheckApplicationStatusesByPodName(target.Namespace, pod.Name, timeout, delay, clients); err != nil {
-			return err
+			return stacktrace.Propagate(err, "could not check application status by pod name")
 		}
 	}
 	return nil
@@ -323,12 +326,12 @@ func CheckUnTerminatedPodStatusesByWorkloadName(target types.AppDetails, timeout
 
 	pods, err := workloads.GetPodsFromWorkloads(target, clients)
 	if err != nil {
-		return err
+		return stacktrace.Propagate(err, "could not get pods by workload names")
 	}
 	for _, pod := range pods.Items {
 		if pod.DeletionTimestamp == nil {
 			if err := CheckApplicationStatusesByPodName(target.Namespace, pod.Name, timeout, delay, clients); err != nil {
-				return err
+				return stacktrace.Propagate(err, "could not check application status by pod name")
 			}
 		}
 	}
@@ -339,12 +342,12 @@ func CheckApplicationStatusesByPodName(appNs, pod string, timeout, delay int, cl
 	// Checking whether application containers are in ready state
 	log.Info("[Status]: Checking whether application containers are in ready state")
 	if err := CheckAllContainerStatusesByPodName(appNs, pod, timeout, delay, clients); err != nil {
-		return err
+		return stacktrace.Propagate(err, "could not check container statuses by pod name")
 	}
 	// Checking whether application pods are in running state
 	log.Info("[Status]: Checking whether application pods are in running state")
 	if err := CheckPodStatusByPodName(appNs, pod, timeout, delay, clients); err != nil {
-		return err
+		return stacktrace.Propagate(err, "could not check pod status by pod name")
 	}
 	return nil
 }
