@@ -22,76 +22,26 @@ import (
 )
 
 var serviceMesh = []string{"istio", "envoy"}
+var destIpsSvcMesh string
+var destIps string
 
 //PrepareAndInjectChaos contains the prepration & injection steps
 func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, args string) error {
 
-	targetPodList := apiv1.PodList{}
 	var err error
-	var podsAffectedPerc int
 	// Get the target pod details for the chaos execution
 	// if the target pod is not defined it will derive the random target pod list using pod affected percentage
-	if experimentsDetails.TargetPods == "" && chaosDetails.AppDetail.Label == "" {
+	if experimentsDetails.TargetPods == "" && chaosDetails.AppDetail == nil {
 		return errors.Errorf("please provide one of the appLabel or TARGET_PODS")
 	}
 	//setup the tunables if provided in range
 	SetChaosTunables(experimentsDetails)
+	logExperimentFields(experimentsDetails)
 
-	switch experimentsDetails.NetworkChaosType {
-	case "network-loss":
-		log.InfoWithValues("[Info]: The chaos tunables are:", logrus.Fields{
-			"NetworkPacketLossPercentage": experimentsDetails.NetworkPacketLossPercentage,
-			"Sequence":                    experimentsDetails.Sequence,
-			"PodsAffectedPerc":            experimentsDetails.PodsAffectedPerc,
-		})
-	case "network-latency":
-		log.InfoWithValues("[Info]: The chaos tunables are:", logrus.Fields{
-			"NetworkLatency":   strconv.Itoa(experimentsDetails.NetworkLatency),
-			"Sequence":         experimentsDetails.Sequence,
-			"PodsAffectedPerc": experimentsDetails.PodsAffectedPerc,
-		})
-	case "network-corruption":
-		log.InfoWithValues("[Info]: The chaos tunables are:", logrus.Fields{
-			"NetworkPacketCorruptionPercentage": experimentsDetails.NetworkPacketCorruptionPercentage,
-			"Sequence":                          experimentsDetails.Sequence,
-			"PodsAffectedPerc":                  experimentsDetails.PodsAffectedPerc,
-		})
-	case "network-duplication":
-		log.InfoWithValues("[Info]: The chaos tunables are:", logrus.Fields{
-			"NetworkPacketDuplicationPercentage": experimentsDetails.NetworkPacketDuplicationPercentage,
-			"Sequence":                           experimentsDetails.Sequence,
-			"PodsAffectedPerc":                   experimentsDetails.PodsAffectedPerc,
-		})
+	targetPodList, err := common.GetTargetPods(experimentsDetails.NodeLabel, experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, clients, chaosDetails)
+	if err != nil {
+		return err
 	}
-	podsAffectedPerc, _ = strconv.Atoi(experimentsDetails.PodsAffectedPerc)
-	if experimentsDetails.NodeLabel == "" {
-
-		//targetPodList, err := common.GetPodListFromSpecifiedNodes(experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, clients, chaosDetails)
-		targetPodList, err = common.GetPodList(experimentsDetails.TargetPods, podsAffectedPerc, clients, chaosDetails)
-		if err != nil {
-			return err
-		}
-	} else {
-		//targetPodList, err := common.GetPodList(experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, clients, chaosDetails)
-		if experimentsDetails.TargetPods == "" {
-			targetPodList, err = common.GetPodListFromSpecifiedNodes(experimentsDetails.TargetPods, podsAffectedPerc, experimentsDetails.NodeLabel, clients, chaosDetails)
-			if err != nil {
-				return err
-			}
-		} else {
-			log.Infof("TARGET_PODS env is provided, overriding the NODE_LABEL input")
-			targetPodList, err = common.GetPodList(experimentsDetails.TargetPods, podsAffectedPerc, clients, chaosDetails)
-			if err != nil {
-				return err
-			}
-		}
-	}
-
-	podNames := []string{}
-	for _, pod := range targetPodList.Items {
-		podNames = append(podNames, pod.Name)
-	}
-	log.Infof("Target pods list for chaos, %v", podNames)
 
 	//Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
@@ -132,8 +82,6 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 
 // injectChaosInSerialMode inject the network chaos in all target application serially (one by one)
 func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, args string, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
-
-	labelSuffix := common.GetRunID()
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
 		if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
@@ -144,35 +92,31 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 	// creating the helper pod to perform network chaos
 	for _, pod := range targetPodList.Items {
 
-		destIPs, err := GetTargetIps(experimentsDetails.DestinationIPs, experimentsDetails.DestinationHosts, clients, isServiceMeshEnabledForPod(pod))
+		serviceMesh, err := setDestIps(pod, experimentsDetails, clients)
 		if err != nil {
 			return err
 		}
 
 		//Get the target container name of the application pod
 		if !experimentsDetails.IsTargetContainerProvided {
-			experimentsDetails.TargetContainer, err = common.GetTargetContainer(experimentsDetails.AppNS, pod.Name, clients)
+			experimentsDetails.TargetContainer, err = common.GetTargetContainer(pod.Namespace, pod.Name, clients)
 			if err != nil {
 				return errors.Errorf("unable to get the target container name, err: %v", err)
 			}
 		}
 
-		log.InfoWithValues("[Info]: Details of application under chaos injection", logrus.Fields{
-			"PodName":       pod.Name,
-			"NodeName":      pod.Spec.NodeName,
-			"ContainerName": experimentsDetails.TargetContainer,
-		})
 		runID := common.GetRunID()
-		if err := createHelperPod(experimentsDetails, clients, chaosDetails, pod.Name, pod.Spec.NodeName, runID, args, labelSuffix, destIPs); err != nil {
+
+		if err := createHelperPod(experimentsDetails, clients, chaosDetails, fmt.Sprintf("%s:%s:%s:%s", pod.Name, pod.Namespace, experimentsDetails.TargetContainer, serviceMesh), pod.Spec.NodeName, runID, args); err != nil {
 			return errors.Errorf("unable to create the helper pod, err: %v", err)
 		}
 
-		appLabel := "name=" + experimentsDetails.ExperimentName + "-helper-" + runID
+		appLabel := fmt.Sprintf("app=%s-helper-%s", experimentsDetails.ExperimentName, runID)
 
 		//checking the status of the helper pods, wait till the pod comes to running state else fail the experiment
 		log.Info("[Status]: Checking the status of the helper pods")
 		if err := status.CheckHelperStatus(experimentsDetails.ChaosNamespace, appLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
-			common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-helper-"+runID, appLabel, chaosDetails, clients)
+			common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
 			return errors.Errorf("helper pods are not in running state, err: %v", err)
 		}
 
@@ -181,14 +125,14 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		log.Info("[Wait]: waiting till the completion of the helper pod")
 		podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, appLabel, clients, experimentsDetails.ChaosDuration+experimentsDetails.Timeout, experimentsDetails.ExperimentName)
 		if err != nil || podStatus == "Failed" {
-			common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-helper-"+runID, appLabel, chaosDetails, clients)
+			common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
 			return common.HelperFailedError(err)
 		}
 
-		//Deleting all the helper pod for container-kill chaos
-		log.Info("[Cleanup]: Deleting the the helper pod")
-		if err := common.DeletePod(experimentsDetails.ExperimentName+"-helper-"+runID, appLabel, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients); err != nil {
-			return errors.Errorf("unable to delete the helper pods, err: %v", err)
+		//Deleting all the helper pod for network chaos
+		log.Info("[Cleanup]: Deleting the helper pod")
+		if err := common.DeleteAllPod(appLabel, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients); err != nil {
+			return errors.Errorf("unable to delete the helper pod, err: %v", err)
 		}
 	}
 
@@ -197,9 +141,8 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 
 // injectChaosInParallelMode inject the network chaos in all target application in parallel mode (all at once)
 func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, args string, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
-
-	labelSuffix := common.GetRunID()
 	var err error
+
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
 		if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
@@ -207,35 +150,25 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		}
 	}
 
-	// creating the helper pod to perform network chaos
-	for _, pod := range targetPodList.Items {
+	targets, err := filterPodsForNodes(targetPodList, experimentsDetails, clients)
+	if err != nil {
+		return err
+	}
 
-		destIPs, err := GetTargetIps(experimentsDetails.DestinationIPs, experimentsDetails.DestinationHosts, clients, isServiceMeshEnabledForPod(pod))
-		if err != nil {
-			return err
+	runID := common.GetRunID()
+
+	for node, tar := range targets {
+		var targetsPerNode []string
+		for _, k := range tar.Target {
+			targetsPerNode = append(targetsPerNode, fmt.Sprintf("%s:%s:%s:%s", k.Name, k.Namespace, k.TargetContainer, k.ServiceMesh))
 		}
 
-		//Get the target container name of the application pod
-		//It checks the empty target container for the first iteration only
-		if !experimentsDetails.IsTargetContainerProvided {
-			experimentsDetails.TargetContainer, err = common.GetTargetContainer(experimentsDetails.AppNS, pod.Name, clients)
-			if err != nil {
-				return errors.Errorf("unable to get the target container name, err: %v", err)
-			}
-		}
-
-		log.InfoWithValues("[Info]: Details of application under chaos injection", logrus.Fields{
-			"PodName":       pod.Name,
-			"NodeName":      pod.Spec.NodeName,
-			"ContainerName": experimentsDetails.TargetContainer,
-		})
-		runID := common.GetRunID()
-		if err := createHelperPod(experimentsDetails, clients, chaosDetails, pod.Name, pod.Spec.NodeName, runID, args, labelSuffix, destIPs); err != nil {
+		if err := createHelperPod(experimentsDetails, clients, chaosDetails, strings.Join(targetsPerNode, ";"), node, runID, args); err != nil {
 			return errors.Errorf("unable to create the helper pod, err: %v", err)
 		}
 	}
 
-	appLabel := "app=" + experimentsDetails.ExperimentName + "-helper-" + labelSuffix
+	appLabel := fmt.Sprintf("app=%s-helper-%s", experimentsDetails.ExperimentName, runID)
 
 	//checking the status of the helper pods, wait till the pod comes to running state else fail the experiment
 	log.Info("[Status]: Checking the status of the helper pods")
@@ -263,17 +196,17 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 }
 
 // createHelperPod derive the attributes for helper pod and create the helper pod
-func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, podName, nodeName, runID, args, labelSuffix, destIPs string) error {
+func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, targets string, nodeName, runID, args string) error {
 
 	privilegedEnable := true
 	terminationGracePeriodSeconds := int64(experimentsDetails.TerminationGracePeriodSeconds)
 
 	helperPod := &apiv1.Pod{
 		ObjectMeta: v1.ObjectMeta{
-			Name:        experimentsDetails.ExperimentName + "-helper-" + runID,
-			Namespace:   experimentsDetails.ChaosNamespace,
-			Labels:      common.GetHelperLabels(chaosDetails.Labels, runID, labelSuffix, experimentsDetails.ExperimentName),
-			Annotations: chaosDetails.Annotations,
+			GenerateName: experimentsDetails.ExperimentName + "-helper-",
+			Namespace:    experimentsDetails.ChaosNamespace,
+			Labels:       common.GetHelperLabels(chaosDetails.Labels, runID, experimentsDetails.ExperimentName),
+			Annotations:  chaosDetails.Annotations,
 		},
 		Spec: apiv1.PodSpec{
 			HostPID:                       true,
@@ -306,7 +239,7 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 						"./helpers -name network-chaos",
 					},
 					Resources: chaosDetails.Resources,
-					Env:       getPodEnv(experimentsDetails, podName, args, destIPs),
+					Env:       getPodEnv(experimentsDetails, targets, args),
 					VolumeMounts: []apiv1.VolumeMount{
 						{
 							Name:      "cri-socket",
@@ -333,12 +266,10 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 }
 
 // getPodEnv derive all the env required for the helper pod
-func getPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, podName, args, destIPs string) []apiv1.EnvVar {
+func getPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, targets string, args string) []apiv1.EnvVar {
 
 	var envDetails common.ENVDetails
-	envDetails.SetEnv("APP_NAMESPACE", experimentsDetails.AppNS).
-		SetEnv("APP_POD", podName).
-		SetEnv("APP_CONTAINER", experimentsDetails.TargetContainer).
+	envDetails.SetEnv("TARGETS", targets).
 		SetEnv("TOTAL_CHAOS_DURATION", strconv.Itoa(experimentsDetails.ChaosDuration)).
 		SetEnv("CHAOS_NAMESPACE", experimentsDetails.ChaosNamespace).
 		SetEnv("CHAOSENGINE", experimentsDetails.EngineName).
@@ -348,13 +279,25 @@ func getPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, podName, a
 		SetEnv("NETWORK_INTERFACE", experimentsDetails.NetworkInterface).
 		SetEnv("EXPERIMENT_NAME", experimentsDetails.ExperimentName).
 		SetEnv("SOCKET_PATH", experimentsDetails.SocketPath).
-		SetEnv("DESTINATION_IPS", destIPs).
 		SetEnv("INSTANCE_ID", experimentsDetails.InstanceID).
+		SetEnv("DESTINATION_IPS", destIps).
+		SetEnv("DESTINATION_IPS_SERVICE_MESH", destIpsSvcMesh).
 		SetEnv("SOURCE_PORTS", experimentsDetails.SourcePorts).
 		SetEnv("DESTINATION_PORTS", experimentsDetails.DestinationPorts).
 		SetEnvFromDownwardAPI("v1", "metadata.name")
 
 	return envDetails.ENV
+}
+
+type targetsDetails struct {
+	Target []target
+}
+
+type target struct {
+	Namespace       string
+	Name            string
+	TargetContainer string
+	ServiceMesh     string
 }
 
 // GetTargetIps return the comma separated target ips
@@ -462,9 +405,91 @@ func SetChaosTunables(experimentsDetails *experimentTypes.ExperimentDetails) {
 // It checks if pod contains service mesh sidecar
 func isServiceMeshEnabledForPod(pod apiv1.Pod) bool {
 	for _, c := range pod.Spec.Containers {
-		if common.StringExistsInSlice(c.Name, serviceMesh) {
+		if common.SubStringExistsInSlice(c.Name, serviceMesh) {
 			return true
 		}
 	}
 	return false
+}
+
+func setDestIps(pod apiv1.Pod, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) (string, error) {
+	var err error
+	if isServiceMeshEnabledForPod(pod) {
+		if destIpsSvcMesh == "" {
+			destIpsSvcMesh, err = GetTargetIps(experimentsDetails.DestinationIPs, experimentsDetails.DestinationHosts, clients, true)
+			if err != nil {
+				return "false", err
+			}
+		}
+		return "true", nil
+	}
+	if destIps == "" {
+		destIps, err = GetTargetIps(experimentsDetails.DestinationIPs, experimentsDetails.DestinationHosts, clients, false)
+		if err != nil {
+			return "false", err
+		}
+	}
+	return "false", nil
+}
+
+func filterPodsForNodes(targetPodList apiv1.PodList, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) (map[string]*targetsDetails, error) {
+	targets := make(map[string]*targetsDetails)
+	targetContainer := experimentsDetails.TargetContainer
+
+	for _, pod := range targetPodList.Items {
+		serviceMesh, err := setDestIps(pod, experimentsDetails, clients)
+		if err != nil {
+			return targets, err
+		}
+
+		if targetContainer == "" {
+			targetContainer = pod.Spec.Containers[0].Name
+		}
+
+		td := target{
+			Name:            pod.Name,
+			Namespace:       pod.Namespace,
+			TargetContainer: targetContainer,
+			ServiceMesh:     serviceMesh,
+		}
+
+		if targets[pod.Spec.NodeName] == nil {
+			targets[pod.Spec.NodeName] = &targetsDetails{
+				Target: []target{td},
+			}
+		} else {
+			targets[pod.Spec.NodeName].Target = append(targets[pod.Spec.NodeName].Target, td)
+		}
+	}
+	return targets, nil
+}
+
+func logExperimentFields(experimentsDetails *experimentTypes.ExperimentDetails) {
+	switch experimentsDetails.NetworkChaosType {
+	case "network-loss":
+		log.InfoWithValues("[Info]: The chaos tunables are:", logrus.Fields{
+			"NetworkPacketLossPercentage": experimentsDetails.NetworkPacketLossPercentage,
+			"Sequence":                    experimentsDetails.Sequence,
+			"PodsAffectedPerc":            experimentsDetails.PodsAffectedPerc,
+		})
+	case "network-latency":
+		log.InfoWithValues("[Info]: The chaos tunables are:", logrus.Fields{
+			"NetworkLatency":   strconv.Itoa(experimentsDetails.NetworkLatency),
+			"Jitter":           experimentsDetails.Jitter,
+			"Sequence":         experimentsDetails.Sequence,
+			"PodsAffectedPerc": experimentsDetails.PodsAffectedPerc,
+		})
+	case "network-corruption":
+		log.InfoWithValues("[Info]: The chaos tunables are:", logrus.Fields{
+			"NetworkPacketCorruptionPercentage": experimentsDetails.NetworkPacketCorruptionPercentage,
+			"Sequence":                          experimentsDetails.Sequence,
+			"PodsAffectedPerc":                  experimentsDetails.PodsAffectedPerc,
+		})
+	case "network-duplication":
+		log.InfoWithValues("[Info]: The chaos tunables are:", logrus.Fields{
+			"NetworkPacketDuplicationPercentage": experimentsDetails.NetworkPacketDuplicationPercentage,
+			"Sequence":                           experimentsDetails.Sequence,
+			"PodsAffectedPerc":                   experimentsDetails.PodsAffectedPerc,
+		})
+	}
 }

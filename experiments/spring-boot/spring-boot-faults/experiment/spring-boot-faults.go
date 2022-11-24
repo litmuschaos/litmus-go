@@ -19,7 +19,7 @@ import (
 )
 
 // Experiment contains steps to inject chaos
-func Experiment(clients clients.ClientSets) {
+func Experiment(clients clients.ClientSets, expName string) {
 
 	experimentsDetails := experimentTypes.ExperimentDetails{}
 	resultDetails := types.ResultDetails{}
@@ -28,7 +28,7 @@ func Experiment(clients clients.ClientSets) {
 
 	//Fetching all the ENV passed from the runner pod
 	log.Infof("[PreReq]: Getting the ENV for the %v experiment", os.Getenv("EXPERIMENT_NAME"))
-	experimentEnv.GetENV(&experimentsDetails, "spring-boot-latency")
+	experimentEnv.GetENV(&experimentsDetails, expName)
 
 	// Initialize the chaos attributes
 	types.InitialiseChaosVariables(&chaosDetails)
@@ -72,7 +72,7 @@ func Experiment(clients clients.ClientSets) {
 	go common.AbortWatcherWithoutExit(experimentsDetails.ExperimentName, clients, &resultDetails, &chaosDetails, &eventsDetails)
 
 	// Select targeted pods
-	log.Infof("[PreCheck]: Geting targeted pods list")
+	log.Infof("[PreCheck]: Getting targeted pods list")
 	if err := litmusLIB.SetTargetPodList(&experimentsDetails, clients, &chaosDetails); err != nil {
 		log.Errorf("Failed to get target pod list, err: %v", err)
 		failStep := "[pre-chaos]: Failed to get pod list, err: " + err.Error()
@@ -101,7 +101,7 @@ func Experiment(clients clients.ClientSets) {
 	//PRE-CHAOS APPLICATION STATUS CHECK
 	if chaosDetails.DefaultHealthCheck {
 		log.Info("[Status]: Verify that the AUT (Application Under Test) is running (pre-chaos)")
-		if err := status.AUTStatusCheck(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.TargetContainer, experimentsDetails.Timeout, experimentsDetails.Delay, clients, &chaosDetails); err != nil {
+		if err := status.AUTStatusCheck(clients, &chaosDetails); err != nil {
 			log.Errorf("Application status check failed, err: %v", err)
 			failStep := "[pre-chaos]: Failed to verify that the AUT (Application Under Test) is in running state, err: " + err.Error()
 			types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, "AUT: Not Running", "Warning", &chaosDetails)
@@ -155,7 +155,7 @@ func Experiment(clients clients.ClientSets) {
 	// POST-CHAOS APPLICATION STATUS CHECK
 	if chaosDetails.DefaultHealthCheck {
 		log.Info("[Status]: Verify that the AUT (Application Under Test) is running (post-chaos)")
-		if err := status.AUTStatusCheck(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.TargetContainer, experimentsDetails.Timeout, experimentsDetails.Delay, clients, &chaosDetails); err != nil {
+		if err := status.AUTStatusCheck(clients, &chaosDetails); err != nil {
 			log.Errorf("Application status check failed, err: %v", err)
 			failStep := "[post-chaos]: Failed to verify that the AUT (Application Under Test) is running, err: " + err.Error()
 			types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, "AUT: Not Running", "Warning", &chaosDetails)

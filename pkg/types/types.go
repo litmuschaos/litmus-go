@@ -3,6 +3,7 @@ package types
 import (
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/litmuschaos/chaos-operator/api/litmuschaos/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
@@ -80,13 +81,13 @@ type ChaosDetails struct {
 	ExperimentName       string
 	Timeout              int
 	Delay                int
-	AppDetail            AppDetails
+	AppDetail            []AppDetails
 	ChaosDuration        int
 	JobCleanupPolicy     string
 	ProbeImagePullPolicy string
 	Randomness           bool
 	Targets              []v1alpha1.TargetDetails
-	ParentsResources     []string
+	ParentsResources     []ParentResource
 	DefaultHealthCheck   bool
 	Annotations          map[string]string
 	Resources            corev1.ResourceRequirements
@@ -94,41 +95,71 @@ type ChaosDetails struct {
 	Labels               map[string]string
 }
 
+type ParentResource struct {
+	Name      string
+	Kind      string
+	Namespace string
+}
+
 // AppDetails contains all the application related envs
 type AppDetails struct {
-	Namespace       string
-	Label           string
-	Kind            string
-	AnnotationCheck bool
-	AnnotationKey   string
-	AnnotationValue string
+	Namespace string
+	Labels    []string
+	Kind      string
+	Names     []string
+}
+
+func GetTargets(targets string) []AppDetails {
+	var result []AppDetails
+	if targets == "" {
+		return nil
+	}
+	t := strings.Split(targets, ";")
+	for _, k := range t {
+		val := strings.Split(strings.TrimSpace(k), ":")
+		data := AppDetails{
+			Kind:      val[0],
+			Namespace: val[1],
+		}
+		if strings.Contains(val[2], "=") {
+			data.Labels = parse(val[2])
+		} else {
+			data.Names = parse(val[2])
+		}
+		result = append(result, data)
+	}
+	return result
+}
+
+func parse(val string) []string {
+	val = strings.TrimSpace(val)
+	val = strings.TrimPrefix(val, "[")
+	val = strings.TrimSuffix(val, "]")
+	if val == "" {
+		return nil
+	}
+	return strings.Split(val, ",")
 }
 
 //InitialiseChaosVariables initialise all the global variables
 func InitialiseChaosVariables(chaosDetails *ChaosDetails) {
-	appDetails := AppDetails{}
-	appDetails.AnnotationCheck, _ = strconv.ParseBool(Getenv("ANNOTATION_CHECK", "false"))
-	appDetails.AnnotationKey = Getenv("ANNOTATION_KEY", "litmuschaos.io/chaos")
-	appDetails.AnnotationValue = "true"
-	appDetails.Kind = Getenv("APP_KIND", "")
-	appDetails.Label = Getenv("APP_LABEL", "")
-	appDetails.Namespace = Getenv("APP_NAMESPACE", "")
+	targets := Getenv("TARGETS", "")
+	chaosDetails.AppDetail = GetTargets(strings.TrimSpace(targets))
 
 	chaosDetails.ChaosNamespace = Getenv("CHAOS_NAMESPACE", "")
 	chaosDetails.ChaosPodName = Getenv("POD_NAME", "")
 	chaosDetails.Randomness, _ = strconv.ParseBool(Getenv("RANDOMNESS", ""))
-	chaosDetails.ChaosDuration, _ = strconv.Atoi(Getenv("TOTAL_CHAOS_DURATION", ""))
+	chaosDetails.ChaosDuration, _ = strconv.Atoi(Getenv("TOTAL_CHAOS_DURATION", "30"))
 	chaosDetails.ChaosUID = clientTypes.UID(Getenv("CHAOS_UID", ""))
 	chaosDetails.EngineName = Getenv("CHAOSENGINE", "")
 	chaosDetails.ExperimentName = Getenv("EXPERIMENT_NAME", "")
 	chaosDetails.InstanceID = Getenv("INSTANCE_ID", "")
 	chaosDetails.Timeout, _ = strconv.Atoi(Getenv("STATUS_CHECK_TIMEOUT", "180"))
 	chaosDetails.Delay, _ = strconv.Atoi(Getenv("STATUS_CHECK_DELAY", "2"))
-	chaosDetails.AppDetail = appDetails
 	chaosDetails.DefaultHealthCheck, _ = strconv.ParseBool(Getenv("DEFAULT_HEALTH_CHECK", "true"))
 	chaosDetails.JobCleanupPolicy = Getenv("JOB_CLEANUP_POLICY", "retain")
 	chaosDetails.ProbeImagePullPolicy = Getenv("LIB_IMAGE_PULL_POLICY", "Always")
-	chaosDetails.ParentsResources = []string{}
+	chaosDetails.ParentsResources = []ParentResource{}
 	chaosDetails.Targets = []v1alpha1.TargetDetails{}
 }
 
