@@ -19,7 +19,6 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
-	"github.com/pkg/errors"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -37,7 +36,7 @@ func ChaosResult(chaosDetails *types.ChaosDetails, clients clients.ClientSets, r
 		Try(func(attempt uint) error {
 			_, err := clients.LitmusClient.ChaosResults(chaosDetails.ChaosNamespace).Get(context.Background(), resultDetails.Name, v1.GetOptions{})
 			if err != nil && !k8serrors.IsNotFound(err) {
-				return cerrors.ChaosResultCRUD{Phase: "PreChaos", Operation: "get", Target: fmt.Sprintf("{name: %s, namespace: %s}", resultDetails.Name, chaosDetails.ChaosNamespace), Reason: err.Error()}
+				return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosResultCRUD, Target: fmt.Sprintf("{name: %s, namespace: %s}", resultDetails.Name, chaosDetails.ChaosNamespace), Reason: err.Error()}
 			} else if err == nil {
 				isResultAvailable = true
 			}
@@ -52,7 +51,7 @@ func ChaosResult(chaosDetails *types.ChaosDetails, clients clients.ClientSets, r
 		// Getting chaos pod label and passing it in chaos result
 		chaosPod, err := clients.KubeClient.CoreV1().Pods(chaosDetails.ChaosNamespace).Get(context.Background(), chaosDetails.ChaosPodName, v1.GetOptions{})
 		if err != nil {
-			return cerrors.Generic{Reason: fmt.Sprintf("failed to get experiment pod {name: %s, namespace: %s}, :%v", chaosDetails.ChaosPodName, chaosDetails.ChaosNamespace, err.Error())}
+			return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Target: fmt.Sprintf("{name: %s, namespace: %s}", chaosDetails.ChaosPodName, chaosDetails.ChaosNamespace), Reason: fmt.Sprintf("failed to get experiment pod :%s", err.Error())}
 		}
 		experimentLabel = chaosPod.Labels
 	}
@@ -116,7 +115,7 @@ func InitializeChaosResult(chaosDetails *types.ChaosDetails, clients clients.Cli
 	if k8serrors.IsAlreadyExists(err) {
 		chaosResult, err = clients.LitmusClient.ChaosResults(chaosDetails.ChaosNamespace).Get(context.Background(), resultDetails.Name, v1.GetOptions{})
 		if err != nil {
-			return cerrors.ChaosResultCRUD{Phase: "PreChaos", Operation: "get", Target: fmt.Sprintf("{name: %s, namespace: %s}", resultDetails.Name, chaosDetails.ChaosNamespace), Reason: err.Error()}
+			return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosResultCRUD, Phase: "PreChaos", Target: fmt.Sprintf("{name: %s, namespace: %s}", resultDetails.Name, chaosDetails.ChaosNamespace), Reason: err.Error()}
 		}
 
 		// updating the chaosresult with new values
@@ -223,7 +222,7 @@ func PatchChaosResult(clients clients.ClientSets, chaosDetails *types.ChaosDetai
 						return stacktrace.Propagate(err, "could not update chaosresult attributes")
 					}
 				}
-				return cerrors.ChaosResultCRUD{Phase: getExperimentPhaseFromResultPhase(resultDetails.Phase), Operation: "update", Target: fmt.Sprintf("{name: %s, namespace: %s}", resultDetails.Name, chaosDetails.ChaosNamespace), Reason: updateErr.Error()}
+				return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosResultCRUD, Phase: getExperimentPhaseFromResultPhase(resultDetails.Phase), Target: fmt.Sprintf("{name: %s, namespace: %s}", resultDetails.Name, chaosDetails.ChaosNamespace), Reason: updateErr.Error()}
 			}
 			return nil
 		})
@@ -234,7 +233,7 @@ func SetResultUID(resultDetails *types.ResultDetails, clients clients.ClientSets
 
 	result, err := clients.LitmusClient.ChaosResults(chaosDetails.ChaosNamespace).Get(context.Background(), resultDetails.Name, v1.GetOptions{})
 	if err != nil {
-		return cerrors.ChaosResultCRUD{Phase: "PreChaos", Operation: "get", Target: fmt.Sprintf("{name: %s, namespace: %s}", resultDetails.Name, chaosDetails.ChaosNamespace), Reason: err.Error()}
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosResultCRUD, Phase: "PreChaos", Target: fmt.Sprintf("{name: %s, namespace: %s}", resultDetails.Name, chaosDetails.ChaosNamespace), Reason: err.Error()}
 	}
 
 	resultDetails.ResultUID = result.UID
@@ -289,7 +288,7 @@ func AnnotateChaosResult(resultName, namespace, status, kind, name string) error
 	command.Stderr = &stderr
 	if err := command.Run(); err != nil {
 		log.Infof("Error String: %v", stderr.String())
-		return errors.Errorf("unable to annotate the %v chaosresult, err: %v", resultName, err)
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosResultCRUD, Target: fmt.Sprintf("{name: %s, namespace: %s}", resultName, namespace), Reason: out.String()}
 	}
 	return nil
 }
@@ -299,7 +298,7 @@ func GetChaosStatus(resultDetails *types.ResultDetails, chaosDetails *types.Chao
 
 	result, err := clients.LitmusClient.ChaosResults(chaosDetails.ChaosNamespace).Get(context.Background(), resultDetails.Name, v1.GetOptions{})
 	if err != nil {
-		return nil, cerrors.ChaosResultCRUD{Phase: "PreChaos", Operation: "get", Target: fmt.Sprintf("{name: %s, namespace: %s}", resultDetails.Name, chaosDetails.ChaosNamespace), Reason: err.Error()}
+		return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosResultCRUD, Phase: "PreChaos", Target: fmt.Sprintf("{name: %s, namespace: %s}", resultDetails.Name, chaosDetails.ChaosNamespace), Reason: err.Error()}
 	}
 	annotations := result.ObjectMeta.Annotations
 	targetList := chaosDetails.Targets

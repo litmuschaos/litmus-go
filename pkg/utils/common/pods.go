@@ -71,12 +71,8 @@ func DeleteAllPod(podLabel, namespace string, timeout, delay int, clients client
 }
 
 // getChaosPodResourceRequirements will return the resource requirements on chaos pod
-func getChaosPodResourceRequirements(podName, containerName, namespace string, clients clients.ClientSets) (core_v1.ResourceRequirements, error) {
+func getChaosPodResourceRequirements(pod *core_v1.Pod, containerName string) (core_v1.ResourceRequirements, error) {
 
-	pod, err := clients.KubeClient.CoreV1().Pods(namespace).Get(context.Background(), podName, v1.GetOptions{})
-	if err != nil {
-		return core_v1.ResourceRequirements{}, err
-	}
 	for _, container := range pod.Spec.Containers {
 		// The name of chaos container is always same as job name
 		// <experiment-name>-<runid>
@@ -84,7 +80,7 @@ func getChaosPodResourceRequirements(podName, containerName, namespace string, c
 			return container.Resources, nil
 		}
 	}
-	return core_v1.ResourceRequirements{}, errors.Errorf("No container found with %v name in target pod", containerName)
+	return core_v1.ResourceRequirements{}, cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Phase: "ChaosInject", Target: fmt.Sprintf("{podName: %s, containerName: %s, namespace: %s}", pod.Name, containerName, pod.Namespace), Reason: "no container found with in target pod"}
 }
 
 // SetHelperData derive the data from experiment pod and sets into experimentDetails struct
@@ -93,7 +89,7 @@ func SetHelperData(chaosDetails *types.ChaosDetails, setHelperData string, clien
 	var pod *core_v1.Pod
 	pod, err = clients.KubeClient.CoreV1().Pods(chaosDetails.ChaosNamespace).Get(context.Background(), chaosDetails.ChaosPodName, v1.GetOptions{})
 	if err != nil {
-		return err
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Phase: "ChaosInject", Target: fmt.Sprintf("{podName: %s, namespace: %s}", pod.Name, pod.Namespace), Reason: err.Error()}
 	}
 
 	// Get Labels
@@ -115,9 +111,9 @@ func SetHelperData(chaosDetails *types.ChaosDetails, setHelperData string, clien
 		chaosDetails.ImagePullSecrets = pod.Spec.ImagePullSecrets
 
 		// Get Resource Requirements
-		chaosDetails.Resources, err = getChaosPodResourceRequirements(chaosDetails.ChaosPodName, chaosDetails.ExperimentName, chaosDetails.ChaosNamespace, clients)
+		chaosDetails.Resources, err = getChaosPodResourceRequirements(pod, chaosDetails.ExperimentName)
 		if err != nil {
-			return errors.Errorf("unable to get resource requirements, err: %v", err)
+			return stacktrace.Propagate(err, "could not inherit resource requirements")
 		}
 		return nil
 	}
@@ -138,12 +134,12 @@ func VerifyExistanceOfPods(namespace, pods string, clients clients.ClientSets) (
 
 	podList := strings.Split(strings.TrimSpace(pods), ",")
 	for index := range podList {
-		isPodsAvailable, err := CheckForAvailibiltyOfPod(namespace, podList[index], clients)
+		isPodsAvailable, err := CheckForAvailabilityOfPod(namespace, podList[index], clients)
 		if err != nil {
 			return false, err
 		}
 		if !isPodsAvailable {
-			return isPodsAvailable, cerrors.TargetPodSelection{Target: fmt.Sprintf("{podName: %s, namespace: %s}", podList[index], namespace), Reason: "pod doesn't exist set by TARGET_PODS ENV"}
+			return isPodsAvailable, cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Target: fmt.Sprintf("{podName: %s, namespace: %s}", podList[index], namespace), Reason: "pod doesn't exist set by TARGET_PODS ENV"}
 		}
 	}
 	return true, nil
@@ -184,8 +180,8 @@ func GetPodList(targetPods string, podAffPerc int, clients clients.ClientSets, c
 	return finalPods, nil
 }
 
-// CheckForAvailibiltyOfPod check the availibility of the specified pod
-func CheckForAvailibiltyOfPod(namespace, name string, clients clients.ClientSets) (bool, error) {
+// CheckForAvailabilityOfPod check the availability of the specified pod
+func CheckForAvailabilityOfPod(namespace, name string, clients clients.ClientSets) (bool, error) {
 
 	if name == "" {
 		return false, nil
@@ -195,7 +191,7 @@ func CheckForAvailibiltyOfPod(namespace, name string, clients clients.ClientSets
 	if err != nil && k8serrors.IsNotFound(err) {
 		return false, nil
 	} else if err != nil {
-		return false, cerrors.TargetPodSelection{Target: fmt.Sprintf("{podName: %s, namespace: %s}", name, namespace), Reason: err.Error()}
+		return false, cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Target: fmt.Sprintf("{podName: %s, namespace: %s}", name, namespace), Reason: err.Error()}
 	}
 	return true, nil
 }
@@ -205,9 +201,9 @@ func CheckForAvailibiltyOfPod(namespace, name string, clients clients.ClientSets
 func FilterNonChaosPods(ns, labels string, clients clients.ClientSets, chaosDetails *types.ChaosDetails) (core_v1.PodList, error) {
 	podList, err := clients.KubeClient.CoreV1().Pods(ns).List(context.Background(), v1.ListOptions{LabelSelector: labels})
 	if err != nil {
-		return core_v1.PodList{}, cerrors.TargetPodSelection{Target: fmt.Sprintf("{podLabel: %s, namespace: %s}", labels, ns), Reason: err.Error()}
+		return core_v1.PodList{}, cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Target: fmt.Sprintf("{podLabel: %s, namespace: %s}", labels, ns), Reason: err.Error()}
 	} else if len(podList.Items) == 0 {
-		return core_v1.PodList{}, cerrors.TargetPodSelection{Target: fmt.Sprintf("{podLabel: %s, namespace: %s}", labels, ns), Reason: "could not find pods with matching labels"}
+		return core_v1.PodList{}, cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Target: fmt.Sprintf("{podLabel: %s, namespace: %s}", labels, ns), Reason: "could not find pods with matching labels"}
 	}
 	nonChaosPods := core_v1.PodList{}
 	// ignore chaos pods
@@ -227,7 +223,7 @@ func GetTargetPodsWhenTargetPodsENVSet(targetPods, namespace string, clients cli
 	for index := range targetPodsList {
 		pod, err := clients.KubeClient.CoreV1().Pods(namespace).Get(context.Background(), strings.TrimSpace(targetPodsList[index]), v1.GetOptions{})
 		if err != nil {
-			return core_v1.PodList{}, cerrors.TargetPodSelection{Target: fmt.Sprintf("{podName: %s, namespace: %s}", targetPodsList[index], namespace), Reason: err.Error()}
+			return core_v1.PodList{}, cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Target: fmt.Sprintf("{podName: %s, namespace: %s}", targetPodsList[index], namespace), Reason: err.Error()}
 		}
 		realPods.Items = append(realPods.Items, *pod)
 	}
@@ -287,7 +283,7 @@ func GetTargetPodsWhenTargetPodsENVNotSet(podAffPerc int, clients clients.Client
 			for _, name := range target.Names {
 				pod, err := clients.KubeClient.CoreV1().Pods(target.Namespace).Get(context.Background(), name, v1.GetOptions{})
 				if err != nil {
-					return finalPods, cerrors.TargetPodSelection{Target: fmt.Sprintf("{podName: %s, namespace: %s}", name, target.Namespace), Reason: err.Error()}
+					return finalPods, cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Target: fmt.Sprintf("{podName: %s, namespace: %s}", name, target.Namespace), Reason: err.Error()}
 				}
 				finalPods.Items = append(finalPods.Items, *pod)
 			}
@@ -303,7 +299,7 @@ func GetTargetPodsWhenTargetPodsENVNotSet(podAffPerc int, clients clients.Client
 				for _, label := range target.Labels {
 					pods, err := clients.KubeClient.CoreV1().Pods(target.Namespace).List(context.Background(), v1.ListOptions{LabelSelector: label})
 					if err != nil {
-						return finalPods, cerrors.TargetPodSelection{Target: fmt.Sprintf("{podLabel: %s, namespace: %s}", label, target.Namespace), Reason: err.Error()}
+						return finalPods, cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Target: fmt.Sprintf("{podLabel: %s, namespace: %s}", label, target.Namespace), Reason: err.Error()}
 					}
 					finalPods.Items = append(finalPods.Items, pods.Items...)
 				}
@@ -312,7 +308,7 @@ func GetTargetPodsWhenTargetPodsENVNotSet(podAffPerc int, clients clients.Client
 	}
 
 	if len(finalPods.Items) == 0 {
-		return finalPods, cerrors.TargetPodSelection{Target: GetAppDetailsForLogging(chaosDetails.AppDetail), Reason: "no target pods founds"}
+		return finalPods, cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Target: GetAppDetailsForLogging(chaosDetails.AppDetail), Reason: "no target pods found"}
 	}
 
 	if podKind {
@@ -456,9 +452,9 @@ func GetPodListFromSpecifiedNodes(podAffPerc int, nodeLabel string, clients clie
 	// identify node list from the provided node label
 	nodes, err = clients.KubeClient.CoreV1().Nodes().List(context.Background(), v1.ListOptions{LabelSelector: nodeLabel})
 	if err != nil {
-		return core_v1.PodList{}, cerrors.TargetPodSelection{Target: fmt.Sprintf("{nodeLabel: %s}", nodeLabel), Reason: err.Error()}
+		return core_v1.PodList{}, cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Target: fmt.Sprintf("{nodeLabel: %s}", nodeLabel), Reason: err.Error()}
 	} else if len(nodes.Items) == 0 {
-		return core_v1.PodList{}, cerrors.TargetPodSelection{Target: fmt.Sprintf("{nodeLabel: %s}", nodeLabel), Reason: "no nodes found with matching labels"}
+		return core_v1.PodList{}, cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Target: fmt.Sprintf("{nodeLabel: %s}", nodeLabel), Reason: "no nodes found with matching labels"}
 	}
 	nodeNames := []string{}
 	for _, node := range nodes.Items {
@@ -491,7 +487,7 @@ func getTargetPodsWhenNodeFilterSet(podAffPerc int, pods core_v1.PodList, nodes 
 	}
 
 	if len(nodeFilteredPods.Items) == 0 {
-		return nodeFilteredPods, cerrors.TargetPodSelection{Target: fmt.Sprintf("{nodes: %v}", nodes), Reason: "no pod found on specified node(s)"}
+		return nodeFilteredPods, cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Target: fmt.Sprintf("{nodes: %v}", nodes), Reason: "no pod found on specified node(s)"}
 	}
 
 	return filterPodsByPercentage(nodeFilteredPods, podAffPerc), nil
