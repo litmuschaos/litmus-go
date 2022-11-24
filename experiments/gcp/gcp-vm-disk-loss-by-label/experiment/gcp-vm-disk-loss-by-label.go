@@ -54,8 +54,7 @@ func GCPVMDiskLossByLabel(clients clients.ClientSets) {
 	log.Infof("[PreReq]: Updating the chaos result of %v experiment (SOT)", experimentsDetails.ExperimentName)
 	if err := result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT"); err != nil {
 		log.Errorf("Unable to Create the Chaos Result, err: %v", err)
-		failStep := "[pre-chaos]: Failed to update the chaos result of gcp-vm-disk-loss-by-label experiment (SOT), err: " + err.Error()
-		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 		return
 	}
 
@@ -86,11 +85,10 @@ func GCPVMDiskLossByLabel(clients clients.ClientSets) {
 
 			if err := probe.RunProbes(&chaosDetails, clients, &resultDetails, "PreChaos", &eventsDetails); err != nil {
 				log.Errorf("Probe Failed, err: %v", err)
-				failStep := "[pre-chaos]: Failed while running probes, err: " + err.Error()
 				msg := "AUT: Running, Probes: Unsuccessful"
 				types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, msg, "Warning", &chaosDetails)
 				events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
-				result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+				result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 				return
 			}
 			msg = "AUT: Running, Probes: Successful"
@@ -104,16 +102,14 @@ func GCPVMDiskLossByLabel(clients clients.ClientSets) {
 	computeService, err = gcp.GetGCPComputeService()
 	if err != nil {
 		log.Errorf("Failed to obtain a gcp compute service, err: %v", err)
-		failStep := "[pre-chaos]: Failed to obtain a gcp compute service, err: " + err.Error()
-		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 		return
 	}
 
 	//selecting the target instances (pre-chaos)
 	if err := gcp.SetTargetDiskVolumes(computeService, &experimentsDetails); err != nil {
 		log.Errorf("Failed to get the target gcp disk volumes, err: %v", err)
-		failStep := "[pre-chaos]: Failed to select the target disk volumes from label, err: " + err.Error()
-		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 		return
 	}
 
@@ -124,14 +120,12 @@ func GCPVMDiskLossByLabel(clients clients.ClientSets) {
 	case "litmus":
 		if err := litmusLIB.PrepareDiskVolumeLossByLabel(computeService, &experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
 			log.Errorf("Chaos injection failed, err: %v", err)
-			failStep := "[chaos]: Failed inside the chaoslib, err: " + err.Error()
-			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 			return
 		}
 	default:
 		log.Error("[Invalid]: Please Provide the correct LIB")
-		failStep := "[chaos]: no match found for specified lib"
-		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 		return
 	}
 
@@ -143,8 +137,7 @@ func GCPVMDiskLossByLabel(clients clients.ClientSets) {
 		instanceName, err := gcp.GetVolumeAttachmentDetails(computeService, experimentsDetails.GCPProjectID, experimentsDetails.Zones, experimentsDetails.TargetDiskVolumeNamesList[i])
 		if err != nil || instanceName == "" {
 			log.Errorf("Failed to verify disk volume attachment status, err: %v", err)
-			failStep := "[post-chaos]: Failed to verify disk volume attachment status, err: " + err.Error()
-			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 			return
 		}
 	}
@@ -159,11 +152,10 @@ func GCPVMDiskLossByLabel(clients clients.ClientSets) {
 		if len(resultDetails.ProbeDetails) != 0 {
 			if err := probe.RunProbes(&chaosDetails, clients, &resultDetails, "PostChaos", &eventsDetails); err != nil {
 				log.Errorf("Probes Failed, err: %v", err)
-				failStep := "[post-chaos]: Failed while running probes, err: " + err.Error()
 				msg := "AUT: Running, Probes: Unsuccessful"
 				types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, msg, "Warning", &chaosDetails)
 				events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
-				result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+				result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 				return
 			}
 			msg = "AUT: Running, Probes: Successful"
