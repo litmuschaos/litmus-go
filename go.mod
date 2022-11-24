@@ -12,7 +12,7 @@ require (
 	github.com/litmuschaos/chaos-operator v0.0.0-20221124094152-26a41c021642
 	github.com/palantir/stacktrace v0.0.0-20161112013806-78658fd2d177
 	github.com/pkg/errors v0.9.1
-	github.com/sirupsen/logrus v1.7.0
+	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/cobra v1.1.1
 	google.golang.org/api v0.48.0
 	gopkg.in/yaml.v2 v2.4.0
@@ -20,7 +20,6 @@ require (
 	k8s.io/apimachinery v0.22.1
 	k8s.io/client-go v12.0.0+incompatible
 	k8s.io/klog v1.0.0
-	k8s.io/kubernetes v1.18.19
 )
 
 require (
@@ -33,14 +32,14 @@ require (
 	github.com/Azure/go-autorest/autorest/validation v0.2.1-0.20191028180845-3492b2aff503 // indirect
 	github.com/Azure/go-autorest/logger v0.2.1 // indirect
 	github.com/Azure/go-autorest/tracing v0.6.0 // indirect
-	github.com/cilium/ebpf v0.4.0 // indirect
-	github.com/coreos/go-systemd/v22 v22.1.0 // indirect
+	github.com/cilium/ebpf v0.6.2 // indirect
+	github.com/coreos/go-systemd/v22 v22.3.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dimchansky/utfbom v1.1.1 // indirect
 	github.com/docker/go-units v0.4.0 // indirect
 	github.com/form3tech-oss/jwt-go v3.2.3+incompatible // indirect
 	github.com/go-logr/logr v0.4.0 // indirect
-	github.com/godbus/dbus/v5 v5.0.3 // indirect
+	github.com/godbus/dbus/v5 v5.0.4 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
@@ -56,15 +55,15 @@ require (
 	github.com/moby/spdystream v0.2.0 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
-	github.com/opencontainers/runtime-spec v1.0.2 // indirect
+	github.com/opencontainers/runtime-spec v1.0.3-0.20210326190908-1c3f411f0417 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	go.opencensus.io v0.23.0 // indirect
 	golang.org/x/crypto v0.0.0-20220314234659-1baeb1ce4c0b // indirect
-	golang.org/x/net v0.0.0-20211209124913-491a49abca63 // indirect
+	golang.org/x/net v0.0.0-20220906165146-f3363e06e74c // indirect
 	golang.org/x/oauth2 v0.0.0-20210514164344-f6687ab2804c // indirect
-	golang.org/x/sys v0.0.0-20220704084225-05e143d24a9e // indirect
-	golang.org/x/term v0.0.0-20210220032956-6a3ed077a48d // indirect
-	golang.org/x/text v0.3.7 // indirect
+	golang.org/x/sys v0.0.0-20220728004956-3c1f35247d10 // indirect
+	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211 // indirect
+	golang.org/x/text v0.3.8 // indirect
 	golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20210604141403-392c879c8b08 // indirect
@@ -92,6 +91,8 @@ replace (
 	k8s.io/cluster-bootstrap => k8s.io/cluster-bootstrap v0.21.2
 	k8s.io/code-generator => k8s.io/code-generator v0.21.2
 	k8s.io/component-base => k8s.io/component-base v0.21.2
+	k8s.io/component-helpers => k8s.io/component-helpers v0.21.5
+	k8s.io/controller-manager => k8s.io/controller-manager v0.21.5
 	k8s.io/cri-api => k8s.io/cri-api v0.21.2
 	k8s.io/csi-translation-lib => k8s.io/csi-translation-lib v0.21.2
 	k8s.io/kube-aggregator => k8s.io/kube-aggregator v0.21.2
@@ -101,8 +102,6 @@ replace (
 	k8s.io/kubectl => k8s.io/kubectl v0.21.2
 	k8s.io/kubelet => k8s.io/kubelet v0.21.2
 	k8s.io/legacy-cloud-providers => k8s.io/legacy-cloud-providers v0.21.2
-	k8s.io/metrics => k8s.io/metrics v0.21.2
-	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.21.2
 )
 
 replace github.com/docker/docker => github.com/moby/moby v0.7.3-0.20190826074503-38ab9da00309 // Required by Helm
