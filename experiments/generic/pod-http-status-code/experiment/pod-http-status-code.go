@@ -1,6 +1,7 @@
 package experiment
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/litmuschaos/chaos-operator/api/litmuschaos/v1alpha1"
@@ -49,8 +50,7 @@ func PodHttpStatusCode(clients clients.ClientSets) {
 	log.Infof("[PreReq]: Updating the chaos result of %v experiment (SOT)", experimentsDetails.ExperimentName)
 	if err := result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT"); err != nil {
 		log.Errorf("Unable to Create the Chaos Result, err: %v", err)
-		failStep := "[pre-chaos]: Failed to update the chaos result of pod-http-status-code experiment (SOT), err: " + err.Error()
-		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 		return
 	}
 
@@ -75,8 +75,7 @@ func PodHttpStatusCode(clients clients.ClientSets) {
 	// PRE-CHAOS check to verify support for provided status code value
 	if experimentsDetails.StatusCode, err = litmusLIB.GetStatusCode(experimentsDetails.StatusCode); err != nil {
 		log.Errorf("[Pre-Chaos]: Failed to verify status code support, err: %v", err)
-		failStep := "[pre-chaos]: Status code not supported. Provide a valid status code"
-		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 		return
 	}
 
@@ -85,10 +84,9 @@ func PodHttpStatusCode(clients clients.ClientSets) {
 		log.Info("[Status]: Verify that the AUT (Application Under Test) is running (pre-chaos)")
 		if err := status.AUTStatusCheck(clients, &chaosDetails); err != nil {
 			log.Errorf("Application status check failed, err: %v", err)
-			failStep := "[pre-chaos]: Failed to verify that the AUT (Application Under Test) is in running state, err: " + err.Error()
 			types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, "AUT: Not Running", "Warning", &chaosDetails)
 			events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
-			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 			return
 		}
 	}
@@ -102,11 +100,10 @@ func PodHttpStatusCode(clients clients.ClientSets) {
 
 			if err := probe.RunProbes(&chaosDetails, clients, &resultDetails, "PreChaos", &eventsDetails); err != nil {
 				log.Errorf("Probe Failed, err: %v", err)
-				failStep := "[pre-chaos]: Failed while running probes, err: " + err.Error()
 				msg := "AUT: Running, Probes: Unsuccessful"
 				types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, msg, "Warning", &chaosDetails)
 				events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
-				result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+				result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 				return
 			}
 			msg = "AUT: Running, Probes: Successful"
@@ -121,14 +118,13 @@ func PodHttpStatusCode(clients clients.ClientSets) {
 	case "litmus":
 		if err := litmusLIB.PodHttpStatusCodeChaos(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
 			log.Errorf("Chaos injection failed, err: %v", err)
-			failStep := "[chaos]: Failed inside the chaoslib, err: " + err.Error()
-			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 			return
 		}
 	default:
 		log.Error("[Invalid]: Please Provide the correct LIB")
-		failStep := "[chaos]: no match found for specified lib"
-		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+		err := fmt.Errorf("[chaos]: no match was found for the specified lib")
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 		return
 	}
 
@@ -140,10 +136,9 @@ func PodHttpStatusCode(clients clients.ClientSets) {
 		log.Info("[Status]: Verify that the AUT (Application Under Test) is running (post-chaos)")
 		if err := status.AUTStatusCheck(clients, &chaosDetails); err != nil {
 			log.Errorf("Application status check failed, err: %v", err)
-			failStep := "[post-chaos]: Failed to verify that the AUT (Application Under Test) is running, err: " + err.Error()
 			types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, "AUT: Not Running", "Warning", &chaosDetails)
 			events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
-			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 			return
 		}
 	}
@@ -156,11 +151,10 @@ func PodHttpStatusCode(clients clients.ClientSets) {
 		if len(resultDetails.ProbeDetails) != 0 {
 			if err := probe.RunProbes(&chaosDetails, clients, &resultDetails, "PostChaos", &eventsDetails); err != nil {
 				log.Errorf("Probes Failed, err: %v", err)
-				failStep := "[post-chaos]: Failed while running probes, err: " + err.Error()
 				msg := "AUT: Running, Probes: Unsuccessful"
 				types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, msg, "Warning", &chaosDetails)
 				events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
-				result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+				result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 				return
 			}
 			msg = "AUT: Running, Probes: Successful"

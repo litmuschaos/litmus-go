@@ -34,8 +34,7 @@ const (
 type ResultDetails struct {
 	Name             string
 	Verdict          v1alpha1.ResultVerdict
-	FailStep         string
-	ErrorCode        string
+	FailureOutput    *v1alpha1.FailureOutput
 	Phase            v1alpha1.ResultPhase
 	ResultUID        clientTypes.UID
 	ProbeDetails     []ProbeDetails
@@ -169,7 +168,6 @@ func InitialiseChaosVariables(chaosDetails *ChaosDetails) {
 func SetResultAttributes(resultDetails *ResultDetails, chaosDetails ChaosDetails) {
 	resultDetails.Verdict = "Awaited"
 	resultDetails.Phase = "Running"
-	resultDetails.FailStep = "N/A"
 	resultDetails.PassedProbeCount = 0
 	if chaosDetails.EngineName != "" {
 		resultDetails.Name = chaosDetails.EngineName + "-" + chaosDetails.ExperimentName
@@ -187,8 +185,10 @@ func SetResultAttributes(resultDetails *ResultDetails, chaosDetails ChaosDetails
 func SetResultAfterCompletion(resultDetails *ResultDetails, verdict v1alpha1.ResultVerdict, phase v1alpha1.ResultPhase, failStep string, errorCode cerrors.ErrorType) {
 	resultDetails.Verdict = verdict
 	resultDetails.Phase = phase
-	resultDetails.FailStep = failStep
-	resultDetails.ErrorCode = string(errorCode)
+	resultDetails.FailureOutput = &v1alpha1.FailureOutput{
+		FailedStep: failStep,
+		ErrorCode:  string(errorCode),
+	}
 }
 
 //SetEngineEventAttributes initialise attributes for event generation in chaos engine

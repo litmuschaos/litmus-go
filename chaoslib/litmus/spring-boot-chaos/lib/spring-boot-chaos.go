@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	corev1 "k8s.io/api/core/v1"
 	"net/http"
 	"os"
@@ -269,7 +270,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 					}
 					// updating the chaosresult after stopped
 					failStep := "Chaos injection stopped!"
-					types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep)
+					types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep, cerrors.ErrorTypeExperimentAborted)
 					result.ChaosResult(chaosDetails, clients, resultDetails, "EOT")
 					log.Info("[Chaos]: Revert Completed")
 					os.Exit(1)
@@ -358,7 +359,7 @@ loop:
 			}
 			// updating the chaosresult after stopped
 			failStep := "Chaos injection stopped!"
-			types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep)
+			types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep, cerrors.ErrorTypeExperimentAborted)
 			result.ChaosResult(chaosDetails, clients, resultDetails, "EOT")
 			log.Info("[Chaos]: Revert Completed")
 			os.Exit(1)
