@@ -80,7 +80,7 @@ func GetDiskDeviceNameForVM(computeService *compute.Service, targetDiskName, gcp
 
 	instanceDetails, err := computeService.Instances.Get(gcpProjectID, zone, instanceName).Do()
 	if err != nil {
-		return "", err
+		return "", cerrors.TargetDiskSelection{Target: fmt.Sprintf("{diskName: %s, zone: %s}", targetDiskName, zone), Reason: err.Error()}
 	}
 
 	for _, disk := range instanceDetails.Disks {

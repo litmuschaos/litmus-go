@@ -100,3 +100,23 @@ func (e TargetDiskSelection) UserFriendly() bool {
 func (e TargetDiskSelection) ErrorType() ErrorType {
 	return ErrorTypeTargetSelection
 }
+
+type TargetVMSelection struct {
+	Target string
+	Reason string
+}
+
+func (e TargetVMSelection) Error() string {
+	if e.Target == "" {
+		return fmt.Sprintf("target selection failed, %s", e.Reason)
+	}
+	return fmt.Sprintf("target '%s' selection failed, %s", e.Target, e.Reason)
+}
+
+func (e TargetVMSelection) UserFriendly() bool {
+	return true
+}
+
+func (e TargetVMSelection) ErrorType() ErrorType {
+	return ErrorTypeTargetSelection
+}
