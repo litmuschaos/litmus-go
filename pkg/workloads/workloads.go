@@ -64,7 +64,7 @@ func getPodsFromWorkload(target types.AppDetails, allPods *kcorev1.PodList, dyna
 			}
 		}
 		if !found {
-			return pods, cerrors.TargetPodSelection{Target: fmt.Sprintf("{namespace: %s, kind: %s, name: %s}", target.Namespace, target.Kind, wld), Reason: "no pod found for specified target"}
+			return pods, cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Target: fmt.Sprintf("{namespace: %s, kind: %s, name: %s}", target.Namespace, target.Kind, wld), Reason: "no pod found for specified target"}
 		}
 	}
 	return pods, nil
@@ -91,7 +91,7 @@ func GetPodOwnerTypeAndName(pod *kcorev1.Pod, dynamicClient dynamic.Interface) (
 func getParent(name, namespace string, gvr schema.GroupVersionResource, dynamicClient dynamic.Interface) (string, string, error) {
 	res, err := dynamicClient.Resource(gvr).Namespace(namespace).Get(context.Background(), name, v1.GetOptions{})
 	if err != nil {
-		return "", "", cerrors.TargetPodSelection{Target: fmt.Sprintf("{namespace: %s, kind: %s, name: %s}", namespace, gvr.Resource, name), Reason: err.Error()}
+		return "", "", cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Target: fmt.Sprintf("{namespace: %s, kind: %s, name: %s}", namespace, gvr.Resource, name), Reason: err.Error()}
 	}
 
 	for _, v := range res.GetOwnerReferences() {
@@ -103,22 +103,10 @@ func getParent(name, namespace string, gvr schema.GroupVersionResource, dynamicC
 	return "", "", nil
 }
 
-func matchPodOwnerWithWorkloads(name, kind string, target types.AppDetails) bool {
-	if kind != target.Kind {
-		return false
-	}
-	for _, t := range target.Names {
-		if t == name {
-			return true
-		}
-	}
-	return false
-}
-
 func getAllPods(namespace string, client clients.ClientSets) (*kcorev1.PodList, error) {
 	pods, err := client.KubeClient.CoreV1().Pods(namespace).List(context.Background(), v1.ListOptions{})
 	if err != nil {
-		return nil, cerrors.TargetPodSelection{Target: fmt.Sprintf("{namespace: %s, resource: AllPods}", namespace), Reason: fmt.Sprintf("failed to get all pods :%v", err.Error())}
+		return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Target: fmt.Sprintf("{namespace: %s, resource: AllPods}", namespace), Reason: fmt.Sprintf("failed to get all pods :%s", err.Error())}
 	}
 	return pods, nil
 }

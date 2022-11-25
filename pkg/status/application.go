@@ -85,7 +85,7 @@ func CheckAuxiliaryApplicationStatus(AuxiliaryAppDetails string, timeout, delay 
 	for _, val := range AuxiliaryAppInfo {
 		AppInfo := strings.Split(val, ":")
 		if err := CheckApplicationStatusesByLabels(AppInfo[0], AppInfo[1], timeout, delay, clients); err != nil {
-			return err
+			return stacktrace.Propagate(err, "could not check auxiliary application status")
 		}
 	}
 	return nil
@@ -99,15 +99,15 @@ func CheckPodStatusPhase(appNs, appLabel string, timeout, delay int, clients cli
 		Try(func(attempt uint) error {
 			podList, err := clients.KubeClient.CoreV1().Pods(appNs).List(context.Background(), metav1.ListOptions{LabelSelector: appLabel})
 			if err != nil {
-				return cerrors.ApplicationStatusChecks{Target: fmt.Sprintf("{podLabels: %s, namespace: %s}", appLabel, appNs), Reason: err.Error()}
+				return cerrors.Error{ErrorCode: cerrors.ErrorTypePodStatusChecks, Target: fmt.Sprintf("{podLabels: %s, namespace: %s}", appLabel, appNs), Reason: err.Error()}
 			} else if len(podList.Items) == 0 {
-				return cerrors.ApplicationStatusChecks{Target: fmt.Sprintf("{podLabels: %s, namespace: %s}", appLabel, appNs), Reason: "no pod found with matching labels"}
+				return cerrors.Error{ErrorCode: cerrors.ErrorTypePodStatusChecks, Target: fmt.Sprintf("{podLabels: %s, namespace: %s}", appLabel, appNs), Reason: "no pod found with matching labels"}
 			}
 
 			for _, pod := range podList.Items {
 				isInState := isOneOfState(string(pod.Status.Phase), states)
 				if !isInState {
-					return cerrors.ApplicationStatusChecks{Target: fmt.Sprintf("{podName: %s, namespace: %s}", pod.Name, appNs), Reason: fmt.Sprintf("pod is not in [%v] states", states)}
+					return cerrors.Error{ErrorCode: cerrors.ErrorTypePodStatusChecks, Target: fmt.Sprintf("{podName: %s, namespace: %s}", pod.Name, appNs), Reason: fmt.Sprintf("pod is not in [%v] states", states)}
 				}
 				log.InfoWithValues("[Status]: The status of Pods are as follows", logrus.Fields{
 					"Pod": pod.Name, "Status": pod.Status.Phase})
@@ -140,9 +140,9 @@ func CheckContainerStatus(appNs, appLabel, containerName string, timeout, delay 
 		Try(func(attempt uint) error {
 			podList, err := clients.KubeClient.CoreV1().Pods(appNs).List(context.Background(), metav1.ListOptions{LabelSelector: appLabel})
 			if err != nil {
-				return cerrors.ApplicationStatusChecks{Target: fmt.Sprintf("{podLabels: %s, namespace: %v}", appLabel, appNs), Reason: err.Error()}
+				return cerrors.Error{ErrorCode: cerrors.ErrorTypePodStatusChecks, Target: fmt.Sprintf("{podLabels: %s, namespace: %v}", appLabel, appNs), Reason: err.Error()}
 			} else if len(podList.Items) == 0 {
-				return cerrors.ApplicationStatusChecks{Target: fmt.Sprintf("{podLabels: %s, namespace: %v}", appLabel, appNs), Reason: "no pod found with matching labels"}
+				return cerrors.Error{ErrorCode: cerrors.ErrorTypePodStatusChecks, Target: fmt.Sprintf("{podLabels: %s, namespace: %v}", appLabel, appNs), Reason: "no pod found with matching labels"}
 			}
 			for _, pod := range podList.Items {
 				switch containerName {
@@ -165,10 +165,10 @@ func validateContainerStatus(containerName, podName string, ContainerStatuses []
 	for _, container := range ContainerStatuses {
 		if container.Name == containerName {
 			if container.State.Terminated != nil {
-				return cerrors.ApplicationStatusChecks{Target: fmt.Sprintf("podName: %s, containerName: %s", podName, containerName), Reason: "container is in terminated state"}
+				return cerrors.Error{ErrorCode: cerrors.ErrorTypePodStatusChecks, Target: fmt.Sprintf("podName: %s, containerName: %s", podName, containerName), Reason: "container is in terminated state"}
 			}
 			if !container.Ready {
-				return cerrors.ApplicationStatusChecks{Target: fmt.Sprintf("podName: %s, containerName: %s", podName, containerName), Reason: "container is not in running state"}
+				return cerrors.Error{ErrorCode: cerrors.ErrorTypePodStatusChecks, Target: fmt.Sprintf("podName: %s, containerName: %s", podName, containerName), Reason: "container is not in running state"}
 			}
 			log.InfoWithValues("[Status]: The Container status are as follows", logrus.Fields{
 				"container": container.Name, "Pod": podName, "Readiness": container.Ready})
@@ -250,9 +250,9 @@ func CheckHelperStatus(appNs, appLabel string, timeout, delay int, clients clien
 		Try(func(attempt uint) error {
 			podList, err := clients.KubeClient.CoreV1().Pods(appNs).List(context.Background(), metav1.ListOptions{LabelSelector: appLabel})
 			if err != nil {
-				return errors.Errorf("unable to find the pods with matching labels, err: %v", err)
+				return cerrors.Error{ErrorCode: cerrors.ErrorTypePodStatusChecks, Target: fmt.Sprintf("{podLabel: %s, namespace: %s}", appLabel, appNs), Reason: fmt.Sprintf("helper status check failed: %s", err.Error())}
 			} else if len(podList.Items) == 0 {
-				errors.Errorf("Unable to find the pods with matching labels")
+				return cerrors.Error{ErrorCode: cerrors.ErrorTypePodStatusChecks, Target: fmt.Sprintf("{podLabel: %s, namespace: %s}", appLabel, appNs), Reason: "helper status check failed: no pods found with mathcing labels"}
 			}
 			for _, pod := range podList.Items {
 				podStatus := string(pod.Status.Phase)
@@ -260,11 +260,11 @@ func CheckHelperStatus(appNs, appLabel string, timeout, delay int, clients clien
 				case "running", "succeeded", "failed":
 					log.Infof("%v helper pod is in %v state", pod.Name, podStatus)
 				default:
-					return errors.Errorf("%v pod is in %v state", pod.Name, podStatus)
+					return cerrors.Error{ErrorCode: cerrors.ErrorTypePodStatusChecks, Target: fmt.Sprintf("{podName: %s, namespace: %s}", pod.Name, pod.Namespace), Reason: fmt.Sprintf("helper pod is in %s state", podStatus)}
 				}
 				for _, container := range pod.Status.ContainerStatuses {
 					if container.State.Terminated != nil && container.State.Terminated.Reason != "Completed" && container.State.Terminated.Reason != "Error" {
-						return errors.Errorf("container is terminated with %v reason", container.State.Terminated.Reason)
+						return cerrors.Error{ErrorCode: cerrors.ErrorTypePodStatusChecks, Target: fmt.Sprintf("{podName: %s, namespace: %s}", pod.Name, pod.Namespace), Reason: fmt.Sprintf("helper pod's container is in terminated state with %s reason", container.State.Terminated.Reason)}
 					}
 				}
 			}
@@ -279,11 +279,11 @@ func CheckPodStatusByPodName(appNs, appName string, timeout, delay int, clients 
 		Try(func(attempt uint) error {
 			pod, err := clients.KubeClient.CoreV1().Pods(appNs).Get(context.Background(), appName, metav1.GetOptions{})
 			if err != nil {
-				return cerrors.ApplicationStatusChecks{Target: fmt.Sprintf("podName: %v, namespace: %v", appName, appNs), Reason: err.Error()}
+				return cerrors.Error{ErrorCode: cerrors.ErrorTypePodStatusChecks, Target: fmt.Sprintf("podName: %v, namespace: %v", appName, appNs), Reason: err.Error()}
 			}
 
 			if pod.Status.Phase != v1.PodRunning {
-				return cerrors.ApplicationStatusChecks{Target: fmt.Sprintf("podName: %v, namespace: %v", appName, appNs), Reason: "pod is not in Running state"}
+				return cerrors.Error{ErrorCode: cerrors.ErrorTypePodStatusChecks, Target: fmt.Sprintf("podName: %v, namespace: %v", appName, appNs), Reason: "pod is not in Running state"}
 			}
 			log.InfoWithValues("[Status]: The status of Pods are as follows", logrus.Fields{
 				"Pod": pod.Name, "Status": pod.Status.Phase})
@@ -299,7 +299,7 @@ func CheckAllContainerStatusesByPodName(appNs, appName string, timeout, delay in
 		Try(func(attempt uint) error {
 			pod, err := clients.KubeClient.CoreV1().Pods(appNs).Get(context.Background(), appName, metav1.GetOptions{})
 			if err != nil {
-				return cerrors.ApplicationStatusChecks{Target: fmt.Sprintf("podName: %v, namespace: %v", appName, appNs), Reason: err.Error()}
+				return cerrors.Error{ErrorCode: cerrors.ErrorTypePodStatusChecks, Target: fmt.Sprintf("podName: %v, namespace: %v", appName, appNs), Reason: err.Error()}
 			}
 			if err := validateAllContainerStatus(pod.Name, pod.Status.ContainerStatuses); err != nil {
 				return err
