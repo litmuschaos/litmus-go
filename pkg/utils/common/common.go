@@ -44,7 +44,7 @@ func RandomInterval(interval string) error {
 		lowerBound, _ = strconv.Atoi(intervals[0])
 		upperBound, _ = strconv.Atoi(intervals[1])
 	default:
-		return cerrors.Generic{Phase: "ChaosInject", Reason: "could not parse CHAOS_INTERVAL env, invalid format"}
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Phase: "ChaosInject", Reason: "could not parse CHAOS_INTERVAL env, invalid format"}
 	}
 	rand.Seed(time.Now().UnixNano())
 	waitTime := lowerBound + rand.Intn(upperBound-lowerBound)
