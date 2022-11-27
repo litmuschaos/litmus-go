@@ -18,14 +18,11 @@ type ExperimentDetails struct {
 	InstanceID         string
 	ChaosNamespace     string
 	ChaosPodName       string
-	AuxiliaryAppInfo   string
 	Timeout            int
 	Delay              int
 	Sequence           string
 	VolumeTag          string
 	Region             string
-	LIBImagePullPolicy string
-	TargetContainer    string
 	VolumeAffectedPerc int
 	EBSVolumeID        string
 	TargetVolumeIDList []string

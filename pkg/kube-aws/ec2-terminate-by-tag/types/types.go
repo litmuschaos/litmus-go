@@ -9,7 +9,6 @@ type ExperimentDetails struct {
 	ExperimentName       string
 	EngineName           string
 	RampTime             int
-	AuxiliaryAppInfo     string
 	ChaosDuration        int
 	ChaosInterval        int
 	ChaosUID             clientTypes.UID
@@ -24,7 +23,5 @@ type ExperimentDetails struct {
 	ManagedNodegroup     string
 	Sequence             string
 	ActiveNodes          int
-	LIBImagePullPolicy   string
-	TargetContainer      string
 	TargetInstanceIDList []string
 }
