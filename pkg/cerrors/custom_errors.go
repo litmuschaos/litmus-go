@@ -2,6 +2,7 @@ package cerrors
 
 import (
 	"encoding/json"
+
 	"github.com/palantir/stacktrace"
 )
 
