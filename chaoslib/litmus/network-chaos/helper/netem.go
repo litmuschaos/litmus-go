@@ -2,7 +2,9 @@ package helper
 
 import (
 	"fmt"
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	"github.com/litmuschaos/litmus-go/pkg/events"
+	"github.com/palantir/stacktrace"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -54,10 +56,11 @@ func Helper(clients clients.ClientSets) {
 	log.Info("[PreReq]: Getting the ENV variables")
 	getENV(&experimentsDetails)
 
-	// Intialise the chaos attributes
+	// Initialise the chaos attributes
 	types.InitialiseChaosVariables(&chaosDetails)
+	chaosDetails.Phase = types.ChaosInjectPhase
 
-	// Intialise Chaos Result Parameters
+	// Initialise Chaos Result Parameters
 	types.SetResultAttributes(&resultDetails, chaosDetails)
 
 	// Set the chaos result uid
@@ -65,6 +68,10 @@ func Helper(clients clients.ClientSets) {
 
 	err := preparePodNetworkChaos(&experimentsDetails, clients, &eventsDetails, &chaosDetails, &resultDetails)
 	if err != nil {
+		// update failstep inside chaosresult
+		if resultErr := result.UpdateFailedStepFromHelper(&resultDetails, &chaosDetails, clients, err); resultErr != nil {
+			log.Fatalf("helper pod failed, err: %v, resultErr: %v", err, resultErr)
+		}
 		log.Fatalf("helper pod failed, err: %v", err)
 	}
 
@@ -75,7 +82,7 @@ func preparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetail
 
 	targetEnv := os.Getenv("TARGETS")
 	if targetEnv == "" {
-		return fmt.Errorf("no target found, provide atleast one target")
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeHelper, Source: chaosDetails.ChaosPodName, Reason: "no target found, provide atleast one target"}
 	}
 
 	var targets []targetDetails
@@ -83,24 +90,25 @@ func preparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetail
 	for _, t := range strings.Split(targetEnv, ";") {
 		target := strings.Split(t, ":")
 		if len(target) != 4 {
-			return fmt.Errorf("unsupported target: '%v', provide target in '<name>:<namespace>:<container-name>:<serviceMesh>", target)
+			return cerrors.Error{ErrorCode: cerrors.ErrorTypeHelper, Source: chaosDetails.ChaosPodName, Reason: fmt.Sprintf("unsupported target format: '%v'", targets)}
 		}
 		td := targetDetails{
 			Name:            target[0],
 			Namespace:       target[1],
 			TargetContainer: target[2],
 			DestinationIps:  getDestIps(target[3]),
+			Source:          chaosDetails.ChaosPodName,
 		}
 
-		td.ContainerId, err = common.GetRuntimeBasedContainerID(experimentsDetails.ContainerRuntime, experimentsDetails.SocketPath, td.Name, td.Namespace, td.TargetContainer, clients)
+		td.ContainerId, err = common.GetRuntimeBasedContainerID(experimentsDetails.ContainerRuntime, experimentsDetails.SocketPath, td.Name, td.Namespace, td.TargetContainer, clients, td.Source)
 		if err != nil {
-			return err
+			return stacktrace.Propagate(err, "could not get container id")
 		}
 
 		// extract out the pid of the target container
-		td.Pid, err = common.GetPauseAndSandboxPID(experimentsDetails.ContainerRuntime, td.ContainerId, experimentsDetails.SocketPath)
+		td.Pid, err = common.GetPauseAndSandboxPID(experimentsDetails.ContainerRuntime, td.ContainerId, experimentsDetails.SocketPath, td.Source)
 		if err != nil {
-			return err
+			return stacktrace.Propagate(err, "could not get container pid")
 		}
 
 		targets = append(targets, td)
@@ -119,14 +127,14 @@ func preparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetail
 	for _, t := range targets {
 		// injecting network chaos inside target container
 		if err = injectChaos(experimentsDetails.NetworkInterface, t); err != nil {
-			return err
+			return stacktrace.Propagate(err, "could not inject chaos")
 		}
 		log.Infof("successfully injected chaos on target: {name: %s, namespace: %v, container: %v}", t.Name, t.Namespace, t.TargetContainer)
 		if err = result.AnnotateChaosResult(resultDetails.Name, chaosDetails.ChaosNamespace, "injected", "pod", t.Name); err != nil {
-			if _, killErr := killnetem(t, experimentsDetails.NetworkInterface); killErr != nil {
-				return fmt.Errorf("unable to revert and annotate chaosresult, err: [%v, %v]", killErr, err)
+			if _, revertErr := killnetem(t, experimentsDetails.NetworkInterface); err != nil {
+				return cerrors.PreserveError{ErrString: fmt.Sprintf("[%s,%s]", stacktrace.RootCause(err).Error(), stacktrace.RootCause(revertErr).Error())}
 			}
-			return err
+			return stacktrace.Propagate(err, "could not annotate chaosresult")
 		}
 	}
 
@@ -158,9 +166,8 @@ func preparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetail
 	}
 
 	if len(errList) != 0 {
-		return fmt.Errorf(" failed to revert chaos, err: %v", strings.Join(errList, ","))
+		return cerrors.PreserveError{ErrString: fmt.Sprintf("[%s]", strings.Join(errList, ","))}
 	}
-
 	return nil
 }
 
@@ -173,11 +180,8 @@ func injectChaos(netInterface string, target targetDetails) error {
 
 	if len(destIps) == 0 && len(sPorts) == 0 && len(dPorts) == 0 {
 		tc := fmt.Sprintf("sudo nsenter -t %d -n tc qdisc replace dev %s root netem %v", target.Pid, netInterface, netemCommands)
-		cmd := exec.Command("/bin/bash", "-c", tc)
-		out, err := cmd.CombinedOutput()
-		log.Info(cmd.String())
-		if err != nil {
-			log.Error(string(out))
+		log.Info(tc)
+		if err := common.RunBashCommand(tc, "failed to create tc rules", target.Source); err != nil {
 			return err
 		}
 	} else {
@@ -195,22 +199,16 @@ func injectChaos(netInterface string, target targetDetails) error {
 		// Create a priority-based queue
 		// This instantly creates classes 1:1, 1:2, 1:3
 		priority := fmt.Sprintf("sudo nsenter -t %v -n tc qdisc replace dev %v root handle 1: prio", target.Pid, netInterface)
-		cmd := exec.Command("/bin/bash", "-c", priority)
-		out, err := cmd.CombinedOutput()
-		log.Info(cmd.String())
-		if err != nil {
-			log.Error(string(out))
+		log.Info(priority)
+		if err := common.RunBashCommand(priority, "failed to create priority-based queue", target.Source); err != nil {
 			return err
 		}
 
 		// Add queueing discipline for 1:3 class.
 		// No traffic is going through 1:3 yet
 		traffic := fmt.Sprintf("sudo nsenter -t %v -n tc qdisc replace dev %v parent 1:3 netem %v", target.Pid, netInterface, netemCommands)
-		cmd = exec.Command("/bin/bash", "-c", traffic)
-		out, err = cmd.CombinedOutput()
-		log.Info(cmd.String())
-		if err != nil {
-			log.Error(string(out))
+		log.Info(traffic)
+		if err := common.RunBashCommand(traffic, "failed to create netem queueing discipline", target.Source); err != nil {
 			return err
 		}
 
@@ -220,11 +218,8 @@ func injectChaos(netInterface string, target targetDetails) error {
 			if strings.Contains(ip, ":") {
 				tc = fmt.Sprintf("sudo nsenter -t %v -n tc filter add dev %v protocol ip parent 1:0 prio 3 u32 match ip6 dst %v flowid 1:3", target.Pid, netInterface, ip)
 			}
-			cmd = exec.Command("/bin/bash", "-c", tc)
-			out, err = cmd.CombinedOutput()
-			log.Info(cmd.String())
-			if err != nil {
-				log.Error(string(out))
+			log.Info(tc)
+			if err := common.RunBashCommand(tc, "failed to create destination ips match filters", target.Source); err != nil {
 				return err
 			}
 		}
@@ -232,11 +227,8 @@ func injectChaos(netInterface string, target targetDetails) error {
 		for _, port := range sPorts {
 			//redirect traffic to specific sport through band 3
 			tc := fmt.Sprintf("sudo nsenter -t %v -n tc filter add dev %v protocol ip parent 1:0 prio 3 u32 match ip sport %v 0xffff flowid 1:3", target.Pid, netInterface, port)
-			cmd = exec.Command("/bin/bash", "-c", tc)
-			out, err = cmd.CombinedOutput()
-			log.Info(cmd.String())
-			if err != nil {
-				log.Error(string(out))
+			log.Info(tc)
+			if err := common.RunBashCommand(tc, "failed to create source ports match filters", target.Source); err != nil {
 				return err
 			}
 		}
@@ -244,11 +236,8 @@ func injectChaos(netInterface string, target targetDetails) error {
 		for _, port := range dPorts {
 			//redirect traffic to specific dport through band 3
 			tc := fmt.Sprintf("sudo nsenter -t %v -n tc filter add dev %v protocol ip parent 1:0 prio 3 u32 match ip dport %v 0xffff flowid 1:3", target.Pid, netInterface, port)
-			cmd = exec.Command("/bin/bash", "-c", tc)
-			out, err = cmd.CombinedOutput()
-			log.Info(cmd.String())
-			if err != nil {
-				log.Error(string(out))
+			log.Info(tc)
+			if err := common.RunBashCommand(tc, "failed to create destination ports match filters", target.Source); err != nil {
 				return err
 			}
 		}
@@ -272,8 +261,8 @@ func killnetem(target targetDetails, networkInterface string) (bool, error) {
 			log.Warn("The network chaos process has already been removed")
 			return true, err
 		}
-		log.Error(string(out))
-		return false, err
+		log.Error(err.Error())
+		return false, cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosRevert, Source: target.Source, Target: fmt.Sprintf("{podName: %s, namespace: %s, container: %s}", target.Name, target.Namespace, target.TargetContainer), Reason: fmt.Sprintf("failed to revert network faults: %s", string(out))}
 	}
 	log.Infof("successfully reverted chaos on target: {name: %s, namespace: %v, container: %v}", target.Name, target.Namespace, target.TargetContainer)
 	return true, nil
@@ -287,6 +276,7 @@ type targetDetails struct {
 	TargetContainer string
 	ContainerId     string
 	Pid             int
+	Source          string
 }
 
 //getENV fetches all the env variables from the runner pod

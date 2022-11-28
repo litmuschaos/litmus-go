@@ -49,7 +49,7 @@ func PreparePodDelete(experimentsDetails *experimentTypes.ExperimentDetails, cli
 			return stacktrace.Propagate(err, "could not run chaos in parallel mode")
 		}
 	default:
-		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Phase: "ChaosInject", Reason: fmt.Sprintf("'%s' sequence is not supported", experimentsDetails.Sequence)}
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("'%s' sequence is not supported", experimentsDetails.Sequence)}
 	}
 
 	//Waiting for the ramp time after chaos injection
@@ -79,7 +79,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		// Get the target pod details for the chaos execution
 		// if the target pod is not defined it will derive the random target pod list using pod affected percentage
 		if experimentsDetails.TargetPods == "" && chaosDetails.AppDetail == nil {
-			return cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Phase: "ChaosInject", Reason: "please provide one of the appLabel or TARGET_PODS"}
+			return cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Reason: "provide one of the appLabel or TARGET_PODS"}
 		}
 
 		targetPodList, err := common.GetTargetPods(experimentsDetails.NodeLabel, experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, clients, chaosDetails)
@@ -117,7 +117,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 				err = clients.KubeClient.CoreV1().Pods(pod.Namespace).Delete(context.Background(), pod.Name, v1.DeleteOptions{})
 			}
 			if err != nil {
-				return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Phase: "ChaosInject", Target: fmt.Sprintf("{podName: %s, namespace: %s}", pod.Name, pod.Namespace), Reason: fmt.Sprintf("failed to delete the target pod: %s", err.Error())}
+				return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Target: fmt.Sprintf("{podName: %s, namespace: %s}", pod.Name, pod.Namespace), Reason: fmt.Sprintf("failed to delete the target pod: %s", err.Error())}
 			}
 
 			switch chaosDetails.Randomness {
@@ -176,7 +176,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		// Get the target pod details for the chaos execution
 		// if the target pod is not defined it will derive the random target pod list using pod affected percentage
 		if experimentsDetails.TargetPods == "" && chaosDetails.AppDetail == nil {
-			return cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Phase: "ChaosInject", Reason: "please provide one of the appLabel or TARGET_PODS"}
+			return cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Reason: "please provide one of the appLabel or TARGET_PODS"}
 		}
 		targetPodList, err := common.GetTargetPods(experimentsDetails.NodeLabel, experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, clients, chaosDetails)
 		if err != nil {
@@ -213,7 +213,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 				err = clients.KubeClient.CoreV1().Pods(pod.Namespace).Delete(context.Background(), pod.Name, v1.DeleteOptions{})
 			}
 			if err != nil {
-				return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Phase: "ChaosInject", Target: fmt.Sprintf("{podName: %s, namespace: %s}", pod.Name, pod.Namespace), Reason: fmt.Sprintf("failed to delete the target pod: %s", err.Error())}
+				return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Target: fmt.Sprintf("{podName: %s, namespace: %s}", pod.Name, pod.Namespace), Reason: fmt.Sprintf("failed to delete the target pod: %s", err.Error())}
 			}
 		}
 
