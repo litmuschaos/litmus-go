@@ -30,6 +30,14 @@ const (
 	AbortVerdict string = "Abort"
 )
 
+type ExperimentPhase string
+
+const (
+	PreChaosPhase    ExperimentPhase = "PreChaos"
+	PostChaosPhase   ExperimentPhase = "PostChaos"
+	ChaosInjectPhase ExperimentPhase = "ChaosInject"
+)
+
 // ResultDetails is for collecting all the chaos-result-related details
 type ResultDetails struct {
 	Name             string
@@ -94,6 +102,7 @@ type ChaosDetails struct {
 	Resources            corev1.ResourceRequirements
 	ImagePullSecrets     []corev1.LocalObjectReference
 	Labels               map[string]string
+	Phase                ExperimentPhase
 }
 
 type ParentResource struct {
@@ -162,6 +171,7 @@ func InitialiseChaosVariables(chaosDetails *ChaosDetails) {
 	chaosDetails.ProbeImagePullPolicy = Getenv("LIB_IMAGE_PULL_POLICY", "Always")
 	chaosDetails.ParentsResources = []ParentResource{}
 	chaosDetails.Targets = []v1alpha1.TargetDetails{}
+	chaosDetails.Phase = PreChaosPhase
 }
 
 //SetResultAttributes initialise all the chaos result ENV
@@ -185,9 +195,11 @@ func SetResultAttributes(resultDetails *ResultDetails, chaosDetails ChaosDetails
 func SetResultAfterCompletion(resultDetails *ResultDetails, verdict v1alpha1.ResultVerdict, phase v1alpha1.ResultPhase, failStep string, errorCode cerrors.ErrorType) {
 	resultDetails.Verdict = verdict
 	resultDetails.Phase = phase
-	resultDetails.FailureOutput = &v1alpha1.FailureOutput{
-		FailedStep: failStep,
-		ErrorCode:  string(errorCode),
+	if errorCode != cerrors.ErrorTypeHelperPodFailed {
+		resultDetails.FailureOutput = &v1alpha1.FailureOutput{
+			FailedStep: failStep,
+			ErrorCode:  string(errorCode),
+		}
 	}
 }
 

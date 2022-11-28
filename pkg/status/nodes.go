@@ -28,14 +28,14 @@ func CheckNodeStatus(nodes string, timeout, delay int, clients clients.ClientSet
 				for index := range targetNodes {
 					node, err := clients.KubeClient.CoreV1().Nodes().Get(context.Background(), targetNodes[index], metav1.GetOptions{})
 					if err != nil {
-						return cerrors.Error{ErrorCode: cerrors.ErrorTypeNodeStatusChecks, Target: fmt.Sprintf("{nodeName: %s}", targetNodes[index]), Reason: err.Error()}
+						return cerrors.Error{ErrorCode: cerrors.ErrorTypeStatusChecks, Target: fmt.Sprintf("{nodeName: %s}", targetNodes[index]), Reason: err.Error()}
 					}
 					nodeList.Items = append(nodeList.Items, *node)
 				}
 			} else {
 				nodes, err := clients.KubeClient.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
 				if err != nil {
-					return cerrors.Error{ErrorCode: cerrors.ErrorTypeNodeStatusChecks, Reason: fmt.Sprintf("failed to list all nodes: %s", err.Error())}
+					return cerrors.Error{ErrorCode: cerrors.ErrorTypeStatusChecks, Reason: fmt.Sprintf("failed to list all nodes: %s", err.Error())}
 				}
 				nodeList = *nodes
 			}
@@ -49,7 +49,7 @@ func CheckNodeStatus(nodes string, timeout, delay int, clients clients.ClientSet
 					}
 				}
 				if !isReady {
-					return cerrors.Error{ErrorCode: cerrors.ErrorTypeNodeStatusChecks, Target: fmt.Sprintf("{nodeName: %s}", node.Name), Reason: "node is not in ready state"}
+					return cerrors.Error{ErrorCode: cerrors.ErrorTypeStatusChecks, Target: fmt.Sprintf("{nodeName: %s}", node.Name), Reason: "node is not in ready state"}
 				}
 				log.InfoWithValues("The Node status are as follows", logrus.Fields{
 					"Node": node.Name, "Ready": isReady})
@@ -66,7 +66,7 @@ func CheckNodeNotReadyState(nodeName string, timeout, delay int, clients clients
 		Try(func(attempt uint) error {
 			node, err := clients.KubeClient.CoreV1().Nodes().Get(context.Background(), nodeName, metav1.GetOptions{})
 			if err != nil {
-				return cerrors.Error{ErrorCode: cerrors.ErrorTypeNodeStatusChecks, Target: fmt.Sprintf("{nodeName: %s}", nodeName), Reason: err.Error()}
+				return cerrors.Error{ErrorCode: cerrors.ErrorTypeStatusChecks, Target: fmt.Sprintf("{nodeName: %s}", nodeName), Reason: err.Error()}
 			}
 			conditions := node.Status.Conditions
 			isReady := false
@@ -78,7 +78,7 @@ func CheckNodeNotReadyState(nodeName string, timeout, delay int, clients clients
 			}
 			// It will retry until the node becomes NotReady
 			if isReady {
-				return cerrors.Error{ErrorCode: cerrors.ErrorTypeNodeStatusChecks, Target: fmt.Sprintf("{nodeName: %s}", nodeName), Reason: "node is not in NotReady state during chaos"}
+				return cerrors.Error{ErrorCode: cerrors.ErrorTypeStatusChecks, Target: fmt.Sprintf("{nodeName: %s}", nodeName), Reason: "node is not in NotReady state during chaos"}
 			}
 			log.InfoWithValues("The Node status are as follows", logrus.Fields{
 				"Node": node.Name, "Ready": isReady})
