@@ -4,14 +4,16 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/litmuschaos/litmus-go/pkg/cerrors"
-	corev1 "k8s.io/api/core/v1"
 	"net/http"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
+	"github.com/palantir/stacktrace"
+	corev1 "k8s.io/api/core/v1"
 
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
@@ -69,14 +71,14 @@ func PrepareChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients
 	switch strings.ToLower(experimentsDetails.Sequence) {
 	case "serial":
 		if err := injectChaosInSerialMode(experimentsDetails, clients, chaosDetails, eventsDetails, resultDetails); err != nil {
-			return err
+			return stacktrace.Propagate(err, "could not run chaos in serial mode")
 		}
 	case "parallel":
 		if err := injectChaosInParallelMode(experimentsDetails, clients, chaosDetails, eventsDetails, resultDetails); err != nil {
-			return err
+			return stacktrace.Propagate(err, "could not run chaos in parallel mode")
 		}
 	default:
-		return errors.Errorf("%v sequence is not supported", experimentsDetails.Sequence)
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("'%s' sequence is not supported", experimentsDetails.Sequence)}
 	}
 
 	// Waiting for the ramp time after chaos injection
@@ -110,7 +112,7 @@ func CheckChaosMonkey(chaosMonkeyPort string, chaosMonkeyPath string, targetPods
 	}
 
 	if hasErrors {
-		return false, errors.Errorf("failed to check chaos moonkey on at least one pod, check logs for details")
+		return false, cerrors.Error{ErrorCode: cerrors.ErrorTypeStatusChecks, Reason: "failed to check chaos monkey on at least one pod, check logs for details"}
 	}
 	return true, nil
 }
@@ -124,7 +126,7 @@ func enableChaosMonkey(chaosMonkeyPort string, chaosMonkeyPath string, pod corev
 	}
 
 	if resp.StatusCode != 200 {
-		return errors.Errorf("failed to enable chaos monkey endpoint on pod %v (status: %v)", pod.Name, resp.StatusCode)
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("failed to enable chaos monkey endpoint on pod %v (status: %v)", pod.Name, resp.StatusCode)}
 	}
 
 	return nil
@@ -135,16 +137,16 @@ func setChaosMonkeyWatchers(chaosMonkeyPort string, chaosMonkeyPath string, watc
 
 	jsonValue, err := json.Marshal(watchers)
 	if err != nil {
-		return err
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("failed to marshal chaos monkey watchers, err: %v", err)}
 	}
 
 	resp, err := http.Post("http://"+pod.Status.PodIP+":"+chaosMonkeyPort+chaosMonkeyPath+"/watchers", "application/json", bytes.NewBuffer(jsonValue))
 	if err != nil {
-		return err
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("failed to call the chaos monkey api to set watchers, err: %v", err)}
 	}
 
 	if resp.StatusCode != 200 {
-		return errors.Errorf("failed to set assault on pod %v (status: %v)", pod.Name, resp.StatusCode)
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("failed to set assault on pod %v (status: %v)", pod.Name, resp.StatusCode)}
 	}
 
 	return nil
@@ -157,11 +159,11 @@ func startAssault(chaosMonkeyPort string, chaosMonkeyPath string, assault []byte
 	log.Infof("[Chaos]: Activating Chaos Monkey assault on pod: %v", pod.Name)
 	resp, err := http.Post("http://"+pod.Status.PodIP+":"+chaosMonkeyPort+chaosMonkeyPath+"/assaults/runtime/attack", "", nil)
 	if err != nil {
-		return err
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Reason: fmt.Sprintf("failed to call the chaos monkey api to start assault, err: %v", err)}
 	}
 
 	if resp.StatusCode != 200 {
-		return errors.Errorf("failed to activate runtime attack on pod %v (status: %v)", pod.Name, resp.StatusCode)
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Reason: fmt.Sprintf("failed to activate runtime attack on pod %v (status: %v)", pod.Name, resp.StatusCode)}
 	}
 	return nil
 }
@@ -171,11 +173,11 @@ func setChaosMonkeyAssault(chaosMonkeyPort string, chaosMonkeyPath string, assau
 
 	resp, err := http.Post("http://"+pod.Status.PodIP+":"+chaosMonkeyPort+chaosMonkeyPath+"/assaults", "application/json", bytes.NewBuffer(assault))
 	if err != nil {
-		return err
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("failed to call the chaos monkey api to set assault, err: %v", err)}
 	}
 
 	if resp.StatusCode != 200 {
-		return errors.Errorf("failed to set assault on pod %v (status: %v)", pod.Name, resp.StatusCode)
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("failed to set assault on pod %v (status: %v)", pod.Name, resp.StatusCode)}
 	}
 	return nil
 }
@@ -185,7 +187,7 @@ func disableChaosMonkey(chaosMonkeyPort string, chaosMonkeyPath string, pod core
 	log.Infof("[Chaos]: disabling assaults on pod %v", pod.Name)
 	jsonValue, err := json.Marshal(revertAssault)
 	if err != nil {
-		return err
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("failed to marshal chaos monkey revert-chaos watchers, err: %v", err)}
 	}
 	if err := setChaosMonkeyAssault(chaosMonkeyPort, chaosMonkeyPath, jsonValue, pod); err != nil {
 		return err
@@ -194,11 +196,11 @@ func disableChaosMonkey(chaosMonkeyPort string, chaosMonkeyPath string, pod core
 	log.Infof("[Chaos]: disabling chaos monkey on pod %v", pod.Name)
 	resp, err := http.Post("http://"+pod.Status.PodIP+":"+chaosMonkeyPort+chaosMonkeyPath+"/disable", "", nil)
 	if err != nil {
-		return err
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosRevert, Reason: fmt.Sprintf("failed to call the chaos monkey api to disable assault, err: %v", err)}
 	}
 
 	if resp.StatusCode != 200 {
-		return errors.Errorf("failed to disable chaos monkey endpoint on pod %v (status: %v)", pod.Name, resp.StatusCode)
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosRevert, Reason: fmt.Sprintf("failed to disable chaos monkey endpoint on pod %v (status: %v)", pod.Name, resp.StatusCode)}
 	}
 
 	return nil
@@ -282,7 +284,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 			}
 
 			if err := disableChaosMonkey(experimentsDetails.ChaosMonkeyPort, experimentsDetails.ChaosMonkeyPath, pod); err != nil {
-				return fmt.Errorf("error in disabling chaos monkey, err: %v", err)
+				return err
 			}
 
 			common.SetTargets(pod.Name, "reverted", "pod", chaosDetails)

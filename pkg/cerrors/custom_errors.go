@@ -2,6 +2,7 @@ package cerrors
 
 import (
 	"encoding/json"
+
 	"github.com/palantir/stacktrace"
 )
 
@@ -11,10 +12,11 @@ const (
 	ErrorTypeNonUserFriendly   ErrorType = "NON_USER_FRIENDLY_ERROR"
 	ErrorTypeGeneric           ErrorType = "GENERIC_ERROR"
 	ErrorTypeChaosResultCRUD   ErrorType = "CHAOS_RESULT_CRUD_ERROR"
-	ErrorTypePodStatusChecks   ErrorType = "POD_STATUS_CHECKS_ERROR"
+	ErrorTypeStatusChecks      ErrorType = "STATUS_CHECKS_ERROR"
 	ErrorTypeTargetSelection   ErrorType = "TARGET_SELECTION_ERROR"
 	ErrorTypeExperimentAborted ErrorType = "EXPERIMENT_ABORTED"
-	ErrorTypeNodeStatusChecks  ErrorType = "NODE_STATUS_CHECKS_ERROR"
+	ErrorTypeChaosInject       ErrorType = "CHAOS_INJECT_ERROR"
+	ErrorTypeChaosRevert       ErrorType = "CHAOS_REVERT_ERROR"
 )
 
 type userFriendly interface {

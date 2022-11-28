@@ -54,7 +54,7 @@ func PrepareDiskVolumeLoss(computeService *compute.Service, experimentsDetails *
 
 	//get the device names for the given disks
 	if err := getDeviceNamesList(computeService, experimentsDetails, diskNamesList, diskZonesList); err != nil {
-		return cerrors.Generic{Phase: "ChaosInject", Reason: "failed to fetch the device names of the given disks"}
+		return stacktrace.Propagate(err, "failed to fetch the disk device names")
 	}
 
 	select {
@@ -76,7 +76,7 @@ func PrepareDiskVolumeLoss(computeService *compute.Service, experimentsDetails *
 				return stacktrace.Propagate(err, "could not run chaos in parallel mode")
 			}
 		default:
-			return cerrors.Generic{Phase: "ChaosInject", Reason: fmt.Sprintf("'%s' sequence is not supported", experimentsDetails.Sequence)}
+			return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("'%s' sequence is not supported", experimentsDetails.Sequence)}
 		}
 	}
 

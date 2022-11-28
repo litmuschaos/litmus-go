@@ -25,12 +25,12 @@ func WaitForVolumeDetachment(computeService *compute.Service, diskName, gcpProje
 
 			volumeState, err := GetDiskVolumeState(computeService, diskName, gcpProjectID, instanceName, zone)
 			if err != nil {
-				return cerrors.TargetDiskSelection{Target: fmt.Sprintf("{diskName: %s, zone: %s}", diskName, zone), Reason: "failed to get the volume state"}
+				return stacktrace.Propagate(err, "failed to get the volume state")
 			}
 
 			if volumeState != "detached" {
 				log.Infof("[Info]: The volume state is %v", volumeState)
-				return cerrors.TargetDiskSelection{Target: fmt.Sprintf("{diskName: %s, zone: %s}", diskName, zone), Reason: "volume is not yet in detached state"}
+				return cerrors.Error{ErrorCode: cerrors.ErrorTypeStatusChecks, Target: fmt.Sprintf("{diskName: %s, zone: %s}", diskName, zone), Reason: "volume is not yet in detached state"}
 			}
 
 			log.Infof("[Info]: %s volume state is %v", diskName, volumeState)
@@ -49,12 +49,12 @@ func WaitForVolumeAttachment(computeService *compute.Service, diskName, gcpProje
 
 			volumeState, err := GetDiskVolumeState(computeService, diskName, gcpProjectID, instanceName, zone)
 			if err != nil {
-				return cerrors.TargetDiskSelection{Target: fmt.Sprintf("{diskName: %s, zone: %s}", diskName, zone), Reason: "failed to get the volume status"}
+				return stacktrace.Propagate(err, "failed to get the volume status")
 			}
 
 			if volumeState != "attached" {
 				log.Infof("[Info]: The volume state is %v", volumeState)
-				return cerrors.TargetDiskSelection{Target: fmt.Sprintf("{diskName: %s, zone: %s}", diskName, zone), Reason: "volume is not yet in attached state"}
+				return cerrors.Error{ErrorCode: cerrors.ErrorTypeStatusChecks, Target: fmt.Sprintf("{diskName: %s, zone: %s}", diskName, zone), Reason: "volume is not yet in attached state"}
 			}
 
 			log.Infof("[Info]: %s volume state is %v", diskName, volumeState)
@@ -67,7 +67,7 @@ func GetDiskVolumeState(computeService *compute.Service, diskName, gcpProjectID,
 
 	diskDetails, err := computeService.Disks.Get(gcpProjectID, zone, diskName).Do()
 	if err != nil {
-		return "", cerrors.TargetDiskSelection{Target: fmt.Sprintf("{diskName: %s, zone: %s}", diskName, zone), Reason: err.Error()}
+		return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeStatusChecks, Target: fmt.Sprintf("{diskName: %s, zone: %s}", diskName, zone), Reason: err.Error()}
 	}
 
 	for _, user := range diskDetails.Users {
@@ -102,21 +102,21 @@ func GetDiskVolumeState(computeService *compute.Service, diskName, gcpProjectID,
 func DiskVolumeStateCheck(computeService *compute.Service, experimentsDetails *experimentTypes.ExperimentDetails) error {
 
 	if experimentsDetails.GCPProjectID == "" {
-		return cerrors.TargetDiskSelection{Target: fmt.Sprintf("{projectId: %s}", experimentsDetails.GCPProjectID), Reason: "no gcp project id provided, please provide the project id"}
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeStatusChecks, Target: fmt.Sprintf("{projectId: %s}", experimentsDetails.GCPProjectID), Reason: "no gcp project id provided, please provide the project id"}
 	}
 
 	diskNamesList := strings.Split(experimentsDetails.DiskVolumeNames, ",")
 	if len(diskNamesList) == 0 {
-		return cerrors.TargetDiskSelection{Target: fmt.Sprintf("{diskNames: %v}", diskNamesList), Reason: "no disk name provided, please provide the name of the disk"}
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeStatusChecks, Target: fmt.Sprintf("{diskNames: %v}", diskNamesList), Reason: "no disk name provided, please provide the name of the disk"}
 	}
 
 	zonesList := strings.Split(experimentsDetails.Zones, ",")
 	if len(zonesList) == 0 {
-		return cerrors.TargetDiskSelection{Target: fmt.Sprintf("{zones: %v}", zonesList), Reason: "no zone provided, please provide the zone of the disk"}
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeStatusChecks, Target: fmt.Sprintf("{zones: %v}", zonesList), Reason: "no zone provided, please provide the zone of the disk"}
 	}
 
 	if len(diskNamesList) != len(zonesList) {
-		return cerrors.TargetDiskSelection{Target: fmt.Sprintf("{diskNames: %v, zones: %v}", diskNamesList, zonesList), Reason: "unequal number of disk names and zones found, please verify the input details"}
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeStatusChecks, Target: fmt.Sprintf("{diskNames: %v, zones: %v}", diskNamesList, zonesList), Reason: "unequal number of disk names and zones found, please verify the input details"}
 	}
 
 	for i := range diskNamesList {

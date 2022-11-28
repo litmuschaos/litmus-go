@@ -8,6 +8,7 @@ import (
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/gcp/gcp-vm-instance-stop/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
+	"github.com/palantir/stacktrace"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/api/compute/v1"
 )
@@ -18,7 +19,7 @@ func VMInstanceStop(computeService *compute.Service, instanceName string, gcpPro
 	// stop the requisite VM instance
 	_, err := computeService.Instances.Stop(gcpProjectID, instanceZone, instanceName).Do()
 	if err != nil {
-		return cerrors.TargetVMSelection{Target: fmt.Sprintf("{vmName: %s, zone: %s}", instanceName, instanceZone), Reason: err.Error()}
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Target: fmt.Sprintf("{vmName: %s, zone: %s}", instanceName, instanceZone), Reason: err.Error()}
 	}
 
 	log.InfoWithValues("Stopping VM instance:", logrus.Fields{
@@ -34,7 +35,7 @@ func VMInstanceStart(computeService *compute.Service, instanceName string, gcpPr
 	// start the requisite VM instance
 	_, err := computeService.Instances.Start(gcpProjectID, instanceZone, instanceName).Do()
 	if err != nil {
-		return cerrors.TargetVMSelection{Target: fmt.Sprintf("{vmName: %s, zone: %s}", instanceName, instanceZone), Reason: err.Error()}
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosRevert, Target: fmt.Sprintf("{vmName: %s, zone: %s}", instanceName, instanceZone), Reason: err.Error()}
 	}
 
 	log.InfoWithValues("Starting VM instance:", logrus.Fields{
@@ -57,13 +58,13 @@ func WaitForVMInstanceDown(computeService *compute.Service, timeout int, delay i
 
 			instanceState, err := GetVMInstanceStatus(computeService, instanceName, gcpProjectID, instanceZone)
 			if err != nil {
-				return cerrors.TargetVMSelection{Target: fmt.Sprintf("{vmName: %s, zone: %s}", instanceName, instanceZone), Reason: "failed to get the vm instance status"}
+				return stacktrace.Propagate(err, "failed to get the vm instance status")
 			}
 
 			log.Infof("The %s vm instance state is %v", instanceName, instanceState)
 
 			if instanceState != "TERMINATED" {
-				return cerrors.TargetVMSelection{Target: fmt.Sprintf("{vmName: %s, zone: %s}", instanceName, instanceZone), Reason: "vm instance is not yet in stopped state"}
+				return cerrors.Error{ErrorCode: cerrors.ErrorTypeStatusChecks, Target: fmt.Sprintf("{vmName: %s, zone: %s}", instanceName, instanceZone), Reason: "vm instance is not yet in stopped state"}
 			}
 
 			return nil
@@ -82,13 +83,13 @@ func WaitForVMInstanceUp(computeService *compute.Service, timeout int, delay int
 
 			instanceState, err := GetVMInstanceStatus(computeService, instanceName, gcpProjectID, instanceZone)
 			if err != nil {
-				return cerrors.TargetVMSelection{Target: fmt.Sprintf("{vmName: %s, zone: %s}", instanceName, instanceZone), Reason: "failed to get the vm instance status"}
+				return stacktrace.Propagate(err, "failed to get the vm instance status")
 			}
 
 			log.Infof("The %s vm instance state is %v", instanceName, instanceState)
 
 			if instanceState != "RUNNING" {
-				return cerrors.TargetVMSelection{Target: fmt.Sprintf("{vmName: %s, zone: %s}", instanceName, instanceZone), Reason: "vm instance is not yet in running state"}
+				return cerrors.Error{ErrorCode: cerrors.ErrorTypeStatusChecks, Target: fmt.Sprintf("{vmName: %s, zone: %s}", instanceName, instanceZone), Reason: "vm instance is not yet in running state"}
 			}
 
 			return nil
@@ -99,12 +100,12 @@ func WaitForVMInstanceUp(computeService *compute.Service, timeout int, delay int
 func SetTargetInstance(computeService *compute.Service, experimentsDetails *experimentTypes.ExperimentDetails) error {
 
 	if experimentsDetails.InstanceLabel == "" {
-		return cerrors.TargetVMSelection{Target: fmt.Sprintf("{label: %s}", experimentsDetails.InstanceLabel), Reason: "label not found, please provide a valid label"}
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Target: fmt.Sprintf("{label: %s}", experimentsDetails.InstanceLabel), Reason: "label not found, please provide a valid label"}
 	}
 
 	response, err := computeService.Instances.List(experimentsDetails.GCPProjectID, experimentsDetails.Zones).Filter("labels." + experimentsDetails.InstanceLabel + ":*").Do()
 	if err != nil {
-		return cerrors.TargetVMSelection{Target: fmt.Sprintf("{label: %s, zone: %s}", experimentsDetails.InstanceLabel, experimentsDetails.Zones), Reason: err.Error()}
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Target: fmt.Sprintf("{label: %s, zone: %s}", experimentsDetails.InstanceLabel, experimentsDetails.Zones), Reason: err.Error()}
 	}
 
 	for _, instance := range response.Items {
@@ -114,7 +115,7 @@ func SetTargetInstance(computeService *compute.Service, experimentsDetails *expe
 	}
 
 	if len(experimentsDetails.TargetVMInstanceNameList) == 0 {
-		return cerrors.TargetVMSelection{Target: fmt.Sprintf("{label: %s, zone: %s}", experimentsDetails.InstanceLabel, experimentsDetails.Zones), Reason: "no RUNNING VM instances found with the given label"}
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Target: fmt.Sprintf("{label: %s, zone: %s}", experimentsDetails.InstanceLabel, experimentsDetails.Zones), Reason: "no RUNNING VM instances found with the given label"}
 	}
 
 	log.InfoWithValues("[Info]: Targeting the RUNNING VM instances filtered from instance label", logrus.Fields{
