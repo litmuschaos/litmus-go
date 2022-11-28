@@ -11,12 +11,10 @@ type ExperimentDetails struct {
 	ChaosDuration    int
 	ChaosInterval    int
 	RampTime         int
-	AuxiliaryAppInfo string
 	ChaosUID         clientTypes.UID
 	InstanceID       string
 	ChaosNamespace   string
 	ChaosPodName     string
-	TargetContainer  string
 	Timeout          int
 	Delay            int
 	ScaleSet         string
