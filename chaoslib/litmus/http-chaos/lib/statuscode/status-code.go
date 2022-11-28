@@ -2,6 +2,7 @@ package statuscode
 
 import (
 	"fmt"
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	"math"
 	"math/rand"
 	"strconv"
@@ -14,7 +15,6 @@ import (
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/http-chaos/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/types"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -71,11 +71,11 @@ func GetStatusCode(statusCode string) (string, error) {
 	} else {
 		acceptedCodes := getAcceptedCodesInList(statusCodeList, acceptedStatusCodes)
 		if len(acceptedCodes) == 0 {
-			return "", errors.Errorf("invalid status code provided, code: %s", statusCode)
+			return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("invalid status code: %s", statusCode)}
 		}
 		return acceptedCodes[rand.Intn(len(acceptedCodes))], nil
 	}
-	return "", errors.Errorf("status code %s is not supported. \nList of supported status codes: %v", statusCode, acceptedStatusCodes)
+	return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("status code '%s' is not supported. Supported status codes are: %v", statusCode, acceptedStatusCodes)}
 }
 
 // getAcceptedCodesInList returns the list of accepted status codes from a list of status codes

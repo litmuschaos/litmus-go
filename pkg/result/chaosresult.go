@@ -115,7 +115,7 @@ func InitializeChaosResult(chaosDetails *types.ChaosDetails, clients clients.Cli
 	if k8serrors.IsAlreadyExists(err) {
 		chaosResult, err = clients.LitmusClient.ChaosResults(chaosDetails.ChaosNamespace).Get(context.Background(), resultDetails.Name, v1.GetOptions{})
 		if err != nil {
-			return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosResultCRUD, Phase: "PreChaos", Target: fmt.Sprintf("{name: %s, namespace: %s}", resultDetails.Name, chaosDetails.ChaosNamespace), Reason: err.Error()}
+			return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosResultCRUD, Target: fmt.Sprintf("{name: %s, namespace: %s}", resultDetails.Name, chaosDetails.ChaosNamespace), Reason: err.Error()}
 		}
 
 		// updating the chaosresult with new values
@@ -155,7 +155,9 @@ func updateResultAttributes(clients clients.ClientSets, chaosDetails *types.Chao
 	var isAllProbePassed bool
 	result.Status.ExperimentStatus.Phase = resultDetails.Phase
 	result.Spec.InstanceID = chaosDetails.InstanceID
-	result.Status.ExperimentStatus.FailureOutput = resultDetails.FailureOutput
+	if resultDetails.FailureOutput != nil || resultDetails.Phase == v1alpha1.ResultPhaseRunning {
+		result.Status.ExperimentStatus.FailureOutput = resultDetails.FailureOutput
+	}
 
 	// for existing chaos result resource it will patch the label
 	result.ObjectMeta.Labels = chaosResultLabel
@@ -233,7 +235,7 @@ func SetResultUID(resultDetails *types.ResultDetails, clients clients.ClientSets
 
 	result, err := clients.LitmusClient.ChaosResults(chaosDetails.ChaosNamespace).Get(context.Background(), resultDetails.Name, v1.GetOptions{})
 	if err != nil {
-		return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosResultCRUD, Phase: "PreChaos", Target: fmt.Sprintf("{name: %s, namespace: %s}", resultDetails.Name, chaosDetails.ChaosNamespace), Reason: err.Error()}
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosResultCRUD, Target: fmt.Sprintf("{name: %s, namespace: %s}", resultDetails.Name, chaosDetails.ChaosNamespace), Reason: err.Error()}
 	}
 
 	resultDetails.ResultUID = result.UID
@@ -242,7 +244,7 @@ func SetResultUID(resultDetails *types.ResultDetails, clients clients.ClientSets
 
 //RecordAfterFailure update the chaosresult and create the summary events
 func RecordAfterFailure(chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, err error, clients clients.ClientSets, eventsDetails *types.EventDetails) {
-	failStep, errorCode := cerrors.GetRootCauseAndErrorCode(err)
+	failStep, errorCode := cerrors.GetRootCauseAndErrorCode(err, string(chaosDetails.Phase))
 
 	// update the chaos result
 	types.SetResultAfterCompletion(resultDetails, "Fail", "Completed", failStep, errorCode)
@@ -298,7 +300,7 @@ func GetChaosStatus(resultDetails *types.ResultDetails, chaosDetails *types.Chao
 
 	result, err := clients.LitmusClient.ChaosResults(chaosDetails.ChaosNamespace).Get(context.Background(), resultDetails.Name, v1.GetOptions{})
 	if err != nil {
-		return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosResultCRUD, Phase: "PreChaos", Target: fmt.Sprintf("{name: %s, namespace: %s}", resultDetails.Name, chaosDetails.ChaosNamespace), Reason: err.Error()}
+		return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosResultCRUD, Target: fmt.Sprintf("{name: %s, namespace: %s}", resultDetails.Name, chaosDetails.ChaosNamespace), Reason: err.Error()}
 	}
 	annotations := result.ObjectMeta.Annotations
 	targetList := chaosDetails.Targets
@@ -321,6 +323,35 @@ func GetChaosStatus(resultDetails *types.ResultDetails, chaosDetails *types.Chao
 	chaosDetails.Targets = targetList
 	result.Annotations = annotations
 	return result, nil
+}
+
+func UpdateFailedStepFromHelper(resultDetails *types.ResultDetails, chaosDetails *types.ChaosDetails, client clients.ClientSets, err error) error {
+	rootCause, errCode := cerrors.GetRootCauseAndErrorCode(err, string(chaosDetails.Phase))
+	return retry.
+		Times(uint(chaosDetails.Timeout / chaosDetails.Delay)).
+		Wait(time.Duration(chaosDetails.Delay) * time.Second).
+		Try(func(attempt uint) error {
+			chaosResult, err := client.LitmusClient.ChaosResults(chaosDetails.ChaosNamespace).Get(context.Background(), resultDetails.Name, v1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			if chaosResult.Status.ExperimentStatus.FailureOutput != nil {
+				chaosResult.Status.ExperimentStatus.FailureOutput.FailedStep = appendFailStep(chaosResult.Status.ExperimentStatus.FailureOutput.FailedStep, rootCause)
+			} else {
+				chaosResult.Status.ExperimentStatus.FailureOutput = &v1alpha1.FailureOutput{
+					FailedStep: rootCause,
+					ErrorCode:  string(errCode),
+				}
+			}
+			_, err = client.LitmusClient.ChaosResults(chaosDetails.ChaosNamespace).Update(context.Background(), chaosResult, v1.UpdateOptions{})
+			return err
+		})
+}
+
+func appendFailStep(failStep string, rootCause string) string {
+	failStep = strings.TrimPrefix(failStep, "[")
+	failStep = strings.TrimSuffix(failStep, "]")
+	return fmt.Sprintf("[%s,%s]", failStep, rootCause)
 }
 
 // updates the chaos status of targets which is already present inside history.targets

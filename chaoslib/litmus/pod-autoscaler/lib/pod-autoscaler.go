@@ -2,7 +2,9 @@ package lib
 
 import (
 	"context"
-	"math"
+	"fmt"
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
+	"github.com/palantir/stacktrace"
 	"os"
 	"os/signal"
 	"strings"
@@ -12,6 +14,7 @@ import (
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-autoscaler/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
+	"github.com/litmuschaos/litmus-go/pkg/math"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
@@ -20,8 +23,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	retries "k8s.io/client-go/util/retry"
-
-	"github.com/pkg/errors"
 )
 
 var (
@@ -30,7 +31,7 @@ var (
 	appsv1StatefulsetClient appsv1.StatefulSetInterface
 )
 
-//PreparePodAutoscaler contains the prepration steps and chaos injection steps
+//PreparePodAutoscaler contains the preparation steps and chaos injection steps
 func PreparePodAutoscaler(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	//Waiting for the ramp time before chaos injection
@@ -46,9 +47,9 @@ func PreparePodAutoscaler(experimentsDetails *experimentTypes.ExperimentDetails,
 	switch strings.ToLower(experimentsDetails.AppKind) {
 	case "deployment", "deployments":
 
-		appsUnderTest, err := getDeploymentDetails(experimentsDetails, clients)
+		appsUnderTest, err := getDeploymentDetails(experimentsDetails)
 		if err != nil {
-			return errors.Errorf("fail to get the name & initial replica count of the deployment, err: %v", err)
+			return stacktrace.Propagate(err, "could not get deployment details")
 		}
 
 		deploymentList := []string{}
@@ -64,21 +65,21 @@ func PreparePodAutoscaler(experimentsDetails *experimentTypes.ExperimentDetails,
 		go abortPodAutoScalerChaos(appsUnderTest, experimentsDetails, clients, resultDetails, eventsDetails, chaosDetails)
 
 		if err = podAutoscalerChaosInDeployment(experimentsDetails, clients, appsUnderTest, resultDetails, eventsDetails, chaosDetails); err != nil {
-			return errors.Errorf("fail to perform autoscaling, err: %v", err)
+			return stacktrace.Propagate(err, "could not scale deployment")
 		}
 
 		if err = autoscalerRecoveryInDeployment(experimentsDetails, clients, appsUnderTest, chaosDetails); err != nil {
-			return errors.Errorf("fail to rollback the autoscaling, err: %v", err)
+			return stacktrace.Propagate(err, "could not revert scaling in deployment")
 		}
 
 	case "statefulset", "statefulsets":
 
-		appsUnderTest, err := getStatefulsetDetails(experimentsDetails, clients)
+		appsUnderTest, err := getStatefulsetDetails(experimentsDetails)
 		if err != nil {
-			return errors.Errorf("fail to get the name & initial replica count of the statefulset, err: %v", err)
+			return stacktrace.Propagate(err, "could not get statefulset details")
 		}
 
-		stsList := []string{}
+		var stsList []string
 		for _, sts := range appsUnderTest {
 			stsList = append(stsList, sts.AppName)
 		}
@@ -91,15 +92,15 @@ func PreparePodAutoscaler(experimentsDetails *experimentTypes.ExperimentDetails,
 		go abortPodAutoScalerChaos(appsUnderTest, experimentsDetails, clients, resultDetails, eventsDetails, chaosDetails)
 
 		if err = podAutoscalerChaosInStatefulset(experimentsDetails, clients, appsUnderTest, resultDetails, eventsDetails, chaosDetails); err != nil {
-			return errors.Errorf("fail to perform autoscaling, err: %v", err)
+			return stacktrace.Propagate(err, "could not scale statefulset")
 		}
 
 		if err = autoscalerRecoveryInStatefulset(experimentsDetails, clients, appsUnderTest, chaosDetails); err != nil {
-			return errors.Errorf("fail to rollback the autoscaling, err: %v", err)
+			return stacktrace.Propagate(err, "could not revert scaling in statefulset")
 		}
 
 	default:
-		return errors.Errorf("application type '%s' is not supported for the chaos", experimentsDetails.AppKind)
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Target: fmt.Sprintf("{kind: %s}", experimentsDetails.AppKind), Reason: "application type is not supported"}
 	}
 
 	//Waiting for the ramp time after chaos injection
@@ -110,38 +111,38 @@ func PreparePodAutoscaler(experimentsDetails *experimentTypes.ExperimentDetails,
 	return nil
 }
 
-func getSliceOfTotalApplicationsTargeted(appList []experimentTypes.ApplicationUnderTest, experimentsDetails *experimentTypes.ExperimentDetails) ([]experimentTypes.ApplicationUnderTest, error) {
+func getSliceOfTotalApplicationsTargeted(appList []experimentTypes.ApplicationUnderTest, experimentsDetails *experimentTypes.ExperimentDetails) []experimentTypes.ApplicationUnderTest {
 
-	slice := int(math.Round(float64(len(appList)*experimentsDetails.AppAffectPercentage) / float64(100)))
-	if slice < 0 || slice > len(appList) {
-		return nil, errors.Errorf("slice of applications to target out of range %d/%d", slice, len(appList))
-	}
-	return appList[:slice], nil
+	newAppListLength := math.Maximum(1, math.Adjustment(math.Minimum(experimentsDetails.AppAffectPercentage, 100), len(appList)))
+	return appList[:newAppListLength]
 }
 
 //getDeploymentDetails is used to get the name and total number of replicas of the deployment
-func getDeploymentDetails(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) ([]experimentTypes.ApplicationUnderTest, error) {
+func getDeploymentDetails(experimentsDetails *experimentTypes.ExperimentDetails) ([]experimentTypes.ApplicationUnderTest, error) {
 
 	deploymentList, err := appsv1DeploymentClient.List(context.Background(), metav1.ListOptions{LabelSelector: experimentsDetails.AppLabel})
-	if err != nil || len(deploymentList.Items) == 0 {
-		return nil, errors.Errorf("fail to get the deployments with matching labels, err: %v", err)
+	if err != nil {
+		return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Target: fmt.Sprintf("{kind: deployment, labels: %s}", experimentsDetails.AppLabel), Reason: err.Error()}
+	} else if len(deploymentList.Items) == 0 {
+		return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Target: fmt.Sprintf("{kind: deployment, labels: %s}", experimentsDetails.AppLabel), Reason: "no deployment found with matching labels"}
 	}
-	appsUnderTest := []experimentTypes.ApplicationUnderTest{}
+	var appsUnderTest []experimentTypes.ApplicationUnderTest
 	for _, app := range deploymentList.Items {
 		log.Infof("[Info]: Found deployment name '%s' with replica count '%d'", app.Name, int(*app.Spec.Replicas))
 		appsUnderTest = append(appsUnderTest, experimentTypes.ApplicationUnderTest{AppName: app.Name, ReplicaCount: int(*app.Spec.Replicas)})
 	}
-	// Applying the APP_AFFECT_PERC variable to determine the total target deployments to scale
-	return getSliceOfTotalApplicationsTargeted(appsUnderTest, experimentsDetails)
-
+	// Applying the APP_AFFECTED_PERC variable to determine the total target deployments to scale
+	return getSliceOfTotalApplicationsTargeted(appsUnderTest, experimentsDetails), nil
 }
 
 //getStatefulsetDetails is used to get the name and total number of replicas of the statefulsets
-func getStatefulsetDetails(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) ([]experimentTypes.ApplicationUnderTest, error) {
+func getStatefulsetDetails(experimentsDetails *experimentTypes.ExperimentDetails) ([]experimentTypes.ApplicationUnderTest, error) {
 
 	statefulsetList, err := appsv1StatefulsetClient.List(context.Background(), metav1.ListOptions{LabelSelector: experimentsDetails.AppLabel})
-	if err != nil || len(statefulsetList.Items) == 0 {
-		return nil, errors.Errorf("fail to get the statefulsets with matching labels, err: %v", err)
+	if err != nil {
+		return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Target: fmt.Sprintf("{kind: statefulset, labels: %s}", experimentsDetails.AppLabel), Reason: err.Error()}
+	} else if len(statefulsetList.Items) == 0 {
+		return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Target: fmt.Sprintf("{kind: statefulset, labels: %s}", experimentsDetails.AppLabel), Reason: "no statefulset found with matching labels"}
 	}
 
 	appsUnderTest := []experimentTypes.ApplicationUnderTest{}
@@ -150,7 +151,7 @@ func getStatefulsetDetails(experimentsDetails *experimentTypes.ExperimentDetails
 		appsUnderTest = append(appsUnderTest, experimentTypes.ApplicationUnderTest{AppName: app.Name, ReplicaCount: int(*app.Spec.Replicas)})
 	}
 	// Applying the APP_AFFECT_PERC variable to determine the total target deployments to scale
-	return getSliceOfTotalApplicationsTargeted(appsUnderTest, experimentsDetails)
+	return getSliceOfTotalApplicationsTargeted(appsUnderTest, experimentsDetails), nil
 }
 
 //podAutoscalerChaosInDeployment scales up the replicas of deployment and verify the status
@@ -163,29 +164,25 @@ func podAutoscalerChaosInDeployment(experimentsDetails *experimentTypes.Experime
 			// RetryOnConflict uses exponential backoff to avoid exhausting the apiserver
 			appUnderTest, err := appsv1DeploymentClient.Get(context.Background(), app.AppName, metav1.GetOptions{})
 			if err != nil {
-				return errors.Errorf("fail to get latest version of application deployment, err: %v", err)
+				return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Target: fmt.Sprintf("{kind: deployment, name: %s, namespace: %s}", app.AppName, experimentsDetails.AppNS), Reason: err.Error()}
 			}
 			// modifying the replica count
 			appUnderTest.Spec.Replicas = int32Ptr(int32(experimentsDetails.Replicas))
 			log.Infof("Updating deployment '%s' to number of replicas '%d'", appUnderTest.ObjectMeta.Name, experimentsDetails.Replicas)
 			_, err = appsv1DeploymentClient.Update(context.Background(), appUnderTest, metav1.UpdateOptions{})
 			if err != nil {
-				return err
+				return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Target: fmt.Sprintf("{kind: deployment, name: %s, namespace: %s}", app.AppName, experimentsDetails.AppNS), Reason: fmt.Sprintf("failed to scale deployment :%s", err.Error())}
 			}
 			common.SetTargets(app.AppName, "injected", "deployment", chaosDetails)
 		}
 		return nil
 	})
 	if retryErr != nil {
-		return errors.Errorf("fail to update the replica count of the deployment, err: %v", retryErr)
+		return retryErr
 	}
 	log.Info("[Info]: The application started scaling")
 
-	if err = deploymentStatusCheck(experimentsDetails, clients, appsUnderTest, resultDetails, eventsDetails, chaosDetails); err != nil {
-		return errors.Errorf("application deployment status check failed, err: %v", err)
-	}
-
-	return nil
+	return deploymentStatusCheck(experimentsDetails, clients, appsUnderTest, resultDetails, eventsDetails, chaosDetails)
 }
 
 //podAutoscalerChaosInStatefulset scales up the replicas of statefulset and verify the status
@@ -198,28 +195,24 @@ func podAutoscalerChaosInStatefulset(experimentsDetails *experimentTypes.Experim
 			// RetryOnConflict uses exponential backoff to avoid exhausting the apiserver
 			appUnderTest, err := appsv1StatefulsetClient.Get(context.Background(), app.AppName, metav1.GetOptions{})
 			if err != nil {
-				return errors.Errorf("fail to get latest version of the target statefulset application , err: %v", err)
+				return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Target: fmt.Sprintf("{kind: statefulset, name: %s, namespace: %s}", app.AppName, experimentsDetails.AppNS), Reason: err.Error()}
 			}
 			// modifying the replica count
 			appUnderTest.Spec.Replicas = int32Ptr(int32(experimentsDetails.Replicas))
 			_, err = appsv1StatefulsetClient.Update(context.Background(), appUnderTest, metav1.UpdateOptions{})
 			if err != nil {
-				return err
+				return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Target: fmt.Sprintf("{kind: statefulset, name: %s, namespace: %s}", app.AppName, experimentsDetails.AppNS), Reason: fmt.Sprintf("failed to scale statefulset :%s", err.Error())}
 			}
 			common.SetTargets(app.AppName, "injected", "statefulset", chaosDetails)
 		}
 		return nil
 	})
 	if retryErr != nil {
-		return errors.Errorf("fail to update the replica count of the statefulset application, err: %v", retryErr)
+		return retryErr
 	}
 	log.Info("[Info]: The application started scaling")
 
-	if err = statefulsetStatusCheck(experimentsDetails, clients, appsUnderTest, resultDetails, eventsDetails, chaosDetails); err != nil {
-		return errors.Errorf("statefulset application status check failed, err: %v", err)
-	}
-
-	return nil
+	return statefulsetStatusCheck(experimentsDetails, clients, appsUnderTest, resultDetails, eventsDetails, chaosDetails)
 }
 
 // deploymentStatusCheck check the status of deployment and verify the available replicas
@@ -227,7 +220,6 @@ func deploymentStatusCheck(experimentsDetails *experimentTypes.ExperimentDetails
 
 	//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
 	ChaosStartTimeStamp := time.Now()
-	isFailed := false
 
 	err = retry.
 		Times(uint(experimentsDetails.ChaosDuration / experimentsDetails.Delay)).
@@ -236,25 +228,20 @@ func deploymentStatusCheck(experimentsDetails *experimentTypes.ExperimentDetails
 			for _, app := range appsUnderTest {
 				deployment, err := appsv1DeploymentClient.Get(context.Background(), app.AppName, metav1.GetOptions{})
 				if err != nil {
-					return errors.Errorf("fail to find the deployment with name %v, err: %v", app.AppName, err)
+					return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Target: fmt.Sprintf("{kind: deployment, namespace: %s, name: %s}", experimentsDetails.AppNS, app.AppName), Reason: err.Error()}
 				}
 				if int(deployment.Status.ReadyReplicas) != experimentsDetails.Replicas {
-					isFailed = true
-					return errors.Errorf("application %s is not scaled yet, the desired replica count is: %v and ready replica count is: %v", app.AppName, experimentsDetails.Replicas, deployment.Status.ReadyReplicas)
+					return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Target: fmt.Sprintf("{kind: deployment, namespace: %s, name: %s}", experimentsDetails.AppNS, app.AppName), Reason: fmt.Sprintf("failed to scale deployment, the desired replica count is: %v and ready replica count is: %v", experimentsDetails.Replicas, deployment.Status.ReadyReplicas)}
 				}
 			}
-			isFailed = false
 			return nil
 		})
 
-	if isFailed {
-		if err = autoscalerRecoveryInDeployment(experimentsDetails, clients, appsUnderTest, chaosDetails); err != nil {
-			return errors.Errorf("fail to perform the autoscaler recovery of the deployment, err: %v", err)
-		}
-		return errors.Errorf("fail to scale the deployment to the desired replica count in the given chaos duration")
-	}
 	if err != nil {
-		return err
+		if scaleErr := autoscalerRecoveryInDeployment(experimentsDetails, clients, appsUnderTest, chaosDetails); scaleErr != nil {
+			return cerrors.PreserveError{ErrString: fmt.Sprintf("[%s,%s]", stacktrace.RootCause(err).Error(), stacktrace.RootCause(scaleErr).Error())}
+		}
+		return stacktrace.Propagate(err, "failed to scale replicas")
 	}
 
 	// run the probes during chaos
@@ -263,6 +250,7 @@ func deploymentStatusCheck(experimentsDetails *experimentTypes.ExperimentDetails
 			return err
 		}
 	}
+
 	duration := int(time.Since(ChaosStartTimeStamp).Seconds())
 	if duration < experimentsDetails.ChaosDuration {
 		log.Info("[Wait]: Waiting for completion of chaos duration")
@@ -277,7 +265,6 @@ func statefulsetStatusCheck(experimentsDetails *experimentTypes.ExperimentDetail
 
 	//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
 	ChaosStartTimeStamp := time.Now()
-	isFailed := false
 
 	err = retry.
 		Times(uint(experimentsDetails.ChaosDuration / experimentsDetails.Delay)).
@@ -286,25 +273,20 @@ func statefulsetStatusCheck(experimentsDetails *experimentTypes.ExperimentDetail
 			for _, app := range appsUnderTest {
 				statefulset, err := appsv1StatefulsetClient.Get(context.Background(), app.AppName, metav1.GetOptions{})
 				if err != nil {
-					return errors.Errorf("fail to find the statefulset with name %v, err: %v", app.AppName, err)
+					return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Target: fmt.Sprintf("{kind: statefulset, namespace: %s, name: %s}", experimentsDetails.AppNS, app.AppName), Reason: err.Error()}
 				}
 				if int(statefulset.Status.ReadyReplicas) != experimentsDetails.Replicas {
-					isFailed = true
-					return errors.Errorf("application %s is not scaled yet, the desired replica count is: %v and ready replica count is: %v", app.AppName, experimentsDetails.Replicas, statefulset.Status.ReadyReplicas)
+					return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Target: fmt.Sprintf("{kind: statefulset, namespace: %s, name: %s}", experimentsDetails.AppNS, app.AppName), Reason: fmt.Sprintf("failed to scale statefulset, the desired replica count is: %v and ready replica count is: %v", experimentsDetails.Replicas, statefulset.Status.ReadyReplicas)}
 				}
 			}
-			isFailed = false
 			return nil
 		})
 
-	if isFailed {
-		if err = autoscalerRecoveryInStatefulset(experimentsDetails, clients, appsUnderTest, chaosDetails); err != nil {
-			return errors.Errorf("fail to perform the autoscaler recovery of the application, err: %v", err)
-		}
-		return errors.Errorf("fail to scale the application to the desired replica count in the given chaos duration")
-	}
 	if err != nil {
-		return err
+		if scaleErr := autoscalerRecoveryInStatefulset(experimentsDetails, clients, appsUnderTest, chaosDetails); scaleErr != nil {
+			return cerrors.PreserveError{ErrString: fmt.Sprintf("[%s,%s]", stacktrace.RootCause(err).Error(), stacktrace.RootCause(scaleErr).Error())}
+		}
+		return stacktrace.Propagate(err, "failed to scale replicas")
 	}
 
 	// run the probes during chaos
@@ -333,20 +315,20 @@ func autoscalerRecoveryInDeployment(experimentsDetails *experimentTypes.Experime
 		for _, app := range appsUnderTest {
 			appUnderTest, err := appsv1DeploymentClient.Get(context.Background(), app.AppName, metav1.GetOptions{})
 			if err != nil {
-				return errors.Errorf("fail to find the latest version of Application Deployment with name %v, err: %v", app.AppName, err)
+				return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosRevert, Target: fmt.Sprintf("{kind: deployment, namespace: %s, name: %s}", experimentsDetails.AppNS, app.AppName), Reason: err.Error()}
 			}
-
 			appUnderTest.Spec.Replicas = int32Ptr(int32(app.ReplicaCount)) // modify replica count
 			_, err = appsv1DeploymentClient.Update(context.Background(), appUnderTest, metav1.UpdateOptions{})
 			if err != nil {
-				return err
+				return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosRevert, Target: fmt.Sprintf("{kind: deployment, name: %s, namespace: %s}", app.AppName, experimentsDetails.AppNS), Reason: fmt.Sprintf("failed to revert scaling in deployment :%s", err.Error())}
 			}
 			common.SetTargets(app.AppName, "reverted", "deployment", chaosDetails)
 		}
 		return nil
 	})
+
 	if retryErr != nil {
-		return errors.Errorf("fail to rollback the deployment, err: %v", retryErr)
+		return retryErr
 	}
 	log.Info("[Info]: Application started rolling back to original replica count")
 
@@ -357,11 +339,11 @@ func autoscalerRecoveryInDeployment(experimentsDetails *experimentTypes.Experime
 			for _, app := range appsUnderTest {
 				applicationDeploy, err := appsv1DeploymentClient.Get(context.Background(), app.AppName, metav1.GetOptions{})
 				if err != nil {
-					return errors.Errorf("fail to find the deployment with name %v, err: %v", app.AppName, err)
+					return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosRevert, Target: fmt.Sprintf("{kind: deployment, namespace: %s, name: %s}", experimentsDetails.AppNS, app.AppName), Reason: err.Error()}
 				}
 				if int(applicationDeploy.Status.ReadyReplicas) != app.ReplicaCount {
 					log.Infof("[Info]: Application ready replica count is: %v", applicationDeploy.Status.ReadyReplicas)
-					return errors.Errorf("fail to rollback to original replica count, err: %v", err)
+					return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosRevert, Target: fmt.Sprintf("{kind: deployment, namespace: %s, name: %s}", experimentsDetails.AppNS, app.AppName), Reason: fmt.Sprintf("failed to rollback deployment scaling, the desired replica count is: %v and ready replica count is: %v", experimentsDetails.Replicas, applicationDeploy.Status.ReadyReplicas)}
 				}
 			}
 			log.Info("[RollBack]: Application rollback to the initial number of replicas")
@@ -379,20 +361,20 @@ func autoscalerRecoveryInStatefulset(experimentsDetails *experimentTypes.Experim
 			// RetryOnConflict uses exponential backoff to avoid exhausting the apiserver
 			appUnderTest, err := appsv1StatefulsetClient.Get(context.Background(), app.AppName, metav1.GetOptions{})
 			if err != nil {
-				return errors.Errorf("failed to find the latest version of Statefulset with name %v, err: %v", app.AppName, err)
+				return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosRevert, Target: fmt.Sprintf("{kind: statefulset, namespace: %s, name: %s}", experimentsDetails.AppNS, app.AppName), Reason: err.Error()}
 			}
 
 			appUnderTest.Spec.Replicas = int32Ptr(int32(app.ReplicaCount)) // modify replica count
 			_, err = appsv1StatefulsetClient.Update(context.Background(), appUnderTest, metav1.UpdateOptions{})
 			if err != nil {
-				return err
+				return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosRevert, Target: fmt.Sprintf("{kind: statefulset, name: %s, namespace: %s}", app.AppName, experimentsDetails.AppNS), Reason: fmt.Sprintf("failed to revert scaling in statefulset :%s", err.Error())}
 			}
 			common.SetTargets(app.AppName, "reverted", "statefulset", chaosDetails)
 		}
 		return nil
 	})
 	if retryErr != nil {
-		return errors.Errorf("fail to rollback the statefulset, err: %v", retryErr)
+		return retryErr
 	}
 	log.Info("[Info]: Application pod started rolling back")
 
@@ -403,11 +385,11 @@ func autoscalerRecoveryInStatefulset(experimentsDetails *experimentTypes.Experim
 			for _, app := range appsUnderTest {
 				applicationDeploy, err := appsv1StatefulsetClient.Get(context.Background(), app.AppName, metav1.GetOptions{})
 				if err != nil {
-					return errors.Errorf("fail to get the statefulset with name %v, err: %v", app.AppName, err)
+					return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosRevert, Target: fmt.Sprintf("{kind: statefulset, namespace: %s, name: %s}", experimentsDetails.AppNS, app.AppName), Reason: err.Error()}
 				}
 				if int(applicationDeploy.Status.ReadyReplicas) != app.ReplicaCount {
 					log.Infof("Application ready replica count is: %v", applicationDeploy.Status.ReadyReplicas)
-					return errors.Errorf("fail to roll back to original replica count, err: %v", err)
+					return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosRevert, Target: fmt.Sprintf("{kind: statefulset, namespace: %s, name: %s}", experimentsDetails.AppNS, app.AppName), Reason: fmt.Sprintf("failed to rollback statefulset scaling, the desired replica count is: %v and ready replica count is: %v", experimentsDetails.Replicas, applicationDeploy.Status.ReadyReplicas)}
 				}
 			}
 			log.Info("[RollBack]: Application roll back to initial number of replicas")

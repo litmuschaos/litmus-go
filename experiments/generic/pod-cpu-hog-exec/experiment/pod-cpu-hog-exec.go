@@ -62,9 +62,10 @@ func PodCPUHogExec(clients clients.ClientSets) {
 
 	//DISPLAY THE APP INFORMATION
 	log.InfoWithValues("The application information is as follows", logrus.Fields{
-		"Targets":        chaosDetails.Targets,
-		"Chaos Duration": experimentsDetails.ChaosDuration,
-		"CPU Cores":      experimentsDetails.CPUcores,
+		"Targets":          common.GetAppDetailsForLogging(chaosDetails.AppDetail),
+		"Target Container": experimentsDetails.TargetContainer,
+		"Chaos Duration":   experimentsDetails.ChaosDuration,
+		"CPU Cores":        experimentsDetails.CPUcores,
 	})
 
 	// Calling AbortWatcher go routine, it will continuously watch for the abort signal and generate the required events and result
@@ -104,6 +105,7 @@ func PodCPUHogExec(clients clients.ClientSets) {
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
+	chaosDetails.Phase = types.ChaosInjectPhase
 	if err := litmusLIB.PrepareCPUExecStress(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
 		log.Errorf("[Error]: CPU hog failed, err: %v", err)
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
@@ -112,6 +114,7 @@ func PodCPUHogExec(clients clients.ClientSets) {
 
 	log.Infof("[Confirmation]: %v chaos has been injected successfully", experimentsDetails.ExperimentName)
 	resultDetails.Verdict = v1alpha1.ResultVerdictPassed
+	chaosDetails.Phase = types.PostChaosPhase
 
 	//POST-CHAOS APPLICATION STATUS CHECK
 	if chaosDetails.DefaultHealthCheck {
@@ -151,10 +154,11 @@ func PodCPUHogExec(clients clients.ClientSets) {
 	log.Infof("[The End]: Updating the chaos result of %v experiment (EOT)", experimentsDetails.ExperimentName)
 	if err := result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT"); err != nil {
 		log.Errorf("Unable to Update the Chaos Result, err: %v", err)
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 		return
 	}
 
-	// generating the event in chaosresult to marked the verdict as pass/fail
+	// generating the event in chaosresult to mark the verdict as pass/fail
 	msg = "experiment: " + experimentsDetails.ExperimentName + ", Result: " + string(resultDetails.Verdict)
 	reason := types.PassVerdict
 	eventType := "Normal"
