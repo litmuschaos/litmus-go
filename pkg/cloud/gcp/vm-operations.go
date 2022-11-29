@@ -2,6 +2,7 @@ package gcp
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
@@ -99,11 +100,22 @@ func WaitForVMInstanceUp(computeService *compute.Service, timeout int, delay int
 // SetTargetInstance will select the target vm instances which are in RUNNING state and filtered from the given label
 func SetTargetInstance(computeService *compute.Service, experimentsDetails *experimentTypes.ExperimentDetails) error {
 
+	var (
+		response *compute.InstanceList
+		err      error
+	)
+
 	if experimentsDetails.InstanceLabel == "" {
 		return cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Target: fmt.Sprintf("{label: %s}", experimentsDetails.InstanceLabel), Reason: "label not found, please provide a valid label"}
 	}
 
-	response, err := computeService.Instances.List(experimentsDetails.GCPProjectID, experimentsDetails.Zones).Filter("labels." + experimentsDetails.InstanceLabel + ":*").Do()
+	if strings.Contains(experimentsDetails.InstanceLabel, ":") {
+		// the label is of format key:value
+		response, err = computeService.Instances.List(experimentsDetails.GCPProjectID, experimentsDetails.Zones).Filter("labels." + experimentsDetails.InstanceLabel).Do()
+	} else {
+		// the label only has key
+		response, err = computeService.Instances.List(experimentsDetails.GCPProjectID, experimentsDetails.Zones).Filter("labels." + experimentsDetails.InstanceLabel + ":*").Do()
+	}
 	if err != nil {
 		return cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Target: fmt.Sprintf("{label: %s, zone: %s}", experimentsDetails.InstanceLabel, experimentsDetails.Zones), Reason: err.Error()}
 	}
@@ -115,7 +127,7 @@ func SetTargetInstance(computeService *compute.Service, experimentsDetails *expe
 	}
 
 	if len(experimentsDetails.TargetVMInstanceNameList) == 0 {
-		return cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Target: fmt.Sprintf("{label: %s, zone: %s}", experimentsDetails.InstanceLabel, experimentsDetails.Zones), Reason: "no RUNNING VM instances found with the given label"}
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Target: fmt.Sprintf("{label: %s, zone: %s}", experimentsDetails.InstanceLabel, experimentsDetails.Zones), Reason: "no running vm instances found with the given label"}
 	}
 
 	log.InfoWithValues("[Info]: Targeting the RUNNING VM instances filtered from instance label", logrus.Fields{
