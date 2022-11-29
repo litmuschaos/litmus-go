@@ -3,9 +3,11 @@ package gcp
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"strings"
 
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"google.golang.org/api/compute/v1"
 	"google.golang.org/api/option"
@@ -30,7 +32,7 @@ func getFileContent(filePath string) (string, error) {
 
 	fileContentByteSlice, err := os.ReadFile(filePath)
 	if err != nil {
-		return "", err
+		return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("failed to read file %v, err: %v", filePath, err)}
 	}
 
 	fileContentString := string(fileContentByteSlice)
@@ -47,52 +49,52 @@ func getServiceAccountJSONFromSecret() ([]byte, error) {
 
 	gcpType, err := getFileContent("/tmp/type")
 	if err != nil {
-		return nil, err
+		return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("failed to read file /tmp/type, err: %v", err)}
 	}
 
 	gcpProjectID, err := getFileContent("/tmp/project_id")
 	if err != nil {
-		return nil, err
+		return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("failed to read file /tmp/project_id, err: %v", err)}
 	}
 
 	gcpPrivateKeyID, err := getFileContent("/tmp/private_key_id")
 	if err != nil {
-		return nil, err
+		return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("failed to read file /tmp/private_key_id, err: %v", err)}
 	}
 
 	gcpPrivateKey, err := getFileContent("/tmp/private_key")
 	if err != nil {
-		return nil, err
+		return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("failed to read file /tmp/private_key, err: %v", err)}
 	}
 
 	gcpClientEmail, err := getFileContent("/tmp/client_email")
 	if err != nil {
-		return nil, err
+		return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("failed to read file /tmp/client_email, err: %v", err)}
 	}
 
 	gcpClientID, err := getFileContent("/tmp/client_id")
 	if err != nil {
-		return nil, err
+		return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("failed to read file /tmp/client_id, err: %v", err)}
 	}
 
 	gcpAuthURI, err := getFileContent("/tmp/auth_uri")
 	if err != nil {
-		return nil, err
+		return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("failed to read file /tmp/auth_uri, err: %v", err)}
 	}
 
 	gcpTokenURI, err := getFileContent("/tmp/token_uri")
 	if err != nil {
-		return nil, err
+		return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("failed to read file /tmp/token_uri, err: %v", err)}
 	}
 
 	gcpAuthCertURL, err := getFileContent("/tmp/auth_provider_x509_cert_url")
 	if err != nil {
-		return nil, err
+		return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("failed to read file /tmp/auth_provider_x509_cert_url, err: %v", err)}
 	}
 
 	gcpClientCertURL, err := getFileContent("/tmp/client_x509_cert_url")
 	if err != nil {
-		return nil, err
+		return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("failed to read file /tmp/client_x509_cert_url, err: %v", err)}
 	}
 
 	credentials := GCPServiceAccountCredentials{gcpType, gcpProjectID, gcpPrivateKeyID, gcpPrivateKey, gcpClientEmail, gcpClientID, gcpAuthURI, gcpTokenURI, gcpAuthCertURL, gcpClientCertURL}
@@ -100,7 +102,7 @@ func getServiceAccountJSONFromSecret() ([]byte, error) {
 
 	byteSliceJSONString, err := json.Marshal(credentials)
 	if err != nil {
-		return nil, err
+		return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("failed to marshal the credentials into json, err: %v", err)}
 	}
 
 	return byteSliceJSONString, nil
@@ -135,7 +137,7 @@ func GetGCPComputeService() (*compute.Service, error) {
 			// create a new GCP Compute Service client using the GCP service account credentials provided through the secret
 			computeService, err := compute.NewService(ctx, option.WithCredentialsJSON(json))
 			if err != nil {
-				return nil, err
+				return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("failed to authenticate a new compute service using the given credentials, err: %v", err)}
 			}
 
 			return computeService, nil
@@ -147,7 +149,7 @@ func GetGCPComputeService() (*compute.Service, error) {
 	// create a new GCP Compute Service client using default GCP service account credentials (using Workload Identity)
 	computeService, err := compute.NewService(ctx)
 	if err != nil {
-		return nil, err
+		return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("failed to authenticate a new compute service using gke workload identity, err: %v", err)}
 	}
 
 	return computeService, nil
