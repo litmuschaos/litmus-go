@@ -3,6 +3,8 @@ package lib
 import (
 	"context"
 	"fmt"
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
+	"github.com/palantir/stacktrace"
 	"strconv"
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
@@ -13,7 +15,6 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	apiv1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,7 +28,7 @@ func PrepareKubeletKill(experimentsDetails *experimentTypes.ExperimentDetails, c
 		//Select node for kubelet-service-kill
 		experimentsDetails.TargetNode, err = common.GetNodeName(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.NodeLabel, clients)
 		if err != nil {
-			return err
+			return stacktrace.Propagate(err, "could not get node name")
 		}
 	}
 
@@ -51,13 +52,13 @@ func PrepareKubeletKill(experimentsDetails *experimentTypes.ExperimentDetails, c
 
 	if experimentsDetails.EngineName != "" {
 		if err := common.SetHelperData(chaosDetails, experimentsDetails.SetHelperData, clients); err != nil {
-			return err
+			return stacktrace.Propagate(err, "could not set helper data")
 		}
 	}
 
 	// Creating the helper pod to perform node memory hog
 	if err = createHelperPod(experimentsDetails, clients, chaosDetails, experimentsDetails.TargetNode); err != nil {
-		return errors.Errorf("unable to create the helper pod, err: %v", err)
+		return stacktrace.Propagate(err, "could not create helper pod")
 	}
 
 	appLabel := fmt.Sprintf("app=%s-helper-%s", experimentsDetails.ExperimentName, experimentsDetails.RunID)
@@ -66,7 +67,7 @@ func PrepareKubeletKill(experimentsDetails *experimentTypes.ExperimentDetails, c
 	log.Info("[Status]: Checking the status of the helper pod")
 	if err = status.CheckHelperStatus(experimentsDetails.ChaosNamespace, appLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
 		common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-helper-"+experimentsDetails.RunID, appLabel, chaosDetails, clients)
-		return errors.Errorf("helper pod is not in running state, err: %v", err)
+		return stacktrace.Propagate(err, "could not check helper status")
 	}
 
 	common.SetTargets(experimentsDetails.TargetNode, "targeted", "node", chaosDetails)
@@ -83,7 +84,7 @@ func PrepareKubeletKill(experimentsDetails *experimentTypes.ExperimentDetails, c
 	log.Info("[Status]: Check for the node to be in NotReady state")
 	if err = status.CheckNodeNotReadyState(experimentsDetails.TargetNode, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
 		common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-helper-"+experimentsDetails.RunID, appLabel, chaosDetails, clients)
-		return errors.Errorf("application node is not in NotReady state, err: %v", err)
+		return stacktrace.Propagate(err, "could not check for NOT READY state")
 	}
 
 	// Wait till the completion of helper pod
@@ -92,13 +93,13 @@ func PrepareKubeletKill(experimentsDetails *experimentTypes.ExperimentDetails, c
 	podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, appLabel, clients, experimentsDetails.ChaosDuration+experimentsDetails.Timeout, experimentsDetails.ExperimentName)
 	if err != nil || podStatus == "Failed" {
 		common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-helper-"+experimentsDetails.RunID, appLabel, chaosDetails, clients)
-		return common.HelperFailedError(err)
+		return common.HelperFailedError(err, appLabel, chaosDetails.ChaosNamespace, false)
 	}
 
 	//Deleting the helper pod
 	log.Info("[Cleanup]: Deleting the helper pod")
 	if err = common.DeletePod(experimentsDetails.ExperimentName+"-helper-"+experimentsDetails.RunID, appLabel, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients); err != nil {
-		return errors.Errorf("unable to delete the helper pod, err: %v", err)
+		return stacktrace.Propagate(err, "could not delete helper pod")
 	}
 
 	//Waiting for the ramp time after chaos injection
@@ -192,7 +193,10 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 	}
 
 	_, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Create(context.Background(), helperPod, v1.CreateOptions{})
-	return err
+	if err != nil {
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("unable to create helper pod: %s", err.Error())}
+	}
+	return nil
 }
 
 func ptrint64(p int64) *int64 {

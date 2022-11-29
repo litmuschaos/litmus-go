@@ -1,12 +1,14 @@
 package lib
 
 import (
+	"fmt"
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	"github.com/litmuschaos/litmus-go/pkg/clients"
+	"github.com/palantir/stacktrace"
 	"strings"
 
 	network_chaos "github.com/litmuschaos/litmus-go/chaoslib/litmus/network-chaos/lib"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-network-partition/types"
-	"github.com/pkg/errors"
 	"gopkg.in/yaml.v2"
 	corev1 "k8s.io/api/core/v1"
 	networkv1 "k8s.io/api/networking/v1"
@@ -52,12 +54,12 @@ func (np *NetworkPolicy) getNetworkPolicyDetails(experimentsDetails *experimentT
 
 	// sets the ports for the traffic control
 	if err := np.setPort(experimentsDetails.PORTS); err != nil {
-		return err
+		return stacktrace.Propagate(err, "could not set port")
 	}
 
 	// sets the destination ips for which the traffic should be blocked
 	if err := np.setExceptIPs(experimentsDetails); err != nil {
-		return err
+		return stacktrace.Propagate(err, "could not set ips")
 	}
 
 	// sets the egress traffic rules
@@ -138,11 +140,11 @@ func (np *NetworkPolicy) setNamespaceSelector(nsLabel string) *NetworkPolicy {
 
 // setPort sets all the protocols and ports
 func (np *NetworkPolicy) setPort(p string) error {
-	ports := []networkv1.NetworkPolicyPort{}
+	var ports []networkv1.NetworkPolicyPort
 	var port Port
 	// unmarshal the protocols and ports from the env
 	if err := yaml.Unmarshal([]byte(strings.TrimSpace(parseCommand(p))), &port); err != nil {
-		return errors.Errorf("Unable to unmarshal, err: %v", err)
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("failed to unmarshal ports: %s", err.Error())}
 	}
 
 	// sets all the tcp ports
@@ -182,7 +184,7 @@ func (np *NetworkPolicy) setExceptIPs(experimentsDetails *experimentTypes.Experi
 	// get all the target ips
 	destinationIPs, err := network_chaos.GetTargetIps(experimentsDetails.DestinationIPs, experimentsDetails.DestinationHosts, clients.ClientSets{}, false)
 	if err != nil {
-		return err
+		return stacktrace.Propagate(err, "could not get destination ips")
 	}
 
 	ips := strings.Split(destinationIPs, ",")

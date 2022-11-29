@@ -19,7 +19,6 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
 	"github.com/litmuschaos/litmus-go/pkg/workloads"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	core_v1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -30,41 +29,32 @@ import (
 func DeletePod(podName, podLabel, namespace string, timeout, delay int, clients clients.ClientSets) error {
 
 	if err := clients.KubeClient.CoreV1().Pods(namespace).Delete(context.Background(), podName, v1.DeleteOptions{}); err != nil {
-		return err
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Target: fmt.Sprintf("{podName: %s, namespace: %s}", podName, namespace), Reason: fmt.Sprintf("failed to delete helper pod: %s", err.Error())}
 	}
 
-	// waiting for the termination of the pod
-	return retry.
-		Times(uint(timeout / delay)).
-		Wait(time.Duration(delay) * time.Second).
-		Try(func(attempt uint) error {
-			podSpec, err := clients.KubeClient.CoreV1().Pods(namespace).List(context.Background(), v1.ListOptions{LabelSelector: podLabel})
-			if err != nil {
-				return errors.Errorf("Unable to delete the pod, err: %v", err)
-			} else if len(podSpec.Items) != 0 {
-				return errors.Errorf("Unable to delete the pod")
-			}
-			return nil
-		})
+	return waitForPodTermination(podLabel, namespace, timeout, delay, clients)
 }
 
 //DeleteAllPod deletes all the pods with matching labels and wait until all the pods got terminated
 func DeleteAllPod(podLabel, namespace string, timeout, delay int, clients clients.ClientSets) error {
 
 	if err := clients.KubeClient.CoreV1().Pods(namespace).DeleteCollection(context.Background(), v1.DeleteOptions{}, v1.ListOptions{LabelSelector: podLabel}); err != nil {
-		return err
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Target: fmt.Sprintf("{podLabel: %s, namespace: %s}", podLabel, namespace), Reason: fmt.Sprintf("failed to delete helper pod(s): %s", err.Error())}
 	}
 
-	// waiting for the termination of the pod
+	return waitForPodTermination(podLabel, namespace, timeout, delay, clients)
+}
+
+func waitForPodTermination(podLabel, namespace string, timeout, delay int, clients clients.ClientSets) error {
 	return retry.
 		Times(uint(timeout / delay)).
 		Wait(time.Duration(delay) * time.Second).
 		Try(func(attempt uint) error {
 			podSpec, err := clients.KubeClient.CoreV1().Pods(namespace).List(context.Background(), v1.ListOptions{LabelSelector: podLabel})
 			if err != nil {
-				return errors.Errorf("Unable to delete the pods, err: %v", err)
+				return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Target: fmt.Sprintf("{podLabel: %s, namespace: %s}", podLabel, namespace), Reason: fmt.Sprintf("failed to list helper pod(s): %s", err.Error())}
 			} else if len(podSpec.Items) != 0 {
-				return errors.Errorf("Unable to delete the pods")
+				return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Target: fmt.Sprintf("{podLabel: %s, namespace: %s}", podLabel, namespace), Reason: "helper pod(s) are not deleted within timeout"}
 			}
 			return nil
 		})
@@ -80,16 +70,16 @@ func getChaosPodResourceRequirements(pod *core_v1.Pod, containerName string) (co
 			return container.Resources, nil
 		}
 	}
-	return core_v1.ResourceRequirements{}, cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Phase: "ChaosInject", Target: fmt.Sprintf("{podName: %s, containerName: %s, namespace: %s}", pod.Name, containerName, pod.Namespace), Reason: "no container found with in target pod"}
+	return core_v1.ResourceRequirements{}, cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Target: fmt.Sprintf("{podName: %s, containerName: %s, namespace: %s}", pod.Name, containerName, pod.Namespace), Reason: "no container found with in target pod"}
 }
 
 // SetHelperData derive the data from experiment pod and sets into experimentDetails struct
 // which can be used to create helper pod
 func SetHelperData(chaosDetails *types.ChaosDetails, setHelperData string, clients clients.ClientSets) error {
 	var pod *core_v1.Pod
-	pod, err = clients.KubeClient.CoreV1().Pods(chaosDetails.ChaosNamespace).Get(context.Background(), chaosDetails.ChaosPodName, v1.GetOptions{})
+	pod, err := GetExperimentPod(chaosDetails.ChaosPodName, chaosDetails.ChaosNamespace, clients)
 	if err != nil {
-		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Phase: "ChaosInject", Target: fmt.Sprintf("{podName: %s, namespace: %s}", pod.Name, pod.Namespace), Reason: err.Error()}
+		return err
 	}
 
 	// Get Labels
@@ -358,29 +348,28 @@ func DeleteAllHelperPodBasedOnJobCleanupPolicy(podLabel string, chaosDetails *ty
 
 // GetServiceAccount derive the serviceAccountName for the helper pod
 func GetServiceAccount(chaosNamespace, chaosPodName string, clients clients.ClientSets) (string, error) {
-	pod, err := clients.KubeClient.CoreV1().Pods(chaosNamespace).Get(context.Background(), chaosPodName, v1.GetOptions{})
+	pod, err := GetExperimentPod(chaosPodName, chaosNamespace, clients)
 	if err != nil {
 		return "", err
 	}
 	return pod.Spec.ServiceAccountName, nil
 }
 
-//GetTargetContainer will fetch the container name from application pod
-//This container will be used as target container
-func GetTargetContainer(appNamespace, appName string, clients clients.ClientSets) (string, error) {
-	pod, err := clients.KubeClient.CoreV1().Pods(appNamespace).Get(context.Background(), appName, v1.GetOptions{})
+// GetExperimentPod fetch the experiment pod
+func GetExperimentPod(name, namespace string, clients clients.ClientSets) (*core_v1.Pod, error) {
+	pod, err := clients.KubeClient.CoreV1().Pods(namespace).Get(context.Background(), name, v1.GetOptions{})
 	if err != nil {
-		return "", err
+		return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Target: fmt.Sprintf("{podName: %s, namespace: %s}", name, namespace), Reason: fmt.Sprintf("failed to get experiment pod: %s", err.Error())}
 	}
-	return pod.Spec.Containers[0].Name, nil
+	return pod, nil
 }
 
 //GetContainerID  derive the container id of the application container
-func GetContainerID(appNamespace, targetPod, targetContainer string, clients clients.ClientSets) (string, error) {
+func GetContainerID(appNamespace, targetPod, targetContainer string, clients clients.ClientSets, source string) (string, error) {
 
 	pod, err := clients.KubeClient.CoreV1().Pods(appNamespace).Get(context.Background(), targetPod, v1.GetOptions{})
 	if err != nil {
-		return "", err
+		return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeHelper, Source: source, Target: fmt.Sprintf("{podName: %s, namespace: %s}", targetPod, appNamespace), Reason: err.Error()}
 	}
 
 	var containerID string
@@ -393,11 +382,14 @@ func GetContainerID(appNamespace, targetPod, targetContainer string, clients cli
 			break
 		}
 	}
+	if containerID == "" {
+		return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeContainerRuntime, Source: source, Target: fmt.Sprintf("{podName: %s, namespace: %s, container: %s}", targetPod, appNamespace, targetContainer), Reason: fmt.Sprintf("no container found with specified name")}
+	}
 	return containerID, nil
 }
 
 //GetRuntimeBasedContainerID extract out the container id of the target container based on the container runtime
-func GetRuntimeBasedContainerID(containerRuntime, socketPath, targetPods, appNamespace, targetContainer string, clients clients.ClientSets) (string, error) {
+func GetRuntimeBasedContainerID(containerRuntime, socketPath, targetPods, appNamespace, targetContainer string, clients clients.ClientSets, source string) (string, error) {
 
 	var containerID string
 	switch containerRuntime {
@@ -407,17 +399,17 @@ func GetRuntimeBasedContainerID(containerRuntime, socketPath, targetPods, appNam
 		cmd := "sudo docker --host " + host + " ps | grep k8s_POD_" + targetPods + "_" + appNamespace + " | awk '{print $1}'"
 		out, err := exec.Command("/bin/sh", "-c", cmd).CombinedOutput()
 		if err != nil {
-			log.Errorf("[docker]: Failed to run docker ps command: %s", string(out))
-			return "", err
+			log.Errorf("[docker]: Failed to run docker ps command: %s", err.Error())
+			return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeContainerRuntime, Source: source, Target: fmt.Sprintf("{podName: %s, namespace: %s, container: %s}", targetPods, appNamespace, targetContainer), Reason: fmt.Sprintf("failed to get container id :%s", string(out))}
 		}
 		containerID = strings.TrimSpace(string(out))
 	case "containerd", "crio":
-		containerID, err = GetContainerID(appNamespace, targetPods, targetContainer, clients)
+		containerID, err = GetContainerID(appNamespace, targetPods, targetContainer, clients, source)
 		if err != nil {
-			return "", err
+			return "", stacktrace.Propagate(err, "could not get container id")
 		}
 	default:
-		return "", errors.Errorf("%v container runtime not suported", containerRuntime)
+		return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeHelper, Source: source, Reason: fmt.Sprintf("unsupported container runtime: %s", containerRuntime)}
 	}
 	log.Infof("Container ID: %v", containerID)
 
@@ -425,18 +417,18 @@ func GetRuntimeBasedContainerID(containerRuntime, socketPath, targetPods, appNam
 }
 
 // CheckContainerStatus checks the status of the application container
-func CheckContainerStatus(appNamespace, appName string, timeout, delay int, clients clients.ClientSets) error {
+func CheckContainerStatus(appNamespace, appName string, timeout, delay int, clients clients.ClientSets, source string) error {
 	return retry.
 		Times(uint(timeout / delay)).
 		Wait(time.Duration(delay) * time.Second).
 		Try(func(attempt uint) error {
 			pod, err := clients.KubeClient.CoreV1().Pods(appNamespace).Get(context.Background(), appName, v1.GetOptions{})
 			if err != nil {
-				return errors.Errorf("unable to find the pod with name %v, err: %v", appName, err)
+				return cerrors.Error{ErrorCode: cerrors.ErrorTypeHelper, Source: source, Target: fmt.Sprintf("{podName: %s, namespace: %s}", appName, appNamespace), Reason: err.Error()}
 			}
 			for _, container := range pod.Status.ContainerStatuses {
 				if !container.Ready {
-					return errors.Errorf("containers are not yet in running state")
+					return cerrors.Error{ErrorCode: cerrors.ErrorTypeHelper, Source: source, Target: fmt.Sprintf("{podName: %s, namespace: %s, container: %s}", appName, appNamespace, container.Name), Reason: "target container is  not in running state"}
 				}
 				log.InfoWithValues("The running status of container are as follows", logrus.Fields{
 					"container": container.Name, "Pod": pod.Name, "Status": pod.Status.Phase})
@@ -579,17 +571,17 @@ type target struct {
 	TargetContainer string
 }
 
-func ParseTargets() (*TargetsDetails, error) {
+func ParseTargets(source string) (*TargetsDetails, error) {
 	var targets TargetsDetails
 	targetEnv := os.Getenv("TARGETS")
 	if targetEnv == "" {
-		return nil, fmt.Errorf("no target found, provide atleast one target")
+		return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeHelper, Source: source, Reason: "no target found, provide atleast one target"}
 	}
 
 	for _, t := range strings.Split(targetEnv, ";") {
 		targetList := strings.Split(t, ":")
 		if len(targetList) != 3 {
-			return nil, fmt.Errorf("unsupported target: '%v', provide target in '<name>:<namespace>:<containerName>", targetList)
+			return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeHelper, Source: source, Reason: fmt.Sprintf("unsupported target format: '%v'", targetList)}
 		}
 		targets.Target = append(targets.Target, target{
 			Name:            targetList[0],

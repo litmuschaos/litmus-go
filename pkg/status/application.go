@@ -14,7 +14,6 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
 	"github.com/litmuschaos/litmus-go/pkg/workloads"
-	"github.com/pkg/errors"
 	logrus "github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -193,20 +192,20 @@ func WaitForCompletion(appNs, appLabel string, clients clients.ClientSets, durat
 	var podStatus string
 	failedPods := 0
 	// It will wait till the completion of target container
-	// it will retries until the target container completed or met the timeout(chaos duration)
+	// it will retry until the target container completed or met the timeout(chaos duration)
 	err := retry.
 		Times(uint(duration)).
 		Wait(1 * time.Second).
 		Try(func(attempt uint) error {
 			podList, err := clients.KubeClient.CoreV1().Pods(appNs).List(context.Background(), metav1.ListOptions{LabelSelector: appLabel})
 			if err != nil {
-				return errors.Errorf("Unable to find the pods with matching labels, err: %v", err)
+				return cerrors.Error{ErrorCode: cerrors.ErrorTypeStatusChecks, Target: fmt.Sprintf("{podLabel: %s, namespace: %s}", appLabel, appNs), Reason: err.Error()}
 			} else if len(podList.Items) == 0 {
-				return errors.Errorf("Unable to find the pods with matching labels")
+				return cerrors.Error{ErrorCode: cerrors.ErrorTypeStatusChecks, Target: fmt.Sprintf("{podLabel: %s, namespace: %s}", appLabel, appNs), Reason: "no pod with matching label"}
 			}
-			// it will check for the status of helper pod, if it is Succeeded and target container is completed then it will marked it as completed and return
+			// it will check for the status of helper pod, if it is Succeeded and target container is completed then it will mark it as completed and return
 			// if it is still running then it will check for the target container, as we can have multiple container inside helper pod (istio)
-			// if the target container is in completed state(ready flag is false), then we will marked the helper pod as completed
+			// if the target container is in completed state(ready flag is false), then we will mark the helper pod as completed
 			// we will retry till it met the timeout(chaos duration)
 			failedPods = 0
 			for _, pod := range podList.Items {
@@ -216,7 +215,7 @@ func WaitForCompletion(appNs, appLabel string, clients clients.ClientSets, durat
 					for _, container := range pod.Status.ContainerStatuses {
 						if container.Name == containerName {
 							if container.Ready {
-								return errors.Errorf("Container is not completed yet")
+								return cerrors.Error{ErrorCode: cerrors.ErrorTypeStatusChecks, Target: fmt.Sprintf("{podName: %s, namespace: %s, container: %s}", pod.Name, pod.Namespace, container.Name), Reason: "container is not completed within timeout"}
 							} else if container.State.Terminated != nil && container.State.Terminated.ExitCode == 1 {
 								podStatus = "Failed"
 								break
@@ -225,7 +224,7 @@ func WaitForCompletion(appNs, appLabel string, clients clients.ClientSets, durat
 					}
 				}
 				if podStatus == "Pending" {
-					return errors.Errorf("pod is in pending state")
+					return cerrors.Error{ErrorCode: cerrors.ErrorTypeStatusChecks, Target: fmt.Sprintf("{podName: %s, namespace: %s}", pod.Name, pod.Namespace), Reason: "pod is in pending state"}
 				}
 				log.InfoWithValues("[Status]: The running status of Pods are as follows", logrus.Fields{
 					"Pod": pod.Name, "Status": podStatus})

@@ -15,6 +15,9 @@ const (
 	ErrorTypeStatusChecks      ErrorType = "STATUS_CHECKS_ERROR"
 	ErrorTypeTargetSelection   ErrorType = "TARGET_SELECTION_ERROR"
 	ErrorTypeExperimentAborted ErrorType = "EXPERIMENT_ABORTED"
+	ErrorTypeHelper            ErrorType = "HELPER_ERROR"
+	ErrorTypeHelperPodFailed   ErrorType = "HELPER_POD_FAILED_ERROR"
+	ErrorTypeContainerRuntime  ErrorType = "CONTAINER_RUNTIME_ERROR"
 	ErrorTypeChaosInject       ErrorType = "CHAOS_INJECT_ERROR"
 	ErrorTypeChaosRevert       ErrorType = "CHAOS_REVERT_ERROR"
 )
@@ -38,16 +41,21 @@ func GetErrorType(err error) ErrorType {
 	return ErrorTypeNonUserFriendly
 }
 
-func GetRootCauseAndErrorCode(err error) (string, ErrorType) {
+func GetRootCauseAndErrorCode(err error, phase string) (string, ErrorType) {
 	rootCause := stacktrace.RootCause(err)
 	errorType := GetErrorType(rootCause)
 	if !IsUserFriendly(rootCause) {
 		return err.Error(), errorType
 	}
+	if error, ok := rootCause.(Error); ok {
+		error.Phase = phase
+		return error.Error(), errorType
+	}
 	return rootCause.Error(), errorType
 }
 
 type Error struct {
+	Source    string    `json:"source,omitempty"`
 	ErrorCode ErrorType `json:"errorCode,omitempty"`
 	Phase     string    `json:"phase,omitempty"`
 	Reason    string    `json:"reason,omitempty"`
@@ -72,4 +80,20 @@ func convertToJson(v interface{}) string {
 		return err.Error()
 	}
 	return string(vStr)
+}
+
+type PreserveError struct {
+	ErrString string
+}
+
+func (pe PreserveError) Error() string {
+	return pe.ErrString
+}
+
+func (pe PreserveError) UserFriendly() bool {
+	return true
+}
+
+func (pe PreserveError) ErrorType() ErrorType {
+	return ErrorTypeGeneric
 }
