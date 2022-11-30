@@ -24,41 +24,41 @@ func (model Model) CompareInt(errorCode cerrors.ErrorType) error {
 	switch model.operator {
 	case ">=":
 		if !obj.isGreaterorEqual() {
-			return cerrors.Error{ErrorCode: errorCode, Reason: fmt.Sprintf("{actual value: %v} is not greater than or equal to {expected value: %v}", obj.a, obj.b)}
+			return cerrors.Error{ErrorCode: errorCode, Target: model.probeName, Reason: fmt.Sprintf("actual value: %v is not greater than or equal to expected value: %v", obj.a, obj.b)}
 		}
 	case "<=":
 		if !obj.isLesserorEqual() {
-			return cerrors.Error{ErrorCode: errorCode, Reason: fmt.Sprintf("{actual value: %v} is not lesser than or equal to {expected value: %v}", obj.a, obj.b)}
+			return cerrors.Error{ErrorCode: errorCode, Target: model.probeName, Reason: fmt.Sprintf("actual value: %v is not lesser than or equal to expected value: %v", obj.a, obj.b)}
 		}
 	case ">":
 		if !obj.isGreater() {
-			return cerrors.Error{ErrorCode: errorCode, Reason: fmt.Sprintf("{actual value: %v} is not greater than {expected value: %v}", obj.a, obj.b)}
+			return cerrors.Error{ErrorCode: errorCode, Target: model.probeName, Reason: fmt.Sprintf("actual value: %v is not greater than expected value: %v", obj.a, obj.b)}
 		}
 	case "<":
 		if !obj.isLesser() {
-			return cerrors.Error{ErrorCode: errorCode, Reason: fmt.Sprintf("{actual value: %v} is not lesser than {expected value: %v}", obj.a, obj.b)}
+			return cerrors.Error{ErrorCode: errorCode, Target: model.probeName, Reason: fmt.Sprintf("actual value: %v is not lesser than expected value: %v", obj.a, obj.b)}
 		}
 	case "==":
 		if !obj.isEqual() {
-			return cerrors.Error{ErrorCode: errorCode, Reason: fmt.Sprintf("{actual value: %v} is not equal to {expected value: %v}", obj.a, obj.b)}
+			return cerrors.Error{ErrorCode: errorCode, Target: model.probeName, Reason: fmt.Sprintf("actual value: %v is not equal to expected value: %v", obj.a, obj.b)}
 		}
 	case "!=":
 		if !obj.isNotEqual() {
-			return cerrors.Error{ErrorCode: errorCode, Reason: fmt.Sprintf("{actual value: %v} is not NotEqual to {expected value: %v}", obj.a, obj.b)}
+			return cerrors.Error{ErrorCode: errorCode, Target: model.probeName, Reason: fmt.Sprintf("actual value: %v is not NotEqual to expected value: %v", obj.a, obj.b)}
 		}
 	case "OneOf", "oneOf":
 		if !obj.isOneOf() {
-			return cerrors.Error{ErrorCode: errorCode, Reason: fmt.Sprintf("Actual value: {%v} doesn't matched with any of the expected values: {%v}", obj.a, obj.c)}
+			return cerrors.Error{ErrorCode: errorCode, Target: model.probeName, Reason: fmt.Sprintf("actual value: %v doesn't matched with any of the expected values: %v", obj.a, obj.c)}
 		}
 	case "between", "Between":
 		if len(obj.c) < 2 {
-			return cerrors.Error{ErrorCode: errorCode, Reason: fmt.Sprintf("{expected value: %v} should contains both lower and upper limits", obj.c)}
+			return cerrors.Error{ErrorCode: errorCode, Target: model.probeName, Reason: fmt.Sprintf("expected value: %v should contains both lower and upper limits", obj.c)}
 		}
 		if !obj.isBetween() {
-			return cerrors.Error{ErrorCode: errorCode, Reason: fmt.Sprintf("Actual value: {%v} doesn't lie in between expected range: {%v}", obj.a, obj.c)}
+			return cerrors.Error{ErrorCode: errorCode, Target: model.probeName, Reason: fmt.Sprintf("actual value: %v doesn't lie in between expected range: %v", obj.a, obj.c)}
 		}
 	default:
-		return cerrors.Error{ErrorCode: errorCode, Reason: fmt.Sprintf("criteria '%s' not supported in the probe", model.operator)}
+		return cerrors.Error{ErrorCode: errorCode, Target: model.probeName, Reason: fmt.Sprintf("criteria '%s' not supported in the probe", model.operator)}
 	}
 	return nil
 }

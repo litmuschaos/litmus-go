@@ -138,7 +138,7 @@ func httpGet(probe v1alpha1.ProbeAttributes, client *http.Client, resultDetails 
 
 // httpPost send the http post request to the given URL
 func httpPost(probe v1alpha1.ProbeAttributes, client *http.Client, resultDetails *types.ResultDetails) error {
-	body, err := getHTTPBody(probe.HTTPProbeInputs.Method.Post)
+	body, err := getHTTPBody(probe.HTTPProbeInputs.Method.Post, probe.Name)
 	if err != nil {
 		return err
 	}
@@ -172,7 +172,7 @@ func httpPost(probe v1alpha1.ProbeAttributes, client *http.Client, resultDetails
 // getHTTPBody fetch the http body for the post request
 // It will use body or bodyPath attributes to get the http request body
 // if both are provided, it will use body field
-func getHTTPBody(httpBody v1alpha1.PostMethod) (string, error) {
+func getHTTPBody(httpBody v1alpha1.PostMethod, probeName string) (string, error) {
 
 	if httpBody.Body != "" {
 		return httpBody.Body, nil
@@ -183,7 +183,7 @@ func getHTTPBody(httpBody v1alpha1.PostMethod) (string, error) {
 	if httpBody.BodyPath != "" {
 		command = "cat " + httpBody.BodyPath
 	} else {
-		return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeHttpProbe, Reason: "[Probe]: Any one of body or bodyPath is required"}
+		return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeHttpProbe, Target: fmt.Sprintf("{name: %v}", probeName), Reason: "[Probe]: Any one of body or bodyPath is required"}
 	}
 
 	var out, errOut bytes.Buffer
@@ -192,7 +192,7 @@ func getHTTPBody(httpBody v1alpha1.PostMethod) (string, error) {
 	cmd.Stdout = &out
 	cmd.Stderr = &errOut
 	if err := cmd.Run(); err != nil {
-		return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeHttpProbe, Reason: fmt.Sprintf("unable to run command, err: %v; error output: %v", err, errOut.String())}
+		return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeHttpProbe, Target: fmt.Sprintf("{name: %v}", probeName), Reason: fmt.Sprintf("unable to run command, err: %v; error output: %v", err, errOut.String())}
 	}
 	return out.String(), nil
 }

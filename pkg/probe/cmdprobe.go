@@ -75,7 +75,7 @@ func triggerInlineCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.
 			cmd.Stdout = &out
 			cmd.Stderr = &errOut
 			if err := cmd.Run(); err != nil {
-				return cerrors.Error{ErrorCode: cerrors.ErrorTypeCmdProbe, Target: fmt.Sprintf("{name: %v}", probe.Name), Reason: fmt.Sprintf("unable to run command, err: %v; error output: %v", err, errOut.String())}
+				return cerrors.Error{ErrorCode: cerrors.ErrorTypeCmdProbe, Target: fmt.Sprintf("{name: %v}", probe.Name), Reason: fmt.Sprintf("unable to run command: %s", errOut.String())}
 			}
 
 			rc := getAndIncrementRunCount(resultDetails, probe.Name)
@@ -130,9 +130,9 @@ func triggerSourceCmdProbe(probe v1alpha1.ProbeAttributes, execCommandDetails li
 }
 
 // createProbePod creates an external pod with source image for the cmd probe
-func createProbePod(clients clients.ClientSets, chaosDetails *types.ChaosDetails, runID string, source v1alpha1.SourceDetails) error {
+func createProbePod(clients clients.ClientSets, chaosDetails *types.ChaosDetails, runID string, source v1alpha1.SourceDetails, probeName string) error {
 	//deriving serviceAccount name for the probe pod
-	svcAccount, err := getServiceAccount(chaosDetails.ChaosNamespace, chaosDetails.ChaosPodName, clients)
+	svcAccount, err := getServiceAccount(chaosDetails.ChaosNamespace, chaosDetails.ChaosPodName, probeName, clients)
 	if err != nil {
 		return stacktrace.Propagate(err, "unable to get the serviceAccountName")
 	}
@@ -173,7 +173,7 @@ func createProbePod(clients clients.ClientSets, chaosDetails *types.ChaosDetails
 
 	_, err = clients.KubeClient.CoreV1().Pods(chaosDetails.ChaosNamespace).Create(context.Background(), cmdProbe, v1.CreateOptions{})
 	if err != nil {
-		return cerrors.Error{ErrorCode: cerrors.ErrorTypeCmdProbe, Reason: err.Error()}
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeCmdProbe, Target: fmt.Sprintf("{name: %v}", probeName), Reason: err.Error()}
 	}
 
 	return nil
@@ -271,10 +271,10 @@ func getProbeCmd(sourceCmd []string) []string {
 }
 
 // deleteProbePod deletes the probe pod and wait until it got terminated
-func deleteProbePod(chaosDetails *types.ChaosDetails, clients clients.ClientSets, runID string) error {
+func deleteProbePod(chaosDetails *types.ChaosDetails, clients clients.ClientSets, runID, probeName string) error {
 
 	if err := clients.KubeClient.CoreV1().Pods(chaosDetails.ChaosNamespace).Delete(context.Background(), chaosDetails.ExperimentName+"-probe-"+runID, v1.DeleteOptions{}); err != nil {
-		return cerrors.Error{ErrorCode: cerrors.ErrorTypeCmdProbe, Reason: err.Error()}
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeCmdProbe, Target: fmt.Sprintf("{name: %v}", probeName), Reason: err.Error()}
 	}
 
 	// waiting till the termination of the pod
@@ -284,9 +284,9 @@ func deleteProbePod(chaosDetails *types.ChaosDetails, clients clients.ClientSets
 		Try(func(attempt uint) error {
 			podSpec, err := clients.KubeClient.CoreV1().Pods(chaosDetails.ChaosNamespace).List(context.Background(), v1.ListOptions{LabelSelector: chaosDetails.ExperimentName + "-probe-" + runID})
 			if err != nil {
-				return cerrors.Error{ErrorCode: cerrors.ErrorTypeCmdProbe, Reason: fmt.Sprintf("probe pod is not deleted yet, err: %v", err)}
+				return cerrors.Error{ErrorCode: cerrors.ErrorTypeCmdProbe, Target: fmt.Sprintf("{name: %v}", probeName), Reason: fmt.Sprintf("failed to list probe pod: %s", err.Error())}
 			} else if len(podSpec.Items) != 0 {
-				return cerrors.Error{ErrorCode: cerrors.ErrorTypeCmdProbe, Reason: "probe pod is not deleted yet"}
+				return cerrors.Error{ErrorCode: cerrors.ErrorTypeCmdProbe, Target: fmt.Sprintf("{name: %v}", probeName), Reason: "probe pod is not deleted within timeout"}
 			}
 			return nil
 		})
@@ -561,7 +561,7 @@ func preChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 			runID := getRunIDFromProbe(resultDetails, probe.Name, probe.Type)
 
 			// deleting the external pod which was created for cmd probe
-			if err = deleteProbePod(chaosDetails, clients, runID); err != nil {
+			if err = deleteProbePod(chaosDetails, clients, runID, probe.Name); err != nil {
 				return err
 			}
 		}
@@ -647,7 +647,7 @@ func postChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resu
 			runID := getRunIDFromProbe(resultDetails, probe.Name, probe.Type)
 
 			// deleting the external pod which was created for cmd probe
-			if err = deleteProbePod(chaosDetails, clients, runID); err != nil {
+			if err = deleteProbePod(chaosDetails, clients, runID, probe.Name); err != nil {
 				return err
 			}
 		}
@@ -670,7 +670,7 @@ func postChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resu
 			// get runId
 			runID := getRunIDFromProbe(resultDetails, probe.Name, probe.Type)
 			// deleting the external pod, which was created for cmd probe
-			if err = deleteProbePod(chaosDetails, clients, runID); err != nil {
+			if err = deleteProbePod(chaosDetails, clients, runID, probe.Name); err != nil {
 				return err
 			}
 
@@ -719,7 +719,7 @@ func createHelperPod(probe v1alpha1.ProbeAttributes, resultDetails *types.Result
 	setRunIDForProbe(resultDetails, probe.Name, probe.Type, runID)
 
 	// create the external pod with source image for cmd probe
-	if err := createProbePod(clients, chaosDetails, runID, probe.CmdProbeInputs.Source); err != nil {
+	if err := createProbePod(clients, chaosDetails, runID, probe.CmdProbeInputs.Source, probe.Name); err != nil {
 		return litmusexec.PodDetails{}, err
 	}
 
@@ -737,10 +737,10 @@ func createHelperPod(probe v1alpha1.ProbeAttributes, resultDetails *types.Result
 }
 
 // getServiceAccount derive the serviceAccountName for the probe pod
-func getServiceAccount(chaosNamespace, chaosPodName string, clients clients.ClientSets) (string, error) {
+func getServiceAccount(chaosNamespace, chaosPodName, probeName string, clients clients.ClientSets) (string, error) {
 	pod, err := clients.KubeClient.CoreV1().Pods(chaosNamespace).Get(context.Background(), chaosPodName, v1.GetOptions{})
 	if err != nil {
-		return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeCmdProbe, Reason: err.Error()}
+		return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeCmdProbe, Target: fmt.Sprintf("{name: %v}", probeName), Reason: err.Error()}
 	}
 	return pod.Spec.ServiceAccountName, nil
 }

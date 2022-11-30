@@ -174,7 +174,7 @@ func triggerPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 		Wait(time.Duration(probe.RunProperties.Interval) * time.Second).
 		TryWithTimeout(func(attempt uint) error {
 			var command string
-			// It will use quer	y or queryPath to get the prometheus metrics
+			// It will use query or queryPath to get the prometheus metrics
 			// if both are provided, it will use query
 			if probe.PromProbeInputs.Query != "" {
 				command = "promql --host " + probe.PromProbeInputs.Endpoint + " \"" + probe.PromProbeInputs.Query + "\"" + " --output csv"

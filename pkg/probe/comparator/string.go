@@ -24,38 +24,38 @@ func (model Model) CompareString(errorCode cerrors.ErrorType) error {
 	switch model.operator {
 	case "equal", "Equal":
 		if !obj.isEqual() {
-			return cerrors.Error{ErrorCode: errorCode, Reason: fmt.Sprintf("{actual value: %v} is not equal to {expected value: %v}", obj.a, obj.b)}
+			return cerrors.Error{ErrorCode: errorCode, Target: model.probeName, Reason: fmt.Sprintf("actual value: %v is not equal to expected value: %v", obj.a, obj.b)}
 		}
 	case "notEqual", "NotEqual":
 		if !obj.isNotEqual() {
-			return cerrors.Error{ErrorCode: errorCode, Reason: fmt.Sprintf("{actual value: %v} is not Notequal to {expected value: %v}", obj.a, obj.b)}
+			return cerrors.Error{ErrorCode: errorCode, Target: model.probeName, Reason: fmt.Sprintf("actual value: %v is not Notequal to expected value: %v", obj.a, obj.b)}
 		}
 	case "contains", "Contains":
 		if !obj.isContains() {
-			return cerrors.Error{ErrorCode: errorCode, Reason: fmt.Sprintf("{actual value: %v} doesn't contains {expected value: %v}", obj.a, obj.b)}
+			return cerrors.Error{ErrorCode: errorCode, Target: model.probeName, Reason: fmt.Sprintf("actual value: %v doesn't contains expected value: %v", obj.a, obj.b)}
 		}
 	case "matches", "Matches":
 		re, err := regexp.Compile(obj.b)
 		if err != nil {
-			return cerrors.Error{ErrorCode: errorCode, Reason: fmt.Sprintf("the probe regex '%s' is not a valid expression", obj.b)}
+			return cerrors.Error{ErrorCode: errorCode, Target: model.probeName, Reason: fmt.Sprintf("the probe regex '%s' is not a valid expression", obj.b)}
 		}
 		if !obj.isMatched(re) {
-			return cerrors.Error{ErrorCode: errorCode, Reason: fmt.Sprintf("{actual value: %v} is not matched with {expected regex: %v}", obj.a, obj.b)}
+			return cerrors.Error{ErrorCode: errorCode, Target: model.probeName, Reason: fmt.Sprintf("actual value: %v is not matched with expected regex: %v", obj.a, obj.b)}
 		}
 	case "notMatches", "NotMatches":
 		re, err := regexp.Compile(obj.b)
 		if err != nil {
-			return cerrors.Error{ErrorCode: errorCode, Reason: fmt.Sprintf("the probe regex '%s' is not a valid expression", obj.b)}
+			return cerrors.Error{ErrorCode: errorCode, Target: model.probeName, Reason: fmt.Sprintf("the probe regex '%s' is not a valid expression", obj.b)}
 		}
 		if obj.isMatched(re) {
-			return cerrors.Error{ErrorCode: errorCode, Reason: fmt.Sprintf("{actual value: %v} is not NotMatched with {expected regex: %v}", obj.a, obj.b)}
+			return cerrors.Error{ErrorCode: errorCode, Target: model.probeName, Reason: fmt.Sprintf("actual value: %v is not NotMatched with expected regex: %v", obj.a, obj.b)}
 		}
 	case "oneOf", "OneOf":
 		if !obj.isOneOf() {
-			return cerrors.Error{ErrorCode: errorCode, Reason: fmt.Sprintf("Actual value: {%v} doesn't matched with any of the expected values: {%v}", obj.a, obj.c)}
+			return cerrors.Error{ErrorCode: errorCode, Target: model.probeName, Reason: fmt.Sprintf("actual value: %v doesn't matched with any of the expected values: %v", obj.a, obj.c)}
 		}
 	default:
-		return cerrors.Error{ErrorCode: errorCode, Reason: fmt.Sprintf("criteria '%s' not supported in the probe", model.operator)}
+		return cerrors.Error{ErrorCode: errorCode, Target: model.probeName, Reason: fmt.Sprintf("criteria '%s' not supported in the probe", model.operator)}
 	}
 	return nil
 }
