@@ -1,17 +1,18 @@
 package comparator
 
 import (
+	"fmt"
 	"reflect"
 	"regexp"
 	"strings"
 
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	"github.com/litmuschaos/litmus-go/pkg/log"
-	"github.com/pkg/errors"
 )
 
 // CompareString compares strings for specific operation
 // it check for the equal, not equal and contains(sub-string) operations
-func (model Model) CompareString() error {
+func (model Model) CompareString(errorCode cerrors.ErrorType) error {
 
 	obj := String{}
 	obj.setValues(reflect.ValueOf(model.a).String(), reflect.ValueOf(model.b).String())
@@ -23,38 +24,38 @@ func (model Model) CompareString() error {
 	switch model.operator {
 	case "equal", "Equal":
 		if !obj.isEqual() {
-			return errors.Errorf("{actual value: %v} is not equal to {expected value: %v}", obj.a, obj.b)
+			return cerrors.Error{ErrorCode: errorCode, Reason: fmt.Sprintf("{actual value: %v} is not equal to {expected value: %v}", obj.a, obj.b)}
 		}
 	case "notEqual", "NotEqual":
 		if !obj.isNotEqual() {
-			return errors.Errorf("{actual value: %v} is not Notequal to {expected value: %v}", obj.a, obj.b)
+			return cerrors.Error{ErrorCode: errorCode, Reason: fmt.Sprintf("{actual value: %v} is not Notequal to {expected value: %v}", obj.a, obj.b)}
 		}
 	case "contains", "Contains":
 		if !obj.isContains() {
-			return errors.Errorf("{actual value: %v} doesn't contains {expected value: %v}", obj.a, obj.b)
+			return cerrors.Error{ErrorCode: errorCode, Reason: fmt.Sprintf("{actual value: %v} doesn't contains {expected value: %v}", obj.a, obj.b)}
 		}
 	case "matches", "Matches":
 		re, err := regexp.Compile(obj.b)
 		if err != nil {
-			return errors.Errorf("the probe regex '%s' is not a valid expression", obj.b)
+			return cerrors.Error{ErrorCode: errorCode, Reason: fmt.Sprintf("the probe regex '%s' is not a valid expression", obj.b)}
 		}
 		if !obj.isMatched(re) {
-			return errors.Errorf("{actual value: %v} is not matched with {expected regex: %v}", obj.a, obj.b)
+			return cerrors.Error{ErrorCode: errorCode, Reason: fmt.Sprintf("{actual value: %v} is not matched with {expected regex: %v}", obj.a, obj.b)}
 		}
 	case "notMatches", "NotMatches":
 		re, err := regexp.Compile(obj.b)
 		if err != nil {
-			return errors.Errorf("the probe regex '%s' is not a valid expression", obj.b)
+			return cerrors.Error{ErrorCode: errorCode, Reason: fmt.Sprintf("the probe regex '%s' is not a valid expression", obj.b)}
 		}
 		if obj.isMatched(re) {
-			return errors.Errorf("{actual value: %v} is not NotMatched with {expected regex: %v}", obj.a, obj.b)
+			return cerrors.Error{ErrorCode: errorCode, Reason: fmt.Sprintf("{actual value: %v} is not NotMatched with {expected regex: %v}", obj.a, obj.b)}
 		}
 	case "oneOf", "OneOf":
 		if !obj.isOneOf() {
-			return errors.Errorf("Actual value: {%v} doesn't matched with any of the expected values: {%v}", obj.a, obj.c)
+			return cerrors.Error{ErrorCode: errorCode, Reason: fmt.Sprintf("Actual value: {%v} doesn't matched with any of the expected values: {%v}", obj.a, obj.c)}
 		}
 	default:
-		return errors.Errorf("criteria '%s' not supported in the probe", model.operator)
+		return cerrors.Error{ErrorCode: errorCode, Reason: fmt.Sprintf("criteria '%s' not supported in the probe", model.operator)}
 	}
 	return nil
 }

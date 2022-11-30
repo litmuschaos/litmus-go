@@ -2,6 +2,7 @@ package cerrors
 
 import (
 	"encoding/json"
+
 	"github.com/palantir/stacktrace"
 )
 
@@ -19,6 +20,10 @@ const (
 	ErrorTypeContainerRuntime  ErrorType = "CONTAINER_RUNTIME_ERROR"
 	ErrorTypeChaosInject       ErrorType = "CHAOS_INJECT_ERROR"
 	ErrorTypeChaosRevert       ErrorType = "CHAOS_REVERT_ERROR"
+	ErrorTypeK8sProbe          ErrorType = "K8S_PROBE_ERROR"
+	ErrorTypeCmdProbe          ErrorType = "CMD_PROBE_ERROR"
+	ErrorTypeHttpProbe         ErrorType = "HTTP_PROBE_ERROR"
+	ErrorTypePromProbe         ErrorType = "PROM_PROBE_ERROR"
 )
 
 type userFriendly interface {

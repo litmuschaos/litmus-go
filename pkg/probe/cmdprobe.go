@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/litmuschaos/chaos-operator/api/litmuschaos/v1alpha1"
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/math"
@@ -19,7 +20,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	litmusexec "github.com/litmuschaos/litmus-go/pkg/utils/exec"
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
-	"github.com/pkg/errors"
+	"github.com/palantir/stacktrace"
 	"github.com/sirupsen/logrus"
 	apiv1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -45,7 +46,7 @@ func prepareCmdProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets,
 			return err
 		}
 	default:
-		return fmt.Errorf("phase '%s' not supported in the cmd probe", phase)
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeCmdProbe, Target: fmt.Sprintf("{name: %v}", probe.Name), Reason: fmt.Sprintf("phase '%s' not supported in the cmd probe", phase)}
 	}
 	return nil
 }
@@ -74,11 +75,11 @@ func triggerInlineCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.
 			cmd.Stdout = &out
 			cmd.Stderr = &errOut
 			if err := cmd.Run(); err != nil {
-				return errors.Errorf("unable to run command, err: %v; error output: %v", err, errOut.String())
+				return cerrors.Error{ErrorCode: cerrors.ErrorTypeCmdProbe, Target: fmt.Sprintf("{name: %v}", probe.Name), Reason: fmt.Sprintf("unable to run command, err: %v; error output: %v", err, errOut.String())}
 			}
 
 			rc := getAndIncrementRunCount(resultDetails, probe.Name)
-			if err = validateResult(probe.CmdProbeInputs.Comparator, strings.TrimSpace(out.String()), rc); err != nil {
+			if err = validateResult(probe.CmdProbeInputs.Comparator, probe.Name, strings.TrimSpace(out.String()), rc); err != nil {
 				log.Errorf("the %v cmd probe has been Failed, err: %v", probe.Name, err)
 				return err
 			}
@@ -112,11 +113,11 @@ func triggerSourceCmdProbe(probe v1alpha1.ProbeAttributes, execCommandDetails li
 			// exec inside the external pod to get the o/p of given command
 			output, err := litmusexec.Exec(&execCommandDetails, clients, command)
 			if err != nil {
-				return errors.Errorf("Unable to get output of cmd command, err: %v", err)
+				return stacktrace.Propagate(err, "unable to get output of cmd command")
 			}
 
 			rc := getAndIncrementRunCount(resultDetails, probe.Name)
-			if err = validateResult(probe.CmdProbeInputs.Comparator, strings.TrimSpace(output), rc); err != nil {
+			if err = validateResult(probe.CmdProbeInputs.Comparator, probe.Name, strings.TrimSpace(output), rc); err != nil {
 				log.Errorf("The %v cmd probe has been Failed, err: %v", probe.Name, err)
 				return err
 			}
@@ -133,7 +134,7 @@ func createProbePod(clients clients.ClientSets, chaosDetails *types.ChaosDetails
 	//deriving serviceAccount name for the probe pod
 	svcAccount, err := getServiceAccount(chaosDetails.ChaosNamespace, chaosDetails.ChaosPodName, clients)
 	if err != nil {
-		return errors.Errorf("unable to get the serviceAccountName, err: %v", err)
+		return stacktrace.Propagate(err, "unable to get the serviceAccountName")
 	}
 
 	expEnv, volume, expVolumeMount := inheritInputs(clients, chaosDetails.ChaosNamespace, chaosDetails.ChaosPodName, source)
@@ -171,7 +172,11 @@ func createProbePod(clients clients.ClientSets, chaosDetails *types.ChaosDetails
 	}
 
 	_, err = clients.KubeClient.CoreV1().Pods(chaosDetails.ChaosNamespace).Create(context.Background(), cmdProbe, v1.CreateOptions{})
-	return err
+	if err != nil {
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeCmdProbe, Reason: err.Error()}
+	}
+
+	return nil
 }
 
 // inheritInputs will inherit the experiment details(ENVs and volumes) to the probe pod based on inheritInputs flag
@@ -265,11 +270,11 @@ func getProbeCmd(sourceCmd []string) []string {
 	return sourceCmd
 }
 
-//deleteProbePod deletes the probe pod and wait until it got terminated
+// deleteProbePod deletes the probe pod and wait until it got terminated
 func deleteProbePod(chaosDetails *types.ChaosDetails, clients clients.ClientSets, runID string) error {
 
 	if err := clients.KubeClient.CoreV1().Pods(chaosDetails.ChaosNamespace).Delete(context.Background(), chaosDetails.ExperimentName+"-probe-"+runID, v1.DeleteOptions{}); err != nil {
-		return err
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeCmdProbe, Reason: err.Error()}
 	}
 
 	// waiting till the termination of the pod
@@ -279,9 +284,9 @@ func deleteProbePod(chaosDetails *types.ChaosDetails, clients clients.ClientSets
 		Try(func(attempt uint) error {
 			podSpec, err := clients.KubeClient.CoreV1().Pods(chaosDetails.ChaosNamespace).List(context.Background(), v1.ListOptions{LabelSelector: chaosDetails.ExperimentName + "-probe-" + runID})
 			if err != nil {
-				return errors.Errorf("Probe Pod is not deleted yet, err: %v", err)
+				return cerrors.Error{ErrorCode: cerrors.ErrorTypeCmdProbe, Reason: fmt.Sprintf("probe pod is not deleted yet, err: %v", err)}
 			} else if len(podSpec.Items) != 0 {
-				return errors.Errorf("Probe Pod is not deleted yet")
+				return cerrors.Error{ErrorCode: cerrors.ErrorTypeCmdProbe, Reason: "probe pod is not deleted yet"}
 			}
 			return nil
 		})
@@ -477,33 +482,34 @@ loop:
 
 // validateResult validate the probe result to specified comparison operation
 // it supports int, float, string operands
-func validateResult(comparator v1alpha1.ComparatorInfo, cmdOutput string, rc int) error {
+func validateResult(comparator v1alpha1.ComparatorInfo, probeName, cmdOutput string, rc int) error {
 
 	compare := cmp.RunCount(rc).
 		FirstValue(cmdOutput).
 		SecondValue(comparator.Value).
-		Criteria(comparator.Criteria)
+		Criteria(comparator.Criteria).
+		ProbeName(probeName)
 
 	switch strings.ToLower(comparator.Type) {
 	case "int":
-		if err = compare.CompareInt(); err != nil {
+		if err = compare.CompareInt(cerrors.ErrorTypeCmdProbe); err != nil {
 			return err
 		}
 	case "float":
-		if err = compare.CompareFloat(); err != nil {
+		if err = compare.CompareFloat(cerrors.ErrorTypeCmdProbe); err != nil {
 			return err
 		}
 	case "string":
-		if err = compare.CompareString(); err != nil {
+		if err = compare.CompareString(cerrors.ErrorTypeCmdProbe); err != nil {
 			return err
 		}
 	default:
-		return fmt.Errorf("comparator type '%s' not supported in the cmd probe", comparator.Type)
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Target: fmt.Sprintf("{name: %v}", probeName), Reason: fmt.Sprintf("comparator type '%s' not supported in the cmd probe", comparator.Type)}
 	}
 	return nil
 }
 
-//preChaosCmdProbe trigger the cmd probe for prechaos phase
+// preChaosCmdProbe trigger the cmd probe for prechaos phase
 func preChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
 
 	switch probe.Mode {
@@ -589,7 +595,7 @@ func preChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 	return nil
 }
 
-//postChaosCmdProbe trigger cmd probe for post chaos phase
+// postChaosCmdProbe trigger cmd probe for post chaos phase
 func postChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
 
 	switch probe.Mode {
@@ -673,7 +679,7 @@ func postChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resu
 	return nil
 }
 
-//onChaosCmdProbe trigger the cmd probe for DuringChaos phase
+// onChaosCmdProbe trigger the cmd probe for DuringChaos phase
 func onChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
 
 	switch probe.Mode {
@@ -720,7 +726,7 @@ func createHelperPod(probe v1alpha1.ProbeAttributes, resultDetails *types.Result
 	// verify the running status of external probe pod
 	log.Info("[Status]: Checking the status of the probe pod")
 	if err = status.CheckApplicationStatusesByLabels(chaosDetails.ChaosNamespace, "name="+chaosDetails.ExperimentName+"-probe-"+runID, chaosDetails.Timeout, chaosDetails.Delay, clients); err != nil {
-		return litmusexec.PodDetails{}, errors.Errorf("probe pod is not in running state, err: %v", err)
+		return litmusexec.PodDetails{}, stacktrace.Propagate(err, "probe pod is not in running state")
 	}
 
 	// setting the attributes for the exec command
@@ -734,7 +740,7 @@ func createHelperPod(probe v1alpha1.ProbeAttributes, resultDetails *types.Result
 func getServiceAccount(chaosNamespace, chaosPodName string, clients clients.ClientSets) (string, error) {
 	pod, err := clients.KubeClient.CoreV1().Pods(chaosNamespace).Get(context.Background(), chaosPodName, v1.GetOptions{})
 	if err != nil {
-		return "", err
+		return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeCmdProbe, Reason: err.Error()}
 	}
 	return pod.Spec.ServiceAccountName, nil
 }
