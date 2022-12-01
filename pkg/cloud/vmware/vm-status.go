@@ -108,7 +108,7 @@ func VMStatusCheck(vcenterServer, vmIds, cookie string) error {
 		if vmStatus != "POWERED_ON" {
 			return cerrors.Error{
 				ErrorCode: cerrors.ErrorTypeStatusChecks,
-				Reason:    "VM is not powered-on",
+				Reason:    "VM is not in POWERED_ON state",
 				Target:    fmt.Sprintf("{VM ID: %v}", vmId),
 			}
 		}

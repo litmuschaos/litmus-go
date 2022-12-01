@@ -95,7 +95,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 				//Stopping the VM
 				log.Infof("[Chaos]: Stopping %s VM", vmId)
 				if err := vmware.StopVM(experimentsDetails.VcenterServer, vmId, cookie); err != nil {
-					return stacktrace.Propagate(err, "failed to stop VM")
+					return stacktrace.Propagate(err, fmt.Sprintf("failed to stop %s vm", vmId))
 				}
 
 				common.SetTargets(vmId, "injected", "VM", chaosDetails)
