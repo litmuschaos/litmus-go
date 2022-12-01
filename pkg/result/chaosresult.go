@@ -146,18 +146,26 @@ func GetProbeStatus(resultDetails *types.ResultDetails) (bool, []v1alpha1.ProbeS
 	return isAllProbePassed, probeStatus
 }
 
-func getFailStep(probeDetails []types.ProbeDetails) string {
-	var errList []string
+func getFailStep(probeDetails []types.ProbeDetails, phase string) (string, string) {
+	var (
+		errList   []string
+		errCode   cerrors.ErrorType
+		rootCause string
+	)
 	for _, probe := range probeDetails {
 		if probe.IsProbeFailedWithError != nil {
-			errList = append(errList, probe.IsProbeFailedWithError.Error())
+			rootCause, errCode = cerrors.GetRootCauseAndErrorCode(probe.IsProbeFailedWithError, phase)
+			errList = append(errList, rootCause)
 		}
 	}
 
 	if len(errList) != 0 {
-		return fmt.Sprintf("[%v]", strings.Join(errList, ","))
+		if len(errList) == 1 {
+			return errList[0], string(errCode)
+		}
+		return fmt.Sprintf("[%v]", strings.Join(errList, ",")), string(cerrors.ErrorTypeGeneric)
 	}
-	return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: "probe didn't met the passing criteria"}.Error()
+	return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: "probe didn't met the passing criteria"}.Error(), string(cerrors.ErrorTypeGeneric)
 }
 
 func updateResultAttributes(clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, chaosResultLabel map[string]string) (*v1alpha1.ChaosResult, error) {
@@ -185,10 +193,10 @@ func updateResultAttributes(clients clients.ClientSets, chaosDetails *types.Chao
 		if !isAllProbePassed {
 			resultDetails.Verdict = "Fail"
 			result.Status.ExperimentStatus.Verdict = "Fail"
-			failStep := getFailStep(resultDetails.ProbeDetails)
+			failStep, errCode := getFailStep(resultDetails.ProbeDetails, string(chaosDetails.Phase))
 			result.Status.ExperimentStatus.FailureOutput = &v1alpha1.FailureOutput{
 				FailedStep: failStep,
-				ErrorCode:  string(cerrors.ErrorTypeGeneric),
+				ErrorCode:  errCode,
 			}
 		}
 		switch strings.ToLower(string(resultDetails.Verdict)) {

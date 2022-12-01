@@ -239,7 +239,7 @@ func markedVerdictInEnd(err error, resultDetails *types.ResultDetails, probe v1a
 	setProbeVerdict(resultDetails, probe, probeVerdict, description)
 	if !probe.RunProperties.StopOnFailure && err != nil {
 		for index := range resultDetails.ProbeDetails {
-			resultDetails.ProbeDetails[index].IsProbeFailedWithError = stacktrace.RootCause(err)
+			resultDetails.ProbeDetails[index].IsProbeFailedWithError = err
 		}
 		return nil
 	}
