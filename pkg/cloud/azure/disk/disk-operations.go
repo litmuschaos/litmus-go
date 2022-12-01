@@ -40,7 +40,7 @@ func DetachDisks(subscriptionID, resourceGroup, azureInstanceName, scaleSet stri
 		if err != nil {
 			return cerrors.Error{
 				ErrorCode: cerrors.ErrorTypeChaosInject,
-				Reason:    fmt.Sprintf("failed get instance: %v", err),
+				Reason:    fmt.Sprintf("failed to get instance: %v", err),
 				Target:    fmt.Sprintf("{Azure Instance Name: %v, Resource Group: %v}", azureInstanceName, resourceGroup),
 			}
 		}
@@ -82,7 +82,7 @@ func DetachDisks(subscriptionID, resourceGroup, azureInstanceName, scaleSet stri
 		if err != nil {
 			return cerrors.Error{
 				ErrorCode: cerrors.ErrorTypeChaosInject,
-				Reason:    fmt.Sprintf("failed get instance: %v", err),
+				Reason:    fmt.Sprintf("failed to get instance: %v", err),
 				Target:    fmt.Sprintf("{Azure Instance Name: %v, Resource Group: %v}", azureInstanceName, resourceGroup),
 			}
 		}
@@ -121,7 +121,7 @@ func AttachDisk(subscriptionID, resourceGroup, azureInstanceName, scaleSet strin
 	authorizer, err := auth.NewAuthorizerFromFile(azure.PublicCloud.ResourceManagerEndpoint)
 	if err != nil {
 		return cerrors.Error{
-			ErrorCode: cerrors.ErrorTypeChaosInject,
+			ErrorCode: cerrors. ErrorTypeChaosRevert,
 			Reason:    fmt.Sprintf("authorization set up failed: %v", err),
 			Target:    fmt.Sprintf("{Azure Instance Name: %v, Resource Group: %v}", azureInstanceName, resourceGroup),
 		}
@@ -139,7 +139,7 @@ func AttachDisk(subscriptionID, resourceGroup, azureInstanceName, scaleSet strin
 		if err != nil {
 			return cerrors.Error{
 				ErrorCode: cerrors.ErrorTypeChaosRevert,
-				Reason:    fmt.Sprintf("failed get instance: %v", err),
+				Reason:    fmt.Sprintf("failed to get instance: %v", err),
 				Target:    fmt.Sprintf("{Azure Instance Name: %v, Resource Group: %v}", azureInstanceName, resourceGroup),
 			}
 		}
@@ -166,7 +166,7 @@ func AttachDisk(subscriptionID, resourceGroup, azureInstanceName, scaleSet strin
 		if err != nil {
 			return cerrors.Error{
 				ErrorCode: cerrors.ErrorTypeChaosRevert,
-				Reason:    fmt.Sprintf("failed get instance: %v", err),
+				Reason:    fmt.Sprintf("failed to get instance: %v", err),
 				Target:    fmt.Sprintf("{Azure Instance Name: %v, Resource Group: %v}", azureInstanceName, resourceGroup)}
 		}
 
@@ -199,7 +199,7 @@ func WaitForDiskToAttach(experimentsDetails *types.ExperimentDetails, diskName s
 				log.Infof("[Status]: Disk %v is not yet attached, current state: %v", diskName, diskState)
 				return cerrors.Error{
 					ErrorCode: cerrors.ErrorTypeChaosRevert,
-					Reason:    fmt.Sprintf("Disk is not yet attached, current state: %v", diskState),
+					Reason:    fmt.Sprintf("Disk is not attached within timeout, disk state: %s", diskState),
 					Target:    fmt.Sprintf("{Azure Disk Name: %v, Resource Group: %v}", diskName, experimentsDetails.ResourceGroup),
 				}
 			}
@@ -222,7 +222,7 @@ func WaitForDiskToDetach(experimentsDetails *types.ExperimentDetails, diskName s
 				log.Infof("[Status]: Disk %v is not yet detached, state: %v", diskName, diskState)
 				return cerrors.Error{
 					ErrorCode: cerrors.ErrorTypeChaosInject,
-					Reason:    fmt.Sprintf("Disk is not yet detached, current state: %v", diskState),
+					Reason:    fmt.Sprintf("Disk is not detached within timeout, disk state: %s", diskState),
 					Target:    fmt.Sprintf("{Azure Disk Name: %v, Resource Group: %v}", diskName, experimentsDetails.ResourceGroup),
 				}
 			}

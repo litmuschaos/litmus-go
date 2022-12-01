@@ -37,7 +37,7 @@ func GetInstanceDiskList(subscriptionID, resourceGroup, scaleSet, azureInstanceN
 		if err != nil {
 			return nil, cerrors.Error{
 				ErrorCode: cerrors.ErrorTypeTargetSelection,
-				Reason:    fmt.Sprintf("failed get instance: %v", err),
+				Reason:    fmt.Sprintf("failed to get instance: %v", err),
 				Target:    fmt.Sprintf("{Azure Instance Name: %v, Resource Group: %v}", azureInstanceName, resourceGroup),
 			}
 		}
@@ -56,7 +56,7 @@ func GetInstanceDiskList(subscriptionID, resourceGroup, scaleSet, azureInstanceN
 		if err != nil {
 			return nil, cerrors.Error{
 				ErrorCode: cerrors.ErrorTypeTargetSelection,
-				Reason:    fmt.Sprintf("failed get instance: %v", err),
+				Reason:    fmt.Sprintf("failed to get instance: %v", err),
 				Target:    fmt.Sprintf("{Azure Instance Name: %v, Resource Group: %v}", azureInstanceName, resourceGroup),
 			}
 		}
@@ -131,7 +131,7 @@ func CheckVirtualDiskWithInstance(subscriptionID, virtualDiskNames, resourceGrou
 		if disk.ManagedBy == nil {
 			return cerrors.Error{
 				ErrorCode: cerrors.ErrorTypeStatusChecks,
-				Reason:    "disk not attached to any instance",
+				Reason:    "disk is not attached to any instance",
 				Target:    fmt.Sprintf("{Azure Disk Name: %v, Resource Group: %v}", diskName, resourceGroup)}
 		}
 	}

@@ -155,7 +155,7 @@ func WaitForAzureComputeDown(timeout, delay int, scaleSet, subscriptionID, resou
 			if instanceState != "VM stopped" {
 				return cerrors.Error{
 					ErrorCode: cerrors.ErrorTypeChaosInject,
-					Reason:    "instance is not yet in stopped state",
+					Reason:    "instance is not in stopped within timeout",
 					Target:    fmt.Sprintf("{Azure Instance Name: %v, Resource Group: %v}", azureInstanceName, resourceGroup),
 				}
 			}
@@ -188,7 +188,7 @@ func WaitForAzureComputeUp(timeout, delay int, scaleSet, subscriptionID, resourc
 			if instanceState != "VM running" {
 				return cerrors.Error{
 					ErrorCode: cerrors.ErrorTypeChaosRevert,
-					Reason:    "instance is not yet in running state",
+					Reason:    "instance is not in running state within timeout",
 					Target:    fmt.Sprintf("{Azure Instance Name: %v, Resource Group: %v}", azureInstanceName, resourceGroup),
 				}
 			}
