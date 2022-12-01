@@ -109,7 +109,7 @@ func VMInstanceStop(clients clients.ClientSets) {
 	// Verify that the GCP VM instance(s) is in RUNNING state (pre-chaos)
 	if chaosDetails.DefaultHealthCheck {
 		if err := gcp.InstanceStatusCheckByName(computeService, experimentsDetails.ManagedInstanceGroup, experimentsDetails.Delay, experimentsDetails.Timeout, "pre-chaos", experimentsDetails.VMInstanceName, experimentsDetails.GCPProjectID, experimentsDetails.Zones); err != nil {
-			log.Errorf("failed to get the vm instance status, err: %v", err)
+			log.Errorf("Failed to get the vm instance status, err: %v", err)
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 			return
 		}
