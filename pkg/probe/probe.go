@@ -56,18 +56,18 @@ func RunProbes(chaosDetails *types.ChaosDetails, clients clients.ClientSets, res
 		// execute the probes for the postchaos phase
 		// it first evaluate the onchaos and continuous modes then it evaluates the other modes
 		// as onchaos and continuous probes are already completed
-		var probeError []error
+		var probeError []string
 		for _, probe := range probes {
 			// evaluate continuous and onchaos probes
 			switch strings.ToLower(probe.Mode) {
 			case "onchaos", "continuous":
 				if err := execute(probe, chaosDetails, clients, resultDetails, phase); err != nil {
-					probeError = append(probeError, err)
+					probeError = append(probeError, stacktrace.RootCause(err).Error())
 				}
 			}
 		}
 		if len(probeError) != 0 {
-			return cerrors.Error{ErrorCode: cerrors.ErrorTypePromProbe, Reason: fmt.Sprintf("probes failed, err: %v", probeError)}
+			return cerrors.PreserveError{ErrString: fmt.Sprintf("[%s]", strings.Join(probeError, ","))}
 		}
 		// executes the eot and edge modes
 		for _, probe := range probes {
