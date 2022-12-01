@@ -237,7 +237,10 @@ func markedVerdictInEnd(err error, resultDetails *types.ResultDetails, probe v1a
 	}
 
 	setProbeVerdict(resultDetails, probe, probeVerdict, description)
-	if !probe.RunProperties.StopOnFailure {
+	if !probe.RunProperties.StopOnFailure && err != nil {
+		for index := range resultDetails.ProbeDetails {
+			resultDetails.ProbeDetails[index].IsProbeFailedWithError = stacktrace.RootCause(err)
+		}
 		return nil
 	}
 	return err
@@ -274,7 +277,7 @@ func parseCommand(templatedCommand string, resultDetails *types.ResultDetails) (
 	// store the parsed output in the buffer
 	var out bytes.Buffer
 	if err := t.Execute(&out, register); err != nil {
-		return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("failed to parse the templated command, err: %v", err)}
+		return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("failed to parse the templated command, %s", err.Error())}
 	}
 
 	return out.String(), nil
@@ -289,12 +292,12 @@ func stopChaosEngine(probe v1alpha1.ProbeAttributes, clients clients.ClientSets,
 	//patch chaosengine's state to stop
 	engine, err := clients.LitmusClient.ChaosEngines(chaosDetails.ChaosNamespace).Get(context.Background(), chaosDetails.EngineName, v1.GetOptions{})
 	if err != nil {
-		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("failed to get chaosengine, err: %v", err)}
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("failed to get chaosengine, %s", err.Error())}
 	}
 	engine.Spec.EngineState = v1alpha1.EngineStateStop
 	_, err = clients.LitmusClient.ChaosEngines(chaosDetails.ChaosNamespace).Update(context.Background(), engine, v1.UpdateOptions{})
 	if err != nil {
-		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("failed to patch the chaosengine to `stop` state, err: %v", err)}
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("failed to patch the chaosengine to `stop` state, %v", err.Error())}
 	}
 
 	return nil

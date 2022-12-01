@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/litmuschaos/litmus-go/pkg/cerrors"
-	"github.com/palantir/stacktrace"
 	"os/exec"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
+	"github.com/palantir/stacktrace"
 
 	"github.com/litmuschaos/chaos-operator/api/litmuschaos/v1alpha1"
 
@@ -23,7 +24,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-//ChaosResult Create and Update the chaos result
+// ChaosResult Create and Update the chaos result
 func ChaosResult(chaosDetails *types.ChaosDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, state string) error {
 	experimentLabel := map[string]string{}
 
@@ -73,7 +74,7 @@ func ChaosResult(chaosDetails *types.ChaosDetails, clients clients.ClientSets, r
 	return PatchChaosResult(clients, chaosDetails, resultDetails, experimentLabel)
 }
 
-//InitializeChaosResult create the chaos result
+// InitializeChaosResult create the chaos result
 func InitializeChaosResult(chaosDetails *types.ChaosDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, chaosResultLabel map[string]string) error {
 
 	_, probeStatus := GetProbeStatus(resultDetails)
@@ -113,7 +114,7 @@ func InitializeChaosResult(chaosDetails *types.ChaosDetails, clients clients.Cli
 	// in his cluster, which was created earlier with older release/version of litmus.
 	// it will override the params and add the labels to it so that it will work as desired.
 	if k8serrors.IsAlreadyExists(err) {
-		chaosResult, err = clients.LitmusClient.ChaosResults(chaosDetails.ChaosNamespace).Get(context.Background(), resultDetails.Name, v1.GetOptions{})
+		_, err = clients.LitmusClient.ChaosResults(chaosDetails.ChaosNamespace).Get(context.Background(), resultDetails.Name, v1.GetOptions{})
 		if err != nil {
 			return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosResultCRUD, Target: fmt.Sprintf("{name: %s, namespace: %s}", resultDetails.Name, chaosDetails.ChaosNamespace), Reason: err.Error()}
 		}
@@ -126,7 +127,7 @@ func InitializeChaosResult(chaosDetails *types.ChaosDetails, clients clients.Cli
 	return nil
 }
 
-//GetProbeStatus fetch status of all probes
+// GetProbeStatus fetch status of all probes
 func GetProbeStatus(resultDetails *types.ResultDetails) (bool, []v1alpha1.ProbeStatuses) {
 	isAllProbePassed := true
 
@@ -143,6 +144,20 @@ func GetProbeStatus(resultDetails *types.ResultDetails) (bool, []v1alpha1.ProbeS
 		}
 	}
 	return isAllProbePassed, probeStatus
+}
+
+func getFailStep(probeDetails []types.ProbeDetails) string {
+	var errList []string
+	for _, probe := range probeDetails {
+		if probe.IsProbeFailedWithError != nil {
+			errList = append(errList, probe.IsProbeFailedWithError.Error())
+		}
+	}
+
+	if len(errList) != 0 {
+		return fmt.Sprintf("[%v]", strings.Join(errList, ","))
+	}
+	return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: "probe didn't met the passing criteria"}.Error()
 }
 
 func updateResultAttributes(clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, chaosResultLabel map[string]string) (*v1alpha1.ChaosResult, error) {
@@ -170,8 +185,9 @@ func updateResultAttributes(clients clients.ClientSets, chaosDetails *types.Chao
 		if !isAllProbePassed {
 			resultDetails.Verdict = "Fail"
 			result.Status.ExperimentStatus.Verdict = "Fail"
+			failStep := getFailStep(resultDetails.ProbeDetails)
 			result.Status.ExperimentStatus.FailureOutput = &v1alpha1.FailureOutput{
-				FailedStep: "Probe execution result didn't met the passing criteria",
+				FailedStep: failStep,
 				ErrorCode:  string(cerrors.ErrorTypeGeneric),
 			}
 		}
@@ -202,7 +218,7 @@ func updateResultAttributes(clients clients.ClientSets, chaosDetails *types.Chao
 	return result, nil
 }
 
-//PatchChaosResult Update the chaos result
+// PatchChaosResult Update the chaos result
 func PatchChaosResult(clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, chaosResultLabel map[string]string) error {
 
 	result, err := updateResultAttributes(clients, chaosDetails, resultDetails, chaosResultLabel)
@@ -242,7 +258,7 @@ func SetResultUID(resultDetails *types.ResultDetails, clients clients.ClientSets
 	return nil
 }
 
-//RecordAfterFailure update the chaosresult and create the summary events
+// RecordAfterFailure update the chaosresult and create the summary events
 func RecordAfterFailure(chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, err error, clients clients.ClientSets, eventsDetails *types.EventDetails) {
 	failStep, errorCode := cerrors.GetRootCauseAndErrorCode(err, string(chaosDetails.Phase))
 

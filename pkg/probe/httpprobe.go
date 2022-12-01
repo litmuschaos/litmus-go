@@ -230,7 +230,7 @@ loop:
 	// and failed the experiment in the end
 	if isExperimentFailed && probe.RunProperties.StopOnFailure {
 		if err := stopChaosEngine(probe, clients, chaosresult, chaosDetails); err != nil {
-			log.Errorf("unable to patch chaosengine to stop, err: %v", err)
+			log.Errorf("Unable to patch chaosengine to stop, err: %v", err)
 		}
 	}
 }
