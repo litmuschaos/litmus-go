@@ -127,7 +127,7 @@ func GetVolumeAttachmentDetails(volumeID, volumeTag, region string) (string, str
 		return "", "", cerrors.Error{
 			ErrorCode: cerrors.ErrorTypeTargetSelection,
 			Reason:    fmt.Sprintf("failed to fetch the volumes with the given tag: %v", err),
-			Target:    fmt.Sprintf("{EBS Volume ID: %v, Region: %v}", volumeID, region),
+			Target:    fmt.Sprintf("{EBS Volume Tag: %v, Region: %v}", volumeTag, region),
 		}
 	}
 	for _, volumeDetails := range res.Volumes {

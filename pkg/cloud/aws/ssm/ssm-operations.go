@@ -98,7 +98,7 @@ func WaitForCommandStatus(status, commandID, ec2InstanceID, region string, timeo
 				log.Infof("The instance state is %v", commandStatus)
 				return cerrors.Error{
 					ErrorCode: cerrors.ErrorTypeChaosInject,
-					Reason:    fmt.Sprintf("SSM command is not yet in %v state", status),
+					Reason:    fmt.Sprintf("SSM command is not in %v state within timeout", status),
 					Target:    fmt.Sprintf("{EC2 Instance ID: %v, Region: %v}", ec2InstanceID, region)}
 			}
 			log.Infof("The SSM command status is %v", commandStatus)
@@ -162,7 +162,7 @@ func CheckInstanceInformation(experimentsDetails *experimentTypes.ExperimentDeta
 			if !isInstanceFound {
 				return cerrors.Error{
 					ErrorCode: cerrors.ErrorTypeChaosInject,
-					Reason:    fmt.Sprintf("error: the instance %v might not have suitable permission or IAM attached to it. Run command \"aws ssm describe-instance-information\" to check for available instances", ec2ID),
+					Reason:    fmt.Sprintf("the instance %v might not have suitable permission or IAM attached to it. Run command `aws ssm describe-instance-information` to check for available instances", ec2ID),
 					Target:    fmt.Sprintf("{EC2 Instance ID: %v, Region: %v}", ec2ID, experimentsDetails.Region),
 				}
 			}

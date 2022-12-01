@@ -122,7 +122,7 @@ func WaitForEC2Up(timeout, delay int, managedNodegroup, region, instanceID strin
 				log.Infof("The instance state is %v", instanceState)
 				return cerrors.Error{
 					ErrorCode: cerrors.ErrorTypeChaosInject,
-					Reason:    "instance is not in running state",
+					Reason:    "instance is not in running state within timeout",
 					Target:    fmt.Sprintf("{EC2 Instance ID: %v, Region: %v}", instanceID, region),
 				}
 			}

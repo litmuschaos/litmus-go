@@ -33,7 +33,7 @@ func WaitForVolumeDetachment(ebsVolumeID, ec2InstanceID, region string, delay, t
 				log.Infof("[Info]: The volume state is %v", volumeState)
 				return cerrors.Error{
 					ErrorCode: cerrors.ErrorTypeChaosInject,
-					Reason:    "volume is not yet in detached state",
+					Reason:    "volume is not detached within timeout",
 					Target:    fmt.Sprintf("{EBS Volume ID: %v, EC2 Instance ID: %v, Region: %v}", ebsVolumeID, ec2InstanceID, region),
 				}
 			}
@@ -57,7 +57,7 @@ func WaitForVolumeAttachment(ebsVolumeID, ec2InstanceID, region string, delay, t
 			if volumeState != "attached" {
 				log.Infof("[Info]: The volume state is %v", volumeState)
 				return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosRevert,
-					Reason: "volume is not yet in attached state",
+					Reason: "volume is not attached within timeout",
 					Target: fmt.Sprintf("{EBS Volume ID: %v, EC2 Instance ID: %v, Region: %v}", ebsVolumeID, ec2InstanceID, region),
 				}
 			}
