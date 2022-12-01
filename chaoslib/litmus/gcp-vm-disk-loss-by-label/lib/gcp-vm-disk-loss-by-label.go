@@ -71,7 +71,7 @@ func PrepareDiskVolumeLossByLabel(computeService *compute.Service, experimentsDe
 				return stacktrace.Propagate(err, "could not run chaos in parallel mode")
 			}
 		default:
-			return cerrors.Error{Phase: "ChaosInject", Reason: fmt.Sprintf("'%s' sequence is not supported", experimentsDetails.Sequence)}
+			return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("'%s' sequence is not supported", experimentsDetails.Sequence)}
 		}
 	}
 

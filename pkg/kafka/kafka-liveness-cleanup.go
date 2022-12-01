@@ -16,7 +16,7 @@ import (
 func LivenessCleanup(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) error {
 
 	if err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaoslibDetail.AppNS).Delete(context.Background(), "kafka-liveness-"+experimentsDetails.RunID, metav1.DeleteOptions{}); err != nil {
-		return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosRevert, Reason: fmt.Sprintf("fail to delete liveness deployment, err: %v", err)}
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosRevert, Reason: fmt.Sprintf("fail to delete liveness deployment, %s", err.Error())}
 	}
 
 	return retry.
@@ -25,7 +25,7 @@ func LivenessCleanup(experimentsDetails *experimentTypes.ExperimentDetails, clie
 		Try(func(attempt uint) error {
 			podSpec, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaoslibDetail.AppNS).List(context.Background(), metav1.ListOptions{LabelSelector: "name=kafka-liveness-" + experimentsDetails.RunID})
 			if err != nil {
-				return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosRevert, Reason: fmt.Sprintf("liveness pod is not deleted yet, err: %v", err)}
+				return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosRevert, Reason: fmt.Sprintf("liveness pod is not deleted yet, %s", err.Error())}
 			} else if len(podSpec.Items) != 0 {
 				return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosRevert, Reason: "liveness pod is not deleted yet"}
 			}

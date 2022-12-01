@@ -32,7 +32,7 @@ func InstanceStatusCheckByName(computeService *compute.Service, managedInstanceG
 	instanceZonesList := strings.Split(instanceZones, ",")
 
 	if managedInstanceGroup != "enable" && managedInstanceGroup != "disable" {
-		return cerrors.Error{ErrorCode: cerrors.ErrorTypeStatusChecks, Target: fmt.Sprintf("{vmNames: %s, zones: %s}", instanceNamesList, instanceZonesList), Reason: fmt.Sprintf("invalid value for MANAGED_INSTANCE_GROUP: %v", managedInstanceGroup)}
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeStatusChecks, Target: fmt.Sprintf("{vmNames: %s, zones: %s}", instanceNamesList, instanceZonesList), Reason: fmt.Sprintf("invalid value for MANAGED_INSTANCE_GROUP: %s", managedInstanceGroup)}
 	}
 
 	if len(instanceNamesList) == 0 {
@@ -66,7 +66,7 @@ func InstanceStatusCheck(computeService *compute.Service, instanceNamesList []st
 		}
 
 		if instanceState != "RUNNING" {
-			return cerrors.Error{ErrorCode: cerrors.ErrorTypeStatusChecks, Target: fmt.Sprintf("{vmName: %s, zone: %s}", instanceNamesList[i], zone), Reason: fmt.Sprintf("vm instance is not in RUNNING state, current state: %v", instanceState)}
+			return cerrors.Error{ErrorCode: cerrors.ErrorTypeStatusChecks, Target: fmt.Sprintf("{vmName: %s, zone: %s}", instanceNamesList[i], zone), Reason: fmt.Sprintf("vm instance is not in RUNNING state, current state: %s", instanceState)}
 		}
 	}
 
