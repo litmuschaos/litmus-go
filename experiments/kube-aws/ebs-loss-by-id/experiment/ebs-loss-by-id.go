@@ -40,7 +40,7 @@ func EBSLossByID(clients clients.ClientSets) {
 	if experimentsDetails.EngineName != "" {
 		// Initialize the probe details. Bail out upon error, as we haven't entered exp business logic yet
 		if err = probe.InitializeProbesInChaosResultDetails(&chaosDetails, clients, &resultDetails); err != nil {
-			log.Errorf("unable to initialize the probes, err: %v", err)
+			log.Errorf("Unable to initialize the probes: %v", err)
 			return
 		}
 	}
@@ -48,7 +48,7 @@ func EBSLossByID(clients clients.ClientSets) {
 	//Updating the chaos result in the beginning of experiment
 	log.Infof("[PreReq]: Updating the chaos result of %v experiment (SOT)", experimentsDetails.ExperimentName)
 	if err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT"); err != nil {
-		log.Errorf("unable to Create the Chaos Result, err: %v", err)
+		log.Errorf("Unable to create the chaosresult: %v", err)
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 		return
 	}
@@ -59,7 +59,9 @@ func EBSLossByID(clients clients.ClientSets) {
 	// generating the event in chaosresult to marked the verdict as awaited
 	msg := "experiment: " + experimentsDetails.ExperimentName + ", Result: Awaited"
 	types.SetResultEventAttributes(&eventsDetails, types.AwaitedVerdict, msg, "Normal", &resultDetails)
-	events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosResult")
+	if eventErr := events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosResult"); eventErr != nil {
+		log.Errorf("Failed to create %v event inside chaosresult", types.AwaitedVerdict)
+	}
 
 	// Calling AbortWatcher go routine, it will continuously watch for the abort signal and generate the required events and result
 	go common.AbortWatcherWithoutExit(experimentsDetails.ExperimentName, clients, &resultDetails, &chaosDetails, &eventsDetails)
@@ -75,7 +77,7 @@ func EBSLossByID(clients clients.ClientSets) {
 	//Verify the aws ec2 instance is attached to ebs volume
 	if chaosDetails.DefaultHealthCheck {
 		if err = aws.EBSStateCheckByID(experimentsDetails.EBSVolumeID, experimentsDetails.Region); err != nil {
-			log.Errorf("volume status check failed pre chaos, err: %v", err)
+			log.Errorf("Volume status check failed pre chaos: %v", err)
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 			return
 		}
@@ -89,10 +91,12 @@ func EBSLossByID(clients clients.ClientSets) {
 		if len(resultDetails.ProbeDetails) != 0 {
 
 			if err = probe.RunProbes(&chaosDetails, clients, &resultDetails, "PreChaos", &eventsDetails); err != nil {
-				log.Errorf("Probe Failed, err: %v", err)
+				log.Errorf("Probe Failed: %v", err)
 				msg := "AUT: Running, Probes: Unsuccessful"
 				types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, msg, "Warning", &chaosDetails)
-				events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
+				if eventErr := events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine"); eventErr != nil {
+					log.Errorf("Failed to create %v event inside chaosengine", types.PreChaosCheck)
+				}
 				result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 				return
 			}
@@ -100,11 +104,13 @@ func EBSLossByID(clients clients.ClientSets) {
 		}
 		// generating the events for the pre-chaos check
 		types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, msg, "Normal", &chaosDetails)
-		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
+		if eventErr := events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine"); eventErr != nil {
+			log.Errorf("Failed to create %v event inside chaosengine", types.PreChaosCheck)
+		}
 	}
 
 	if err = litmusLIB.PrepareEBSLossByID(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
-		log.Errorf("Chaos injection failed, err: %v", err)
+		log.Errorf("Chaos injection failed: %v", err)
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 		return
 	}
@@ -115,7 +121,7 @@ func EBSLossByID(clients clients.ClientSets) {
 	if chaosDetails.DefaultHealthCheck {
 		//Verify the aws ec2 instance is attached to ebs volume
 		if err = aws.EBSStateCheckByID(experimentsDetails.EBSVolumeID, experimentsDetails.Region); err != nil {
-			log.Errorf("volume status check failed post chaos, err: %v", err)
+			log.Errorf("Volume status check failed post chaos: %v", err)
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 			return
 		}
@@ -128,10 +134,12 @@ func EBSLossByID(clients clients.ClientSets) {
 		// run the probes in the post-chaos check
 		if len(resultDetails.ProbeDetails) != 0 {
 			if err = probe.RunProbes(&chaosDetails, clients, &resultDetails, "PostChaos", &eventsDetails); err != nil {
-				log.Errorf("Probes Failed, err: %v", err)
+				log.Errorf("Probes Failed: %v", err)
 				msg := "AUT: Running, Probes: Unsuccessful"
 				types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, msg, "Warning", &chaosDetails)
-				events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
+				if eventErr := events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine"); eventErr != nil {
+					log.Errorf("Failed to create %v event inside chaosengine", types.PostChaosCheck)
+				}
 				result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 				return
 			}
@@ -140,13 +148,15 @@ func EBSLossByID(clients clients.ClientSets) {
 
 		// generating post chaos event
 		types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, msg, "Normal", &chaosDetails)
-		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
+		if eventErr := events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine"); eventErr != nil {
+			log.Errorf("Failed to create %v event inside chaosengine", types.PostChaosCheck)
+		}
 	}
 
 	//Updating the chaosResult in the end of experiment
 	log.Infof("[The End]: Updating the chaos result of %v experiment (EOT)", experimentsDetails.ExperimentName)
 	if err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT"); err != nil {
-		log.Errorf("unable to Update the Chaos Result, err: %v", err)
+		log.Errorf("Unable to update the chaosresult: %v", err)
 		return
 	}
 
@@ -159,12 +169,16 @@ func EBSLossByID(clients clients.ClientSets) {
 		eventType = "Warning"
 	}
 	types.SetResultEventAttributes(&eventsDetails, reason, msg, eventType, &resultDetails)
-	events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosResult")
+	if eventErr := events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosResult"); eventErr != nil {
+		log.Errorf("Failed to create %v event inside chaosresult", reason)
+	}
 
 	if experimentsDetails.EngineName != "" {
 		msg := experimentsDetails.ExperimentName + " experiment has been " + string(resultDetails.Verdict) + "ed"
 		types.SetEngineEventAttributes(&eventsDetails, types.Summary, msg, "Normal", &chaosDetails)
-		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
+		if eventErr := events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine"); eventErr != nil {
+			log.Errorf("Failed to create %v event inside chaosengine", types.Summary)
+		}
 	}
 
 }
