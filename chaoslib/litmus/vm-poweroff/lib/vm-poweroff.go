@@ -1,12 +1,14 @@
 package lib
 
 import (
+	"fmt"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
 	"time"
 
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/cloud/vmware"
 	"github.com/litmuschaos/litmus-go/pkg/events"
@@ -15,7 +17,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/vmware/vm-poweroff/types"
-	"github.com/pkg/errors"
+	"github.com/palantir/stacktrace"
 )
 
 var inject, abort chan os.Signal
@@ -48,14 +50,14 @@ func InjectVMPowerOffChaos(experimentsDetails *experimentTypes.ExperimentDetails
 	switch strings.ToLower(experimentsDetails.Sequence) {
 	case "serial":
 		if err := injectChaosInSerialMode(experimentsDetails, vmIdList, cookie, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
-			return err
+			return stacktrace.Propagate(err, "could not run chaos in serial mode")
 		}
 	case "parallel":
 		if err := injectChaosInParallelMode(experimentsDetails, vmIdList, cookie, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
-			return err
+			return stacktrace.Propagate(err, "could not run chaos in parallel mode")
 		}
 	default:
-		return errors.Errorf("%v sequence is not supported", experimentsDetails.Sequence)
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("'%s' sequence is not supported", experimentsDetails.Sequence)}
 	}
 
 	//Waiting for the ramp time after chaos injection
@@ -93,7 +95,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 				//Stopping the VM
 				log.Infof("[Chaos]: Stopping %s VM", vmId)
 				if err := vmware.StopVM(experimentsDetails.VcenterServer, vmId, cookie); err != nil {
-					return errors.Errorf("failed to stop %s vm: %s", vmId, err.Error())
+					return stacktrace.Propagate(err, fmt.Sprintf("failed to stop %s vm", vmId))
 				}
 
 				common.SetTargets(vmId, "injected", "VM", chaosDetails)
@@ -101,14 +103,14 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 				//Wait for the VM to completely stop
 				log.Infof("[Wait]: Wait for VM '%s' to get in POWERED_OFF state", vmId)
 				if err := vmware.WaitForVMStop(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.VcenterServer, vmId, cookie); err != nil {
-					return errors.Errorf("vm %s failed to successfully shutdown, err: %s", vmId, err.Error())
+					return stacktrace.Propagate(err, "VM shutdown failed")
 				}
 
 				//Run the probes during the chaos
 				//The OnChaos probes execution will start in the first iteration and keep running for the entire chaos duration
 				if len(resultDetails.ProbeDetails) != 0 && i == 0 {
 					if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
-						return err
+						return stacktrace.Propagate(err, "failed to run probes")
 					}
 				}
 
@@ -119,13 +121,13 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 				//Starting the VM
 				log.Infof("[Chaos]: Starting back %s VM", vmId)
 				if err := vmware.StartVM(experimentsDetails.VcenterServer, vmId, cookie); err != nil {
-					return errors.Errorf("failed to start back %s vm: %s", vmId, err.Error())
+					return stacktrace.Propagate(err, "failed to start back vm")
 				}
 
 				//Wait for the VM to completely start
 				log.Infof("[Wait]: Wait for VM '%s' to get in POWERED_ON state", vmId)
 				if err := vmware.WaitForVMStart(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.VcenterServer, vmId, cookie); err != nil {
-					return errors.Errorf("vm %s failed to successfully start, err: %s", vmId, err.Error())
+					return stacktrace.Propagate(err, "vm failed to start")
 				}
 
 				common.SetTargets(vmId, "reverted", "VM", chaosDetails)
@@ -165,7 +167,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 				//Stopping the VM
 				log.Infof("[Chaos]: Stopping %s VM", vmId)
 				if err := vmware.StopVM(experimentsDetails.VcenterServer, vmId, cookie); err != nil {
-					return errors.Errorf("failed to stop %s vm: %s", vmId, err.Error())
+					return stacktrace.Propagate(err, fmt.Sprintf("failed to stop %s vm", vmId))
 				}
 
 				common.SetTargets(vmId, "injected", "VM", chaosDetails)
@@ -176,14 +178,14 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 				//Wait for the VM to completely stop
 				log.Infof("[Wait]: Wait for VM '%s' to get in POWERED_OFF state", vmId)
 				if err := vmware.WaitForVMStop(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.VcenterServer, vmId, cookie); err != nil {
-					return errors.Errorf("vm %s failed to successfully shutdown, err: %s", vmId, err.Error())
+					return stacktrace.Propagate(err, "vm failed to shutdown")
 				}
 			}
 
 			//Running the probes during chaos
 			if len(resultDetails.ProbeDetails) != 0 {
 				if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
-					return err
+					return stacktrace.Propagate(err, "failed to run probes")
 				}
 			}
 
@@ -196,7 +198,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 				//Starting the VM
 				log.Infof("[Chaos]: Starting back %s VM", vmId)
 				if err := vmware.StartVM(experimentsDetails.VcenterServer, vmId, cookie); err != nil {
-					return errors.Errorf("failed to start back %s vm: %s", vmId, err.Error())
+					return stacktrace.Propagate(err, fmt.Sprintf("failed to start back %s vm", vmId))
 				}
 			}
 
@@ -205,7 +207,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 				//Wait for the VM to completely start
 				log.Infof("[Wait]: Wait for VM '%s' to get in POWERED_ON state", vmId)
 				if err := vmware.WaitForVMStart(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.VcenterServer, vmId, cookie); err != nil {
-					return errors.Errorf("vm %s failed to successfully start, err: %s", vmId, err.Error())
+					return stacktrace.Propagate(err, "vm failed to successfully start")
 				}
 			}
 
