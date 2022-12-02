@@ -8,13 +8,13 @@ import (
 	"time"
 
 	"github.com/litmuschaos/chaos-operator/api/litmuschaos/v1alpha1"
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/math"
 	cmp "github.com/litmuschaos/litmus-go/pkg/probe/comparator"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -36,12 +36,12 @@ func preparePromProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets
 			return err
 		}
 	default:
-		return errors.Errorf("phase '%s' not supported in the prom probe", phase)
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypePromProbe, Target: fmt.Sprintf("{name: %v}", probe.Name), Reason: fmt.Sprintf("phase '%s' not supported in the prom probe", phase)}
 	}
 	return nil
 }
 
-//preChaosPromProbe trigger the prometheus probe for prechaos phase
+// preChaosPromProbe trigger the prometheus probe for prechaos phase
 func preChaosPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
 
 	switch strings.ToLower(probe.Mode) {
@@ -93,7 +93,7 @@ func preChaosPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resu
 	return nil
 }
 
-//postChaosPromProbe trigger the prometheus probe for postchaos phase
+// postChaosPromProbe trigger the prometheus probe for postchaos phase
 func postChaosPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
 
 	switch strings.ToLower(probe.Mode) {
@@ -139,7 +139,7 @@ func postChaosPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Res
 	return nil
 }
 
-//onChaosPromProbe trigger the prom probe for DuringChaos phase
+// onChaosPromProbe trigger the prom probe for DuringChaos phase
 func onChaosPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
 
 	switch strings.ToLower(probe.Mode) {
@@ -181,7 +181,7 @@ func triggerPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 			} else if probe.PromProbeInputs.QueryPath != "" {
 				command = "promql --host " + probe.PromProbeInputs.Endpoint + " \"$(cat " + probe.PromProbeInputs.QueryPath + ")\"" + " --output csv"
 			} else {
-				return errors.Errorf("[Probe]: Any one of query or queryPath is required")
+				return cerrors.Error{ErrorCode: cerrors.ErrorTypePromProbe, Target: fmt.Sprintf("{name: %v}", probe.Name), Reason: "[Probe]: Any one of query or queryPath is required"}
 			}
 
 			var out, errOut bytes.Buffer
@@ -190,11 +190,11 @@ func triggerPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 			cmd.Stdout = &out
 			cmd.Stderr = &errOut
 			if err := cmd.Run(); err != nil {
-				return fmt.Errorf("unable to run command, err: %v; error output: %v", err, errOut.String())
+				return cerrors.Error{ErrorCode: cerrors.ErrorTypePromProbe, Target: fmt.Sprintf("{name: %v}", probe.Name), Reason: fmt.Sprintf("unable to run command, err: %v; error output: %v", err, errOut.String())}
 			}
 
 			// extract the values from the metrics
-			value, err := extractValueFromMetrics(strings.TrimSpace(out.String()))
+			value, err := extractValueFromMetrics(strings.TrimSpace(out.String()), probe.Name)
 			if err != nil {
 				return err
 			}
@@ -205,7 +205,8 @@ func triggerPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 				FirstValue(value).
 				SecondValue(probe.PromProbeInputs.Comparator.Value).
 				Criteria(probe.PromProbeInputs.Comparator.Criteria).
-				CompareFloat(); err != nil {
+				ProbeName(probe.Name).
+				CompareFloat(cerrors.ErrorTypePromProbe); err != nil {
 				log.Errorf("The %v prom probe has been Failed, err: %v", probe.Name, err)
 				return err
 			}
@@ -302,7 +303,7 @@ loop:
 }
 
 // extractValueFromMetrics extract the value field from the prometheus metrix
-func extractValueFromMetrics(metrics string) (string, error) {
+func extractValueFromMetrics(metrics, probeName string) (string, error) {
 
 	// spliting the metrics based on newline as metrics may have multiple entries
 	rows := strings.Split(metrics, "\n")
@@ -310,9 +311,9 @@ func extractValueFromMetrics(metrics string) (string, error) {
 	// output should contains exact one metrics entry along with header
 	// erroring out the cases where it contains more or less entries
 	if len(rows) > 2 {
-		return "", errors.Errorf("metrics entries can't be more than two")
+		return "", cerrors.Error{ErrorCode: cerrors.ErrorTypePromProbe, Target: fmt.Sprintf("{name: %v}", probeName), Reason: "metrics entries can't be more than two"}
 	} else if len(rows) < 2 {
-		return "", errors.Errorf("metrics doesn't contains required values")
+		return "", cerrors.Error{ErrorCode: cerrors.ErrorTypePromProbe, Target: fmt.Sprintf("{name: %v}", probeName), Reason: "metrics doesn't contains required values"}
 	}
 
 	// deriving the index for the value column from the headers
@@ -325,13 +326,13 @@ func extractValueFromMetrics(metrics string) (string, error) {
 		}
 	}
 	if indexForValueColumn == -1 {
-		return "", errors.Errorf("metrics entries doesn't contains value column")
+		return "", cerrors.Error{ErrorCode: cerrors.ErrorTypePromProbe, Target: fmt.Sprintf("{name: %v}", probeName), Reason: "metrics entries doesn't contains value column"}
 	}
 
 	// splitting the metrics entries which are available as comma separated
 	values := strings.Split(rows[1], ",")
 	if values[indexForValueColumn] == "" {
-		return "", errors.Errorf("error while parsing value from derived matrics")
+		return "", cerrors.Error{ErrorCode: cerrors.ErrorTypePromProbe, Target: fmt.Sprintf("{name: %v}", probeName), Reason: "error while parsing value from derived matrics"}
 	}
 	return values[indexForValueColumn], nil
 }
