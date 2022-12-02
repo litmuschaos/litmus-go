@@ -127,6 +127,8 @@ func EC2TerminateByID(clients clients.ClientSets) {
 		}
 	}
 
+	chaosDetails.Phase = types.ChaosInjectPhase
+
 	if err = litmusLIB.PrepareEC2TerminateByID(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
 		log.Errorf("Chaos injection failed: %v", err)
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
@@ -135,6 +137,8 @@ func EC2TerminateByID(clients clients.ClientSets) {
 
 	log.Infof("[Confirmation]: %v chaos has been injected successfully", experimentsDetails.ExperimentName)
 	resultDetails.Verdict = v1alpha1.ResultVerdictPassed
+
+	chaosDetails.Phase = types.PostChaosPhase
 
 	//Verify the aws ec2 instance is running (post chaos)
 	if chaosDetails.DefaultHealthCheck && experimentsDetails.ManagedNodegroup != "enable" {

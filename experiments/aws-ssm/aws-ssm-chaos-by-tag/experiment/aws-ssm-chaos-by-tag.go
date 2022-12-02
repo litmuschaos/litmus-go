@@ -107,6 +107,8 @@ func AWSSSMChaosByTag(clients clients.ClientSets) {
 		}
 	}
 
+	chaosDetails.Phase = types.ChaosInjectPhase
+
 	if err := litmusLIB.PrepareAWSSSMChaosByTag(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
 		log.Errorf("Chaos injection failed: %v", err)
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
@@ -122,6 +124,8 @@ func AWSSSMChaosByTag(clients clients.ClientSets) {
 
 	log.Infof("[Confirmation]: %v chaos has been injected successfully", experimentsDetails.ExperimentName)
 	resultDetails.Verdict = v1alpha1.ResultVerdictPassed
+
+	chaosDetails.Phase = types.PostChaosPhase
 
 	if chaosDetails.DefaultHealthCheck {
 		//Verify the aws ec2 instance is running (post chaos)

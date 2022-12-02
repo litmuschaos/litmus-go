@@ -1,10 +1,11 @@
 package gcp
 
 import (
+	"fmt"
 	"strings"
 
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	"github.com/litmuschaos/litmus-go/pkg/log"
-	"github.com/pkg/errors"
 	"google.golang.org/api/compute/v1"
 )
 
@@ -16,7 +17,7 @@ func GetVMInstanceStatus(computeService *compute.Service, instanceName string, g
 	// get information about the requisite VM instance
 	response, err := computeService.Instances.Get(gcpProjectID, instanceZone, instanceName).Do()
 	if err != nil {
-		return "", err
+		return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeStatusChecks, Target: fmt.Sprintf("{vmName: %s, zone: %s}", instanceName, instanceZone), Reason: err.Error()}
 	}
 
 	// return the VM status
@@ -31,15 +32,15 @@ func InstanceStatusCheckByName(computeService *compute.Service, managedInstanceG
 	instanceZonesList := strings.Split(instanceZones, ",")
 
 	if managedInstanceGroup != "enable" && managedInstanceGroup != "disable" {
-		return errors.Errorf("invalid value for MANAGED_INSTANCE_GROUP: %v", managedInstanceGroup)
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeStatusChecks, Target: fmt.Sprintf("{vmNames: %s, zones: %s}", instanceNamesList, instanceZonesList), Reason: fmt.Sprintf("invalid value for MANAGED_INSTANCE_GROUP: %s", managedInstanceGroup)}
 	}
 
 	if len(instanceNamesList) == 0 {
-		return errors.Errorf("no vm instance name found to stop")
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeStatusChecks, Target: fmt.Sprintf("{vmNames: %v}", instanceNamesList), Reason: "no vm instance name found to stop"}
 	}
 
 	if len(instanceNamesList) != len(instanceZonesList) {
-		return errors.Errorf("the number of vm instance names and the number of regions are not equal")
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeStatusChecks, Target: fmt.Sprintf("{vmNames: %v, zones: %v}", instanceNamesList, instanceZonesList), Reason: "unequal number of vm instance names and zones"}
 	}
 
 	log.Infof("[Info]: The vm instances under chaos (IUC) are: %v", instanceNamesList)
@@ -65,7 +66,7 @@ func InstanceStatusCheck(computeService *compute.Service, instanceNamesList []st
 		}
 
 		if instanceState != "RUNNING" {
-			return errors.Errorf("%s vm instance is not in RUNNING state, current state: %v", instanceNamesList[i], instanceState)
+			return cerrors.Error{ErrorCode: cerrors.ErrorTypeStatusChecks, Target: fmt.Sprintf("{vmName: %s, zone: %s}", instanceNamesList[i], zone), Reason: fmt.Sprintf("vm instance is not in RUNNING state, current state: %s", instanceState)}
 		}
 	}
 
