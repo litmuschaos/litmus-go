@@ -118,6 +118,8 @@ func AzureDiskLoss(clients clients.ClientSets) {
 		}
 	}
 
+	chaosDetails.Phase = types.ChaosInjectPhase
+
 	if err = litmusLIB.PrepareChaos(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 		log.Errorf("Chaos injection failed: %v", err)
@@ -126,6 +128,8 @@ func AzureDiskLoss(clients clients.ClientSets) {
 
 	log.Infof("[Confirmation]: %v chaos has been injected successfully", experimentsDetails.ExperimentName)
 	resultDetails.Verdict = v1alpha1.ResultVerdictPassed
+
+	chaosDetails.Phase = types.PostChaosPhase
 
 	// POST-CHAOS VIRTUAL DISK STATUS CHECK
 	if chaosDetails.DefaultHealthCheck {

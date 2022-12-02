@@ -123,6 +123,8 @@ func VMDiskLoss(clients clients.ClientSets) {
 		return
 	}
 
+	chaosDetails.Phase = types.ChaosInjectPhase
+
 	if err = litmusLIB.PrepareDiskVolumeLoss(computeService, &experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
 		log.Errorf("Chaos injection failed, err: %v", err)
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
@@ -131,6 +133,8 @@ func VMDiskLoss(clients clients.ClientSets) {
 
 	log.Infof("[Confirmation]: %v chaos has been injected successfully", experimentsDetails.ExperimentName)
 	resultDetails.Verdict = v1alpha1.ResultVerdictPassed
+
+	chaosDetails.Phase = types.PostChaosPhase
 
 	//Verify the vm instance is attached to disk volume
 	if chaosDetails.DefaultHealthCheck {

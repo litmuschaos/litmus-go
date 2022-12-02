@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
@@ -64,21 +63,23 @@ func Exec(commandDetails *PodDetails, clients clients.ClientSets, command []stri
 	}
 
 	// storing the output inside the output buffer for future use
-	var out bytes.Buffer
-	stdout := &out
-	stderr := os.Stderr
+	var stdout, stderr bytes.Buffer
 
 	// Stream will initiate the transport of the standard shell streams and return an error if a problem occurs.
 	if err = exec.Stream(remotecommand.StreamOptions{
 		Stdin:  nil,
-		Stdout: stdout,
-		Stderr: stderr,
+		Stdout: &stdout,
+		Stderr: &stderr,
 		Tty:    false,
 	}); err != nil {
-		return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("failed to create a stderr and stdout stream, err: %v", err)}
+		return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("failed to create a stderr and stdout stream, %s", err.Error())}
 	}
 
-	return out.String(), nil
+	if strings.TrimSpace(stderr.String()) != "" {
+		return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: stderr.String()}
+	}
+
+	return stdout.String(), nil
 }
 
 // SetExecCommandAttributes initialise all the pod details  to run exec command

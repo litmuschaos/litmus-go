@@ -120,6 +120,8 @@ func AzureInstanceStop(clients clients.ClientSets) {
 		log.Info("[Status]: Azure instance(s) is in running state (pre-chaos)")
 	}
 
+	chaosDetails.Phase = types.ChaosInjectPhase
+
 	if err = litmusLIB.PrepareAzureStop(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
 		log.Errorf("Chaos injection failed: %v", err)
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
@@ -128,6 +130,8 @@ func AzureInstanceStop(clients clients.ClientSets) {
 
 	log.Info("[Confirmation]: Azure instance stop chaos has been injected successfully")
 	resultDetails.Verdict = v1alpha1.ResultVerdictPassed
+
+	chaosDetails.Phase = types.PostChaosPhase
 
 	//Verify the azure instance is running (post chaos)
 	if chaosDetails.DefaultHealthCheck {

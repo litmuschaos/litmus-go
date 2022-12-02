@@ -127,6 +127,8 @@ func NodeRestart(clients clients.ClientSets) {
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
+	chaosDetails.Phase = types.ChaosInjectPhase
+
 	if err := litmusLIB.PrepareChaos(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 		log.Errorf("Chaos injection failed, err: %v", err)
@@ -135,6 +137,8 @@ func NodeRestart(clients clients.ClientSets) {
 
 	log.Infof("[Confirmation]: %v chaos has been injected successfully", experimentsDetails.ExperimentName)
 	resultDetails.Verdict = v1alpha1.ResultVerdictPassed
+
+	chaosDetails.Phase = types.PostChaosPhase
 
 	//POST-CHAOS APPLICATION STATUS CHECK
 	if chaosDetails.DefaultHealthCheck {

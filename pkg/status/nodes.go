@@ -3,9 +3,10 @@ package status
 import (
 	"context"
 	"fmt"
-	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	"strings"
 	"time"
+
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/log"
