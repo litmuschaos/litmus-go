@@ -148,7 +148,7 @@ func WaitTillCycleComplete(experimentsDetails *experimentTypes.ExperimentDetails
 func ResourceVersionCheck(ResourceVersionBefore, ResourceVersionAfter string) error {
 
 	if ResourceVersionBefore != ResourceVersionAfter {
-		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: "resource version check failed, resource version remains same"}
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: "liveness pod failed as target pod is unhealthy"}
 	}
 	log.Info("The cassandra cluster is active")
 
@@ -330,7 +330,7 @@ func CreateLivenessPod(experimentsDetails *experimentTypes.ExperimentDetails, cl
 	// Creating liveness deployment
 	_, err := clients.KubeClient.AppsV1().Deployments(experimentsDetails.ChaoslibDetail.AppNS).Create(context.Background(), liveness, metav1.CreateOptions{})
 	if err != nil {
-		return cerrors.Error{ErrorCode: cerrors.ErrorTypeStatusChecks, Reason: fmt.Sprintf("unable to create liveness deployment, %s", err.Error())}
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeStatusChecks, Target: fmt.Sprintf("{deploymentName: %s, namespace: %s}", liveness.Name, liveness.Namespace), Reason: fmt.Sprintf("unable to create liveness deployment, %s", err.Error())}
 	}
 	log.Info("Liveness Deployment Created successfully!")
 	return nil
@@ -368,7 +368,7 @@ func CreateLivenessService(experimentsDetails *experimentTypes.ExperimentDetails
 	// Creating liveness service
 	_, err := clients.KubeClient.CoreV1().Services(experimentsDetails.ChaoslibDetail.AppNS).Create(context.Background(), livenessSvc, metav1.CreateOptions{})
 	if err != nil {
-		return cerrors.Error{ErrorCode: cerrors.ErrorTypeStatusChecks, Reason: fmt.Sprintf("unable to create liveness service, %s", err.Error())}
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeStatusChecks, Target: fmt.Sprintf("{serviceName: %s, namespace: %s}", livenessSvc.Name, livenessSvc.Namespace), Reason: fmt.Sprintf("unable to create liveness service, %s", err.Error())}
 	}
 	log.Info("Liveness service created successfully!")
 

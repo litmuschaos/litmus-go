@@ -104,13 +104,13 @@ func CheckChaosMonkey(chaosMonkeyPort string, chaosMonkeyPath string, targetPods
 
 		resp, err := http.Get(endpoint)
 		if err != nil {
-			log.Errorf("failed to request chaos monkey endpoint on pod %v (err: %v)", pod.Name, resp.StatusCode)
+			log.Errorf("failed to request chaos monkey endpoint on pod %s, %s", pod.Name, err.Error())
 			hasErrors = true
 			continue
 		}
 
 		if resp.StatusCode != 200 {
-			log.Errorf("failed to get chaos monkey endpoint on pod %v (status: %v)", pod.Name, resp.StatusCode)
+			log.Errorf("failed to get chaos monkey endpoint on pod %s (status: %d)", pod.Name, resp.StatusCode)
 			hasErrors = true
 		}
 	}
@@ -130,7 +130,7 @@ func enableChaosMonkey(chaosMonkeyPort string, chaosMonkeyPath string, pod corev
 	}
 
 	if resp.StatusCode != 200 {
-		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Target: fmt.Sprintf("{podName: %s, namespace: %s}", pod.Name, pod.Namespace), Reason: fmt.Sprintf("failed to enable chaos monkey endpoint (status: %v)", resp.StatusCode)}
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Target: fmt.Sprintf("{podName: %s, namespace: %s}", pod.Name, pod.Namespace), Reason: fmt.Sprintf("failed to enable chaos monkey endpoint (status: %d)", resp.StatusCode)}
 	}
 
 	return nil
@@ -150,7 +150,7 @@ func setChaosMonkeyWatchers(chaosMonkeyPort string, chaosMonkeyPath string, watc
 	}
 
 	if resp.StatusCode != 200 {
-		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Target: fmt.Sprintf("{podName: %s, namespace: %s}", pod.Name, pod.Namespace), Reason: fmt.Sprintf("failed to set assault (status: %v)", resp.StatusCode)}
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Target: fmt.Sprintf("{podName: %s, namespace: %s}", pod.Name, pod.Namespace), Reason: fmt.Sprintf("failed to set assault (status: %d)", resp.StatusCode)}
 	}
 
 	return nil
@@ -167,7 +167,7 @@ func startAssault(chaosMonkeyPort string, chaosMonkeyPath string, assault []byte
 	}
 
 	if resp.StatusCode != 200 {
-		return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Target: fmt.Sprintf("{podName: %s, namespace: %s}", pod.Name, pod.Namespace), Reason: fmt.Sprintf("failed to activate runtime attack (status: %v)", resp.StatusCode)}
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Target: fmt.Sprintf("{podName: %s, namespace: %s}", pod.Name, pod.Namespace), Reason: fmt.Sprintf("failed to activate runtime attack (status: %d)", resp.StatusCode)}
 	}
 	return nil
 }
@@ -181,14 +181,14 @@ func setChaosMonkeyAssault(chaosMonkeyPort string, chaosMonkeyPath string, assau
 	}
 
 	if resp.StatusCode != 200 {
-		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Target: fmt.Sprintf("{podName: %s, namespace: %s}", pod.Name, pod.Namespace), Reason: fmt.Sprintf("failed to set assault (status: %v)", resp.StatusCode)}
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Target: fmt.Sprintf("{podName: %s, namespace: %s}", pod.Name, pod.Namespace), Reason: fmt.Sprintf("failed to set assault (status: %d)", resp.StatusCode)}
 	}
 	return nil
 }
 
 // disableChaosMonkey disables chaos monkey on selected pods
 func disableChaosMonkey(chaosMonkeyPort string, chaosMonkeyPath string, pod corev1.Pod) error {
-	log.Infof("[Chaos]: disabling assaults on pod %v", pod.Name)
+	log.Infof("[Chaos]: disabling assaults on pod %s", pod.Name)
 	jsonValue, err := json.Marshal(revertAssault)
 	if err != nil {
 		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Target: fmt.Sprintf("{podName: %s, namespace: %s}", pod.Name, pod.Namespace), Reason: fmt.Sprintf("failed to marshal chaos monkey revert-chaos watchers, %s", err.Error())}
@@ -197,14 +197,14 @@ func disableChaosMonkey(chaosMonkeyPort string, chaosMonkeyPath string, pod core
 		return err
 	}
 
-	log.Infof("[Chaos]: disabling chaos monkey on pod %v", pod.Name)
+	log.Infof("[Chaos]: disabling chaos monkey on pod %s", pod.Name)
 	resp, err := http.Post("http://"+pod.Status.PodIP+":"+chaosMonkeyPort+chaosMonkeyPath+"/disable", "", nil)
 	if err != nil {
 		return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosRevert, Target: fmt.Sprintf("{podName: %s, namespace: %s}", pod.Name, pod.Namespace), Reason: fmt.Sprintf("failed to call the chaos monkey api to disable assault, %s", err.Error())}
 	}
 
 	if resp.StatusCode != 200 {
-		return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosRevert, Target: fmt.Sprintf("{podName: %s, namespace: %s}", pod.Name, pod.Namespace), Reason: fmt.Sprintf("failed to disable chaos monkey endpoint (status: %v)", resp.StatusCode)}
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosRevert, Target: fmt.Sprintf("{podName: %s, namespace: %s}", pod.Name, pod.Namespace), Reason: fmt.Sprintf("failed to disable chaos monkey endpoint (status: %d)", resp.StatusCode)}
 	}
 
 	return nil
@@ -334,17 +334,17 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 			})
 
 			if err := setChaosMonkeyWatchers(experimentsDetails.ChaosMonkeyPort, experimentsDetails.ChaosMonkeyPath, experimentsDetails.ChaosMonkeyWatchers, pod); err != nil {
-				log.Errorf("[Chaos]: Failed to set watchers, err: %v ", err)
+				log.Errorf("[Chaos]: Failed to set watchers, err: %v", err)
 				return err
 			}
 
 			if err := startAssault(experimentsDetails.ChaosMonkeyPort, experimentsDetails.ChaosMonkeyPath, experimentsDetails.ChaosMonkeyAssault, pod); err != nil {
-				log.Errorf("[Chaos]: Failed to set assault, err: %v ", err)
+				log.Errorf("[Chaos]: Failed to set assault, err: %v", err)
 				return err
 			}
 
 			if err := enableChaosMonkey(experimentsDetails.ChaosMonkeyPort, experimentsDetails.ChaosMonkeyPath, pod); err != nil {
-				log.Errorf("[Chaos]: Failed to enable chaos, err: %v ", err)
+				log.Errorf("[Chaos]: Failed to enable chaos, err: %v", err)
 				return err
 			}
 			common.SetTargets(pod.Name, "injected", "pod", chaosDetails)

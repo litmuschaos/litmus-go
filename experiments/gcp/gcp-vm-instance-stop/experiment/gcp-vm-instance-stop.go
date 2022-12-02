@@ -117,6 +117,8 @@ func VMInstanceStop(clients clients.ClientSets) {
 		log.Info("[Status]: VM instance is in running state (pre-chaos)")
 	}
 
+	chaosDetails.Phase = types.ChaosInjectPhase
+
 	if err := litmusLIB.PrepareVMStop(computeService, &experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
 		log.Errorf("Chaos injection failed, err: %v", err)
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
@@ -125,6 +127,8 @@ func VMInstanceStop(clients clients.ClientSets) {
 
 	log.Infof("[Confirmation]: %v chaos has been injected successfully", experimentsDetails.ExperimentName)
 	resultDetails.Verdict = v1alpha1.ResultVerdictPassed
+
+	chaosDetails.Phase = types.PostChaosPhase
 
 	//Verify the GCP VM instance is in RUNNING status (post-chaos)
 	if chaosDetails.DefaultHealthCheck {

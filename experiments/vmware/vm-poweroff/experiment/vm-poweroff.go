@@ -111,6 +111,8 @@ func VMPoweroff(clients clients.ClientSets) {
 		events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 	}
 
+	chaosDetails.Phase = types.ChaosInjectPhase
+
 	if err = litmusLIB.InjectVMPowerOffChaos(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails, cookie); err != nil {
 		log.Errorf("Chaos injection failed, err: %v", err)
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
@@ -119,6 +121,8 @@ func VMPoweroff(clients clients.ClientSets) {
 
 	log.Infof("[Confirmation]: %v chaos has been injected successfully", experimentsDetails.ExperimentName)
 	resultDetails.Verdict = v1alpha1.ResultVerdictPassed
+
+	chaosDetails.Phase = types.PostChaosPhase
 
 	if chaosDetails.DefaultHealthCheck {
 		//POST-CHAOS VM STATUS CHECK
