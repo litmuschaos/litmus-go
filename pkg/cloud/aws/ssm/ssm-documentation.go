@@ -1,21 +1,26 @@
 package ssm
 
 import (
-	"io/ioutil"
+	"fmt"
+	"os"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ssm"
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	"github.com/litmuschaos/litmus-go/pkg/cloud/aws/common"
-	"github.com/pkg/errors"
 )
 
 // CreateAndUploadDocument will create and add the ssm document in aws service monitoring docs.
 func CreateAndUploadDocument(documentName, documentType, documentFormat, documentPath, region string) error {
 
 	sesh := common.GetAWSSession(region)
-	openFile, err := ioutil.ReadFile(documentPath)
+	openFile, err := os.ReadFile(documentPath)
 	if err != nil {
-		return errors.Errorf("fail to read the file err: %v", err)
+		return cerrors.Error{
+			ErrorCode: cerrors.ErrorTypeChaosInject,
+			Reason:    fmt.Sprintf("failed to read the file: %v", err),
+			Target:    fmt.Sprintf("{SSM Document Path: %v/%v.%v, Region: %v}", documentPath, documentName, documentFormat, region),
+		}
 	}
 	documentContent := string(openFile)
 
@@ -30,7 +35,11 @@ func CreateAndUploadDocument(documentName, documentType, documentFormat, documen
 	})
 
 	if err != nil {
-		return errors.Errorf("fail to create docs, err: %v", err)
+		return cerrors.Error{
+			ErrorCode: cerrors.ErrorTypeChaosInject,
+			Reason:    fmt.Sprintf("failed to upload docs: %v", err),
+			Target:    fmt.Sprintf("{SSM Document Path: %v/%v.%v, Region: %v}", documentPath, documentName, documentFormat, region),
+		}
 	}
 	return nil
 }
@@ -44,7 +53,11 @@ func SSMDeleteDocument(documentName, region string) error {
 		Name: aws.String(documentName),
 	})
 	if err != nil {
-		return common.CheckAWSError(err)
+		return cerrors.Error{
+			ErrorCode: cerrors.ErrorTypeChaosRevert,
+			Reason:    fmt.Sprintf("failed to delete SSM document: %v", common.CheckAWSError(err).Error()),
+			Target:    fmt.Sprintf("{SSM Document Name: %v, Region: %v}", documentName, region),
+		}
 	}
 	return nil
 }
