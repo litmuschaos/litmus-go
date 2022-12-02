@@ -3,10 +3,11 @@ package vmware
 import (
 	"crypto/tls"
 	"encoding/json"
-	"io/ioutil"
+	"fmt"
+	"io"
 	"net/http"
 
-	"github.com/pkg/errors"
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 )
 
 // ErrorResponse contains error response code
@@ -18,7 +19,7 @@ type ErrorResponse struct {
 	} `json:"value"`
 }
 
-//GetVcenterSessionID returns the vcenter sessionid
+// GetVcenterSessionID returns the vcenter sessionid
 func GetVcenterSessionID(vcenterServer, vcenterUser, vcenterPass string) (string, error) {
 
 	type Cookie struct {
@@ -27,7 +28,7 @@ func GetVcenterSessionID(vcenterServer, vcenterUser, vcenterPass string) (string
 
 	req, err := http.NewRequest("POST", "https://"+vcenterServer+"/rest/com/vmware/cis/session", nil)
 	if err != nil {
-		return "", err
+		return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("failed to get vcenter session id: %v", err.Error())}
 	}
 
 	req.Header.Set("Content-Type", "application/json")
@@ -39,25 +40,42 @@ func GetVcenterSessionID(vcenterServer, vcenterUser, vcenterPass string) (string
 	client := &http.Client{Transport: tr}
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", err
+		return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("failed to get vcenter session id: %v", err.Error())}
 	}
 
 	defer resp.Body.Close()
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", err
+		return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("failed to get vcenter session id: %v", err.Error())}
 	}
 
 	if resp.StatusCode != http.StatusOK {
 
 		var errorResponse ErrorResponse
-		json.Unmarshal(body, &errorResponse)
-		return "", errors.Errorf("error during authentication: %s", errorResponse.MsgValue.MsgMessages[0].MsgDefaultMessage)
+		var reason string
+
+		err = json.Unmarshal(body, &errorResponse)
+		if err != nil {
+			reason = fmt.Sprintf("failed to unmarshal error response: %v", err)
+		} else {
+			reason = fmt.Sprintf("error during authentication: %v", errorResponse.MsgValue.MsgMessages[0].MsgDefaultMessage)
+		}
+
+		return "", cerrors.Error{
+			ErrorCode: cerrors.ErrorTypeGeneric,
+			Reason:    reason,
+		}
 	}
 
 	var cookie Cookie
-	json.Unmarshal(body, &cookie)
+
+	if err = json.Unmarshal(body, &cookie); err != nil {
+		return "", cerrors.Error{
+			ErrorCode: cerrors.ErrorTypeStatusChecks,
+			Reason:    fmt.Sprintf("failed to unmarshal cookie: %v", err),
+		}
+	}
 
 	login := "vmware-api-session-id=" + cookie.MsgValue + ";Path=/rest;Secure;HttpOnly"
 	return login, nil
