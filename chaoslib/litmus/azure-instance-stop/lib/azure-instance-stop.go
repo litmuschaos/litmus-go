@@ -42,11 +42,11 @@ func PrepareAzureStop(experimentsDetails *experimentTypes.ExperimentDetails, cli
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 
-	//  get the instance name or list of instance names
-	instanceNameList := strings.Split(experimentsDetails.AzureInstanceNames, ",")
-	if len(instanceNameList) == 0 {
+	if experimentsDetails.AzureInstanceNames == "" {
 		return errors.Errorf("no instance name found to stop")
 	}
+	//  get the instance name or list of instance names
+	instanceNameList := strings.Split(strings.TrimSpace(experimentsDetails.AzureInstanceNames), ",")
 
 	// watching for the abort signal and revert the chaos
 	go abortWatcher(experimentsDetails, instanceNameList)

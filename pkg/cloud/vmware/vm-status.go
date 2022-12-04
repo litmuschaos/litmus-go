@@ -58,11 +58,10 @@ func GetVMStatus(vcenterServer, vmId, cookie string) (string, error) {
 
 //VMStatusCheck validates the steady state for the given vm ids
 func VMStatusCheck(vcenterServer, vmIds, cookie string) error {
-
-	vmIdList := strings.Split(vmIds, ",")
-	if len(vmIdList) == 0 {
+	if vmIds == "" {
 		return errors.Errorf("no vm received, please input the target VMMoids")
 	}
+	vmIdList := strings.Split(strings.TrimSpace(vmIds), ",")
 
 	for _, vmId := range vmIdList {
 
