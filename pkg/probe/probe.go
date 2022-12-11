@@ -249,7 +249,7 @@ func markedVerdictInEnd(err error, resultDetails *types.ResultDetails, probe v1a
 func getDescription(mode, phase string) string {
 	switch mode {
 	case "edge":
-		return fmt.Sprintf("'%v' Probe didn't met the passing criteria", phase)
+		return fmt.Sprintf("Probe didn't met the passing criteria in phase: %s", phase)
 	default:
 		return "Probe didn't met the passing criteria"
 	}
@@ -339,4 +339,13 @@ func getProbeVerdict(resultDetails *types.ResultDetails, name, probeType string)
 		}
 	}
 	return v1alpha1.ProbeVerdictNA
+}
+
+func addProbePhase(err error, phase string) error {
+	rootCause := stacktrace.RootCause(err)
+	if error, ok := rootCause.(cerrors.Error); ok {
+		error.Phase = phase
+		err = error
+	}
+	return err
 }

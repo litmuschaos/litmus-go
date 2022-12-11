@@ -52,7 +52,9 @@ func GetRootCauseAndErrorCode(err error, phase string) (string, ErrorType) {
 		return err.Error(), errorType
 	}
 	if error, ok := rootCause.(Error); ok {
-		error.Phase = phase
+		if error.Phase == "" {
+			error.Phase = phase
+		}
 		return error.Error(), errorType
 	}
 	return rootCause.Error(), errorType
