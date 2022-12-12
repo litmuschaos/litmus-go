@@ -38,7 +38,9 @@ func stressStorage(experimentDetails *experimentTypes.ExperimentDetails, podName
 	command := []string{"/bin/sh", "-c", fioCmd}
 
 	litmusexec.SetExecCommandAttributes(&execCommandDetails, podName, experimentDetails.TargetContainer, ns)
-	_, err := litmusexec.Exec(&execCommandDetails, clients, command)
+	out, err := litmusexec.Exec(&execCommandDetails, clients, command)
+
+	log.Infof("fio result:\n %v", out)
 
 	stressErr <- err
 }
