@@ -121,7 +121,7 @@ func AttachDisk(subscriptionID, resourceGroup, azureInstanceName, scaleSet strin
 	authorizer, err := auth.NewAuthorizerFromFile(azure.PublicCloud.ResourceManagerEndpoint)
 	if err != nil {
 		return cerrors.Error{
-			ErrorCode: cerrors. ErrorTypeChaosRevert,
+			ErrorCode: cerrors.ErrorTypeChaosRevert,
 			Reason:    fmt.Sprintf("authorization set up failed: %v", err),
 			Target:    fmt.Sprintf("{Azure Instance Name: %v, Resource Group: %v}", azureInstanceName, resourceGroup),
 		}

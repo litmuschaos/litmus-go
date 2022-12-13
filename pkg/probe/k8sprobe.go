@@ -124,13 +124,14 @@ func triggerContinuousK8sProbe(probe v1alpha1.ProbeAttributes, clients clients.C
 		time.Sleep(time.Duration(probe.RunProperties.InitialDelaySeconds) * time.Second)
 	}
 
-	// it trigger the k8s probe for the entire duration of chaos and it fails, if any error encounter
+	// it triggers the k8s probe for the entire duration of chaos and it fails, if any error encounter
 	// marked the error for the probes, if any
 loop:
 	for {
 		err = triggerK8sProbe(probe, clients, chaosresult)
 		// record the error inside the probeDetails, we are maintaining a dedicated variable for the err, inside probeDetails
 		if err != nil {
+			err = addProbePhase(err, string(chaosDetails.Phase))
 			for index := range chaosresult.ProbeDetails {
 				if chaosresult.ProbeDetails[index].Name == probe.Name {
 					chaosresult.ProbeDetails[index].IsProbeFailedWithError = err
@@ -390,6 +391,7 @@ loop:
 			err = triggerK8sProbe(probe, clients, chaosresult)
 			// record the error inside the probeDetails, we are maintaining a dedicated variable for the err, inside probeDetails
 			if err != nil {
+				err = addProbePhase(err, string(chaosDetails.Phase))
 				for index := range chaosresult.ProbeDetails {
 					if chaosresult.ProbeDetails[index].Name == probe.Name {
 						chaosresult.ProbeDetails[index].IsProbeFailedWithError = err
