@@ -1,7 +1,10 @@
 package lib
 
 import (
+    "fmt"
 	"os"
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
+    "github.com/palantir/stacktrace"
 	"os/signal"
 	"syscall"
 	"time"
@@ -13,7 +16,6 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	litmusexec "github.com/litmuschaos/litmus-go/pkg/utils/exec"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 )
@@ -25,7 +27,7 @@ func injectChaos(experimentsDetails *experimentTypes.ExperimentDetails, podName 
 	litmusexec.SetExecCommandAttributes(&execCommandDetails, podName, experimentsDetails.TargetContainer, experimentsDetails.AppNS)
 	_, err := litmusexec.Exec(&execCommandDetails, clients, command)
 	if err != nil {
-		return errors.Errorf("unable to run command inside target container, err: %v", err)
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Target: fmt.Sprintf("{podName: %s, namespace: %s}", podName, experimentsDetails.AppNS), Reason: fmt.Sprintf("failed to inject chaos: %s", err.Error())}
 	}
 	return nil
 }
@@ -36,7 +38,7 @@ func experimentExecution(experimentsDetails *experimentTypes.ExperimentDetails, 
 	// if the target pod is not defined it will derive the random target pod list using pod affected percentage
 	targetPodList, err := common.GetPodList(experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, clients, chaosDetails)
 	if err != nil {
-		return err
+		return stacktrace.Propagate(err, "could not get target pods")
 	}
 
 	podNames := []string{}
@@ -45,14 +47,6 @@ func experimentExecution(experimentsDetails *experimentTypes.ExperimentDetails, 
 	}
 	log.Infof("Target pods list for chaos, %v", podNames)
 
-	//Get the target container name of the application pod
-	if experimentsDetails.TargetContainer == "" {
-		experimentsDetails.TargetContainer, err = common.GetTargetContainer(experimentsDetails.AppNS, targetPodList.Items[0].Name, clients)
-		if err != nil {
-			return errors.Errorf("unable to get the target container name, err: %v", err)
-		}
-	}
-
 	return runChaos(experimentsDetails, targetPodList, clients, resultDetails, eventsDetails, chaosDetails)
 }
 
@@ -60,7 +54,14 @@ func runChaos(experimentsDetails *experimentTypes.ExperimentDetails, targetPodLi
 	var endTime <-chan time.Time
 	timeDelay := time.Duration(experimentsDetails.ChaosDuration) * time.Second
 
+	experimentsDetails.IsTargetContainerProvided = experimentsDetails.TargetContainer != ""
+
 	for _, pod := range targetPodList.Items {
+
+        //Get the target container name of the application pod
+		if !experimentsDetails.IsTargetContainerProvided {
+			experimentsDetails.TargetContainer = pod.Spec.Containers[0].Name
+		}
 
 		if experimentsDetails.EngineName != "" {
 			msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on " + pod.Name + " pod"
@@ -99,7 +100,7 @@ func runChaos(experimentsDetails *experimentTypes.ExperimentDetails, targetPodLi
 			}
 		}
 		if err := killChaos(experimentsDetails, pod.Name, clients); err != nil {
-			return err
+			return stacktrace.Propagate(err, "could not revert chaos")
 		}
 	}
 	return nil
@@ -115,7 +116,7 @@ func PrepareChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients
 	}
 	//Starting the CPU stress experiment
 	if err := experimentExecution(experimentsDetails, clients, resultDetails, eventsDetails, chaosDetails);err != nil {
-		return err
+		return stacktrace.Propagate(err, "could not execute experiment")
 	}
 	//Waiting for the ramp time after chaos injection
 	if experimentsDetails.RampTime != 0 {
@@ -134,7 +135,7 @@ func killChaos(experimentsDetails *experimentTypes.ExperimentDetails, podName st
 	litmusexec.SetExecCommandAttributes(&execCommandDetails, podName, experimentsDetails.TargetContainer, experimentsDetails.AppNS)
 	_, err := litmusexec.Exec(&execCommandDetails, clients, command)
 	if err != nil {
-		return errors.Errorf("unable to kill the process in %v pod, err: %v", podName, err)
-	}
+    		return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosRevert, Target: fmt.Sprintf("{podName: %s, namespace: %s}", podName, experimentsDetails.AppNS), Reason: fmt.Sprintf("failed to revert chaos: %s", err.Error())}
+    }
 	return nil
 }

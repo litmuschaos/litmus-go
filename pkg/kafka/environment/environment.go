@@ -49,7 +49,6 @@ func GetENV(kafkaDetails *kafkaTypes.ExperimentDetails) {
 	kafkaDetails.ZookeeperLabel = types.Getenv("ZOOKEEPER_LABEL", "")
 	kafkaDetails.ZookeeperService = types.Getenv("ZOOKEEPER_SERVICE", "")
 	kafkaDetails.ZookeeperPort = types.Getenv("ZOOKEEPER_PORT", "")
-	kafkaDetails.Lib = types.Getenv("LIB", "litmus")
 	kafkaDetails.RunID = types.Getenv("RunID", "")
 
 }

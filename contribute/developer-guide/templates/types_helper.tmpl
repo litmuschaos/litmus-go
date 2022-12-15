@@ -14,7 +14,6 @@ type ExperimentDetails struct {
 	ChaosDuration       int
 	ChaosInterval       int
 	RampTime            int
-	ChaosLib            string
 	AppNS               string
 	AppLabel            string
 	AppKind             string
@@ -32,4 +31,5 @@ type ExperimentDetails struct {
 	LIBImage            string
 	SetHelperData       string
 	ChaosServiceAccount string
+	IsTargetContainerProvided bool
 }
