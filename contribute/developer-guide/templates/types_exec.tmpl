@@ -14,7 +14,6 @@ type ExperimentDetails struct {
 	ChaosDuration       int
 	ChaosInterval       int
 	RampTime            int
-	ChaosLib            string
 	AppNS               string
 	AppLabel            string
 	AppKind             string
@@ -31,4 +30,5 @@ type ExperimentDetails struct {
 	PodsAffectedPerc    int
 	TargetPods          string
 	LIBImagePullPolicy string
+	IsTargetContainerProvided bool
 }
