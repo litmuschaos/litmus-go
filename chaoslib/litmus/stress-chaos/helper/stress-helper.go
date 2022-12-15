@@ -4,6 +4,8 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
+	"github.com/palantir/stacktrace"
 	"io"
 	"os"
 	"os/exec"
@@ -72,6 +74,7 @@ func Helper(clients clients.ClientSets) {
 
 	// Intialise the chaos attributes
 	types.InitialiseChaosVariables(&chaosDetails)
+	chaosDetails.Phase = types.ChaosInjectPhase
 
 	// Intialise Chaos Result Parameters
 	types.SetResultAttributes(&resultDetails, chaosDetails)
@@ -80,6 +83,10 @@ func Helper(clients clients.ClientSets) {
 	result.SetResultUID(&resultDetails, clients, &chaosDetails)
 
 	if err := prepareStressChaos(&experimentsDetails, clients, &eventsDetails, &chaosDetails, &resultDetails); err != nil {
+		// update failstep inside chaosresult
+		if resultErr := result.UpdateFailedStepFromHelper(&resultDetails, &chaosDetails, clients, err); resultErr != nil {
+			log.Fatalf("helper pod failed, err: %v, resultErr: %v", err, resultErr)
+		}
 		log.Fatalf("helper pod failed, err: %v", err)
 	}
 }
@@ -89,13 +96,13 @@ func prepareStressChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 	// get stressors in list format
 	stressorList := prepareStressor(experimentsDetails)
 	if len(stressorList) == 0 {
-		return errors.Errorf("fail to prepare stressor for %v experiment", experimentsDetails.ExperimentName)
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeHelper, Source: chaosDetails.ChaosPodName, Reason: "fail to prepare stressors"}
 	}
 	stressors := strings.Join(stressorList, " ")
 
-	targetList, err := common.ParseTargets()
+	targetList, err := common.ParseTargets(chaosDetails.ChaosPodName)
 	if err != nil {
-		return err
+		return stacktrace.Propagate(err, "could not parse targets")
 	}
 
 	var targets []targetDetails
@@ -105,22 +112,23 @@ func prepareStressChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 			Name:            t.Name,
 			Namespace:       t.Namespace,
 			TargetContainer: t.TargetContainer,
+			Source:          chaosDetails.ChaosPodName,
 		}
 
-		td.ContainerId, err = common.GetContainerID(td.Namespace, td.Name, td.TargetContainer, clients)
+		td.ContainerId, err = common.GetContainerID(td.Namespace, td.Name, td.TargetContainer, clients, td.Source)
 		if err != nil {
-			return err
+			return stacktrace.Propagate(err, "could not get container id")
 		}
 
 		// extract out the pid of the target container
-		td.Pid, err = common.GetPID(experimentsDetails.ContainerRuntime, td.ContainerId, experimentsDetails.SocketPath)
+		td.Pid, err = common.GetPID(experimentsDetails.ContainerRuntime, td.ContainerId, experimentsDetails.SocketPath, td.Source)
 		if err != nil {
-			return err
+			return stacktrace.Propagate(err, "could not get container pid")
 		}
 
-		td.CGroupManager, err = getCGroupManager(td.Pid, td.ContainerId)
+		td.CGroupManager, err = getCGroupManager(td)
 		if err != nil {
-			return errors.Errorf("fail to get the cgroup manager, err: %v", err)
+			return stacktrace.Propagate(err, "could not get cgroup manager")
 		}
 		targets = append(targets, td)
 	}
@@ -140,14 +148,14 @@ func prepareStressChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 	for index, t := range targets {
 		targets[index].Cmd, err = injectChaos(t, stressors)
 		if err != nil {
-			return err
+			return stacktrace.Propagate(err, "could not inject chaos")
 		}
 		log.Infof("successfully injected chaos on target: {name: %s, namespace: %v, container: %v}", t.Name, t.Namespace, t.TargetContainer)
 		if err = result.AnnotateChaosResult(resultDetails.Name, chaosDetails.ChaosNamespace, "injected", "pod", t.Name); err != nil {
 			if revertErr := terminateProcess(t); revertErr != nil {
-				return fmt.Errorf("failed to revert and annotate the result, err: %v", fmt.Sprintf("%s, %s", err.Error(), revertErr.Error()))
+				return cerrors.PreserveError{ErrString: fmt.Sprintf("[%s,%s]", stacktrace.RootCause(err).Error(), stacktrace.RootCause(revertErr).Error())}
 			}
-			return err
+			return stacktrace.Propagate(err, "could not annotate chaosresult")
 		}
 	}
 
@@ -201,7 +209,7 @@ func prepareStressChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 			}
 		}
 		if len(errList) != 0 {
-			return fmt.Errorf("err: %v", strings.Join(errList, ", "))
+			return cerrors.PreserveError{ErrString: fmt.Sprintf("[%s]", strings.Join(errList, ","))}
 		}
 	case err := <-done:
 		if err != nil {
@@ -211,10 +219,10 @@ func prepareStressChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 				if status.Signaled() && status.Signal() == syscall.SIGKILL {
 					// wait for the completion of abort handler
 					time.Sleep(10 * time.Second)
-					return errors.Errorf("process stopped with SIGTERM signal")
+					return cerrors.Error{ErrorCode: cerrors.ErrorTypeExperimentAborted, Source: chaosDetails.ChaosPodName, Reason: fmt.Sprintf("process stopped with SIGTERM signal")}
 				}
 			}
-			return errors.Errorf("process exited before the actual cleanup, err: %v", err)
+			return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Source: chaosDetails.ChaosPodName, Reason: err.Error()}
 		}
 		log.Info("[Info]: Reverting Chaos")
 		var errList []string
@@ -223,12 +231,13 @@ func prepareStressChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 				errList = append(errList, err.Error())
 				continue
 			}
+			log.Infof("successfully reverted chaos on target: {name: %s, namespace: %v, container: %v}", t.Name, t.Namespace, t.TargetContainer)
 			if err = result.AnnotateChaosResult(resultDetails.Name, chaosDetails.ChaosNamespace, "reverted", "pod", t.Name); err != nil {
 				errList = append(errList, err.Error())
 			}
 		}
 		if len(errList) != 0 {
-			return fmt.Errorf("err: %v", strings.Join(errList, ", "))
+			return cerrors.PreserveError{ErrString: fmt.Sprintf("[%s]", strings.Join(errList, ","))}
 		}
 	}
 
@@ -241,7 +250,7 @@ func terminateProcess(t targetDetails) error {
 		if strings.Contains(err.Error(), ProcessAlreadyKilled) || strings.Contains(err.Error(), ProcessAlreadyFinished) {
 			return nil
 		}
-		return err
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosRevert, Source: t.Source, Target: fmt.Sprintf("{podName: %s, namespace: %s, container: %s}", t.Name, t.Namespace, t.TargetContainer), Reason: fmt.Sprintf("failed to revert chaos: %s", err.Error())}
 	}
 	log.Infof("successfully reverted chaos on target: {name: %s, namespace: %v, container: %v}", t.Name, t.Namespace, t.TargetContainer)
 	return nil
@@ -316,27 +325,27 @@ func prepareStressor(experimentDetails *experimentTypes.ExperimentDetails) []str
 }
 
 //pidPath will get the pid path of the container
-func pidPath(pid int) cgroups.Path {
-	processPath := "/proc/" + strconv.Itoa(pid) + "/cgroup"
-	paths, err := parseCgroupFile(processPath)
+func pidPath(t targetDetails) cgroups.Path {
+	processPath := "/proc/" + strconv.Itoa(t.Pid) + "/cgroup"
+	paths, err := parseCgroupFile(processPath, t)
 	if err != nil {
 		return getErrorPath(errors.Wrapf(err, "parse cgroup file %s", processPath))
 	}
-	return getExistingPath(paths, pid, "")
+	return getExistingPath(paths, t.Pid, "")
 }
 
 //parseCgroupFile will read and verify the cgroup file entry of a container
-func parseCgroupFile(path string) (map[string]string, error) {
+func parseCgroupFile(path string, t targetDetails) (map[string]string, error) {
 	file, err := os.Open(path)
 	if err != nil {
-		return nil, errors.Errorf("unable to parse cgroup file: %v", err)
+		return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeHelper, Source: t.Source, Target: fmt.Sprintf("{podName: %s, namespace: %s, container: %s}", t.Name, t.Namespace, t.TargetContainer), Reason: fmt.Sprintf("fail to parse cgroup: %s", err.Error())}
 	}
 	defer file.Close()
-	return parseCgroupFromReader(file)
+	return parseCgroupFromReader(file, t)
 }
 
 //parseCgroupFromReader will parse the cgroup file from the reader
-func parseCgroupFromReader(r io.Reader) (map[string]string, error) {
+func parseCgroupFromReader(r io.Reader, t targetDetails) (map[string]string, error) {
 	var (
 		cgroups = make(map[string]string)
 		s       = bufio.NewScanner(r)
@@ -347,7 +356,7 @@ func parseCgroupFromReader(r io.Reader) (map[string]string, error) {
 			parts = strings.SplitN(text, ":", 3)
 		)
 		if len(parts) < 3 {
-			return nil, errors.Errorf("invalid cgroup entry: %q", text)
+			return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeHelper, Source: t.Source, Target: fmt.Sprintf("{podName: %s, namespace: %s, container: %s}", t.Name, t.Namespace, t.TargetContainer), Reason: fmt.Sprintf("invalid cgroup entry: %q", text)}
 		}
 		for _, subs := range strings.Split(parts[1], ",") {
 			if subs != "" {
@@ -356,7 +365,7 @@ func parseCgroupFromReader(r io.Reader) (map[string]string, error) {
 		}
 	}
 	if err := s.Err(); err != nil {
-		return nil, errors.Errorf("buffer scanner failed: %v", err)
+		return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeHelper, Source: t.Source, Target: fmt.Sprintf("{podName: %s, namespace: %s, container: %s}", t.Name, t.Namespace, t.TargetContainer), Reason: fmt.Sprintf("buffer scanner failed: %s", err.Error())}
 	}
 
 	return cgroups, nil
@@ -423,18 +432,18 @@ func getCgroupDestination(pid int, subsystem string) (string, error) {
 }
 
 //findValidCgroup will be used to get a valid cgroup path
-func findValidCgroup(path cgroups.Path, target string) (string, error) {
+func findValidCgroup(path cgroups.Path, t targetDetails) (string, error) {
 	for _, subsystem := range cgroupSubsystemList {
 		path, err := path(cgroups.Name(subsystem))
 		if err != nil {
-			log.Errorf("fail to retrieve the cgroup path, subsystem: %v, target: %v, err: %v", subsystem, target, err)
+			log.Errorf("fail to retrieve the cgroup path, subsystem: %v, target: %v, err: %v", subsystem, t.ContainerId, err)
 			continue
 		}
-		if strings.Contains(path, target) {
+		if strings.Contains(path, t.ContainerId) {
 			return path, nil
 		}
 	}
-	return "", errors.Errorf("never found valid cgroup for %s", target)
+	return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeHelper, Source: t.Source, Target: fmt.Sprintf("{podName: %s, namespace: %s, container: %s}", t.Name, t.Namespace, t.TargetContainer), Reason: "could not find valid cgroup"}
 }
 
 //getENV fetches all the env variables from the runner pod
@@ -485,27 +494,27 @@ func abortWatcher(targets []targetDetails, resultName, chaosNS string) {
 }
 
 // getCGroupManager will return the cgroup for the given pid of the process
-func getCGroupManager(pid int, containerID string) (interface{}, error) {
+func getCGroupManager(t targetDetails) (interface{}, error) {
 	if cgroups.Mode() == cgroups.Unified {
-		groupPath, err := cgroupsv2.PidGroupPath(pid)
+		groupPath, err := cgroupsv2.PidGroupPath(t.Pid)
 		if err != nil {
-			return nil, errors.Errorf("Error in getting groupPath, %v", err)
+			return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeHelper, Source: t.Source, Target: fmt.Sprintf("{podName: %s, namespace: %s, container: %s}", t.Name, t.Namespace, t.TargetContainer), Reason: fmt.Sprintf("fail to get pid group path: %s", err.Error())}
 		}
 
 		cgroup2, err := cgroupsv2.LoadManager("/sys/fs/cgroup", groupPath)
 		if err != nil {
-			return nil, errors.Errorf("Error loading cgroup v2 manager, %v", err)
+			return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeHelper, Source: t.Source, Target: fmt.Sprintf("{podName: %s, namespace: %s, container: %s}", t.Name, t.Namespace, t.TargetContainer), Reason: fmt.Sprintf("fail to load the cgroup: %s", err.Error())}
 		}
 		return cgroup2, nil
 	}
-	path := pidPath(pid)
-	cgroup, err := findValidCgroup(path, containerID)
+	path := pidPath(t)
+	cgroup, err := findValidCgroup(path, t)
 	if err != nil {
-		return nil, errors.Errorf("fail to get cgroup, err: %v", err)
+		return nil, stacktrace.Propagate(err, "could not find valid cgroup")
 	}
 	cgroup1, err := cgroups.Load(cgroups.V1, cgroups.StaticPath(cgroup))
 	if err != nil {
-		return nil, errors.Errorf("fail to load the cgroup, err: %v", err)
+		return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeHelper, Source: t.Source, Target: fmt.Sprintf("{podName: %s, namespace: %s, container: %s}", t.Name, t.Namespace, t.TargetContainer), Reason: fmt.Sprintf("fail to load the cgroup: %s", err.Error())}
 	}
 
 	return cgroup1, nil
@@ -533,15 +542,15 @@ func injectChaos(t targetDetails, stressors string) (*exec.Cmd, error) {
 	cmd.Stdout = &buf
 	err = cmd.Start()
 	if err != nil {
-		return nil, errors.Errorf("fail to start the stress process %v, err: %v", stressCommand, err)
+		return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Source: t.Source, Target: fmt.Sprintf("{podName: %s, namespace: %s, container: %s}", t.Name, t.Namespace, t.TargetContainer), Reason: fmt.Sprintf("failed to start stress process: %s", err.Error())}
 	}
 
 	// add the stress process to the cgroup of target container
 	if err = addProcessToCgroup(cmd.Process.Pid, t.CGroupManager); err != nil {
 		if killErr := cmd.Process.Kill(); killErr != nil {
-			return nil, errors.Errorf("stressors failed killing %v process, err: %v", cmd.Process.Pid, killErr)
+			return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Source: t.Source, Target: fmt.Sprintf("{podName: %s, namespace: %s, container: %s}", t.Name, t.Namespace, t.TargetContainer), Reason: fmt.Sprintf("fail to add the stress process to cgroup %s and kill stress process: %s", err.Error(), killErr.Error())}
 		}
-		return nil, errors.Errorf("fail to add the stress process into target container cgroup, err: %v", err)
+		return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Source: t.Source, Target: fmt.Sprintf("{podName: %s, namespace: %s, container: %s}", t.Name, t.Namespace, t.TargetContainer), Reason: fmt.Sprintf("fail to add the stress process to cgroup: %s", err.Error())}
 	}
 
 	log.Info("[Info]: Sending signal to resume the stress process")
@@ -551,7 +560,7 @@ func injectChaos(t targetDetails, stressors string) (*exec.Cmd, error) {
 
 	// remove pause and resume or start the stress process
 	if err := cmd.Process.Signal(syscall.SIGCONT); err != nil {
-		return nil, errors.Errorf("fail to remove pause and start the stress process: %v", err)
+		return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Source: t.Source, Target: fmt.Sprintf("{podName: %s, namespace: %s, container: %s}", t.Name, t.Namespace, t.TargetContainer), Reason: fmt.Sprintf("fail to remove pause and start the stress process: %s", err.Error())}
 	}
 	return cmd, nil
 }
@@ -564,4 +573,5 @@ type targetDetails struct {
 	Pid             int
 	CGroupManager   interface{}
 	Cmd             *exec.Cmd
+	Source          string
 }

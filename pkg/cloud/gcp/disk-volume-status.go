@@ -1,13 +1,15 @@
 package gcp
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/gcp/gcp-vm-disk-loss/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
-	"github.com/pkg/errors"
+	"github.com/palantir/stacktrace"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/api/compute/v1"
 )
@@ -15,7 +17,7 @@ import (
 // WaitForVolumeDetachment will wait for the disk volume to completely detach from a VM instance
 func WaitForVolumeDetachment(computeService *compute.Service, diskName, gcpProjectID, instanceName, zone string, delay, timeout int) error {
 
-	log.Info("[Status]: Checking disk volume status for detachment")
+	log.Infof("[Status]: Checking %s disk volume status for detachment", diskName)
 	return retry.
 		Times(uint(timeout / delay)).
 		Wait(time.Duration(delay) * time.Second).
@@ -23,15 +25,15 @@ func WaitForVolumeDetachment(computeService *compute.Service, diskName, gcpProje
 
 			volumeState, err := GetDiskVolumeState(computeService, diskName, gcpProjectID, instanceName, zone)
 			if err != nil {
-				return errors.Errorf("failed to get the volume state")
+				return stacktrace.Propagate(err, "failed to get the volume state")
 			}
 
 			if volumeState != "detached" {
 				log.Infof("[Info]: The volume state is %v", volumeState)
-				return errors.Errorf("volume is not yet in detached state")
+				return cerrors.Error{ErrorCode: cerrors.ErrorTypeStatusChecks, Target: fmt.Sprintf("{diskName: %s, zone: %s}", diskName, zone), Reason: "volume is not yet in detached state"}
 			}
 
-			log.Infof("[Info]: The volume state is %v", volumeState)
+			log.Infof("[Info]: %s volume state is %v", diskName, volumeState)
 			return nil
 		})
 }
@@ -39,7 +41,7 @@ func WaitForVolumeDetachment(computeService *compute.Service, diskName, gcpProje
 // WaitForVolumeAttachment will wait for the disk volume to get attached to a VM instance
 func WaitForVolumeAttachment(computeService *compute.Service, diskName, gcpProjectID, instanceName, zone string, delay, timeout int) error {
 
-	log.Info("[Status]: Checking disk volume status for attachment")
+	log.Infof("[Status]: Checking %s disk volume status for attachment", diskName)
 	return retry.
 		Times(uint(timeout / delay)).
 		Wait(time.Duration(delay) * time.Second).
@@ -47,15 +49,15 @@ func WaitForVolumeAttachment(computeService *compute.Service, diskName, gcpProje
 
 			volumeState, err := GetDiskVolumeState(computeService, diskName, gcpProjectID, instanceName, zone)
 			if err != nil {
-				return errors.Errorf("failed to get the volume status")
+				return stacktrace.Propagate(err, "failed to get the volume status")
 			}
 
 			if volumeState != "attached" {
 				log.Infof("[Info]: The volume state is %v", volumeState)
-				return errors.Errorf("volume is not yet in attached state")
+				return cerrors.Error{ErrorCode: cerrors.ErrorTypeStatusChecks, Target: fmt.Sprintf("{diskName: %s, zone: %s}", diskName, zone), Reason: "volume is not yet in attached state"}
 			}
 
-			log.Infof("[Info]: The volume state is %v", volumeState)
+			log.Infof("[Info]: %s volume state is %v", diskName, volumeState)
 			return nil
 		})
 }
@@ -65,7 +67,7 @@ func GetDiskVolumeState(computeService *compute.Service, diskName, gcpProjectID,
 
 	diskDetails, err := computeService.Disks.Get(gcpProjectID, zone, diskName).Do()
 	if err != nil {
-		return "", err
+		return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeStatusChecks, Target: fmt.Sprintf("{diskName: %s, zone: %s}", diskName, zone), Reason: err.Error()}
 	}
 
 	for _, user := range diskDetails.Users {
@@ -100,27 +102,27 @@ func GetDiskVolumeState(computeService *compute.Service, diskName, gcpProjectID,
 func DiskVolumeStateCheck(computeService *compute.Service, experimentsDetails *experimentTypes.ExperimentDetails) error {
 
 	if experimentsDetails.GCPProjectID == "" {
-		return errors.Errorf("no gcp project id provided, please provide the project id")
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeStatusChecks, Target: fmt.Sprintf("{projectId: %s}", experimentsDetails.GCPProjectID), Reason: "no gcp project id provided, please provide the project id"}
 	}
 
 	diskNamesList := strings.Split(experimentsDetails.DiskVolumeNames, ",")
 	if len(diskNamesList) == 0 {
-		return errors.Errorf("no disk name provided, please provide the name of the disk")
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeStatusChecks, Target: fmt.Sprintf("{diskNames: %v}", diskNamesList), Reason: "no disk name provided, please provide the name of the disk"}
 	}
 
 	zonesList := strings.Split(experimentsDetails.Zones, ",")
 	if len(zonesList) == 0 {
-		return errors.Errorf("no zone provided, please provide the zone of the disk")
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeStatusChecks, Target: fmt.Sprintf("{zones: %v}", zonesList), Reason: "no zone provided, please provide the zone of the disk"}
 	}
 
 	if len(diskNamesList) != len(zonesList) {
-		return errors.Errorf("unequal number of disk names and zones found, please verify the input details")
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeStatusChecks, Target: fmt.Sprintf("{diskNames: %v, zones: %v}", diskNamesList, zonesList), Reason: "unequal number of disk names and zones found, please verify the input details"}
 	}
 
 	for i := range diskNamesList {
 		instanceName, err := GetVolumeAttachmentDetails(computeService, experimentsDetails.GCPProjectID, zonesList[i], diskNamesList[i])
 		if err != nil || instanceName == "" {
-			return errors.Errorf("failed to get the vm instance name for %s disk volume, err: %v", diskNamesList[i], err)
+			return stacktrace.Propagate(err, "failed to get the vm instance name for disk volume")
 		}
 	}
 
@@ -136,7 +138,7 @@ func SetTargetDiskInstanceNames(computeService *compute.Service, experimentsDeta
 	for i := range diskNamesList {
 		instanceName, err := GetVolumeAttachmentDetails(computeService, experimentsDetails.GCPProjectID, zonesList[i], diskNamesList[i])
 		if err != nil || instanceName == "" {
-			return errors.Errorf("failed to get the vm instance name for %s disk volume, err: %v", diskNamesList[i], err)
+			return stacktrace.Propagate(err, "failed to get the vm instance name for disk volume")
 		}
 
 		experimentsDetails.TargetDiskInstanceNamesList = append(experimentsDetails.TargetDiskInstanceNamesList, instanceName)

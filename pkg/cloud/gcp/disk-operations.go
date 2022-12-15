@@ -1,11 +1,12 @@
 package gcp
 
 import (
+	"fmt"
 	"strings"
 
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/gcp/gcp-vm-disk-loss/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/api/compute/v1"
 )
@@ -15,7 +16,7 @@ func DiskVolumeDetach(computeService *compute.Service, instanceName string, gcpP
 
 	response, err := computeService.Instances.DetachDisk(gcpProjectID, zone, instanceName, deviceName).Do()
 	if err != nil {
-		return err
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Target: fmt.Sprintf("{deviceName: %s, zone: %s}", deviceName, zone), Reason: err.Error()}
 	}
 
 	log.InfoWithValues("Detaching disk having:", logrus.Fields{
@@ -32,7 +33,7 @@ func DiskVolumeAttach(computeService *compute.Service, instanceName string, gcpP
 
 	diskDetails, err := computeService.Disks.Get(gcpProjectID, zone, diskName).Do()
 	if err != nil {
-		return err
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosRevert, Target: fmt.Sprintf("{diskName: %s, zone: %s}", diskName, zone), Reason: err.Error()}
 	}
 
 	requestBody := &compute.AttachedDisk{
@@ -42,7 +43,7 @@ func DiskVolumeAttach(computeService *compute.Service, instanceName string, gcpP
 
 	response, err := computeService.Instances.AttachDisk(gcpProjectID, zone, instanceName, requestBody).Do()
 	if err != nil {
-		return err
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosRevert, Target: fmt.Sprintf("{diskName: %s, zone: %s}", diskName, zone), Reason: err.Error()}
 	}
 
 	log.InfoWithValues("Attaching disk having:", logrus.Fields{
@@ -59,7 +60,7 @@ func GetVolumeAttachmentDetails(computeService *compute.Service, gcpProjectID st
 
 	diskDetails, err := computeService.Disks.Get(gcpProjectID, zone, diskName).Do()
 	if err != nil {
-		return "", err
+		return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Target: fmt.Sprintf("{diskName: %s, zone: %s}", diskName, zone), Reason: err.Error()}
 	}
 
 	if len(diskDetails.Users) > 0 {
@@ -71,7 +72,7 @@ func GetVolumeAttachmentDetails(computeService *compute.Service, gcpProjectID st
 		return attachedInstanceName, nil
 	}
 
-	return "", errors.Errorf("%s disk is not attached to any VM instance", diskName)
+	return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Target: fmt.Sprintf("{diskName: %s, zone: %s}", diskName, zone), Reason: fmt.Sprintf("%s disk is not attached to any vm instance", diskName)}
 }
 
 // GetDiskDeviceNameForVM returns the device name for the target disk for a given VM
@@ -79,7 +80,7 @@ func GetDiskDeviceNameForVM(computeService *compute.Service, targetDiskName, gcp
 
 	instanceDetails, err := computeService.Instances.Get(gcpProjectID, zone, instanceName).Do()
 	if err != nil {
-		return "", err
+		return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Target: fmt.Sprintf("{diskName: %s, zone: %s}", targetDiskName, zone), Reason: err.Error()}
 	}
 
 	for _, disk := range instanceDetails.Disks {
@@ -94,7 +95,7 @@ func GetDiskDeviceNameForVM(computeService *compute.Service, targetDiskName, gcp
 		}
 	}
 
-	return "", errors.Errorf("%s disk not found for %s vm instance", targetDiskName, instanceName)
+	return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Target: fmt.Sprintf("{diskName: %s, zone: %s}", targetDiskName, zone), Reason: fmt.Sprintf("%s disk not found for %s vm instance", targetDiskName, instanceName)}
 }
 
 // SetTargetDiskVolumes will select the target disk volumes which are attached to some VM instance and filtered from the given label
@@ -113,7 +114,7 @@ func SetTargetDiskVolumes(computeService *compute.Service, experimentsDetails *e
 		response, err = computeService.Disks.List(experimentsDetails.GCPProjectID, experimentsDetails.Zones).Filter("labels." + experimentsDetails.DiskVolumeLabel + ":*").Do()
 	}
 	if err != nil {
-		return err
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Target: fmt.Sprintf("{label: %s, zone: %s}", experimentsDetails.DiskVolumeLabel, experimentsDetails.Zones), Reason: err.Error()}
 	}
 
 	for _, disk := range response.Items {
@@ -123,7 +124,7 @@ func SetTargetDiskVolumes(computeService *compute.Service, experimentsDetails *e
 	}
 
 	if len(experimentsDetails.TargetDiskVolumeNamesList) == 0 {
-		return errors.Errorf("no attached disk volumes found with the label: %s", experimentsDetails.DiskVolumeLabel)
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Target: fmt.Sprintf("{label: %s, zone: %s}", experimentsDetails.DiskVolumeLabel, experimentsDetails.Zones), Reason: "no attached disk volumes found with the given label"}
 	}
 
 	log.InfoWithValues("[Info]: Targeting the attached disk volumes filtered from disk label", logrus.Fields{

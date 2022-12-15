@@ -1,6 +1,6 @@
 module github.com/litmuschaos/litmus-go
 
-go 1.17
+go 1.18
 
 require (
 	github.com/Azure/azure-sdk-for-go v56.1.0+incompatible
@@ -9,7 +9,8 @@ require (
 	github.com/aws/aws-sdk-go v1.38.59
 	github.com/containerd/cgroups v1.0.1
 	github.com/kyokomi/emoji v2.2.4+incompatible
-	github.com/litmuschaos/chaos-operator v0.0.0-20221121155030-e5b440b5cd82
+	github.com/litmuschaos/chaos-operator v0.0.0-20221124094152-26a41c021642
+	github.com/palantir/stacktrace v0.0.0-20161112013806-78658fd2d177
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.7.0
 	github.com/spf13/cobra v1.1.1

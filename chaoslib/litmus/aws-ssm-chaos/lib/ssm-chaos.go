@@ -13,7 +13,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
-	"github.com/pkg/errors"
+	"github.com/palantir/stacktrace"
 )
 
 // InjectChaosInSerialMode will inject the aws ssm chaos in serial mode that is one after other
@@ -46,7 +46,7 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 				ec2IDList := strings.Fields(ec2ID)
 				commandId, err := ssm.SendSSMCommand(experimentsDetails, ec2IDList)
 				if err != nil {
-					return errors.Errorf("fail to send ssm command, err: %v", err)
+					return stacktrace.Propagate(err, "failed to send ssm command")
 				}
 				//prepare commands for abort recovery
 				experimentsDetails.CommandIDs = append(experimentsDetails.CommandIDs, commandId)
@@ -54,21 +54,21 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 				//wait for the ssm command to get in running state
 				log.Info("[Wait]: Waiting for the ssm command to get in InProgress state")
 				if err := ssm.WaitForCommandStatus("InProgress", commandId, ec2ID, experimentsDetails.Region, experimentsDetails.ChaosDuration+experimentsDetails.Timeout, experimentsDetails.Delay); err != nil {
-					return errors.Errorf("fail to start ssm command, err: %v", err)
+					return stacktrace.Propagate(err, "failed to start ssm command")
 				}
 				common.SetTargets(ec2ID, "injected", "EC2", chaosDetails)
 
 				// run the probes during chaos
 				if len(resultDetails.ProbeDetails) != 0 && i == 0 {
 					if err = probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
-						return err
+						return stacktrace.Propagate(err, "failed to run probes")
 					}
 				}
 
 				//wait for the ssm command to get succeeded in the given chaos duration
 				log.Info("[Wait]: Waiting for the ssm command to get completed")
 				if err := ssm.WaitForCommandStatus("Success", commandId, ec2ID, experimentsDetails.Region, experimentsDetails.ChaosDuration+experimentsDetails.Timeout, experimentsDetails.Delay); err != nil {
-					return errors.Errorf("fail to send ssm command, err: %v", err)
+					return stacktrace.Propagate(err, "failed to send ssm command")
 				}
 				common.SetTargets(ec2ID, "reverted", "EC2", chaosDetails)
 
@@ -110,7 +110,7 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 			log.Info("[Chaos]: Starting the ssm command")
 			commandId, err := ssm.SendSSMCommand(experimentsDetails, instanceIDList)
 			if err != nil {
-				return errors.Errorf("fail to send ssm command, err: %v", err)
+				return stacktrace.Propagate(err, "failed to send ssm command")
 			}
 			//prepare commands for abort recovery
 			experimentsDetails.CommandIDs = append(experimentsDetails.CommandIDs, commandId)
@@ -119,14 +119,14 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 				//wait for the ssm command to get in running state
 				log.Info("[Wait]: Waiting for the ssm command to get in InProgress state")
 				if err := ssm.WaitForCommandStatus("InProgress", commandId, ec2ID, experimentsDetails.Region, experimentsDetails.ChaosDuration+experimentsDetails.Timeout, experimentsDetails.Delay); err != nil {
-					return errors.Errorf("fail to start ssm command, err: %v", err)
+					return stacktrace.Propagate(err, "failed to start ssm command")
 				}
 			}
 
 			// run the probes during chaos
 			if len(resultDetails.ProbeDetails) != 0 {
 				if err = probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
-					return err
+					return stacktrace.Propagate(err, "failed to run probes")
 				}
 			}
 
@@ -134,7 +134,7 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 				//wait for the ssm command to get succeeded in the given chaos duration
 				log.Info("[Wait]: Waiting for the ssm command to get completed")
 				if err := ssm.WaitForCommandStatus("Success", commandId, ec2ID, experimentsDetails.Region, experimentsDetails.ChaosDuration+experimentsDetails.Timeout, experimentsDetails.Delay); err != nil {
-					return errors.Errorf("fail to send ssm command, err: %v", err)
+					return stacktrace.Propagate(err, "failed to send ssm command")
 				}
 			}
 
@@ -159,14 +159,14 @@ func AbortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, abort c
 	case len(experimentsDetails.CommandIDs) != 0:
 		for _, commandId := range experimentsDetails.CommandIDs {
 			if err := ssm.CancelCommand(commandId, experimentsDetails.Region); err != nil {
-				log.Errorf("[Abort]: fail to cancle command, recovery failed, err: %v", err)
+				log.Errorf("[Abort]: Failed to cancel command, recovery failed: %v", err)
 			}
 		}
 	default:
-		log.Info("[Abort]: No command found to cancle")
+		log.Info("[Abort]: No SSM Command found to cancel")
 	}
 	if err := ssm.SSMDeleteDocument(experimentsDetails.DocumentName, experimentsDetails.Region); err != nil {
-		log.Errorf("fail to delete ssm doc, err: %v", err)
+		log.Errorf("Failed to delete ssm document: %v", err)
 	}
 	log.Info("[Abort]: Chaos Revert Completed")
 	os.Exit(1)

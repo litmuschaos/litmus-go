@@ -1,9 +1,13 @@
 package common
 
 import (
+	"bytes"
 	"fmt"
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
+	"github.com/palantir/stacktrace"
 	"math/rand"
 	"os"
+	"os/exec"
 	"os/signal"
 	"reflect"
 	"strconv"
@@ -17,7 +21,6 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/math"
 	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/types"
-	"github.com/pkg/errors"
 	apiv1 "k8s.io/api/core/v1"
 )
 
@@ -43,7 +46,7 @@ func RandomInterval(interval string) error {
 		lowerBound, _ = strconv.Atoi(intervals[0])
 		upperBound, _ = strconv.Atoi(intervals[1])
 	default:
-		return errors.Errorf("unable to parse CHAOS_INTERVAL, provide in valid format")
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: "could not parse CHAOS_INTERVAL env, invalid format"}
 	}
 	rand.Seed(time.Now().UnixNano())
 	waitTime := lowerBound + rand.Intn(upperBound-lowerBound)
@@ -84,7 +87,7 @@ func AbortWatcherWithoutExit(expname string, clients clients.ClientSets, resultD
 	log.Info("[Chaos]: Chaos Experiment Abortion started because of terminated signal received")
 	// updating the chaosresult after stopped
 	failStep := "Chaos injection stopped!"
-	types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep)
+	types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep, cerrors.ErrorTypeExperimentAborted)
 	if err := result.ChaosResult(chaosDetails, clients, resultDetails, "EOT"); err != nil {
 		log.Errorf("[ABORT]: Failed to update result, err: %v", err)
 	}
@@ -159,11 +162,14 @@ func getEnvSource(apiVersion string, fieldPath string) apiv1.EnvVarSource {
 }
 
 // HelperFailedError return the helper pod error message
-func HelperFailedError(err error) error {
+func HelperFailedError(err error, appLabel, namespace string, podLevel bool) error {
 	if err != nil {
-		return errors.Errorf("helper pod failed, err: %v", err)
+		return stacktrace.Propagate(err, "helper pod failed")
 	}
-	return errors.Errorf("helper pod failed")
+	if podLevel {
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeHelperPodFailed, Target: fmt.Sprintf("{podLabel: %s, namespace: %s}", appLabel, namespace), Reason: "helper pod failed"}
+	}
+	return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Target: fmt.Sprintf("{podLabel: %s, namespace: %s}", appLabel, namespace), Reason: "helper pod failed"}
 }
 
 // GetStatusMessage returns the event message
@@ -235,4 +241,19 @@ func Contains(val interface{}, slice interface{}) bool {
 		}
 	}
 	return false
+}
+
+func RunBashCommand(command string, failMsg string, source string) error {
+	cmd := exec.Command("/bin/bash", "-c", command)
+	return RunCLICommands(cmd, source, "", failMsg, cerrors.ErrorTypeHelper)
+}
+
+func RunCLICommands(cmd *exec.Cmd, source, target, failMsg string, errorCode cerrors.ErrorType) error {
+	var out, stdErr bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &stdErr
+	if err = cmd.Run(); err != nil {
+		return cerrors.Error{ErrorCode: errorCode, Target: target, Source: source, Reason: fmt.Sprintf("%s: %s", failMsg, stdErr.String())}
+	}
+	return nil
 }

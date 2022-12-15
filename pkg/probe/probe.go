@@ -10,11 +10,12 @@ import (
 
 	"github.com/kyokomi/emoji"
 	"github.com/litmuschaos/chaos-operator/api/litmuschaos/v1alpha1"
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
-	"github.com/pkg/errors"
+	"github.com/palantir/stacktrace"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -55,18 +56,18 @@ func RunProbes(chaosDetails *types.ChaosDetails, clients clients.ClientSets, res
 		// execute the probes for the postchaos phase
 		// it first evaluate the onchaos and continuous modes then it evaluates the other modes
 		// as onchaos and continuous probes are already completed
-		var probeError []error
+		var probeError []string
 		for _, probe := range probes {
 			// evaluate continuous and onchaos probes
 			switch strings.ToLower(probe.Mode) {
 			case "onchaos", "continuous":
 				if err := execute(probe, chaosDetails, clients, resultDetails, phase); err != nil {
-					probeError = append(probeError, err)
+					probeError = append(probeError, stacktrace.RootCause(err).Error())
 				}
 			}
 		}
 		if len(probeError) != 0 {
-			return errors.Errorf("probes failed, err: %v", probeError)
+			return cerrors.PreserveError{ErrString: fmt.Sprintf("[%s]", strings.Join(probeError, ","))}
 		}
 		// executes the eot and edge modes
 		for _, probe := range probes {
@@ -81,7 +82,7 @@ func RunProbes(chaosDetails *types.ChaosDetails, clients clients.ClientSets, res
 	return nil
 }
 
-//setProbeVerdict mark the verdict of the probe in the chaosresult as passed
+// setProbeVerdict mark the verdict of the probe in the chaosresult as passed
 // on the basis of phase(pre/post chaos)
 func setProbeVerdict(resultDetails *types.ResultDetails, probe v1alpha1.ProbeAttributes, verdict v1alpha1.ProbeVerdict, description string) {
 	for index, probes := range resultDetails.ProbeDetails {
@@ -98,7 +99,7 @@ func setProbeVerdict(resultDetails *types.ResultDetails, probe v1alpha1.ProbeAtt
 	}
 }
 
-//SetProbeVerdictAfterFailure mark the verdict of all the failed/unrun probes as failed
+// SetProbeVerdictAfterFailure mark the verdict of all the failed/unrun probes as failed
 func SetProbeVerdictAfterFailure(result *v1alpha1.ChaosResult) {
 	for index := range result.Status.ProbeStatuses {
 		if result.Status.ProbeStatuses[index].Status.Verdict == v1alpha1.ProbeVerdictAwaited {
@@ -119,7 +120,7 @@ func getProbesFromEngine(chaosDetails *types.ChaosDetails, clients clients.Clien
 		Try(func(attempt uint) error {
 			engine, err := clients.LitmusClient.ChaosEngines(chaosDetails.ChaosNamespace).Get(context.Background(), chaosDetails.EngineName, v1.GetOptions{})
 			if err != nil {
-				return fmt.Errorf("unable to Get the chaosengine, err: %v", err)
+				return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("unable to get the chaosengine, err: %v", err)}
 			}
 			// get all the probes defined inside chaosengine for the corresponding experiment
 			for _, experiment := range engine.Spec.Experiments {
@@ -136,7 +137,7 @@ func getProbesFromEngine(chaosDetails *types.ChaosDetails, clients clients.Clien
 }
 
 // InitializeProbesInChaosResultDetails set the probe inside chaos result
-// it fetch the probe details from the chaosengine and set into the chaosresult
+// it fetches the probe details from the chaosengine and set into the chaosresult
 func InitializeProbesInChaosResultDetails(chaosDetails *types.ChaosDetails, clients clients.ClientSets, chaosresult *types.ResultDetails) error {
 
 	var probeDetails []types.ProbeDetails
@@ -164,7 +165,7 @@ func InitializeProbesInChaosResultDetails(chaosDetails *types.ChaosDetails, clie
 	return nil
 }
 
-//getAndIncrementRunCount return the run count for the specified probe
+// getAndIncrementRunCount return the run count for the specified probe
 func getAndIncrementRunCount(resultDetails *types.ResultDetails, probeName string) int {
 	for index, probe := range resultDetails.ProbeDetails {
 		if probeName == probe.Name {
@@ -175,7 +176,7 @@ func getAndIncrementRunCount(resultDetails *types.ResultDetails, probeName strin
 	return 0
 }
 
-//getRunIDFromProbe return the run_id for the dedicated probe
+// getRunIDFromProbe return the run_id for the dedicated probe
 // which will used in the continuous cmd probe, run_id is used as suffix in the external pod name
 func getRunIDFromProbe(resultDetails *types.ResultDetails, probeName, probeType string) string {
 
@@ -187,7 +188,7 @@ func getRunIDFromProbe(resultDetails *types.ResultDetails, probeName, probeType 
 	return ""
 }
 
-//setRunIDForProbe set the run_id for the dedicated probe.
+// setRunIDForProbe set the run_id for the dedicated probe.
 // which will used in the continuous cmd probe, run_id is used as suffix in the external pod name
 func setRunIDForProbe(resultDetails *types.ResultDetails, probeName, probeType, runid string) {
 
@@ -236,7 +237,10 @@ func markedVerdictInEnd(err error, resultDetails *types.ResultDetails, probe v1a
 	}
 
 	setProbeVerdict(resultDetails, probe, probeVerdict, description)
-	if !probe.RunProperties.StopOnFailure {
+	if !probe.RunProperties.StopOnFailure && err != nil {
+		for index := range resultDetails.ProbeDetails {
+			resultDetails.ProbeDetails[index].IsProbeFailedWithError = err
+		}
 		return nil
 	}
 	return err
@@ -245,13 +249,13 @@ func markedVerdictInEnd(err error, resultDetails *types.ResultDetails, probe v1a
 func getDescription(mode, phase string) string {
 	switch mode {
 	case "edge":
-		return fmt.Sprintf("'%v' Probe didn't met the passing criteria", phase)
+		return fmt.Sprintf("Probe didn't met the passing criteria in phase: %s", phase)
 	default:
 		return "Probe didn't met the passing criteria"
 	}
 }
 
-//CheckForErrorInContinuousProbe check for the error in the continuous probes
+// CheckForErrorInContinuousProbe check for the error in the continuous probes
 func checkForErrorInContinuousProbe(resultDetails *types.ResultDetails, probeName string) error {
 
 	for index, probe := range resultDetails.ProbeDetails {
@@ -273,7 +277,7 @@ func parseCommand(templatedCommand string, resultDetails *types.ResultDetails) (
 	// store the parsed output in the buffer
 	var out bytes.Buffer
 	if err := t.Execute(&out, register); err != nil {
-		return "", err
+		return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("failed to parse the templated command, %s", err.Error())}
 	}
 
 	return out.String(), nil
@@ -288,11 +292,15 @@ func stopChaosEngine(probe v1alpha1.ProbeAttributes, clients clients.ClientSets,
 	//patch chaosengine's state to stop
 	engine, err := clients.LitmusClient.ChaosEngines(chaosDetails.ChaosNamespace).Get(context.Background(), chaosDetails.EngineName, v1.GetOptions{})
 	if err != nil {
-		return err
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("failed to get chaosengine, %s", err.Error())}
 	}
 	engine.Spec.EngineState = v1alpha1.EngineStateStop
 	_, err = clients.LitmusClient.ChaosEngines(chaosDetails.ChaosNamespace).Update(context.Background(), engine, v1.UpdateOptions{})
-	return err
+	if err != nil {
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("failed to patch the chaosengine to `stop` state, %v", err.Error())}
+	}
+
+	return nil
 }
 
 // execute contains steps to execute & evaluate probes in different modes at different phases
@@ -301,25 +309,25 @@ func execute(probe v1alpha1.ProbeAttributes, chaosDetails *types.ChaosDetails, c
 	case "k8sprobe":
 		// it contains steps to prepare the k8s probe
 		if err = prepareK8sProbe(probe, resultDetails, clients, phase, chaosDetails); err != nil {
-			return errors.Errorf("probes failed, err: %v", err)
+			return stacktrace.Propagate(err, "probes failed")
 		}
 	case "cmdprobe":
 		// it contains steps to prepare cmd probe
 		if err = prepareCmdProbe(probe, clients, chaosDetails, resultDetails, phase); err != nil {
-			return errors.Errorf("probes failed, err: %v", err)
+			return stacktrace.Propagate(err, "probes failed")
 		}
 	case "httpprobe":
 		// it contains steps to prepare http probe
 		if err = prepareHTTPProbe(probe, clients, chaosDetails, resultDetails, phase); err != nil {
-			return errors.Errorf("probes failed, err: %v", err)
+			return stacktrace.Propagate(err, "probes failed")
 		}
 	case "promprobe":
 		// it contains steps to prepare prom probe
 		if err = preparePromProbe(probe, clients, chaosDetails, resultDetails, phase); err != nil {
-			return errors.Errorf("probes failed, err: %v", err)
+			return stacktrace.Propagate(err, "probes failed")
 		}
 	default:
-		return errors.Errorf("No supported probe type found, type: %v", probe.Type)
+		return stacktrace.Propagate(err, "%v probe type not supported", probe.Type)
 	}
 	return nil
 }
@@ -331,4 +339,13 @@ func getProbeVerdict(resultDetails *types.ResultDetails, name, probeType string)
 		}
 	}
 	return v1alpha1.ProbeVerdictNA
+}
+
+func addProbePhase(err error, phase string) error {
+	rootCause := stacktrace.RootCause(err)
+	if error, ok := rootCause.(cerrors.Error); ok {
+		error.Phase = phase
+		err = error
+	}
+	return err
 }

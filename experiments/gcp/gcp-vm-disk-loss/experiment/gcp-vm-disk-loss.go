@@ -54,8 +54,7 @@ func VMDiskLoss(clients clients.ClientSets) {
 	log.Infof("[PreReq]: Updating the chaos result of %v experiment (SOT)", experimentsDetails.ExperimentName)
 	if err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT"); err != nil {
 		log.Errorf("Unable to create the Chaos Result, err: %v", err)
-		failStep := "[pre-chaos]: Failed to update the chaos result of gcp disk loss experiment (SOT), err: " + err.Error()
-		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 		return
 	}
 
@@ -86,11 +85,10 @@ func VMDiskLoss(clients clients.ClientSets) {
 
 			if err = probe.RunProbes(&chaosDetails, clients, &resultDetails, "PreChaos", &eventsDetails); err != nil {
 				log.Errorf("Probe Failed, err: %v", err)
-				failStep := "[pre-chaos]: Failed while running probes, err: " + err.Error()
 				msg := "AUT: Running, Probes: Unsuccessful"
 				types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, msg, "Warning", &chaosDetails)
 				events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
-				result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+				result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 				return
 			}
 			msg = "AUT: Running, Probes: Successful"
@@ -104,8 +102,7 @@ func VMDiskLoss(clients clients.ClientSets) {
 	computeService, err = gcp.GetGCPComputeService()
 	if err != nil {
 		log.Errorf("Failed to obtain a gcp compute service, err: %v", err)
-		failStep := "[pre-chaos]: Failed to obtain a gcp compute service, err: " + err.Error()
-		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 		return
 	}
 
@@ -113,8 +110,7 @@ func VMDiskLoss(clients clients.ClientSets) {
 	if chaosDetails.DefaultHealthCheck {
 		if err := gcp.DiskVolumeStateCheck(computeService, &experimentsDetails); err != nil {
 			log.Errorf("Volume status check failed pre chaos, err: %v", err)
-			failStep := "[pre-chaos]: Failed to verify if the disk volume is attached to an instance, err: " + err.Error()
-			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 			return
 		}
 		log.Info("[Status]: Disk volumes are attached to the VM instances (pre-chaos)")
@@ -123,36 +119,28 @@ func VMDiskLoss(clients clients.ClientSets) {
 	// Fetch target disk instance names
 	if err := gcp.SetTargetDiskInstanceNames(computeService, &experimentsDetails); err != nil {
 		log.Errorf("Failed to fetch the disk instance names, err: %v", err)
-		failStep := "[pre-chaos]: Failed to fetch the disk instance names, err: " + err.Error()
-		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 		return
 	}
 
-	// Including the litmus lib for disk-loss
-	switch experimentsDetails.ChaosLib {
-	case "litmus":
-		if err = litmusLIB.PrepareDiskVolumeLoss(computeService, &experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
-			log.Errorf("Chaos injection failed, err: %v", err)
-			failStep := "[chaos]: Failed inside the chaoslib, err: " + err.Error()
-			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-			return
-		}
-	default:
-		log.Error("[Invalid]: Please provide the correct LIB")
-		failStep := "[chaos]: no match was found for the specified lib"
-		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+	chaosDetails.Phase = types.ChaosInjectPhase
+
+	if err = litmusLIB.PrepareDiskVolumeLoss(computeService, &experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
+		log.Errorf("Chaos injection failed, err: %v", err)
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 		return
 	}
 
 	log.Infof("[Confirmation]: %v chaos has been injected successfully", experimentsDetails.ExperimentName)
 	resultDetails.Verdict = v1alpha1.ResultVerdictPassed
 
+	chaosDetails.Phase = types.PostChaosPhase
+
 	//Verify the vm instance is attached to disk volume
 	if chaosDetails.DefaultHealthCheck {
 		if err := gcp.DiskVolumeStateCheck(computeService, &experimentsDetails); err != nil {
 			log.Errorf("Volume status check failed post chaos, err: %v", err)
-			failStep := "[post-chaos]: Failed to verify if the disk volume is attached to an instance, err: " + err.Error()
-			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 			return
 		}
 		log.Info("[Status]: Disk volumes are attached to the VM instances (post-chaos)")
@@ -166,11 +154,10 @@ func VMDiskLoss(clients clients.ClientSets) {
 		if len(resultDetails.ProbeDetails) != 0 {
 			if err = probe.RunProbes(&chaosDetails, clients, &resultDetails, "PostChaos", &eventsDetails); err != nil {
 				log.Errorf("Probes Failed, err: %v", err)
-				failStep := "[post-chaos]: Failed while running probes, err: " + err.Error()
 				msg := "AUT: Running, Probes: Unsuccessful"
 				types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, msg, "Warning", &chaosDetails)
 				events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
-				result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+				result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 				return
 			}
 			msg = "AUT: Running, Probes: Successful"

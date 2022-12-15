@@ -12,15 +12,16 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
+	"github.com/palantir/stacktrace"
 )
 
-//injectChaos initiates node restart chaos on the target node
+// injectChaos initiates node restart chaos on the target node
 func injectChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) error {
 	URL := fmt.Sprintf("https://%v/redfish/v1/Systems/System.Embedded.1/Actions/ComputerSystem.Reset", experimentsDetails.IPMIIP)
 	return redfishLib.RebootNode(URL, experimentsDetails.User, experimentsDetails.Password)
 }
 
-//experimentExecution function orchestrates the experiment by calling the injectChaos function
+// experimentExecution function orchestrates the experiment by calling the injectChaos function
 func experimentExecution(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	// run the probes during chaos
@@ -37,15 +38,15 @@ func experimentExecution(experimentsDetails *experimentTypes.ExperimentDetails, 
 	}
 
 	if err := injectChaos(experimentsDetails, clients); err != nil {
-		return err
+		return stacktrace.Propagate(err, "chaos injection failed")
 	}
 
-	log.Infof("[Chaos]:Waiting for: %vs", experimentsDetails.ChaosDuration)
+	log.Infof("[Chaos]: Waiting for: %vs", experimentsDetails.ChaosDuration)
 	time.Sleep(time.Duration(experimentsDetails.ChaosDuration) * time.Second)
 	return nil
 }
 
-//PrepareChaos contains the chaos prepration and injection steps
+// PrepareChaos contains the chaos prepration and injection steps
 func PrepareChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	//Waiting for the ramp time before chaos injection

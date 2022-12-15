@@ -1,17 +1,18 @@
 package comparator
 
 import (
+	"fmt"
 	"reflect"
 	"strconv"
 	"strings"
 
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	"github.com/litmuschaos/litmus-go/pkg/log"
-	"github.com/pkg/errors"
 )
 
 // CompareFloat compares floating numbers for specific operation
 // it check for the >=, >, <=, <, ==, != operators
-func (model Model) CompareFloat() error {
+func (model Model) CompareFloat(errorCode cerrors.ErrorType) error {
 
 	obj := Float{}
 	obj.setValues(reflect.ValueOf(model.a).String(), reflect.ValueOf(model.b).String())
@@ -23,41 +24,41 @@ func (model Model) CompareFloat() error {
 	switch model.operator {
 	case ">=":
 		if !obj.isGreaterorEqual() {
-			return errors.Errorf("{actual value: %v} is not greater than or equal to {expected value: %v}", obj.a, obj.b)
+			return cerrors.Error{ErrorCode: errorCode, Target: model.probeName, Reason: fmt.Sprintf("actual value: %v is not greater than or equal to expected value: %v", obj.a, obj.b)}
 		}
 	case "<=":
 		if !obj.isLesserorEqual() {
-			return errors.Errorf("{actual value: %v} is not lesser than or equal to {expected value: %v}", obj.a, obj.b)
+			return cerrors.Error{ErrorCode: errorCode, Target: model.probeName, Reason: fmt.Sprintf("actual value: %v is not lesser than or equal to expected value: %v", obj.a, obj.b)}
 		}
 	case ">":
 		if !obj.isGreater() {
-			return errors.Errorf("{actual value: %v} is not greater than {expected value: %v}", obj.a, obj.b)
+			return cerrors.Error{ErrorCode: errorCode, Target: model.probeName, Reason: fmt.Sprintf("actual value: %v is not greater than expected value: %v", obj.a, obj.b)}
 		}
 	case "<":
 		if !obj.isLesser() {
-			return errors.Errorf("{actual value: %v} is not lesser than {expected value: %v}", obj.a, obj.b)
+			return cerrors.Error{ErrorCode: errorCode, Target: model.probeName, Reason: fmt.Sprintf("actual value: %v is not lesser than expected value: %v", obj.a, obj.b)}
 		}
 	case "==":
 		if !obj.isEqual() {
-			return errors.Errorf("{actual value: %v} is not equal to {expected value: %v}", obj.a, obj.b)
+			return cerrors.Error{ErrorCode: errorCode, Target: model.probeName, Reason: fmt.Sprintf("actual value: %v is not equal to expected value: %v", obj.a, obj.b)}
 		}
 	case "!=":
 		if !obj.isNotEqual() {
-			return errors.Errorf("{actual value: %v} is not Notequal to {expected value: %v}", obj.a, obj.b)
+			return cerrors.Error{ErrorCode: errorCode, Target: model.probeName, Reason: fmt.Sprintf("actual value: %v is not Notequal to expected value: %v", obj.a, obj.b)}
 		}
 	case "OneOf", "oneOf":
 		if !obj.isOneOf() {
-			return errors.Errorf("Actual value: {%v} doesn't matched with any of the expected values: {%v}", obj.a, obj.c)
+			return cerrors.Error{ErrorCode: errorCode, Target: model.probeName, Reason: fmt.Sprintf("actual value: %v doesn't matched with any of the expected values: %v", obj.a, obj.c)}
 		}
 	case "between", "Between":
 		if len(obj.c) < 2 {
-			return errors.Errorf("{expected value: %v} should contains both lower and upper limits", obj.c)
+			return cerrors.Error{ErrorCode: errorCode, Target: model.probeName, Reason: fmt.Sprintf("expected value: %v should contains both lower and upper limits", obj.c)}
 		}
 		if !obj.isBetween() {
-			return errors.Errorf("Actual value: {%v} doesn't lie in between expected range: {%v}", obj.a, obj.c)
+			return cerrors.Error{ErrorCode: errorCode, Target: model.probeName, Reason: fmt.Sprintf("actual value: %v doesn't lie in between expected range: %v", obj.a, obj.c)}
 		}
 	default:
-		return errors.Errorf("criteria '%s' not supported in the probe", model.operator)
+		return cerrors.Error{ErrorCode: errorCode, Target: model.probeName, Reason: fmt.Sprintf("criteria '%s' not supported in the probe", model.operator)}
 	}
 	return nil
 }
