@@ -107,10 +107,12 @@ func getHTTPMethodType(httpMethod v1alpha1.HTTPMethod) string {
 
 // httpGet send the http Get request to the given URL and verify the response code to follow the specified criteria
 func httpGet(probe v1alpha1.ProbeAttributes, client *http.Client, resultDetails *types.ResultDetails) error {
+	var description string
+
 	// it will retry for some retry count, in each iterations of try it contains following things
 	// it contains a timeout per iteration of retry. if the timeout expires without success then it will go to next try
 	// for a timeout, it will run the command, if it fails wait for the interval and again execute the command until timeout expires
-	return retry.Times(uint(probe.RunProperties.Retry)).
+	if err := retry.Times(uint(probe.RunProperties.Retry)).
 		Wait(time.Duration(probe.RunProperties.Interval) * time.Second).
 		Try(func(attempt uint) error {
 			// getting the response from the given url
@@ -132,8 +134,13 @@ func httpGet(probe v1alpha1.ProbeAttributes, client *http.Client, resultDetails 
 				log.Errorf("The %v http probe get method has Failed, err: %v", probe.Name, err)
 				return err
 			}
+			description = fmt.Sprintf("The URL %s did respond with correct status code. Actual and Expected status codes are '%s' and '%s' respectively", probe.HTTPProbeInputs.URL, code, probe.HTTPProbeInputs.Method.Get.ResponseCode)
 			return nil
-		})
+		}); err != nil {
+		return err
+	}
+	setProbeDescription(resultDetails, probe, description)
+	return nil
 }
 
 // httpPost send the http post request to the given URL
@@ -142,10 +149,13 @@ func httpPost(probe v1alpha1.ProbeAttributes, client *http.Client, resultDetails
 	if err != nil {
 		return err
 	}
-	// it will retry for some retry count, in each iterations of try it contains following things
+
+	var description string
+
+	// it will retry for some retry count, in each iteration of try it contains following things
 	// it contains a timeout per iteration of retry. if the timeout expires without success then it will go to next try
 	// for a timeout, it will run the command, if it fails wait for the interval and again execute the command until timeout expires
-	return retry.Times(uint(probe.RunProperties.Retry)).
+	if err := retry.Times(uint(probe.RunProperties.Retry)).
 		Wait(time.Duration(probe.RunProperties.Interval) * time.Second).
 		Try(func(attempt uint) error {
 			resp, err := client.Post(probe.HTTPProbeInputs.URL, probe.HTTPProbeInputs.Method.Post.ContentType, strings.NewReader(body))
@@ -165,8 +175,13 @@ func httpPost(probe v1alpha1.ProbeAttributes, client *http.Client, resultDetails
 				log.Errorf("The %v http probe post method has Failed, err: %v", probe.Name, err)
 				return err
 			}
+			description = fmt.Sprintf("The URL %s did respond with correct status code. Actual and Expected status codes are '%s' and '%s' respectively", probe.HTTPProbeInputs.URL, code, probe.HTTPProbeInputs.Method.Get.ResponseCode)
 			return nil
-		})
+		}); err != nil {
+		return err
+	}
+	setProbeDescription(resultDetails, probe, description)
+	return nil
 }
 
 // getHTTPBody fetch the http body for the post request
@@ -217,6 +232,7 @@ loop:
 			for index := range chaosresult.ProbeDetails {
 				if chaosresult.ProbeDetails[index].Name == probe.Name {
 					chaosresult.ProbeDetails[index].IsProbeFailedWithError = err
+					chaosresult.ProbeDetails[index].Status.Description = getDescription(err)
 					log.Errorf("The %v http probe has been Failed, err: %v", probe.Name, err)
 					isExperimentFailed = true
 					break loop
@@ -350,6 +366,7 @@ loop:
 				for index := range chaosresult.ProbeDetails {
 					if chaosresult.ProbeDetails[index].Name == probe.Name {
 						chaosresult.ProbeDetails[index].IsProbeFailedWithError = err
+						chaosresult.ProbeDetails[index].Status.Description = getDescription(err)
 						isExperimentFailed = true
 						break loop
 					}
