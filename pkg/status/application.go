@@ -3,6 +3,7 @@ package status
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"strings"
 	"time"
 
@@ -188,7 +189,7 @@ func validateAllContainerStatus(podName string, ContainerStatuses []v1.Container
 }
 
 // WaitForCompletion wait until the completion of pod
-func WaitForCompletion(appNs, appLabel string, clients clients.ClientSets, duration int, containerName string) (string, error) {
+func WaitForCompletion(appNs, appLabel string, clients clients.ClientSets, duration int, containerNames ...string) (string, error) {
 	var podStatus string
 	failedPods := 0
 	// It will wait till the completion of target container
@@ -213,7 +214,7 @@ func WaitForCompletion(appNs, appLabel string, clients clients.ClientSets, durat
 				log.Infof("helper pod status: %v", podStatus)
 				if podStatus != "Succeeded" && podStatus != "Failed" {
 					for _, container := range pod.Status.ContainerStatuses {
-						if container.Name == containerName {
+						if Contains(container.Name, containerNames) {
 							if container.Ready {
 								return cerrors.Error{ErrorCode: cerrors.ErrorTypeStatusChecks, Target: fmt.Sprintf("{podName: %s, namespace: %s, container: %s}", pod.Name, pod.Namespace, container.Name), Reason: "container is not completed within timeout"}
 							} else if container.State.Terminated != nil && container.State.Terminated.ExitCode == 1 {
@@ -350,4 +351,16 @@ func CheckApplicationStatusesByPodName(appNs, pod string, timeout, delay int, cl
 		return stacktrace.Propagate(err, "could not check pod status by pod name")
 	}
 	return nil
+}
+
+func Contains(val interface{}, slice interface{}) bool {
+	if slice == nil {
+		return false
+	}
+	for i := 0; i < reflect.ValueOf(slice).Len(); i++ {
+		if fmt.Sprintf("%v", reflect.ValueOf(val).Interface()) == fmt.Sprintf("%v", reflect.ValueOf(slice).Index(i).Interface()) {
+			return true
+		}
+	}
+	return false
 }

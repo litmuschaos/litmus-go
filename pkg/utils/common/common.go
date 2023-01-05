@@ -257,3 +257,12 @@ func RunCLICommands(cmd *exec.Cmd, source, target, failMsg string, errorCode cer
 	}
 	return nil
 }
+
+func BuildSidecar(chaosDetails *types.ChaosDetails) apiv1.Container {
+	return apiv1.Container{
+		Name:            chaosDetails.ExperimentName + "-sidecar",
+		Image:           chaosDetails.SideCar.Image,
+		ImagePullPolicy: chaosDetails.SideCar.ImagePullPolicy,
+		Env:             chaosDetails.SideCar.ENV,
+	}
+}

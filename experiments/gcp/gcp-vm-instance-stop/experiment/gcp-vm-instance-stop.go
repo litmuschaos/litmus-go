@@ -43,8 +43,8 @@ func VMInstanceStop(clients clients.ClientSets) {
 	types.SetResultAttributes(&resultDetails, chaosDetails)
 
 	if experimentsDetails.EngineName != "" {
-		// Initialize the probe details. Bail out upon error, as we haven't entered exp business logic yet
-		if err := probe.InitializeProbesInChaosResultDetails(&chaosDetails, clients, &resultDetails); err != nil {
+		// Get values from chaosengine. Bail out upon error, as we haven't entered exp business logic yet
+		if err := types.GetValuesFromChaosEngine(&chaosDetails, clients, &resultDetails); err != nil {
 			log.Errorf("Unable to initialize the probes, err: %v", err)
 			return
 		}
