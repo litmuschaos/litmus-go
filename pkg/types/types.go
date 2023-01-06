@@ -6,7 +6,9 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
+	"github.com/palantir/stacktrace"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"math/rand"
 	"os"
 	"strconv"
 	"strings"
@@ -116,13 +118,15 @@ type ChaosDetails struct {
 	ImagePullSecrets     []corev1.LocalObjectReference
 	Labels               map[string]string
 	Phase                ExperimentPhase
-	SideCar              *SideCar
+	SideCar              []SideCar
 }
 
 type SideCar struct {
 	ENV             []corev1.EnvVar
 	Image           string
 	ImagePullPolicy corev1.PullPolicy
+	Name            string
+	Secrets         []v1alpha1.Secret
 }
 
 type ParentResource struct {
@@ -263,7 +267,7 @@ func GetChaosEngine(chaosDetails *ChaosDetails, clients clients.ClientSets) (*v1
 		Try(func(attempt uint) error {
 			engine, err = clients.LitmusClient.ChaosEngines(chaosDetails.ChaosNamespace).Get(context.Background(), chaosDetails.EngineName, v1.GetOptions{})
 			if err != nil {
-				return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("unable to get the chaosengine, err: %v", err)}
+				return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: err.Error(), Target: fmt.Sprintf("{engineName: %s, engineNs: %s}", chaosDetails.EngineName, chaosDetails.ChaosNamespace)}
 			}
 			return nil
 		}); err != nil {
@@ -279,7 +283,7 @@ func GetValuesFromChaosEngine(chaosDetails *ChaosDetails, clients clients.Client
 	// get the probes from the chaosengine
 	engine, err := GetChaosEngine(chaosDetails, clients)
 	if err != nil {
-		return err
+		return stacktrace.Propagate(err, "could not get chaosengine")
 	}
 
 	// get all the probes defined inside chaosengine for the corresponding experiment
@@ -293,6 +297,7 @@ func GetValuesFromChaosEngine(chaosDetails *ChaosDetails, clients clients.Client
 	return nil
 }
 
+// InitializeSidecarDetails sets the sidecar details
 func InitializeSidecarDetails(chaosDetails *ChaosDetails, engine *v1alpha1.ChaosEngine, env []corev1.EnvVar) {
 	if engine.Annotations == nil {
 		return
@@ -302,26 +307,65 @@ func InitializeSidecarDetails(chaosDetails *ChaosDetails, engine *v1alpha1.Chaos
 		return
 	}
 
-	if engine.Spec.Components.SideCar == nil || engine.Spec.Components.SideCar.Image == "" {
+	if len(engine.Spec.Components.Sidecar) == 0 {
 		return
 	}
 
-	sidecar := &SideCar{
-		Image:           engine.Spec.Components.SideCar.Image,
-		ImagePullPolicy: engine.Spec.Components.SideCar.ImagePullPolicy,
+	var sidecars []SideCar
+	for _, v := range engine.Spec.Components.Sidecar {
+		sidecar := SideCar{
+			Image:           v.Image,
+			ImagePullPolicy: v.ImagePullPolicy,
+			Name:            chaosDetails.ExperimentName + "-sidecar-" + GetRunID(),
+			Secrets:         v.Secrets,
+		}
+
+		if sidecar.ImagePullPolicy == "" {
+			sidecar.ImagePullPolicy = corev1.PullIfNotPresent
+		}
+
+		sidecars = append(sidecars, sidecar)
 	}
 
-	if sidecar.ImagePullPolicy == "" {
-		sidecar.ImagePullPolicy = corev1.PullIfNotPresent
-	}
-
+	var envs []corev1.EnvVar
 	for _, env := range env {
 		if strings.HasPrefix(env.Name, SideCarPrefix) {
-			sidecar.ENV = append(sidecar.ENV, env)
+			envs = append(envs, env)
 		}
 	}
 
-	chaosDetails.SideCar = sidecar
+	// setting default envs into the sidecar
+	envs = append(envs, []corev1.EnvVar{
+		{
+			Name:      "POD_NAME",
+			ValueFrom: getEnvSource("v1", "metadata.name"),
+		},
+		{
+			Name:      "POD_NAMESPACE",
+			ValueFrom: getEnvSource("v1", "metadata.namespace"),
+		},
+		{
+			Name:  "MAIN_CONTAINER",
+			Value: chaosDetails.ExperimentName,
+		},
+	}...)
+
+	for i := range sidecars {
+		sidecars[i].ENV = envs
+	}
+
+	chaosDetails.SideCar = sidecars
+}
+
+// getEnvSource return the env source for the given apiVersion & fieldPath
+func getEnvSource(apiVersion string, fieldPath string) *corev1.EnvVarSource {
+	downwardENV := corev1.EnvVarSource{
+		FieldRef: &corev1.ObjectFieldSelector{
+			APIVersion: apiVersion,
+			FieldPath:  fieldPath,
+		},
+	}
+	return &downwardENV
 }
 
 func InitializeProbesInChaosResultDetails(chaosresult *ResultDetails, probes []v1alpha1.ProbeAttributes) {
@@ -342,4 +386,15 @@ func InitializeProbesInChaosResultDetails(chaosresult *ResultDetails, probes []v
 
 	chaosresult.ProbeDetails = probeDetails
 	chaosresult.ProbeArtifacts = map[string]ProbeArtifact{}
+}
+
+// GetRunID generate a random string
+func GetRunID() string {
+	var letterRunes = []rune("abcdefghijklmnopqrstuvwxyz")
+	runID := make([]rune, 6)
+	rand.Seed(time.Now().UnixNano())
+	for i := range runID {
+		runID[i] = letterRunes[rand.Intn(len(letterRunes))]
+	}
+	return string(runID)
 }

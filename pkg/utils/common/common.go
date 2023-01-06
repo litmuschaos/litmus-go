@@ -258,11 +258,69 @@ func RunCLICommands(cmd *exec.Cmd, source, target, failMsg string, errorCode cer
 	return nil
 }
 
-func BuildSidecar(chaosDetails *types.ChaosDetails) apiv1.Container {
-	return apiv1.Container{
-		Name:            chaosDetails.ExperimentName + "-sidecar",
-		Image:           chaosDetails.SideCar.Image,
-		ImagePullPolicy: chaosDetails.SideCar.ImagePullPolicy,
-		Env:             chaosDetails.SideCar.ENV,
+// BuildSidecar builds the sidecar containers list
+func BuildSidecar(chaosDetails *types.ChaosDetails) []apiv1.Container {
+	var sidecars []apiv1.Container
+
+	for _, c := range chaosDetails.SideCar {
+		container := apiv1.Container{
+			Name:            c.Name,
+			Image:           c.Image,
+			ImagePullPolicy: c.ImagePullPolicy,
+			Env:             c.ENV,
+		}
+		if len(c.Secrets) != 0 {
+			var volMounts []apiv1.VolumeMount
+			for _, v := range c.Secrets {
+				volMounts = append(volMounts, apiv1.VolumeMount{
+					Name:      v.Name,
+					MountPath: v.MountPath,
+				})
+			}
+			container.VolumeMounts = volMounts
+		}
+		sidecars = append(sidecars, container)
 	}
+	return sidecars
+}
+
+// GetSidecarVolumes get the list of all the unique volumes from the sidecar
+func GetSidecarVolumes(chaosDetails *types.ChaosDetails) []apiv1.Volume {
+	var volumes []apiv1.Volume
+	k := int32(420)
+
+	secretMap := make(map[string]bool)
+	for _, c := range chaosDetails.SideCar {
+		if len(c.Secrets) != 0 {
+			for _, v := range c.Secrets {
+				if _, ok := secretMap[v.Name]; ok {
+					continue
+				}
+				secretMap[v.Name] = true
+				volumes = append(volumes, apiv1.Volume{
+					Name: v.Name,
+					VolumeSource: apiv1.VolumeSource{
+						Secret: &apiv1.SecretVolumeSource{
+							SecretName:  v.Name,
+							DefaultMode: &k,
+						},
+					},
+				})
+			}
+		}
+	}
+
+	return volumes
+}
+
+// GetContainerNames gets the name of the main and sidecar containers
+func GetContainerNames(chaosDetails *types.ChaosDetails) []string {
+	containerNames := []string{chaosDetails.ExperimentName}
+	if len(chaosDetails.SideCar) == 0 {
+		return containerNames
+	}
+	for _, c := range chaosDetails.SideCar {
+		containerNames = append(containerNames, c.Name)
+	}
+	return containerNames
 }

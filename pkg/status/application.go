@@ -353,11 +353,13 @@ func CheckApplicationStatusesByPodName(appNs, pod string, timeout, delay int, cl
 	return nil
 }
 
+// Contains checks whether slice contains the expected value
 func Contains(val interface{}, slice interface{}) bool {
 	if slice == nil {
 		return false
 	}
 	for i := 0; i < reflect.ValueOf(slice).Len(); i++ {
+		// it matches the expected value with the ith index value of slice
 		if fmt.Sprintf("%v", reflect.ValueOf(val).Interface()) == fmt.Sprintf("%v", reflect.ValueOf(slice).Index(i).Interface()) {
 			return true
 		}
