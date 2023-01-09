@@ -127,6 +127,7 @@ type SideCar struct {
 	ImagePullPolicy corev1.PullPolicy
 	Name            string
 	Secrets         []v1alpha1.Secret
+	EnvFrom         []corev1.EnvFromSource
 }
 
 type ParentResource struct {
@@ -257,7 +258,7 @@ func Getenv(key string, defaultValue string) string {
 	return value
 }
 
-// GetChaosEngine fetch the details of the probes from the chaosengines
+// GetChaosEngine fetches the chaosengine instance
 func GetChaosEngine(chaosDetails *ChaosDetails, clients clients.ClientSets) (*v1alpha1.ChaosEngine, error) {
 	var engine *v1alpha1.ChaosEngine
 
@@ -277,10 +278,10 @@ func GetChaosEngine(chaosDetails *ChaosDetails, clients clients.ClientSets) (*v1
 	return engine, nil
 }
 
-// GetValuesFromChaosEngine get the values from chaosengine
+// GetValuesFromChaosEngine get the values from the chaosengine
 func GetValuesFromChaosEngine(chaosDetails *ChaosDetails, clients clients.ClientSets, chaosresult *ResultDetails) error {
 
-	// get the probes from the chaosengine
+	// get the chaosengine instance
 	engine, err := GetChaosEngine(chaosDetails, clients)
 	if err != nil {
 		return stacktrace.Propagate(err, "could not get chaosengine")
@@ -318,6 +319,8 @@ func InitializeSidecarDetails(chaosDetails *ChaosDetails, engine *v1alpha1.Chaos
 			ImagePullPolicy: v.ImagePullPolicy,
 			Name:            chaosDetails.ExperimentName + "-sidecar-" + GetRunID(),
 			Secrets:         v.Secrets,
+			ENV:             append(v.ENV, getDefaultEnvs(chaosDetails.ExperimentName)...),
+			EnvFrom:         v.EnvFrom,
 		}
 
 		if sidecar.ImagePullPolicy == "" {
@@ -327,15 +330,11 @@ func InitializeSidecarDetails(chaosDetails *ChaosDetails, engine *v1alpha1.Chaos
 		sidecars = append(sidecars, sidecar)
 	}
 
-	var envs []corev1.EnvVar
-	for _, env := range env {
-		if strings.HasPrefix(env.Name, SideCarPrefix) {
-			envs = append(envs, env)
-		}
-	}
+	chaosDetails.SideCar = sidecars
+}
 
-	// setting default envs into the sidecar
-	envs = append(envs, []corev1.EnvVar{
+func getDefaultEnvs(cName string) []corev1.EnvVar {
+	return []corev1.EnvVar{
 		{
 			Name:      "POD_NAME",
 			ValueFrom: getEnvSource("v1", "metadata.name"),
@@ -346,15 +345,9 @@ func InitializeSidecarDetails(chaosDetails *ChaosDetails, engine *v1alpha1.Chaos
 		},
 		{
 			Name:  "MAIN_CONTAINER",
-			Value: chaosDetails.ExperimentName,
+			Value: cName,
 		},
-	}...)
-
-	for i := range sidecars {
-		sidecars[i].ENV = envs
 	}
-
-	chaosDetails.SideCar = sidecars
 }
 
 // getEnvSource return the env source for the given apiVersion & fieldPath

@@ -268,6 +268,7 @@ func BuildSidecar(chaosDetails *types.ChaosDetails) []apiv1.Container {
 			Image:           c.Image,
 			ImagePullPolicy: c.ImagePullPolicy,
 			Env:             c.ENV,
+			EnvFrom:         c.EnvFrom,
 		}
 		if len(c.Secrets) != 0 {
 			var volMounts []apiv1.VolumeMount
