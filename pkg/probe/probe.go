@@ -90,10 +90,20 @@ func setProbeVerdict(resultDetails *types.ResultDetails, probe v1alpha1.ProbeAtt
 			if probes.Mode == "Edge" && probes.Status.Verdict == v1alpha1.ProbeVerdictFailed {
 				return
 			}
-			resultDetails.ProbeDetails[index].Status = v1alpha1.ProbeStatus{
-				Verdict:     verdict,
-				Description: description,
+			resultDetails.ProbeDetails[index].Status.Verdict = verdict
+			if description != "" {
+				resultDetails.ProbeDetails[index].Status.Description = description
 			}
+			break
+		}
+	}
+}
+
+// setProbeDescription sets the description to probe
+func setProbeDescription(resultDetails *types.ResultDetails, probe v1alpha1.ProbeAttributes, description string) {
+	for index, probes := range resultDetails.ProbeDetails {
+		if probes.Name == probe.Name && probes.Type == probe.Type {
+			resultDetails.ProbeDetails[index].Status.Description = description
 			break
 		}
 	}
@@ -104,7 +114,7 @@ func SetProbeVerdictAfterFailure(result *v1alpha1.ChaosResult) {
 	for index := range result.Status.ProbeStatuses {
 		if result.Status.ProbeStatuses[index].Status.Verdict == v1alpha1.ProbeVerdictAwaited {
 			result.Status.ProbeStatuses[index].Status.Verdict = v1alpha1.ProbeVerdictNA
-			result.Status.ProbeStatuses[index].Status.Description = "either probe is not executed or not evaluated"
+			result.Status.ProbeStatuses[index].Status.Description = "Either probe is not executed or not evaluated"
 		}
 	}
 }
@@ -191,7 +201,6 @@ func getRunIDFromProbe(resultDetails *types.ResultDetails, probeName, probeType 
 // setRunIDForProbe set the run_id for the dedicated probe.
 // which will used in the continuous cmd probe, run_id is used as suffix in the external pod name
 func setRunIDForProbe(resultDetails *types.ResultDetails, probeName, probeType, runid string) {
-
 	for index, probe := range resultDetails.ProbeDetails {
 		if probe.Name == probeName && probe.Type == probeType {
 			resultDetails.ProbeDetails[index].RunID = runid
@@ -233,26 +242,28 @@ func markedVerdictInEnd(err error, resultDetails *types.ResultDetails, probe v1a
 			"ProbeInstance": phase,
 			"ProbeStatus":   probeVerdict,
 		})
-		description = getDescription(strings.ToLower(probe.Mode), phase)
+		description = getDescription(err)
 	}
 
 	setProbeVerdict(resultDetails, probe, probeVerdict, description)
 	if !probe.RunProperties.StopOnFailure && err != nil {
 		for index := range resultDetails.ProbeDetails {
-			resultDetails.ProbeDetails[index].IsProbeFailedWithError = err
+			if resultDetails.ProbeDetails[index].Name == probe.Name {
+				resultDetails.ProbeDetails[index].IsProbeFailedWithError = err
+				break
+			}
 		}
 		return nil
 	}
 	return err
 }
 
-func getDescription(mode, phase string) string {
-	switch mode {
-	case "edge":
-		return fmt.Sprintf("Probe didn't met the passing criteria in phase: %s", phase)
-	default:
-		return "Probe didn't met the passing criteria"
+func getDescription(err error) string {
+	rootCause := stacktrace.RootCause(err)
+	if error, ok := rootCause.(cerrors.Error); ok {
+		return error.Reason
 	}
+	return ""
 }
 
 // CheckForErrorInContinuousProbe check for the error in the continuous probes

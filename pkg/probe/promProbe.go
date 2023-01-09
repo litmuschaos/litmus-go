@@ -164,12 +164,12 @@ func onChaosPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 
 // triggerPromProbe trigger the prometheus probe inside the external pod
 func triggerPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails) error {
-
+	var description string
 	// running the prom probe command and matching the output
 	// it will retry for some retry count, in each iterations of try it contains following things
 	// it contains a timeout per iteration of retry. if the timeout expires without success then it will go to next try
 	// for a timeout, it will run the command, if it fails wait for the interval and again execute the command until timeout expires
-	return retry.Times(uint(probe.RunProperties.Retry)).
+	if err := retry.Times(uint(probe.RunProperties.Retry)).
 		Timeout(int64(probe.RunProperties.ProbeTimeout)).
 		Wait(time.Duration(probe.RunProperties.Interval) * time.Second).
 		TryWithTimeout(func(attempt uint) error {
@@ -190,7 +190,7 @@ func triggerPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 			cmd.Stdout = &out
 			cmd.Stderr = &errOut
 			if err := cmd.Run(); err != nil {
-				return cerrors.Error{ErrorCode: cerrors.ErrorTypePromProbe, Target: fmt.Sprintf("{name: %v}", probe.Name), Reason: fmt.Sprintf("unable to run command, err: %v; error output: %v", err, errOut.String())}
+				return cerrors.Error{ErrorCode: cerrors.ErrorTypePromProbe, Target: fmt.Sprintf("{name: %v}", probe.Name), Reason: fmt.Sprintf("unable to run command, error: %s", errOut.String())}
 			}
 
 			// extract the values from the metrics
@@ -210,8 +210,13 @@ func triggerPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 				log.Errorf("The %v prom probe has been Failed, err: %v", probe.Name, err)
 				return err
 			}
+			description = fmt.Sprintf("Probe responded with a valid prometheus metrics value. Actual and Expected status values are %s and %s respectively", value, probe.PromProbeInputs.Comparator.Value)
 			return nil
-		})
+		}); err != nil {
+		return err
+	}
+	setProbeDescription(resultDetails, probe, description)
+	return nil
 }
 
 // triggerContinuousPromProbe trigger the continuous prometheus probe
@@ -235,6 +240,7 @@ loop:
 			for index := range chaosresult.ProbeDetails {
 				if chaosresult.ProbeDetails[index].Name == probe.Name {
 					chaosresult.ProbeDetails[index].IsProbeFailedWithError = err
+					chaosresult.ProbeDetails[index].Status.Description = getDescription(err)
 					log.Errorf("The %v prom probe has been Failed, err: %v", probe.Name, err)
 					isExperimentFailed = true
 					break loop
@@ -284,6 +290,7 @@ loop:
 				for index := range chaosresult.ProbeDetails {
 					if chaosresult.ProbeDetails[index].Name == probe.Name {
 						chaosresult.ProbeDetails[index].IsProbeFailedWithError = err
+						chaosresult.ProbeDetails[index].Status.Description = getDescription(err)
 						log.Errorf("The %v prom probe has been Failed, err: %v", probe.Name, err)
 						isExperimentFailed = true
 						break loop

@@ -193,10 +193,12 @@ func updateResultAttributes(clients clients.ClientSets, chaosDetails *types.Chao
 		if !isAllProbePassed {
 			resultDetails.Verdict = "Fail"
 			result.Status.ExperimentStatus.Verdict = "Fail"
-			failStep, errCode := getFailStep(resultDetails.ProbeDetails, string(chaosDetails.Phase))
-			result.Status.ExperimentStatus.FailureOutput = &v1alpha1.FailureOutput{
-				FailedStep: failStep,
-				ErrorCode:  errCode,
+			if result.Status.ExperimentStatus.FailureOutput == nil || result.Status.ExperimentStatus.FailureOutput.FailedStep == "" {
+				failStep, errCode := getFailStep(resultDetails.ProbeDetails, string(chaosDetails.Phase))
+				result.Status.ExperimentStatus.FailureOutput = &v1alpha1.FailureOutput{
+					FailedStep: failStep,
+					ErrorCode:  errCode,
+				}
 			}
 		}
 		switch strings.ToLower(string(resultDetails.Verdict)) {

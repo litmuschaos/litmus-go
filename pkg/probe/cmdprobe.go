@@ -53,8 +53,9 @@ func prepareCmdProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets,
 
 // triggerInlineCmdProbe trigger the cmd probe and storing the output into the out buffer
 func triggerInlineCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails) error {
+	var description string
 
-	// It parse the templated command and return normal string
+	// It parses the templated command and return normal string
 	// if command doesn't have template, it will return the same command
 	probe.CmdProbeInputs.Command, err = parseCommand(probe.CmdProbeInputs.Command, resultDetails)
 	if err != nil {
@@ -62,10 +63,10 @@ func triggerInlineCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.
 	}
 
 	// running the cmd probe command and storing the output into the out buffer
-	// it will retry for some retry count, in each iterations of try it contains following things
+	// it will retry for some retry count, in each iteration of try it contains following things
 	// it contains a timeout per iteration of retry. if the timeout expires without success then it will go to next try
-	// for a timeout, it will run the command, if it fails wait for the iterval and again execute the command until timeout expires
-	return retry.Times(uint(probe.RunProperties.Retry)).
+	// for a timeout, it will run the command, if it fails wait for the interval and again execute the command until timeout expires
+	if err := retry.Times(uint(probe.RunProperties.Retry)).
 		Timeout(int64(probe.RunProperties.ProbeTimeout)).
 		Wait(time.Duration(probe.RunProperties.Interval) * time.Second).
 		TryWithTimeout(func(attempt uint) error {
@@ -79,7 +80,8 @@ func triggerInlineCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.
 			}
 
 			rc := getAndIncrementRunCount(resultDetails, probe.Name)
-			if err = validateResult(probe.CmdProbeInputs.Comparator, probe.Name, strings.TrimSpace(out.String()), rc); err != nil {
+			description, err = validateResult(probe.CmdProbeInputs.Comparator, probe.Name, strings.TrimSpace(out.String()), rc)
+			if err != nil {
 				log.Errorf("the %v cmd probe has been Failed, err: %v", probe.Name, err)
 				return err
 			}
@@ -88,11 +90,17 @@ func triggerInlineCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.
 			probes.ProbeArtifacts.Register = strings.TrimSpace(out.String())
 			resultDetails.ProbeArtifacts[probe.Name] = probes
 			return nil
-		})
+		}); err != nil {
+		return err
+	}
+
+	setProbeDescription(resultDetails, probe, description)
+	return nil
 }
 
 // triggerSourceCmdProbe trigger the cmd probe inside the external pod
 func triggerSourceCmdProbe(probe v1alpha1.ProbeAttributes, execCommandDetails litmusexec.PodDetails, clients clients.ClientSets, resultDetails *types.ResultDetails) error {
+	var description string
 
 	// It parse the templated command and return normal string
 	// if command doesn't have template, it will return the same command
@@ -105,7 +113,7 @@ func triggerSourceCmdProbe(probe v1alpha1.ProbeAttributes, execCommandDetails li
 	// it will retry for some retry count, in each iterations of try it contains following things
 	// it contains a timeout per iteration of retry. if the timeout expires without success then it will go to next try
 	// for a timeout, it will run the command, if it fails wait for the iterval and again execute the command until timeout expires
-	return retry.Times(uint(probe.RunProperties.Retry)).
+	if err := retry.Times(uint(probe.RunProperties.Retry)).
 		Timeout(int64(probe.RunProperties.ProbeTimeout)).
 		Wait(time.Duration(probe.RunProperties.Interval) * time.Second).
 		TryWithTimeout(func(attempt uint) error {
@@ -117,7 +125,7 @@ func triggerSourceCmdProbe(probe v1alpha1.ProbeAttributes, execCommandDetails li
 			}
 
 			rc := getAndIncrementRunCount(resultDetails, probe.Name)
-			if err = validateResult(probe.CmdProbeInputs.Comparator, probe.Name, strings.TrimSpace(output), rc); err != nil {
+			if description, err = validateResult(probe.CmdProbeInputs.Comparator, probe.Name, strings.TrimSpace(output), rc); err != nil {
 				log.Errorf("The %v cmd probe has been Failed, err: %v", probe.Name, err)
 				return err
 			}
@@ -126,7 +134,12 @@ func triggerSourceCmdProbe(probe v1alpha1.ProbeAttributes, execCommandDetails li
 			probes.ProbeArtifacts.Register = strings.TrimSpace(output)
 			resultDetails.ProbeArtifacts[probe.Name] = probes
 			return nil
-		})
+		}); err != nil {
+		return err
+	}
+
+	setProbeDescription(resultDetails, probe, description)
+	return nil
 }
 
 // createProbePod creates an external pod with source image for the cmd probe
@@ -316,13 +329,14 @@ func triggerInlineContinuousCmdProbe(probe v1alpha1.ProbeAttributes, clients cli
 	// it marked the error for the probes, if any
 loop:
 	for {
-		err = triggerInlineCmdProbe(probe, chaosresult)
+		err := triggerInlineCmdProbe(probe, chaosresult)
 		// record the error inside the probeDetails, we are maintaining a dedicated variable for the err, inside probeDetails
 		if err != nil {
 			err = addProbePhase(err, string(chaosDetails.Phase))
 			for index := range chaosresult.ProbeDetails {
 				if chaosresult.ProbeDetails[index].Name == probe.Name {
 					chaosresult.ProbeDetails[index].IsProbeFailedWithError = err
+					chaosresult.ProbeDetails[index].Status.Description = getDescription(err)
 					log.Errorf("The %v cmd probe has been Failed, err: %v", probe.Name, err)
 					isExperimentFailed = true
 					break loop
@@ -373,6 +387,7 @@ loop:
 				for index := range chaosresult.ProbeDetails {
 					if chaosresult.ProbeDetails[index].Name == probe.Name {
 						chaosresult.ProbeDetails[index].IsProbeFailedWithError = err
+						chaosresult.ProbeDetails[index].Status.Description = getDescription(err)
 						log.Errorf("The %v cmd probe has been Failed, err: %v", probe.Name, err)
 						isExperimentFailed = true
 						break loop
@@ -423,6 +438,7 @@ loop:
 				for index := range chaosresult.ProbeDetails {
 					if chaosresult.ProbeDetails[index].Name == probe.Name {
 						chaosresult.ProbeDetails[index].IsProbeFailedWithError = err
+						chaosresult.ProbeDetails[index].Status.Description = getDescription(err)
 						log.Errorf("The %v cmd probe has been Failed, err: %v", probe.Name, err)
 						isExperimentFailed = true
 						break loop
@@ -465,6 +481,7 @@ loop:
 			for index := range chaosresult.ProbeDetails {
 				if chaosresult.ProbeDetails[index].Name == probe.Name {
 					chaosresult.ProbeDetails[index].IsProbeFailedWithError = err
+					chaosresult.ProbeDetails[index].Status.Description = getDescription(err)
 					log.Errorf("The %v cmd probe has been Failed, err: %v", probe.Name, err)
 					isExperimentFailed = true
 					break loop
@@ -486,7 +503,7 @@ loop:
 
 // validateResult validate the probe result to specified comparison operation
 // it supports int, float, string operands
-func validateResult(comparator v1alpha1.ComparatorInfo, probeName, cmdOutput string, rc int) error {
+func validateResult(comparator v1alpha1.ComparatorInfo, probeName, cmdOutput string, rc int) (string, error) {
 
 	compare := cmp.RunCount(rc).
 		FirstValue(cmdOutput).
@@ -497,20 +514,21 @@ func validateResult(comparator v1alpha1.ComparatorInfo, probeName, cmdOutput str
 	switch strings.ToLower(comparator.Type) {
 	case "int":
 		if err = compare.CompareInt(cerrors.ErrorTypeCmdProbe); err != nil {
-			return err
+			return "", err
 		}
 	case "float":
 		if err = compare.CompareFloat(cerrors.ErrorTypeCmdProbe); err != nil {
-			return err
+			return "", err
 		}
 	case "string":
 		if err = compare.CompareString(cerrors.ErrorTypeCmdProbe); err != nil {
-			return err
+			return "", err
 		}
 	default:
-		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Target: fmt.Sprintf("{name: %v}", probeName), Reason: fmt.Sprintf("comparator type '%s' not supported in the cmd probe", comparator.Type)}
+		return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Target: fmt.Sprintf("{name: %v}", probeName), Reason: fmt.Sprintf("comparator type '%s' not supported in the cmd probe", comparator.Type)}
 	}
-	return nil
+	description := fmt.Sprintf("Probe responded with a valid output. Actual and Expected values are '%s' and '%s' respectively", cmdOutput, comparator.Value)
+	return description, nil
 }
 
 // preChaosCmdProbe trigger the cmd probe for prechaos phase

@@ -72,10 +72,12 @@ func triggerK8sProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets,
 		}
 	}
 
+	var description string
+
 	// it will retry for some retry count, in each iterations of try it contains following things
 	// it contains a timeout per iteration of retry. if the timeout expires without success then it will go to next try
 	// for a timeout, it will run the command, if it fails wait for the iterval and again execute the command until timeout expires
-	return retry.Times(uint(probe.RunProperties.Retry)).
+	if err := retry.Times(uint(probe.RunProperties.Retry)).
 		Timeout(int64(probe.RunProperties.ProbeTimeout)).
 		Wait(time.Duration(probe.RunProperties.Interval) * time.Second).
 		TryWithTimeout(func(attempt uint) error {
@@ -110,9 +112,14 @@ func triggerK8sProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets,
 			default:
 				return cerrors.Error{ErrorCode: cerrors.ErrorTypeK8sProbe, Target: fmt.Sprintf("{name: %v}", probe.Name), Reason: fmt.Sprintf("operation type '%s' not supported in the k8s probe", inputs.Operation)}
 			}
-
+			description = fmt.Sprintf("Probe is successfully performed the '%s' operation on kubernetes resource", probe.K8sProbeInputs.Operation)
 			return nil
-		})
+		}); err != nil {
+		return err
+	}
+
+	setProbeDescription(resultDetails, probe, description)
+	return nil
 }
 
 // triggerContinuousK8sProbe trigger the continuous k8s probes
@@ -135,6 +142,7 @@ loop:
 			for index := range chaosresult.ProbeDetails {
 				if chaosresult.ProbeDetails[index].Name == probe.Name {
 					chaosresult.ProbeDetails[index].IsProbeFailedWithError = err
+					chaosresult.ProbeDetails[index].Status.Description = getDescription(err)
 					log.Errorf("the %v k8s probe has been Failed, err: %v", probe.Name, err)
 					isExperimentFailed = true
 					break loop
@@ -190,7 +198,7 @@ func deleteResource(probe v1alpha1.ProbeAttributes, gvr schema.GroupVersionResou
 		if err != nil {
 			return cerrors.Error{ErrorCode: cerrors.ErrorTypeK8sProbe, Target: fmt.Sprintf("{name: %v}", probe.Name), Reason: fmt.Sprintf("unable to list the resources with matching selector, err: %v", err)}
 		} else if len(resourceList.Items) == 0 {
-			return cerrors.Error{ErrorCode: cerrors.ErrorTypeK8sProbe, Target: fmt.Sprintf("{name: %v}", probe.Name), Reason: "no resource found with provided selectors"}
+			return cerrors.Error{ErrorCode: cerrors.ErrorTypeK8sProbe, Target: fmt.Sprintf("{name: %v}", probe.Name), Reason: fmt.Sprintf("no resource found with provided {labelSelectors: %s, fieldSelectors: %s} selectors", probe.K8sProbeInputs.LabelSelector, probe.K8sProbeInputs.FieldSelector)}
 		}
 
 		for index := range resourceList.Items {
@@ -218,7 +226,7 @@ func resourcesPresent(probe v1alpha1.ProbeAttributes, gvr schema.GroupVersionRes
 			log.Errorf("the %v k8s probe has Failed, err: %v", probe.Name, err)
 			return cerrors.Error{ErrorCode: cerrors.ErrorTypeK8sProbe, Target: fmt.Sprintf("{name: %v}", probe.Name), Reason: fmt.Sprintf("unable to list the resources with matching selector, err: %v", err)}
 		} else if len(resourceList.Items) == 0 {
-			return cerrors.Error{ErrorCode: cerrors.ErrorTypeK8sProbe, Target: fmt.Sprintf("{name: %v}", probe.Name), Reason: "no resource found with provided selectors"}
+			return cerrors.Error{ErrorCode: cerrors.ErrorTypeK8sProbe, Target: fmt.Sprintf("{name: %v}", probe.Name), Reason: fmt.Sprintf("no resource found with provided {labelSelectors: %s, fieldSelectors: %s} selectors", probe.K8sProbeInputs.LabelSelector, probe.K8sProbeInputs.FieldSelector)}
 		}
 	}
 	return nil
@@ -248,7 +256,7 @@ func resourcesAbsent(probe v1alpha1.ProbeAttributes, gvr schema.GroupVersionReso
 					return cerrors.Error{ErrorCode: cerrors.ErrorTypeK8sProbe, Target: fmt.Sprintf("{name: %v}", probe.Name), Reason: fmt.Sprintf("unable to get the resources with name %v from k8s, err: %v", res, err)}
 				}
 			} else if resource != nil {
-				return cerrors.Error{ErrorCode: cerrors.ErrorTypeK8sProbe, Target: fmt.Sprintf("{name: %v}", probe.Name), Reason: fmt.Sprintf("resource '%v' still exists but is expected to be absent", res)}
+				return cerrors.Error{ErrorCode: cerrors.ErrorTypeK8sProbe, Target: fmt.Sprintf("{name: %v}", probe.Name), Reason: fmt.Sprintf("resource '%v' exists but it is expected to be absent", res)}
 			}
 		}
 	} else {
@@ -260,7 +268,7 @@ func resourcesAbsent(probe v1alpha1.ProbeAttributes, gvr schema.GroupVersionReso
 			return cerrors.Error{ErrorCode: cerrors.ErrorTypeK8sProbe, Target: fmt.Sprintf("{name: %v}", probe.Name), Reason: fmt.Sprintf("unable to list the resources with matching selector, err: %v", err)}
 		}
 		if len(resourceList.Items) != 0 {
-			return cerrors.Error{ErrorCode: cerrors.ErrorTypeK8sProbe, Target: fmt.Sprintf("{name: %v}", probe.Name), Reason: fmt.Sprintf("resource with provided selectors still exists, found %v resources with matching selectors", len(resourceList.Items))}
+			return cerrors.Error{ErrorCode: cerrors.ErrorTypeK8sProbe, Target: fmt.Sprintf("{name: %v}", probe.Name), Reason: fmt.Sprintf("resource with {labelSelectors: %s, fieldSelectors: %s} should not exists, found %v resources with matching selectors", probe.K8sProbeInputs.LabelSelector, probe.K8sProbeInputs.FieldSelector, len(resourceList.Items))}
 		}
 	}
 	return nil
@@ -395,6 +403,7 @@ loop:
 				for index := range chaosresult.ProbeDetails {
 					if chaosresult.ProbeDetails[index].Name == probe.Name {
 						chaosresult.ProbeDetails[index].IsProbeFailedWithError = err
+						chaosresult.ProbeDetails[index].Status.Description = getDescription(err)
 						log.Errorf("The %v k8s probe has been Failed, err: %v", probe.Name, err)
 						isExperimentFailed = true
 						break loop
