@@ -4,20 +4,17 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"html/template"
-	"strings"
-	"time"
-
 	"github.com/kyokomi/emoji"
 	"github.com/litmuschaos/chaos-operator/api/litmuschaos/v1alpha1"
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/types"
-	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
 	"github.com/palantir/stacktrace"
 	"github.com/sirupsen/logrus"
+	"html/template"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"strings"
 )
 
 var err error
@@ -27,7 +24,7 @@ var err error
 func RunProbes(chaosDetails *types.ChaosDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, phase string, eventsDetails *types.EventDetails) error {
 
 	// get the probes details from the chaosengine
-	probes, err := getProbesFromEngine(chaosDetails, clients)
+	probes, err := getProbesFromChaosEngine(chaosDetails, clients)
 	if err != nil {
 		return err
 	}
@@ -119,60 +116,17 @@ func SetProbeVerdictAfterFailure(result *v1alpha1.ChaosResult) {
 	}
 }
 
-// getProbesFromEngine fetch the details of the probes from the chaosengines
-func getProbesFromEngine(chaosDetails *types.ChaosDetails, clients clients.ClientSets) ([]v1alpha1.ProbeAttributes, error) {
-
-	var Probes []v1alpha1.ProbeAttributes
-
-	if err := retry.
-		Times(uint(chaosDetails.Timeout / chaosDetails.Delay)).
-		Wait(time.Duration(chaosDetails.Delay) * time.Second).
-		Try(func(attempt uint) error {
-			engine, err := clients.LitmusClient.ChaosEngines(chaosDetails.ChaosNamespace).Get(context.Background(), chaosDetails.EngineName, v1.GetOptions{})
-			if err != nil {
-				return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("unable to get the chaosengine, err: %v", err)}
-			}
-			// get all the probes defined inside chaosengine for the corresponding experiment
-			for _, experiment := range engine.Spec.Experiments {
-				if experiment.Name == chaosDetails.ExperimentName {
-					Probes = experiment.Spec.Probe
-				}
-			}
-			return nil
-		}); err != nil {
+func getProbesFromChaosEngine(chaosDetails *types.ChaosDetails, clients clients.ClientSets) ([]v1alpha1.ProbeAttributes, error) {
+	engine, err := types.GetChaosEngine(chaosDetails, clients)
+	if err != nil {
 		return nil, err
 	}
-
-	return Probes, nil
-}
-
-// InitializeProbesInChaosResultDetails set the probe inside chaos result
-// it fetches the probe details from the chaosengine and set into the chaosresult
-func InitializeProbesInChaosResultDetails(chaosDetails *types.ChaosDetails, clients clients.ClientSets, chaosresult *types.ResultDetails) error {
-
-	var probeDetails []types.ProbeDetails
-	// get the probes from the chaosengine
-	probes, err := getProbesFromEngine(chaosDetails, clients)
-	if err != nil {
-		return err
-	}
-
-	// set the probe details for k8s probe
-	for _, probe := range probes {
-		tempProbe := types.ProbeDetails{}
-		tempProbe.Name = probe.Name
-		tempProbe.Type = probe.Type
-		tempProbe.Mode = probe.Mode
-		tempProbe.RunCount = 0
-		tempProbe.Status = v1alpha1.ProbeStatus{
-			Verdict: "Awaited",
+	for _, exp := range engine.Spec.Experiments {
+		if exp.Name == chaosDetails.ExperimentName {
+			return exp.Spec.Probe, nil
 		}
-		probeDetails = append(probeDetails, tempProbe)
 	}
-
-	chaosresult.ProbeDetails = probeDetails
-	chaosresult.ProbeArtifacts = map[string]types.ProbeArtifact{}
-	return nil
+	return nil, nil
 }
 
 // getAndIncrementRunCount return the run count for the specified probe

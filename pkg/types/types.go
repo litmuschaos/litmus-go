@@ -1,14 +1,29 @@
 package types
 
 import (
+	"context"
+	"fmt"
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
+	"github.com/litmuschaos/litmus-go/pkg/clients"
+	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
+	"github.com/palantir/stacktrace"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"math/rand"
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/litmuschaos/chaos-operator/api/litmuschaos/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	clientTypes "k8s.io/apimachinery/pkg/types"
+)
+
+var err error
+
+const (
+	SideCarEnabled = "sidecar/enabled"
+	SideCarPrefix  = "SIDECAR"
 )
 
 const (
@@ -103,6 +118,16 @@ type ChaosDetails struct {
 	ImagePullSecrets     []corev1.LocalObjectReference
 	Labels               map[string]string
 	Phase                ExperimentPhase
+	SideCar              []SideCar
+}
+
+type SideCar struct {
+	ENV             []corev1.EnvVar
+	Image           string
+	ImagePullPolicy corev1.PullPolicy
+	Name            string
+	Secrets         []v1alpha1.Secret
+	EnvFrom         []corev1.EnvFromSource
 }
 
 type ParentResource struct {
@@ -231,4 +256,138 @@ func Getenv(key string, defaultValue string) string {
 		value = defaultValue
 	}
 	return value
+}
+
+// GetChaosEngine fetches the chaosengine instance
+func GetChaosEngine(chaosDetails *ChaosDetails, clients clients.ClientSets) (*v1alpha1.ChaosEngine, error) {
+	var engine *v1alpha1.ChaosEngine
+
+	if err := retry.
+		Times(uint(chaosDetails.Timeout / chaosDetails.Delay)).
+		Wait(time.Duration(chaosDetails.Delay) * time.Second).
+		Try(func(attempt uint) error {
+			engine, err = clients.LitmusClient.ChaosEngines(chaosDetails.ChaosNamespace).Get(context.Background(), chaosDetails.EngineName, v1.GetOptions{})
+			if err != nil {
+				return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: err.Error(), Target: fmt.Sprintf("{engineName: %s, engineNs: %s}", chaosDetails.EngineName, chaosDetails.ChaosNamespace)}
+			}
+			return nil
+		}); err != nil {
+		return nil, err
+	}
+
+	return engine, nil
+}
+
+// GetValuesFromChaosEngine get the values from the chaosengine
+func GetValuesFromChaosEngine(chaosDetails *ChaosDetails, clients clients.ClientSets, chaosresult *ResultDetails) error {
+
+	// get the chaosengine instance
+	engine, err := GetChaosEngine(chaosDetails, clients)
+	if err != nil {
+		return stacktrace.Propagate(err, "could not get chaosengine")
+	}
+
+	// get all the probes defined inside chaosengine for the corresponding experiment
+	for _, experiment := range engine.Spec.Experiments {
+		if experiment.Name == chaosDetails.ExperimentName {
+			InitializeProbesInChaosResultDetails(chaosresult, experiment.Spec.Probe)
+			InitializeSidecarDetails(chaosDetails, engine, experiment.Spec.Components.ENV)
+		}
+	}
+
+	return nil
+}
+
+// InitializeSidecarDetails sets the sidecar details
+func InitializeSidecarDetails(chaosDetails *ChaosDetails, engine *v1alpha1.ChaosEngine, env []corev1.EnvVar) {
+	if engine.Annotations == nil {
+		return
+	}
+
+	if sidecarEnabled, ok := engine.Annotations[SideCarEnabled]; !ok || (sidecarEnabled == "false") {
+		return
+	}
+
+	if len(engine.Spec.Components.Sidecar) == 0 {
+		return
+	}
+
+	var sidecars []SideCar
+	for _, v := range engine.Spec.Components.Sidecar {
+		sidecar := SideCar{
+			Image:           v.Image,
+			ImagePullPolicy: v.ImagePullPolicy,
+			Name:            chaosDetails.ExperimentName + "-sidecar-" + GetRunID(),
+			Secrets:         v.Secrets,
+			ENV:             append(v.ENV, getDefaultEnvs(chaosDetails.ExperimentName)...),
+			EnvFrom:         v.EnvFrom,
+		}
+
+		if sidecar.ImagePullPolicy == "" {
+			sidecar.ImagePullPolicy = corev1.PullIfNotPresent
+		}
+
+		sidecars = append(sidecars, sidecar)
+	}
+
+	chaosDetails.SideCar = sidecars
+}
+
+func getDefaultEnvs(cName string) []corev1.EnvVar {
+	return []corev1.EnvVar{
+		{
+			Name:      "POD_NAME",
+			ValueFrom: getEnvSource("v1", "metadata.name"),
+		},
+		{
+			Name:      "POD_NAMESPACE",
+			ValueFrom: getEnvSource("v1", "metadata.namespace"),
+		},
+		{
+			Name:  "MAIN_CONTAINER",
+			Value: cName,
+		},
+	}
+}
+
+// getEnvSource return the env source for the given apiVersion & fieldPath
+func getEnvSource(apiVersion string, fieldPath string) *corev1.EnvVarSource {
+	downwardENV := corev1.EnvVarSource{
+		FieldRef: &corev1.ObjectFieldSelector{
+			APIVersion: apiVersion,
+			FieldPath:  fieldPath,
+		},
+	}
+	return &downwardENV
+}
+
+func InitializeProbesInChaosResultDetails(chaosresult *ResultDetails, probes []v1alpha1.ProbeAttributes) {
+	var probeDetails []ProbeDetails
+
+	// set the probe details for k8s probe
+	for _, probe := range probes {
+		tempProbe := ProbeDetails{}
+		tempProbe.Name = probe.Name
+		tempProbe.Type = probe.Type
+		tempProbe.Mode = probe.Mode
+		tempProbe.RunCount = 0
+		tempProbe.Status = v1alpha1.ProbeStatus{
+			Verdict: "Awaited",
+		}
+		probeDetails = append(probeDetails, tempProbe)
+	}
+
+	chaosresult.ProbeDetails = probeDetails
+	chaosresult.ProbeArtifacts = map[string]ProbeArtifact{}
+}
+
+// GetRunID generate a random string
+func GetRunID() string {
+	var letterRunes = []rune("abcdefghijklmnopqrstuvwxyz")
+	runID := make([]rune, 6)
+	rand.Seed(time.Now().UnixNano())
+	for i := range runID {
+		runID[i] = letterRunes[rand.Intn(len(letterRunes))]
+	}
+	return string(runID)
 }
