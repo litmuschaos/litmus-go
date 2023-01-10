@@ -75,10 +75,6 @@ func Exec(commandDetails *PodDetails, clients clients.ClientSets, command []stri
 		return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("failed to create a stderr and stdout stream, %s", err.Error())}
 	}
 
-	if strings.TrimSpace(stderr.String()) != "" {
-		return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: stderr.String()}
-	}
-
 	return stdout.String(), nil
 }
 
