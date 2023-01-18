@@ -65,11 +65,14 @@ func preChaosPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resu
 		}
 
 		// triggering the prom probe and storing the output into the out buffer
-		err = triggerPromProbe(probe, resultDetails)
+		probeFailed, err := triggerPromProbe(probe, resultDetails)
+		if err != nil && !probeFailed {
+			return err
+		}
 
 		// failing the probe, if the success condition doesn't met after the retry & timeout combinations
 		// it will update the status of all the unrun probes as well
-		if err = markedVerdictInEnd(err, resultDetails, probe, "PreChaos"); err != nil {
+		if err = markedVerdictInEnd(err, resultDetails, probe, "PreChaos", probeFailed); err != nil {
 			return err
 		}
 
@@ -117,21 +120,24 @@ func postChaosPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Res
 		}
 
 		// triggering the prom probe and storing the output into the out buffer
-		err = triggerPromProbe(probe, resultDetails)
+		probeFailed, err := triggerPromProbe(probe, resultDetails)
+		if err != nil && !probeFailed {
+			return err
+		}
 
 		// failing the probe, if the success condition doesn't met after the retry & timeout combinations
 		// it will update the status of all the unrun probes as well
-		if err = markedVerdictInEnd(err, resultDetails, probe, "PostChaos"); err != nil {
+		if err = markedVerdictInEnd(err, resultDetails, probe, "PostChaos", probeFailed); err != nil {
 			return err
 		}
 
 	case "continuous", "onchaos":
 
 		// it will check for the error, It will detect the error if any error encountered in probe during chaos
-		err = checkForErrorInContinuousProbe(resultDetails, probe.Name)
+		probeFailed, err := checkForErrorInContinuousProbe(resultDetails, probe.Name)
 
 		// failing the probe, if the success condition doesn't met after the retry & timeout combinations
-		if err = markedVerdictInEnd(err, resultDetails, probe, "PostChaos"); err != nil {
+		if err = markedVerdictInEnd(err, resultDetails, probe, "PostChaos", probeFailed); err != nil {
 			return err
 		}
 
@@ -163,8 +169,9 @@ func onChaosPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 }
 
 // triggerPromProbe trigger the prometheus probe inside the external pod
-func triggerPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails) error {
+func triggerPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails) (bool, error) {
 	var description string
+	var probeFailed bool
 	// running the prom probe command and matching the output
 	// it will retry for some retry count, in each iteration of try it contains following things
 	// it contains a timeout per iteration of retry. if the timeout expires without success then it will go to next try
@@ -173,6 +180,7 @@ func triggerPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 		Timeout(int64(probe.RunProperties.ProbeTimeout)).
 		Wait(time.Duration(probe.RunProperties.Interval) * time.Millisecond).
 		TryWithTimeout(func(attempt uint) error {
+			probeFailed = false
 			var command string
 			// It will use query or queryPath to get the prometheus metrics
 			// if both are provided, it will use query
@@ -206,17 +214,18 @@ func triggerPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 				SecondValue(probe.PromProbeInputs.Comparator.Value).
 				Criteria(probe.PromProbeInputs.Comparator.Criteria).
 				ProbeName(probe.Name).
-				CompareFloat(cerrors.ErrorTypePromProbe); err != nil {
+				CompareFloat(cerrors.ErrorTypePromProbeFailed); err != nil {
 				log.Errorf("The %v prom probe has been Failed, err: %v", probe.Name, err)
+				probeFailed = true
 				return err
 			}
 			description = fmt.Sprintf("Probe responded with a valid prometheus metrics value. Actual and Expected status values are %s and %s respectively", value, probe.PromProbeInputs.Comparator.Value)
 			return nil
 		}); err != nil {
-		return err
+		return probeFailed, err
 	}
 	setProbeDescription(resultDetails, probe, description)
-	return nil
+	return probeFailed, nil
 }
 
 // triggerContinuousPromProbe trigger the continuous prometheus probe
@@ -233,13 +242,14 @@ func triggerContinuousPromProbe(probe v1alpha1.ProbeAttributes, clients clients.
 	// it marked the error for the probes, if any
 loop:
 	for {
-		err = triggerPromProbe(probe, chaosresult)
+		probeFailed, err := triggerPromProbe(probe, chaosresult)
 		// record the error inside the probeDetails, we are maintaining a dedicated variable for the err, inside probeDetails
 		if err != nil {
 			err = addProbePhase(err, string(chaosDetails.Phase))
 			for index := range chaosresult.ProbeDetails {
 				if chaosresult.ProbeDetails[index].Name == probe.Name {
 					chaosresult.ProbeDetails[index].IsProbeFailedWithError = err
+					chaosresult.ProbeDetails[index].Failed = probeFailed
 					chaosresult.ProbeDetails[index].Status.Description = getDescription(err)
 					log.Errorf("The %v prom probe has been Failed, err: %v", probe.Name, err)
 					isExperimentFailed = true
@@ -285,11 +295,12 @@ loop:
 			break loop
 		default:
 			// record the error inside the probeDetails, we are maintaining a dedicated variable for the err, inside probeDetails
-			if err = triggerPromProbe(probe, chaosresult); err != nil {
+			if isFailed, err := triggerPromProbe(probe, chaosresult); err != nil {
 				err = addProbePhase(err, string(chaosDetails.Phase))
 				for index := range chaosresult.ProbeDetails {
 					if chaosresult.ProbeDetails[index].Name == probe.Name {
 						chaosresult.ProbeDetails[index].IsProbeFailedWithError = err
+						chaosresult.ProbeDetails[index].Failed = isFailed
 						chaosresult.ProbeDetails[index].Status.Description = getDescription(err)
 						log.Errorf("The %v prom probe has been Failed, err: %v", probe.Name, err)
 						isExperimentFailed = true

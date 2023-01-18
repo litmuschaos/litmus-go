@@ -2,14 +2,15 @@ package lib
 
 import (
 	"fmt"
-	"github.com/litmuschaos/litmus-go/pkg/cerrors"
-	"github.com/palantir/stacktrace"
 	"os"
 	"os/signal"
 	"strconv"
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
+	"github.com/palantir/stacktrace"
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
@@ -65,7 +66,7 @@ func stressMemory(MemoryConsumption, containerName, podName, namespace string, c
 	command := []string{"/bin/sh", "-c", ddCmd}
 
 	litmusexec.SetExecCommandAttributes(&execCommandDetails, podName, containerName, namespace)
-	_, err := litmusexec.Exec(&execCommandDetails, clients, command)
+	_, _, err := litmusexec.Exec(&execCommandDetails, clients, command)
 
 	stressErr <- err
 }
@@ -298,7 +299,7 @@ func killStressMemorySerial(containerName, podName, namespace, memFreeCmd string
 	command := []string{"/bin/sh", "-c", memFreeCmd}
 
 	litmusexec.SetExecCommandAttributes(&execCommandDetails, podName, containerName, namespace)
-	out, err := litmusexec.Exec(&execCommandDetails, clients, command)
+	out, _, err := litmusexec.Exec(&execCommandDetails, clients, command)
 	if err != nil {
 		return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosRevert, Target: fmt.Sprintf("{podName: %s, namespace: %s}", podName, namespace), Reason: fmt.Sprintf("failed to revert chaos: %s", out)}
 	}

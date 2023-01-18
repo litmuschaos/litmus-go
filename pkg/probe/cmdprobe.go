@@ -52,14 +52,15 @@ func prepareCmdProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets,
 }
 
 // triggerInlineCmdProbe trigger the cmd probe and storing the output into the out buffer
-func triggerInlineCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails) error {
+func triggerInlineCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails) (bool, error) {
 	var description string
+	var probeFailed bool
 
 	// It parses the templated command and return normal string
 	// if command doesn't have template, it will return the same command
 	probe.CmdProbeInputs.Command, err = parseCommand(probe.CmdProbeInputs.Command, resultDetails)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	// running the cmd probe command and storing the output into the out buffer
@@ -70,19 +71,23 @@ func triggerInlineCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.
 		Timeout(int64(probe.RunProperties.ProbeTimeout)).
 		Wait(time.Duration(probe.RunProperties.Interval) * time.Millisecond).
 		TryWithTimeout(func(attempt uint) error {
-			var out, errOut bytes.Buffer
+			probeFailed = false
+			var out, stdErr bytes.Buffer
 			// run the inline command probe
 			cmd := exec.Command("/bin/sh", "-c", probe.CmdProbeInputs.Command)
 			cmd.Stdout = &out
-			cmd.Stderr = &errOut
+			cmd.Stderr = &stdErr
 			if err := cmd.Run(); err != nil {
-				return cerrors.Error{ErrorCode: cerrors.ErrorTypeCmdProbe, Target: fmt.Sprintf("{name: %v}", probe.Name), Reason: fmt.Sprintf("unable to run command: %s", errOut.String())}
+				return cerrors.Error{ErrorCode: cerrors.ErrorTypeCmdProbe, Target: fmt.Sprintf("{name: %v}", probe.Name), Reason: fmt.Sprintf("unable to run command: %s", out.String())}
 			}
 
 			rc := getAndIncrementRunCount(resultDetails, probe.Name)
 			description, err = validateResult(probe.CmdProbeInputs.Comparator, probe.Name, strings.TrimSpace(out.String()), rc)
 			if err != nil {
-				log.Errorf("the %v cmd probe has been Failed, err: %v", probe.Name, err)
+				probeFailed = true
+				if stdErr.String() != "" {
+					return stacktrace.Propagate(err, "stdErr: %s", stdErr.String())
+				}
 				return err
 			}
 
@@ -91,22 +96,23 @@ func triggerInlineCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.
 			resultDetails.ProbeArtifacts[probe.Name] = probes
 			return nil
 		}); err != nil {
-		return err
+		return probeFailed, err
 	}
 
 	setProbeDescription(resultDetails, probe, description)
-	return nil
+	return probeFailed, nil
 }
 
 // triggerSourceCmdProbe trigger the cmd probe inside the external pod
-func triggerSourceCmdProbe(probe v1alpha1.ProbeAttributes, execCommandDetails litmusexec.PodDetails, clients clients.ClientSets, resultDetails *types.ResultDetails) error {
+func triggerSourceCmdProbe(probe v1alpha1.ProbeAttributes, execCommandDetails litmusexec.PodDetails, clients clients.ClientSets, resultDetails *types.ResultDetails) (bool, error) {
 	var description string
+	var probeFailed bool
 
-	// It parse the templated command and return normal string
+	// It parses the templated command and return normal string
 	// if command doesn't have template, it will return the same command
 	probe.CmdProbeInputs.Command, err = parseCommand(probe.CmdProbeInputs.Command, resultDetails)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	// running the cmd probe command and matching the output
@@ -117,16 +123,20 @@ func triggerSourceCmdProbe(probe v1alpha1.ProbeAttributes, execCommandDetails li
 		Timeout(int64(probe.RunProperties.ProbeTimeout)).
 		Wait(time.Duration(probe.RunProperties.Interval) * time.Millisecond).
 		TryWithTimeout(func(attempt uint) error {
+			probeFailed = false
 			command := append([]string{"/bin/sh", "-c"}, probe.CmdProbeInputs.Command)
 			// exec inside the external pod to get the o/p of given command
-			output, err := litmusexec.Exec(&execCommandDetails, clients, command)
+			output, stdErr, err := litmusexec.Exec(&execCommandDetails, clients, command)
 			if err != nil {
 				return stacktrace.Propagate(err, "unable to get output of cmd command")
 			}
 
 			rc := getAndIncrementRunCount(resultDetails, probe.Name)
 			if description, err = validateResult(probe.CmdProbeInputs.Comparator, probe.Name, strings.TrimSpace(output), rc); err != nil {
-				log.Errorf("The %v cmd probe has been Failed, err: %v", probe.Name, err)
+				probeFailed = true
+				if stdErr != "" {
+					return stacktrace.Propagate(err, "stdErr: %s", stdErr)
+				}
 				return err
 			}
 
@@ -135,11 +145,11 @@ func triggerSourceCmdProbe(probe v1alpha1.ProbeAttributes, execCommandDetails li
 			resultDetails.ProbeArtifacts[probe.Name] = probes
 			return nil
 		}); err != nil {
-		return err
+		return probeFailed, err
 	}
 
 	setProbeDescription(resultDetails, probe, description)
-	return nil
+	return probeFailed, nil
 }
 
 // createProbePod creates an external pod with source image for the cmd probe
@@ -318,13 +328,14 @@ func triggerInlineContinuousCmdProbe(probe v1alpha1.ProbeAttributes, clients cli
 	// it marked the error for the probes, if any
 loop:
 	for {
-		err := triggerInlineCmdProbe(probe, chaosresult)
+		isFailed, err := triggerInlineCmdProbe(probe, chaosresult)
 		// record the error inside the probeDetails, we are maintaining a dedicated variable for the err, inside probeDetails
 		if err != nil {
 			err = addProbePhase(err, string(chaosDetails.Phase))
 			for index := range chaosresult.ProbeDetails {
 				if chaosresult.ProbeDetails[index].Name == probe.Name {
 					chaosresult.ProbeDetails[index].IsProbeFailedWithError = err
+					chaosresult.ProbeDetails[index].Failed = isFailed
 					chaosresult.ProbeDetails[index].Status.Description = getDescription(err)
 					log.Errorf("The %v cmd probe has been Failed, err: %v", probe.Name, err)
 					isExperimentFailed = true
@@ -371,11 +382,12 @@ loop:
 			break loop
 		default:
 			// record the error inside the probeDetails, we are maintaining a dedicated variable for the err, inside probeDetails
-			if err = triggerInlineCmdProbe(probe, chaosresult); err != nil {
+			if isFailed, err := triggerInlineCmdProbe(probe, chaosresult); err != nil {
 				err = addProbePhase(err, string(chaosDetails.Phase))
 				for index := range chaosresult.ProbeDetails {
 					if chaosresult.ProbeDetails[index].Name == probe.Name {
 						chaosresult.ProbeDetails[index].IsProbeFailedWithError = err
+						chaosresult.ProbeDetails[index].Failed = isFailed
 						chaosresult.ProbeDetails[index].Status.Description = getDescription(err)
 						log.Errorf("The %v cmd probe has been Failed, err: %v", probe.Name, err)
 						isExperimentFailed = true
@@ -422,11 +434,12 @@ loop:
 			break loop
 		default:
 			// record the error inside the probeDetails, we are maintaining a dedicated variable for the err, inside probeDetails
-			if err = triggerSourceCmdProbe(probe, execCommandDetails, clients, chaosresult); err != nil {
+			if isFailed, err := triggerSourceCmdProbe(probe, execCommandDetails, clients, chaosresult); err != nil {
 				err = addProbePhase(err, string(chaosDetails.Phase))
 				for index := range chaosresult.ProbeDetails {
 					if chaosresult.ProbeDetails[index].Name == probe.Name {
 						chaosresult.ProbeDetails[index].IsProbeFailedWithError = err
+						chaosresult.ProbeDetails[index].Failed = isFailed
 						chaosresult.ProbeDetails[index].Status.Description = getDescription(err)
 						log.Errorf("The %v cmd probe has been Failed, err: %v", probe.Name, err)
 						isExperimentFailed = true
@@ -463,13 +476,14 @@ func triggerSourceContinuousCmdProbe(probe v1alpha1.ProbeAttributes, execCommand
 	// it marked the error for the probes, if any
 loop:
 	for {
-		err = triggerSourceCmdProbe(probe, execCommandDetails, clients, chaosresult)
+		isFailed, err := triggerSourceCmdProbe(probe, execCommandDetails, clients, chaosresult)
 		// record the error inside the probeDetails, we are maintaining a dedicated variable for the err, inside probeDetails
 		if err != nil {
 			err = addProbePhase(err, string(chaosDetails.Phase))
 			for index := range chaosresult.ProbeDetails {
 				if chaosresult.ProbeDetails[index].Name == probe.Name {
 					chaosresult.ProbeDetails[index].IsProbeFailedWithError = err
+					chaosresult.ProbeDetails[index].Failed = isFailed
 					chaosresult.ProbeDetails[index].Status.Description = getDescription(err)
 					log.Errorf("The %v cmd probe has been Failed, err: %v", probe.Name, err)
 					isExperimentFailed = true
@@ -502,15 +516,15 @@ func validateResult(comparator v1alpha1.ComparatorInfo, probeName, cmdOutput str
 
 	switch strings.ToLower(comparator.Type) {
 	case "int":
-		if err = compare.CompareInt(cerrors.ErrorTypeCmdProbe); err != nil {
+		if err = compare.CompareInt(cerrors.ErrorTypeCmdProbeFailed); err != nil {
 			return "", err
 		}
 	case "float":
-		if err = compare.CompareFloat(cerrors.ErrorTypeCmdProbe); err != nil {
+		if err = compare.CompareFloat(cerrors.ErrorTypeCmdProbeFailed); err != nil {
 			return "", err
 		}
 	case "string":
-		if err = compare.CompareString(cerrors.ErrorTypeCmdProbe); err != nil {
+		if err = compare.CompareString(cerrors.ErrorTypeCmdProbeFailed); err != nil {
 			return "", err
 		}
 	default:
@@ -545,11 +559,14 @@ func preChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 
 		// triggering the cmd probe for the inline mode
 		if reflect.DeepEqual(probe.CmdProbeInputs.Source, v1alpha1.SourceDetails{}) {
-			err = triggerInlineCmdProbe(probe, resultDetails)
+			isFailed, err := triggerInlineCmdProbe(probe, resultDetails)
+			if err != nil && !isFailed {
+				return err
+			}
 
 			// failing the probe, if the success condition doesn't met after the retry & timeout combinations
 			// it will update the status of all the unrun probes as well
-			if err := markedVerdictInEnd(err, resultDetails, probe, "PreChaos"); err != nil {
+			if err := markedVerdictInEnd(err, resultDetails, probe, "PreChaos", isFailed); err != nil {
 				return err
 			}
 		} else {
@@ -560,11 +577,14 @@ func preChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 			}
 
 			// triggering the cmd probe and storing the output into the out buffer
-			err = triggerSourceCmdProbe(probe, execCommandDetails, clients, resultDetails)
+			isFailed, err := triggerSourceCmdProbe(probe, execCommandDetails, clients, resultDetails)
+			if err != nil && !isFailed {
+				return err
+			}
 
 			// failing the probe, if the success condition doesn't met after the retry & timeout combinations
 			// it will update the status of all the unrun probes as well
-			if err = markedVerdictInEnd(err, resultDetails, probe, "PreChaos"); err != nil {
+			if err = markedVerdictInEnd(err, resultDetails, probe, "PreChaos", isFailed); err != nil {
 				return err
 			}
 
@@ -631,11 +651,14 @@ func postChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resu
 
 		// triggering the cmd probe for the inline mode
 		if reflect.DeepEqual(probe.CmdProbeInputs.Source, v1alpha1.SourceDetails{}) {
-			err = triggerInlineCmdProbe(probe, resultDetails)
+			isFailed, err := triggerInlineCmdProbe(probe, resultDetails)
+			if err != nil && !isFailed {
+				return err
+			}
 
 			// failing the probe, if the success condition doesn't met after the retry & timeout combinations
 			// it will update the status of all the unrun probes as well
-			if err = markedVerdictInEnd(err, resultDetails, probe, "PostChaos"); err != nil {
+			if err = markedVerdictInEnd(err, resultDetails, probe, "PostChaos", isFailed); err != nil {
 				return err
 			}
 		} else {
@@ -646,11 +669,14 @@ func postChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resu
 			}
 
 			// triggering the cmd probe and storing the output into the out buffer
-			err = triggerSourceCmdProbe(probe, execCommandDetails, clients, resultDetails)
+			isFailed, err := triggerSourceCmdProbe(probe, execCommandDetails, clients, resultDetails)
+			if err != nil && !isFailed {
+				return err
+			}
 
 			// failing the probe, if the success condition doesn't met after the retry & timeout combinations
 			// it will update the status of all the unrun probes as well
-			if err = markedVerdictInEnd(err, resultDetails, probe, "PostChaos"); err != nil {
+			if err = markedVerdictInEnd(err, resultDetails, probe, "PostChaos", isFailed); err != nil {
 				return err
 			}
 
@@ -665,17 +691,17 @@ func postChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resu
 	case "Continuous", "OnChaos":
 		if reflect.DeepEqual(probe.CmdProbeInputs.Source, v1alpha1.SourceDetails{}) {
 			// it will check for the error, It will detect the error if any error encountered in probe during chaos
-			err = checkForErrorInContinuousProbe(resultDetails, probe.Name)
+			isFailed, err := checkForErrorInContinuousProbe(resultDetails, probe.Name)
 			// failing the probe, if the success condition doesn't met after the retry & timeout combinations
-			if err = markedVerdictInEnd(err, resultDetails, probe, "PostChaos"); err != nil {
+			if err = markedVerdictInEnd(err, resultDetails, probe, "PostChaos", isFailed); err != nil {
 				return err
 			}
 		} else {
 			// it will check for the error, It will detect the error if any error encountered in probe during chaos
-			err = checkForErrorInContinuousProbe(resultDetails, probe.Name)
+			isFailed, err := checkForErrorInContinuousProbe(resultDetails, probe.Name)
 
 			// failing the probe, if the success condition doesn't met after the retry & timeout combinations
-			if err = markedVerdictInEnd(err, resultDetails, probe, "PostChaos"); err != nil {
+			if err = markedVerdictInEnd(err, resultDetails, probe, "PostChaos", isFailed); err != nil {
 				return err
 			}
 			// get runId

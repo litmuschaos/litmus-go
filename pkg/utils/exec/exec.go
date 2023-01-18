@@ -23,14 +23,14 @@ type PodDetails struct {
 }
 
 // Exec function will run the provide commands inside the target container
-func Exec(commandDetails *PodDetails, clients clients.ClientSets, command []string) (string, error) {
+func Exec(commandDetails *PodDetails, clients clients.ClientSets, command []string) (string, string, error) {
 
 	pod, err := clients.KubeClient.CoreV1().Pods(commandDetails.Namespace).Get(context.Background(), commandDetails.PodName, v1.GetOptions{})
 	if err != nil {
-		return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("unable to get %v pod in %v namespace, err: %v", commandDetails.PodName, commandDetails.Namespace, err)}
+		return "", "", cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("unable to get %v pod in %v namespace, err: %v", commandDetails.PodName, commandDetails.Namespace, err)}
 	}
 	if err := checkPodStatus(pod, commandDetails.ContainerName); err != nil {
-		return "", err
+		return "", "", err
 	}
 
 	req := clients.KubeClient.CoreV1().RESTClient().Post().
@@ -40,7 +40,7 @@ func Exec(commandDetails *PodDetails, clients clients.ClientSets, command []stri
 		SubResource("exec")
 	scheme := runtime.NewScheme()
 	if err := apiv1.AddToScheme(scheme); err != nil {
-		return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("error adding to scheme: %v", err)}
+		return "", "", cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("error adding to scheme: %v", err)}
 	}
 
 	// NewParameterCodec creates a ParameterCodec capable of transforming url values into versioned objects and back.
@@ -59,7 +59,7 @@ func Exec(commandDetails *PodDetails, clients clients.ClientSets, command []stri
 	// multiplexed bidirectional streams.
 	exec, err := remotecommand.NewSPDYExecutor(clients.KubeConfig, "POST", req.URL())
 	if err != nil {
-		return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("error while creating Executor: %v", err)}
+		return "", "", cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("error while creating Executor: %v", err)}
 	}
 
 	// storing the output inside the output buffer for future use
@@ -72,10 +72,10 @@ func Exec(commandDetails *PodDetails, clients clients.ClientSets, command []stri
 		Stderr: &stderr,
 		Tty:    false,
 	}); err != nil {
-		return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("failed to create a stderr and stdout stream, %s", err.Error())}
+		return "", "", cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("failed to create a stderr and stdout stream, %s", err.Error())}
 	}
 
-	return stdout.String(), nil
+	return stdout.String(), stderr.String(), nil
 }
 
 // SetExecCommandAttributes initialise all the pod details  to run exec command

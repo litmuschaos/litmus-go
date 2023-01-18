@@ -184,12 +184,7 @@ func Experiment(clients clients.ClientSets, expName string) {
 
 	// generating the event in chaosResult to mark the verdict as pass/fail
 	msg = "experiment: " + experimentsDetails.ExperimentName + ", Result: " + string(resultDetails.Verdict)
-	reason := types.PassVerdict
-	eventType := "Normal"
-	if resultDetails.Verdict != "Pass" {
-		reason = types.FailVerdict
-		eventType = "Warning"
-	}
+	reason, eventType := types.GetChaosResultVerdictEvent(resultDetails.Verdict)
 	types.SetResultEventAttributes(&eventsDetails, reason, msg, eventType, &resultDetails)
 	_ = events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosResult")
 

@@ -24,6 +24,10 @@ const (
 	ErrorTypeCmdProbe          ErrorType = "CMD_PROBE_ERROR"
 	ErrorTypeHttpProbe         ErrorType = "HTTP_PROBE_ERROR"
 	ErrorTypePromProbe         ErrorType = "PROM_PROBE_ERROR"
+	ErrorTypeK8sProbeFailed    ErrorType = "K8S_PROBE_FAILED"
+	ErrorTypeCmdProbeFailed    ErrorType = "CMD_PROBE_FAILED"
+	ErrorTypeHttpProbeFailed   ErrorType = "HTTP_PROBE_FAILED"
+	ErrorTypePromProbeFailed   ErrorType = "PROM_PROBE_FAILED"
 )
 
 type userFriendly interface {

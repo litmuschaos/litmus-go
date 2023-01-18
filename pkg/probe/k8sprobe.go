@@ -43,25 +43,25 @@ func prepareK8sProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Result
 }
 
 // triggerK8sProbe run the k8s probe command
-func triggerK8sProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets, resultDetails *types.ResultDetails) error {
+func triggerK8sProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets, resultDetails *types.ResultDetails) (bool, error) {
 
 	inputs := &probe.K8sProbeInputs
 
-	// It parse the templated command and return normal string
+	// It parses the templated command and return normal string
 	// if command doesn't have template, it will return the same command
 	inputs.FieldSelector, err = parseCommand(inputs.FieldSelector, resultDetails)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	inputs.LabelSelector, err = parseCommand(inputs.LabelSelector, resultDetails)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	inputs.ResourceNames, err = parseCommand(inputs.ResourceNames, resultDetails)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	parsedResourceNames := []string{}
@@ -115,11 +115,11 @@ func triggerK8sProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets,
 			description = fmt.Sprintf("Probe is successfully performed the '%s' operation on kubernetes resource", probe.K8sProbeInputs.Operation)
 			return nil
 		}); err != nil {
-		return err
+		return true, err
 	}
 
 	setProbeDescription(resultDetails, probe, description)
-	return nil
+	return false, nil
 }
 
 // triggerContinuousK8sProbe trigger the continuous k8s probes
@@ -135,13 +135,14 @@ func triggerContinuousK8sProbe(probe v1alpha1.ProbeAttributes, clients clients.C
 	// marked the error for the probes, if any
 loop:
 	for {
-		err = triggerK8sProbe(probe, clients, chaosresult)
+		isFailed, err := triggerK8sProbe(probe, clients, chaosresult)
 		// record the error inside the probeDetails, we are maintaining a dedicated variable for the err, inside probeDetails
 		if err != nil {
 			err = addProbePhase(err, string(chaosDetails.Phase))
 			for index := range chaosresult.ProbeDetails {
 				if chaosresult.ProbeDetails[index].Name == probe.Name {
 					chaosresult.ProbeDetails[index].IsProbeFailedWithError = err
+					chaosresult.ProbeDetails[index].Failed = isFailed
 					chaosresult.ProbeDetails[index].Status.Description = getDescription(err)
 					log.Errorf("the %v k8s probe has been Failed, err: %v", probe.Name, err)
 					isExperimentFailed = true
@@ -226,7 +227,7 @@ func resourcesPresent(probe v1alpha1.ProbeAttributes, gvr schema.GroupVersionRes
 			log.Errorf("the %v k8s probe has Failed, err: %v", probe.Name, err)
 			return cerrors.Error{ErrorCode: cerrors.ErrorTypeK8sProbe, Target: fmt.Sprintf("{name: %v}", probe.Name), Reason: fmt.Sprintf("unable to list the resources with matching selector, err: %v", err)}
 		} else if len(resourceList.Items) == 0 {
-			return cerrors.Error{ErrorCode: cerrors.ErrorTypeK8sProbe, Target: fmt.Sprintf("{name: %v}", probe.Name), Reason: fmt.Sprintf("no resource found with provided {labelSelectors: %s, fieldSelectors: %s} selectors", probe.K8sProbeInputs.LabelSelector, probe.K8sProbeInputs.FieldSelector)}
+			return cerrors.Error{ErrorCode: cerrors.ErrorTypeK8sProbeFailed, Target: fmt.Sprintf("{name: %v}", probe.Name), Reason: fmt.Sprintf("no resource found with provided {labelSelectors: %s, fieldSelectors: %s} selectors", probe.K8sProbeInputs.LabelSelector, probe.K8sProbeInputs.FieldSelector)}
 		}
 	}
 	return nil
@@ -238,7 +239,7 @@ func areResourcesWithNamePresent(probe v1alpha1.ProbeAttributes, gvr schema.Grou
 		if err != nil {
 			return cerrors.Error{ErrorCode: cerrors.ErrorTypeK8sProbe, Target: fmt.Sprintf("{name: %v}", probe.Name), Reason: fmt.Sprintf("unable to get the resources with name %v, err: %v", res, err)}
 		} else if resource == nil {
-			return cerrors.Error{ErrorCode: cerrors.ErrorTypeK8sProbe, Target: fmt.Sprintf("{name: %v}", probe.Name), Reason: fmt.Sprintf("unable to get the resources with name %v", res)}
+			return cerrors.Error{ErrorCode: cerrors.ErrorTypeK8sProbeFailed, Target: fmt.Sprintf("{name: %v}", probe.Name), Reason: fmt.Sprintf("unable to get the resources with name %v", res)}
 		}
 	}
 	return nil
@@ -256,7 +257,7 @@ func resourcesAbsent(probe v1alpha1.ProbeAttributes, gvr schema.GroupVersionReso
 					return cerrors.Error{ErrorCode: cerrors.ErrorTypeK8sProbe, Target: fmt.Sprintf("{name: %v}", probe.Name), Reason: fmt.Sprintf("unable to get the resources with name %v from k8s, err: %v", res, err)}
 				}
 			} else if resource != nil {
-				return cerrors.Error{ErrorCode: cerrors.ErrorTypeK8sProbe, Target: fmt.Sprintf("{name: %v}", probe.Name), Reason: fmt.Sprintf("resource '%v' exists but it is expected to be absent", res)}
+				return cerrors.Error{ErrorCode: cerrors.ErrorTypeK8sProbeFailed, Target: fmt.Sprintf("{name: %v}", probe.Name), Reason: fmt.Sprintf("resource '%v' exists but it is expected to be absent", res)}
 			}
 		}
 	} else {
@@ -268,7 +269,7 @@ func resourcesAbsent(probe v1alpha1.ProbeAttributes, gvr schema.GroupVersionReso
 			return cerrors.Error{ErrorCode: cerrors.ErrorTypeK8sProbe, Target: fmt.Sprintf("{name: %v}", probe.Name), Reason: fmt.Sprintf("unable to list the resources with matching selector, err: %v", err)}
 		}
 		if len(resourceList.Items) != 0 {
-			return cerrors.Error{ErrorCode: cerrors.ErrorTypeK8sProbe, Target: fmt.Sprintf("{name: %v}", probe.Name), Reason: fmt.Sprintf("resource with {labelSelectors: %s, fieldSelectors: %s} should not exists, found %v resources with matching selectors", probe.K8sProbeInputs.LabelSelector, probe.K8sProbeInputs.FieldSelector, len(resourceList.Items))}
+			return cerrors.Error{ErrorCode: cerrors.ErrorTypeK8sProbeFailed, Target: fmt.Sprintf("{name: %v}", probe.Name), Reason: fmt.Sprintf("resource with {labelSelectors: %s, fieldSelectors: %s} should not exists, found %v resources with matching selectors", probe.K8sProbeInputs.LabelSelector, probe.K8sProbeInputs.FieldSelector, len(resourceList.Items))}
 		}
 	}
 	return nil
@@ -294,11 +295,14 @@ func preChaosK8sProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 			time.Sleep(time.Duration(probe.RunProperties.InitialDelaySeconds) * time.Second)
 		}
 		// triggering the k8s probe
-		err = triggerK8sProbe(probe, clients, resultDetails)
+		isFailed, err := triggerK8sProbe(probe, clients, resultDetails)
+		if err != nil && !isFailed {
+			return err
+		}
 
 		// failing the probe, if the success condition doesn't met after the retry & timeout combinations
 		// it will update the status of all the unrun probes as well
-		if err = markedVerdictInEnd(err, resultDetails, probe, "PreChaos"); err != nil {
+		if err = markedVerdictInEnd(err, resultDetails, probe, "PreChaos", isFailed); err != nil {
 			return err
 		}
 	case "continuous":
@@ -336,18 +340,21 @@ func postChaosK8sProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resu
 			time.Sleep(time.Duration(probe.RunProperties.InitialDelaySeconds) * time.Second)
 		}
 		// triggering the k8s probe
-		err = triggerK8sProbe(probe, clients, resultDetails)
+		isFailed, err := triggerK8sProbe(probe, clients, resultDetails)
+		if err != nil && !isFailed {
+			return err
+		}
 
 		// failing the probe, if the success condition doesn't met after the retry & timeout combinations
 		// it will update the status of all the unrun probes as well
-		if err = markedVerdictInEnd(err, resultDetails, probe, "PostChaos"); err != nil {
+		if err = markedVerdictInEnd(err, resultDetails, probe, "PostChaos", isFailed); err != nil {
 			return err
 		}
 	case "continuous", "onchaos":
 		// it will check for the error, It will detect the error if any error encountered in probe during chaos
-		err = checkForErrorInContinuousProbe(resultDetails, probe.Name)
+		isFailed, err := checkForErrorInContinuousProbe(resultDetails, probe.Name)
 		// failing the probe, if the success condition doesn't met after the retry & timeout combinations
-		if err = markedVerdictInEnd(err, resultDetails, probe, "PostChaos"); err != nil {
+		if err = markedVerdictInEnd(err, resultDetails, probe, "PostChaos", isFailed); err != nil {
 			return err
 		}
 	}
@@ -396,13 +403,14 @@ loop:
 			log.Infof("[Chaos]: Time is up for the %v probe", probe.Name)
 			break loop
 		default:
-			err = triggerK8sProbe(probe, clients, chaosresult)
+			isFailed, err := triggerK8sProbe(probe, clients, chaosresult)
 			// record the error inside the probeDetails, we are maintaining a dedicated variable for the err, inside probeDetails
 			if err != nil {
 				err = addProbePhase(err, string(chaosDetails.Phase))
 				for index := range chaosresult.ProbeDetails {
 					if chaosresult.ProbeDetails[index].Name == probe.Name {
 						chaosresult.ProbeDetails[index].IsProbeFailedWithError = err
+						chaosresult.ProbeDetails[index].Failed = isFailed
 						chaosresult.ProbeDetails[index].Status.Description = getDescription(err)
 						log.Errorf("The %v k8s probe has been Failed, err: %v", probe.Name, err)
 						isExperimentFailed = true

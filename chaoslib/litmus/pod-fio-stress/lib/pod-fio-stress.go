@@ -2,14 +2,15 @@ package lib
 
 import (
 	"fmt"
-	"github.com/litmuschaos/litmus-go/pkg/cerrors"
-	"github.com/litmuschaos/litmus-go/pkg/result"
-	"github.com/palantir/stacktrace"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
+	"github.com/litmuschaos/litmus-go/pkg/result"
+	"github.com/palantir/stacktrace"
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
@@ -60,7 +61,7 @@ func stressStorage(experimentDetails *experimentTypes.ExperimentDetails, podName
 	command := []string{"/bin/sh", "-c", fioCmd}
 
 	litmusexec.SetExecCommandAttributes(&execCommandDetails, podName, experimentDetails.TargetContainer, ns)
-	_, err := litmusexec.Exec(&execCommandDetails, clients, command)
+	_, _, err := litmusexec.Exec(&execCommandDetails, clients, command)
 
 	stressErr <- err
 }
@@ -272,7 +273,7 @@ func killStressSerial(containerName, podName, namespace, KillCmd string, clients
 	command := []string{"/bin/sh", "-c", KillCmd}
 
 	litmusexec.SetExecCommandAttributes(&execCommandDetails, podName, containerName, namespace)
-	out, err := litmusexec.Exec(&execCommandDetails, clients, command)
+	out, _, err := litmusexec.Exec(&execCommandDetails, clients, command)
 	if err != nil {
 		return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosRevert, Target: fmt.Sprintf("{podName: %s, namespace: %s}", podName, namespace), Reason: fmt.Sprintf("failed to revert chaos: %s", out)}
 	}
