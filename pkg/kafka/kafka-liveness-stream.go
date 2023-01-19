@@ -11,8 +11,8 @@ import (
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/kafka/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/status"
-	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	litmusexec "github.com/litmuschaos/litmus-go/pkg/utils/exec"
+	"github.com/litmuschaos/litmus-go/pkg/utils/stringutils"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -25,7 +25,7 @@ func LivenessStream(experimentsDetails *experimentTypes.ExperimentDetails, clien
 
 	// Generate a random string as suffix to topic name
 	log.Info("[Liveness]: Set the kafka topic name")
-	experimentsDetails.RunID = common.GetRunID()
+	experimentsDetails.RunID = stringutils.GetRunID()
 	KafkaTopicName := "topic-" + experimentsDetails.RunID
 
 	log.Info("[Liveness]: Creating the kafka liveness pod")

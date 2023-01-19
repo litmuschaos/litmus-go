@@ -3,9 +3,10 @@ package lib
 import (
 	"context"
 	"fmt"
+	"strconv"
+
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	"github.com/palantir/stacktrace"
-	"strconv"
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
@@ -15,6 +16,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
+	"github.com/litmuschaos/litmus-go/pkg/utils/stringutils"
 	"github.com/sirupsen/logrus"
 	apiv1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,7 +38,7 @@ func PrepareKubeletKill(experimentsDetails *experimentTypes.ExperimentDetails, c
 		"NodeName": experimentsDetails.TargetNode,
 	})
 
-	experimentsDetails.RunID = common.GetRunID()
+	experimentsDetails.RunID = stringutils.GetRunID()
 
 	//Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {

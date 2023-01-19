@@ -55,17 +55,6 @@ func RandomInterval(interval string) error {
 	return nil
 }
 
-// GetRunID generate a random string
-func GetRunID() string {
-	var letterRunes = []rune("abcdefghijklmnopqrstuvwxyz")
-	runID := make([]rune, 6)
-	rand.Seed(time.Now().UnixNano())
-	for i := range runID {
-		runID[i] = letterRunes[rand.Intn(len(letterRunes))]
-	}
-	return string(runID)
-}
-
 // AbortWatcher continuously watch for the abort signals
 // it will update chaosresult w/ failed step and create an abort event, if it received abort signal during chaos
 func AbortWatcher(expname string, clients clients.ClientSets, resultDetails *types.ResultDetails, chaosDetails *types.ChaosDetails, eventsDetails *types.EventDetails) {

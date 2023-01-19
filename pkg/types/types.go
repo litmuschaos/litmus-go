@@ -6,9 +6,9 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
+	"github.com/litmuschaos/litmus-go/pkg/utils/stringutils"
 	"github.com/palantir/stacktrace"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"math/rand"
 	"os"
 	"strconv"
 	"strings"
@@ -317,7 +317,7 @@ func InitializeSidecarDetails(chaosDetails *ChaosDetails, engine *v1alpha1.Chaos
 		sidecar := SideCar{
 			Image:           v.Image,
 			ImagePullPolicy: v.ImagePullPolicy,
-			Name:            chaosDetails.ExperimentName + "-sidecar-" + GetRunID(),
+			Name:            chaosDetails.ExperimentName + "-sidecar-" + stringutils.GetRunID(),
 			Secrets:         v.Secrets,
 			ENV:             append(v.ENV, getDefaultEnvs(chaosDetails.ExperimentName)...),
 			EnvFrom:         v.EnvFrom,
@@ -379,15 +379,4 @@ func InitializeProbesInChaosResultDetails(chaosresult *ResultDetails, probes []v
 
 	chaosresult.ProbeDetails = probeDetails
 	chaosresult.ProbeArtifacts = map[string]ProbeArtifact{}
-}
-
-// GetRunID generate a random string
-func GetRunID() string {
-	var letterRunes = []rune("abcdefghijklmnopqrstuvwxyz")
-	runID := make([]rune, 6)
-	rand.Seed(time.Now().UnixNano())
-	for i := range runID {
-		runID[i] = letterRunes[rand.Intn(len(letterRunes))]
-	}
-	return string(runID)
 }
