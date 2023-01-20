@@ -3,12 +3,13 @@ package lib
 import (
 	"context"
 	"fmt"
-	"github.com/litmuschaos/litmus-go/pkg/cerrors"
-	"github.com/palantir/stacktrace"
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"net"
 	"strconv"
 	"strings"
+
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
+	"github.com/palantir/stacktrace"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/network-chaos/types"
@@ -17,6 +18,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
+	"github.com/litmuschaos/litmus-go/pkg/utils/stringutils"
 	"github.com/sirupsen/logrus"
 	apiv1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -103,7 +105,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 			experimentsDetails.TargetContainer = pod.Spec.Containers[0].Name
 		}
 
-		runID := common.GetRunID()
+		runID := stringutils.GetRunID()
 
 		if err := createHelperPod(experimentsDetails, clients, chaosDetails, fmt.Sprintf("%s:%s:%s:%s", pod.Name, pod.Namespace, experimentsDetails.TargetContainer, serviceMesh), pod.Spec.NodeName, runID, args); err != nil {
 			return stacktrace.Propagate(err, "could not create helper pod")
@@ -153,7 +155,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		return stacktrace.Propagate(err, "could not filter target pods")
 	}
 
-	runID := common.GetRunID()
+	runID := stringutils.GetRunID()
 
 	for node, tar := range targets {
 		var targetsPerNode []string
@@ -459,7 +461,7 @@ func filterPodsForNodes(targetPodList apiv1.PodList, experimentsDetails *experim
 			return targets, stacktrace.Propagate(err, "could not set destination ips")
 		}
 
-		if targetContainer == "" {
+		if experimentsDetails.TargetContainer == "" {
 			targetContainer = pod.Spec.Containers[0].Name
 		}
 

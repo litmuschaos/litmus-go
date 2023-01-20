@@ -16,6 +16,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
+	"github.com/litmuschaos/litmus-go/pkg/utils/stringutils"
 	"github.com/sirupsen/logrus"
 	apiv1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -37,7 +38,7 @@ func PrepareDockerServiceKill(experimentsDetails *experimentTypes.ExperimentDeta
 		"NodeName": experimentsDetails.TargetNode,
 	})
 
-	experimentsDetails.RunID = common.GetRunID()
+	experimentsDetails.RunID = stringutils.GetRunID()
 
 	//Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {

@@ -3,10 +3,11 @@ package lib
 import (
 	"context"
 	"fmt"
-	"github.com/litmuschaos/litmus-go/pkg/cerrors"
-	"github.com/palantir/stacktrace"
 	"strconv"
 	"strings"
+
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
+	"github.com/palantir/stacktrace"
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
@@ -16,6 +17,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
+	"github.com/litmuschaos/litmus-go/pkg/utils/stringutils"
 	"github.com/sirupsen/logrus"
 	apiv1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -104,7 +106,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 			"NumberOfWorkers":                 experimentsDetails.NumberOfWorkers,
 		})
 
-		experimentsDetails.RunID = common.GetRunID()
+		experimentsDetails.RunID = stringutils.GetRunID()
 
 		// Creating the helper pod to perform node io stress
 		if err := createHelperPod(experimentsDetails, chaosDetails, appNode, clients); err != nil {
@@ -148,7 +150,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		}
 	}
 
-	experimentsDetails.RunID = common.GetRunID()
+	experimentsDetails.RunID = stringutils.GetRunID()
 
 	for _, appNode := range targetNodeList {
 

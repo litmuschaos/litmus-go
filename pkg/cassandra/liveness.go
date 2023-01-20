@@ -16,8 +16,8 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/status"
-	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
+	"github.com/litmuschaos/litmus-go/pkg/utils/stringutils"
 	appsv1 "k8s.io/api/apps/v1"
 	apiv1 "k8s.io/api/core/v1"
 
@@ -28,7 +28,7 @@ import (
 func LivenessCheck(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) (string, error) {
 
 	// Generate the run_id for the liveness pod
-	experimentsDetails.RunID = common.GetRunID()
+	experimentsDetails.RunID = stringutils.GetRunID()
 
 	// Creating liveness deployment
 	if err := CreateLivenessPod(experimentsDetails, clients); err != nil {

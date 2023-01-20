@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"math/rand"
+	"github.com/litmuschaos/litmus-go/pkg/utils/stringutils"
 	"os/exec"
 	"reflect"
 	"strings"
@@ -303,17 +303,6 @@ func deleteProbePod(chaosDetails *types.ChaosDetails, clients clients.ClientSets
 			}
 			return nil
 		})
-}
-
-// getRunID generate a random string
-func getRunID() string {
-	var letterRunes = []rune("abcdefghijklmnopqrstuvwxyz")
-	rand.Seed(time.Now().Unix())
-	runID := make([]rune, 6)
-	for i := range runID {
-		runID[i] = letterRunes[rand.Intn(len(letterRunes))]
-	}
-	return string(runID)
 }
 
 // triggerInlineContinuousCmdProbe trigger the inline continuous cmd probes
@@ -737,7 +726,7 @@ func onChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Result
 // it will be created if the mode is not inline
 func createHelperPod(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) (litmusexec.PodDetails, error) {
 	// Generate the run_id
-	runID := getRunID()
+	runID := stringutils.GetRunID()
 	setRunIDForProbe(resultDetails, probe.Name, probe.Type, runID)
 
 	// create the external pod with source image for cmd probe
