@@ -81,11 +81,13 @@ func RunProbes(chaosDetails *types.ChaosDetails, clients clients.ClientSets, res
 
 // setProbeVerdict mark the verdict of the probe in the chaosresult as passed
 // on the basis of phase(pre/post chaos)
-func setProbeVerdict(resultDetails *types.ResultDetails, probe v1alpha1.ProbeAttributes, verdict v1alpha1.ProbeVerdict, description string) {
+func setProbeVerdict(resultDetails *types.ResultDetails, probe v1alpha1.ProbeAttributes, verdict v1alpha1.ProbeVerdict, description, phase string) {
 	for index, probes := range resultDetails.ProbeDetails {
 		if probes.Name == probe.Name && probes.Type == probe.Type {
-			if probes.Mode == "Edge" && probes.Status.Verdict == v1alpha1.ProbeVerdictFailed {
-				return
+			if probes.Mode == "Edge" {
+				if (phase == "PreChaos" && verdict != v1alpha1.ProbeVerdictFailed) || (phase == "PostChaos" && probes.Status.Verdict == v1alpha1.ProbeVerdictFailed) {
+					return
+				}
 			}
 			resultDetails.ProbeDetails[index].Status.Verdict = verdict
 			if description != "" {
@@ -164,10 +166,10 @@ func setRunIDForProbe(resultDetails *types.ResultDetails, probeName, probeType, 
 }
 
 // markedVerdictInEnd add the probe status in the chaosresult
-func markedVerdictInEnd(err error, resultDetails *types.ResultDetails, probe v1alpha1.ProbeAttributes, phase string, probeFailed bool) error {
+func markedVerdictInEnd(err error, resultDetails *types.ResultDetails, probe v1alpha1.ProbeAttributes, phase string) error {
 	probeVerdict := v1alpha1.ProbeVerdictPassed
 	var description string
-	if probeFailed {
+	if err != nil {
 		probeVerdict = v1alpha1.ProbeVerdictFailed
 	}
 
@@ -199,20 +201,24 @@ func markedVerdictInEnd(err error, resultDetails *types.ResultDetails, probe v1a
 		description = getDescription(err)
 	}
 
-	setProbeVerdict(resultDetails, probe, probeVerdict, description)
-	if !probe.RunProperties.StopOnFailure && err != nil {
-		if probeDetails := getProbeByName(probe.Name, resultDetails.ProbeDetails); probeDetails != nil {
-			probeDetails.IsProbeFailedWithError = err
+	setProbeVerdict(resultDetails, probe, probeVerdict, description, phase)
+
+	if err != nil {
+		switch probe.RunProperties.StopOnFailure {
+		case true:
+			// adding signal to communicate that experiment is stopped because of error in probe
+			if probeDetails := getProbeByName(probe.Name, resultDetails.ProbeDetails); probeDetails != nil {
+				probeDetails.Stopped = true
+			}
+			return err
+		default:
+			if probeDetails := getProbeByName(probe.Name, resultDetails.ProbeDetails); probeDetails != nil {
+				probeDetails.IsProbeFailedWithError = err
+			}
+			return nil
 		}
-		return nil
 	}
-	// adding signal to communicate that experiment is stopped because of error in probe
-	if probeFailed {
-		if probeDetails := getProbeByName(probe.Name, resultDetails.ProbeDetails); probeDetails != nil {
-			probeDetails.Stopped = true
-		}
-	}
-	return err
+	return nil
 }
 
 func getProbeByName(name string, probeDetails []*types.ProbeDetails) *types.ProbeDetails {
@@ -233,14 +239,14 @@ func getDescription(err error) string {
 }
 
 // CheckForErrorInContinuousProbe check for the error in the continuous probes
-func checkForErrorInContinuousProbe(resultDetails *types.ResultDetails, probeName string) (bool, error) {
+func checkForErrorInContinuousProbe(resultDetails *types.ResultDetails, probeName string) error {
 
 	for index, probe := range resultDetails.ProbeDetails {
 		if probe.Name == probeName {
-			return resultDetails.ProbeDetails[index].Failed, resultDetails.ProbeDetails[index].IsProbeFailedWithError
+			return resultDetails.ProbeDetails[index].IsProbeFailedWithError
 		}
 	}
-	return false, nil
+	return nil
 }
 
 // ParseCommand parse the templated command and replace the templated value by actual value
@@ -263,9 +269,9 @@ func parseCommand(templatedCommand string, resultDetails *types.ResultDetails) (
 // stopChaosEngine update the probe status and patch the chaosengine to stop state
 func stopChaosEngine(probe v1alpha1.ProbeAttributes, clients clients.ClientSets, chaosresult *types.ResultDetails, chaosDetails *types.ChaosDetails) error {
 	// it will check for the error, It will detect the error if any error encountered in probe during chaos
-	isFailed, err := checkForErrorInContinuousProbe(chaosresult, probe.Name)
+	err = checkForErrorInContinuousProbe(chaosresult, probe.Name)
 	// failing the probe, if the success condition doesn't met after the retry & timeout combinations
-	markedVerdictInEnd(err, chaosresult, probe, "PostChaos", isFailed)
+	markedVerdictInEnd(err, chaosresult, probe, "PostChaos")
 	//patch chaosengine's state to stop
 	engine, err := clients.LitmusClient.ChaosEngines(chaosDetails.ChaosNamespace).Get(context.Background(), chaosDetails.EngineName, v1.GetOptions{})
 	if err != nil {

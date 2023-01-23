@@ -96,7 +96,7 @@ func GetLoadDistribution(experimentsDetails *experimentTypes.ExperimentDetails, 
 
 	command := append([]string{"/bin/sh", "-c"}, "nodetool status  | awk '{print $6}' | tail -n +6 | head -n -1")
 	litmusexec.SetExecCommandAttributes(&execCommandDetails, targetPod, "cassandra", experimentsDetails.ChaoslibDetail.AppNS)
-	response,_, err := litmusexec.Exec(&execCommandDetails, clients, command)
+	response, _, err := litmusexec.Exec(&execCommandDetails, clients, command)
 	if err != nil {
 		return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("unable to get nodetool status details, err: %v", err)}
 	}

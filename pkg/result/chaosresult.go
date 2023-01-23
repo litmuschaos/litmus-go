@@ -195,18 +195,16 @@ func updateResultAttributes(clients clients.ClientSets, chaosDetails *types.Chao
 	switch strings.ToLower(string(resultDetails.Phase)) {
 	case "completed", "error", "stopped":
 		if !isAllProbePassed {
-			resultDetails.Verdict = "Fail"
-			result.Status.ExperimentStatus.Verdict = "Fail"
-			result.Status.ExperimentStatus.Phase = v1alpha1.ResultPhaseCompleted
-			if experimentStopped {
-				result.Status.ExperimentStatus.Phase = v1alpha1.ResultPhaseStopped
-			}
-			if resultDetails.Phase == v1alpha1.ResultPhaseError && (result.Status.ExperimentStatus.ErrorOutput == nil || result.Status.ExperimentStatus.ErrorOutput.ErrorMessage == "") {
-				failStep, errCode := getFailStep(resultDetails.ProbeDetails, string(chaosDetails.Phase))
-				result.Status.ExperimentStatus.ErrorOutput = &v1alpha1.ErrorOutput{
-					ErrorMessage: failStep,
-					ErrorCode:    errCode,
+			if resultDetails.Phase != v1alpha1.ResultPhaseError {
+				result.Status.ExperimentStatus.Phase = v1alpha1.ResultPhaseCompleted
+				if experimentStopped {
+					result.Status.ExperimentStatus.Phase = v1alpha1.ResultPhaseStopped
 				}
+				resultDetails.Verdict = "Fail"
+				result.Status.ExperimentStatus.Verdict = "Fail"
+			} else {
+				resultDetails.Verdict = "Error"
+				result.Status.ExperimentStatus.Verdict = "Error"
 			}
 		}
 		switch strings.ToLower(string(resultDetails.Verdict)) {
@@ -282,11 +280,13 @@ func SetResultUID(resultDetails *types.ResultDetails, clients clients.ClientSets
 func RecordAfterFailure(chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, err error, clients clients.ClientSets, eventsDetails *types.EventDetails) {
 	failStep, errorCode := cerrors.GetRootCauseAndErrorCode(err, string(chaosDetails.Phase))
 	phase := v1alpha1.ResultPhaseError
+	verdict := v1alpha1.ResultVerdictError
 	if isProbeFailedErrorCode(errorCode) {
 		phase = v1alpha1.ResultPhaseCompleted
+		verdict = v1alpha1.ResultVerdictFailed
 	}
 	// update the chaos result
-	types.SetResultAfterCompletion(resultDetails, "Error", phase, failStep, errorCode)
+	types.SetResultAfterCompletion(resultDetails, verdict, phase, failStep, errorCode)
 	if err := ChaosResult(chaosDetails, clients, resultDetails, "EOT"); err != nil {
 		log.Errorf("failed to update chaosresult, err: %v", err)
 	}
@@ -310,7 +310,7 @@ func RecordAfterFailure(chaosDetails *types.ChaosDetails, resultDetails *types.R
 
 func isProbeFailedErrorCode(errCode cerrors.ErrorType) bool {
 	switch errCode {
-	case cerrors.ErrorTypeK8sProbeFailed, cerrors.ErrorTypePromProbeFailed, cerrors.ErrorTypeCmdProbeFailed, cerrors.ErrorTypeHttpProbeFailed:
+	case cerrors.ErrorTypeK8sProbe, cerrors.ErrorTypePromProbe, cerrors.ErrorTypeCmdProbe, cerrors.ErrorTypeHttpProbe:
 		return true
 	default:
 		return false
@@ -384,11 +384,11 @@ func UpdateFailedStepFromHelper(resultDetails *types.ResultDetails, chaosDetails
 				return err
 			}
 			if chaosResult.Status.ExperimentStatus.ErrorOutput != nil {
-				chaosResult.Status.ExperimentStatus.ErrorOutput.ErrorMessage = appendFailStep(chaosResult.Status.ExperimentStatus.ErrorOutput.ErrorMessage, rootCause)
+				chaosResult.Status.ExperimentStatus.ErrorOutput.Reason = appendFailStep(chaosResult.Status.ExperimentStatus.ErrorOutput.Reason, rootCause)
 			} else {
 				chaosResult.Status.ExperimentStatus.ErrorOutput = &v1alpha1.ErrorOutput{
-					ErrorMessage: rootCause,
-					ErrorCode:    string(errCode),
+					Reason:    rootCause,
+					ErrorCode: string(errCode),
 				}
 			}
 			_, err = client.LitmusClient.ChaosResults(chaosDetails.ChaosNamespace).Update(context.Background(), chaosResult, v1.UpdateOptions{})

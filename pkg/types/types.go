@@ -227,8 +227,8 @@ func SetResultAfterCompletion(resultDetails *ResultDetails, verdict v1alpha1.Res
 	resultDetails.Phase = phase
 	if errorCode != cerrors.ErrorTypeHelperPodFailed && resultDetails.Phase == v1alpha1.ResultPhaseError {
 		resultDetails.ErrorOutput = &v1alpha1.ErrorOutput{
-			ErrorMessage: failStep,
-			ErrorCode:    string(errorCode),
+			Reason:    failStep,
+			ErrorCode: string(errorCode),
 		}
 	}
 }

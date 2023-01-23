@@ -295,7 +295,7 @@ func killStressCPUSerial(experimentsDetails *experimentTypes.ExperimentDetails, 
 	command := []string{"/bin/sh", "-c", experimentsDetails.ChaosKillCmd}
 
 	litmusexec.SetExecCommandAttributes(&execCommandDetails, podName, experimentsDetails.TargetContainer, ns)
-	out,_, err := litmusexec.Exec(&execCommandDetails, clients, command)
+	out, _, err := litmusexec.Exec(&execCommandDetails, clients, command)
 	if err != nil {
 		return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosRevert, Target: fmt.Sprintf("{podName: %s, namespace: %s}", podName, ns), Reason: fmt.Sprintf("failed to revert chaos: %s", out)}
 	}
