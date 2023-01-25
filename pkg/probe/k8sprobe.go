@@ -79,7 +79,7 @@ func triggerK8sProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets,
 	// for a timeout, it will run the command, if it fails wait for the iterval and again execute the command until timeout expires
 	if err := retry.Times(uint(probe.RunProperties.Retry)).
 		Timeout(int64(probe.RunProperties.ProbeTimeout)).
-		Wait(time.Duration(probe.RunProperties.Interval) * time.Second).
+		Wait(time.Duration(probe.RunProperties.Interval) * time.Millisecond).
 		TryWithTimeout(func(attempt uint) error {
 			//defining the gvr for the requested resource
 			gvr := schema.GroupVersionResource{
