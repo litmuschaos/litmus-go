@@ -22,6 +22,7 @@ type ExperimentDetails struct {
 	Delay          int
 	Sequence       string
 	VMIds          string
+	VMTag          string
 	VcenterServer  string
 	VcenterUser    string
 	VcenterPass    string
