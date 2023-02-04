@@ -171,7 +171,7 @@ func triggerPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 	// for a timeout, it will run the command, if it fails wait for the interval and again execute the command until timeout expires
 	if err := retry.Times(uint(probe.RunProperties.Retry)).
 		Timeout(int64(probe.RunProperties.ProbeTimeout)).
-		Wait(time.Duration(probe.RunProperties.Interval) * time.Second).
+		Wait(time.Duration(probe.RunProperties.Interval) * time.Millisecond).
 		TryWithTimeout(func(attempt uint) error {
 			var command string
 			// It will use query or queryPath to get the prometheus metrics

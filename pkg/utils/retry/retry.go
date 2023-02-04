@@ -88,14 +88,14 @@ func (model Model) TryWithTimeout(action Action) error {
 	var err error
 	err = nil
 	for attempt := uint(0); (attempt == 0 || err != nil) && attempt <= model.retry; attempt++ {
-		startTime := time.Now().Unix()
-		currentTime := time.Now().Unix()
+		startTime := time.Now().UnixMilli()
+		currentTime := time.Now().UnixMilli()
 		for trial := uint(0); (trial == 0 || err != nil) && currentTime < startTime+model.timeout; trial++ {
 			err = action(attempt)
 			if model.waitTime > 0 {
 				time.Sleep(model.waitTime)
 			}
-			currentTime = time.Now().Unix()
+			currentTime = time.Now().UnixMilli()
 		}
 
 	}

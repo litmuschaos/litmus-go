@@ -68,7 +68,7 @@ func triggerInlineCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.
 	// for a timeout, it will run the command, if it fails wait for the interval and again execute the command until timeout expires
 	if err := retry.Times(uint(probe.RunProperties.Retry)).
 		Timeout(int64(probe.RunProperties.ProbeTimeout)).
-		Wait(time.Duration(probe.RunProperties.Interval) * time.Second).
+		Wait(time.Duration(probe.RunProperties.Interval) * time.Millisecond).
 		TryWithTimeout(func(attempt uint) error {
 			var out, errOut bytes.Buffer
 			// run the inline command probe
@@ -115,7 +115,7 @@ func triggerSourceCmdProbe(probe v1alpha1.ProbeAttributes, execCommandDetails li
 	// for a timeout, it will run the command, if it fails wait for the iterval and again execute the command until timeout expires
 	if err := retry.Times(uint(probe.RunProperties.Retry)).
 		Timeout(int64(probe.RunProperties.ProbeTimeout)).
-		Wait(time.Duration(probe.RunProperties.Interval) * time.Second).
+		Wait(time.Duration(probe.RunProperties.Interval) * time.Millisecond).
 		TryWithTimeout(func(attempt uint) error {
 			command := append([]string{"/bin/sh", "-c"}, probe.CmdProbeInputs.Command)
 			// exec inside the external pod to get the o/p of given command
