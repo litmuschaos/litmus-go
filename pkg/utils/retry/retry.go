@@ -2,6 +2,7 @@ package retry
 
 import (
 	"fmt"
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	"time"
 
 	"github.com/pkg/errors"
@@ -79,25 +80,27 @@ func (model Model) Try(action Action) error {
 	return err
 }
 
-// TryWithTimeout is used to run a action with retries
-// for each iteration of retry there will be some timeout
+// TryWithTimeout is used to run an action with retries
+// for each iteration of attempt there will be some timeout
 func (model Model) TryWithTimeout(action Action) error {
 	if action == nil {
 		return fmt.Errorf("no action specified")
 	}
 	var err error
 	err = nil
-	for attempt := uint(0); (attempt == 0 || err != nil) && attempt <= model.retry; attempt++ {
+	for attempt := uint(0); (attempt == 0 || err != nil) && attempt < model.retry; {
 		startTime := time.Now().UnixMilli()
-		currentTime := time.Now().UnixMilli()
-		for trial := uint(0); (trial == 0 || err != nil) && currentTime < startTime+model.timeout; trial++ {
-			err = action(attempt)
-			if model.waitTime > 0 {
-				time.Sleep(model.waitTime)
+		err = action(attempt)
+		if err == nil && time.Now().UnixMilli()-startTime >= model.timeout {
+			err = cerrors.Error{
+				ErrorCode: cerrors.ErrorTypeGeneric,
+				Reason:    "probe is failed due to timeout",
 			}
-			currentTime = time.Now().UnixMilli()
 		}
-
+		attempt++
+		if model.waitTime > 0 && attempt < model.retry {
+			time.Sleep(model.waitTime)
+		}
 	}
 
 	return err
