@@ -217,7 +217,7 @@ func getDescription(err error) string {
 	if error, ok := rootCause.(cerrors.Error); ok {
 		return error.Reason
 	}
-	return ""
+	return rootCause.Error()
 }
 
 // CheckForErrorInContinuousProbe check for the error in the continuous probes

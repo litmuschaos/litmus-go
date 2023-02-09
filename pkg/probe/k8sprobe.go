@@ -74,10 +74,10 @@ func triggerK8sProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets,
 
 	var description string
 
-	// it will retry for some retry count, in each iterations of try it contains following things
+	// it will retry for some retry count, in each iteration of try it contains following things
 	// it contains a timeout per iteration of retry. if the timeout expires without success then it will go to next try
-	// for a timeout, it will run the command, if it fails wait for the iterval and again execute the command until timeout expires
-	if err := retry.Times(uint(probe.RunProperties.Retry)).
+	// for a timeout, it will run the command, if it fails wait for the interval and again execute the command until timeout expires
+	if err := retry.Times(uint(probe.RunProperties.Attempt)).
 		Timeout(int64(probe.RunProperties.ProbeTimeout)).
 		Wait(time.Duration(probe.RunProperties.Interval) * time.Millisecond).
 		TryWithTimeout(func(attempt uint) error {
