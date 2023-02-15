@@ -25,6 +25,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.Timeout, _ = strconv.Atoi(types.Getenv("STATUS_CHECK_TIMEOUT", "180"))
 	experimentDetails.Sequence = types.Getenv("SEQUENCE", "parallel")
 	experimentDetails.VMIds = strings.TrimSpace(types.Getenv("APP_VM_MOIDS", ""))
+	experimentDetails.VMTag = strings.TrimSpace(types.Getenv("APP_VM_TAG", ""))
 	experimentDetails.VcenterServer = types.Getenv("VCENTERSERVER", "")
 	experimentDetails.VcenterUser = types.Getenv("VCENTERUSER", "")
 	experimentDetails.VcenterPass = types.Getenv("VCENTERPASS", "")

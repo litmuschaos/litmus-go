@@ -19,6 +19,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+var err error
+
 // VMPoweroff contains steps to inject vm-power-off chaos
 func VMPoweroff(clients clients.ClientSets) {
 
@@ -61,6 +63,16 @@ func VMPoweroff(clients clients.ClientSets) {
 	types.SetResultEventAttributes(&eventsDetails, types.AwaitedVerdict, msg, "Normal", &resultDetails)
 	if eventErr := events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosResult"); eventErr != nil {
 		log.Errorf("Failed to create %v event inside chaosresult", types.AwaitedVerdict)
+	}
+
+	if experimentsDetails.VMTag != "" {
+		// GET VM IDs FROM TAG
+		experimentsDetails.VMIds, err = vmware.GetVMIDFromTag(experimentsDetails.VMTag)
+		if err != nil {
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
+			log.Errorf("Unable to get the VM ID, err: %v", err)
+			return
+		}
 	}
 
 	//DISPLAY THE VM INFORMATION
