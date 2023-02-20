@@ -314,3 +314,13 @@ func addProbePhase(err error, phase string) error {
 	}
 	return err
 }
+
+func getAttempts(attempt, retries int) int {
+	if attempt == 0 && retries == 0 {
+		return 1
+	}
+	if attempt == 0 {
+		return retries
+	}
+	return attempt
+}
