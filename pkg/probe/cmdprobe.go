@@ -82,7 +82,7 @@ func triggerInlineCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.
 			rc := getAndIncrementRunCount(resultDetails, probe.Name)
 			description, err = validateResult(probe.CmdProbeInputs.Comparator, probe.Name, strings.TrimSpace(out.String()), rc)
 			if err != nil {
-				if stdErr.String() != "" {
+				if strings.TrimSpace(stdErr.String()) != "" {
 					return cerrors.Error{
 						ErrorCode: cerrors.ErrorTypeCmdProbe,
 						Target:    probe.Name,
@@ -132,7 +132,7 @@ func triggerSourceCmdProbe(probe v1alpha1.ProbeAttributes, execCommandDetails li
 
 			rc := getAndIncrementRunCount(resultDetails, probe.Name)
 			if description, err = validateResult(probe.CmdProbeInputs.Comparator, probe.Name, strings.TrimSpace(output), rc); err != nil {
-				if stdErr != "" {
+				if strings.TrimSpace(stdErr) != "" {
 					return cerrors.Error{
 						ErrorCode: cerrors.ErrorTypeCmdProbe,
 						Target:    probe.Name,

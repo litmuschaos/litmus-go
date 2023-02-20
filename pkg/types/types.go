@@ -254,20 +254,14 @@ func SetResultEventAttributes(eventsDetails *EventDetails, Reason, Message, Type
 	eventsDetails.Type = Type
 }
 
+// GetChaosResultVerdictEvent return the verdict and event type
 func GetChaosResultVerdictEvent(verdict v1alpha1.ResultVerdict) (string, string) {
-	var reason, eventType string
 	switch verdict {
 	case v1alpha1.ResultVerdictPassed:
-		reason = PassVerdict
-		eventType = "Normal"
-	case v1alpha1.ResultVerdictFailed:
-		reason = FailVerdict
-		eventType = "Warning"
-	case v1alpha1.ResultVerdictError:
-		reason = ErrorVerdict
-		eventType = "Warning"
+		return string(verdict), "Normal"
+	default:
+		return string(verdict), "Warning"
 	}
-	return reason, eventType
 }
 
 // Getenv fetch the env and set the default value, if any
