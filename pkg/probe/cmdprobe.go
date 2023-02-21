@@ -70,19 +70,25 @@ func triggerInlineCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.
 		Timeout(int64(probe.RunProperties.ProbeTimeout)).
 		Wait(time.Duration(probe.RunProperties.Interval) * time.Millisecond).
 		TryWithTimeout(func(attempt uint) error {
-			var out, errOut bytes.Buffer
+			var out, stdErr bytes.Buffer
 			// run the inline command probe
 			cmd := exec.Command("/bin/sh", "-c", probe.CmdProbeInputs.Command)
 			cmd.Stdout = &out
-			cmd.Stderr = &errOut
+			cmd.Stderr = &stdErr
 			if err := cmd.Run(); err != nil {
-				return cerrors.Error{ErrorCode: cerrors.ErrorTypeCmdProbe, Target: fmt.Sprintf("{name: %v}", probe.Name), Reason: fmt.Sprintf("unable to run command: %s", errOut.String())}
+				return cerrors.Error{ErrorCode: cerrors.ErrorTypeCmdProbe, Target: fmt.Sprintf("{name: %v}", probe.Name), Reason: fmt.Sprintf("unable to run command: %s", out.String())}
 			}
 
 			rc := getAndIncrementRunCount(resultDetails, probe.Name)
 			description, err = validateResult(probe.CmdProbeInputs.Comparator, probe.Name, strings.TrimSpace(out.String()), rc)
 			if err != nil {
-				log.Errorf("the %v cmd probe has been Failed, err: %v", probe.Name, err)
+				if strings.TrimSpace(stdErr.String()) != "" {
+					return cerrors.Error{
+						ErrorCode: cerrors.ErrorTypeCmdProbe,
+						Target:    probe.Name,
+						Reason:    stdErr.String(),
+					}
+				}
 				return err
 			}
 
@@ -102,7 +108,7 @@ func triggerInlineCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.
 func triggerSourceCmdProbe(probe v1alpha1.ProbeAttributes, execCommandDetails litmusexec.PodDetails, clients clients.ClientSets, resultDetails *types.ResultDetails) error {
 	var description string
 
-	// It parse the templated command and return normal string
+	// It parses the templated command and return normal string
 	// if command doesn't have template, it will return the same command
 	probe.CmdProbeInputs.Command, err = parseCommand(probe.CmdProbeInputs.Command, resultDetails)
 	if err != nil {
@@ -119,14 +125,20 @@ func triggerSourceCmdProbe(probe v1alpha1.ProbeAttributes, execCommandDetails li
 		TryWithTimeout(func(attempt uint) error {
 			command := append([]string{"/bin/sh", "-c"}, probe.CmdProbeInputs.Command)
 			// exec inside the external pod to get the o/p of given command
-			output, err := litmusexec.Exec(&execCommandDetails, clients, command)
+			output, stdErr, err := litmusexec.Exec(&execCommandDetails, clients, command)
 			if err != nil {
 				return stacktrace.Propagate(err, "unable to get output of cmd command")
 			}
 
 			rc := getAndIncrementRunCount(resultDetails, probe.Name)
 			if description, err = validateResult(probe.CmdProbeInputs.Comparator, probe.Name, strings.TrimSpace(output), rc); err != nil {
-				log.Errorf("The %v cmd probe has been Failed, err: %v", probe.Name, err)
+				if strings.TrimSpace(stdErr) != "" {
+					return cerrors.Error{
+						ErrorCode: cerrors.ErrorTypeCmdProbe,
+						Target:    probe.Name,
+						Reason:    stdErr,
+					}
+				}
 				return err
 			}
 

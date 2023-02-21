@@ -47,14 +47,14 @@ func prepareHTTPProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets
 // triggerHTTPProbe run the http probe command
 func triggerHTTPProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails) error {
 
-	// It parse the templated url and return normal string
+	// It parses the templated url and return normal string
 	// if command doesn't have template, it will return the same command
 	probe.HTTPProbeInputs.URL, err = parseCommand(probe.HTTPProbeInputs.URL, resultDetails)
 	if err != nil {
 		return err
 	}
 
-	// it fetch the http method type
+	// it fetches the http method type
 	method := getHTTPMethodType(probe.HTTPProbeInputs.Method)
 
 	// initialize simple http client with default attributes
@@ -77,9 +77,7 @@ func triggerHTTPProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 			"ResponseCode":    probe.HTTPProbeInputs.Method.Get.ResponseCode,
 			"ResponseTimeout": probe.RunProperties.ProbeTimeout,
 		})
-		if err := httpGet(probe, client, resultDetails); err != nil {
-			return err
-		}
+		return httpGet(probe, client, resultDetails)
 	case "Post":
 		log.InfoWithValues("[Probe]: HTTP Post method informations", logrus.Fields{
 			"Name":            probe.Name,
@@ -89,14 +87,12 @@ func triggerHTTPProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 			"ContentType":     probe.HTTPProbeInputs.Method.Post.ContentType,
 			"ResponseTimeout": probe.RunProperties.ProbeTimeout,
 		})
-		if err := httpPost(probe, client, resultDetails); err != nil {
-			return err
-		}
+		return httpPost(probe, client, resultDetails)
 	}
 	return nil
 }
 
-// it fetch the http method type
+// it fetches the http method type
 // it supports Get and Post methods
 func getHTTPMethodType(httpMethod v1alpha1.HTTPMethod) string {
 	if !reflect.DeepEqual(httpMethod.Get, v1alpha1.GetMethod{}) {
@@ -221,7 +217,7 @@ func triggerContinuousHTTPProbe(probe v1alpha1.ProbeAttributes, clients clients.
 		time.Sleep(time.Duration(probe.RunProperties.InitialDelaySeconds) * time.Second)
 	}
 
-	// it trigger the http probe for the entire duration of chaos and it fails, if any error encounter
+	// it triggers the http probe for the entire duration of chaos and it fails, if any error encounter
 	// it marked the error for the probes, if any
 loop:
 	for {

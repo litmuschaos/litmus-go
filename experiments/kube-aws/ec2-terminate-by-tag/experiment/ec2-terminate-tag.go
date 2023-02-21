@@ -191,12 +191,7 @@ func EC2TerminateByTag(clients clients.ClientSets) {
 
 	// generating the event in chaosresult to marked the verdict as pass/fail
 	msg = "experiment: " + experimentsDetails.ExperimentName + ", Result: " + string(resultDetails.Verdict)
-	reason := types.PassVerdict
-	eventType := "Normal"
-	if resultDetails.Verdict != "Pass" {
-		reason = types.FailVerdict
-		eventType = "Warning"
-	}
+	reason, eventType := types.GetChaosResultVerdictEvent(resultDetails.Verdict)
 	types.SetResultEventAttributes(&eventsDetails, reason, msg, eventType, &resultDetails)
 	if eventErr := events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosResult"); eventErr != nil {
 		log.Errorf("Failed to create %v event inside chaosresult", reason)
