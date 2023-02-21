@@ -47,7 +47,7 @@ func triggerK8sProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets,
 
 	inputs := &probe.K8sProbeInputs
 
-	// It parse the templated command and return normal string
+	// It parses the templated command and return normal string
 	// if command doesn't have template, it will return the same command
 	inputs.FieldSelector, err = parseCommand(inputs.FieldSelector, resultDetails)
 	if err != nil {

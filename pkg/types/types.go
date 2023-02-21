@@ -3,16 +3,17 @@ package types
 import (
 	"context"
 	"fmt"
+	"os"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
 	"github.com/litmuschaos/litmus-go/pkg/utils/stringutils"
 	"github.com/palantir/stacktrace"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"os"
-	"strconv"
-	"strings"
-	"time"
 
 	"github.com/litmuschaos/chaos-operator/api/litmuschaos/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
@@ -43,6 +44,8 @@ const (
 	FailVerdict string = "Fail"
 	// AbortVerdict marked the verdict as abort when experiment aborted
 	AbortVerdict string = "Abort"
+	// ErrorVerdict marked the verdict as error in the end of experiment
+	ErrorVerdict string = "Error"
 )
 
 type ExperimentPhase string
@@ -57,10 +60,10 @@ const (
 type ResultDetails struct {
 	Name             string
 	Verdict          v1alpha1.ResultVerdict
-	FailureOutput    *v1alpha1.FailureOutput
+	ErrorOutput      *v1alpha1.ErrorOutput
 	Phase            v1alpha1.ResultPhase
 	ResultUID        clientTypes.UID
-	ProbeDetails     []ProbeDetails
+	ProbeDetails     []*ProbeDetails
 	PassedProbeCount int
 	ProbeArtifacts   map[string]ProbeArtifact
 }
@@ -82,8 +85,10 @@ type ProbeDetails struct {
 	Mode                   string
 	Status                 v1alpha1.ProbeStatus
 	IsProbeFailedWithError error
+	Failed                 bool
 	RunID                  string
 	RunCount               int
+	Stopped                bool
 }
 
 // EventDetails is for collecting all the events-related details
@@ -220,10 +225,10 @@ func SetResultAttributes(resultDetails *ResultDetails, chaosDetails ChaosDetails
 func SetResultAfterCompletion(resultDetails *ResultDetails, verdict v1alpha1.ResultVerdict, phase v1alpha1.ResultPhase, failStep string, errorCode cerrors.ErrorType) {
 	resultDetails.Verdict = verdict
 	resultDetails.Phase = phase
-	if errorCode != cerrors.ErrorTypeHelperPodFailed {
-		resultDetails.FailureOutput = &v1alpha1.FailureOutput{
-			FailedStep: failStep,
-			ErrorCode:  string(errorCode),
+	if errorCode != cerrors.ErrorTypeHelperPodFailed && resultDetails.Phase == v1alpha1.ResultPhaseError {
+		resultDetails.ErrorOutput = &v1alpha1.ErrorOutput{
+			Reason:    failStep,
+			ErrorCode: string(errorCode),
 		}
 	}
 }
@@ -247,6 +252,16 @@ func SetResultEventAttributes(eventsDetails *EventDetails, Reason, Message, Type
 	eventsDetails.ResourceName = resultDetails.Name
 	eventsDetails.ResourceUID = resultDetails.ResultUID
 	eventsDetails.Type = Type
+}
+
+// GetChaosResultVerdictEvent return the verdict and event type
+func GetChaosResultVerdictEvent(verdict v1alpha1.ResultVerdict) (string, string) {
+	switch verdict {
+	case v1alpha1.ResultVerdictPassed:
+		return string(verdict), "Normal"
+	default:
+		return string(verdict), "Warning"
+	}
 }
 
 // Getenv fetch the env and set the default value, if any
@@ -362,11 +377,11 @@ func getEnvSource(apiVersion string, fieldPath string) *corev1.EnvVarSource {
 }
 
 func InitializeProbesInChaosResultDetails(chaosresult *ResultDetails, probes []v1alpha1.ProbeAttributes) {
-	var probeDetails []ProbeDetails
+	var probeDetails []*ProbeDetails
 
 	// set the probe details for k8s probe
 	for _, probe := range probes {
-		tempProbe := ProbeDetails{}
+		tempProbe := &ProbeDetails{}
 		tempProbe.Name = probe.Name
 		tempProbe.Type = probe.Type
 		tempProbe.Mode = probe.Mode
