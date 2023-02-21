@@ -84,6 +84,8 @@ func RunProbes(chaosDetails *types.ChaosDetails, clients clients.ClientSets, res
 func setProbeVerdict(resultDetails *types.ResultDetails, probe v1alpha1.ProbeAttributes, verdict v1alpha1.ProbeVerdict, description, phase string) {
 	for index, probes := range resultDetails.ProbeDetails {
 		if probes.Name == probe.Name && probes.Type == probe.Type {
+			// in edge mode, it will not update the verdict to pass in prechaos mode as probe verdict should be evaluated based on both the prechaos and postchaos results
+			// in postchaos it will not override the verdict if verdict is already failed in prechaos
 			if probes.Mode == "Edge" {
 				if (phase == "PreChaos" && verdict != v1alpha1.ProbeVerdictFailed) || (phase == "PostChaos" && probes.Status.Verdict == v1alpha1.ProbeVerdictFailed) {
 					return

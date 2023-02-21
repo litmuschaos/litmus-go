@@ -384,7 +384,7 @@ func UpdateFailedStepFromHelper(resultDetails *types.ResultDetails, chaosDetails
 				return err
 			}
 			if chaosResult.Status.ExperimentStatus.ErrorOutput != nil {
-				chaosResult.Status.ExperimentStatus.ErrorOutput.Reason = appendFailStep(chaosResult.Status.ExperimentStatus.ErrorOutput.Reason, rootCause)
+				chaosResult.Status.ExperimentStatus.ErrorOutput.Reason = appendErrorOutput(chaosResult.Status.ExperimentStatus.ErrorOutput.Reason, rootCause)
 			} else {
 				chaosResult.Status.ExperimentStatus.ErrorOutput = &v1alpha1.ErrorOutput{
 					Reason:    rootCause,
@@ -396,7 +396,7 @@ func UpdateFailedStepFromHelper(resultDetails *types.ResultDetails, chaosDetails
 		})
 }
 
-func appendFailStep(failStep string, rootCause string) string {
+func appendErrorOutput(failStep string, rootCause string) string {
 	failStep = strings.TrimPrefix(failStep, "[")
 	failStep = strings.TrimSuffix(failStep, "]")
 	return fmt.Sprintf("[%s,%s]", failStep, rootCause)
