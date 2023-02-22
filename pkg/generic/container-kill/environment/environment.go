@@ -9,7 +9,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/types"
 )
 
-//GetENV fetches all the env variables from the runner pod
+// GetENV fetches all the env variables from the runner pod
 func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.ExperimentName = types.Getenv("EXPERIMENT_NAME", "container-kill")
 	experimentDetails.ChaosNamespace = types.Getenv("CHAOS_NAMESPACE", "")
@@ -24,12 +24,12 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.LIBImage = types.Getenv("LIB_IMAGE", "litmuschaos/go-runner:latest")
 	experimentDetails.LIBImagePullPolicy = types.Getenv("LIB_IMAGE_PULL_POLICY", "Always")
 	experimentDetails.TargetContainer = types.Getenv("TARGET_CONTAINER", "")
-	experimentDetails.SocketPath = types.Getenv("SOCKET_PATH", "/var/run/docker.sock")
+	experimentDetails.SocketPath = types.Getenv("SOCKET_PATH", "/run/containerd/containerd.sock")
 	experimentDetails.PodsAffectedPerc = types.Getenv("PODS_AFFECTED_PERC", "0")
 	experimentDetails.Delay, _ = strconv.Atoi(types.Getenv("STATUS_CHECK_DELAY", "2"))
 	experimentDetails.Timeout, _ = strconv.Atoi(types.Getenv("STATUS_CHECK_TIMEOUT", "180"))
 	experimentDetails.TargetPods = types.Getenv("TARGET_PODS", "")
-	experimentDetails.ContainerRuntime = types.Getenv("CONTAINER_RUNTIME", "docker")
+	experimentDetails.ContainerRuntime = types.Getenv("CONTAINER_RUNTIME", "containerd")
 	experimentDetails.Sequence = types.Getenv("SEQUENCE", "parallel")
 	experimentDetails.Signal = types.Getenv("SIGNAL", "SIGKILL")
 	experimentDetails.TerminationGracePeriodSeconds, _ = strconv.Atoi(types.Getenv("TERMINATION_GRACE_PERIOD_SECONDS", ""))

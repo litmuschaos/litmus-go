@@ -18,7 +18,7 @@ const (
 	Spoof DNSChaosType = "spoof"
 )
 
-//GetENV fetches all the env variables from the runner pod
+// GetENV fetches all the env variables from the runner pod
 func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expType DNSChaosType) {
 	experimentDetails.ChaosNamespace = types.Getenv("CHAOS_NAMESPACE", "litmus")
 	experimentDetails.EngineName = types.Getenv("CHAOSENGINE", "")
@@ -34,8 +34,8 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expType DNSCha
 	experimentDetails.Timeout, _ = strconv.Atoi(types.Getenv("STATUS_CHECK_TIMEOUT", "180"))
 	experimentDetails.TargetPods = types.Getenv("TARGET_PODS", "")
 	experimentDetails.PodsAffectedPerc, _ = strconv.Atoi(types.Getenv("PODS_AFFECTED_PERC", "0"))
-	experimentDetails.ContainerRuntime = types.Getenv("CONTAINER_RUNTIME", "docker")
-	experimentDetails.SocketPath = types.Getenv("SOCKET_PATH", "/var/run/docker.sock")
+	experimentDetails.ContainerRuntime = types.Getenv("CONTAINER_RUNTIME", "containerd")
+	experimentDetails.SocketPath = types.Getenv("SOCKET_PATH", "/run/containerd/containerd.sock")
 	experimentDetails.ChaosServiceAccount = types.Getenv("CHAOS_SERVICE_ACCOUNT", "")
 	experimentDetails.Sequence = types.Getenv("SEQUENCE", "parallel")
 	experimentDetails.SetHelperData = types.Getenv("SET_HELPER_DATA", "true")
