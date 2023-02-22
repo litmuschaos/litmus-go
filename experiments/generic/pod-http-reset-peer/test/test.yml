@@ -62,10 +62,6 @@ spec:
           - name: PROXY_PORT
             value: "2002"
 
-          # lib can be litmus or pumba
-          - name: LIB
-            value: 'litmus'
-
           ## percentage of total pods to target
           - name: PODS_AFFECTED_PERC
             value: ''
@@ -74,10 +70,9 @@ spec:
             value: ''
 
           # provide the name of container runtime
-          # for litmus LIB, it supports docker, containerd, crio
-          # for pumba LIB, it supports docker only
+           # it supports docker, containerd, and crio
           - name: CONTAINER_RUNTIME
-            value: 'docker'
+            value: 'containerd'
 
           # provide the socket file path
           - name: SOCKET_PATH
