@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"html/template"
+	"strings"
+
 	"github.com/kyokomi/emoji"
 	"github.com/litmuschaos/chaos-operator/api/litmuschaos/v1alpha1"
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
@@ -12,9 +15,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/palantir/stacktrace"
 	"github.com/sirupsen/logrus"
-	"html/template"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"strings"
 )
 
 var err error
@@ -223,6 +224,7 @@ func markedVerdictInEnd(err error, resultDetails *types.ResultDetails, probe v1a
 	return nil
 }
 
+// getProbeByName returns the probe details of a probe given its name
 func getProbeByName(name string, probeDetails []*types.ProbeDetails) *types.ProbeDetails {
 	for _, p := range probeDetails {
 		if p.Name == name {
