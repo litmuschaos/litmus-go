@@ -88,7 +88,7 @@ func main() {
 
 	log.Infof("Experiment Name: %v", *experimentName)
 
-	// invoke the corresponding experiment based on the the (-name) flag
+	// invoke the corresponding experiment based on the (-name) flag
 	switch *experimentName {
 	case "container-kill":
 		containerKill.ContainerKill(clients)

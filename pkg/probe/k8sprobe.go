@@ -45,7 +45,7 @@ func prepareK8sProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Result
 // triggerK8sProbe run the k8s probe command
 func triggerK8sProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets, resultDetails *types.ResultDetails) error {
 
-	inputs := &probe.K8sProbeInputs
+	inputs := probe.K8sProbeInputs
 
 	// It parses the templated command and return normal string
 	// if command doesn't have template, it will return the same command
