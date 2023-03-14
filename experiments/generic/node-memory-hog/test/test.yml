@@ -41,10 +41,7 @@ spec:
 
           # in MB
           - name: MEMORY_PERCENTAGE
-            value: '500'
-
-          - name: LIB
-            value: 'litmus'
+            value: '500' 
 
           - name: LIB_IMAGE
             value: 'litmuschaos/go-runner:ci'

@@ -25,11 +25,6 @@ spec:
           - name: RAMP_TIME
             value: ''
 
-          ## env var that describes the library used to execute the chaos
-          ## default: litmus.
-          - name: LIB
-            value: 'litmus'
-
           - name: AUXILIARY_APPINFO
             value: ''
 

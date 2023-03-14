@@ -46,10 +46,7 @@ spec:
 
           # in sec
           - name: TOTAL_CHAOS_DURATION
-            value: '60'
-
-          - name: LIB
-            value: 'litmus'
+            value: '60' 
 
           - name: TARGET_POD
             value: ''
@@ -70,9 +67,9 @@ spec:
 
           # provide the name of container runtime
           # it supports docker, containerd, crio
-          # default to docker
+          # defaults to containerd
           - name: CONTAINER_RUNTIME
-            value: 'docker'
+            value: 'containerd'
 
           # provide the container runtime path
           # applicable only for containerd and crio runtime
