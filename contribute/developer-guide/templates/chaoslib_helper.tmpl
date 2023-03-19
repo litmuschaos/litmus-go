@@ -21,6 +21,12 @@ import (
 
 func experimentExecution(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
+    // Get the target pod details for the chaos execution
+	// if the target pod is not defined it will derive the random target pod list using pod affected percentage
+	if experimentsDetails.TargetPods == "" && chaosDetails.AppDetail == nil {
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Reason: "provide one of the appLabel or TARGET_PODS"}
+	}
+
 	// Get the target pod details for the chaos execution
 	// if the target pod is not defined it will derive the random target pod list using pod affected percentage
 	targetPodList, err := common.GetPodList(experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, clients, chaosDetails)
@@ -65,8 +71,15 @@ func runChaos(experimentsDetails *experimentTypes.ExperimentDetails, targetPodLi
         }
     }
 
+    experimentsDetails.IsTargetContainerProvided = experimentsDetails.TargetContainer != ""
+
     // creating the helper pod to perform container kill chaos
     for _, pod := range targetPodList.Items {
+
+        //Get the target container name of the application pod
+        if !experimentsDetails.IsTargetContainerProvided {
+            experimentsDetails.TargetContainer = pod.Spec.Containers[0].Name
+        }
 
         runID :=  stringutils.GetRunID()
 
@@ -76,33 +89,33 @@ func runChaos(experimentsDetails *experimentTypes.ExperimentDetails, targetPodLi
             "Target Container": experimentsDetails.TargetContainer,
         })
 
-        if err := createHelperPod(experimentsDetails, clients, chaosDetails, pod.Name, pod.Spec.NodeName, runID, labelSuffix); err != nil {
+        if err := createHelperPod(experimentsDetails, clients, chaosDetails, pod.Name, pod.Spec.NodeName, runID); err != nil {
             return stacktrace.Propagate(err, "could not create helper pod")
         }
 
         common.SetTargets(pod.Name, "targeted", "pod", chaosDetails)
 
-        appLabel := "name=" + experimentsDetails.ExperimentName + "-helper-" + runID
+       appLabel := fmt.Sprintf("app=%s-helper-%s", experimentsDetails.ExperimentName, runID)
 
         //checking the status of the helper pod, wait till the pod comes to running state else fail the experiment
         log.Info("[Status]: Checking the status of the helper pod")
         if err := status.CheckHelperStatus(experimentsDetails.ChaosNamespace, appLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
-            common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-helper-"+runID, appLabel, chaosDetails, clients)
+           common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
             return stacktrace.Propagate(err, "could not check helper status")
         }
 
         // Wait till the completion of the helper pod
         // set an upper limit for the waiting time
         log.Info("[Wait]: waiting till the completion of the helper pod")
-        podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, appLabel, clients, experimentsDetails.ChaosDuration+experimentsDetails.Timeout, experimentsDetails.ExperimentName)
+        podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, appLabel, clients, experimentsDetails.ChaosDuration+experimentsDetails.Timeout, common.GetContainerNames(chaosDetails)...)
         if err != nil || podStatus == "Failed" {
-            common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-helper-"+runID, appLabel, chaosDetails, clients)
-           return common.HelperFailedError(err, appLabel, experimentsDetails.ChaosNamespace, true)
+            common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
+            return common.HelperFailedError(err, appLabel, experimentsDetails.ChaosNamespace, true)
         }
 
-        //Deleting the helper pod
-        log.Info("[Cleanup]: Deleting the helper pod")
-        if err := common.DeletePod(experimentsDetails.ExperimentName+"-helper-"+runID, appLabel, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients); err != nil {
+        //Deleting all the helper pod for container-kill chaos
+        log.Info("[Cleanup]: Deleting all the helper pods")
+        if err = common.DeleteAllPod(appLabel, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients); err != nil {
             return stacktrace.Propagate(err, "could not delete helper pod(s)")
         }
     }
@@ -135,7 +148,7 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 
 	helperPod := &corev1.Pod{
 		ObjectMeta: v1.ObjectMeta{
-			Name:        experimentsDetails.ExperimentName + "-helper-" + runID,
+			GenerateName: experimentsDetails.ExperimentName + "-helper-",
 			Namespace:   experimentsDetails.ChaosNamespace,
 			Labels:      common.GetHelperLabels(chaosDetails.Labels, runID, experimentsDetails.ExperimentName),
 			Annotations: chaosDetails.Annotations,
