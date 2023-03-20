@@ -34,6 +34,12 @@ func injectChaos(experimentsDetails *experimentTypes.ExperimentDetails, podName 
 
 func experimentExecution(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
+    // Get the target pod details for the chaos execution
+	// if the target pod is not defined it will derive the random target pod list using pod affected percentage
+	if experimentsDetails.TargetPods == "" && chaosDetails.AppDetail == nil {
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Reason: "provide one of the appLabel or TARGET_PODS"}
+	}
+
 	// Get the target pod details for the chaos execution
 	// if the target pod is not defined it will derive the random target pod list using pod affected percentage
 	targetPodList, err := common.GetPodList(experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, clients, chaosDetails)
@@ -51,6 +57,13 @@ func experimentExecution(experimentsDetails *experimentTypes.ExperimentDetails, 
 }
 
 func runChaos(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList corev1.PodList, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	// run the probes during chaos
+	if len(resultDetails.ProbeDetails) != 0 {
+		if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+			return err
+		}
+	}
+
 	var endTime <-chan time.Time
 	timeDelay := time.Duration(experimentsDetails.ChaosDuration) * time.Second
 
