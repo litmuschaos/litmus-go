@@ -118,11 +118,9 @@ func httpGet(probe v1alpha1.ProbeAttributes, client *http.Client, resultDetails 
 			}
 
 			code := strconv.Itoa(resp.StatusCode)
-			rc := getAndIncrementRunCount(resultDetails, probe.Name)
 
 			// comparing the response code with the expected criteria
-			if err = cmp.RunCount(rc).
-				FirstValue(code).
+			if err = cmp.FirstValue(code).
 				SecondValue(probe.HTTPProbeInputs.Method.Get.ResponseCode).
 				Criteria(probe.HTTPProbeInputs.Method.Get.Criteria).
 				ProbeName(probe.Name).
@@ -159,11 +157,9 @@ func httpPost(probe v1alpha1.ProbeAttributes, client *http.Client, resultDetails
 				return cerrors.Error{ErrorCode: cerrors.ErrorTypeHttpProbe, Target: fmt.Sprintf("{name: %v}", probe.Name), Reason: err.Error()}
 			}
 			code := strconv.Itoa(resp.StatusCode)
-			rc := getAndIncrementRunCount(resultDetails, probe.Name)
 
 			// comparing the response code with the expected criteria
-			if err = cmp.RunCount(rc).
-				FirstValue(code).
+			if err = cmp.FirstValue(code).
 				SecondValue(probe.HTTPProbeInputs.Method.Post.ResponseCode).
 				Criteria(probe.HTTPProbeInputs.Method.Post.Criteria).
 				ProbeName(probe.Name).
