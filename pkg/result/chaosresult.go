@@ -212,7 +212,7 @@ func updateResultAttributes(clients clients.ClientSets, chaosDetails *types.Chao
 				result.Status.History.FailedRuns++
 			}
 			probe.SetProbeVerdictAfterFailure(result)
-			if len(resultDetails.ProbeDetails) != 0 {
+			if len(resultDetails.ProbeDetails) != 0 && resultDetails.Verdict == v1alpha1.ResultVerdictFailed {
 				result.Status.ExperimentStatus.ProbeSuccessPercentage = strconv.Itoa((resultDetails.PassedProbeCount * 100) / len(resultDetails.ProbeDetails))
 			} else {
 				result.Status.ExperimentStatus.ProbeSuccessPercentage = "0"
