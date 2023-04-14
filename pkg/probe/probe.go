@@ -81,11 +81,15 @@ func RunProbes(chaosDetails *types.ChaosDetails, clients clients.ClientSets, res
 
 // setProbeVerdict mark the verdict of the probe in the chaosresult as passed
 // on the basis of phase(pre/post chaos)
-func setProbeVerdict(resultDetails *types.ResultDetails, probe v1alpha1.ProbeAttributes, verdict v1alpha1.ProbeVerdict, description string) {
+func setProbeVerdict(resultDetails *types.ResultDetails, probe v1alpha1.ProbeAttributes, verdict v1alpha1.ProbeVerdict, description, phase string) {
 	for index, probes := range resultDetails.ProbeDetails {
 		if probes.Name == probe.Name && probes.Type == probe.Type {
-			if probes.Mode == "Edge" && probes.Status.Verdict == v1alpha1.ProbeVerdictFailed {
-				return
+			// in edge mode, it will not update the verdict to pass in prechaos mode as probe verdict should be evaluated based on both the prechaos and postchaos results
+			// in postchaos it will not override the verdict if verdict is already failed in prechaos
+			if probes.Mode == "Edge" {
+				if (phase == "PreChaos" && verdict != v1alpha1.ProbeVerdictFailed) || (phase == "PostChaos" && probes.Status.Verdict == v1alpha1.ProbeVerdictFailed) {
+					return
+				}
 			}
 			resultDetails.ProbeDetails[index].Status.Verdict = verdict
 			if description != "" {
@@ -199,17 +203,35 @@ func markedVerdictInEnd(err error, resultDetails *types.ResultDetails, probe v1a
 		description = getDescription(err)
 	}
 
-	setProbeVerdict(resultDetails, probe, probeVerdict, description)
-	if !probe.RunProperties.StopOnFailure && err != nil {
-		for index := range resultDetails.ProbeDetails {
-			if resultDetails.ProbeDetails[index].Name == probe.Name {
-				resultDetails.ProbeDetails[index].IsProbeFailedWithError = err
-				break
+	setProbeVerdict(resultDetails, probe, probeVerdict, description, phase)
+
+	if err != nil {
+		switch probe.RunProperties.StopOnFailure {
+		case true:
+			// adding signal to communicate that experiment is stopped because of error in probe
+			if probeDetails := getProbeByName(probe.Name, resultDetails.ProbeDetails); probeDetails != nil {
+				probeDetails.Stopped = true
 			}
+			return err
+		default:
+			if probeDetails := getProbeByName(probe.Name, resultDetails.ProbeDetails); probeDetails != nil {
+				probeDetails.IsProbeFailedWithError = err
+			}
+			return nil
 		}
-		return nil
 	}
+
 	return err
+}
+
+// getProbeByName returns the probe details of a probe given its name
+func getProbeByName(name string, probeDetails []*types.ProbeDetails) *types.ProbeDetails {
+	for _, p := range probeDetails {
+		if p.Name == name {
+			return p
+		}
+	}
+	return nil
 }
 
 func getDescription(err error) string {
@@ -217,7 +239,7 @@ func getDescription(err error) string {
 	if error, ok := rootCause.(cerrors.Error); ok {
 		return error.Reason
 	}
-	return ""
+	return rootCause.Error()
 }
 
 // CheckForErrorInContinuousProbe check for the error in the continuous probes

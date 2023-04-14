@@ -513,21 +513,21 @@ func validateResult(comparator v1alpha1.ComparatorInfo, probeName, cmdOutput str
 
 	switch strings.ToLower(comparator.Type) {
 	case "int":
-		if err = compare.CompareInt(cerrors.ErrorTypeCmdProbe); err != nil {
+		if err = compare.CompareInt(cerrors.FailureTypeCmdProbe); err != nil {
 			return "", err
 		}
 	case "float":
-		if err = compare.CompareFloat(cerrors.ErrorTypeCmdProbe); err != nil {
+		if err = compare.CompareFloat(cerrors.FailureTypeCmdProbe); err != nil {
 			return "", err
 		}
 	case "string":
-		if err = compare.CompareString(cerrors.ErrorTypeCmdProbe); err != nil {
+		if err = compare.CompareString(cerrors.FailureTypeCmdProbe); err != nil {
 			return "", err
 		}
 	default:
-		return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Target: fmt.Sprintf("{name: %v}", probeName), Reason: fmt.Sprintf("comparator type '%s' not supported in the cmd probe", comparator.Type)}
+		return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeCmdProbe, Target: fmt.Sprintf("{name: %v}", probeName), Reason: fmt.Sprintf("comparator type '%s' not supported in the cmd probe", comparator.Type)}
 	}
-	description := fmt.Sprintf("Probe responded with a valid output. Actual and Expected values are '%s' and '%s' respectively", cmdOutput, comparator.Value)
+	description := fmt.Sprintf("Actual value: '%s'. Expected value: '%s'", cmdOutput, comparator.Value)
 	return description, nil
 }
 
@@ -556,7 +556,9 @@ func preChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 
 		// triggering the cmd probe for the inline mode
 		if reflect.DeepEqual(probe.CmdProbeInputs.Source, v1alpha1.SourceDetails{}) {
-			err = triggerInlineCmdProbe(probe, resultDetails)
+			if err = triggerInlineCmdProbe(probe, resultDetails); err != nil && cerrors.GetErrorType(err) != cerrors.FailureTypeCmdProbe {
+				return err
+			}
 
 			// failing the probe, if the success condition doesn't met after the retry & timeout combinations
 			// it will update the status of all the unrun probes as well
@@ -571,7 +573,9 @@ func preChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 			}
 
 			// triggering the cmd probe and storing the output into the out buffer
-			err = triggerSourceCmdProbe(probe, execCommandDetails, clients, resultDetails)
+			if err = triggerSourceCmdProbe(probe, execCommandDetails, clients, resultDetails); err != nil && cerrors.GetErrorType(err) != cerrors.FailureTypeCmdProbe {
+				return err
+			}
 
 			// failing the probe, if the success condition doesn't met after the retry & timeout combinations
 			// it will update the status of all the unrun probes as well
@@ -642,7 +646,9 @@ func postChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resu
 
 		// triggering the cmd probe for the inline mode
 		if reflect.DeepEqual(probe.CmdProbeInputs.Source, v1alpha1.SourceDetails{}) {
-			err = triggerInlineCmdProbe(probe, resultDetails)
+			if err = triggerInlineCmdProbe(probe, resultDetails); err != nil && cerrors.GetErrorType(err) != cerrors.FailureTypeCmdProbe {
+				return err
+			}
 
 			// failing the probe, if the success condition doesn't met after the retry & timeout combinations
 			// it will update the status of all the unrun probes as well
@@ -657,7 +663,9 @@ func postChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resu
 			}
 
 			// triggering the cmd probe and storing the output into the out buffer
-			err = triggerSourceCmdProbe(probe, execCommandDetails, clients, resultDetails)
+			if err = triggerSourceCmdProbe(probe, execCommandDetails, clients, resultDetails); err != nil && cerrors.GetErrorType(err) != cerrors.FailureTypeCmdProbe {
+				return err
+			}
 
 			// failing the probe, if the success condition doesn't met after the retry & timeout combinations
 			// it will update the status of all the unrun probes as well
@@ -676,14 +684,18 @@ func postChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resu
 	case "Continuous", "OnChaos":
 		if reflect.DeepEqual(probe.CmdProbeInputs.Source, v1alpha1.SourceDetails{}) {
 			// it will check for the error, It will detect the error if any error encountered in probe during chaos
-			err = checkForErrorInContinuousProbe(resultDetails, probe.Name)
+			if err = checkForErrorInContinuousProbe(resultDetails, probe.Name); err != nil && cerrors.GetErrorType(err) != cerrors.FailureTypeCmdProbe {
+				return err
+			}
 			// failing the probe, if the success condition doesn't met after the retry & timeout combinations
 			if err = markedVerdictInEnd(err, resultDetails, probe, "PostChaos"); err != nil {
 				return err
 			}
 		} else {
 			// it will check for the error, It will detect the error if any error encountered in probe during chaos
-			err = checkForErrorInContinuousProbe(resultDetails, probe.Name)
+			if err = checkForErrorInContinuousProbe(resultDetails, probe.Name); err != nil && cerrors.GetErrorType(err) != cerrors.FailureTypeCmdProbe {
+				return err
+			}
 
 			// failing the probe, if the success condition doesn't met after the retry & timeout combinations
 			if err = markedVerdictInEnd(err, resultDetails, probe, "PostChaos"); err != nil {

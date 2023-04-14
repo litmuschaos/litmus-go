@@ -60,7 +60,7 @@ type ResultDetails struct {
 	FailureOutput    *v1alpha1.FailureOutput
 	Phase            v1alpha1.ResultPhase
 	ResultUID        clientTypes.UID
-	ProbeDetails     []ProbeDetails
+	ProbeDetails     []*ProbeDetails
 	PassedProbeCount int
 	ProbeArtifacts   map[string]ProbeArtifact
 }
@@ -84,6 +84,7 @@ type ProbeDetails struct {
 	IsProbeFailedWithError error
 	RunID                  string
 	RunCount               int
+	Stopped                bool
 }
 
 // EventDetails is for collecting all the events-related details
@@ -362,11 +363,11 @@ func getEnvSource(apiVersion string, fieldPath string) *corev1.EnvVarSource {
 }
 
 func InitializeProbesInChaosResultDetails(chaosresult *ResultDetails, probes []v1alpha1.ProbeAttributes) {
-	var probeDetails []ProbeDetails
+	var probeDetails []*ProbeDetails
 
 	// set the probe details for k8s probe
 	for _, probe := range probes {
-		tempProbe := ProbeDetails{}
+		tempProbe := &ProbeDetails{}
 		tempProbe.Name = probe.Name
 		tempProbe.Type = probe.Type
 		tempProbe.Mode = probe.Mode

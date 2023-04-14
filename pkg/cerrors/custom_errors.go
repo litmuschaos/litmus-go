@@ -21,9 +21,13 @@ const (
 	ErrorTypeChaosInject       ErrorType = "CHAOS_INJECT_ERROR"
 	ErrorTypeChaosRevert       ErrorType = "CHAOS_REVERT_ERROR"
 	ErrorTypeK8sProbe          ErrorType = "K8S_PROBE_ERROR"
+	FailureTypeK8sProbe        ErrorType = "K8S_PROBE_FAILURE"
 	ErrorTypeCmdProbe          ErrorType = "CMD_PROBE_ERROR"
+	FailureTypeCmdProbe        ErrorType = "CMD_PROBE_FAILURE"
 	ErrorTypeHttpProbe         ErrorType = "HTTP_PROBE_ERROR"
+	FailureTypeHttpProbe       ErrorType = "HTTP_PROBE_FAILURE"
 	ErrorTypePromProbe         ErrorType = "PROM_PROBE_ERROR"
+	FailureTypePromProbe       ErrorType = "PROM_PROBE_FAILURE"
 )
 
 type userFriendly interface {
