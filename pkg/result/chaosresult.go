@@ -77,7 +77,7 @@ func ChaosResult(chaosDetails *types.ChaosDetails, clients clients.ClientSets, r
 // InitializeChaosResult create the chaos result
 func InitializeChaosResult(chaosDetails *types.ChaosDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, chaosResultLabel map[string]string) error {
 
-	_, probeStatus := GetProbeStatus(resultDetails)
+	_, _, probeStatus := GetProbeStatus(resultDetails)
 	chaosResult := &v1alpha1.ChaosResult{
 		ObjectMeta: v1.ObjectMeta{
 			Name:      resultDetails.Name,
@@ -128,8 +128,9 @@ func InitializeChaosResult(chaosDetails *types.ChaosDetails, clients clients.Cli
 }
 
 // GetProbeStatus fetch status of all probes
-func GetProbeStatus(resultDetails *types.ResultDetails) (bool, []v1alpha1.ProbeStatuses) {
+func GetProbeStatus(resultDetails *types.ResultDetails) (bool, bool, []v1alpha1.ProbeStatuses) {
 	isAllProbePassed := true
+	experimentStopped := false
 
 	probeStatus := []v1alpha1.ProbeStatuses{}
 	for _, probe := range resultDetails.ProbeDetails {
@@ -141,12 +142,15 @@ func GetProbeStatus(resultDetails *types.ResultDetails) (bool, []v1alpha1.ProbeS
 		probeStatus = append(probeStatus, probes)
 		if probe.Status.Verdict == v1alpha1.ProbeVerdictFailed {
 			isAllProbePassed = false
+			if probe.Stopped {
+				experimentStopped = probe.Stopped
+			}
 		}
 	}
-	return isAllProbePassed, probeStatus
+	return isAllProbePassed, experimentStopped, probeStatus
 }
 
-func getFailStep(probeDetails []types.ProbeDetails, phase string) (string, string) {
+func getFailStep(probeDetails []*types.ProbeDetails, phase string) (string, string) {
 	var (
 		errList   []string
 		errCode   cerrors.ErrorType
@@ -175,7 +179,7 @@ func updateResultAttributes(clients clients.ClientSets, chaosDetails *types.Chao
 	}
 
 	updateHistory(result)
-	var isAllProbePassed bool
+	var isAllProbePassed, experimentStopped bool
 	result.Status.ExperimentStatus.Phase = resultDetails.Phase
 	result.Spec.InstanceID = chaosDetails.InstanceID
 	if resultDetails.FailureOutput != nil || resultDetails.Phase == v1alpha1.ResultPhaseRunning {
@@ -185,14 +189,13 @@ func updateResultAttributes(clients clients.ClientSets, chaosDetails *types.Chao
 	// for existing chaos result resource it will patch the label
 	result.ObjectMeta.Labels = chaosResultLabel
 	result.Status.History.Targets = chaosDetails.Targets
-	isAllProbePassed, result.Status.ProbeStatuses = GetProbeStatus(resultDetails)
+	isAllProbePassed, experimentStopped, result.Status.ProbeStatuses = GetProbeStatus(resultDetails)
 	result.Status.ExperimentStatus.Verdict = resultDetails.Verdict
 
 	switch strings.ToLower(string(resultDetails.Phase)) {
 	case "completed":
 		if !isAllProbePassed {
 			resultDetails.Verdict = "Fail"
-			result.Status.ExperimentStatus.Verdict = "Fail"
 			if result.Status.ExperimentStatus.FailureOutput == nil || result.Status.ExperimentStatus.FailureOutput.FailedStep == "" {
 				failStep, errCode := getFailStep(resultDetails.ProbeDetails, string(chaosDetails.Phase))
 				result.Status.ExperimentStatus.FailureOutput = &v1alpha1.FailureOutput{
@@ -200,6 +203,12 @@ func updateResultAttributes(clients clients.ClientSets, chaosDetails *types.Chao
 					ErrorCode:  errCode,
 				}
 			}
+			//ResultPhaseStopped will be used regardless of previous probe success/failure
+			if experimentStopped {
+				result.Status.ExperimentStatus.Phase = v1alpha1.ResultPhaseStopped
+				resultDetails.Verdict = v1alpha1.ResultVerdictStopped
+			}
+			result.Status.ExperimentStatus.Verdict = resultDetails.Verdict
 		}
 		switch strings.ToLower(string(resultDetails.Verdict)) {
 		case "pass":
