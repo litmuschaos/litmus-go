@@ -79,8 +79,7 @@ func triggerInlineCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.
 				return cerrors.Error{ErrorCode: cerrors.ErrorTypeCmdProbe, Target: fmt.Sprintf("{name: %v}", probe.Name), Reason: fmt.Sprintf("unable to run command: %s", out.String())}
 			}
 
-			rc := getAndIncrementRunCount(resultDetails, probe.Name)
-			description, err = validateResult(probe.CmdProbeInputs.Comparator, probe.Name, strings.TrimSpace(out.String()), rc)
+			description, err = validateResult(probe.CmdProbeInputs.Comparator, probe.Name, strings.TrimSpace(out.String()))
 			if err != nil {
 				if strings.TrimSpace(stdErr.String()) != "" {
 					return cerrors.Error{
@@ -130,8 +129,7 @@ func triggerSourceCmdProbe(probe v1alpha1.ProbeAttributes, execCommandDetails li
 				return stacktrace.Propagate(err, "unable to get output of cmd command")
 			}
 
-			rc := getAndIncrementRunCount(resultDetails, probe.Name)
-			if description, err = validateResult(probe.CmdProbeInputs.Comparator, probe.Name, strings.TrimSpace(output), rc); err != nil {
+			if description, err = validateResult(probe.CmdProbeInputs.Comparator, probe.Name, strings.TrimSpace(output)); err != nil {
 				if strings.TrimSpace(stdErr) != "" {
 					return cerrors.Error{
 						ErrorCode: cerrors.ErrorTypeCmdProbe,
@@ -504,10 +502,9 @@ loop:
 
 // validateResult validate the probe result to specified comparison operation
 // it supports int, float, string operands
-func validateResult(comparator v1alpha1.ComparatorInfo, probeName, cmdOutput string, rc int) (string, error) {
+func validateResult(comparator v1alpha1.ComparatorInfo, probeName, cmdOutput string) (string, error) {
 
-	compare := cmp.RunCount(rc).
-		FirstValue(cmdOutput).
+	compare := cmp.FirstValue(cmdOutput).
 		SecondValue(comparator.Value).
 		Criteria(comparator.Criteria).
 		ProbeName(probeName)

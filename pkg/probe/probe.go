@@ -134,17 +134,6 @@ func getProbesFromChaosEngine(chaosDetails *types.ChaosDetails, clients clients.
 	return nil, nil
 }
 
-// getAndIncrementRunCount return the run count for the specified probe
-func getAndIncrementRunCount(resultDetails *types.ResultDetails, probeName string) int {
-	for index, probe := range resultDetails.ProbeDetails {
-		if probeName == probe.Name {
-			resultDetails.ProbeDetails[index].RunCount++
-			return resultDetails.ProbeDetails[index].RunCount
-		}
-	}
-	return 0
-}
-
 // getRunIDFromProbe return the run_id for the dedicated probe
 // which will used in the continuous cmd probe, run_id is used as suffix in the external pod name
 func getRunIDFromProbe(resultDetails *types.ResultDetails, probeName, probeType string) string {
