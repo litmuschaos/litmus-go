@@ -173,7 +173,7 @@ func updateResultAttributes(clients clients.ClientSets, chaosDetails *types.Chao
 	switch strings.ToLower(string(resultDetails.Phase)) {
 	case "completed", "error", "stopped":
 		if !isAllProbePassed {
-			result.Status.ExperimentStatus.Phase = v1alpha1.ResultPhaseCompletedWithError
+			result.Status.ExperimentStatus.Phase = v1alpha1.ResultPhaseCompletedWithProbeFailure
 			resultDetails.Verdict = v1alpha1.ResultVerdictFailed
 			if experimentStopped {
 				result.Status.ExperimentStatus.Phase = v1alpha1.ResultPhaseStopped
