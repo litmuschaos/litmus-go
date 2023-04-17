@@ -17,7 +17,9 @@ func (model Model) CompareInt(errorCode cerrors.ErrorType) error {
 	obj := Integer{}
 	obj.setValues(reflect.ValueOf(model.a).String(), reflect.ValueOf(model.b).String())
 
-	log.Infof("[Probe]: {Actual value: %v}, {Expected value: %v}, {Operator: %v}", obj.a, obj.b, model.operator)
+	if model.rc == 1 {
+		log.Infof("[Probe]: {Actual value: %v}, {Expected value: %v}, {Operator: %v}", obj.a, obj.b, model.operator)
+	}
 
 	switch model.operator {
 	case ">=":

@@ -87,6 +87,7 @@ type ProbeDetails struct {
 	IsProbeFailedWithError error
 	Failed                 bool
 	RunID                  string
+	RunCount               int
 	Stopped                bool
 }
 
@@ -384,6 +385,7 @@ func InitializeProbesInChaosResultDetails(chaosresult *ResultDetails, probes []v
 		tempProbe.Name = probe.Name
 		tempProbe.Type = probe.Type
 		tempProbe.Mode = probe.Mode
+		tempProbe.RunCount = 0
 		tempProbe.Status = v1alpha1.ProbeStatus{
 			Verdict: "Awaited",
 		}

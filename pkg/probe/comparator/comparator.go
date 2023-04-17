@@ -6,7 +6,20 @@ type Model struct {
 	a         interface{}
 	b         interface{}
 	operator  string
+	rc        int
 	probeName string
+}
+
+// RunCount sets the run counts
+func RunCount(rc int) *Model {
+	model := Model{}
+	return model.RunCount(rc)
+}
+
+// RunCount sets the run counts
+func (model *Model) RunCount(rc int) *Model {
+	model.rc = rc
+	return model
 }
 
 // FirstValue sets the first operands
