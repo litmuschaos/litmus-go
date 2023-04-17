@@ -150,28 +150,6 @@ func GetProbeStatus(resultDetails *types.ResultDetails) (bool, bool, []v1alpha1.
 	return isAllProbePassed, experimentStopped, probeStatus
 }
 
-func getFailStep(probeDetails []*types.ProbeDetails, phase string) (string, string) {
-	var (
-		errList   []string
-		errCode   cerrors.ErrorType
-		rootCause string
-	)
-	for _, probe := range probeDetails {
-		if probe.IsProbeFailedWithError != nil {
-			rootCause, errCode = cerrors.GetRootCauseAndErrorCode(probe.IsProbeFailedWithError, phase)
-			errList = append(errList, rootCause)
-		}
-	}
-
-	if len(errList) != 0 {
-		if len(errList) == 1 {
-			return errList[0], string(errCode)
-		}
-		return fmt.Sprintf("[%v]", strings.Join(errList, ",")), string(cerrors.ErrorTypeGeneric)
-	}
-	return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: "probe didn't met the passing criteria"}.Error(), string(cerrors.ErrorTypeGeneric)
-}
-
 func updateResultAttributes(clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, chaosResultLabel map[string]string) (*v1alpha1.ChaosResult, error) {
 	result, err := GetChaosStatus(resultDetails, chaosDetails, clients)
 	if err != nil {
@@ -277,7 +255,7 @@ func RecordAfterFailure(chaosDetails *types.ChaosDetails, resultDetails *types.R
 	failStep, errorCode := cerrors.GetRootCauseAndErrorCode(err, string(chaosDetails.Phase))
 	phase := v1alpha1.ResultPhaseError
 	verdict := v1alpha1.ResultVerdictError
-	if isProbeFailedErrorCode(failStep) {
+	if probe.IsProbeFailed(failStep) {
 		phase = v1alpha1.ResultPhaseCompleted
 		verdict = v1alpha1.ResultVerdictFailed
 	}
@@ -302,13 +280,6 @@ func RecordAfterFailure(chaosDetails *types.ChaosDetails, resultDetails *types.R
 			log.Errorf("failed to create %v event inside chaosengine", types.Summary)
 		}
 	}
-}
-
-func isProbeFailedErrorCode(reason string) bool {
-	if strings.Contains(reason, string(cerrors.ErrorTypeK8sProbe)) || strings.Contains(reason, string(cerrors.ErrorTypePromProbe)) || strings.Contains(reason, string(cerrors.ErrorTypeCmdProbe)) || strings.Contains(reason, string(cerrors.ErrorTypeHttpProbe)) {
-		return true
-	}
-	return false
 }
 
 // updateHistory initialise the history for the older results
