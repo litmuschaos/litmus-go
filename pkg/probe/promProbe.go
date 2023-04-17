@@ -65,7 +65,9 @@ func preChaosPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resu
 		}
 
 		// triggering the prom probe and storing the output into the out buffer
-		err = triggerPromProbe(probe, resultDetails)
+		if err = triggerPromProbe(probe, resultDetails); err != nil && cerrors.GetErrorType(err) != cerrors.FailureTypePromProbe {
+			return err
+		}
 
 		// failing the probe, if the success condition doesn't met after the retry & timeout combinations
 		// it will update the status of all the unrun probes as well
@@ -117,7 +119,9 @@ func postChaosPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Res
 		}
 
 		// triggering the prom probe and storing the output into the out buffer
-		err = triggerPromProbe(probe, resultDetails)
+		if err = triggerPromProbe(probe, resultDetails); err != nil && cerrors.GetErrorType(err) != cerrors.FailureTypePromProbe {
+			return err
+		}
 
 		// failing the probe, if the success condition doesn't met after the retry & timeout combinations
 		// it will update the status of all the unrun probes as well
@@ -128,7 +132,9 @@ func postChaosPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Res
 	case "continuous", "onchaos":
 
 		// it will check for the error, It will detect the error if any error encountered in probe during chaos
-		err = checkForErrorInContinuousProbe(resultDetails, probe.Name)
+		if err = checkForErrorInContinuousProbe(resultDetails, probe.Name); err != nil && cerrors.GetErrorType(err) != cerrors.FailureTypePromProbe {
+			return err
+		}
 
 		// failing the probe, if the success condition doesn't met after the retry & timeout combinations
 		if err = markedVerdictInEnd(err, resultDetails, probe, "PostChaos"); err != nil {
@@ -204,11 +210,11 @@ func triggerPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 				SecondValue(probe.PromProbeInputs.Comparator.Value).
 				Criteria(probe.PromProbeInputs.Comparator.Criteria).
 				ProbeName(probe.Name).
-				CompareFloat(cerrors.ErrorTypePromProbe); err != nil {
+				CompareFloat(cerrors.FailureTypePromProbe); err != nil {
 				log.Errorf("The %v prom probe has been Failed, err: %v", probe.Name, err)
 				return err
 			}
-			description = fmt.Sprintf("Probe responded with a valid prometheus metrics value. Actual and Expected status values are %s and %s respectively", value, probe.PromProbeInputs.Comparator.Value)
+			description = fmt.Sprintf("Obtained the specified prometheus metrics. Actual value: %s. Expected value: %s", value, probe.PromProbeInputs.Comparator.Value)
 			return nil
 		}); err != nil {
 		return err

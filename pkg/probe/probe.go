@@ -335,3 +335,11 @@ func getAttempts(attempt, retries int) int {
 	}
 	return attempt
 }
+
+func IsProbeFailed(reason string) bool {
+	if strings.Contains(reason, string(cerrors.FailureTypeK8sProbe)) || strings.Contains(reason, string(cerrors.FailureTypePromProbe)) ||
+		strings.Contains(reason, string(cerrors.FailureTypeCmdProbe)) || strings.Contains(reason, string(cerrors.FailureTypeHttpProbe)) {
+		return true
+	}
+	return false
+}
