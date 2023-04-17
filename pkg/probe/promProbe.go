@@ -205,8 +205,10 @@ func triggerPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 				return err
 			}
 
+			rc := getAndIncrementRunCount(resultDetails, probe.Name)
 			// comparing the metrics output with the expected criteria
-			if err = cmp.FirstValue(value).
+			if err = cmp.RunCount(rc).
+				FirstValue(value).
 				SecondValue(probe.PromProbeInputs.Comparator.Value).
 				Criteria(probe.PromProbeInputs.Comparator.Criteria).
 				ProbeName(probe.Name).
