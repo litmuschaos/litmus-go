@@ -22,15 +22,15 @@ func (model Model) CompareString(errorCode cerrors.ErrorType) error {
 	switch model.operator {
 	case "equal", "Equal":
 		if !obj.isEqual() {
-			return cerrors.Error{ErrorCode: errorCode, Target: model.probeName, Reason: fmt.Sprintf("Probe responded with an invalid output. Actual value: %v is not equal to the Expected value: %v", obj.a, obj.b)}
+			return cerrors.Error{ErrorCode: errorCode, Target: model.probeName, Reason: fmt.Sprintf("Actual value: %v. Expected value: equal to %v", obj.a, obj.b)}
 		}
 	case "notEqual", "NotEqual":
 		if !obj.isNotEqual() {
-			return cerrors.Error{ErrorCode: errorCode, Target: model.probeName, Reason: fmt.Sprintf("Probe responded with an invalid output. Actual value: %v should not matched with the Expected value: %v", obj.a, obj.b)}
+			return cerrors.Error{ErrorCode: errorCode, Target: model.probeName, Reason: fmt.Sprintf("Actual value: %v. Expected value: should not be equal to %v", obj.a, obj.b)}
 		}
 	case "contains", "Contains":
 		if !obj.isContains() {
-			return cerrors.Error{ErrorCode: errorCode, Target: model.probeName, Reason: fmt.Sprintf("Probe responded with an invalid output. Actual value: %v doesn't contain Expected value: %v", obj.a, obj.b)}
+			return cerrors.Error{ErrorCode: errorCode, Target: model.probeName, Reason: fmt.Sprintf("Actual value: %v. Expected value: should contain %v", obj.a, obj.b)}
 		}
 	case "matches", "Matches":
 		re, err := regexp.Compile(obj.b)
@@ -38,7 +38,7 @@ func (model Model) CompareString(errorCode cerrors.ErrorType) error {
 			return cerrors.Error{ErrorCode: errorCode, Target: model.probeName, Reason: fmt.Sprintf("The probe regex '%s' is not a valid expression", obj.b)}
 		}
 		if !obj.isMatched(re) {
-			return cerrors.Error{ErrorCode: errorCode, Target: model.probeName, Reason: fmt.Sprintf("Probe responded with an invalid output. Actual value: %v is not matched with the Expected regex: %v", obj.a, obj.b)}
+			return cerrors.Error{ErrorCode: errorCode, Target: model.probeName, Reason: fmt.Sprintf("Actual value: %v. Expected value: should match regex %v", obj.a, obj.b)}
 		}
 	case "notMatches", "NotMatches":
 		re, err := regexp.Compile(obj.b)
@@ -46,11 +46,11 @@ func (model Model) CompareString(errorCode cerrors.ErrorType) error {
 			return cerrors.Error{ErrorCode: errorCode, Target: model.probeName, Reason: fmt.Sprintf("The probe regex '%s' is not a valid expression", obj.b)}
 		}
 		if obj.isMatched(re) {
-			return cerrors.Error{ErrorCode: errorCode, Target: model.probeName, Reason: fmt.Sprintf("Probe responded with an invalid output. Actual value: %v should not matched with Expected regex: %v", obj.a, obj.b)}
+			return cerrors.Error{ErrorCode: errorCode, Target: model.probeName, Reason: fmt.Sprintf("Actual value: %v. Expected value: should not match regex: %v", obj.a, obj.b)}
 		}
 	case "oneOf", "OneOf":
 		if !obj.isOneOf() {
-			return cerrors.Error{ErrorCode: errorCode, Target: model.probeName, Reason: fmt.Sprintf("Probe responded with an invalid output. Actual value: %v doesn't matched any of the the Expected values: %v", obj.a, obj.c)}
+			return cerrors.Error{ErrorCode: errorCode, Target: model.probeName, Reason: fmt.Sprintf("Actual value: %v. Expected values: should match one of following [%v]", obj.a, obj.c)}
 		}
 	default:
 		return cerrors.Error{ErrorCode: errorCode, Target: model.probeName, Reason: fmt.Sprintf("criteria '%s' not supported in the probe", model.operator)}

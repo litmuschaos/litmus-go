@@ -208,7 +208,7 @@ func triggerPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 				log.Errorf("The %v prom probe has been Failed, err: %v", probe.Name, err)
 				return err
 			}
-			description = fmt.Sprintf("Probe responded with a valid prometheus metrics value. Actual and Expected status values are %s and %s respectively", value, probe.PromProbeInputs.Comparator.Value)
+			description = fmt.Sprintf("Obtained the specified prometheus metrics. Actual value: %s. Expected value: %s", value, probe.PromProbeInputs.Comparator.Value)
 			return nil
 		}); err != nil {
 		return err

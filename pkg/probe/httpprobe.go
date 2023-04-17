@@ -128,7 +128,7 @@ func httpGet(probe v1alpha1.ProbeAttributes, client *http.Client, resultDetails 
 				log.Errorf("The %v http probe get method has Failed, err: %v", probe.Name, err)
 				return err
 			}
-			description = fmt.Sprintf("The URL %s did respond with correct status code. Actual and Expected status codes are '%s' and '%s' respectively", probe.HTTPProbeInputs.URL, code, probe.HTTPProbeInputs.Method.Get.ResponseCode)
+			description = fmt.Sprintf("The URL %s did respond with correct status code. Actual code: '%s'. Expected code: '%s'", probe.HTTPProbeInputs.URL, code, probe.HTTPProbeInputs.Method.Get.ResponseCode)
 			return nil
 		}); err != nil {
 		return err
@@ -167,7 +167,7 @@ func httpPost(probe v1alpha1.ProbeAttributes, client *http.Client, resultDetails
 				log.Errorf("The %v http probe post method has Failed, err: %v", probe.Name, err)
 				return err
 			}
-			description = fmt.Sprintf("The URL %s did respond with correct status code. Actual and Expected status codes are '%s' and '%s' respectively", probe.HTTPProbeInputs.URL, code, probe.HTTPProbeInputs.Method.Get.ResponseCode)
+			description = fmt.Sprintf("The URL %s did respond with correct status code. Actual code: '%s'. Expected code: '%s'", probe.HTTPProbeInputs.URL, code, probe.HTTPProbeInputs.Method.Get.ResponseCode)
 			return nil
 		}); err != nil {
 		return err

@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/litmuschaos/litmus-go/pkg/utils/stringutils"
 	"os/exec"
 	"reflect"
 	"strings"
 	"time"
+
+	"github.com/litmuschaos/litmus-go/pkg/utils/stringutils"
 
 	"github.com/litmuschaos/chaos-operator/api/litmuschaos/v1alpha1"
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
@@ -525,7 +526,7 @@ func validateResult(comparator v1alpha1.ComparatorInfo, probeName, cmdOutput str
 	default:
 		return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Target: fmt.Sprintf("{name: %v}", probeName), Reason: fmt.Sprintf("comparator type '%s' not supported in the cmd probe", comparator.Type)}
 	}
-	description := fmt.Sprintf("Probe responded with a valid output. Actual and Expected values are '%s' and '%s' respectively", cmdOutput, comparator.Value)
+	description := fmt.Sprintf("Actual value: '%s'. Expected value: '%s'", cmdOutput, comparator.Value)
 	return description, nil
 }
 

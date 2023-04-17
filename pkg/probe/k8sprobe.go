@@ -112,7 +112,7 @@ func triggerK8sProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets,
 			default:
 				return cerrors.Error{ErrorCode: cerrors.ErrorTypeK8sProbe, Target: fmt.Sprintf("{name: %v}", probe.Name), Reason: fmt.Sprintf("operation type '%s' not supported in the k8s probe", inputs.Operation)}
 			}
-			description = fmt.Sprintf("Probe is successfully performed the '%s' operation on kubernetes resource", probe.K8sProbeInputs.Operation)
+			description = fmt.Sprintf("Probe successfully performed the '%s' operation on the specified Kubernetes resource", probe.K8sProbeInputs.Operation)
 			return nil
 		}); err != nil {
 		return err
