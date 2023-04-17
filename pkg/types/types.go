@@ -89,6 +89,15 @@ type ProbeDetails struct {
 	RunID                  string
 	RunCount               int
 	Stopped                bool
+	Timeouts               ProbeTimeouts
+}
+
+type ProbeTimeouts struct {
+	ProbeTimeout         time.Duration
+	Interval             time.Duration
+	ProbePollingInterval time.Duration
+	InitialDelay         time.Duration
+	EvaluationTimeout    time.Duration
 }
 
 // EventDetails is for collecting all the events-related details
@@ -305,7 +314,9 @@ func GetValuesFromChaosEngine(chaosDetails *ChaosDetails, clients clients.Client
 	// get all the probes defined inside chaosengine for the corresponding experiment
 	for _, experiment := range engine.Spec.Experiments {
 		if experiment.Name == chaosDetails.ExperimentName {
-			InitializeProbesInChaosResultDetails(chaosresult, experiment.Spec.Probe)
+			if err := InitializeProbesInChaosResultDetails(chaosresult, experiment.Spec.Probe); err != nil {
+				return stacktrace.Propagate(err, "could not initialize probe")
+			}
 			InitializeSidecarDetails(chaosDetails, engine, experiment.Spec.Components.ENV)
 		}
 	}
@@ -376,7 +387,7 @@ func getEnvSource(apiVersion string, fieldPath string) *corev1.EnvVarSource {
 	return &downwardENV
 }
 
-func InitializeProbesInChaosResultDetails(chaosresult *ResultDetails, probes []v1alpha1.ProbeAttributes) {
+func InitializeProbesInChaosResultDetails(chaosresult *ResultDetails, probes []v1alpha1.ProbeAttributes) error {
 	var probeDetails []*ProbeDetails
 
 	// set the probe details for k8s probe
@@ -389,9 +400,54 @@ func InitializeProbesInChaosResultDetails(chaosresult *ResultDetails, probes []v
 		tempProbe.Status = v1alpha1.ProbeStatus{
 			Verdict: "Awaited",
 		}
+		tempProbe.Timeouts, err = parseProbeTimeouts(probe)
+		if err != nil {
+			return err
+		}
 		probeDetails = append(probeDetails, tempProbe)
 	}
 
 	chaosresult.ProbeDetails = probeDetails
 	chaosresult.ProbeArtifacts = map[string]ProbeArtifact{}
+	return nil
+}
+
+func parseProbeTimeouts(probe v1alpha1.ProbeAttributes) (ProbeTimeouts, error) {
+	var timeout ProbeTimeouts
+	timeout.ProbeTimeout, err = parseDuration(probe.RunProperties.ProbeTimeout)
+	if err != nil {
+		return timeout, generateError(probe.Name, probe.Type, "ProbeTimeout", err)
+	}
+	timeout.Interval, err = parseDuration(probe.RunProperties.Interval)
+	if err != nil {
+		return timeout, generateError(probe.Name, probe.Type, "Interval", err)
+	}
+	timeout.ProbePollingInterval, err = parseDuration(probe.RunProperties.ProbePollingInterval)
+	if err != nil {
+		return timeout, generateError(probe.Name, probe.Type, "ProbePollingInterval", err)
+	}
+	timeout.InitialDelay, err = parseDuration(probe.RunProperties.InitialDelay)
+	if err != nil {
+		return timeout, generateError(probe.Name, probe.Type, "InitialDelay", err)
+	}
+	timeout.EvaluationTimeout, err = parseDuration(probe.RunProperties.EvaluationTimeout)
+	if err != nil {
+		return timeout, generateError(probe.Name, probe.Type, "EvaluationTimeout", err)
+	}
+	return timeout, nil
+}
+
+func parseDuration(duration string) (time.Duration, error) {
+	if strings.TrimSpace(duration) == "" {
+		return 0, nil
+	}
+	return time.ParseDuration(duration)
+}
+
+func generateError(probeName, probeType, field string, err error) error {
+	return cerrors.Error{
+		ErrorCode: cerrors.ErrorTypeGeneric,
+		Reason:    fmt.Sprintf("Invalid probe runProperties field '%s': %s", field, err.Error()),
+		Target:    fmt.Sprintf("{probeName: %s, type: %s}", probeName, probeType),
+	}
 }

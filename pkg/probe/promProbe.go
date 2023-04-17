@@ -43,6 +43,7 @@ func preparePromProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets
 
 // preChaosPromProbe trigger the prometheus probe for prechaos phase
 func preChaosPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
+	probeTimeout := getProbeTimeouts(probe.Name, resultDetails.ProbeDetails)
 
 	switch strings.ToLower(probe.Mode) {
 	case "sot", "edge":
@@ -59,9 +60,9 @@ func preChaosPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resu
 		})
 
 		// waiting for initial delay
-		if probe.RunProperties.InitialDelaySeconds != 0 {
-			log.Infof("[Wait]: Waiting for %vs before probe execution", probe.RunProperties.InitialDelaySeconds)
-			time.Sleep(time.Duration(probe.RunProperties.InitialDelaySeconds) * time.Second)
+		if probeTimeout.InitialDelay != 0 {
+			log.Infof("[Wait]: Waiting for %v before probe execution", probe.RunProperties.InitialDelay)
+			time.Sleep(probeTimeout.InitialDelay)
 		}
 
 		// triggering the prom probe and storing the output into the out buffer
@@ -97,6 +98,7 @@ func preChaosPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resu
 
 // postChaosPromProbe trigger the prometheus probe for postchaos phase
 func postChaosPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
+	probeTimeout := getProbeTimeouts(probe.Name, resultDetails.ProbeDetails)
 
 	switch strings.ToLower(probe.Mode) {
 	case "eot", "edge":
@@ -113,9 +115,9 @@ func postChaosPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Res
 		})
 
 		// waiting for initial delay
-		if probe.RunProperties.InitialDelaySeconds != 0 {
-			log.Infof("[Wait]: Waiting for %vs before probe execution", probe.RunProperties.InitialDelaySeconds)
-			time.Sleep(time.Duration(probe.RunProperties.InitialDelaySeconds) * time.Second)
+		if probeTimeout.InitialDelay != 0 {
+			log.Infof("[Wait]: Waiting for %v before probe execution", probe.RunProperties.InitialDelay)
+			time.Sleep(probeTimeout.InitialDelay)
 		}
 
 		// triggering the prom probe and storing the output into the out buffer
@@ -170,14 +172,16 @@ func onChaosPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 
 // triggerPromProbe trigger the prometheus probe inside the external pod
 func triggerPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails) error {
+	probeTimeout := getProbeTimeouts(probe.Name, resultDetails.ProbeDetails)
+
 	var description string
 	// running the prom probe command and matching the output
 	// it will retry for some retry count, in each iteration of try it contains following things
 	// it contains a timeout per iteration of retry. if the timeout expires without success then it will go to next try
 	// for a timeout, it will run the command, if it fails wait for the interval and again execute the command until timeout expires
 	if err := retry.Times(uint(getAttempts(probe.RunProperties.Attempt, probe.RunProperties.Retry))).
-		Timeout(int64(probe.RunProperties.ProbeTimeout)).
-		Wait(time.Duration(probe.RunProperties.Interval) * time.Millisecond).
+		Timeout(probeTimeout.ProbeTimeout).
+		Wait(probeTimeout.Interval).
 		TryWithTimeout(func(attempt uint) error {
 			var command string
 			// It will use query or queryPath to get the prometheus metrics
@@ -219,7 +223,7 @@ func triggerPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 			description = fmt.Sprintf("Obtained the specified prometheus metrics. Actual value: %s. Expected value: %s", value, probe.PromProbeInputs.Comparator.Value)
 			return nil
 		}); err != nil {
-		return err
+		return checkProbeTimeoutError(probe.Name, cerrors.FailureTypePromProbe, err)
 	}
 	setProbeDescription(resultDetails, probe, description)
 	return nil
@@ -227,12 +231,13 @@ func triggerPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 
 // triggerContinuousPromProbe trigger the continuous prometheus probe
 func triggerContinuousPromProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets, chaosresult *types.ResultDetails, chaosDetails *types.ChaosDetails) {
+	probeTimeout := getProbeTimeouts(probe.Name, chaosresult.ProbeDetails)
 
 	var isExperimentFailed bool
 	// waiting for initial delay
-	if probe.RunProperties.InitialDelaySeconds != 0 {
-		log.Infof("[Wait]: Waiting for %vs before probe execution", probe.RunProperties.InitialDelaySeconds)
-		time.Sleep(time.Duration(probe.RunProperties.InitialDelaySeconds) * time.Second)
+	if probeTimeout.InitialDelay != 0 {
+		log.Infof("[Wait]: Waiting for %v before probe execution", probe.RunProperties.InitialDelay)
+		time.Sleep(probeTimeout.InitialDelay)
 	}
 
 	// it trigger the prom probe for the entire duration of chaos and it fails, if any err encounter
@@ -254,7 +259,7 @@ loop:
 			}
 		}
 		// waiting for the probe polling interval
-		time.Sleep(time.Duration(probe.RunProperties.ProbePollingInterval) * time.Second)
+		time.Sleep(probeTimeout.ProbePollingInterval)
 	}
 	// if experiment fails and stopOnfailure is provided as true then it will patch the chaosengine for abort
 	// if experiment fails but stopOnfailure is provided as false then it will continue the execution
@@ -268,14 +273,15 @@ loop:
 
 // triggerOnChaosPromProbe trigger the onchaos prom probe
 func triggerOnChaosPromProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets, chaosresult *types.ResultDetails, chaosDetails *types.ChaosDetails) {
+	probeTimeout := getProbeTimeouts(probe.Name, chaosresult.ProbeDetails)
 
 	var isExperimentFailed bool
 	duration := chaosDetails.ChaosDuration
 	// waiting for initial delay
-	if probe.RunProperties.InitialDelaySeconds != 0 {
-		log.Infof("[Wait]: Waiting for %vs before probe execution", probe.RunProperties.InitialDelaySeconds)
-		time.Sleep(time.Duration(probe.RunProperties.InitialDelaySeconds) * time.Second)
-		duration = math.Maximum(0, duration-probe.RunProperties.InitialDelaySeconds)
+	if probeTimeout.InitialDelay != 0 {
+		log.Infof("[Wait]: Waiting for %v before probe execution", probe.RunProperties.InitialDelay)
+		time.Sleep(probeTimeout.InitialDelay)
+		duration = math.Maximum(0, duration-int(probeTimeout.InitialDelay))
 	}
 
 	endTime := time.After(time.Duration(duration) * time.Second)
@@ -304,7 +310,7 @@ loop:
 				}
 			}
 			// waiting for the probe polling interval
-			time.Sleep(time.Duration(probe.RunProperties.ProbePollingInterval) * time.Second)
+			time.Sleep(probeTimeout.ProbePollingInterval)
 		}
 	}
 	// if experiment fails and stopOnfailure is provided as true then it will patch the chaosengine for abort

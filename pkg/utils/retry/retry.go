@@ -15,7 +15,7 @@ type Action func(attempt uint) error
 type Model struct {
 	retry    uint
 	waitTime time.Duration
-	timeout  int64
+	timeout  time.Duration
 }
 
 // Times is used to define the retry count
@@ -48,14 +48,14 @@ func (model *Model) Wait(waitTime time.Duration) *Model {
 
 // Timeout is used to define the timeout duration for each iteration of retry
 // it will run if the instance of model is not present before
-func Timeout(timeout int64) *Model {
+func Timeout(timeout time.Duration) *Model {
 	model := Model{}
 	return model.Timeout(timeout)
 }
 
 // Timeout is used to define the timeout duration for each iteration of retry
 // it will run if the instance of model is already present
-func (model *Model) Timeout(timeout int64) *Model {
+func (model *Model) Timeout(timeout time.Duration) *Model {
 	model.timeout = timeout
 	return model
 }
@@ -67,7 +67,7 @@ func (model Model) Try(action Action) error {
 	}
 
 	var err error
-	for attempt := uint(0); (attempt == 0 || err != nil) && attempt <= model.retry; attempt++ {
+	for attempt := uint(0); (attempt == 0 || err != nil) && attempt < model.retry; attempt++ {
 		err = action(attempt)
 		if model.waitTime > 0 {
 			time.Sleep(model.waitTime)
@@ -91,10 +91,10 @@ func (model Model) TryWithTimeout(action Action) error {
 	for attempt := uint(0); (attempt == 0 || err != nil) && attempt < model.retry; {
 		startTime := time.Now().UnixMilli()
 		err = action(attempt)
-		if err == nil && time.Now().UnixMilli()-startTime >= model.timeout {
+		if err == nil && time.Now().UnixMilli()-startTime >= model.timeout.Milliseconds() {
 			err = cerrors.Error{
-				ErrorCode: cerrors.ErrorTypeGeneric,
-				Reason:    "probe is failed due to timeout",
+				ErrorCode: cerrors.ErrorTypeTimeout,
+				Reason:    "action timeout",
 			}
 		}
 		attempt++
