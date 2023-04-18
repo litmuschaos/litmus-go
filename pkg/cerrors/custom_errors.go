@@ -28,6 +28,7 @@ const (
 	FailureTypeHttpProbe       ErrorType = "HTTP_PROBE_FAILURE"
 	ErrorTypePromProbe         ErrorType = "PROM_PROBE_ERROR"
 	FailureTypePromProbe       ErrorType = "PROM_PROBE_FAILURE"
+	ErrorTypeTimeout           ErrorType = "TIMEOUT"
 )
 
 type userFriendly interface {
@@ -44,6 +45,10 @@ func IsUserFriendly(err error) bool {
 // GetErrorType returns the type of error if the error is user-friendly
 func GetErrorType(err error) ErrorType {
 	if ufe, ok := err.(userFriendly); ok {
+		return ufe.ErrorType()
+	}
+	rootCause := stacktrace.RootCause(err)
+	if ufe, ok := rootCause.(userFriendly); ok {
 		return ufe.ErrorType()
 	}
 	return ErrorTypeNonUserFriendly

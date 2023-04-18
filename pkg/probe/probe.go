@@ -234,6 +234,14 @@ func getProbeByName(name string, probeDetails []*types.ProbeDetails) *types.Prob
 	return nil
 }
 
+func getProbeTimeouts(name string, probeDetails []*types.ProbeDetails) types.ProbeTimeouts {
+	probe := getProbeByName(name, probeDetails)
+	if probe != nil {
+		return probe.Timeouts
+	}
+	return types.ProbeTimeouts{}
+}
+
 func getDescription(err error) string {
 	rootCause := stacktrace.RootCause(err)
 	if error, ok := rootCause.(cerrors.Error); ok {
@@ -353,4 +361,16 @@ func IsProbeFailed(reason string) bool {
 		return true
 	}
 	return false
+}
+
+func checkProbeTimeoutError(name string, code cerrors.ErrorType, probeErr error) error {
+	log.Infof("name: %s, err: %v", name, probeErr)
+	if cerrors.GetErrorType(probeErr) == cerrors.ErrorTypeTimeout {
+		return cerrors.Error{
+			ErrorCode: code,
+			Target:    fmt.Sprintf("{name: %s}", name),
+			Reason:    "probe failed due to timeout",
+		}
+	}
+	return probeErr
 }

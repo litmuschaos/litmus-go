@@ -40,7 +40,7 @@ func (model Model) CompareInt(errorCode cerrors.ErrorType) error {
 		}
 	case "==":
 		if !obj.isEqual() {
-			return cerrors.Error{ErrorCode: errorCode, Target: model.probeName, Reason: fmt.Sprintf("Actual value: %v. Expected value: should not be equal to %v", obj.a, obj.b)}
+			return cerrors.Error{ErrorCode: errorCode, Target: model.probeName, Reason: fmt.Sprintf("Actual value: %v. Expected value: should be equal to %v", obj.a, obj.b)}
 		}
 	case "!=":
 		if !obj.isNotEqual() {
