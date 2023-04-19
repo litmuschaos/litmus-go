@@ -2,10 +2,6 @@
 name: Security Scan
 on:
   workflow_dispatch:
-    inputs:   
-      snyk_token:
-        description: 'snyk token'
-        required: true
 
 jobs:
   snyk:
@@ -15,7 +11,7 @@ jobs:
       - name: Run Snyk to check for vulnerabilities
         uses: snyk/actions/golang@master
         env:
-          SNYK_TOKEN: ${{ github.event.inputs.snyk_token }}
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
 
   trivy:
     runs-on: ubuntu-latest
