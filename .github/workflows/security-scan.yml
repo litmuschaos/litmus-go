@@ -3,7 +3,7 @@ name: Security Scan
 on:
   workflow_dispatch:
     inputs:   
-      snyk-token:
+      snyk_token:
         description: 'snyk token'
         required: true
 
@@ -17,7 +17,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - uses: snyk/actions/setup@master
-      - run: snyk auth ${{ github.event.inputs.release_tag }}
+      - run: snyk auth ${{ github.event.inputs.snyk_token }}
       - uses: actions/setup-go@v1
         with:
           go-version: 1.18
