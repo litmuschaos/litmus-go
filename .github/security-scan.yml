@@ -1,0 +1,48 @@
+---
+name: Security Scan
+on:
+  workflow_dispatch:
+    inputs:   
+      snyk-token:
+        description: 'snyk token'
+        required: true
+
+jobs:
+  snyk:
+    container:
+      image: litmuschaos/snyk:1.0
+      volumes:
+      - /home/runner/work/_actions/:/home/runner/work/_actions/
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: snyk/actions/setup@master
+      - run: snyk auth ${{ github.event.inputs.release_tag }}
+      - uses: actions/setup-go@v1
+        with:
+          go-version: 1.18
+      - name: Snyk monitor
+        run: snyk test
+
+
+  trivy:
+    needs: pre-checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Build an image from Dockerfile
+        run: |
+          docker build -f build/Dockerfile -t docker.io/litmuschaos/go-runner:${{ github.sha }} . --build-arg TARGETARCH=amd64
+      
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'docker.io/litmuschaos/go-runner:${{ github.sha }}'
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
