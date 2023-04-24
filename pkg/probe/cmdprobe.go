@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
-	"reflect"
 	"strings"
 	"time"
 
@@ -158,7 +157,7 @@ func triggerSourceCmdProbe(probe v1alpha1.ProbeAttributes, execCommandDetails li
 }
 
 // createProbePod creates an external pod with source image for the cmd probe
-func createProbePod(clients clients.ClientSets, chaosDetails *types.ChaosDetails, runID string, source v1alpha1.SourceDetails, probeName string) error {
+func createProbePod(clients clients.ClientSets, chaosDetails *types.ChaosDetails, runID string, source *v1alpha1.SourceDetails, probeName string) error {
 	//deriving serviceAccount name for the probe pod
 	svcAccount, err := getServiceAccount(chaosDetails.ChaosNamespace, chaosDetails.ChaosPodName, probeName, clients)
 	if err != nil {
@@ -208,7 +207,7 @@ func createProbePod(clients clients.ClientSets, chaosDetails *types.ChaosDetails
 }
 
 // inheritInputs will inherit the experiment details(ENVs and volumes) to the probe pod based on inheritInputs flag
-func inheritInputs(clients clients.ClientSets, chaosNS, chaosPodName string, source v1alpha1.SourceDetails) ([]apiv1.EnvVar, []apiv1.Volume, []apiv1.VolumeMount) {
+func inheritInputs(clients clients.ClientSets, chaosNS, chaosPodName string, source *v1alpha1.SourceDetails) ([]apiv1.EnvVar, []apiv1.Volume, []apiv1.VolumeMount) {
 
 	if !source.InheritInputs {
 		return source.ENVList, source.Volumes, source.VolumesMount
@@ -566,7 +565,7 @@ func preChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 		}
 
 		// triggering the cmd probe for the inline mode
-		if reflect.DeepEqual(probe.CmdProbeInputs.Source, v1alpha1.SourceDetails{}) {
+		if isInlineProbe(probe.CmdProbeInputs) {
 			if err = triggerInlineCmdProbe(probe, resultDetails); err != nil && cerrors.GetErrorType(err) != cerrors.FailureTypeCmdProbe {
 				return err
 			}
@@ -615,7 +614,7 @@ func preChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 			"Mode":           probe.Mode,
 			"Phase":          "PreChaos",
 		})
-		if reflect.DeepEqual(probe.CmdProbeInputs.Source, v1alpha1.SourceDetails{}) {
+		if isInlineProbe(probe.CmdProbeInputs) {
 			go triggerInlineContinuousCmdProbe(probe, clients, resultDetails, chaosDetails)
 		} else {
 
@@ -657,7 +656,7 @@ func postChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resu
 		}
 
 		// triggering the cmd probe for the inline mode
-		if reflect.DeepEqual(probe.CmdProbeInputs.Source, v1alpha1.SourceDetails{}) {
+		if isInlineProbe(probe.CmdProbeInputs) {
 			if err = triggerInlineCmdProbe(probe, resultDetails); err != nil && cerrors.GetErrorType(err) != cerrors.FailureTypeCmdProbe {
 				return err
 			}
@@ -694,7 +693,7 @@ func postChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resu
 			}
 		}
 	case "Continuous", "OnChaos":
-		if reflect.DeepEqual(probe.CmdProbeInputs.Source, v1alpha1.SourceDetails{}) {
+		if isInlineProbe(probe.CmdProbeInputs) {
 			// it will check for the error, It will detect the error if any error encountered in probe during chaos
 			if err = checkForErrorInContinuousProbe(resultDetails, probe.Name); err != nil && cerrors.GetErrorType(err) != cerrors.FailureTypeCmdProbe {
 				return err
@@ -741,7 +740,7 @@ func onChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Result
 			"Mode":           probe.Mode,
 			"Phase":          "DuringChaos",
 		})
-		if reflect.DeepEqual(probe.CmdProbeInputs.Source, v1alpha1.SourceDetails{}) {
+		if isInlineProbe(probe.CmdProbeInputs) {
 			go triggerInlineOnChaosCmdProbe(probe, clients, resultDetails, chaosDetails)
 		} else {
 
@@ -789,4 +788,11 @@ func getServiceAccount(chaosNamespace, chaosPodName, probeName string, clients c
 		return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeCmdProbe, Target: fmt.Sprintf("{name: %v}", probeName), Reason: err.Error()}
 	}
 	return pod.Spec.ServiceAccountName, nil
+}
+
+func isInlineProbe(inputs *v1alpha1.CmdProbeInputs) bool {
+	if inputs.Source == nil {
+		return true
+	}
+	return false
 }
