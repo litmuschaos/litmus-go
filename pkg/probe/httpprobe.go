@@ -185,7 +185,7 @@ func httpPost(probe v1alpha1.ProbeAttributes, client *http.Client, resultDetails
 // getHTTPBody fetch the http body for the post request
 // It will use body or bodyPath attributes to get the http request body
 // if both are provided, it will use body field
-func getHTTPBody(httpBody v1alpha1.PostMethod, probeName string) (string, error) {
+func getHTTPBody(httpBody *v1alpha1.PostMethod, probeName string) (string, error) {
 
 	if httpBody.Body != "" {
 		return httpBody.Body, nil
