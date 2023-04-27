@@ -35,7 +35,7 @@ type ResultDetails struct {
 	FailStep         string
 	Phase            v1alpha1.ResultPhase
 	ResultUID        clientTypes.UID
-	ProbeDetails     []ProbeDetails
+	ProbeDetails     []*ProbeDetails
 	PassedProbeCount int
 	ProbeArtifacts   map[string]ProbeArtifact
 }
@@ -57,6 +57,7 @@ type ProbeDetails struct {
 	Mode                   string
 	Status                 v1alpha1.ProbeStatus
 	IsProbeFailedWithError error
+	HasProbeExecutedOnce   bool
 	RunID                  string
 	RunCount               int
 }
