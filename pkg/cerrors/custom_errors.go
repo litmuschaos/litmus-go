@@ -28,6 +28,7 @@ const (
 	FailureTypeHttpProbe       ErrorType = "HTTP_PROBE_FAILURE"
 	ErrorTypePromProbe         ErrorType = "PROM_PROBE_ERROR"
 	FailureTypePromProbe       ErrorType = "PROM_PROBE_FAILURE"
+	FailureTypeProbeTimeout    ErrorType = "PROBE_TIMEOUT"
 )
 
 type userFriendly interface {

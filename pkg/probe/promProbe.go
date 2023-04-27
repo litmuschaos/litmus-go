@@ -132,7 +132,7 @@ func postChaosPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Res
 	case "continuous", "onchaos":
 
 		// it will check for the error, It will detect the error if any error encountered in probe during chaos
-		if err = checkForErrorInContinuousProbe(resultDetails, probe.Name); err != nil && cerrors.GetErrorType(err) != cerrors.FailureTypePromProbe {
+		if err = checkForErrorInContinuousProbe(resultDetails, chaosDetails.Timeout, chaosDetails.Delay, probe.Name); err != nil && cerrors.GetErrorType(err) != cerrors.FailureTypePromProbe {
 			return err
 		}
 
@@ -229,6 +229,7 @@ func triggerPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 func triggerContinuousPromProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets, chaosresult *types.ResultDetails, chaosDetails *types.ChaosDetails) {
 
 	var isExperimentFailed bool
+	probeDetails := getProbeByName(probe.Name, chaosresult.ProbeDetails)
 	// waiting for initial delay
 	if probe.RunProperties.InitialDelaySeconds != 0 {
 		log.Infof("[Wait]: Waiting for %vs before probe execution", probe.RunProperties.InitialDelaySeconds)
@@ -243,16 +244,14 @@ loop:
 		// record the error inside the probeDetails, we are maintaining a dedicated variable for the err, inside probeDetails
 		if err != nil {
 			err = addProbePhase(err, string(chaosDetails.Phase))
-			for index := range chaosresult.ProbeDetails {
-				if chaosresult.ProbeDetails[index].Name == probe.Name {
-					chaosresult.ProbeDetails[index].IsProbeFailedWithError = err
-					chaosresult.ProbeDetails[index].Status.Description = getDescription(err)
-					log.Errorf("The %v prom probe has been Failed, err: %v", probe.Name, err)
-					isExperimentFailed = true
-					break loop
-				}
-			}
+			probeDetails.IsProbeFailedWithError = err
+			probeDetails.Status.Description = getDescription(err)
+			log.Errorf("%v k8s probe has Failed, err: %v", probe.Name, err)
+			isExperimentFailed = true
+			probeDetails.HasProbeExecutedOnce = true
+			break loop
 		}
+		probeDetails.HasProbeExecutedOnce = true
 		// waiting for the probe polling interval
 		time.Sleep(time.Duration(probe.RunProperties.ProbePollingInterval) * time.Second)
 	}
@@ -271,6 +270,7 @@ func triggerOnChaosPromProbe(probe v1alpha1.ProbeAttributes, clients clients.Cli
 
 	var isExperimentFailed bool
 	duration := chaosDetails.ChaosDuration
+	probeDetails := getProbeByName(probe.Name, chaosresult.ProbeDetails)
 	// waiting for initial delay
 	if probe.RunProperties.InitialDelaySeconds != 0 {
 		log.Infof("[Wait]: Waiting for %vs before probe execution", probe.RunProperties.InitialDelaySeconds)
@@ -293,16 +293,14 @@ loop:
 			// record the error inside the probeDetails, we are maintaining a dedicated variable for the err, inside probeDetails
 			if err = triggerPromProbe(probe, chaosresult); err != nil {
 				err = addProbePhase(err, string(chaosDetails.Phase))
-				for index := range chaosresult.ProbeDetails {
-					if chaosresult.ProbeDetails[index].Name == probe.Name {
-						chaosresult.ProbeDetails[index].IsProbeFailedWithError = err
-						chaosresult.ProbeDetails[index].Status.Description = getDescription(err)
-						log.Errorf("The %v prom probe has been Failed, err: %v", probe.Name, err)
-						isExperimentFailed = true
-						break loop
-					}
-				}
+				probeDetails.IsProbeFailedWithError = err
+				probeDetails.Status.Description = getDescription(err)
+				log.Errorf("%v k8s probe has Failed, err: %v", probe.Name, err)
+				isExperimentFailed = true
+				probeDetails.HasProbeExecutedOnce = true
+				break loop
 			}
+			probeDetails.HasProbeExecutedOnce = true
 			// waiting for the probe polling interval
 			time.Sleep(time.Duration(probe.RunProperties.ProbePollingInterval) * time.Second)
 		}
