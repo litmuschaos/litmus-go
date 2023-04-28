@@ -85,6 +85,7 @@ type ProbeDetails struct {
 	RunID                  string
 	RunCount               int
 	Stopped                bool
+	HasProbeExecutedOnce   bool
 }
 
 // EventDetails is for collecting all the events-related details

@@ -52,7 +52,7 @@ func (model Model) CompareFloat(errorCode cerrors.ErrorType) error {
 		}
 	case "between", "Between":
 		if len(obj.c) < 2 {
-			return cerrors.Error{ErrorCode: errorCode, Target: model.probeName, Reason: fmt.Sprintf("The expectation should specify both the lower and upper limits", obj.c)}
+			return cerrors.Error{ErrorCode: errorCode, Target: model.probeName, Reason: fmt.Sprintf("The expectation %v should specify both the lower and upper limits", obj.c)}
 		}
 		if !obj.isBetween() {
 			return cerrors.Error{ErrorCode: errorCode, Target: model.probeName, Reason: fmt.Sprintf("Actual value: %v doesn't lie in between the Expected range: [%v]", obj.a, obj.c)}

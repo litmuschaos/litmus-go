@@ -15,6 +15,7 @@ import (
 	"html/template"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"strings"
+	"time"
 )
 
 var err error
@@ -243,14 +244,28 @@ func getDescription(err error) string {
 }
 
 // CheckForErrorInContinuousProbe check for the error in the continuous probes
-func checkForErrorInContinuousProbe(resultDetails *types.ResultDetails, probeName string) error {
+func checkForErrorInContinuousProbe(resultDetails *types.ResultDetails, timeout, delay int, probeName string) error {
+	probe := getProbeByName(probeName, resultDetails.ProbeDetails)
+	timeoutChan := time.After(time.Duration(timeout) * time.Second)
 
-	for index, probe := range resultDetails.ProbeDetails {
-		if probe.Name == probeName {
-			return resultDetails.ProbeDetails[index].IsProbeFailedWithError
+loop:
+	for {
+		select {
+		case <-timeoutChan:
+			return cerrors.Error{
+				ErrorCode: cerrors.FailureTypeProbeTimeout,
+				Target:    fmt.Sprintf("{probe: %s, timeout: %ds}", probeName, timeout),
+				Reason:    "probe execution timed out",
+			}
+		default:
+			if probe.HasProbeExecutedOnce {
+				break loop
+			}
+			log.Infof("[Probe]: Waiting for %s probe to finish or timeout", probeName)
+			time.Sleep(time.Duration(delay) * time.Second)
 		}
 	}
-	return nil
+	return probe.IsProbeFailedWithError
 }
 
 // ParseCommand parse the templated command and replace the templated value by actual value
@@ -273,7 +288,7 @@ func parseCommand(templatedCommand string, resultDetails *types.ResultDetails) (
 // stopChaosEngine update the probe status and patch the chaosengine to stop state
 func stopChaosEngine(probe v1alpha1.ProbeAttributes, clients clients.ClientSets, chaosresult *types.ResultDetails, chaosDetails *types.ChaosDetails) error {
 	// it will check for the error, It will detect the error if any error encountered in probe during chaos
-	err = checkForErrorInContinuousProbe(chaosresult, probe.Name)
+	err = checkForErrorInContinuousProbe(chaosresult, chaosDetails.Timeout, chaosDetails.Delay, probe.Name)
 	// failing the probe, if the success condition doesn't met after the retry & timeout combinations
 	markedVerdictInEnd(err, chaosresult, probe, "PostChaos")
 	//patch chaosengine's state to stop
