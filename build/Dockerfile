@@ -1,6 +1,6 @@
 # Multi-stage docker build
 # Build stage
-FROM golang:1.18 AS builder
+FROM golang:1.20 AS builder
 
 ARG TARGETOS=linux
 ARG TARGETARCH
