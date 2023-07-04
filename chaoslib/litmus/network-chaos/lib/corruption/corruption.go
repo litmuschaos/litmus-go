@@ -7,7 +7,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/types"
 )
 
-//PodNetworkCorruptionChaos contains the steps to prepare and inject chaos
+// PodNetworkCorruptionChaos contains the steps to prepare and inject chaos
 func PodNetworkCorruptionChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	args := "corrupt " + experimentsDetails.NetworkPacketCorruptionPercentage

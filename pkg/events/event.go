@@ -11,7 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-//CreateEvents create the events in the desired resource
+// CreateEvents create the events in the desired resource
 func CreateEvents(eventsDetails *types.EventDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, kind, eventName string) error {
 	events := &apiv1.Event{
 		ObjectMeta: metav1.ObjectMeta{
@@ -40,7 +40,7 @@ func CreateEvents(eventsDetails *types.EventDetails, clients clients.ClientSets,
 	return err
 }
 
-//GenerateEvents update the events and increase the count by 1, if already present
+// GenerateEvents update the events and increase the count by 1, if already present
 // else it will create a new event
 func GenerateEvents(eventsDetails *types.EventDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, kind string) error {
 

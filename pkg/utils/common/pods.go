@@ -25,7 +25,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-//DeletePod deletes the specified pod and wait until it got terminated
+// DeletePod deletes the specified pod and wait until it got terminated
 func DeletePod(podName, podLabel, namespace string, timeout, delay int, clients clients.ClientSets) error {
 
 	if err := clients.KubeClient.CoreV1().Pods(namespace).Delete(context.Background(), podName, v1.DeleteOptions{}); err != nil {
@@ -35,7 +35,7 @@ func DeletePod(podName, podLabel, namespace string, timeout, delay int, clients 
 	return waitForPodTermination(podLabel, namespace, timeout, delay, clients)
 }
 
-//DeleteAllPod deletes all the pods with matching labels and wait until all the pods got terminated
+// DeleteAllPod deletes all the pods with matching labels and wait until all the pods got terminated
 func DeleteAllPod(podLabel, namespace string, timeout, delay int, clients clients.ClientSets) error {
 
 	if err := clients.KubeClient.CoreV1().Pods(namespace).DeleteCollection(context.Background(), v1.DeleteOptions{}, v1.ListOptions{LabelSelector: podLabel}); err != nil {
@@ -135,7 +135,7 @@ func VerifyExistanceOfPods(namespace, pods string, clients clients.ClientSets) (
 	return true, nil
 }
 
-//GetPodList check for the availability of the target pod for the chaos execution
+// GetPodList check for the availability of the target pod for the chaos execution
 // if the target pod is not defined it will derive the random target pod list using pod affected percentage
 func GetPodList(targetPods string, podAffPerc int, clients clients.ClientSets, chaosDetails *types.ChaosDetails) (core_v1.PodList, error) {
 	finalPods := core_v1.PodList{}
@@ -186,7 +186,7 @@ func CheckForAvailabilityOfPod(namespace, name string, clients clients.ClientSet
 	return true, nil
 }
 
-//FilterNonChaosPods remove the chaos pods(operator, runner) for the podList
+// FilterNonChaosPods remove the chaos pods(operator, runner) for the podList
 // it filter when the applabels are not defined and it will select random pods from appns
 func FilterNonChaosPods(ns, labels string, clients clients.ClientSets, chaosDetails *types.ChaosDetails) (core_v1.PodList, error) {
 	podList, err := clients.KubeClient.CoreV1().Pods(ns).List(context.Background(), v1.ListOptions{LabelSelector: labels})
@@ -364,7 +364,7 @@ func GetExperimentPod(name, namespace string, clients clients.ClientSets) (*core
 	return pod, nil
 }
 
-//GetContainerID  derive the container id of the application container
+// GetContainerID  derive the container id of the application container
 func GetContainerID(appNamespace, targetPod, targetContainer string, clients clients.ClientSets, source string) (string, error) {
 
 	pod, err := clients.KubeClient.CoreV1().Pods(appNamespace).Get(context.Background(), targetPod, v1.GetOptions{})
@@ -388,7 +388,7 @@ func GetContainerID(appNamespace, targetPod, targetContainer string, clients cli
 	return containerID, nil
 }
 
-//GetRuntimeBasedContainerID extract out the container id of the target container based on the container runtime
+// GetRuntimeBasedContainerID extract out the container id of the target container based on the container runtime
 func GetRuntimeBasedContainerID(containerRuntime, socketPath, targetPods, appNamespace, targetContainer string, clients clients.ClientSets, source string) (string, error) {
 
 	var containerID string

@@ -77,7 +77,7 @@ func Helper(clients clients.ClientSets) {
 
 }
 
-//preparePodNetworkChaos contains the prepration steps before chaos injection
+// preparePodNetworkChaos contains the prepration steps before chaos injection
 func preparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails) error {
 
 	targetEnv := os.Getenv("TARGETS")
@@ -279,7 +279,7 @@ type targetDetails struct {
 	Source          string
 }
 
-//getENV fetches all the env variables from the runner pod
+// getENV fetches all the env variables from the runner pod
 func getENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.ExperimentName = types.Getenv("EXPERIMENT_NAME", "")
 	experimentDetails.InstanceID = types.Getenv("INSTANCE_ID", "")
