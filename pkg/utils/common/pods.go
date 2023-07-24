@@ -93,8 +93,11 @@ func SetHelperData(chaosDetails *types.ChaosDetails, setHelperData string, clien
 
 	// Get Labels
 	labels := pod.ObjectMeta.Labels
-	delete(labels, "controller-uid")
-	delete(labels, "job-name")
+	for label := range labels {
+		if strings.HasSuffix(label, "job-name") || strings.HasSuffix(label, "controller-uid") {
+			delete(labels, label)
+		}
+	}
 	chaosDetails.Labels = labels
 
 	switch setHelperData {
