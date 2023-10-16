@@ -163,7 +163,7 @@ func injectChaos(experimentDetails *experimentTypes.ExperimentDetails, pid int) 
 			if len(whitelistDPorts) != 0 || len(whitelistSPorts) != 0 {
 				for _, port := range whitelistDPorts {
 					//redirect traffic to specific dport through band 2
-					tc := fmt.Sprintf("sudo nsenter -t %v -n tc filter add dev %v protocol ip parent 1:0 prio 2 u32 match ip dport %v 0xffff flowid 1:2", target.Pid, netInterface, port)
+					tc := fmt.Sprintf("sudo nsenter -t %v -n tc filter add dev %v protocol ip parent 1:0 prio 2 u32 match ip dport %v 0xffff flowid 1:2", pid, experimentDetails.NetworkInterface, port)
 					cmd = exec.Command("/bin/bash", "-c", tc)
 					out, err = cmd.CombinedOutput()
 					log.Info(cmd.String())
@@ -175,7 +175,7 @@ func injectChaos(experimentDetails *experimentTypes.ExperimentDetails, pid int) 
 
 				for _, port := range whitelistSPorts {
 					//redirect traffic to specific sport through band 2
-					tc := fmt.Sprintf("sudo nsenter -t %v -n tc filter add dev %v protocol ip parent 1:0 prio 2 u32 match ip sport %v 0xffff flowid 1:2", target.Pid, netInterface, port)
+					tc := fmt.Sprintf("sudo nsenter -t %v -n tc filter add dev %v protocol ip parent 1:0 prio 2 u32 match ip sport %v 0xffff flowid 1:2", pid, experimentDetails.NetworkInterface, port)
 					cmd = exec.Command("/bin/bash", "-c", tc)
 					out, err = cmd.CombinedOutput()
 					log.Info(cmd.String())
@@ -185,7 +185,7 @@ func injectChaos(experimentDetails *experimentTypes.ExperimentDetails, pid int) 
 					}
 				}
 
-				tc := fmt.Sprintf("sudo nsenter -t %v -n tc filter add dev %v protocol ip parent 1:0 prio 3 u32 match ip dst 0.0.0.0/0 flowid 1:3", target.Pid, netInterface)
+				tc := fmt.Sprintf("sudo nsenter -t %v -n tc filter add dev %v protocol ip parent 1:0 prio 3 u32 match ip dst 0.0.0.0/0 flowid 1:3", pid, experimentDetails.NetworkInterface)
 				cmd = exec.Command("/bin/bash", "-c", tc)
 				out, err = cmd.CombinedOutput()
 				log.Info(cmd.String())
