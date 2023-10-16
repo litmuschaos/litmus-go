@@ -26,11 +26,10 @@ const (
 )
 
 var (
-	err           error
-	inject, abort chan os.Signal
+	err                                                       error
+	inject, abort                                             chan os.Signal
+	destIps, sPorts, dPorts, whitelistDPorts, whitelistSPorts []string
 )
-
-var destIps, sPorts, dPorts []string
 
 // Helper injects the network chaos
 func Helper(clients clients.ClientSets) {
@@ -128,7 +127,7 @@ func injectChaos(experimentDetails *experimentTypes.ExperimentDetails, pid int) 
 		// stopping the chaos execution, if abort signal received
 		os.Exit(1)
 	default:
-		if len(destIps) == 0 && len(sPorts) == 0 && len(dPorts) == 0 {
+		if len(destIps) == 0 && len(sPorts) == 0 && len(dPorts) == 0 && len(whitelistDPorts) == 0 && len(whitelistSPorts) == 0 {
 			tc := fmt.Sprintf("sudo nsenter -t %d -n tc qdisc replace dev %s root netem %v", pid, experimentDetails.NetworkInterface, netemCommands)
 			cmd := exec.Command("/bin/bash", "-c", tc)
 			out, err := cmd.CombinedOutput()
@@ -161,24 +160,32 @@ func injectChaos(experimentDetails *experimentTypes.ExperimentDetails, pid int) 
 				return err
 			}
 
-			for _, ip := range destIps {
-				// redirect traffic to specific IP through band 3
-				tc := fmt.Sprintf("sudo nsenter -t %v -n tc filter add dev %v protocol ip parent 1:0 prio 3 u32 match ip dst %v flowid 1:3", pid, experimentDetails.NetworkInterface, ip)
-				if strings.Contains(ip, ":") {
-					tc = fmt.Sprintf("sudo nsenter -t %v -n tc filter add dev %v protocol ip parent 1:0 prio 3 u32 match ip6 dst %v flowid 1:3", pid, experimentDetails.NetworkInterface, ip)
+			if len(whitelistDPorts) != 0 || len(whitelistSPorts) != 0 {
+				for _, port := range whitelistDPorts {
+					//redirect traffic to specific dport through band 2
+					tc := fmt.Sprintf("sudo nsenter -t %v -n tc filter add dev %v protocol ip parent 1:0 prio 2 u32 match ip dport %v 0xffff flowid 1:2", target.Pid, netInterface, port)
+					cmd = exec.Command("/bin/bash", "-c", tc)
+					out, err = cmd.CombinedOutput()
+					log.Info(cmd.String())
+					if err != nil {
+						log.Error(string(out))
+						return err
+					}
 				}
-				cmd = exec.Command("/bin/bash", "-c", tc)
-				out, err = cmd.CombinedOutput()
-				log.Info(cmd.String())
-				if err != nil {
-					log.Error(string(out))
-					return err
-				}
-			}
 
-			for _, port := range sPorts {
-				//redirect traffic to specific sport through band 3
-				tc := fmt.Sprintf("sudo nsenter -t %v -n tc filter add dev %v protocol ip parent 1:0 prio 3 u32 match ip sport %v 0xffff flowid 1:3", pid, experimentDetails.NetworkInterface, port)
+				for _, port := range whitelistSPorts {
+					//redirect traffic to specific sport through band 2
+					tc := fmt.Sprintf("sudo nsenter -t %v -n tc filter add dev %v protocol ip parent 1:0 prio 2 u32 match ip sport %v 0xffff flowid 1:2", target.Pid, netInterface, port)
+					cmd = exec.Command("/bin/bash", "-c", tc)
+					out, err = cmd.CombinedOutput()
+					log.Info(cmd.String())
+					if err != nil {
+						log.Error(string(out))
+						return err
+					}
+				}
+
+				tc := fmt.Sprintf("sudo nsenter -t %v -n tc filter add dev %v protocol ip parent 1:0 prio 3 u32 match ip dst 0.0.0.0/0 flowid 1:3", target.Pid, netInterface)
 				cmd = exec.Command("/bin/bash", "-c", tc)
 				out, err = cmd.CombinedOutput()
 				log.Info(cmd.String())
@@ -186,17 +193,45 @@ func injectChaos(experimentDetails *experimentTypes.ExperimentDetails, pid int) 
 					log.Error(string(out))
 					return err
 				}
-			}
+			} else {
 
-			for _, port := range dPorts {
-				//redirect traffic to specific dport through band 3
-				tc := fmt.Sprintf("sudo nsenter -t %v -n tc filter add dev %v protocol ip parent 1:0 prio 3 u32 match ip dport %v 0xffff flowid 1:3", pid, experimentDetails.NetworkInterface, port)
-				cmd = exec.Command("/bin/bash", "-c", tc)
-				out, err = cmd.CombinedOutput()
-				log.Info(cmd.String())
-				if err != nil {
-					log.Error(string(out))
-					return err
+				for _, ip := range destIps {
+					// redirect traffic to specific IP through band 3
+					tc := fmt.Sprintf("sudo nsenter -t %v -n tc filter add dev %v protocol ip parent 1:0 prio 3 u32 match ip dst %v flowid 1:3", pid, experimentDetails.NetworkInterface, ip)
+					if strings.Contains(ip, ":") {
+						tc = fmt.Sprintf("sudo nsenter -t %v -n tc filter add dev %v protocol ip parent 1:0 prio 3 u32 match ip6 dst %v flowid 1:3", pid, experimentDetails.NetworkInterface, ip)
+					}
+					cmd = exec.Command("/bin/bash", "-c", tc)
+					out, err = cmd.CombinedOutput()
+					log.Info(cmd.String())
+					if err != nil {
+						log.Error(string(out))
+						return err
+					}
+				}
+
+				for _, port := range sPorts {
+					//redirect traffic to specific sport through band 3
+					tc := fmt.Sprintf("sudo nsenter -t %v -n tc filter add dev %v protocol ip parent 1:0 prio 3 u32 match ip sport %v 0xffff flowid 1:3", pid, experimentDetails.NetworkInterface, port)
+					cmd = exec.Command("/bin/bash", "-c", tc)
+					out, err = cmd.CombinedOutput()
+					log.Info(cmd.String())
+					if err != nil {
+						log.Error(string(out))
+						return err
+					}
+				}
+
+				for _, port := range dPorts {
+					//redirect traffic to specific dport through band 3
+					tc := fmt.Sprintf("sudo nsenter -t %v -n tc filter add dev %v protocol ip parent 1:0 prio 3 u32 match ip dport %v 0xffff flowid 1:3", pid, experimentDetails.NetworkInterface, port)
+					cmd = exec.Command("/bin/bash", "-c", tc)
+					out, err = cmd.CombinedOutput()
+					log.Info(cmd.String())
+					if err != nil {
+						log.Error(string(out))
+						return err
+					}
 				}
 			}
 		}
@@ -247,10 +282,18 @@ func getENV(experimentDetails *experimentTypes.ExperimentDetails) {
 
 	destIps = getDestinationIPs(experimentDetails.DestinationIPs)
 	if strings.TrimSpace(experimentDetails.DestinationPorts) != "" {
-		dPorts = strings.Split(strings.TrimSpace(experimentDetails.DestinationPorts), ",")
+		if strings.Contains(experimentDetails.DestinationPorts, "!") {
+			whitelistDPorts = strings.Split(strings.TrimPrefix(strings.TrimSpace(experimentDetails.DestinationPorts), "!"), ",")
+		} else {
+			dPorts = strings.Split(strings.TrimSpace(experimentDetails.DestinationPorts), ",")
+		}
 	}
 	if strings.TrimSpace(experimentDetails.SourcePorts) != "" {
-		sPorts = strings.Split(strings.TrimSpace(experimentDetails.SourcePorts), ",")
+		if strings.Contains(experimentDetails.SourcePorts, "!") {
+			whitelistSPorts = strings.Split(strings.TrimPrefix(strings.TrimSpace(experimentDetails.SourcePorts), "!"), ",")
+		} else {
+			sPorts = strings.Split(strings.TrimSpace(experimentDetails.SourcePorts), ",")
+		}
 	}
 }
 
