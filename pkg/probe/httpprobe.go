@@ -222,24 +222,31 @@ func triggerContinuousHTTPProbe(probe v1alpha1.ProbeAttributes, clients clients.
 
 	// it triggers the http probe for the entire duration of chaos and it fails, if any error encounter
 	// it marked the error for the probes, if any
+
 loop:
 	for {
-		err = triggerHTTPProbe(probe, chaosresult)
-		// record the error inside the probeDetails, we are maintaining a dedicated variable for the err, inside probeDetails
-		if err != nil {
-			err = addProbePhase(err, string(chaosDetails.Phase))
-			for index := range chaosresult.ProbeDetails {
-				if chaosresult.ProbeDetails[index].Name == probe.Name {
-					chaosresult.ProbeDetails[index].IsProbeFailedWithError = err
-					chaosresult.ProbeDetails[index].Status.Description = getDescription(err)
-					log.Errorf("The %v http probe has been Failed, err: %v", probe.Name, err)
-					isExperimentFailed = true
-					break loop
+		select {
+		case <-chaosDetails.ProbeContext.Ctx.Done():
+			log.Info("Chaos Execution completed. Stopping Probes")
+			break
+		default:
+			err = triggerHTTPProbe(probe, chaosresult)
+			// record the error inside the probeDetails, we are maintaining a dedicated variable for the err, inside probeDetails
+			if err != nil {
+				err = addProbePhase(err, string(chaosDetails.Phase))
+				for index := range chaosresult.ProbeDetails {
+					if chaosresult.ProbeDetails[index].Name == probe.Name {
+						chaosresult.ProbeDetails[index].IsProbeFailedWithError = err
+						chaosresult.ProbeDetails[index].Status.Description = getDescription(err)
+						log.Errorf("The %v http probe has been Failed, err: %v", probe.Name, err)
+						isExperimentFailed = true
+						break loop
+					}
 				}
 			}
+			// waiting for the probe polling interval
+			time.Sleep(probeTimeout.ProbePollingInterval)
 		}
-		// waiting for the probe polling interval
-		time.Sleep(probeTimeout.ProbePollingInterval)
 	}
 	// if experiment fails and stopOnfailure is provided as true then it will patch the chaosengine for abort
 	// if experiment fails but stopOnfailure is provided as false then it will continue the execution
@@ -292,7 +299,9 @@ func preChaosHTTPProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resu
 			"Mode":           probe.Mode,
 			"Phase":          "PreChaos",
 		})
+
 		go triggerContinuousHTTPProbe(probe, clients, resultDetails, chaosDetails)
+
 	}
 	return nil
 }

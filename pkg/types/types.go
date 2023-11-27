@@ -132,6 +132,7 @@ type ChaosDetails struct {
 	ImagePullSecrets     []corev1.LocalObjectReference
 	Labels               map[string]string
 	Phase                ExperimentPhase
+	ProbeContext         ProbeContext
 	SideCar              []SideCar
 }
 
@@ -148,6 +149,11 @@ type ParentResource struct {
 	Name      string
 	Kind      string
 	Namespace string
+}
+
+type ProbeContext struct {
+	Ctx        context.Context
+	CancelFunc context.CancelFunc
 }
 
 // AppDetails contains all the application related envs
@@ -190,7 +196,7 @@ func parse(val string) []string {
 	return strings.Split(val, ",")
 }
 
-//InitialiseChaosVariables initialise all the global variables
+// InitialiseChaosVariables initialise all the global variables
 func InitialiseChaosVariables(chaosDetails *ChaosDetails) {
 	targets := Getenv("TARGETS", "")
 	chaosDetails.AppDetail = GetTargets(strings.TrimSpace(targets))
@@ -213,7 +219,7 @@ func InitialiseChaosVariables(chaosDetails *ChaosDetails) {
 	chaosDetails.Phase = PreChaosPhase
 }
 
-//SetResultAttributes initialise all the chaos result ENV
+// SetResultAttributes initialise all the chaos result ENV
 func SetResultAttributes(resultDetails *ResultDetails, chaosDetails ChaosDetails) {
 	resultDetails.Verdict = "Awaited"
 	resultDetails.Phase = "Running"
@@ -230,7 +236,7 @@ func SetResultAttributes(resultDetails *ResultDetails, chaosDetails ChaosDetails
 
 }
 
-//SetResultAfterCompletion set all the chaos result ENV in the EOT
+// SetResultAfterCompletion set all the chaos result ENV in the EOT
 func SetResultAfterCompletion(resultDetails *ResultDetails, verdict v1alpha1.ResultVerdict, phase v1alpha1.ResultPhase, failStep string, errorCode cerrors.ErrorType) {
 	resultDetails.Verdict = verdict
 	resultDetails.Phase = phase
@@ -242,7 +248,7 @@ func SetResultAfterCompletion(resultDetails *ResultDetails, verdict v1alpha1.Res
 	}
 }
 
-//SetEngineEventAttributes initialise attributes for event generation in chaos engine
+// SetEngineEventAttributes initialise attributes for event generation in chaos engine
 func SetEngineEventAttributes(eventsDetails *EventDetails, Reason, Message, Type string, chaosDetails *ChaosDetails) {
 
 	eventsDetails.Reason = Reason
@@ -253,7 +259,7 @@ func SetEngineEventAttributes(eventsDetails *EventDetails, Reason, Message, Type
 
 }
 
-//SetResultEventAttributes initialise attributes for event generation in chaos result
+// SetResultEventAttributes initialise attributes for event generation in chaos result
 func SetResultEventAttributes(eventsDetails *EventDetails, Reason, Message, Type string, resultDetails *ResultDetails) {
 
 	eventsDetails.Reason = Reason

@@ -55,6 +55,8 @@ func RunProbes(chaosDetails *types.ChaosDetails, clients clients.ClientSets, res
 		// it first evaluate the onchaos and continuous modes then it evaluates the other modes
 		// as onchaos and continuous probes are already completed
 		var probeError []string
+		// call cancel function from chaosDetails context
+		chaosDetails.ProbeContext.CancelFunc()
 		for _, probe := range probes {
 			// evaluate continuous and onchaos probes
 			switch strings.ToLower(probe.Mode) {
