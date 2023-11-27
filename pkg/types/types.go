@@ -217,6 +217,7 @@ func InitialiseChaosVariables(chaosDetails *ChaosDetails) {
 	chaosDetails.ParentsResources = []ParentResource{}
 	chaosDetails.Targets = []v1alpha1.TargetDetails{}
 	chaosDetails.Phase = PreChaosPhase
+	chaosDetails.ProbeContext.Ctx, chaosDetails.ProbeContext.CancelFunc = context.WithCancel(context.Background())
 }
 
 // SetResultAttributes initialise all the chaos result ENV

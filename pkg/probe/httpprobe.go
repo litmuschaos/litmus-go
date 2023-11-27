@@ -228,7 +228,7 @@ loop:
 		select {
 		case <-chaosDetails.ProbeContext.Ctx.Done():
 			log.Info("Chaos Execution completed. Stopping Probes")
-			break
+			break loop
 		default:
 			err = triggerHTTPProbe(probe, chaosresult)
 			// record the error inside the probeDetails, we are maintaining a dedicated variable for the err, inside probeDetails
