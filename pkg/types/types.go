@@ -86,6 +86,7 @@ type ProbeDetails struct {
 	Status                 v1alpha1.ProbeStatus
 	IsProbeFailedWithError error
 	Failed                 bool
+	HasProbeCompleted      bool
 	RunID                  string
 	RunCount               int
 	Stopped                bool

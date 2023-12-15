@@ -364,8 +364,10 @@ func postChaosK8sProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resu
 		}
 	case "continuous", "onchaos":
 		// it will check for the error, It will detect the error if any error encountered in probe during chaos
-		if err = checkForErrorInContinuousProbe(resultDetails, probe.Name); err != nil && cerrors.GetErrorType(err) != cerrors.FailureTypeK8sProbe {
-			return err
+		if err = checkForErrorInContinuousProbe(resultDetails, probe.Name, chaosDetails.Delay, chaosDetails.Timeout); err != nil && cerrors.GetErrorType(err) != cerrors.FailureTypeK8sProbe {
+			if cerrors.GetErrorType(err) != cerrors.FailureTypeProbeTimeout {
+				return err
+			}
 		}
 		// failing the probe, if the success condition doesn't met after the retry & timeout combinations
 		if err = markedVerdictInEnd(err, resultDetails, probe, "PostChaos"); err != nil {
