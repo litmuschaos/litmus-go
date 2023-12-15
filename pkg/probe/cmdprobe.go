@@ -337,6 +337,11 @@ loop:
 		select {
 		case <-chaosDetails.ProbeContext.Ctx.Done():
 			log.Info("Chaos Execution completed. Stopping Probes")
+			for index := range chaosresult.ProbeDetails {
+				if chaosresult.ProbeDetails[index].Name == probe.Name {
+					chaosresult.ProbeDetails[index].HasProbeCompleted = true
+				}
+			}
 			break loop
 		default:
 			err := triggerInlineCmdProbe(probe, chaosresult)

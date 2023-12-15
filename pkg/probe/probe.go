@@ -254,7 +254,7 @@ func getDescription(err error) string {
 }
 
 // CheckForErrorInContinuousProbe check for the error in the continuous probes
-func checkForErrorInContinuousProbe(resultDetails *types.ResultDetails, probeName string, timeout int, delay int) error {
+func checkForErrorInContinuousProbe(resultDetails *types.ResultDetails, probeName string, delay int, timeout int) error {
 
 	probe := getProbeByName(probeName, resultDetails.ProbeDetails)
 	timeoutSignal := time.After(time.Duration(timeout) * time.Second)
