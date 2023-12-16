@@ -30,7 +30,7 @@ import (
 	clientTypes "k8s.io/apimachinery/pkg/types"
 )
 
-//list of cgroups in a container
+// list of cgroups in a container
 var (
 	cgroupSubsystemList = []string{"cpu", "memory", "systemd", "net_cls",
 		"net_prio", "freezer", "blkio", "perf_event", "devices", "cpuset",
@@ -91,7 +91,7 @@ func Helper(clients clients.ClientSets) {
 	}
 }
 
-//prepareStressChaos contains the chaos preparation and injection steps
+// prepareStressChaos contains the chaos preparation and injection steps
 func prepareStressChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails) error {
 	// get stressors in list format
 	stressorList := prepareStressor(experimentsDetails)
@@ -105,7 +105,10 @@ func prepareStressChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 		return stacktrace.Propagate(err, "could not parse targets")
 	}
 
-	var targets []targetDetails
+	var (
+		targets   []targetDetails
+		groupPath = ""
+	)
 
 	for _, t := range targetList.Target {
 		td := targetDetails{
@@ -126,7 +129,7 @@ func prepareStressChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 			return stacktrace.Propagate(err, "could not get container pid")
 		}
 
-		td.CGroupManager, err = getCGroupManager(td)
+		td.CGroupManager, err, groupPath = getCGroupManager(td)
 		if err != nil {
 			return stacktrace.Propagate(err, "could not get cgroup manager")
 		}
@@ -146,7 +149,7 @@ func prepareStressChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 	done := make(chan error, 1)
 
 	for index, t := range targets {
-		targets[index].Cmd, err = injectChaos(t, stressors)
+		targets[index].Cmd, err = injectChaos(t, stressors, groupPath)
 		if err != nil {
 			return stacktrace.Propagate(err, "could not inject chaos")
 		}
@@ -244,7 +247,7 @@ func prepareStressChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 	return nil
 }
 
-//terminateProcess will remove the stress process from the target container after chaos completion
+// terminateProcess will remove the stress process from the target container after chaos completion
 func terminateProcess(t targetDetails) error {
 	if err := syscall.Kill(-t.Cmd.Process.Pid, syscall.SIGKILL); err != nil {
 		if strings.Contains(err.Error(), ProcessAlreadyKilled) || strings.Contains(err.Error(), ProcessAlreadyFinished) {
@@ -256,7 +259,7 @@ func terminateProcess(t targetDetails) error {
 	return nil
 }
 
-//prepareStressor will set the required stressors for the given experiment
+// prepareStressor will set the required stressors for the given experiment
 func prepareStressor(experimentDetails *experimentTypes.ExperimentDetails) []string {
 
 	stressArgs := []string{
@@ -324,7 +327,7 @@ func prepareStressor(experimentDetails *experimentTypes.ExperimentDetails) []str
 	return stressArgs
 }
 
-//pidPath will get the pid path of the container
+// pidPath will get the pid path of the container
 func pidPath(t targetDetails) cgroups.Path {
 	processPath := "/proc/" + strconv.Itoa(t.Pid) + "/cgroup"
 	paths, err := parseCgroupFile(processPath, t)
@@ -334,7 +337,7 @@ func pidPath(t targetDetails) cgroups.Path {
 	return getExistingPath(paths, t.Pid, "")
 }
 
-//parseCgroupFile will read and verify the cgroup file entry of a container
+// parseCgroupFile will read and verify the cgroup file entry of a container
 func parseCgroupFile(path string, t targetDetails) (map[string]string, error) {
 	file, err := os.Open(path)
 	if err != nil {
@@ -344,7 +347,7 @@ func parseCgroupFile(path string, t targetDetails) (map[string]string, error) {
 	return parseCgroupFromReader(file, t)
 }
 
-//parseCgroupFromReader will parse the cgroup file from the reader
+// parseCgroupFromReader will parse the cgroup file from the reader
 func parseCgroupFromReader(r io.Reader, t targetDetails) (map[string]string, error) {
 	var (
 		cgroups = make(map[string]string)
@@ -371,7 +374,7 @@ func parseCgroupFromReader(r io.Reader, t targetDetails) (map[string]string, err
 	return cgroups, nil
 }
 
-//getExistingPath will be used to get the existing valid cgroup path
+// getExistingPath will be used to get the existing valid cgroup path
 func getExistingPath(paths map[string]string, pid int, suffix string) cgroups.Path {
 	for n, p := range paths {
 		dest, err := getCgroupDestination(pid, n)
@@ -401,14 +404,14 @@ func getExistingPath(paths map[string]string, pid int, suffix string) cgroups.Pa
 	}
 }
 
-//getErrorPath will give the invalid cgroup path
+// getErrorPath will give the invalid cgroup path
 func getErrorPath(err error) cgroups.Path {
 	return func(_ cgroups.Name) (string, error) {
 		return "", err
 	}
 }
 
-//getCgroupDestination will validate the subsystem with the mountpath in container mountinfo file.
+// getCgroupDestination will validate the subsystem with the mountpath in container mountinfo file.
 func getCgroupDestination(pid int, subsystem string) (string, error) {
 	mountinfoPath := fmt.Sprintf("/proc/%d/mountinfo", pid)
 	file, err := os.Open(mountinfoPath)
@@ -431,7 +434,7 @@ func getCgroupDestination(pid int, subsystem string) (string, error) {
 	return "", errors.Errorf("no destination found for %v ", subsystem)
 }
 
-//findValidCgroup will be used to get a valid cgroup path
+// findValidCgroup will be used to get a valid cgroup path
 func findValidCgroup(path cgroups.Path, t targetDetails) (string, error) {
 	for _, subsystem := range cgroupSubsystemList {
 		path, err := path(cgroups.Name(subsystem))
@@ -446,7 +449,7 @@ func findValidCgroup(path cgroups.Path, t targetDetails) (string, error) {
 	return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeHelper, Source: t.Source, Target: fmt.Sprintf("{podName: %s, namespace: %s, container: %s}", t.Name, t.Namespace, t.TargetContainer), Reason: "could not find valid cgroup"}
 }
 
-//getENV fetches all the env variables from the runner pod
+// getENV fetches all the env variables from the runner pod
 func getENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.ExperimentName = types.Getenv("EXPERIMENT_NAME", "")
 	experimentDetails.InstanceID = types.Getenv("INSTANCE_ID", "")
@@ -494,44 +497,71 @@ func abortWatcher(targets []targetDetails, resultName, chaosNS string) {
 }
 
 // getCGroupManager will return the cgroup for the given pid of the process
-func getCGroupManager(t targetDetails) (interface{}, error) {
+func getCGroupManager(t targetDetails) (interface{}, error, string) {
 	if cgroups.Mode() == cgroups.Unified {
-		groupPath, err := cgroupsv2.PidGroupPath(t.Pid)
+		//groupPath, err := cgroupsv2.PidGroupPath(t.Pid)
+		//if err != nil {
+		//	return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeHelper, Source: t.Source, Target: fmt.Sprintf("{podName: %s, namespace: %s, container: %s}", t.Name, t.Namespace, t.TargetContainer), Reason: fmt.Sprintf("fail to get pid group path: %s", err.Error())}
+		//}
+		//
+		//cgroup2, err := cgroupsv2.LoadManager("/sys/fs/cgroup", groupPath)
+		//if err != nil {
+		//	return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeHelper, Source: t.Source, Target: fmt.Sprintf("{podName: %s, namespace: %s, container: %s}", t.Name, t.Namespace, t.TargetContainer), Reason: fmt.Sprintf("fail to load the cgroup: %s", err.Error())}
+		//}
+		//return cgroup2, nil
+		groupPath := ""
+		output, err := exec.Command("bash", "-c", fmt.Sprintf("nsenter -t 1 -C -m -- cat /proc/%v/cgroup", t.Pid)).CombinedOutput()
 		if err != nil {
-			return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeHelper, Source: t.Source, Target: fmt.Sprintf("{podName: %s, namespace: %s, container: %s}", t.Name, t.Namespace, t.TargetContainer), Reason: fmt.Sprintf("fail to get pid group path: %s", err.Error())}
+			return nil, errors.Errorf("Error in getting groupPath,%s", string(output)), ""
 		}
+		parts := strings.SplitN(string(output), ":", 3)
+		if len(parts) < 3 {
+			return "", fmt.Errorf("invalid cgroup entry: %s", string(output)), ""
+		}
+		if parts[0] == "0" && parts[1] == "" {
+			groupPath = parts[2]
+		}
+		log.Infof("group path: %s", groupPath)
 
-		cgroup2, err := cgroupsv2.LoadManager("/sys/fs/cgroup", groupPath)
+		cgroup2, err := cgroupsv2.LoadManager("/sys/fs/cgroup", string(groupPath))
 		if err != nil {
-			return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeHelper, Source: t.Source, Target: fmt.Sprintf("{podName: %s, namespace: %s, container: %s}", t.Name, t.Namespace, t.TargetContainer), Reason: fmt.Sprintf("fail to load the cgroup: %s", err.Error())}
+			return nil, errors.Errorf("Error loading cgroup v2 manager, %v", err), ""
 		}
-		return cgroup2, nil
+		return cgroup2, nil, groupPath
 	}
 	path := pidPath(t)
 	cgroup, err := findValidCgroup(path, t)
 	if err != nil {
-		return nil, stacktrace.Propagate(err, "could not find valid cgroup")
+		return nil, stacktrace.Propagate(err, "could not find valid cgroup"), ""
 	}
 	cgroup1, err := cgroups.Load(cgroups.V1, cgroups.StaticPath(cgroup))
 	if err != nil {
-		return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeHelper, Source: t.Source, Target: fmt.Sprintf("{podName: %s, namespace: %s, container: %s}", t.Name, t.Namespace, t.TargetContainer), Reason: fmt.Sprintf("fail to load the cgroup: %s", err.Error())}
+		return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeHelper, Source: t.Source, Target: fmt.Sprintf("{podName: %s, namespace: %s, container: %s}", t.Name, t.Namespace, t.TargetContainer), Reason: fmt.Sprintf("fail to load the cgroup: %s", err.Error())}, ""
 	}
 
-	return cgroup1, nil
+	return cgroup1, nil, ""
 }
 
 // addProcessToCgroup will add the process to cgroup
 // By default it will add to v1 cgroup
-func addProcessToCgroup(pid int, control interface{}) error {
+func addProcessToCgroup(pid int, control interface{}, groupPath string) error {
 	if cgroups.Mode() == cgroups.Unified {
-		var cgroup1 = control.(*cgroupsv2.Manager)
-		return cgroup1.AddProc(uint64(pid))
+		//var cgroup1 = control.(*cgroupsv2.Manager)
+		//return cgroup1.AddProc(uint64(pid))
+		args := []string{"-t", "1", "-C", "--", "sudo", "sh", "-c",
+			fmt.Sprintf("echo %d >> /sys/fs/cgroup%s/cgroup.procs", pid, strings.ReplaceAll(groupPath, "\n", ""))}
+		output, err := exec.Command("nsenter", args...).CombinedOutput()
+		if err != nil {
+			logrus.Error(string(output))
+			return err
+		}
+		return nil
 	}
 	var cgroup1 = control.(cgroups.Cgroup)
 	return cgroup1.Add(cgroups.Process{Pid: pid})
 }
 
-func injectChaos(t targetDetails, stressors string) (*exec.Cmd, error) {
+func injectChaos(t targetDetails, stressors, groupPath string) (*exec.Cmd, error) {
 	stressCommand := "pause nsutil -t " + strconv.Itoa(t.Pid) + " -p -- " + stressors
 	log.Infof("[Info]: starting process: %v", stressCommand)
 
@@ -546,7 +576,7 @@ func injectChaos(t targetDetails, stressors string) (*exec.Cmd, error) {
 	}
 
 	// add the stress process to the cgroup of target container
-	if err = addProcessToCgroup(cmd.Process.Pid, t.CGroupManager); err != nil {
+	if err = addProcessToCgroup(cmd.Process.Pid, t.CGroupManager, groupPath); err != nil {
 		if killErr := cmd.Process.Kill(); killErr != nil {
 			return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Source: t.Source, Target: fmt.Sprintf("{podName: %s, namespace: %s, container: %s}", t.Name, t.Namespace, t.TargetContainer), Reason: fmt.Sprintf("fail to add the stress process to cgroup %s and kill stress process: %s", err.Error(), killErr.Error())}
 		}
