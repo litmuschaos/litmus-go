@@ -227,7 +227,7 @@ loop:
 	for {
 		select {
 		case <-chaosDetails.ProbeContext.Ctx.Done():
-			log.Info("Chaos Execution completed. Stopping Probes")
+			log.Infof("Stopping %s continuous Probe", probe.Name)
 			for index := range chaosresult.ProbeDetails {
 				if chaosresult.ProbeDetails[index].Name == probe.Name {
 					chaosresult.ProbeDetails[index].HasProbeCompleted = true
@@ -345,10 +345,8 @@ func postChaosHTTPProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Res
 		}
 	case "Continuous", "OnChaos":
 		// it will check for the error, It will detect the error if any error encountered in probe during chaos
-		if err = checkForErrorInContinuousProbe(resultDetails, probe.Name, delay, timeout); err != nil && cerrors.GetErrorType(err) != cerrors.FailureTypeHttpProbe {
-			if cerrors.GetErrorType(err) != cerrors.FailureTypeProbeTimeout {
-				return err
-			}
+		if err = checkForErrorInContinuousProbe(resultDetails, probe.Name, delay, timeout); err != nil && cerrors.GetErrorType(err) != cerrors.FailureTypeHttpProbe && cerrors.GetErrorType(err) != cerrors.FailureTypeProbeTimeout {
+			return err
 		}
 		// failing the probe, if the success condition doesn't met after the retry & timeout combinations
 		if err = markedVerdictInEnd(err, resultDetails, probe, "PostChaos"); err != nil {
@@ -381,6 +379,11 @@ loop:
 		case <-endTime:
 			log.Infof("[Chaos]: Time is up for the %v probe", probe.Name)
 			endTime = nil
+			for index := range chaosresult.ProbeDetails {
+				if chaosresult.ProbeDetails[index].Name == probe.Name {
+					chaosresult.ProbeDetails[index].HasProbeCompleted = true
+				}
+			}
 			break loop
 		default:
 			err = triggerHTTPProbe(probe, chaosresult)

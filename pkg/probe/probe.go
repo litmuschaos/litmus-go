@@ -257,6 +257,7 @@ func getDescription(err error) string {
 func checkForErrorInContinuousProbe(resultDetails *types.ResultDetails, probeName string, delay int, timeout int) error {
 
 	probe := getProbeByName(probeName, resultDetails.ProbeDetails)
+	startTime := time.Now()
 	timeoutSignal := time.After(time.Duration(timeout) * time.Second)
 
 loop:
@@ -272,7 +273,7 @@ loop:
 			if probe.HasProbeCompleted {
 				break loop
 			}
-			log.Infof("[Probe]: Waiting for %s probe to finish or timeout", probeName)
+			log.Infof("[Probe]: Waiting for %s probe to finish or timeout (Elapsed time: %v)", probeName, time.Since(startTime).Seconds())
 			time.Sleep(time.Duration(delay) * time.Second)
 		}
 	}

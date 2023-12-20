@@ -134,10 +134,8 @@ func postChaosPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Res
 	case "continuous", "onchaos":
 
 		// it will check for the error, It will detect the error if any error encountered in probe during chaos
-		if err = checkForErrorInContinuousProbe(resultDetails, probe.Name, chaosDetails.Delay, chaosDetails.Timeout); err != nil && cerrors.GetErrorType(err) != cerrors.FailureTypePromProbe {
-			if cerrors.GetErrorType(err) != cerrors.FailureTypeProbeTimeout {
-				return err
-			}
+		if err = checkForErrorInContinuousProbe(resultDetails, probe.Name, chaosDetails.Delay, chaosDetails.Timeout); err != nil && cerrors.GetErrorType(err) != cerrors.FailureTypePromProbe && cerrors.GetErrorType(err) != cerrors.FailureTypeProbeTimeout {
+			return err
 		}
 
 		// failing the probe, if the success condition doesn't met after the retry & timeout combinations
@@ -248,7 +246,7 @@ loop:
 	for {
 		select {
 		case <-chaosDetails.ProbeContext.Ctx.Done():
-			log.Info("Chaos Execution completed. Stopping Probes")
+			log.Infof("Stopping %s continuous Probe", probe.Name)
 			for index := range chaosresult.ProbeDetails {
 				if chaosresult.ProbeDetails[index].Name == probe.Name {
 					chaosresult.ProbeDetails[index].HasProbeCompleted = true
@@ -306,6 +304,11 @@ loop:
 		select {
 		case <-endTime:
 			log.Infof("[Chaos]: Time is up for the %v probe", probe.Name)
+			for index := range chaosresult.ProbeDetails {
+				if chaosresult.ProbeDetails[index].Name == probe.Name {
+					chaosresult.ProbeDetails[index].HasProbeCompleted = true
+				}
+			}
 			endTime = nil
 			break loop
 		default:

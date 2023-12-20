@@ -336,7 +336,7 @@ loop:
 	for {
 		select {
 		case <-chaosDetails.ProbeContext.Ctx.Done():
-			log.Info("Chaos Execution completed. Stopping Probes")
+			log.Infof("Stopping %s continuous Probe", probe.Name)
 			for index := range chaosresult.ProbeDetails {
 				if chaosresult.ProbeDetails[index].Name == probe.Name {
 					chaosresult.ProbeDetails[index].HasProbeCompleted = true
@@ -387,16 +387,20 @@ func triggerInlineOnChaosCmdProbe(probe v1alpha1.ProbeAttributes, clients client
 
 	var endTime <-chan time.Time
 	timeDelay := time.Duration(duration) * time.Second
-
+	endTime = time.After(timeDelay)
 	// it trigger the inline cmd probe for the entire duration of chaos and it fails, if any err encounter
 	// it marked the error for the probes, if any
 loop:
 	for {
-		endTime = time.After(timeDelay)
 		select {
 		case <-endTime:
 			log.Infof("[Chaos]: Time is up for the %v probe", probe.Name)
 			endTime = nil
+			for index := range chaosresult.ProbeDetails {
+				if chaosresult.ProbeDetails[index].Name == probe.Name {
+					chaosresult.ProbeDetails[index].HasProbeCompleted = true
+				}
+			}
 			break loop
 		default:
 			// record the error inside the probeDetails, we are maintaining a dedicated variable for the err, inside probeDetails
@@ -449,6 +453,11 @@ loop:
 		case <-endTime:
 			log.Infof("[Chaos]: Time is up for the %v probe", probe.Name)
 			endTime = nil
+			for index := range chaosresult.ProbeDetails {
+				if chaosresult.ProbeDetails[index].Name == probe.Name {
+					chaosresult.ProbeDetails[index].HasProbeCompleted = true
+				}
+			}
 			break loop
 		default:
 			// record the error inside the probeDetails, we are maintaining a dedicated variable for the err, inside probeDetails
@@ -497,7 +506,7 @@ loop:
 
 		select {
 		case <-chaosDetails.ProbeContext.Ctx.Done():
-			log.Info("[Probe]: Chaos Execution completed. Stopping Probes")
+			log.Infof("Stopping %s continuous Probe", probe.Name)
 			for index := range chaosresult.ProbeDetails {
 				if chaosresult.ProbeDetails[index].Name == probe.Name {
 					chaosresult.ProbeDetails[index].HasProbeCompleted = true
@@ -719,10 +728,8 @@ func postChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resu
 	case "Continuous", "OnChaos":
 		if isInlineProbe(probe.CmdProbeInputs) {
 			// it will check for the error, It will detect the error if any error encountered in probe during chaos
-			if err = checkForErrorInContinuousProbe(resultDetails, probe.Name, chaosDetails.Delay, chaosDetails.Timeout); err != nil && cerrors.GetErrorType(err) != cerrors.FailureTypeCmdProbe {
-				if cerrors.GetErrorType(err) != cerrors.FailureTypeProbeTimeout {
-					return err
-				}
+			if err = checkForErrorInContinuousProbe(resultDetails, probe.Name, chaosDetails.Delay, chaosDetails.Timeout); err != nil && cerrors.GetErrorType(err) != cerrors.FailureTypeCmdProbe && cerrors.GetErrorType(err) != cerrors.FailureTypeProbeTimeout {
+				return err
 			}
 			// failing the probe, if the success condition doesn't met after the retry & timeout combinations
 			if err = markedVerdictInEnd(err, resultDetails, probe, "PostChaos"); err != nil {
@@ -730,10 +737,8 @@ func postChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resu
 			}
 		} else {
 			// it will check for the error, It will detect the error if any error encountered in probe during chaos
-			if err = checkForErrorInContinuousProbe(resultDetails, probe.Name, chaosDetails.Delay, chaosDetails.Timeout); err != nil && cerrors.GetErrorType(err) != cerrors.FailureTypeCmdProbe {
-				if cerrors.GetErrorType(err) != cerrors.FailureTypeProbeTimeout {
-					return err
-				}
+			if err = checkForErrorInContinuousProbe(resultDetails, probe.Name, chaosDetails.Delay, chaosDetails.Timeout); err != nil && cerrors.GetErrorType(err) != cerrors.FailureTypeCmdProbe && cerrors.GetErrorType(err) != cerrors.FailureTypeProbeTimeout {
+				return err
 			}
 
 			// failing the probe, if the success condition doesn't met after the retry & timeout combinations
