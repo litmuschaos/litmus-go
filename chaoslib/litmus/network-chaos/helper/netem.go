@@ -28,11 +28,10 @@ const (
 )
 
 var (
-	err           error
-	inject, abort chan os.Signal
+	err                                              error
+	inject, abort                                    chan os.Signal
+	sPorts, dPorts, whitelistDPorts, whitelistSPorts []string
 )
-
-var sPorts, dPorts []string
 
 // Helper injects the network chaos
 func Helper(clients clients.ClientSets) {
@@ -178,7 +177,7 @@ func injectChaos(netInterface string, target targetDetails) error {
 
 	netemCommands := os.Getenv("NETEM_COMMAND")
 
-	if len(target.DestinationIps) == 0 && len(sPorts) == 0 && len(dPorts) == 0 {
+	if len(target.DestinationIps) == 0 && len(sPorts) == 0 && len(dPorts) == 0 && len(whitelistDPorts) == 0 && len(whitelistSPorts) == 0 {
 		tc := fmt.Sprintf("sudo nsenter -t %d -n tc qdisc replace dev %s root netem %v", target.Pid, netInterface, netemCommands)
 		log.Info(tc)
 		if err := common.RunBashCommand(tc, "failed to create tc rules", target.Source); err != nil {
@@ -202,33 +201,60 @@ func injectChaos(netInterface string, target targetDetails) error {
 			return err
 		}
 
-		for _, ip := range target.DestinationIps {
-			// redirect traffic to specific IP through band 3
-			tc := fmt.Sprintf("sudo nsenter -t %v -n tc filter add dev %v protocol ip parent 1:0 prio 3 u32 match ip dst %v flowid 1:3", target.Pid, netInterface, ip)
-			if strings.Contains(ip, ":") {
-				tc = fmt.Sprintf("sudo nsenter -t %v -n tc filter add dev %v protocol ip parent 1:0 prio 3 u32 match ip6 dst %v flowid 1:3", target.Pid, netInterface, ip)
+		if len(whitelistDPorts) != 0 || len(whitelistSPorts) != 0 {
+			for _, port := range whitelistDPorts {
+				//redirect traffic to specific dport through band 2
+				tc := fmt.Sprintf("sudo nsenter -t %v -n tc filter add dev %v protocol ip parent 1:0 prio 2 u32 match ip dport %v 0xffff flowid 1:2", target.Pid, netInterface, port)
+				log.Info(tc)
+				if err := common.RunBashCommand(tc, "failed to create whitelist dport match filters", target.Source); err != nil {
+					return err
+				}
 			}
-			log.Info(tc)
-			if err := common.RunBashCommand(tc, "failed to create destination ips match filters", target.Source); err != nil {
-				return err
-			}
-		}
 
-		for _, port := range sPorts {
-			//redirect traffic to specific sport through band 3
-			tc := fmt.Sprintf("sudo nsenter -t %v -n tc filter add dev %v protocol ip parent 1:0 prio 3 u32 match ip sport %v 0xffff flowid 1:3", target.Pid, netInterface, port)
+			for _, port := range whitelistSPorts {
+				//redirect traffic to specific sport through band 2
+				tc := fmt.Sprintf("sudo nsenter -t %v -n tc filter add dev %v protocol ip parent 1:0 prio 2 u32 match ip sport %v 0xffff flowid 1:2", target.Pid, netInterface, port)
+				log.Info(tc)
+				if err := common.RunBashCommand(tc, "failed to create whitelist sport match filters", target.Source); err != nil {
+					return err
+				}
+			}
+
+			tc := fmt.Sprintf("sudo nsenter -t %v -n tc filter add dev %v protocol ip parent 1:0 prio 3 u32 match ip dst 0.0.0.0/0 flowid 1:3", target.Pid, netInterface)
 			log.Info(tc)
-			if err := common.RunBashCommand(tc, "failed to create source ports match filters", target.Source); err != nil {
+			if err := common.RunBashCommand(tc, "failed to create rule for all ports match filters", target.Source); err != nil {
 				return err
 			}
-		}
+		} else {
 
-		for _, port := range dPorts {
-			//redirect traffic to specific dport through band 3
-			tc := fmt.Sprintf("sudo nsenter -t %v -n tc filter add dev %v protocol ip parent 1:0 prio 3 u32 match ip dport %v 0xffff flowid 1:3", target.Pid, netInterface, port)
-			log.Info(tc)
-			if err := common.RunBashCommand(tc, "failed to create destination ports match filters", target.Source); err != nil {
-				return err
+			for _, ip := range target.DestinationIps {
+				// redirect traffic to specific IP through band 3
+				tc := fmt.Sprintf("sudo nsenter -t %v -n tc filter add dev %v protocol ip parent 1:0 prio 3 u32 match ip dst %v flowid 1:3", target.Pid, netInterface, ip)
+				if strings.Contains(ip, ":") {
+					tc = fmt.Sprintf("sudo nsenter -t %v -n tc filter add dev %v protocol ip parent 1:0 prio 3 u32 match ip6 dst %v flowid 1:3", target.Pid, netInterface, ip)
+				}
+				log.Info(tc)
+				if err := common.RunBashCommand(tc, "failed to create destination ips match filters", target.Source); err != nil {
+					return err
+				}
+			}
+
+			for _, port := range sPorts {
+				//redirect traffic to specific sport through band 3
+				tc := fmt.Sprintf("sudo nsenter -t %v -n tc filter add dev %v protocol ip parent 1:0 prio 3 u32 match ip sport %v 0xffff flowid 1:3", target.Pid, netInterface, port)
+				log.Info(tc)
+				if err := common.RunBashCommand(tc, "failed to create source ports match filters", target.Source); err != nil {
+					return err
+				}
+			}
+
+			for _, port := range dPorts {
+				//redirect traffic to specific dport through band 3
+				tc := fmt.Sprintf("sudo nsenter -t %v -n tc filter add dev %v protocol ip parent 1:0 prio 3 u32 match ip dport %v 0xffff flowid 1:3", target.Pid, netInterface, port)
+				log.Info(tc)
+				if err := common.RunBashCommand(tc, "failed to create destination ports match filters", target.Source); err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -286,10 +312,18 @@ func getENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.DestinationPorts = types.Getenv("DESTINATION_PORTS", "")
 
 	if strings.TrimSpace(experimentDetails.DestinationPorts) != "" {
-		dPorts = strings.Split(strings.TrimSpace(experimentDetails.DestinationPorts), ",")
+		if strings.Contains(experimentDetails.DestinationPorts, "!") {
+			whitelistDPorts = strings.Split(strings.TrimPrefix(strings.TrimSpace(experimentDetails.DestinationPorts), "!"), ",")
+		} else {
+			dPorts = strings.Split(strings.TrimSpace(experimentDetails.DestinationPorts), ",")
+		}
 	}
 	if strings.TrimSpace(experimentDetails.SourcePorts) != "" {
-		sPorts = strings.Split(strings.TrimSpace(experimentDetails.SourcePorts), ",")
+		if strings.Contains(experimentDetails.SourcePorts, "!") {
+			whitelistSPorts = strings.Split(strings.TrimPrefix(strings.TrimSpace(experimentDetails.SourcePorts), "!"), ",")
+		} else {
+			sPorts = strings.Split(strings.TrimSpace(experimentDetails.SourcePorts), ",")
+		}
 	}
 }
 
