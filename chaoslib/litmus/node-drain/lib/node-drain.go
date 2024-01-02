@@ -76,6 +76,10 @@ func PrepareNodeDrain(experimentsDetails *experimentTypes.ExperimentDetails, cli
 
 	// Drain the application node
 	if err := drainNode(experimentsDetails, clients, chaosDetails); err != nil {
+		log.Info("[Revert]: Reverting chaos because error during draining of node")
+		if uncordonErr := uncordonNode(experimentsDetails, clients, chaosDetails); uncordonErr != nil {
+			return cerrors.PreserveError{ErrString: fmt.Sprintf("[%s,%s]", stacktrace.RootCause(err).Error(), stacktrace.RootCause(uncordonErr).Error())}
+		}
 		return stacktrace.Propagate(err, "could not drain node")
 	}
 
