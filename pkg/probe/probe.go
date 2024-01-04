@@ -273,7 +273,7 @@ loop:
 			if probe.HasProbeCompleted {
 				break loop
 			}
-			log.Infof("[Probe]: Waiting for %s probe to finish or timeout (Elapsed time: %v)", probeName, time.Since(startTime).Seconds())
+			log.Infof("[Probe]: Waiting for %s probe to finish or timeout (Elapsed time: %v s)", probeName, time.Since(startTime).Seconds())
 			time.Sleep(time.Duration(delay) * time.Second)
 		}
 	}
