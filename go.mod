@@ -9,7 +9,7 @@ require (
 	github.com/aws/aws-sdk-go v1.38.59
 	github.com/containerd/cgroups v1.0.1
 	github.com/kyokomi/emoji v2.2.4+incompatible
-	github.com/litmuschaos/chaos-operator v0.0.0-20230602170015-d019f63af50f
+	github.com/litmuschaos/chaos-operator v0.0.0-20240104104915-2d8472873222
 	github.com/palantir/stacktrace v0.0.0-20161112013806-78658fd2d177
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.8.1
@@ -81,7 +81,6 @@ require (
 
 // Pinned to kubernetes-1.21.2
 replace (
-	github.com/litmuschaos/chaos-operator => ../chaos-operator
 	k8s.io/api => k8s.io/api v0.21.2
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.21.2
 	k8s.io/apimachinery => k8s.io/apimachinery v0.21.2

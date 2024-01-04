@@ -326,8 +326,20 @@ loop:
 					}
 				}
 			}
-			// waiting for the probe polling interval
-			time.Sleep(probeTimeout.ProbePollingInterval)
+
+			select {
+			case <-chaosDetails.ProbeContext.Ctx.Done():
+				log.Infof("Stopping %s continuous Probe", probe.Name)
+				for index := range chaosresult.ProbeDetails {
+					if chaosresult.ProbeDetails[index].Name == probe.Name {
+						chaosresult.ProbeDetails[index].HasProbeCompleted = true
+					}
+				}
+				break loop
+			default:
+				// waiting for the probe polling interval
+				time.Sleep(probeTimeout.ProbePollingInterval)
+			}
 		}
 	}
 	// if experiment fails and stopOnfailure is provided as true then it will patch the chaosengine for abort
