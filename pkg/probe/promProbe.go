@@ -216,6 +216,7 @@ func triggerPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 				SecondValue(probe.PromProbeInputs.Comparator.Value).
 				Criteria(probe.PromProbeInputs.Comparator.Criteria).
 				ProbeName(probe.Name).
+				ProbeVerbosity(probe.RunProperties.Verbosity).
 				CompareFloat(cerrors.FailureTypePromProbe); err != nil {
 				log.Errorf("The %v prom probe has been Failed, err: %v", probe.Name, err)
 				return err

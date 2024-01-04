@@ -127,6 +127,7 @@ func httpGet(probe v1alpha1.ProbeAttributes, client *http.Client, resultDetails 
 				SecondValue(probe.HTTPProbeInputs.Method.Get.ResponseCode).
 				Criteria(probe.HTTPProbeInputs.Method.Get.Criteria).
 				ProbeName(probe.Name).
+				ProbeVerbosity(probe.RunProperties.Verbosity).
 				CompareInt(cerrors.FailureTypeHttpProbe); err != nil {
 				log.Errorf("The %v http probe get method has Failed, err: %v", probe.Name, err)
 				return err
