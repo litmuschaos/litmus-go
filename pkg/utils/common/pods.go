@@ -3,14 +3,15 @@ package common
 import (
 	"context"
 	"fmt"
-	"github.com/litmuschaos/litmus-go/pkg/cerrors"
-	"github.com/palantir/stacktrace"
 	"math/rand"
 	"os"
 	"os/exec"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
+	"github.com/palantir/stacktrace"
 
 	"github.com/litmuschaos/chaos-operator/api/litmuschaos/v1alpha1"
 	"github.com/litmuschaos/litmus-go/pkg/clients"
@@ -25,7 +26,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-//DeletePod deletes the specified pod and wait until it got terminated
+// DeletePod deletes the specified pod and wait until it got terminated
 func DeletePod(podName, podLabel, namespace string, timeout, delay int, clients clients.ClientSets) error {
 
 	if err := clients.KubeClient.CoreV1().Pods(namespace).Delete(context.Background(), podName, v1.DeleteOptions{}); err != nil {
@@ -35,7 +36,7 @@ func DeletePod(podName, podLabel, namespace string, timeout, delay int, clients 
 	return waitForPodTermination(podLabel, namespace, timeout, delay, clients)
 }
 
-//DeleteAllPod deletes all the pods with matching labels and wait until all the pods got terminated
+// DeleteAllPod deletes all the pods with matching labels and wait until all the pods got terminated
 func DeleteAllPod(podLabel, namespace string, timeout, delay int, clients clients.ClientSets) error {
 
 	if err := clients.KubeClient.CoreV1().Pods(namespace).DeleteCollection(context.Background(), v1.DeleteOptions{}, v1.ListOptions{LabelSelector: podLabel}); err != nil {
@@ -138,7 +139,7 @@ func VerifyExistanceOfPods(namespace, pods string, clients clients.ClientSets) (
 	return true, nil
 }
 
-//GetPodList check for the availability of the target pod for the chaos execution
+// GetPodList check for the availability of the target pod for the chaos execution
 // if the target pod is not defined it will derive the random target pod list using pod affected percentage
 func GetPodList(targetPods string, podAffPerc int, clients clients.ClientSets, chaosDetails *types.ChaosDetails) (core_v1.PodList, error) {
 	finalPods := core_v1.PodList{}
@@ -189,7 +190,7 @@ func CheckForAvailabilityOfPod(namespace, name string, clients clients.ClientSet
 	return true, nil
 }
 
-//FilterNonChaosPods remove the chaos pods(operator, runner) for the podList
+// FilterNonChaosPods remove the chaos pods(operator, runner) for the podList
 // it filter when the applabels are not defined and it will select random pods from appns
 func FilterNonChaosPods(ns, labels string, clients clients.ClientSets, chaosDetails *types.ChaosDetails) (core_v1.PodList, error) {
 	podList, err := clients.KubeClient.CoreV1().Pods(ns).List(context.Background(), v1.ListOptions{LabelSelector: labels})
@@ -294,7 +295,7 @@ func GetTargetPodsWhenTargetPodsENVNotSet(podAffPerc int, clients clients.Client
 					if err != nil {
 						return finalPods, cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Target: fmt.Sprintf("{podLabel: %s, namespace: %s}", label, target.Namespace), Reason: err.Error()}
 					}
-					finalPods.Items = append(finalPods.Items, pods.Items...)
+					finalPods.Items = append(finalPods.Items, filterPodsByOwnerKind(pods.Items, target)...)
 				}
 			}
 		}
@@ -308,6 +309,39 @@ func GetTargetPodsWhenTargetPodsENVNotSet(podAffPerc int, clients clients.Client
 		return finalPods, nil
 	}
 	return filterPodsByPercentage(finalPods, podAffPerc), nil
+}
+
+func filterPodsByOwnerKind(pods []core_v1.Pod, target types.AppDetails) []core_v1.Pod {
+	wantedOwnerKind := getOwnerKindFromTargetKind(target)
+	var filteredPods []core_v1.Pod
+	for _, pod := range pods {
+		if len(pod.OwnerReferences) > 0 {
+			for _, ownerReference := range pod.OwnerReferences {
+				if ownerReference.Kind == wantedOwnerKind {
+					filteredPods = append(filteredPods, pod)
+					continue
+				}
+			}
+		}
+	}
+	return filteredPods
+}
+
+func getOwnerKindFromTargetKind(target types.AppDetails) string {
+	switch target.Kind {
+	case "deployment":
+		return "ReplicaSet"
+	case "statefulset":
+		return "StatefulSet"
+	case "daemonset":
+		return "DaemonSet"
+	case "deploymentconfig":
+		return "ReplicationController"
+	case "rollout":
+		return "ReplicaSet"
+	default:
+		return ""
+	}
 }
 
 func filterPodsByPercentage(finalPods core_v1.PodList, podAffPerc int) core_v1.PodList {
@@ -367,7 +401,7 @@ func GetExperimentPod(name, namespace string, clients clients.ClientSets) (*core
 	return pod, nil
 }
 
-//GetContainerID  derive the container id of the application container
+// GetContainerID  derive the container id of the application container
 func GetContainerID(appNamespace, targetPod, targetContainer string, clients clients.ClientSets, source string) (string, error) {
 
 	pod, err := clients.KubeClient.CoreV1().Pods(appNamespace).Get(context.Background(), targetPod, v1.GetOptions{})
@@ -391,7 +425,7 @@ func GetContainerID(appNamespace, targetPod, targetContainer string, clients cli
 	return containerID, nil
 }
 
-//GetRuntimeBasedContainerID extract out the container id of the target container based on the container runtime
+// GetRuntimeBasedContainerID extract out the container id of the target container based on the container runtime
 func GetRuntimeBasedContainerID(containerRuntime, socketPath, targetPods, appNamespace, targetContainer string, clients clients.ClientSets, source string) (string, error) {
 
 	var containerID string
