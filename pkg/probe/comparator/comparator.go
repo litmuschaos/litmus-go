@@ -3,11 +3,12 @@ package comparator
 // Model contains operands and operator for the comparison operations
 // a and b attribute belongs to operands and operator attribute belongs to operator
 type Model struct {
-	a         interface{}
-	b         interface{}
-	operator  string
-	rc        int
-	probeName string
+	a              interface{}
+	b              interface{}
+	operator       string
+	rc             int
+	probeName      string
+	probeVerbosity string
 }
 
 // RunCount sets the run counts
@@ -49,5 +50,11 @@ func (model *Model) Criteria(criteria string) *Model {
 // ProbeName sets the name of the probe under evaluation
 func (model *Model) ProbeName(probeName string) *Model {
 	model.probeName = probeName
+	return model
+}
+
+// ProbeVerbosity sets the name of the probe under evaluation
+func (model *Model) ProbeVerbosity(verbosity string) *Model {
+	model.probeVerbosity = verbosity
 	return model
 }

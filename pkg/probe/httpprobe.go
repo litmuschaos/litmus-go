@@ -33,7 +33,7 @@ func prepareHTTPProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets
 			return err
 		}
 	case "postchaos":
-		if err := postChaosHTTPProbe(probe, resultDetails); err != nil {
+		if err := postChaosHTTPProbe(probe, resultDetails, chaosDetails.Delay, chaosDetails.Timeout); err != nil {
 			return err
 		}
 	case "duringchaos":
@@ -127,6 +127,7 @@ func httpGet(probe v1alpha1.ProbeAttributes, client *http.Client, resultDetails 
 				SecondValue(probe.HTTPProbeInputs.Method.Get.ResponseCode).
 				Criteria(probe.HTTPProbeInputs.Method.Get.Criteria).
 				ProbeName(probe.Name).
+				ProbeVerbosity(probe.RunProperties.Verbosity).
 				CompareInt(cerrors.FailureTypeHttpProbe); err != nil {
 				log.Errorf("The %v http probe get method has Failed, err: %v", probe.Name, err)
 				return err
@@ -169,6 +170,7 @@ func httpPost(probe v1alpha1.ProbeAttributes, client *http.Client, resultDetails
 				SecondValue(probe.HTTPProbeInputs.Method.Post.ResponseCode).
 				Criteria(probe.HTTPProbeInputs.Method.Post.Criteria).
 				ProbeName(probe.Name).
+				ProbeVerbosity(probe.RunProperties.Verbosity).
 				CompareInt(cerrors.FailureTypeHttpProbe); err != nil {
 				log.Errorf("The %v http probe post method has Failed, err: %v", probe.Name, err)
 				return err
@@ -222,24 +224,36 @@ func triggerContinuousHTTPProbe(probe v1alpha1.ProbeAttributes, clients clients.
 
 	// it triggers the http probe for the entire duration of chaos and it fails, if any error encounter
 	// it marked the error for the probes, if any
+
 loop:
 	for {
-		err = triggerHTTPProbe(probe, chaosresult)
-		// record the error inside the probeDetails, we are maintaining a dedicated variable for the err, inside probeDetails
-		if err != nil {
-			err = addProbePhase(err, string(chaosDetails.Phase))
+		select {
+		case <-chaosDetails.ProbeContext.Ctx.Done():
+			log.Infof("Stopping %s continuous Probe", probe.Name)
 			for index := range chaosresult.ProbeDetails {
 				if chaosresult.ProbeDetails[index].Name == probe.Name {
-					chaosresult.ProbeDetails[index].IsProbeFailedWithError = err
-					chaosresult.ProbeDetails[index].Status.Description = getDescription(err)
-					log.Errorf("The %v http probe has been Failed, err: %v", probe.Name, err)
-					isExperimentFailed = true
-					break loop
+					chaosresult.ProbeDetails[index].HasProbeCompleted = true
 				}
 			}
+			break loop
+		default:
+			err = triggerHTTPProbe(probe, chaosresult)
+			// record the error inside the probeDetails, we are maintaining a dedicated variable for the err, inside probeDetails
+			if err != nil {
+				err = addProbePhase(err, string(chaosDetails.Phase))
+				for index := range chaosresult.ProbeDetails {
+					if chaosresult.ProbeDetails[index].Name == probe.Name {
+						chaosresult.ProbeDetails[index].IsProbeFailedWithError = err
+						chaosresult.ProbeDetails[index].Status.Description = getDescription(err)
+						log.Errorf("The %v http probe has been Failed, err: %v", probe.Name, err)
+						isExperimentFailed = true
+						break loop
+					}
+				}
+			}
+			// waiting for the probe polling interval
+			time.Sleep(probeTimeout.ProbePollingInterval)
 		}
-		// waiting for the probe polling interval
-		time.Sleep(probeTimeout.ProbePollingInterval)
 	}
 	// if experiment fails and stopOnfailure is provided as true then it will patch the chaosengine for abort
 	// if experiment fails but stopOnfailure is provided as false then it will continue the execution
@@ -292,13 +306,15 @@ func preChaosHTTPProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resu
 			"Mode":           probe.Mode,
 			"Phase":          "PreChaos",
 		})
+
 		go triggerContinuousHTTPProbe(probe, clients, resultDetails, chaosDetails)
+
 	}
 	return nil
 }
 
 // postChaosHTTPProbe trigger the http probe for postchaos phase
-func postChaosHTTPProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails) error {
+func postChaosHTTPProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.ResultDetails, delay int, timeout int) error {
 	probeTimeout := getProbeTimeouts(probe.Name, resultDetails.ProbeDetails)
 
 	switch probe.Mode {
@@ -331,7 +347,7 @@ func postChaosHTTPProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Res
 		}
 	case "Continuous", "OnChaos":
 		// it will check for the error, It will detect the error if any error encountered in probe during chaos
-		if err = checkForErrorInContinuousProbe(resultDetails, probe.Name); err != nil && cerrors.GetErrorType(err) != cerrors.FailureTypeHttpProbe {
+		if err = checkForErrorInContinuousProbe(resultDetails, probe.Name, delay, timeout); err != nil && cerrors.GetErrorType(err) != cerrors.FailureTypeHttpProbe && cerrors.GetErrorType(err) != cerrors.FailureTypeProbeTimeout {
 			return err
 		}
 		// failing the probe, if the success condition doesn't met after the retry & timeout combinations
@@ -365,6 +381,11 @@ loop:
 		case <-endTime:
 			log.Infof("[Chaos]: Time is up for the %v probe", probe.Name)
 			endTime = nil
+			for index := range chaosresult.ProbeDetails {
+				if chaosresult.ProbeDetails[index].Name == probe.Name {
+					chaosresult.ProbeDetails[index].HasProbeCompleted = true
+				}
+			}
 			break loop
 		default:
 			err = triggerHTTPProbe(probe, chaosresult)
@@ -381,8 +402,19 @@ loop:
 				}
 			}
 
-			// waiting for the probe polling interval
-			time.Sleep(probeTimeout.ProbePollingInterval)
+			select {
+			case <-chaosDetails.ProbeContext.Ctx.Done():
+				log.Infof("Stopping %s continuous Probe", probe.Name)
+				for index := range chaosresult.ProbeDetails {
+					if chaosresult.ProbeDetails[index].Name == probe.Name {
+						chaosresult.ProbeDetails[index].HasProbeCompleted = true
+					}
+				}
+				break loop
+			default:
+				// waiting for the probe polling interval
+				time.Sleep(probeTimeout.ProbePollingInterval)
+			}
 		}
 	}
 	// if experiment fails and stopOnfailure is provided as true then it will patch the chaosengine for abort
