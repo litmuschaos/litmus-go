@@ -295,7 +295,11 @@ func GetTargetPodsWhenTargetPodsENVNotSet(podAffPerc int, clients clients.Client
 					if err != nil {
 						return finalPods, cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Target: fmt.Sprintf("{podLabel: %s, namespace: %s}", label, target.Namespace), Reason: err.Error()}
 					}
-					finalPods.Items = append(finalPods.Items, filterPodsByOwnerKind(pods.Items, target)...)
+					filteredPods, err := filterPodsByOwnerKind(pods.Items, target, clients)
+					if err != nil {
+						return finalPods, stacktrace.Propagate(err, "could not identify parent type from pod")
+					}
+					finalPods.Items = append(finalPods.Items, filteredPods...)
 				}
 			}
 		}
@@ -311,37 +315,18 @@ func GetTargetPodsWhenTargetPodsENVNotSet(podAffPerc int, clients clients.Client
 	return filterPodsByPercentage(finalPods, podAffPerc), nil
 }
 
-func filterPodsByOwnerKind(pods []core_v1.Pod, target types.AppDetails) []core_v1.Pod {
-	wantedOwnerKind := getOwnerKindFromTargetKind(target)
+func filterPodsByOwnerKind(pods []core_v1.Pod, target types.AppDetails, clients clients.ClientSets) ([]core_v1.Pod, error) {
 	var filteredPods []core_v1.Pod
 	for _, pod := range pods {
-		if len(pod.OwnerReferences) > 0 {
-			for _, ownerReference := range pod.OwnerReferences {
-				if ownerReference.Kind == wantedOwnerKind {
-					filteredPods = append(filteredPods, pod)
-					continue
-				}
-			}
+		parentType, _, err := workloads.GetPodOwnerTypeAndName(&pod, clients.DynamicClient)
+		if err != nil {
+			return nil, err
+		}
+		if target.Kind == parentType {
+			filteredPods = append(filteredPods, pod)
 		}
 	}
-	return filteredPods
-}
-
-func getOwnerKindFromTargetKind(target types.AppDetails) string {
-	switch target.Kind {
-	case "deployment":
-		return "ReplicaSet"
-	case "statefulset":
-		return "StatefulSet"
-	case "daemonset":
-		return "DaemonSet"
-	case "deploymentconfig":
-		return "ReplicationController"
-	case "rollout":
-		return "ReplicaSet"
-	default:
-		return ""
-	}
+	return filteredPods, nil
 }
 
 func filterPodsByPercentage(finalPods core_v1.PodList, podAffPerc int) core_v1.PodList {
