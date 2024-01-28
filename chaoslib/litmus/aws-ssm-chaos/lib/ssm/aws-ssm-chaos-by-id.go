@@ -16,6 +16,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/palantir/stacktrace"
+	"github.com/pkg/errors"
 )
 
 var (
@@ -53,6 +54,9 @@ func PrepareAWSSSMChaosByID(experimentsDetails *experimentTypes.ExperimentDetail
 	go lib.AbortWatcher(experimentsDetails, abort)
 
 	//get the instance id or list of instance ids
+	if strings.TrimSpace(experimentsDetails.EC2InstanceID) == "" {
+		return errors.Errorf("no instance id found for chaos injection")
+	}
 	instanceIDList := strings.Split(experimentsDetails.EC2InstanceID, ",")
 	if experimentsDetails.EC2InstanceID == "" || len(instanceIDList) == 0 {
 		return cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Reason: "no instance id found for chaos injection"}

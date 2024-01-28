@@ -19,6 +19,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/palantir/stacktrace"
+	"github.com/pkg/errors"
 )
 
 var (
@@ -45,6 +46,9 @@ func PrepareAzureStop(experimentsDetails *experimentTypes.ExperimentDetails, cli
 	}
 
 	//  get the instance name or list of instance names
+	if strings.TrimSpace(experimentsDetails.AzureInstanceNames) == "" {
+		return errors.Errorf("no instance name found for chaos injection")
+	}
 	instanceNameList := strings.Split(experimentsDetails.AzureInstanceNames, ",")
 	if experimentsDetails.AzureInstanceNames == "" || len(instanceNameList) == 0 {
 		return cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Reason: "no instance name found to stop"}

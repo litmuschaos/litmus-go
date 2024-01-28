@@ -18,6 +18,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/palantir/stacktrace"
+	"github.com/pkg/errors"
 	"google.golang.org/api/compute/v1"
 )
 
@@ -46,9 +47,15 @@ func PrepareVMStop(computeService *compute.Service, experimentsDetails *experime
 	}
 
 	// get the instance name or list of instance names
+	if strings.TrimSpace(experimentsDetails.VMInstanceName) == "" {
+		return errors.Errorf("no instance name found for chaos injection")
+	}
 	instanceNamesList := strings.Split(experimentsDetails.VMInstanceName, ",")
 
 	// get the zone name or list of corresponding zones for the instances
+	if strings.TrimSpace(experimentsDetails.Zones) == "" {
+		return errors.Errorf("no zone name found for chaos injection")
+	}
 	instanceZonesList := strings.Split(experimentsDetails.Zones, ",")
 
 	go abortWatcher(computeService, experimentsDetails, instanceNamesList, instanceZonesList, chaosDetails)

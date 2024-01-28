@@ -2,9 +2,6 @@ package helper
 
 import (
 	"fmt"
-	"github.com/litmuschaos/litmus-go/pkg/cerrors"
-	"github.com/litmuschaos/litmus-go/pkg/events"
-	"github.com/palantir/stacktrace"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -12,6 +9,11 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
+	"github.com/litmuschaos/litmus-go/pkg/events"
+	"github.com/palantir/stacktrace"
+	"github.com/pkg/errors"
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/network-chaos/types"
@@ -367,7 +369,9 @@ func getDestIps(serviceMesh string) []string {
 	if strings.TrimSpace(destIps) == "" {
 		return nil
 	}
-
+	if strings.TrimSpace(destIps) == "" {
+		return errors.Errorf("no destination ips found for chaos injection")
+	}
 	ips := strings.Split(strings.TrimSpace(destIps), ",")
 
 	// removing duplicates ips from the list, if any

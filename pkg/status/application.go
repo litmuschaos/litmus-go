@@ -9,6 +9,7 @@ import (
 
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	"github.com/palantir/stacktrace"
+	"github.com/pkg/errors"
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/log"
@@ -80,7 +81,9 @@ func CheckApplicationStatusesByLabels(appNs, appLabel string, timeout, delay int
 
 // CheckAuxiliaryApplicationStatus checks the status of the Auxiliary applications
 func CheckAuxiliaryApplicationStatus(AuxiliaryAppDetails string, timeout, delay int, clients clients.ClientSets) error {
-
+	if strings.TrimSpace(AuxiliaryAppDetails) == "" {
+		return errors.Errorf("no auxiliary application provided")
+	}
 	AuxiliaryAppInfo := strings.Split(AuxiliaryAppDetails, ",")
 
 	for _, val := range AuxiliaryAppInfo {

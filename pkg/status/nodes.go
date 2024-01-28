@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
+	"github.com/pkg/errors"
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/log"
@@ -25,6 +26,9 @@ func CheckNodeStatus(nodes string, timeout, delay int, clients clients.ClientSet
 		Try(func(attempt uint) error {
 			nodeList := apiv1.NodeList{}
 			if nodes != "" {
+				if strings.TrimSpace(nodes) == "" {
+					return errors.Errorf("no node provided")
+				}
 				targetNodes := strings.Split(nodes, ",")
 				for index := range targetNodes {
 					node, err := clients.KubeClient.CoreV1().Nodes().Get(context.Background(), targetNodes[index], metav1.GetOptions{})

@@ -15,6 +15,7 @@ import (
 	cmp "github.com/litmuschaos/litmus-go/pkg/probe/comparator"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -367,6 +368,9 @@ func extractValueFromMetrics(metrics, probeName string) (string, error) {
 	}
 
 	// deriving the index for the value column from the headers
+	if strings.TrimSpace(rows[0]) == "" {
+		return errors.Errorf("error while parsing rows")
+	}
 	headerColumn := strings.Split(rows[0], ",")
 	indexForValueColumn := -1
 	for index := range headerColumn {
@@ -380,6 +384,9 @@ func extractValueFromMetrics(metrics, probeName string) (string, error) {
 	}
 
 	// splitting the metrics entries which are available as comma separated
+	if strings.TrimSpace(rows[1]) == "" {
+		return errors.Errorf("error while parsing rows")
+	}
 	values := strings.Split(rows[1], ",")
 	if values[indexForValueColumn] == "" {
 		return "", cerrors.Error{ErrorCode: cerrors.ErrorTypePromProbe, Target: fmt.Sprintf("{name: %v}", probeName), Reason: "error while parsing value from derived matrics"}

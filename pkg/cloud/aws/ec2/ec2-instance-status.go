@@ -10,6 +10,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/cloud/aws/common"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/palantir/stacktrace"
+	"github.com/pkg/errors"
 )
 
 // GetEC2InstanceStatus will verify and give the ec2 instance details along with ebs volume idetails.
@@ -51,7 +52,9 @@ func GetEC2InstanceStatus(instanceID, region string) (string, error) {
 
 // InstanceStatusCheckByID is used to check the instance status of all the instance under chaos.
 func InstanceStatusCheckByID(instanceID, region string) error {
-
+	if strings.TrimSpace(instanceID) == "" {
+		return errors.Errorf("no instance id provided to terminate")
+	}
 	instanceIDList := strings.Split(instanceID, ",")
 	if instanceID == "" || len(instanceIDList) == 0 {
 		return cerrors.Error{

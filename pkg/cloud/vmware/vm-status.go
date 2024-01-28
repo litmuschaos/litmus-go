@@ -10,6 +10,7 @@ import (
 
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	"github.com/palantir/stacktrace"
+	"github.com/pkg/errors"
 )
 
 // GetVMStatus returns the current status of a given VM
@@ -89,7 +90,9 @@ func GetVMStatus(vcenterServer, vmId, cookie string) (string, error) {
 
 // VMStatusCheck validates the steady state for the given vm ids
 func VMStatusCheck(vcenterServer, vmIds, cookie string) error {
-
+	if strings.TrimSpace(vmIds) == "" {
+		return errors.Errorf("vmIds not provided")
+	}
 	vmIdList := strings.Split(vmIds, ",")
 	if vmIds == "" || len(vmIdList) == 0 {
 		return cerrors.Error{
