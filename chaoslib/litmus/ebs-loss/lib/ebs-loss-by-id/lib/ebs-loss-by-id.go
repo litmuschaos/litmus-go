@@ -49,8 +49,8 @@ func PrepareEBSLossByID(experimentsDetails *experimentTypes.ExperimentDetails, c
 	default:
 
 		//get the volume id or list of instance ids
-		if strings.TrimSpace(experimentsDetails.EBSVolumeID) == "" {
-			return errors.Errorf("no volume id found for chaos injection")
+		if strings.Count(experimentsDetails.EBSVolumeID, ",") == len(experimentsDetails.EBSVolumeID) {
+			return errors.Errorf("variable contains only one or more commas")
 		}
 		volumeIDList := strings.Split(experimentsDetails.EBSVolumeID, ",")
 		if len(volumeIDList) == 0 {

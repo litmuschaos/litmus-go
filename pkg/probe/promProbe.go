@@ -368,8 +368,8 @@ func extractValueFromMetrics(metrics, probeName string) (string, error) {
 	}
 
 	// deriving the index for the value column from the headers
-	if strings.TrimSpace(rows[0]) == "" {
-		return errors.Errorf("error while parsing rows")
+	if strings.Count(rows[0], ",") == len(rows[0]) {
+		return "", errors.Errorf("error while parsing rows")
 	}
 	headerColumn := strings.Split(rows[0], ",")
 	indexForValueColumn := -1
@@ -384,8 +384,8 @@ func extractValueFromMetrics(metrics, probeName string) (string, error) {
 	}
 
 	// splitting the metrics entries which are available as comma separated
-	if strings.TrimSpace(rows[1]) == "" {
-		return errors.Errorf("error while parsing rows")
+	if strings.Count(rows[1], ",") == len(rows[1]) {
+		return "", errors.Errorf("error while parsing rows")
 	}
 	values := strings.Split(rows[1], ",")
 	if values[indexForValueColumn] == "" {

@@ -46,8 +46,8 @@ func PrepareEC2TerminateByID(experimentsDetails *experimentTypes.ExperimentDetai
 	}
 
 	//get the instance id or list of instance ids
-	if strings.TrimSpace(experimentsDetails.Ec2InstanceID) == "" {
-		return errors.Errorf("no instance id found for chaos injection")
+	if strings.Count(experimentsDetails.Ec2InstanceID, ",") == len(experimentsDetails.Ec2InstanceID) {
+		return errors.Errorf("variable contains only one or more commas")
 	}
 	instanceIDList := strings.Split(experimentsDetails.Ec2InstanceID, ",")
 	if experimentsDetails.Ec2InstanceID == "" || len(instanceIDList) == 0 {

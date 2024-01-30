@@ -49,8 +49,8 @@ func PrepareChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients
 	}
 
 	//get the disk name  or list of disk names
-	if strings.TrimSpace(experimentsDetails.VirtualDiskNames) == "" {
-		return errors.Errorf("no volume names found for chaos injection")
+	if strings.Count(experimentsDetails.VirtualDiskNames, ",") == len(experimentsDetails.VirtualDiskNames) {
+		return errors.Errorf("variable contains only one or more commas")
 	}
 	diskNameList := strings.Split(experimentsDetails.VirtualDiskNames, ",")
 	if experimentsDetails.VirtualDiskNames == "" || len(diskNameList) == 0 {

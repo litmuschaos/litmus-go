@@ -43,8 +43,8 @@ func InjectVMPowerOffChaos(experimentsDetails *experimentTypes.ExperimentDetails
 	}
 
 	//Fetching the target VM Ids
-	if strings.TrimSpace(experimentsDetails.VMIds) == "" {
-		return errors.Errorf("no vm id found for chaos injection")
+	if strings.Count(experimentsDetails.VMIds, ",") == len(experimentsDetails.VMIds) {
+		return errors.Errorf("variable contains only one or more commas")
 	}
 	vmIdList := strings.Split(experimentsDetails.VMIds, ",")
 

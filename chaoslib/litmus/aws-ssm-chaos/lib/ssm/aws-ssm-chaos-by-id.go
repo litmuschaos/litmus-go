@@ -54,8 +54,8 @@ func PrepareAWSSSMChaosByID(experimentsDetails *experimentTypes.ExperimentDetail
 	go lib.AbortWatcher(experimentsDetails, abort)
 
 	//get the instance id or list of instance ids
-	if strings.TrimSpace(experimentsDetails.EC2InstanceID) == "" {
-		return errors.Errorf("no instance id found for chaos injection")
+	if strings.Count(experimentsDetails.EC2InstanceID, ",") == len(experimentsDetails.EC2InstanceID) {
+		return errors.Errorf("variable contains only one or more commas")
 	}
 	instanceIDList := strings.Split(experimentsDetails.EC2InstanceID, ",")
 	if experimentsDetails.EC2InstanceID == "" || len(instanceIDList) == 0 {

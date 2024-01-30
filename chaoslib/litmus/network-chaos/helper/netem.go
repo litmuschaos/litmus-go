@@ -11,16 +11,14 @@ import (
 	"time"
 
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
-	"github.com/litmuschaos/litmus-go/pkg/events"
-	"github.com/palantir/stacktrace"
-	"github.com/pkg/errors"
-
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
+	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/network-chaos/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
+	"github.com/palantir/stacktrace"
 	clientTypes "k8s.io/apimachinery/pkg/types"
 )
 
@@ -369,8 +367,8 @@ func getDestIps(serviceMesh string) []string {
 	if strings.TrimSpace(destIps) == "" {
 		return nil
 	}
-	if strings.TrimSpace(destIps) == "" {
-		return errors.Errorf("no destination ips found for chaos injection")
+	if strings.Count(destIps, ",") == len(destIps) {
+		return nil
 	}
 	ips := strings.Split(strings.TrimSpace(destIps), ",")
 

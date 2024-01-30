@@ -68,7 +68,7 @@ func triggerK8sProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets,
 
 	parsedResourceNames := []string{}
 	if inputs.ResourceNames != "" {
-		if strings.TrimSpace(inputs.ResourceNames) == "" {
+		if strings.Count(inputs.ResourceNames, ",") == len(inputs.ResourceNames) {
 			return errors.Errorf("resource names cannot be empty")
 		}
 		parsedResourceNames = strings.Split(inputs.ResourceNames, ",")

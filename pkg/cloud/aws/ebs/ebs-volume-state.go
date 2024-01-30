@@ -117,7 +117,7 @@ func GetEBSStatus(ebsVolumeID, ec2InstanceID, region string) (string, error) {
 
 // EBSStateCheckByID will check the attachment state of the given volume
 func EBSStateCheckByID(volumeIDs, region string) error {
-	if strings.TrimSpace(volumeIDs) == "" {
+	if strings.Count(volumeIDs, ",") == len(volumeIDs) {
 		return errors.Errorf("no volumeID provided, please provide a volume to detach")
 	}
 	volumeIDList := strings.Split(volumeIDs, ",")

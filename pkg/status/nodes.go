@@ -26,7 +26,7 @@ func CheckNodeStatus(nodes string, timeout, delay int, clients clients.ClientSet
 		Try(func(attempt uint) error {
 			nodeList := apiv1.NodeList{}
 			if nodes != "" {
-				if strings.TrimSpace(nodes) == "" {
+				if strings.Count(nodes, ",") == len(nodes) {
 					return errors.Errorf("no node provided")
 				}
 				targetNodes := strings.Split(nodes, ",")

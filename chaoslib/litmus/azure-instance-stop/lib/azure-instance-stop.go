@@ -46,8 +46,8 @@ func PrepareAzureStop(experimentsDetails *experimentTypes.ExperimentDetails, cli
 	}
 
 	//  get the instance name or list of instance names
-	if strings.TrimSpace(experimentsDetails.AzureInstanceNames) == "" {
-		return errors.Errorf("no instance name found for chaos injection")
+	if strings.Count(experimentsDetails.AzureInstanceNames, ",") == len(experimentsDetails.AzureInstanceNames) {
+		return errors.Errorf("variable contains only one or more commas")
 	}
 	instanceNameList := strings.Split(experimentsDetails.AzureInstanceNames, ",")
 	if experimentsDetails.AzureInstanceNames == "" || len(instanceNameList) == 0 {

@@ -105,14 +105,14 @@ func DiskVolumeStateCheck(computeService *compute.Service, experimentsDetails *e
 	if experimentsDetails.GCPProjectID == "" {
 		return cerrors.Error{ErrorCode: cerrors.ErrorTypeStatusChecks, Target: fmt.Sprintf("{projectId: %s}", experimentsDetails.GCPProjectID), Reason: "no gcp project id provided, please provide the project id"}
 	}
-	if strings.TrimSpace(experimentsDetails.DiskVolumeNames) == "" {
+	if strings.Count(experimentsDetails.DiskVolumeNames, ",") == len(experimentsDetails.DiskVolumeNames) {
 		return errors.Errorf("no disk name provided, please provide the name of the disk")
 	}
 	diskNamesList := strings.Split(experimentsDetails.DiskVolumeNames, ",")
 	if len(diskNamesList) == 0 {
 		return cerrors.Error{ErrorCode: cerrors.ErrorTypeStatusChecks, Target: fmt.Sprintf("{diskNames: %v}", diskNamesList), Reason: "no disk name provided, please provide the name of the disk"}
 	}
-	if strings.TrimSpace(experimentsDetails.Zones) == "" {
+	if strings.Count(experimentsDetails.Zones, ",") == len(experimentsDetails.Zones) {
 		return errors.Errorf("no zone provided, please provide the zone of the disk")
 	}
 	zonesList := strings.Split(experimentsDetails.Zones, ",")
@@ -136,7 +136,7 @@ func DiskVolumeStateCheck(computeService *compute.Service, experimentsDetails *e
 
 // SetTargetDiskInstanceNames fetches the vm instances to which the disks are attached
 func SetTargetDiskInstanceNames(computeService *compute.Service, experimentsDetails *experimentTypes.ExperimentDetails) error {
-	if strings.TrimSpace(experimentsDetails.DiskVolumeNames) == "" {
+	if strings.Count(experimentsDetails.DiskVolumeNames, ",") == len(experimentsDetails.DiskVolumeNames) {
 		return errors.Errorf("no disk name provided, please provide the name of the disk")
 	}
 	diskNamesList := strings.Split(experimentsDetails.DiskVolumeNames, ",")

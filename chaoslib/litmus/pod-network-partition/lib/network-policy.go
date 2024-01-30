@@ -115,8 +115,8 @@ func (np *NetworkPolicy) setPolicy(policy string) *NetworkPolicy {
 // setPodSelector sets the pod labels selector
 func (np *NetworkPolicy) setPodSelector(podLabel string) *NetworkPolicy {
 	podSelector := map[string]string{}
-	if strings.TrimSpace(podLabel) == "" {
-		return errors.errorf("pod selector cannot be empty")
+	if strings.Count(podLabel, ",") == len(podLabel) {
+		return nil
 	}
 	labels := strings.Split(podLabel, ",")
 	for i := range labels {
@@ -132,8 +132,8 @@ func (np *NetworkPolicy) setPodSelector(podLabel string) *NetworkPolicy {
 // setNamespaceSelector sets the namespace labels selector
 func (np *NetworkPolicy) setNamespaceSelector(nsLabel string) *NetworkPolicy {
 	nsSelector := map[string]string{}
-	if strings.TrimSpace(nsLabel) == "" {
-		return errors.errorf("namespace selector cannot be empty")
+	if strings.Count(nsLabel, ",") == len(nsLabel) {
+		return nil
 	}
 	labels := strings.Split(nsLabel, ",")
 	for i := range labels {

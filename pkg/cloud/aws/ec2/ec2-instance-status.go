@@ -52,7 +52,7 @@ func GetEC2InstanceStatus(instanceID, region string) (string, error) {
 
 // InstanceStatusCheckByID is used to check the instance status of all the instance under chaos.
 func InstanceStatusCheckByID(instanceID, region string) error {
-	if strings.TrimSpace(instanceID) == "" {
+	if strings.Count(instanceID, ",") == len(instanceID) {
 		return errors.Errorf("no instance id provided to terminate")
 	}
 	instanceIDList := strings.Split(instanceID, ",")

@@ -81,7 +81,7 @@ func CheckApplicationStatusesByLabels(appNs, appLabel string, timeout, delay int
 
 // CheckAuxiliaryApplicationStatus checks the status of the Auxiliary applications
 func CheckAuxiliaryApplicationStatus(AuxiliaryAppDetails string, timeout, delay int, clients clients.ClientSets) error {
-	if strings.TrimSpace(AuxiliaryAppDetails) == "" {
+	if strings.Count(AuxiliaryAppDetails, ",") == len(AuxiliaryAppDetails) {
 		return errors.Errorf("no auxiliary application provided")
 	}
 	AuxiliaryAppInfo := strings.Split(AuxiliaryAppDetails, ",")

@@ -47,8 +47,8 @@ func PrepareVMStop(computeService *compute.Service, experimentsDetails *experime
 	}
 
 	// get the instance name or list of instance names
-	if strings.TrimSpace(experimentsDetails.VMInstanceName) == "" {
-		return errors.Errorf("no instance name found for chaos injection")
+	if strings.Count(experimentsDetails.VMInstanceName, ",") == len(experimentsDetails.VMInstanceName) {
+		return errors.Errorf("variable contains only one or more commas")
 	}
 	instanceNamesList := strings.Split(experimentsDetails.VMInstanceName, ",")
 
