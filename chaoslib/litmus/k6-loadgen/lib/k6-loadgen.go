@@ -3,7 +3,6 @@ package lib
 import (
 	"context"
 	"fmt"
-	"path/filepath"
 
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
@@ -20,13 +19,12 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func experimentExecution(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, configMapName string) error {
+func experimentExecution(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 	if experimentsDetails.EngineName != "" {
 		msg := "Injecting " + experimentsDetails.ExperimentName + " chaos"
 		types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
 		events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 	}
-
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
 		if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
@@ -37,7 +35,7 @@ func experimentExecution(experimentsDetails *experimentTypes.ExperimentDetails, 
 	runID := stringutils.GetRunID()
 
 	// creating the helper pod to perform k6-loadgen chaos
-	if err := createHelperPod(experimentsDetails, clients, chaosDetails, runID, configMapName); err != nil {
+	if err := createHelperPod(experimentsDetails, clients, chaosDetails, runID); err != nil {
 		return stacktrace.Propagate(err, "could not create helper pod")
 	}
 
@@ -65,31 +63,19 @@ func experimentExecution(experimentsDetails *experimentTypes.ExperimentDetails, 
 		return stacktrace.Propagate(err, "could not delete helper pod(s)")
 	}
 
-	// Delete the configmap
-	log.Info("[Cleanup]: Deleting the configmap")
-	if err = common.DeleteConfigMap(configMapName, experimentsDetails.ChaosNamespace, clients); err != nil {
-		return stacktrace.Propagate(err, "could not delete configmap")
-	}
-
 	return nil
 }
 
 // PrepareChaos contains the preparation steps before chaos injection
 func PrepareChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-
 	// Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
 		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", experimentsDetails.RampTime)
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
-	// Creating configmap for k6 script
-	configMapName, err := common.CreateConfigMapFromFile(experimentsDetails.ChaosNamespace, experimentsDetails.ScriptPath, clients, chaosDetails)
-	if err != nil {
-		return stacktrace.Propagate(err, "could not create script configmap")
-	}
 
 	// Starting the k6-loadgen experiment
-	if err := experimentExecution(experimentsDetails, clients, resultDetails, eventsDetails, chaosDetails, configMapName); err != nil {
+	if err := experimentExecution(experimentsDetails, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
 		return stacktrace.Propagate(err, "could not execute chaos")
 	}
 
@@ -102,11 +88,8 @@ func PrepareChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients
 }
 
 // createHelperPod derive the attributes for helper pod and create the helper pod
-func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, runID, configMapName string) error {
+func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, runID string) error {
 	const volumeName = "script-volume"
-	const mountPath = "/mnt"
-	_, configMapKey := filepath.Split(experimentsDetails.ScriptPath)
-
 	helperPod := &corev1.Pod{
 		ObjectMeta: v1.ObjectMeta{
 			GenerateName: experimentsDetails.ExperimentName + "-helper-",
@@ -128,14 +111,14 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 						"run",
 					},
 					Args: []string{
-						mountPath + "/" + configMapKey,
+						experimentsDetails.ScriptPath,
 						"-q",
 					},
 					Resources: chaosDetails.Resources,
 					VolumeMounts: []corev1.VolumeMount{
 						{
 							Name:      volumeName,
-							MountPath: mountPath,
+							MountPath: experimentsDetails.ScriptPath,
 						},
 					},
 				},
@@ -144,10 +127,8 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 				{
 					Name: volumeName,
 					VolumeSource: corev1.VolumeSource{
-						ConfigMap: &corev1.ConfigMapVolumeSource{
-							LocalObjectReference: corev1.LocalObjectReference{
-								Name: configMapName,
-							},
+						HostPath: &corev1.HostPathVolumeSource{
+							Path: experimentsDetails.ScriptPath,
 						},
 					},
 				},
