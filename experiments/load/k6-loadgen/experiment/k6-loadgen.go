@@ -1,7 +1,6 @@
 package experiment
 
 import (
-	"errors"
 	"os"
 
 	"github.com/litmuschaos/chaos-operator/api/litmuschaos/v1alpha1"
@@ -49,13 +48,6 @@ func Experiment(clients clients.ClientSets) {
 	log.Infof("[PreReq]: Updating the chaos result of %v experiment (SOT)", experimentsDetails.ExperimentName)
 	if err := result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT"); err != nil {
 		log.Errorf("Unable to Create the Chaos Result, err: %v", err)
-		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
-		return
-	}
-
-	// Check if the script path exists
-	if _, err := os.Stat(experimentsDetails.ScriptPath); errors.Is(err, os.ErrNotExist) {
-		log.Errorf("The script path %v does not exist", experimentsDetails.ScriptPath)
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 		return
 	}

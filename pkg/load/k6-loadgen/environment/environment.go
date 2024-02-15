@@ -36,5 +36,6 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.LIBImage = types.Getenv("LIB_IMAGE", "ghcr.io/grafana/k6-operator:latest-runner")
 	experimentDetails.SetHelperData = types.Getenv("SET_HELPER_DATA", "true")
 	experimentDetails.ChaosServiceAccount = types.Getenv("CHAOS_SERVICE_ACCOUNT", "")
-	experimentDetails.ScriptPath = types.Getenv("SCRIPT_PATH", "/tmp/script.js")
+	experimentDetails.ScriptSecretName = types.Getenv("SCRIPT_SECRET_NAME", "k6-script")
+	experimentDetails.ScriptSecretKey = types.Getenv("SCRIPT_SECRET_KEY", "script.js")
 }

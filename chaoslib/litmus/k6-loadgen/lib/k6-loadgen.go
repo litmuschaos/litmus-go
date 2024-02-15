@@ -50,7 +50,7 @@ func experimentExecution(experimentsDetails *experimentTypes.ExperimentDetails, 
 
 	// Wait till the completion of the helper pod
 	// set an upper limit for the waiting time
-	log.Info("[Wait]: waiting till the completion of the helper pod")
+	log.Info("[Wait]: Waiting till the completion of the helper pod")
 	podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, appLabel, clients, experimentsDetails.ChaosDuration+experimentsDetails.Timeout, common.GetContainerNames(chaosDetails)...)
 	if err != nil || podStatus == "Failed" {
 		common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
@@ -90,6 +90,7 @@ func PrepareChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients
 // createHelperPod derive the attributes for helper pod and create the helper pod
 func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, runID string) error {
 	const volumeName = "script-volume"
+	const mountPath = "/mnt"
 	helperPod := &corev1.Pod{
 		ObjectMeta: v1.ObjectMeta{
 			GenerateName: experimentsDetails.ExperimentName + "-helper-",
@@ -111,14 +112,14 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 						"run",
 					},
 					Args: []string{
-						experimentsDetails.ScriptPath,
+						mountPath + "/" + experimentsDetails.ScriptSecretKey,
 						"-q",
 					},
 					Resources: chaosDetails.Resources,
 					VolumeMounts: []corev1.VolumeMount{
 						{
 							Name:      volumeName,
-							MountPath: experimentsDetails.ScriptPath,
+							MountPath: "/mnt",
 						},
 					},
 				},
@@ -127,8 +128,8 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 				{
 					Name: volumeName,
 					VolumeSource: corev1.VolumeSource{
-						HostPath: &corev1.HostPathVolumeSource{
-							Path: experimentsDetails.ScriptPath,
+						Secret: &corev1.SecretVolumeSource{
+							SecretName: experimentsDetails.ScriptSecretName,
 						},
 					},
 				},

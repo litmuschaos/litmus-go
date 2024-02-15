@@ -4,9 +4,6 @@ import (
 	clientTypes "k8s.io/apimachinery/pkg/types"
 )
 
-// ADD THE ATTRIBUTES OF YOUR CHOICE HERE
-// FEW MANDATORY ATTRIBUTES ARE ADDED BY DEFAULT
-
 // ExperimentDetails is for collecting all the experiment-related details
 type ExperimentDetails struct {
 	ExperimentName            string
@@ -32,5 +29,6 @@ type ExperimentDetails struct {
 	SetHelperData             string
 	ChaosServiceAccount       string
 	IsTargetContainerProvided bool
-	ScriptPath                string
+	ScriptSecretName          string
+	ScriptSecretKey           string
 }
