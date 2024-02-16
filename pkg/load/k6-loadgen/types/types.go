@@ -1,34 +1,21 @@
 package types
 
-import (
-	clientTypes "k8s.io/apimachinery/pkg/types"
-)
-
 // ExperimentDetails is for collecting all the experiment-related details
 type ExperimentDetails struct {
-	ExperimentName            string
-	EngineName                string
-	ChaosDuration             int
-	ChaosInterval             int
-	RampTime                  int
-	AppNS                     string
-	AppLabel                  string
-	AppKind                   string
-	AuxiliaryAppInfo          string
-	ChaosUID                  clientTypes.UID
-	InstanceID                string
-	ChaosNamespace            string
-	ChaosPodName              string
-	Timeout                   int
-	Delay                     int
-	TargetContainer           string
-	PodsAffectedPerc          int
-	TargetPods                string
-	LIBImagePullPolicy        string
-	LIBImage                  string
-	SetHelperData             string
-	ChaosServiceAccount       string
-	IsTargetContainerProvided bool
-	ScriptSecretName          string
-	ScriptSecretKey           string
+	ExperimentName     string
+	EngineName         string
+	ChaosDuration      int
+	ChaosInterval      int
+	RampTime           int
+	AppNS              string
+	AppLabel           string
+	AppKind            string
+	ChaosNamespace     string
+	Timeout            int
+	Delay              int
+	PodsAffectedPerc   int
+	LIBImagePullPolicy string
+	LIBImage           string
+	ScriptSecretName   string
+	ScriptSecretKey    string
 }

@@ -3,6 +3,7 @@ package lib
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
@@ -99,9 +100,8 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 			Annotations:  chaosDetails.Annotations,
 		},
 		Spec: corev1.PodSpec{
-			RestartPolicy:      corev1.RestartPolicyNever,
-			ImagePullSecrets:   chaosDetails.ImagePullSecrets,
-			ServiceAccountName: experimentsDetails.ChaosServiceAccount,
+			RestartPolicy:    corev1.RestartPolicyNever,
+			ImagePullSecrets: chaosDetails.ImagePullSecrets,
 			Containers: []corev1.Container{
 				{
 					Name:            experimentsDetails.ExperimentName,
@@ -114,6 +114,8 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 					Args: []string{
 						mountPath + "/" + experimentsDetails.ScriptSecretKey,
 						"-q",
+						"--duration",
+						strconv.Itoa(experimentsDetails.ChaosDuration) + "s",
 					},
 					Resources: chaosDetails.Resources,
 					VolumeMounts: []corev1.VolumeMount{
