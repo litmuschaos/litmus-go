@@ -134,7 +134,7 @@ func postChaosPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Res
 	case "continuous", "onchaos":
 
 		// it will check for the error, It will detect the error if any error encountered in probe during chaos
-		if err = checkForErrorInContinuousProbe(resultDetails, probe.Name); err != nil && cerrors.GetErrorType(err) != cerrors.FailureTypePromProbe {
+		if err = checkForErrorInContinuousProbe(resultDetails, probe.Name, chaosDetails.Delay, chaosDetails.Timeout); err != nil && cerrors.GetErrorType(err) != cerrors.FailureTypePromProbe && cerrors.GetErrorType(err) != cerrors.FailureTypeProbeTimeout {
 			return err
 		}
 
@@ -216,6 +216,7 @@ func triggerPromProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resul
 				SecondValue(probe.PromProbeInputs.Comparator.Value).
 				Criteria(probe.PromProbeInputs.Comparator.Criteria).
 				ProbeName(probe.Name).
+				ProbeVerbosity(probe.RunProperties.Verbosity).
 				CompareFloat(cerrors.FailureTypePromProbe); err != nil {
 				log.Errorf("The %v prom probe has been Failed, err: %v", probe.Name, err)
 				return err
@@ -244,22 +245,33 @@ func triggerContinuousPromProbe(probe v1alpha1.ProbeAttributes, clients clients.
 	// it marked the error for the probes, if any
 loop:
 	for {
-		err = triggerPromProbe(probe, chaosresult)
-		// record the error inside the probeDetails, we are maintaining a dedicated variable for the err, inside probeDetails
-		if err != nil {
-			err = addProbePhase(err, string(chaosDetails.Phase))
+		select {
+		case <-chaosDetails.ProbeContext.Ctx.Done():
+			log.Infof("Stopping %s continuous Probe", probe.Name)
 			for index := range chaosresult.ProbeDetails {
 				if chaosresult.ProbeDetails[index].Name == probe.Name {
-					chaosresult.ProbeDetails[index].IsProbeFailedWithError = err
-					chaosresult.ProbeDetails[index].Status.Description = getDescription(err)
-					log.Errorf("The %v prom probe has been Failed, err: %v", probe.Name, err)
-					isExperimentFailed = true
-					break loop
+					chaosresult.ProbeDetails[index].HasProbeCompleted = true
 				}
 			}
+			break loop
+		default:
+			err = triggerPromProbe(probe, chaosresult)
+			// record the error inside the probeDetails, we are maintaining a dedicated variable for the err, inside probeDetails
+			if err != nil {
+				err = addProbePhase(err, string(chaosDetails.Phase))
+				for index := range chaosresult.ProbeDetails {
+					if chaosresult.ProbeDetails[index].Name == probe.Name {
+						chaosresult.ProbeDetails[index].IsProbeFailedWithError = err
+						chaosresult.ProbeDetails[index].Status.Description = getDescription(err)
+						log.Errorf("The %v prom probe has been Failed, err: %v", probe.Name, err)
+						isExperimentFailed = true
+						break loop
+					}
+				}
+			}
+			// waiting for the probe polling interval
+			time.Sleep(probeTimeout.ProbePollingInterval)
 		}
-		// waiting for the probe polling interval
-		time.Sleep(probeTimeout.ProbePollingInterval)
 	}
 	// if experiment fails and stopOnfailure is provided as true then it will patch the chaosengine for abort
 	// if experiment fails but stopOnfailure is provided as false then it will continue the execution
@@ -293,6 +305,11 @@ loop:
 		select {
 		case <-endTime:
 			log.Infof("[Chaos]: Time is up for the %v probe", probe.Name)
+			for index := range chaosresult.ProbeDetails {
+				if chaosresult.ProbeDetails[index].Name == probe.Name {
+					chaosresult.ProbeDetails[index].HasProbeCompleted = true
+				}
+			}
 			endTime = nil
 			break loop
 		default:
@@ -309,8 +326,20 @@ loop:
 					}
 				}
 			}
-			// waiting for the probe polling interval
-			time.Sleep(probeTimeout.ProbePollingInterval)
+
+			select {
+			case <-chaosDetails.ProbeContext.Ctx.Done():
+				log.Infof("Stopping %s continuous Probe", probe.Name)
+				for index := range chaosresult.ProbeDetails {
+					if chaosresult.ProbeDetails[index].Name == probe.Name {
+						chaosresult.ProbeDetails[index].HasProbeCompleted = true
+					}
+				}
+				break loop
+			default:
+				// waiting for the probe polling interval
+				time.Sleep(probeTimeout.ProbePollingInterval)
+			}
 		}
 	}
 	// if experiment fails and stopOnfailure is provided as true then it will patch the chaosengine for abort

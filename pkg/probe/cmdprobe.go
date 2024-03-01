@@ -81,7 +81,7 @@ func triggerInlineCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.
 			}
 
 			rc := getAndIncrementRunCount(resultDetails, probe.Name)
-			description, err = validateResult(probe.CmdProbeInputs.Comparator, probe.Name, strings.TrimSpace(out.String()), rc)
+			description, err = validateResult(probe.CmdProbeInputs.Comparator, probe.Name, probe.RunProperties.Verbosity, strings.TrimSpace(out.String()), rc)
 			if err != nil {
 				if strings.TrimSpace(stdErr.String()) != "" {
 					return cerrors.Error{
@@ -133,7 +133,7 @@ func triggerSourceCmdProbe(probe v1alpha1.ProbeAttributes, execCommandDetails li
 			}
 
 			rc := getAndIncrementRunCount(resultDetails, probe.Name)
-			if description, err = validateResult(probe.CmdProbeInputs.Comparator, probe.Name, strings.TrimSpace(output), rc); err != nil {
+			if description, err = validateResult(probe.CmdProbeInputs.Comparator, probe.Name, probe.RunProperties.Verbosity, strings.TrimSpace(output), rc); err != nil {
 				if strings.TrimSpace(stdErr) != "" {
 					return cerrors.Error{
 						ErrorCode: cerrors.FailureTypeCmdProbe,
@@ -334,22 +334,33 @@ func triggerInlineContinuousCmdProbe(probe v1alpha1.ProbeAttributes, clients cli
 	// it marked the error for the probes, if any
 loop:
 	for {
-		err := triggerInlineCmdProbe(probe, chaosresult)
-		// record the error inside the probeDetails, we are maintaining a dedicated variable for the err, inside probeDetails
-		if err != nil {
-			err = addProbePhase(err, string(chaosDetails.Phase))
+		select {
+		case <-chaosDetails.ProbeContext.Ctx.Done():
+			log.Infof("Stopping %s continuous Probe", probe.Name)
 			for index := range chaosresult.ProbeDetails {
 				if chaosresult.ProbeDetails[index].Name == probe.Name {
-					chaosresult.ProbeDetails[index].IsProbeFailedWithError = err
-					chaosresult.ProbeDetails[index].Status.Description = getDescription(err)
-					log.Errorf("The %v cmd probe has been Failed, err: %v", probe.Name, err)
-					isExperimentFailed = true
-					break loop
+					chaosresult.ProbeDetails[index].HasProbeCompleted = true
 				}
 			}
+			break loop
+		default:
+			err := triggerInlineCmdProbe(probe, chaosresult)
+			// record the error inside the probeDetails, we are maintaining a dedicated variable for the err, inside probeDetails
+			if err != nil {
+				err = addProbePhase(err, string(chaosDetails.Phase))
+				for index := range chaosresult.ProbeDetails {
+					if chaosresult.ProbeDetails[index].Name == probe.Name {
+						chaosresult.ProbeDetails[index].IsProbeFailedWithError = err
+						chaosresult.ProbeDetails[index].Status.Description = getDescription(err)
+						log.Errorf("The %v cmd probe has been Failed, err: %v", probe.Name, err)
+						isExperimentFailed = true
+						break loop
+					}
+				}
+			}
+			// waiting for the probe polling interval
+			time.Sleep(probeTimeout.ProbePollingInterval)
 		}
-		// waiting for the probe polling interval
-		time.Sleep(probeTimeout.ProbePollingInterval)
 	}
 	// if experiment fails and stopOnfailure is provided as true then it will patch the chaosengine for abort
 	// if experiment fails but stopOnfailure is provided as false then it will continue the execution
@@ -376,16 +387,20 @@ func triggerInlineOnChaosCmdProbe(probe v1alpha1.ProbeAttributes, clients client
 
 	var endTime <-chan time.Time
 	timeDelay := time.Duration(duration) * time.Second
-
+	endTime = time.After(timeDelay)
 	// it trigger the inline cmd probe for the entire duration of chaos and it fails, if any err encounter
 	// it marked the error for the probes, if any
 loop:
 	for {
-		endTime = time.After(timeDelay)
 		select {
 		case <-endTime:
 			log.Infof("[Chaos]: Time is up for the %v probe", probe.Name)
 			endTime = nil
+			for index := range chaosresult.ProbeDetails {
+				if chaosresult.ProbeDetails[index].Name == probe.Name {
+					chaosresult.ProbeDetails[index].HasProbeCompleted = true
+				}
+			}
 			break loop
 		default:
 			// record the error inside the probeDetails, we are maintaining a dedicated variable for the err, inside probeDetails
@@ -401,8 +416,19 @@ loop:
 					}
 				}
 			}
-			// waiting for the probe polling interval
-			time.Sleep(probeTimeout.ProbePollingInterval)
+			select {
+			case <-chaosDetails.ProbeContext.Ctx.Done():
+				log.Infof("Stopping %s continuous Probe", probe.Name)
+				for index := range chaosresult.ProbeDetails {
+					if chaosresult.ProbeDetails[index].Name == probe.Name {
+						chaosresult.ProbeDetails[index].HasProbeCompleted = true
+					}
+				}
+				break loop
+			default:
+				// waiting for the probe polling interval
+				time.Sleep(probeTimeout.ProbePollingInterval)
+			}
 		}
 	}
 	// if experiment fails and stopOnfailure is provided as true then it will patch the chaosengine for abort
@@ -438,6 +464,11 @@ loop:
 		case <-endTime:
 			log.Infof("[Chaos]: Time is up for the %v probe", probe.Name)
 			endTime = nil
+			for index := range chaosresult.ProbeDetails {
+				if chaosresult.ProbeDetails[index].Name == probe.Name {
+					chaosresult.ProbeDetails[index].HasProbeCompleted = true
+				}
+			}
 			break loop
 		default:
 			// record the error inside the probeDetails, we are maintaining a dedicated variable for the err, inside probeDetails
@@ -453,8 +484,20 @@ loop:
 					}
 				}
 			}
-			// waiting for the probe polling interval
-			time.Sleep(probeTimeout.ProbePollingInterval)
+
+			select {
+			case <-chaosDetails.ProbeContext.Ctx.Done():
+				log.Infof("Stopping %s continuous Probe", probe.Name)
+				for index := range chaosresult.ProbeDetails {
+					if chaosresult.ProbeDetails[index].Name == probe.Name {
+						chaosresult.ProbeDetails[index].HasProbeCompleted = true
+					}
+				}
+				break loop
+			default:
+				// waiting for the probe polling interval
+				time.Sleep(probeTimeout.ProbePollingInterval)
+			}
 		}
 	}
 	// if experiment fails and stopOnfailure is provided as true then it will patch the chaosengine for abort
@@ -483,22 +526,35 @@ func triggerSourceContinuousCmdProbe(probe v1alpha1.ProbeAttributes, execCommand
 	// it marked the error for the probes, if any
 loop:
 	for {
-		err = triggerSourceCmdProbe(probe, execCommandDetails, clients, chaosresult)
-		// record the error inside the probeDetails, we are maintaining a dedicated variable for the err, inside probeDetails
-		if err != nil {
-			err = addProbePhase(err, string(chaosDetails.Phase))
+
+		select {
+		case <-chaosDetails.ProbeContext.Ctx.Done():
+			log.Infof("Stopping %s continuous Probe", probe.Name)
 			for index := range chaosresult.ProbeDetails {
 				if chaosresult.ProbeDetails[index].Name == probe.Name {
-					chaosresult.ProbeDetails[index].IsProbeFailedWithError = err
-					chaosresult.ProbeDetails[index].Status.Description = getDescription(err)
-					log.Errorf("The %v cmd probe has been Failed, err: %v", probe.Name, err)
-					isExperimentFailed = true
-					break loop
+					chaosresult.ProbeDetails[index].HasProbeCompleted = true
 				}
 			}
+			break loop
+
+		default:
+			err = triggerSourceCmdProbe(probe, execCommandDetails, clients, chaosresult)
+			// record the error inside the probeDetails, we are maintaining a dedicated variable for the err, inside probeDetails
+			if err != nil {
+				err = addProbePhase(err, string(chaosDetails.Phase))
+				for index := range chaosresult.ProbeDetails {
+					if chaosresult.ProbeDetails[index].Name == probe.Name {
+						chaosresult.ProbeDetails[index].IsProbeFailedWithError = err
+						chaosresult.ProbeDetails[index].Status.Description = getDescription(err)
+						log.Errorf("The %v cmd probe has been Failed, err: %v", probe.Name, err)
+						isExperimentFailed = true
+						break loop
+					}
+				}
+			}
+			// waiting for the probe polling interval
+			time.Sleep(probeTimeout.ProbePollingInterval)
 		}
-		// waiting for the probe polling interval
-		time.Sleep(probeTimeout.ProbePollingInterval)
 	}
 	// if experiment fails and stopOnfailure is provided as true then it will patch the chaosengine for abort
 	// if experiment fails but stopOnfailure is provided as false then it will continue the execution
@@ -512,13 +568,14 @@ loop:
 
 // validateResult validate the probe result to specified comparison operation
 // it supports int, float, string operands
-func validateResult(comparator v1alpha1.ComparatorInfo, probeName, cmdOutput string, rc int) (string, error) {
+func validateResult(comparator v1alpha1.ComparatorInfo, probeName, probeVerbosity string, cmdOutput string, rc int) (string, error) {
 
 	compare := cmp.RunCount(rc).
 		FirstValue(cmdOutput).
 		SecondValue(comparator.Value).
 		Criteria(comparator.Criteria).
-		ProbeName(probeName)
+		ProbeName(probeName).
+		ProbeVerbosity(probeVerbosity)
 
 	switch strings.ToLower(comparator.Type) {
 	case "int":
@@ -695,7 +752,7 @@ func postChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resu
 	case "Continuous", "OnChaos":
 		if isInlineProbe(probe.CmdProbeInputs) {
 			// it will check for the error, It will detect the error if any error encountered in probe during chaos
-			if err = checkForErrorInContinuousProbe(resultDetails, probe.Name); err != nil && cerrors.GetErrorType(err) != cerrors.FailureTypeCmdProbe {
+			if err = checkForErrorInContinuousProbe(resultDetails, probe.Name, chaosDetails.Delay, chaosDetails.Timeout); err != nil && cerrors.GetErrorType(err) != cerrors.FailureTypeCmdProbe && cerrors.GetErrorType(err) != cerrors.FailureTypeProbeTimeout {
 				return err
 			}
 			// failing the probe, if the success condition doesn't met after the retry & timeout combinations
@@ -704,7 +761,7 @@ func postChaosCmdProbe(probe v1alpha1.ProbeAttributes, resultDetails *types.Resu
 			}
 		} else {
 			// it will check for the error, It will detect the error if any error encountered in probe during chaos
-			if err = checkForErrorInContinuousProbe(resultDetails, probe.Name); err != nil && cerrors.GetErrorType(err) != cerrors.FailureTypeCmdProbe {
+			if err = checkForErrorInContinuousProbe(resultDetails, probe.Name, chaosDetails.Delay, chaosDetails.Timeout); err != nil && cerrors.GetErrorType(err) != cerrors.FailureTypeCmdProbe && cerrors.GetErrorType(err) != cerrors.FailureTypeProbeTimeout {
 				return err
 			}
 

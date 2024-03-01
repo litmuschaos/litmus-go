@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"html/template"
 	"strings"
+	"time"
 
 	"github.com/kyokomi/emoji"
 	"github.com/litmuschaos/chaos-operator/api/litmuschaos/v1alpha1"
@@ -55,6 +56,8 @@ func RunProbes(chaosDetails *types.ChaosDetails, clients clients.ClientSets, res
 		// it first evaluate the onchaos and continuous modes then it evaluates the other modes
 		// as onchaos and continuous probes are already completed
 		var probeError []string
+		// call cancel function from chaosDetails context
+		chaosDetails.ProbeContext.CancelFunc()
 		for _, probe := range probes {
 			// evaluate continuous and onchaos probes
 			switch strings.ToLower(probe.Mode) {
@@ -251,8 +254,29 @@ func getDescription(err error) string {
 }
 
 // CheckForErrorInContinuousProbe check for the error in the continuous probes
-func checkForErrorInContinuousProbe(resultDetails *types.ResultDetails, probeName string) error {
+func checkForErrorInContinuousProbe(resultDetails *types.ResultDetails, probeName string, delay int, timeout int) error {
 
+	probe := getProbeByName(probeName, resultDetails.ProbeDetails)
+	startTime := time.Now()
+	timeoutSignal := time.After(time.Duration(timeout) * time.Second)
+
+loop:
+	for {
+		select {
+		case <-timeoutSignal:
+			return cerrors.Error{
+				ErrorCode: cerrors.FailureTypeProbeTimeout,
+				Target:    fmt.Sprintf("{probe: %s, timeout: %ds}", probeName, timeout),
+				Reason:    "Probe is failed due to timeout",
+			}
+		default:
+			if probe.HasProbeCompleted {
+				break loop
+			}
+			log.Infof("[Probe]: Waiting for %s probe to finish or timeout (Elapsed time: %v s)", probeName, time.Since(startTime).Seconds())
+			time.Sleep(time.Duration(delay) * time.Second)
+		}
+	}
 	for index, probe := range resultDetails.ProbeDetails {
 		if probe.Name == probeName {
 			return resultDetails.ProbeDetails[index].IsProbeFailedWithError
@@ -281,7 +305,10 @@ func parseCommand(templatedCommand string, resultDetails *types.ResultDetails) (
 // stopChaosEngine update the probe status and patch the chaosengine to stop state
 func stopChaosEngine(probe v1alpha1.ProbeAttributes, clients clients.ClientSets, chaosresult *types.ResultDetails, chaosDetails *types.ChaosDetails) error {
 	// it will check for the error, It will detect the error if any error encountered in probe during chaos
-	err = checkForErrorInContinuousProbe(chaosresult, probe.Name)
+	if err = checkForErrorInContinuousProbe(chaosresult, probe.Name, chaosDetails.Timeout, chaosDetails.Delay); err != nil && cerrors.GetErrorType(err) != cerrors.FailureTypeProbeTimeout {
+		return err
+	}
+
 	// failing the probe, if the success condition doesn't met after the retry & timeout combinations
 	markedVerdictInEnd(err, chaosresult, probe, "PostChaos")
 	//patch chaosengine's state to stop
