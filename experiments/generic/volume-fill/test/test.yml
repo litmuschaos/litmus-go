@@ -1,0 +1,72 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: litmus-experiment
+spec:
+  replicas: 1
+  selector: 
+    matchLabels:
+      app: litmus-experiment
+  template:
+    metadata:
+      labels:
+        app: litmus-experiment
+    spec:
+      serviceAccountName: disk-fill-sa
+      containers:
+      - name: gotest
+        image: busybox
+        command:
+          - sleep 
+          - "3600"
+        env:
+          - name: APP_NAMESPACE
+            value: 'default'
+
+          - name: APP_LABEL
+            value: 'run=nginx'
+
+          - name: APP_KIND
+            value: 'deployment'
+
+          - name: TARGET_CONTAINER
+            value: 'nginx'
+
+          - name: TOTAL_CHAOS_DURATION
+            value: '60'
+
+          - name: LIB
+            value: 'litmus'
+
+          - name: TARGET_POD
+            value: ''
+
+          - name: TARGET_VOLUME
+            value: ''
+
+          - name: LIB_IMAGE
+            value: 'litmuschaos/go-runner:ci'
+
+          - name: DATA_BLOCK_SIZE
+            value: ''
+
+          - name: CONTAINER_PATH
+            value: '/var/lib/docker/containers'
+
+          - name: SOCKET_PATH
+            value: '/var/run/docker.sock'
+
+          - name: CONTAINER_RUNTIME
+            value: "docker"
+
+          - name: CHAOS_NAMESPACE
+            value: 'default'
+
+          - name: RAMP_TIME
+            value: ''
+
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
