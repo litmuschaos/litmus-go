@@ -9,7 +9,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-//PodHttpModifyHeaderChaos contains the steps to prepare and inject http modify header chaos
+// PodHttpModifyHeaderChaos contains the steps to prepare and inject http modify header chaos
 func PodHttpModifyHeaderChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	log.InfoWithValues("[Info]: The chaos tunables are:", logrus.Fields{

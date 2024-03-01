@@ -19,7 +19,7 @@ import (
 
 var err error
 
-//GetNodeList check for the availability of the application node for the chaos execution
+// GetNodeList check for the availability of the application node for the chaos execution
 // if the application node is not defined it will derive the random target node list using node affected percentage
 func GetNodeList(nodeNames, nodeLabel string, nodeAffPerc int, clients clients.ClientSets) ([]string, error) {
 
@@ -60,7 +60,7 @@ func GetNodeList(nodeNames, nodeLabel string, nodeAffPerc int, clients clients.C
 	return nodeList, nil
 }
 
-//GetNodeName will select a random replica of application pod and return the node name of that application pod
+// GetNodeName will select a random replica of application pod and return the node name of that application pod
 func GetNodeName(namespace, labels, nodeLabel string, clients clients.ClientSets) (string, error) {
 
 	switch nodeLabel {

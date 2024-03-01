@@ -28,7 +28,7 @@ var serviceMesh = []string{"istio", "envoy"}
 var destIpsSvcMesh string
 var destIps string
 
-//PrepareAndInjectChaos contains the preparation & injection steps
+// PrepareAndInjectChaos contains the preparation & injection steps
 func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, args string) error {
 
 	var err error
@@ -414,8 +414,8 @@ func getIpsForTargetHosts(targetHosts string, clients clients.ClientSets, servic
 	return strings.Join(commaSeparatedIPs, ","), nil
 }
 
-//SetChaosTunables will set up a random value within a given range of values
-//If the value is not provided in range it'll set up the initial provided value.
+// SetChaosTunables will set up a random value within a given range of values
+// If the value is not provided in range it'll set up the initial provided value.
 func SetChaosTunables(experimentsDetails *experimentTypes.ExperimentDetails) {
 	experimentsDetails.NetworkPacketLossPercentage = common.ValidateRange(experimentsDetails.NetworkPacketLossPercentage)
 	experimentsDetails.NetworkPacketCorruptionPercentage = common.ValidateRange(experimentsDetails.NetworkPacketCorruptionPercentage)

@@ -23,7 +23,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-//PrepareAndInjectChaos contains the preparation & injection steps
+// PrepareAndInjectChaos contains the preparation & injection steps
 func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	// Get the target pod details for the chaos execution

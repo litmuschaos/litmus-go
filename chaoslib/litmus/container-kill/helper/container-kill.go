@@ -171,7 +171,7 @@ func validate(t targetDetails, timeout, delay int, clients clients.ClientSets) e
 	return verifyRestartCount(t, timeout, delay, clients, t.RestartCountBefore)
 }
 
-//stopContainerdContainer kill the application container
+// stopContainerdContainer kill the application container
 func stopContainerdContainer(containerIDs []string, socketPath, signal, source string) error {
 	if signal != "SIGKILL" && signal != "SIGTERM" {
 		return cerrors.Error{ErrorCode: cerrors.ErrorTypeHelper, Source: source, Reason: fmt.Sprintf("unsupported signal %s, use either SIGTERM or SIGKILL", signal)}
@@ -192,7 +192,7 @@ func stopContainerdContainer(containerIDs []string, socketPath, signal, source s
 	return nil
 }
 
-//stopDockerContainer kill the application container
+// stopDockerContainer kill the application container
 func stopDockerContainer(containerIDs []string, socketPath, signal, source string) error {
 	var errOut, out bytes.Buffer
 	cmd := exec.Command("sudo", "docker", "--host", fmt.Sprintf("unix://%s", socketPath), "kill", "--signal", signal)
@@ -205,7 +205,7 @@ func stopDockerContainer(containerIDs []string, socketPath, signal, source strin
 	return nil
 }
 
-//getRestartCount return the restart count of target container
+// getRestartCount return the restart count of target container
 func getRestartCount(target targetDetails, clients clients.ClientSets) (int, error) {
 	pod, err := clients.KubeClient.CoreV1().Pods(target.Namespace).Get(context.Background(), target.Name, v1.GetOptions{})
 	if err != nil {
@@ -221,7 +221,7 @@ func getRestartCount(target targetDetails, clients clients.ClientSets) (int, err
 	return restartCount, nil
 }
 
-//verifyRestartCount verify the restart count of target container that it is restarted or not after chaos injection
+// verifyRestartCount verify the restart count of target container that it is restarted or not after chaos injection
 func verifyRestartCount(t targetDetails, timeout, delay int, clients clients.ClientSets, restartCountBefore int) error {
 
 	restartCountAfter := 0
@@ -247,7 +247,7 @@ func verifyRestartCount(t targetDetails, timeout, delay int, clients clients.Cli
 		})
 }
 
-//getENV fetches all the env variables from the runner pod
+// getENV fetches all the env variables from the runner pod
 func getENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.ExperimentName = types.Getenv("EXPERIMENT_NAME", "")
 	experimentDetails.InstanceID = types.Getenv("INSTANCE_ID", "")

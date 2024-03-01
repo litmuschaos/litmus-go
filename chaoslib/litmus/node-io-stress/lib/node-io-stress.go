@@ -287,8 +287,8 @@ func getContainerArguments(experimentsDetails *experimentTypes.ExperimentDetails
 	return stressArgs
 }
 
-//setChaosTunables will set up a random value within a given range of values
-//If the value is not provided in range it'll set up the initial provided value.
+// setChaosTunables will set up a random value within a given range of values
+// If the value is not provided in range it'll set up the initial provided value.
 func setChaosTunables(experimentsDetails *experimentTypes.ExperimentDetails) {
 	experimentsDetails.FilesystemUtilizationBytes = common.ValidateRange(experimentsDetails.FilesystemUtilizationBytes)
 	experimentsDetails.FilesystemUtilizationPercentage = common.ValidateRange(experimentsDetails.FilesystemUtilizationPercentage)

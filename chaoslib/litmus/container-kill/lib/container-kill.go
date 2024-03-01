@@ -22,7 +22,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-//PrepareContainerKill contains the preparation steps before chaos injection
+// PrepareContainerKill contains the preparation steps before chaos injection
 func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	var err error
@@ -280,8 +280,8 @@ func getPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, targets st
 	return envDetails.ENV
 }
 
-//SetChaosTunables will setup a random value within a given range of values
-//If the value is not provided in range it'll setup the initial provided value.
+// SetChaosTunables will setup a random value within a given range of values
+// If the value is not provided in range it'll setup the initial provided value.
 func SetChaosTunables(experimentsDetails *experimentTypes.ExperimentDetails) {
 	experimentsDetails.PodsAffectedPerc = common.ValidateRange(experimentsDetails.PodsAffectedPerc)
 	experimentsDetails.Sequence = common.GetRandomSequence(experimentsDetails.Sequence)

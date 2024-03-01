@@ -11,7 +11,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-//PodHttpLatencyChaos contains the steps to prepare and inject http latency chaos
+// PodHttpLatencyChaos contains the steps to prepare and inject http latency chaos
 func PodHttpLatencyChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	log.InfoWithValues("[Info]: The chaos tunables are:", logrus.Fields{

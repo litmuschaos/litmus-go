@@ -217,7 +217,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 	return nil
 }
 
-//setCPUCapacity fetch the node cpu capacity
+// setCPUCapacity fetch the node cpu capacity
 func setCPUCapacity(experimentsDetails *experimentTypes.ExperimentDetails, appNode string, clients clients.ClientSets) error {
 	node, err := clients.KubeClient.CoreV1().Nodes().Get(context.Background(), appNode, v1.GetOptions{})
 	if err != nil {
@@ -278,8 +278,8 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, chao
 	return nil
 }
 
-//setChaosTunables will set up a random value within a given range of values
-//If the value is not provided in range it'll set up the initial provided value.
+// setChaosTunables will set up a random value within a given range of values
+// If the value is not provided in range it'll set up the initial provided value.
 func setChaosTunables(experimentsDetails *experimentTypes.ExperimentDetails) {
 	experimentsDetails.NodeCPUcores = common.ValidateRange(experimentsDetails.NodeCPUcores)
 	experimentsDetails.CPULoad = common.ValidateRange(experimentsDetails.CPULoad)

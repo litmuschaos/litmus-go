@@ -24,7 +24,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-//PrepareChaos contains the chaos preparation and injection steps
+// PrepareChaos contains the chaos preparation and injection steps
 func PrepareChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	//Waiting for the ramp time before chaos injection
@@ -66,7 +66,7 @@ func stressStorage(experimentDetails *experimentTypes.ExperimentDetails, podName
 	stressErr <- err
 }
 
-//experimentExecution function orchestrates the experiment by calling the StressStorage function, of every container, of every pod that is targeted
+// experimentExecution function orchestrates the experiment by calling the StressStorage function, of every container, of every pod that is targeted
 func experimentExecution(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	// Get the target pod details for the chaos execution
@@ -265,7 +265,8 @@ loop:
 }
 
 // killStressSerial function to kill a stress process running inside target container
-//  Triggered by either timeout of chaos duration or termination of the experiment
+//
+//	Triggered by either timeout of chaos duration or termination of the experiment
 func killStressSerial(containerName, podName, namespace, KillCmd string, clients clients.ClientSets) error {
 	// It will contain all the pod & container details required for exec command
 	execCommandDetails := litmusexec.PodDetails{}

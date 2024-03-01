@@ -18,7 +18,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-//NodeDrain inject the node-drain chaos
+// NodeDrain inject the node-drain chaos
 func NodeDrain(clients clients.ClientSets) {
 
 	experimentsDetails := experimentTypes.ExperimentDetails{}

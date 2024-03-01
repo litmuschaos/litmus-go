@@ -74,7 +74,7 @@ func Helper(clients clients.ClientSets) {
 
 }
 
-//preparePodDNSChaos contains the preparation steps before chaos injection
+// preparePodDNSChaos contains the preparation steps before chaos injection
 func preparePodDNSChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails) error {
 
 	targetList, err := common.ParseTargets(chaosDetails.ChaosPodName)
@@ -264,7 +264,7 @@ func abortWatcher(targets []targetDetails, resultName, chaosNS string) {
 	os.Exit(1)
 }
 
-//getENV fetches all the env variables from the runner pod
+// getENV fetches all the env variables from the runner pod
 func getENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.ExperimentName = types.Getenv("EXPERIMENT_NAME", "")
 	experimentDetails.InstanceID = types.Getenv("INSTANCE_ID", "")

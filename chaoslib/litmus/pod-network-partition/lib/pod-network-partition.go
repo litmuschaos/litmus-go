@@ -31,7 +31,7 @@ var (
 	inject, abort chan os.Signal
 )
 
-//PrepareAndInjectChaos contains the prepration & injection steps
+// PrepareAndInjectChaos contains the prepration & injection steps
 func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	// inject channel is used to transmit signal notifications.

@@ -362,8 +362,8 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, chao
 	return nil
 }
 
-//setChaosTunables will set up a random value within a given range of values
-//If the value is not provided in range it'll set up the initial provided value.
+// setChaosTunables will set up a random value within a given range of values
+// If the value is not provided in range it'll set up the initial provided value.
 func setChaosTunables(experimentsDetails *experimentTypes.ExperimentDetails) {
 	experimentsDetails.MemoryConsumptionMebibytes = common.ValidateRange(experimentsDetails.MemoryConsumptionMebibytes)
 	experimentsDetails.MemoryConsumptionPercentage = common.ValidateRange(experimentsDetails.MemoryConsumptionPercentage)

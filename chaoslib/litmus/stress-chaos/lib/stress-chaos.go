@@ -22,7 +22,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-//PrepareAndInjectStressChaos contains the prepration & injection steps for the stress experiments.
+// PrepareAndInjectStressChaos contains the prepration & injection steps for the stress experiments.
 func PrepareAndInjectStressChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	var err error
@@ -332,8 +332,8 @@ func ptrint64(p int64) *int64 {
 	return &p
 }
 
-//SetChaosTunables will set up a random value within a given range of values
-//If the value is not provided in range it'll set up the initial provided value.
+// SetChaosTunables will set up a random value within a given range of values
+// If the value is not provided in range it'll set up the initial provided value.
 func SetChaosTunables(experimentsDetails *experimentTypes.ExperimentDetails) {
 	experimentsDetails.CPUcores = common.ValidateRange(experimentsDetails.CPUcores)
 	experimentsDetails.CPULoad = common.ValidateRange(experimentsDetails.CPULoad)
