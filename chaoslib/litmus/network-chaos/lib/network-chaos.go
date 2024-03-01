@@ -358,6 +358,9 @@ func getPodIPFromService(host string, clients clients.ClientSets) ([]string, err
 		return ips, cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Target: fmt.Sprintf("{svcName: %s,podLabel: %s, namespace: %s}", svcNs, svcSelector, svcNs), Reason: fmt.Sprintf("failed to derive pods from service: %s", err.Error())}
 	}
 	for _, p := range pods.Items {
+		if p.Status.PodIP == "" {
+			continue
+		}
 		ips = append(ips, p.Status.PodIP)
 	}
 
