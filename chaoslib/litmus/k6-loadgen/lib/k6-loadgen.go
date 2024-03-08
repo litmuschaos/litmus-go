@@ -6,7 +6,7 @@ import (
 	"strconv"
 
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
-	clients "github.com/litmuschaos/litmus-go/pkg/clients"
+	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/load/k6-loadgen/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
@@ -58,7 +58,7 @@ func experimentExecution(experimentsDetails *experimentTypes.ExperimentDetails, 
 		return common.HelperFailedError(err, appLabel, experimentsDetails.ChaosNamespace, true)
 	}
 
-	//Deleting all the helper pod for container-kill chaos
+	//Deleting all the helper pod for k6-loadgen chaos
 	log.Info("[Cleanup]: Deleting all the helper pods")
 	if err = common.DeleteAllPod(appLabel, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients); err != nil {
 		return stacktrace.Propagate(err, "could not delete helper pod(s)")
@@ -121,7 +121,7 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 					VolumeMounts: []corev1.VolumeMount{
 						{
 							Name:      volumeName,
-							MountPath: "/mnt",
+							MountPath: mountPath,
 						},
 					},
 				},
