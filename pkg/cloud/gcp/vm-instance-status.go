@@ -6,6 +6,7 @@ import (
 
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	"github.com/litmuschaos/litmus-go/pkg/log"
+	"github.com/pkg/errors"
 	"google.golang.org/api/compute/v1"
 )
 
@@ -26,9 +27,16 @@ func GetVMInstanceStatus(computeService *compute.Service, instanceName string, g
 
 // InstanceStatusCheckByName is used to check the status of all the VM instances under chaos
 func InstanceStatusCheckByName(computeService *compute.Service, managedInstanceGroup string, delay, timeout int, check string, instanceNames string, gcpProjectId string, instanceZones string) error {
-
+	if strings.Count(instanceNames, ",") == len(instanceNames) {
+		return errors.Errorf("no instance provided")
+	}
 	instanceNamesList := strings.Split(instanceNames, ",")
-
+	if strings.TrimSpace(instanceZones) == "" {
+		return errors.Errorf("no zone provided")
+	}
+	if strings.Count(instanceZones, ",") == len(instanceZones) {
+		return errors.Errorf("no zone provided")
+	}
 	instanceZonesList := strings.Split(instanceZones, ",")
 
 	if managedInstanceGroup != "enable" && managedInstanceGroup != "disable" {

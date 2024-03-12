@@ -18,6 +18,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/vmware/vm-poweroff/types"
 	"github.com/palantir/stacktrace"
+	"github.com/pkg/errors"
 )
 
 var inject, abort chan os.Signal
@@ -42,6 +43,9 @@ func InjectVMPowerOffChaos(experimentsDetails *experimentTypes.ExperimentDetails
 	}
 
 	//Fetching the target VM Ids
+	if strings.Count(experimentsDetails.VMIds, ",") == len(experimentsDetails.VMIds) {
+		return errors.Errorf("variable contains only one or more commas")
+	}
 	vmIdList := strings.Split(experimentsDetails.VMIds, ",")
 
 	// Calling AbortWatcher go routine, it will continuously watch for the abort signal and generate the required events and result
