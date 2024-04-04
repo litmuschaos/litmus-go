@@ -89,19 +89,8 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 
 			common.SetTargets(strconv.Itoa(pid), "injected", "Process", chaosDetails)
 
-			// ACTION_SUCCESSFUL feedback is received only if the process is killed successfully
-			if feedback != "ACTION_SUCCESSFUL" {
-				if feedback == "ERROR" {
-
-					agentError, err := messages.GetErrorMessage(payload)
-					if err != nil {
-						return errors.Errorf("failed to interpret error message from agent, err: %v", err)
-					}
-
-					return errors.Errorf("error occured while killing %d process, err: %s", pid, agentError)
-				}
-
-				return errors.Errorf("unintelligible feedback received from agent: %s", feedback)
+			if err := messages.ValidateAgentFeedback(feedback, payload); err != nil {
+				return errors.Errorf("error occured while killing %d process, err: %v", pid, err)
 			}
 
 			log.Infof("[Chaos]: %d process killed successfully", pid)
@@ -157,19 +146,8 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 			common.SetTargets(strconv.Itoa(pid), "injected", "Process", chaosDetails)
 		}
 
-		// ACTION_SUCCESSFUL feedback is received only if all the processes are killed successfully
-		if feedback != "ACTION_SUCCESSFUL" {
-			if feedback == "ERROR" {
-
-				agentError, err := messages.GetErrorMessage(payload)
-				if err != nil {
-					return errors.Errorf("failed to interpret error message from agent, err: %v", err)
-				}
-
-				return errors.Errorf("error during process kill, err: %s", agentError)
-			}
-
-			return errors.Errorf("unintelligible feedback received from agent: %s", feedback)
+		if err := messages.ValidateAgentFeedback(feedback, payload); err != nil {
+			return errors.Errorf("error occured while trying to kill the process, err: %v", err)
 		}
 
 		log.Infof("[Chaos]: %v processes killed successfully", pids)
