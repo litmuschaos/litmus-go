@@ -7,7 +7,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/types"
 )
 
-//PodNetworkLossChaos contains the steps to prepare and inject chaos
+// PodNetworkLossChaos contains the steps to prepare and inject chaos
 func PodNetworkLossChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	args := "loss " + experimentsDetails.NetworkPacketLossPercentage

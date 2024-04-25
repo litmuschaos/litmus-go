@@ -131,7 +131,7 @@ func getCRIOPID(containerID, socketPath, source string) (int, error) {
 	return pid, nil
 }
 
-//GetPauseAndSandboxPID extract out the PID of the target container
+// GetPauseAndSandboxPID extract out the PID of the target container
 func GetPauseAndSandboxPID(runtime, containerID, socketPath, source string) (int, error) {
 	var pid int
 

@@ -25,7 +25,7 @@ import (
 
 var inject chan os.Signal
 
-//PrepareCPUExecStress contains the chaos preparation and injection steps
+// PrepareCPUExecStress contains the chaos preparation and injection steps
 func PrepareCPUExecStress(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	// inject channel is used to transmit signal notifications.
@@ -62,7 +62,7 @@ func stressCPU(experimentsDetails *experimentTypes.ExperimentDetails, podName, n
 	stressErr <- err
 }
 
-//experimentCPU function orchestrates the experiment by calling the StressCPU function for every core, of every container, of every pod that is targeted
+// experimentCPU function orchestrates the experiment by calling the StressCPU function for every core, of every container, of every pod that is targeted
 func experimentCPU(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	// Get the target pod details for the chaos execution
@@ -287,7 +287,8 @@ loop:
 }
 
 // killStressCPUSerial function to kill a stress process running inside target container
-//  Triggered by either timeout of chaos duration or termination of the experiment
+//
+//	Triggered by either timeout of chaos duration or termination of the experiment
 func killStressCPUSerial(experimentsDetails *experimentTypes.ExperimentDetails, podName, ns string, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
 	// It will contain all the pod & container details required for exec command
 	execCommandDetails := litmusexec.PodDetails{}
