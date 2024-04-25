@@ -305,7 +305,7 @@ func killStressMemorySerial(containerName, podName, namespace, memFreeCmd string
 		return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosRevert, Target: fmt.Sprintf("{podName: %s, namespace: %s}", podName, namespace), Reason: fmt.Sprintf("failed to revert chaos: %s", out)}
 	}
 	common.SetTargets(podName, "reverted", "pod", chaosDetails)
-	return nil
+	return err
 }
 
 // killStressMemoryParallel function to kill all the stress process running inside target container
