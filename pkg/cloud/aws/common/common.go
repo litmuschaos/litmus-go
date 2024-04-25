@@ -7,7 +7,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-//GetAWSSession will return the aws session for a given region
+// GetAWSSession will return the aws session for a given region
 func GetAWSSession(region string) *session.Session {
 	return session.Must(session.NewSessionWithOptions(session.Options{
 		SharedConfigState: session.SharedConfigEnable,
@@ -15,7 +15,7 @@ func GetAWSSession(region string) *session.Session {
 	}))
 }
 
-//CheckAWSError will return the aws errors
+// CheckAWSError will return the aws errors
 func CheckAWSError(err error) error {
 	if aerr, ok := err.(awserr.Error); ok {
 		switch aerr.Code() {

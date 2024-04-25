@@ -9,7 +9,7 @@ import (
 	clientTypes "k8s.io/apimachinery/pkg/types"
 )
 
-//GetENV fetches all the env variables from the runner pod
+// GetENV fetches all the env variables from the runner pod
 func GetENV(cassandraDetails *cassandraTypes.ExperimentDetails) {
 
 	var ChaoslibDetail exp.ExperimentDetails
