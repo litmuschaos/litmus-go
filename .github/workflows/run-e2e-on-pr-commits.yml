@@ -312,8 +312,15 @@ jobs:
         run: |
           make build-amd64
 
+      - name: Install KinD
+        run: |
+          curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.22.0/kind-linux-amd64
+          chmod +x ./kind
+          mv ./kind /usr/local/bin/kind
+
       - name: Create KinD Cluster
-        run: kind create cluster --config build/kind-cluster/kind-config.yaml
+        run: |
+          kind create cluster --config build/kind-cluster/kind-config.yaml
 
       - name: Configuring and testing the Installation
         run: |
@@ -324,7 +331,7 @@ jobs:
 
       - name: Load image on the nodes of the cluster
         run: |
-          kind load docker-image --name=kind litmuschaos/go-runner:ci            
+          kind load docker-image --name=kind litmuschaos/go-runner:ci
 
       - uses: actions/checkout@v2
         with:

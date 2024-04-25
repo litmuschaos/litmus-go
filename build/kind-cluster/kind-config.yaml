@@ -1,7 +1,30 @@
 apiVersion: kind.x-k8s.io/v1alpha4
 kind: Cluster
+networking:
+  podSubnet: "192.168.0.0/16"  # Custom pod network CIDR
+  serviceSubnet: "192.169.0.0/16"  # Custom service subnet
+kubernetesVersion: "v1.23.3"  # Specify Kubernetes version
 nodes:
 - role: control-plane
+  extraPortMappings:
+  - containerPort: 80
+    hostPort: 80
+    protocol: TCP  # Port mapping for HTTP traffic
+  - containerPort: 443
+    hostPort: 443
+    protocol: TCP  # Port mapping for HTTPS traffic
+  kubeadmConfigPatches:
+  - |
+    kind: InitConfiguration
+    nodeRegistration:
+      kubeletExtraArgs:
+        node-labels: "ingress-ready=true"
+        authorization-mode: "AlwaysAllow"
+- role: worker
+  extraMounts:
+  - hostPath: /mnt/data
+    containerPath: /var/lib/data
+- role: worker
 - role: worker
 - role: worker
 - role: worker
