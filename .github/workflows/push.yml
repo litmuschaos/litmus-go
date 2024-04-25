@@ -3,7 +3,7 @@ name: Push
 on:
   push:
     branches:
-      - master
+      - fix_branch
     tags-ignore:
       - '**'
 jobs:
