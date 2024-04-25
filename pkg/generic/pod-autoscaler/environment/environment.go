@@ -8,7 +8,7 @@ import (
 	clientTypes "k8s.io/apimachinery/pkg/types"
 )
 
-//GetENV fetches all the env variables from the runner pod
+// GetENV fetches all the env variables from the runner pod
 func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 
 	experimentDetails.ExperimentName = types.Getenv("EXPERIMENT_NAME", "pod-autoscaler")
