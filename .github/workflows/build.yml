@@ -10,11 +10,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       # Install golang
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v2
         with:
-          go-version: 1.20
+          go-version: 1.18
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v2
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
 
       #TODO: Add Dockerfile linting
       # Running go-lint
@@ -33,16 +35,16 @@ jobs:
           fi
           
       - name: golangci-lint
-        uses: reviewdog/action-golangci-lint@v2
+        uses: reviewdog/action-golangci-lint@v1   
 
   build:
     needs: pre-checks
     runs-on: ubuntu-latest
     steps:
       # Install golang
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v2
         with:
-          go-version: 1.20
+          go-version: 1.18
 
       - uses: actions/checkout@v2
         with:
