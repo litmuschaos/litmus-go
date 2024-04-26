@@ -355,6 +355,7 @@ jobs:
 
       - name: Configuring and testing the Installation
         run: |
+          kubectl taint nodes kind-control-plane node-role.kubernetes.io/control-plane-
           kubectl cluster-info --context kind-kind
           kubectl wait node --all --for condition=ready --timeout=90s
           kubectl get nodes
