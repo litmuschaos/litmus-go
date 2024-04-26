@@ -395,6 +395,4 @@ jobs:
         if: always()
         run: |
           kubectl get nodes
-          kubectl get pods -n litmus
-          kubectl describe pods -n litmus
           kind delete cluster
