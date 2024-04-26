@@ -9,206 +9,6 @@ on:
       - '**.yaml'
 
 jobs:
-  # Helm_Install_Generic_Tests:
-  #   runs-on: ubuntu-18.04
-  #   steps:
-      
-  #     - uses: actions/checkout@v2
-  #       with:
-  #         ref: ${{ github.event.pull_request.head.sha }}    
-          
-  #     - name: Generate go binary and build docker image
-  #       run: make build-amd64
-
-  #     #Install and configure a kind cluster
-  #     - name: Installing KinD cluster for the test
-  #       uses: engineerd/setup-kind@v0.5.0
-  #       with:
-  #           version: "v0.7.0"
-  #           config: "build/kind-cluster/kind-config.yaml"
-
-  #     - name: Configuring and testing the Installation
-  #       run: |
-  #         kubectl taint nodes kind-control-plane node-role.kubernetes.io/master-
-  #         kind get kubeconfig --internal >$HOME/.kube/config
-  #         kubectl cluster-info --context kind-kind
-  #         kubectl get nodes 
-
-  #     - name: Load docker image
-  #       run: /usr/local/bin/kind load docker-image litmuschaos/go-runner:ci
-
-  #     - name: Deploy a sample application for chaos injection
-  #       run: |
-  #         kubectl apply -f https://raw.githubusercontent.com/litmuschaos/chaos-ci-lib/master/app/nginx.yml
-  #         kubectl wait --for=condition=Ready pods --all --namespace default --timeout=90s
-          
-  #     - name: Setting up kubeconfig ENV for Github Chaos Action
-  #       run: echo ::set-env name=KUBE_CONFIG_DATA::$(base64 -w 0 ~/.kube/config)
-  #       env:
-  #         ACTIONS_ALLOW_UNSECURE_COMMANDS: true
-
-  #     - name: Setup Litmus
-  #       uses: litmuschaos/github-chaos-actions@master
-  #       env:
-  #         INSTALL_LITMUS: true
-
-  #     - name: Running Litmus pod delete chaos experiment
-  #       if: always()
-  #       uses: litmuschaos/github-chaos-actions@master
-  #       env:
-  #         EXPERIMENT_NAME: pod-delete
-  #         EXPERIMENT_IMAGE: litmuschaos/go-runner
-  #         EXPERIMENT_IMAGE_TAG: ci
-  #         IMAGE_PULL_POLICY: IfNotPresent
-  #         JOB_CLEANUP_POLICY: delete 
-
-  #     - name: Running container kill chaos experiment
-  #       if: always()
-  #       uses: litmuschaos/github-chaos-actions@master
-  #       env:
-  #         EXPERIMENT_NAME: container-kill
-  #         EXPERIMENT_IMAGE: litmuschaos/go-runner
-  #         EXPERIMENT_IMAGE_TAG: ci
-  #         IMAGE_PULL_POLICY: IfNotPresent
-  #         JOB_CLEANUP_POLICY: delete 
-  #         CONTAINER_RUNTIME: containerd
-
-  #     - name: Running node-cpu-hog chaos experiment
-  #       if: always()
-  #       uses: litmuschaos/github-chaos-actions@master
-  #       env:
-  #         EXPERIMENT_NAME: node-cpu-hog
-  #         EXPERIMENT_IMAGE: litmuschaos/go-runner
-  #         EXPERIMENT_IMAGE_TAG: ci
-  #         IMAGE_PULL_POLICY: IfNotPresent
-  #         JOB_CLEANUP_POLICY: delete 
-          
-
-  #     - name: Running node-memory-hog chaos experiment
-  #       if: always()
-  #       uses: litmuschaos/github-chaos-actions@master
-  #       env:
-  #         EXPERIMENT_NAME: node-memory-hog
-  #         EXPERIMENT_IMAGE: litmuschaos/go-runner
-  #         EXPERIMENT_IMAGE_TAG: ci
-  #         IMAGE_PULL_POLICY: IfNotPresent
-  #         JOB_CLEANUP_POLICY: delete        
-          
-  #     - name: Running pod-cpu-hog chaos experiment
-  #       if: always()
-  #       uses: litmuschaos/github-chaos-actions@master
-  #       env:
-  #         EXPERIMENT_NAME: pod-cpu-hog
-  #         EXPERIMENT_IMAGE: litmuschaos/go-runner
-  #         EXPERIMENT_IMAGE_TAG: ci
-  #         IMAGE_PULL_POLICY: IfNotPresent
-  #         JOB_CLEANUP_POLICY: delete       
-  #         TARGET_CONTAINER: nginx
-  #         TOTAL_CHAOS_DURATION: 60
-  #         CPU_CORES: 1
-
-  #     - name: Running pod-memory-hog chaos experiment
-  #       if: always()
-  #       uses: litmuschaos/github-chaos-actions@master
-  #       env:
-  #         EXPERIMENT_NAME: pod-memory-hog
-  #         EXPERIMENT_IMAGE: litmuschaos/go-runner
-  #         EXPERIMENT_IMAGE_TAG: ci
-  #         IMAGE_PULL_POLICY: IfNotPresent
-  #         JOB_CLEANUP_POLICY: delete       
-  #         TARGET_CONTAINER: nginx
-  #         TOTAL_CHAOS_DURATION: 60
-  #         MEMORY_CONSUMPTION: 500 
-          
-  #     - name: Running pod network corruption chaos experiment
-  #       if: always()
-  #       uses: litmuschaos/github-chaos-actions@master
-  #       env:
-  #         EXPERIMENT_NAME: pod-network-corruption
-  #         EXPERIMENT_IMAGE: litmuschaos/go-runner
-  #         EXPERIMENT_IMAGE_TAG: ci
-  #         IMAGE_PULL_POLICY: IfNotPresent
-  #         JOB_CLEANUP_POLICY: delete       
-  #         TARGET_CONTAINER: nginx
-  #         TOTAL_CHAOS_DURATION: 60
-  #         NETWORK_INTERFACE: eth0
-  #         CONTAINER_RUNTIME: containerd 
-
-  #     - name: Running pod network duplication chaos experiment
-  #       if: always()
-  #       uses: litmuschaos/github-chaos-actions@master
-  #       env:
-  #         EXPERIMENT_NAME: pod-network-duplication
-  #         EXPERIMENT_IMAGE: litmuschaos/go-runner
-  #         EXPERIMENT_IMAGE_TAG: ci
-  #         IMAGE_PULL_POLICY: IfNotPresent
-  #         JOB_CLEANUP_POLICY: delete       
-  #         TARGET_CONTAINER: nginx
-  #         TOTAL_CHAOS_DURATION: 60
-  #         NETWORK_INTERFACE: eth0
-  #         CONTAINER_RUNTIME: containerd     
-        
-  #     - name: Running pod-network-latency chaos experiment
-  #       if: always()
-  #       uses: litmuschaos/github-chaos-actions@master
-  #       env:
-  #         EXPERIMENT_NAME: pod-network-latency
-  #         EXPERIMENT_IMAGE: litmuschaos/go-runner
-  #         EXPERIMENT_IMAGE_TAG: ci
-  #         IMAGE_PULL_POLICY: IfNotPresent
-  #         JOB_CLEANUP_POLICY: delete         
-  #         TARGET_CONTAINER: nginx
-  #         TOTAL_CHAOS_DURATION: 60
-  #         NETWORK_INTERFACE: eth0
-  #         NETWORK_LATENCY: 60000
-  #         CONTAINER_RUNTIME: containerd              
-
-  #     - name: Running pod-network-loss chaos experiment
-  #       if: always()
-  #       uses: litmuschaos/github-chaos-actions@master
-  #       env:
-  #         EXPERIMENT_NAME: pod-network-loss
-  #         EXPERIMENT_IMAGE: litmuschaos/go-runner
-  #         EXPERIMENT_IMAGE_TAG: ci
-  #         IMAGE_PULL_POLICY: IfNotPresent
-  #         JOB_CLEANUP_POLICY: delete       
-  #         TARGET_CONTAINER: nginx
-  #         TOTAL_CHAOS_DURATION: 60
-  #         NETWORK_INTERFACE: eth0
-  #         NETWORK_PACKET_LOSS_PERCENTAGE: 100
-  #         CONTAINER_RUNTIME: containerd
-
-  #     - name: Running pod autoscaler chaos experiment
-  #       if: always()
-  #       uses: litmuschaos/github-chaos-actions@master
-  #       env:
-  #         EXPERIMENT_NAME: pod-autoscaler
-  #         EXPERIMENT_IMAGE: litmuschaos/go-runner
-  #         EXPERIMENT_IMAGE_TAG: ci
-  #         IMAGE_PULL_POLICY: IfNotPresent
-  #         JOB_CLEANUP_POLICY: delete      
-  #         TOTAL_CHAOS_DURATION: 60       
-        
-  #     - name: Running node-io-stress chaos experiment
-  #       if: always()
-  #       uses: litmuschaos/github-chaos-actions@master
-  #       env:
-  #         EXPERIMENT_NAME: node-io-stress
-  #         EXPERIMENT_IMAGE: litmuschaos/go-runner
-  #         EXPERIMENT_IMAGE_TAG: ci
-  #         IMAGE_PULL_POLICY: IfNotPresent
-  #         JOB_CLEANUP_POLICY: delete       
-  #         TOTAL_CHAOS_DURATION: 120
-  #         FILESYSTEM_UTILIZATION_PERCENTAGE: 10                 
-          
-  #     - name: Uninstall Litmus
-  #       uses: litmuschaos/github-chaos-actions@master
-  #       env:          
-  #         LITMUS_CLEANUP: true
-
-  #     - name: Deleting KinD cluster
-  #       if: always()
-  #       run: kind delete cluster
 
   Pod_Level_In_Serial_Mode:
     runs-on: ubuntu-latest
@@ -250,8 +50,8 @@ jobs:
 
       - uses: actions/checkout@v2
         with:
-          repository: 'uditgaurav/litmus-e2e'
-          ref: 'fix_test_cases'
+          repository: 'litmuschaos/litmus-e2e'
+          ref: 'master'
                    
       - name: Running Pod level experiment with affected percentage 100 and in series mode
         env:
@@ -309,8 +109,8 @@ jobs:
 
       - uses: actions/checkout@v2
         with:
-          repository: 'uditgaurav/litmus-e2e'
-          ref: 'fix_test_cases'
+          repository: 'litmuschaos/litmus-e2e'
+          ref: 'master'
           
       - name: Running Pod level experiment with affected percentage 100 and in parallel mode
         env:
@@ -366,8 +166,8 @@ jobs:
 
       - uses: actions/checkout@v2
         with:
-          repository: 'uditgaurav/litmus-e2e'
-          ref: 'fix_test_cases'
+          repository: 'litmuschaos/litmus-e2e'
+          ref: 'master'
           
       - name: Setup litmus and deploy application
         env:
