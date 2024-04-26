@@ -257,6 +257,7 @@ jobs:
         env:
           GO_EXPERIMENT_IMAGE: litmuschaos/go-runner:ci
           EXPERIMENT_IMAGE_PULL_POLICY: IfNotPresent
+          KUBECONFIG: /home/runner/.kube/config
         run: |
           make build-litmus
           make app-deploy
