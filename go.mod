@@ -1,6 +1,6 @@
 module github.com/litmuschaos/litmus-go
 
-go 1.18
+go 1.20
 
 require (
 	github.com/AdaLogics/go-fuzz-headers v0.0.0-20230811130428-ced1acdcaa24
