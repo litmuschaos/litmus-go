@@ -21,6 +21,7 @@ help:
 	@echo "\tmake push          -- pushes the litmus-go multi-arch image"
 	@echo "\tmake build-amd64   -- builds the litmus-go binary & docker amd64 image"
 	@echo "\tmake push-amd64    -- pushes the litmus-go amd64 image"
+	@echo "\tpush-arm64			-- pushes the litmus-go arm64 image"
 	@echo ""
 
 .PHONY: all
@@ -89,6 +90,17 @@ push-amd64:
 	@echo "--> Pushing image"
 	@echo "------------------------------"
 	@sudo docker push $(DOCKER_REGISTRY)/$(DOCKER_REPO)/$(DOCKER_IMAGE):$(DOCKER_TAG)
+
+.PHONY: push-arm64
+push-arm64: docker.buildx image-push-arm64
+
+image-push-arm64:
+	@echo "------------------------"
+	@echo "--> Push go-runner image"
+	@echo "------------------------"
+	@echo "Pushing $(DOCKER_REPO)/$(DOCKER_IMAGE):$(DOCKER_TAG)"
+	@docker buildx build . --push --file build/Dockerfile --progress plane --platform linux/arm64,linux/amd64 --no-cache --tag $(DOCKER_REGISTRY)/$(DOCKER_REPO)/$(DOCKER_IMAGE):$(DOCKER_TAG)
+
 
 .PHONY: trivy-check
 trivy-check:
