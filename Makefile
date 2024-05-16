@@ -21,7 +21,7 @@ help:
 	@echo "\tmake push          -- pushes the litmus-go multi-arch image"
 	@echo "\tmake build-amd64   -- builds the litmus-go binary & docker amd64 image"
 	@echo "\tmake push-amd64    -- pushes the litmus-go amd64 image"
-	@echo "\tpush-arm64			-- pushes the litmus-go arm64 image"
+	@echo "\tpush-multiarch		-- pushes the litmus-go multiarch image"
 	@echo ""
 
 .PHONY: all
@@ -91,8 +91,8 @@ push-amd64:
 	@echo "------------------------------"
 	@sudo docker push $(DOCKER_REGISTRY)/$(DOCKER_REPO)/$(DOCKER_IMAGE):$(DOCKER_TAG)
 
-.PHONY: push-arm64
-push-arm64: docker.buildx image-push-arm64
+.PHONY: push-multiarch
+push-multiarch: docker.buildx image-push-multiarch
 
 image-push-arm64:
 	@echo "------------------------"
