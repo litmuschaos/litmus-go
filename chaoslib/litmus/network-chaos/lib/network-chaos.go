@@ -3,10 +3,13 @@ package lib
 import (
 	"context"
 	"fmt"
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"net"
 	"strconv"
 	"strings"
+
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
+	"github.com/palantir/stacktrace"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/network-chaos/types"
@@ -15,7 +18,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
-	"github.com/pkg/errors"
+	"github.com/litmuschaos/litmus-go/pkg/utils/stringutils"
 	"github.com/sirupsen/logrus"
 	apiv1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -25,22 +28,22 @@ var serviceMesh = []string{"istio", "envoy"}
 var destIpsSvcMesh string
 var destIps string
 
-//PrepareAndInjectChaos contains the prepration & injection steps
+// PrepareAndInjectChaos contains the preparation & injection steps
 func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, args string) error {
 
 	var err error
 	// Get the target pod details for the chaos execution
 	// if the target pod is not defined it will derive the random target pod list using pod affected percentage
 	if experimentsDetails.TargetPods == "" && chaosDetails.AppDetail == nil {
-		return errors.Errorf("please provide one of the appLabel or TARGET_PODS")
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Reason: "provide one of the appLabel or TARGET_PODS"}
 	}
-	//setup the tunables if provided in range
+	//set up the tunables if provided in range
 	SetChaosTunables(experimentsDetails)
 	logExperimentFields(experimentsDetails)
 
 	targetPodList, err := common.GetTargetPods(experimentsDetails.NodeLabel, experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, clients, chaosDetails)
 	if err != nil {
-		return err
+		return stacktrace.Propagate(err, "could not get target pods")
 	}
 
 	//Waiting for the ramp time before chaos injection
@@ -53,28 +56,28 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 	if experimentsDetails.ChaosServiceAccount == "" {
 		experimentsDetails.ChaosServiceAccount, err = common.GetServiceAccount(experimentsDetails.ChaosNamespace, experimentsDetails.ChaosPodName, clients)
 		if err != nil {
-			return errors.Errorf("unable to get the serviceAccountName, err: %v", err)
+			return stacktrace.Propagate(err, "could not  experiment service account")
 		}
 	}
 
 	if experimentsDetails.EngineName != "" {
 		if err := common.SetHelperData(chaosDetails, experimentsDetails.SetHelperData, clients); err != nil {
-			return err
+			return stacktrace.Propagate(err, "could not set helper data")
 		}
 	}
 
-	experimentsDetails.IsTargetContainerProvided = (experimentsDetails.TargetContainer != "")
+	experimentsDetails.IsTargetContainerProvided = experimentsDetails.TargetContainer != ""
 	switch strings.ToLower(experimentsDetails.Sequence) {
 	case "serial":
 		if err = injectChaosInSerialMode(experimentsDetails, targetPodList, clients, chaosDetails, args, resultDetails, eventsDetails); err != nil {
-			return err
+			return stacktrace.Propagate(err, "could not run chaos in serial mode")
 		}
 	case "parallel":
 		if err = injectChaosInParallelMode(experimentsDetails, targetPodList, clients, chaosDetails, args, resultDetails, eventsDetails); err != nil {
-			return err
+			return stacktrace.Propagate(err, "could not run chaos in parallel mode")
 		}
 	default:
-		return errors.Errorf("%v sequence is not supported", experimentsDetails.Sequence)
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("'%s' sequence is not supported", experimentsDetails.Sequence)}
 	}
 
 	return nil
@@ -94,21 +97,18 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 
 		serviceMesh, err := setDestIps(pod, experimentsDetails, clients)
 		if err != nil {
-			return err
+			return stacktrace.Propagate(err, "could not set destination ips")
 		}
 
 		//Get the target container name of the application pod
 		if !experimentsDetails.IsTargetContainerProvided {
-			experimentsDetails.TargetContainer, err = common.GetTargetContainer(pod.Namespace, pod.Name, clients)
-			if err != nil {
-				return errors.Errorf("unable to get the target container name, err: %v", err)
-			}
+			experimentsDetails.TargetContainer = pod.Spec.Containers[0].Name
 		}
 
-		runID := common.GetRunID()
+		runID := stringutils.GetRunID()
 
 		if err := createHelperPod(experimentsDetails, clients, chaosDetails, fmt.Sprintf("%s:%s:%s:%s", pod.Name, pod.Namespace, experimentsDetails.TargetContainer, serviceMesh), pod.Spec.NodeName, runID, args); err != nil {
-			return errors.Errorf("unable to create the helper pod, err: %v", err)
+			return stacktrace.Propagate(err, "could not create helper pod")
 		}
 
 		appLabel := fmt.Sprintf("app=%s-helper-%s", experimentsDetails.ExperimentName, runID)
@@ -117,22 +117,22 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		log.Info("[Status]: Checking the status of the helper pods")
 		if err := status.CheckHelperStatus(experimentsDetails.ChaosNamespace, appLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
 			common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
-			return errors.Errorf("helper pods are not in running state, err: %v", err)
+			return stacktrace.Propagate(err, "could not check helper status")
 		}
 
 		// Wait till the completion of the helper pod
 		// set an upper limit for the waiting time
 		log.Info("[Wait]: waiting till the completion of the helper pod")
-		podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, appLabel, clients, experimentsDetails.ChaosDuration+experimentsDetails.Timeout, experimentsDetails.ExperimentName)
+		podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, appLabel, clients, experimentsDetails.ChaosDuration+experimentsDetails.Timeout, common.GetContainerNames(chaosDetails)...)
 		if err != nil || podStatus == "Failed" {
 			common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
-			return common.HelperFailedError(err)
+			return common.HelperFailedError(err, appLabel, chaosDetails.ChaosNamespace, true)
 		}
 
 		//Deleting all the helper pod for network chaos
 		log.Info("[Cleanup]: Deleting the helper pod")
 		if err := common.DeleteAllPod(appLabel, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients); err != nil {
-			return errors.Errorf("unable to delete the helper pod, err: %v", err)
+			return stacktrace.Propagate(err, "could not delete helper pod(s)")
 		}
 	}
 
@@ -152,10 +152,10 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 
 	targets, err := filterPodsForNodes(targetPodList, experimentsDetails, clients)
 	if err != nil {
-		return err
+		return stacktrace.Propagate(err, "could not filter target pods")
 	}
 
-	runID := common.GetRunID()
+	runID := stringutils.GetRunID()
 
 	for node, tar := range targets {
 		var targetsPerNode []string
@@ -164,7 +164,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		}
 
 		if err := createHelperPod(experimentsDetails, clients, chaosDetails, strings.Join(targetsPerNode, ";"), node, runID, args); err != nil {
-			return errors.Errorf("unable to create the helper pod, err: %v", err)
+			return stacktrace.Propagate(err, "could not create helper pod")
 		}
 	}
 
@@ -174,22 +174,22 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 	log.Info("[Status]: Checking the status of the helper pods")
 	if err := status.CheckHelperStatus(experimentsDetails.ChaosNamespace, appLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
 		common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
-		return errors.Errorf("helper pods are not in running state, err: %v", err)
+		return stacktrace.Propagate(err, "could not check helper status")
 	}
 
 	// Wait till the completion of the helper pod
 	// set an upper limit for the waiting time
 	log.Info("[Wait]: waiting till the completion of the helper pod")
-	podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, appLabel, clients, experimentsDetails.ChaosDuration+experimentsDetails.Timeout, experimentsDetails.ExperimentName)
+	podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, appLabel, clients, experimentsDetails.ChaosDuration+experimentsDetails.Timeout, common.GetContainerNames(chaosDetails)...)
 	if err != nil || podStatus == "Failed" {
 		common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
-		return common.HelperFailedError(err)
+		return common.HelperFailedError(err, appLabel, chaosDetails.ChaosNamespace, true)
 	}
 
 	//Deleting all the helper pod for container-kill chaos
 	log.Info("[Cleanup]: Deleting all the helper pod")
 	if err := common.DeleteAllPod(appLabel, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients); err != nil {
-		return errors.Errorf("unable to delete the helper pods, err: %v", err)
+		return stacktrace.Propagate(err, "could not delete helper pod(s)")
 	}
 
 	return nil
@@ -260,9 +260,16 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 		},
 	}
 
-	_, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Create(context.Background(), helperPod, v1.CreateOptions{})
-	return err
+	if len(chaosDetails.SideCar) != 0 {
+		helperPod.Spec.Containers = append(helperPod.Spec.Containers, common.BuildSidecar(chaosDetails)...)
+		helperPod.Spec.Volumes = append(helperPod.Spec.Volumes, common.GetSidecarVolumes(chaosDetails)...)
+	}
 
+	_, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Create(context.Background(), helperPod, v1.CreateOptions{})
+	if err != nil {
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("unable to create helper pod: %s", err.Error())}
+	}
+	return nil
 }
 
 // getPodEnv derive all the env required for the helper pod
@@ -301,13 +308,13 @@ type target struct {
 }
 
 // GetTargetIps return the comma separated target ips
-// It fetch the ips from the target ips (if defined by users)
-// it append the ips from the host, if target host is provided
+// It fetches the ips from the target ips (if defined by users)
+// it appends the ips from the host, if target host is provided
 func GetTargetIps(targetIPs, targetHosts string, clients clients.ClientSets, serviceMesh bool) (string, error) {
 
 	ipsFromHost, err := getIpsForTargetHosts(targetHosts, clients, serviceMesh)
 	if err != nil {
-		return "", err
+		return "", stacktrace.Propagate(err, "could not get ips from target hosts")
 	}
 	if targetIPs == "" {
 		targetIPs = ipsFromHost
@@ -317,12 +324,12 @@ func GetTargetIps(targetIPs, targetHosts string, clients clients.ClientSets, ser
 	return targetIPs, nil
 }
 
-// it derive the pod ips from the kubernetes service
+// it derives the pod ips from the kubernetes service
 func getPodIPFromService(host string, clients clients.ClientSets) ([]string, error) {
 	var ips []string
 	svcFields := strings.Split(host, ".")
 	if len(svcFields) != 5 {
-		return ips, fmt.Errorf("provide the valid FQDN for service in '<svc-name>.<namespace>.svc.cluster.local format, host: %v", host)
+		return ips, cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Target: fmt.Sprintf("{host: %s}", host), Reason: "provide the valid FQDN for service in '<svc-name>.<namespace>.svc.cluster.local format"}
 	}
 	svcName, svcNs := svcFields[0], svcFields[1]
 	svc, err := clients.KubeClient.CoreV1().Services(svcNs).Get(context.Background(), svcName, v1.GetOptions{})
@@ -331,17 +338,32 @@ func getPodIPFromService(host string, clients clients.ClientSets) ([]string, err
 			log.Warnf("forbidden - failed to get %v service in %v namespace, err: %v", svcName, svcNs, err)
 			return ips, nil
 		}
-		return ips, err
+		return ips, cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Target: fmt.Sprintf("{serviceName: %s, namespace: %s}", svcName, svcNs), Reason: err.Error()}
 	}
+
+	if svc.Spec.Selector == nil {
+		return nil, nil
+	}
+	var svcSelector string
 	for k, v := range svc.Spec.Selector {
-		pods, err := clients.KubeClient.CoreV1().Pods(svcNs).List(context.Background(), v1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", k, v)})
-		if err != nil {
-			return ips, err
+		if svcSelector == "" {
+			svcSelector += fmt.Sprintf("%s=%s", k, v)
+			continue
 		}
-		for _, p := range pods.Items {
-			ips = append(ips, p.Status.PodIP)
-		}
+		svcSelector += fmt.Sprintf(",%s=%s", k, v)
 	}
+
+	pods, err := clients.KubeClient.CoreV1().Pods(svcNs).List(context.Background(), v1.ListOptions{LabelSelector: svcSelector})
+	if err != nil {
+		return ips, cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Target: fmt.Sprintf("{svcName: %s,podLabel: %s, namespace: %s}", svcNs, svcSelector, svcNs), Reason: fmt.Sprintf("failed to derive pods from service: %s", err.Error())}
+	}
+	for _, p := range pods.Items {
+		if p.Status.PodIP == "" {
+			continue
+		}
+		ips = append(ips, p.Status.PodIP)
+	}
+
 	return ips, nil
 }
 
@@ -358,7 +380,7 @@ func getIpsForTargetHosts(targetHosts string, clients clients.ClientSets, servic
 		if strings.Contains(hosts[i], "svc.cluster.local") && serviceMesh {
 			ips, err := getPodIPFromService(hosts[i], clients)
 			if err != nil {
-				return "", err
+				return "", stacktrace.Propagate(err, "could not get pod ips from service")
 			}
 			log.Infof("Host: {%v}, IP address: {%v}", hosts[i], ips)
 			commaSeparatedIPs = append(commaSeparatedIPs, ips...)
@@ -386,14 +408,14 @@ func getIpsForTargetHosts(targetHosts string, clients clients.ClientSets, servic
 		}
 	}
 	if len(commaSeparatedIPs) == 0 {
-		return "", errors.Errorf("provided hosts: {%v} are invalid, unable to resolve", targetHosts)
+		return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Target: fmt.Sprintf("hosts: %s", targetHosts), Reason: "provided hosts are invalid, unable to resolve"}
 	}
 	log.Infof("Injecting chaos on {%v} hosts", finalHosts)
 	return strings.Join(commaSeparatedIPs, ","), nil
 }
 
-//SetChaosTunables will setup a random value within a given range of values
-//If the value is not provided in range it'll setup the initial provided value.
+// SetChaosTunables will set up a random value within a given range of values
+// If the value is not provided in range it'll set up the initial provided value.
 func SetChaosTunables(experimentsDetails *experimentTypes.ExperimentDetails) {
 	experimentsDetails.NetworkPacketLossPercentage = common.ValidateRange(experimentsDetails.NetworkPacketLossPercentage)
 	experimentsDetails.NetworkPacketCorruptionPercentage = common.ValidateRange(experimentsDetails.NetworkPacketCorruptionPercentage)
@@ -439,10 +461,10 @@ func filterPodsForNodes(targetPodList apiv1.PodList, experimentsDetails *experim
 	for _, pod := range targetPodList.Items {
 		serviceMesh, err := setDestIps(pod, experimentsDetails, clients)
 		if err != nil {
-			return targets, err
+			return targets, stacktrace.Propagate(err, "could not set destination ips")
 		}
 
-		if targetContainer == "" {
+		if experimentsDetails.TargetContainer == "" {
 			targetContainer = pod.Spec.Containers[0].Name
 		}
 

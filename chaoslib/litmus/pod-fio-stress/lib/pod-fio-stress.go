@@ -8,6 +8,10 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
+	"github.com/litmuschaos/litmus-go/pkg/result"
+	"github.com/palantir/stacktrace"
+
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-fio-stress/types"
@@ -16,10 +20,29 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	litmusexec "github.com/litmuschaos/litmus-go/pkg/utils/exec"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 )
+
+// PrepareChaos contains the chaos preparation and injection steps
+func PrepareChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+
+	//Waiting for the ramp time before chaos injection
+	if experimentsDetails.RampTime != 0 {
+		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", experimentsDetails.RampTime)
+		common.WaitForDuration(experimentsDetails.RampTime)
+	}
+	//Starting the Fio stress experiment
+	if err := experimentExecution(experimentsDetails, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+		return stacktrace.Propagate(err, "could not inject chaos")
+	}
+	//Waiting for the ramp time after chaos injection
+	if experimentsDetails.RampTime != 0 {
+		log.Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", experimentsDetails.RampTime)
+		common.WaitForDuration(experimentsDetails.RampTime)
+	}
+	return nil
+}
 
 // stressStorage uses the REST API to exec into the target container of the target pod
 // The function will be constantly increasing the storage utilisation until it reaches the maximum available or allowed number.
@@ -38,22 +61,23 @@ func stressStorage(experimentDetails *experimentTypes.ExperimentDetails, podName
 	command := []string{"/bin/sh", "-c", fioCmd}
 
 	litmusexec.SetExecCommandAttributes(&execCommandDetails, podName, experimentDetails.TargetContainer, ns)
-	_, err := litmusexec.Exec(&execCommandDetails, clients, command)
+	_, _, err := litmusexec.Exec(&execCommandDetails, clients, command)
 
 	stressErr <- err
 }
 
-//experimentExecution function orchestrates the experiment by calling the StressStorage function, of every container, of every pod that is targeted
+// experimentExecution function orchestrates the experiment by calling the StressStorage function, of every container, of every pod that is targeted
 func experimentExecution(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	// Get the target pod details for the chaos execution
 	// if the target pod is not defined it will derive the random target pod list using pod affected percentage
 	if experimentsDetails.TargetPods == "" && chaosDetails.AppDetail == nil {
-		return errors.Errorf("please provide either of the appLabel or TARGET_PODS")
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Reason: "provide one of the appLabel or TARGET_PODS"}
 	}
+
 	targetPodList, err := common.GetPodList(experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, clients, chaosDetails)
 	if err != nil {
-		return err
+		return stacktrace.Propagate(err, "could not get target pods")
 	}
 
 	podNames := []string{}
@@ -62,18 +86,18 @@ func experimentExecution(experimentsDetails *experimentTypes.ExperimentDetails, 
 	}
 	log.Infof("Target pods list for chaos, %v", podNames)
 
-	experimentsDetails.IsTargetContainerProvided = (experimentsDetails.TargetContainer != "")
+	experimentsDetails.IsTargetContainerProvided = experimentsDetails.TargetContainer != ""
 	switch strings.ToLower(experimentsDetails.Sequence) {
 	case "serial":
 		if err = injectChaosInSerialMode(experimentsDetails, targetPodList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
-			return err
+			return stacktrace.Propagate(err, "could not run chaos in serial mode")
 		}
 	case "parallel":
 		if err = injectChaosInParallelMode(experimentsDetails, targetPodList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
-			return err
+			return stacktrace.Propagate(err, "could not run chaos in parallel mode")
 		}
 	default:
-		return errors.Errorf("%v sequence is not supported", experimentsDetails.Sequence)
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("'%s' sequence is not supported", experimentsDetails.Sequence)}
 	}
 
 	return nil
@@ -83,7 +107,6 @@ func experimentExecution(experimentsDetails *experimentTypes.ExperimentDetails, 
 func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList corev1.PodList, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 	// creating err channel to receive the error from the go routine
 	stressErr := make(chan error)
-	var err error
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
 		if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
@@ -103,10 +126,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		}
 		//Get the target container name of the application pod
 		if !experimentsDetails.IsTargetContainerProvided {
-			experimentsDetails.TargetContainer, err = common.GetTargetContainer(pod.Namespace, pod.Name, clients)
-			if err != nil {
-				return errors.Errorf("unable to get the target container name, err: %v", err)
-			}
+			experimentsDetails.TargetContainer = pod.Spec.Containers[0].Name
 		}
 
 		log.InfoWithValues("[Chaos]: The Target application details", logrus.Fields{
@@ -130,18 +150,24 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 			case err := <-stressErr:
 				// skipping the execution, if received any error other than 137, while executing stress command and marked result as fail
 				// it will ignore the error code 137(oom kill), it will skip further execution and marked the result as pass
-				// oom kill occurs if stor to be stressed exceed than the resource limit for the target container
+				// oom kill occurs if resource to be stressed exceed than the resource limit for the target container
 				if err != nil {
 					if strings.Contains(err.Error(), "137") {
 						log.Warn("Chaos process OOM killed")
 						return nil
 					}
-					return err
+					return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Target: fmt.Sprintf("podName: %s, namespace: %s, container: %s", pod.Name, pod.Namespace, experimentsDetails.TargetContainer), Reason: fmt.Sprintf("failed to stress cpu of target pod: %s", err.Error())}
 				}
 			case <-signChan:
 				log.Info("[Chaos]: Revert Started")
 				if err := killStressSerial(experimentsDetails.TargetContainer, pod.Name, pod.Namespace, experimentsDetails.ChaosKillCmd, clients); err != nil {
 					log.Errorf("Error in Kill stress after abortion, err: %v", err)
+				}
+				err := cerrors.Error{ErrorCode: cerrors.ErrorTypeExperimentAborted, Target: fmt.Sprintf("{podName: %s, namespace: %s, container: %s}", pod.Name, pod.Namespace, experimentsDetails.TargetContainer), Reason: "experiment is aborted"}
+				failStep, errCode := cerrors.GetRootCauseAndErrorCode(err, string(chaosDetails.Phase))
+				types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep, errCode)
+				if err := result.ChaosResult(chaosDetails, clients, resultDetails, "EOT"); err != nil {
+					log.Errorf("failed to update chaos result %s", err.Error())
 				}
 				log.Info("[Chaos]: Revert Completed")
 				os.Exit(1)
@@ -152,7 +178,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 			}
 		}
 		if err := killStressSerial(experimentsDetails.TargetContainer, pod.Name, pod.Namespace, experimentsDetails.ChaosKillCmd, clients); err != nil {
-			return err
+			return stacktrace.Propagate(err, "could not revert chaos")
 		}
 	}
 	return nil
@@ -162,7 +188,6 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList corev1.PodList, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 	// creating err channel to receive the error from the go routine
 	stressErr := make(chan error)
-	var err error
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
 		if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
@@ -182,10 +207,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		}
 		//Get the target container name of the application pod
 		if !experimentsDetails.IsTargetContainerProvided {
-			experimentsDetails.TargetContainer, err = common.GetTargetContainer(pod.Namespace, pod.Name, clients)
-			if err != nil {
-				return errors.Errorf("unable to get the target container name, err: %v", err)
-			}
+			experimentsDetails.TargetContainer = pod.Spec.Containers[0].Name
 		}
 
 		log.InfoWithValues("[Chaos]: The Target application details", logrus.Fields{
@@ -209,18 +231,24 @@ loop:
 		case err := <-stressErr:
 			// skipping the execution, if received any error other than 137, while executing stress command and marked result as fail
 			// it will ignore the error code 137(oom kill), it will skip further execution and marked the result as pass
-			// oom kill occurs if stor to be stressed exceed than the resource limit for the target container
+			// oom kill occurs if resource to be stressed exceed than the resource limit for the target container
 			if err != nil {
 				if strings.Contains(err.Error(), "137") {
 					log.Warn("Chaos process OOM killed")
 					return nil
 				}
-				return err
+				return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Reason: fmt.Sprintf("failed to injcet chaos: %s", err.Error())}
 			}
 		case <-signChan:
 			log.Info("[Chaos]: Revert Started")
 			if err := killStressParallel(experimentsDetails.TargetContainer, targetPodList, experimentsDetails.ChaosKillCmd, clients); err != nil {
 				log.Errorf("Error in Kill stress after abortion, err: %v", err)
+			}
+			err := cerrors.Error{ErrorCode: cerrors.ErrorTypeExperimentAborted, Reason: "experiment is aborted"}
+			failStep, errCode := cerrors.GetRootCauseAndErrorCode(err, string(chaosDetails.Phase))
+			types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep, errCode)
+			if err := result.ChaosResult(chaosDetails, clients, resultDetails, "EOT"); err != nil {
+				log.Errorf("failed to update chaos result %s", err.Error())
 			}
 			log.Info("[Chaos]: Revert Completed")
 			os.Exit(1)
@@ -230,44 +258,25 @@ loop:
 		}
 	}
 	if err := killStressParallel(experimentsDetails.TargetContainer, targetPodList, experimentsDetails.ChaosKillCmd, clients); err != nil {
-		return err
+		return stacktrace.Propagate(err, "could revert chaos")
 	}
 
-	return nil
-}
-
-//PrepareChaos contains the chaos prepration and injection steps
-func PrepareChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-
-	//Waiting for the ramp time before chaos injection
-	if experimentsDetails.RampTime != 0 {
-		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", experimentsDetails.RampTime)
-		common.WaitForDuration(experimentsDetails.RampTime)
-	}
-	//Starting the Fio stress experiment
-	if err := experimentExecution(experimentsDetails, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
-		return err
-	}
-	//Waiting for the ramp time after chaos injection
-	if experimentsDetails.RampTime != 0 {
-		log.Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", experimentsDetails.RampTime)
-		common.WaitForDuration(experimentsDetails.RampTime)
-	}
 	return nil
 }
 
 // killStressSerial function to kill a stress process running inside target container
-//  Triggered by either timeout of chaos duration or termination of the experiment
+//
+//	Triggered by either timeout of chaos duration or termination of the experiment
 func killStressSerial(containerName, podName, namespace, KillCmd string, clients clients.ClientSets) error {
-	// It will contains all the pod & container details required for exec command
+	// It will contain all the pod & container details required for exec command
 	execCommandDetails := litmusexec.PodDetails{}
 
 	command := []string{"/bin/sh", "-c", KillCmd}
 
 	litmusexec.SetExecCommandAttributes(&execCommandDetails, podName, containerName, namespace)
-	_, err := litmusexec.Exec(&execCommandDetails, clients, command)
+	out, _, err := litmusexec.Exec(&execCommandDetails, clients, command)
 	if err != nil {
-		return errors.Errorf("Unable to kill stress process inside target container, err: %v", err)
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosRevert, Target: fmt.Sprintf("{podName: %s, namespace: %s}", podName, namespace), Reason: fmt.Sprintf("failed to revert chaos: %s", out)}
 	}
 	return nil
 }
@@ -275,12 +284,14 @@ func killStressSerial(containerName, podName, namespace, KillCmd string, clients
 // killStressParallel function to kill all the stress process running inside target container
 // Triggered by either timeout of chaos duration or termination of the experiment
 func killStressParallel(containerName string, targetPodList corev1.PodList, KillCmd string, clients clients.ClientSets) error {
-
+	var errList []string
 	for _, pod := range targetPodList.Items {
-
 		if err := killStressSerial(containerName, pod.Name, pod.Namespace, KillCmd, clients); err != nil {
-			return err
+			errList = append(errList, err.Error())
 		}
+	}
+	if len(errList) != 0 {
+		return cerrors.PreserveError{ErrString: fmt.Sprintf("[%s]", strings.Join(errList, ","))}
 	}
 	return nil
 }

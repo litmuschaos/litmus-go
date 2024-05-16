@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	"github.com/litmuschaos/litmus-go/pkg/result"
+	"github.com/palantir/stacktrace"
 	"github.com/sirupsen/logrus"
 	"os/exec"
 	"strconv"
@@ -17,7 +19,6 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
-	"github.com/pkg/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientTypes "k8s.io/apimachinery/pkg/types"
 )
@@ -36,14 +37,18 @@ func Helper(clients clients.ClientSets) {
 	log.Info("[PreReq]: Getting the ENV variables")
 	getENV(&experimentsDetails)
 
-	// Intialise the chaos attributes
+	// Initialise the chaos attributes
 	types.InitialiseChaosVariables(&chaosDetails)
+	chaosDetails.Phase = types.ChaosInjectPhase
 
-	// Intialise Chaos Result Parameters
+	// Initialise Chaos Result Parameters
 	types.SetResultAttributes(&resultDetails, chaosDetails)
 
-	err := killContainer(&experimentsDetails, clients, &eventsDetails, &chaosDetails, &resultDetails)
-	if err != nil {
+	if err := killContainer(&experimentsDetails, clients, &eventsDetails, &chaosDetails, &resultDetails); err != nil {
+		// update failstep inside chaosresult
+		if resultErr := result.UpdateFailedStepFromHelper(&resultDetails, &chaosDetails, clients, err); resultErr != nil {
+			log.Fatalf("helper pod failed, err: %v, resultErr: %v", err, resultErr)
+		}
 		log.Fatalf("helper pod failed, err: %v", err)
 	}
 }
@@ -52,9 +57,9 @@ func Helper(clients clients.ClientSets) {
 // it will kill the container till the chaos duration
 // the execution will stop after timestamp passes the given chaos duration
 func killContainer(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails) error {
-	targetList, err := common.ParseTargets()
+	targetList, err := common.ParseTargets(chaosDetails.ChaosPodName)
 	if err != nil {
-		return err
+		return stacktrace.Propagate(err, "could not parse targets")
 	}
 
 	var targets []targetDetails
@@ -64,6 +69,7 @@ func killContainer(experimentsDetails *experimentTypes.ExperimentDetails, client
 			Name:            t.Name,
 			Namespace:       t.Namespace,
 			TargetContainer: t.TargetContainer,
+			Source:          chaosDetails.ChaosPodName,
 		}
 		targets = append(targets, td)
 		log.Infof("Injecting chaos on target: {name: %s, namespace: %v, container: %v}", t.Name, t.Namespace, t.TargetContainer)
@@ -90,12 +96,12 @@ func killIterations(targets []targetDetails, experimentsDetails *experimentTypes
 		for _, t := range targets {
 			t.RestartCountBefore, err = getRestartCount(t, clients)
 			if err != nil {
-				return err
+				return stacktrace.Propagate(err, "could get container restart count")
 			}
 
-			containerId, err := common.GetContainerID(t.Namespace, t.Name, t.TargetContainer, clients)
+			containerId, err := common.GetContainerID(t.Namespace, t.Name, t.TargetContainer, clients, t.Source)
 			if err != nil {
-				return err
+				return stacktrace.Propagate(err, "could not get container id")
 			}
 
 			log.InfoWithValues("[Info]: Details of application under chaos injection", logrus.Fields{
@@ -108,7 +114,7 @@ func killIterations(targets []targetDetails, experimentsDetails *experimentTypes
 		}
 
 		if err := kill(experimentsDetails, containerIds, clients, eventsDetails, chaosDetails); err != nil {
-			return err
+			return stacktrace.Propagate(err, "could not kill target container")
 		}
 
 		//Waiting for the chaos interval after chaos injection
@@ -119,10 +125,10 @@ func killIterations(targets []targetDetails, experimentsDetails *experimentTypes
 
 		for _, t := range targets {
 			if err := validate(t, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
-				return err
+				return stacktrace.Propagate(err, "could not verify restart count")
 			}
 			if err := result.AnnotateChaosResult(resultDetails.Name, chaosDetails.ChaosNamespace, "targeted", "pod", t.Name); err != nil {
-				return err
+				return stacktrace.Propagate(err, "could not annotate chaosresult")
 			}
 		}
 
@@ -142,23 +148,22 @@ func kill(experimentsDetails *experimentTypes.ExperimentDetails, containerIds []
 
 	switch experimentsDetails.ContainerRuntime {
 	case "docker":
-		if err := stopDockerContainer(containerIds, experimentsDetails.SocketPath, experimentsDetails.Signal); err != nil {
-			return err
+		if err := stopDockerContainer(containerIds, experimentsDetails.SocketPath, experimentsDetails.Signal, experimentsDetails.ChaosPodName); err != nil {
+			return stacktrace.Propagate(err, "could not stop container")
 		}
 	case "containerd", "crio":
-		if err := stopContainerdContainer(containerIds, experimentsDetails.SocketPath, experimentsDetails.Signal); err != nil {
-			return err
+		if err := stopContainerdContainer(containerIds, experimentsDetails.SocketPath, experimentsDetails.Signal, experimentsDetails.ChaosPodName); err != nil {
+			return stacktrace.Propagate(err, "could not stop container")
 		}
 	default:
-		return errors.Errorf("%v container runtime not supported", experimentsDetails.ContainerRuntime)
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeHelper, Source: chaosDetails.ChaosPodName, Reason: fmt.Sprintf("unsupported container runtime %s", experimentsDetails.ContainerRuntime)}
 	}
 	return nil
 }
 
 func validate(t targetDetails, timeout, delay int, clients clients.ClientSets) error {
 	//Check the status of restarted container
-	err := common.CheckContainerStatus(t.Namespace, t.Name, timeout, delay, clients)
-	if err != nil {
+	if err := common.CheckContainerStatus(t.Namespace, t.Name, timeout, delay, clients, t.Source); err != nil {
 		return err
 	}
 
@@ -166,10 +171,10 @@ func validate(t targetDetails, timeout, delay int, clients clients.ClientSets) e
 	return verifyRestartCount(t, timeout, delay, clients, t.RestartCountBefore)
 }
 
-//stopContainerdContainer kill the application container
-func stopContainerdContainer(containerIDs []string, socketPath, signal string) error {
+// stopContainerdContainer kill the application container
+func stopContainerdContainer(containerIDs []string, socketPath, signal, source string) error {
 	if signal != "SIGKILL" && signal != "SIGTERM" {
-		return errors.Errorf("{%v} signal not supported, use either SIGTERM or SIGKILL", signal)
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeHelper, Source: source, Reason: fmt.Sprintf("unsupported signal %s, use either SIGTERM or SIGKILL", signal)}
 	}
 
 	cmd := exec.Command("sudo", "crictl", "-i", fmt.Sprintf("unix://%s", socketPath), "-r", fmt.Sprintf("unix://%s", socketPath), "stop")
@@ -178,31 +183,33 @@ func stopContainerdContainer(containerIDs []string, socketPath, signal string) e
 	}
 	cmd.Args = append(cmd.Args, containerIDs...)
 
-	var errOut bytes.Buffer
+	var errOut, out bytes.Buffer
 	cmd.Stderr = &errOut
+	cmd.Stdout = &out
 	if err := cmd.Run(); err != nil {
-		return errors.Errorf("Unable to run command, err: %v; error output: %v", err, errOut.String())
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Source: source, Reason: fmt.Sprintf("failed to stop container :%s", out.String())}
 	}
 	return nil
 }
 
-//stopDockerContainer kill the application container
-func stopDockerContainer(containerIDs []string, socketPath, signal string) error {
-	var errOut bytes.Buffer
+// stopDockerContainer kill the application container
+func stopDockerContainer(containerIDs []string, socketPath, signal, source string) error {
+	var errOut, out bytes.Buffer
 	cmd := exec.Command("sudo", "docker", "--host", fmt.Sprintf("unix://%s", socketPath), "kill", "--signal", signal)
 	cmd.Args = append(cmd.Args, containerIDs...)
 	cmd.Stderr = &errOut
+	cmd.Stdout = &out
 	if err := cmd.Run(); err != nil {
-		return errors.Errorf("Unable to run command, err: %v; error output: %v", err, errOut.String())
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Source: source, Reason: fmt.Sprintf("failed to stop container :%s", out.String())}
 	}
 	return nil
 }
 
-//getRestartCount return the restart count of target container
+// getRestartCount return the restart count of target container
 func getRestartCount(target targetDetails, clients clients.ClientSets) (int, error) {
 	pod, err := clients.KubeClient.CoreV1().Pods(target.Namespace).Get(context.Background(), target.Name, v1.GetOptions{})
 	if err != nil {
-		return 0, err
+		return 0, cerrors.Error{ErrorCode: cerrors.ErrorTypeHelper, Source: target.Source, Target: fmt.Sprintf("{podName: %s, namespace: %s}", target.Name, target.Namespace), Reason: err.Error()}
 	}
 	restartCount := 0
 	for _, container := range pod.Status.ContainerStatuses {
@@ -214,7 +221,7 @@ func getRestartCount(target targetDetails, clients clients.ClientSets) (int, err
 	return restartCount, nil
 }
 
-//verifyRestartCount verify the restart count of target container that it is restarted or not after chaos injection
+// verifyRestartCount verify the restart count of target container that it is restarted or not after chaos injection
 func verifyRestartCount(t targetDetails, timeout, delay int, clients clients.ClientSets, restartCountBefore int) error {
 
 	restartCountAfter := 0
@@ -224,7 +231,7 @@ func verifyRestartCount(t targetDetails, timeout, delay int, clients clients.Cli
 		Try(func(attempt uint) error {
 			pod, err := clients.KubeClient.CoreV1().Pods(t.Namespace).Get(context.Background(), t.Name, v1.GetOptions{})
 			if err != nil {
-				return errors.Errorf("Unable to find the pod with name %v, err: %v", t.Name, err)
+				return cerrors.Error{ErrorCode: cerrors.ErrorTypeHelper, Source: t.Source, Target: fmt.Sprintf("{podName: %s, namespace: %s}", t.Name, t.Namespace), Reason: err.Error()}
 			}
 			for _, container := range pod.Status.ContainerStatuses {
 				if container.Name == t.TargetContainer {
@@ -233,14 +240,14 @@ func verifyRestartCount(t targetDetails, timeout, delay int, clients clients.Cli
 				}
 			}
 			if restartCountAfter <= restartCountBefore {
-				return errors.Errorf("Target container is not restarted")
+				return cerrors.Error{ErrorCode: cerrors.ErrorTypeHelper, Source: t.Source, Target: fmt.Sprintf("{podName: %s, namespace: %s, container: %s}", t.Name, t.Namespace, t.TargetContainer), Reason: "target container is not restarted after kill"}
 			}
 			log.Infof("restartCount of target container after chaos injection: %v", strconv.Itoa(restartCountAfter))
 			return nil
 		})
 }
 
-//getENV fetches all the env variables from the runner pod
+// getENV fetches all the env variables from the runner pod
 func getENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.ExperimentName = types.Getenv("EXPERIMENT_NAME", "")
 	experimentDetails.InstanceID = types.Getenv("INSTANCE_ID", "")
@@ -262,4 +269,5 @@ type targetDetails struct {
 	Namespace          string
 	TargetContainer    string
 	RestartCountBefore int
+	Source             string
 }

@@ -7,7 +7,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/types"
 )
 
-//PodNetworkDuplicationChaos contains the steps to prepare and inject chaos
+// PodNetworkDuplicationChaos contains the steps to prepare and inject chaos
 func PodNetworkDuplicationChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	args := "duplicate " + experimentsDetails.NetworkPacketDuplicationPercentage

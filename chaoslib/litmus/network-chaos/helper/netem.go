@@ -2,7 +2,9 @@ package helper
 
 import (
 	"fmt"
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	"github.com/litmuschaos/litmus-go/pkg/events"
+	"github.com/palantir/stacktrace"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -26,11 +28,10 @@ const (
 )
 
 var (
-	err           error
-	inject, abort chan os.Signal
+	err                                              error
+	inject, abort                                    chan os.Signal
+	sPorts, dPorts, whitelistDPorts, whitelistSPorts []string
 )
-
-var destIps, sPorts, dPorts []string
 
 // Helper injects the network chaos
 func Helper(clients clients.ClientSets) {
@@ -54,10 +55,11 @@ func Helper(clients clients.ClientSets) {
 	log.Info("[PreReq]: Getting the ENV variables")
 	getENV(&experimentsDetails)
 
-	// Intialise the chaos attributes
+	// Initialise the chaos attributes
 	types.InitialiseChaosVariables(&chaosDetails)
+	chaosDetails.Phase = types.ChaosInjectPhase
 
-	// Intialise Chaos Result Parameters
+	// Initialise Chaos Result Parameters
 	types.SetResultAttributes(&resultDetails, chaosDetails)
 
 	// Set the chaos result uid
@@ -65,17 +67,21 @@ func Helper(clients clients.ClientSets) {
 
 	err := preparePodNetworkChaos(&experimentsDetails, clients, &eventsDetails, &chaosDetails, &resultDetails)
 	if err != nil {
+		// update failstep inside chaosresult
+		if resultErr := result.UpdateFailedStepFromHelper(&resultDetails, &chaosDetails, clients, err); resultErr != nil {
+			log.Fatalf("helper pod failed, err: %v, resultErr: %v", err, resultErr)
+		}
 		log.Fatalf("helper pod failed, err: %v", err)
 	}
 
 }
 
-//preparePodNetworkChaos contains the prepration steps before chaos injection
+// preparePodNetworkChaos contains the prepration steps before chaos injection
 func preparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails) error {
 
 	targetEnv := os.Getenv("TARGETS")
 	if targetEnv == "" {
-		return fmt.Errorf("no target found, provide atleast one target")
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeHelper, Source: chaosDetails.ChaosPodName, Reason: "no target found, provide atleast one target"}
 	}
 
 	var targets []targetDetails
@@ -83,24 +89,25 @@ func preparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetail
 	for _, t := range strings.Split(targetEnv, ";") {
 		target := strings.Split(t, ":")
 		if len(target) != 4 {
-			return fmt.Errorf("unsupported target: '%v', provide target in '<name>:<namespace>:<container-name>:<serviceMesh>", target)
+			return cerrors.Error{ErrorCode: cerrors.ErrorTypeHelper, Source: chaosDetails.ChaosPodName, Reason: fmt.Sprintf("unsupported target format: '%v'", targets)}
 		}
 		td := targetDetails{
 			Name:            target[0],
 			Namespace:       target[1],
 			TargetContainer: target[2],
 			DestinationIps:  getDestIps(target[3]),
+			Source:          chaosDetails.ChaosPodName,
 		}
 
-		td.ContainerId, err = common.GetRuntimeBasedContainerID(experimentsDetails.ContainerRuntime, experimentsDetails.SocketPath, td.Name, td.Namespace, td.TargetContainer, clients)
+		td.ContainerId, err = common.GetRuntimeBasedContainerID(experimentsDetails.ContainerRuntime, experimentsDetails.SocketPath, td.Name, td.Namespace, td.TargetContainer, clients, td.Source)
 		if err != nil {
-			return err
+			return stacktrace.Propagate(err, "could not get container id")
 		}
 
 		// extract out the pid of the target container
-		td.Pid, err = common.GetPauseAndSandboxPID(experimentsDetails.ContainerRuntime, td.ContainerId, experimentsDetails.SocketPath)
+		td.Pid, err = common.GetPauseAndSandboxPID(experimentsDetails.ContainerRuntime, td.ContainerId, experimentsDetails.SocketPath, td.Source)
 		if err != nil {
-			return err
+			return stacktrace.Propagate(err, "could not get container pid")
 		}
 
 		targets = append(targets, td)
@@ -119,14 +126,14 @@ func preparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetail
 	for _, t := range targets {
 		// injecting network chaos inside target container
 		if err = injectChaos(experimentsDetails.NetworkInterface, t); err != nil {
-			return err
+			return stacktrace.Propagate(err, "could not inject chaos")
 		}
 		log.Infof("successfully injected chaos on target: {name: %s, namespace: %v, container: %v}", t.Name, t.Namespace, t.TargetContainer)
 		if err = result.AnnotateChaosResult(resultDetails.Name, chaosDetails.ChaosNamespace, "injected", "pod", t.Name); err != nil {
-			if _, killErr := killnetem(t, experimentsDetails.NetworkInterface); killErr != nil {
-				return fmt.Errorf("unable to revert and annotate chaosresult, err: [%v, %v]", killErr, err)
+			if _, revertErr := killnetem(t, experimentsDetails.NetworkInterface); err != nil {
+				return cerrors.PreserveError{ErrString: fmt.Sprintf("[%s,%s]", stacktrace.RootCause(err).Error(), stacktrace.RootCause(revertErr).Error())}
 			}
-			return err
+			return stacktrace.Propagate(err, "could not annotate chaosresult")
 		}
 	}
 
@@ -158,9 +165,8 @@ func preparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetail
 	}
 
 	if len(errList) != 0 {
-		return fmt.Errorf(" failed to revert chaos, err: %v", strings.Join(errList, ","))
+		return cerrors.PreserveError{ErrString: fmt.Sprintf("[%s]", strings.Join(errList, ","))}
 	}
-
 	return nil
 }
 
@@ -171,85 +177,84 @@ func injectChaos(netInterface string, target targetDetails) error {
 
 	netemCommands := os.Getenv("NETEM_COMMAND")
 
-	if len(destIps) == 0 && len(sPorts) == 0 && len(dPorts) == 0 {
+	if len(target.DestinationIps) == 0 && len(sPorts) == 0 && len(dPorts) == 0 && len(whitelistDPorts) == 0 && len(whitelistSPorts) == 0 {
 		tc := fmt.Sprintf("sudo nsenter -t %d -n tc qdisc replace dev %s root netem %v", target.Pid, netInterface, netemCommands)
-		cmd := exec.Command("/bin/bash", "-c", tc)
-		out, err := cmd.CombinedOutput()
-		log.Info(cmd.String())
-		if err != nil {
-			log.Error(string(out))
+		log.Info(tc)
+		if err := common.RunBashCommand(tc, "failed to create tc rules", target.Source); err != nil {
 			return err
 		}
 	} else {
 
-		ips := strings.Split(target.DestinationIps, ",")
-		var uniqueIps []string
-
-		// removing duplicates ips from the list, if any
-		for i := range ips {
-			if !common.Contains(ips[i], uniqueIps) {
-				uniqueIps = append(uniqueIps, ips[i])
-			}
-		}
-
 		// Create a priority-based queue
 		// This instantly creates classes 1:1, 1:2, 1:3
 		priority := fmt.Sprintf("sudo nsenter -t %v -n tc qdisc replace dev %v root handle 1: prio", target.Pid, netInterface)
-		cmd := exec.Command("/bin/bash", "-c", priority)
-		out, err := cmd.CombinedOutput()
-		log.Info(cmd.String())
-		if err != nil {
-			log.Error(string(out))
+		log.Info(priority)
+		if err := common.RunBashCommand(priority, "failed to create priority-based queue", target.Source); err != nil {
 			return err
 		}
 
 		// Add queueing discipline for 1:3 class.
 		// No traffic is going through 1:3 yet
 		traffic := fmt.Sprintf("sudo nsenter -t %v -n tc qdisc replace dev %v parent 1:3 netem %v", target.Pid, netInterface, netemCommands)
-		cmd = exec.Command("/bin/bash", "-c", traffic)
-		out, err = cmd.CombinedOutput()
-		log.Info(cmd.String())
-		if err != nil {
-			log.Error(string(out))
+		log.Info(traffic)
+		if err := common.RunBashCommand(traffic, "failed to create netem queueing discipline", target.Source); err != nil {
 			return err
 		}
 
-		for _, ip := range uniqueIps {
-			// redirect traffic to specific IP through band 3
-			tc := fmt.Sprintf("sudo nsenter -t %v -n tc filter add dev %v protocol ip parent 1:0 prio 3 u32 match ip dst %v flowid 1:3", target.Pid, netInterface, ip)
-			if strings.Contains(ip, ":") {
-				tc = fmt.Sprintf("sudo nsenter -t %v -n tc filter add dev %v protocol ip parent 1:0 prio 3 u32 match ip6 dst %v flowid 1:3", target.Pid, netInterface, ip)
+		if len(whitelistDPorts) != 0 || len(whitelistSPorts) != 0 {
+			for _, port := range whitelistDPorts {
+				//redirect traffic to specific dport through band 2
+				tc := fmt.Sprintf("sudo nsenter -t %v -n tc filter add dev %v protocol ip parent 1:0 prio 2 u32 match ip dport %v 0xffff flowid 1:2", target.Pid, netInterface, port)
+				log.Info(tc)
+				if err := common.RunBashCommand(tc, "failed to create whitelist dport match filters", target.Source); err != nil {
+					return err
+				}
 			}
-			cmd = exec.Command("/bin/bash", "-c", tc)
-			out, err = cmd.CombinedOutput()
-			log.Info(cmd.String())
-			if err != nil {
-				log.Error(string(out))
-				return err
-			}
-		}
 
-		for _, port := range sPorts {
-			//redirect traffic to specific sport through band 3
-			tc := fmt.Sprintf("sudo nsenter -t %v -n tc filter add dev %v protocol ip parent 1:0 prio 3 u32 match ip sport %v 0xffff flowid 1:3", target.Pid, netInterface, port)
-			cmd = exec.Command("/bin/bash", "-c", tc)
-			out, err = cmd.CombinedOutput()
-			log.Info(cmd.String())
-			if err != nil {
-				log.Error(string(out))
+			for _, port := range whitelistSPorts {
+				//redirect traffic to specific sport through band 2
+				tc := fmt.Sprintf("sudo nsenter -t %v -n tc filter add dev %v protocol ip parent 1:0 prio 2 u32 match ip sport %v 0xffff flowid 1:2", target.Pid, netInterface, port)
+				log.Info(tc)
+				if err := common.RunBashCommand(tc, "failed to create whitelist sport match filters", target.Source); err != nil {
+					return err
+				}
+			}
+
+			tc := fmt.Sprintf("sudo nsenter -t %v -n tc filter add dev %v protocol ip parent 1:0 prio 3 u32 match ip dst 0.0.0.0/0 flowid 1:3", target.Pid, netInterface)
+			log.Info(tc)
+			if err := common.RunBashCommand(tc, "failed to create rule for all ports match filters", target.Source); err != nil {
 				return err
 			}
-		}
+		} else {
 
-		for _, port := range dPorts {
-			//redirect traffic to specific dport through band 3
-			tc := fmt.Sprintf("sudo nsenter -t %v -n tc filter add dev %v protocol ip parent 1:0 prio 3 u32 match ip dport %v 0xffff flowid 1:3", target.Pid, netInterface, port)
-			cmd = exec.Command("/bin/bash", "-c", tc)
-			out, err = cmd.CombinedOutput()
-			log.Info(cmd.String())
-			if err != nil {
-				log.Error(string(out))
-				return err
+			for _, ip := range target.DestinationIps {
+				// redirect traffic to specific IP through band 3
+				tc := fmt.Sprintf("sudo nsenter -t %v -n tc filter add dev %v protocol ip parent 1:0 prio 3 u32 match ip dst %v flowid 1:3", target.Pid, netInterface, ip)
+				if strings.Contains(ip, ":") {
+					tc = fmt.Sprintf("sudo nsenter -t %v -n tc filter add dev %v protocol ip parent 1:0 prio 3 u32 match ip6 dst %v flowid 1:3", target.Pid, netInterface, ip)
+				}
+				log.Info(tc)
+				if err := common.RunBashCommand(tc, "failed to create destination ips match filters", target.Source); err != nil {
+					return err
+				}
+			}
+
+			for _, port := range sPorts {
+				//redirect traffic to specific sport through band 3
+				tc := fmt.Sprintf("sudo nsenter -t %v -n tc filter add dev %v protocol ip parent 1:0 prio 3 u32 match ip sport %v 0xffff flowid 1:3", target.Pid, netInterface, port)
+				log.Info(tc)
+				if err := common.RunBashCommand(tc, "failed to create source ports match filters", target.Source); err != nil {
+					return err
+				}
+			}
+
+			for _, port := range dPorts {
+				//redirect traffic to specific dport through band 3
+				tc := fmt.Sprintf("sudo nsenter -t %v -n tc filter add dev %v protocol ip parent 1:0 prio 3 u32 match ip dport %v 0xffff flowid 1:3", target.Pid, netInterface, port)
+				log.Info(tc)
+				if err := common.RunBashCommand(tc, "failed to create destination ports match filters", target.Source); err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -272,8 +277,8 @@ func killnetem(target targetDetails, networkInterface string) (bool, error) {
 			log.Warn("The network chaos process has already been removed")
 			return true, err
 		}
-		log.Error(string(out))
-		return false, err
+		log.Error(err.Error())
+		return false, cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosRevert, Source: target.Source, Target: fmt.Sprintf("{podName: %s, namespace: %s, container: %s}", target.Name, target.Namespace, target.TargetContainer), Reason: fmt.Sprintf("failed to revert network faults: %s", string(out))}
 	}
 	log.Infof("successfully reverted chaos on target: {name: %s, namespace: %v, container: %v}", target.Name, target.Namespace, target.TargetContainer)
 	return true, nil
@@ -283,13 +288,14 @@ type targetDetails struct {
 	Name            string
 	Namespace       string
 	ServiceMesh     string
-	DestinationIps  string
+	DestinationIps  []string
 	TargetContainer string
 	ContainerId     string
 	Pid             int
+	Source          string
 }
 
-//getENV fetches all the env variables from the runner pod
+// getENV fetches all the env variables from the runner pod
 func getENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.ExperimentName = types.Getenv("EXPERIMENT_NAME", "")
 	experimentDetails.InstanceID = types.Getenv("INSTANCE_ID", "")
@@ -305,29 +311,20 @@ func getENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.SourcePorts = types.Getenv("SOURCE_PORTS", "")
 	experimentDetails.DestinationPorts = types.Getenv("DESTINATION_PORTS", "")
 
-	destIps = getDestinationIPs(experimentDetails.DestinationIPs)
 	if strings.TrimSpace(experimentDetails.DestinationPorts) != "" {
-		dPorts = strings.Split(strings.TrimSpace(experimentDetails.DestinationPorts), ",")
-	}
-	if strings.TrimSpace(experimentDetails.SourcePorts) != "" {
-		sPorts = strings.Split(strings.TrimSpace(experimentDetails.SourcePorts), ",")
-	}
-}
-
-func getDestinationIPs(ips string) []string {
-	if strings.TrimSpace(ips) == "" {
-		return nil
-	}
-	destIPs := strings.Split(strings.TrimSpace(ips), ",")
-	var uniqueIps []string
-
-	// removing duplicates ips from the list, if any
-	for i := range destIPs {
-		if !common.Contains(destIPs[i], uniqueIps) {
-			uniqueIps = append(uniqueIps, destIPs[i])
+		if strings.Contains(experimentDetails.DestinationPorts, "!") {
+			whitelistDPorts = strings.Split(strings.TrimPrefix(strings.TrimSpace(experimentDetails.DestinationPorts), "!"), ",")
+		} else {
+			dPorts = strings.Split(strings.TrimSpace(experimentDetails.DestinationPorts), ",")
 		}
 	}
-	return uniqueIps
+	if strings.TrimSpace(experimentDetails.SourcePorts) != "" {
+		if strings.Contains(experimentDetails.SourcePorts, "!") {
+			whitelistSPorts = strings.Split(strings.TrimPrefix(strings.TrimSpace(experimentDetails.SourcePorts), "!"), ",")
+		} else {
+			sPorts = strings.Split(strings.TrimSpace(experimentDetails.SourcePorts), ",")
+		}
+	}
 }
 
 // abortWatcher continuously watch for the abort signals
@@ -357,9 +354,28 @@ func abortWatcher(targets []targetDetails, networkInterface, resultName, chaosNS
 	log.Info("Chaos Revert Completed")
 	os.Exit(1)
 }
-func getDestIps(serviceMesh string) string {
-	if serviceMesh == "false" {
-		return os.Getenv("DESTINATION_IPS")
+func getDestIps(serviceMesh string) []string {
+	var (
+		destIps   = os.Getenv("DESTINATION_IPS")
+		uniqueIps []string
+	)
+
+	if serviceMesh == "true" {
+		destIps = os.Getenv("DESTINATION_IPS_SERVICE_MESH")
 	}
-	return os.Getenv("DESTINATION_IPS_SERVICE_MESH")
+
+	if strings.TrimSpace(destIps) == "" {
+		return nil
+	}
+
+	ips := strings.Split(strings.TrimSpace(destIps), ",")
+
+	// removing duplicates ips from the list, if any
+	for i := range ips {
+		if !common.Contains(ips[i], uniqueIps) {
+			uniqueIps = append(uniqueIps, ips[i])
+		}
+	}
+
+	return uniqueIps
 }

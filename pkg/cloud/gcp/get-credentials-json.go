@@ -3,9 +3,11 @@ package gcp
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"strings"
 
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"google.golang.org/api/compute/v1"
 	"google.golang.org/api/option"
@@ -30,7 +32,7 @@ func getFileContent(filePath string) (string, error) {
 
 	fileContentByteSlice, err := os.ReadFile(filePath)
 	if err != nil {
-		return "", err
+		return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("failed to read file %s, %s", filePath, err.Error())}
 	}
 
 	fileContentString := string(fileContentByteSlice)
@@ -100,7 +102,7 @@ func getServiceAccountJSONFromSecret() ([]byte, error) {
 
 	byteSliceJSONString, err := json.Marshal(credentials)
 	if err != nil {
-		return nil, err
+		return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("failed to marshal the credentials into json, %s", err.Error())}
 	}
 
 	return byteSliceJSONString, nil
@@ -135,7 +137,7 @@ func GetGCPComputeService() (*compute.Service, error) {
 			// create a new GCP Compute Service client using the GCP service account credentials provided through the secret
 			computeService, err := compute.NewService(ctx, option.WithCredentialsJSON(json))
 			if err != nil {
-				return nil, err
+				return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("failed to authenticate a new compute service using the given credentials, %s", err.Error())}
 			}
 
 			return computeService, nil
@@ -147,7 +149,7 @@ func GetGCPComputeService() (*compute.Service, error) {
 	// create a new GCP Compute Service client using default GCP service account credentials (using Workload Identity)
 	computeService, err := compute.NewService(ctx)
 	if err != nil {
-		return nil, err
+		return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("failed to authenticate a new compute service using gke workload identity, %s", err.Error())}
 	}
 
 	return computeService, nil

@@ -56,6 +56,7 @@ import (
 	ebsLossByTag "github.com/litmuschaos/litmus-go/experiments/kube-aws/ebs-loss-by-tag/experiment"
 	ec2TerminateByID "github.com/litmuschaos/litmus-go/experiments/kube-aws/ec2-terminate-by-id/experiment"
 	ec2TerminateByTag "github.com/litmuschaos/litmus-go/experiments/kube-aws/ec2-terminate-by-tag/experiment"
+	k6Loadgen "github.com/litmuschaos/litmus-go/experiments/load/k6-loadgen/experiment"
 	springBootFaults "github.com/litmuschaos/litmus-go/experiments/spring-boot/spring-boot-faults/experiment"
 	vmpoweroff "github.com/litmuschaos/litmus-go/experiments/vmware/vm-poweroff/experiment"
 
@@ -88,7 +89,7 @@ func main() {
 
 	log.Infof("Experiment Name: %v", *experimentName)
 
-	// invoke the corresponding experiment based on the the (-name) flag
+	// invoke the corresponding experiment based on the (-name) flag
 	switch *experimentName {
 	case "container-kill":
 		containerKill.ContainerKill(clients)
@@ -184,6 +185,8 @@ func main() {
 		gcpVMDiskLossByLabel.GCPVMDiskLossByLabel(clients)
 	case "spring-boot-cpu-stress", "spring-boot-memory-stress", "spring-boot-exceptions", "spring-boot-app-kill", "spring-boot-faults", "spring-boot-latency":
 		springBootFaults.Experiment(clients, *experimentName)
+	case "k6-loadgen":
+		k6Loadgen.Experiment(clients)
 	default:
 		log.Errorf("Unsupported -name %v, please provide the correct value of -name args", *experimentName)
 		return

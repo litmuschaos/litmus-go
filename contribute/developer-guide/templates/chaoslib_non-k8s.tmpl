@@ -14,7 +14,6 @@ import (
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/{{ .Category }}/{{ .Name }}/types"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
-	"github.com/pkg/errors"
 )
 
 var (
@@ -22,7 +21,7 @@ var (
 	inject, abort chan os.Signal
 )
 
-//PrepareChaos contains the prepration and injection steps for the experiment
+//PrepareChaos contains the preparation and injection steps for the experiment
 func PrepareChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	// inject channel is used to transmit signal notifications.
@@ -46,7 +45,7 @@ func PrepareChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients
 	// THIS TEMPLATE CONTAINS THE SELECTION BY ID FOR TAG YOU NEED TO ADD/CALL A FUNCTION HERE
 	targetIDList := strings.Split(experimentsDetails.TargetID, ",")
 	if experimentsDetails.TargetID == "" {
-		return errors.Errorf("no target id found to perform chaos on")
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Reason: "no target id found"}
 	}
 
 	// watching for the abort signal and revert the chaos
@@ -55,14 +54,14 @@ func PrepareChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients
 	switch strings.ToLower(experimentsDetails.Sequence) {
 	case "serial":
 		if err = injectChaosInSerialMode(experimentsDetails, targetIDList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
-			return err
+			return stacktrace.Propagate(err, "could not run chaos in serial mode")
 		}
 	case "parallel":
 		if err = injectChaosInParallelMode(experimentsDetails, targetIDList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
-			return err
+			return stacktrace.Propagate(err, "could not run chaos in parallel mode")
 		}
 	default:
-		return errors.Errorf("%v sequence is not supported", experimentsDetails.Sequence)
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("'%s' sequence is not supported", experimentsDetails.Sequence)}
 	}
 
 	//Waiting for the ramp time after chaos injection

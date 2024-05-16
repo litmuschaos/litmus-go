@@ -12,7 +12,6 @@ type ExperimentDetails struct {
 	LIBImage                           string
 	LIBImagePullPolicy                 string
 	RampTime                           int
-	ChaosLib                           string
 	AppNS                              string
 	AppLabel                           string
 	AppKind                            string
@@ -27,7 +26,6 @@ type ExperimentDetails struct {
 	NetworkLatency                     int
 	NetworkPacketLossPercentage        string
 	NetworkPacketCorruptionPercentage  string
-	TCImage                            string
 	Timeout                            int
 	Delay                              int
 	TargetPods                         string

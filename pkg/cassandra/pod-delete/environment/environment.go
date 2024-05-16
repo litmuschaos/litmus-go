@@ -9,7 +9,7 @@ import (
 	clientTypes "k8s.io/apimachinery/pkg/types"
 )
 
-//GetENV fetches all the env variables from the runner pod
+// GetENV fetches all the env variables from the runner pod
 func GetENV(cassandraDetails *cassandraTypes.ExperimentDetails) {
 
 	var ChaoslibDetail exp.ExperimentDetails
@@ -20,7 +20,6 @@ func GetENV(cassandraDetails *cassandraTypes.ExperimentDetails) {
 	ChaoslibDetail.ChaosDuration, _ = strconv.Atoi(types.Getenv("TOTAL_CHAOS_DURATION", "30"))
 	ChaoslibDetail.ChaosInterval = types.Getenv("CHAOS_INTERVAL", "10")
 	ChaoslibDetail.RampTime, _ = strconv.Atoi(types.Getenv("RAMP_TIME", "0"))
-	ChaoslibDetail.ChaosLib = types.Getenv("LIB", "litmus")
 	ChaoslibDetail.ChaosServiceAccount = types.Getenv("CHAOS_SERVICE_ACCOUNT", "")
 	ChaoslibDetail.ChaosUID = clientTypes.UID(types.Getenv("CHAOS_UID", ""))
 	ChaoslibDetail.InstanceID = types.Getenv("INSTANCE_ID", "")

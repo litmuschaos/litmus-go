@@ -5,7 +5,7 @@ import (
 )
 
 // ADD THE ATTRIBUTES OF YOUR CHOICE HERE
-// FEW MENDATORY ATTRIBUTES ARE ADDED BY DEFAULT 
+// FEW MANDATORY ATTRIBUTES ARE ADDED BY DEFAULT
 
 // ExperimentDetails is for collecting all the experiment-related details
 type ExperimentDetails struct {
@@ -14,7 +14,6 @@ type ExperimentDetails struct {
 	ChaosDuration       int
 	ChaosInterval       int
 	RampTime            int
-	ChaosLib            string
 	AppNS               string
 	AppLabel            string
 	AppKind             string
@@ -32,4 +31,5 @@ type ExperimentDetails struct {
 	LIBImage            string
 	SetHelperData       string
 	ChaosServiceAccount string
+	IsTargetContainerProvided bool
 }

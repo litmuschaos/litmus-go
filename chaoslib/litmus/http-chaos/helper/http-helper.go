@@ -1,10 +1,10 @@
 package helper
 
 import (
-	"bytes"
 	"fmt"
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
+	"github.com/palantir/stacktrace"
 	"os"
-	"os/exec"
 	"os/signal"
 	"strconv"
 	"strings"
@@ -18,7 +18,6 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
-	"github.com/pkg/errors"
 	clientTypes "k8s.io/apimachinery/pkg/types"
 )
 
@@ -49,10 +48,11 @@ func Helper(clients clients.ClientSets) {
 	log.Info("[PreReq]: Getting the ENV variables")
 	getENV(&experimentsDetails)
 
-	// Intialise the chaos attributes
+	// Initialise the chaos attributes
 	types.InitialiseChaosVariables(&chaosDetails)
+	chaosDetails.Phase = types.ChaosInjectPhase
 
-	// Intialise Chaos Result Parameters
+	// Initialise Chaos Result Parameters
 	types.SetResultAttributes(&resultDetails, chaosDetails)
 
 	// Set the chaos result uid
@@ -60,17 +60,20 @@ func Helper(clients clients.ClientSets) {
 
 	err := prepareK8sHttpChaos(&experimentsDetails, clients, &eventsDetails, &chaosDetails, &resultDetails)
 	if err != nil {
+		// update failstep inside chaosresult
+		if resultErr := result.UpdateFailedStepFromHelper(&resultDetails, &chaosDetails, clients, err); resultErr != nil {
+			log.Fatalf("helper pod failed, err: %v, resultErr: %v", err, resultErr)
+		}
 		log.Fatalf("helper pod failed, err: %v", err)
 	}
-
 }
 
-// prepareK8sHttpChaos contains the prepration steps before chaos injection
+// prepareK8sHttpChaos contains the preparation steps before chaos injection
 func prepareK8sHttpChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails) error {
 
-	targetList, err := common.ParseTargets()
+	targetList, err := common.ParseTargets(chaosDetails.ChaosPodName)
 	if err != nil {
-		return err
+		return stacktrace.Propagate(err, "could not parse targets")
 	}
 
 	var targets []targetDetails
@@ -80,17 +83,18 @@ func prepareK8sHttpChaos(experimentsDetails *experimentTypes.ExperimentDetails, 
 			Name:            t.Name,
 			Namespace:       t.Namespace,
 			TargetContainer: t.TargetContainer,
+			Source:          chaosDetails.ChaosPodName,
 		}
 
-		td.ContainerId, err = common.GetRuntimeBasedContainerID(experimentsDetails.ContainerRuntime, experimentsDetails.SocketPath, td.Name, td.Namespace, td.TargetContainer, clients)
+		td.ContainerId, err = common.GetRuntimeBasedContainerID(experimentsDetails.ContainerRuntime, experimentsDetails.SocketPath, td.Name, td.Namespace, td.TargetContainer, clients, td.Source)
 		if err != nil {
-			return err
+			return stacktrace.Propagate(err, "could not get container id")
 		}
 
 		// extract out the pid of the target container
-		td.Pid, err = common.GetPauseAndSandboxPID(experimentsDetails.ContainerRuntime, td.ContainerId, experimentsDetails.SocketPath)
+		td.Pid, err = common.GetPauseAndSandboxPID(experimentsDetails.ContainerRuntime, td.ContainerId, experimentsDetails.SocketPath, td.Source)
 		if err != nil {
-			return err
+			return stacktrace.Propagate(err, "could not get container pid")
 		}
 		targets = append(targets, td)
 	}
@@ -108,14 +112,14 @@ func prepareK8sHttpChaos(experimentsDetails *experimentTypes.ExperimentDetails, 
 	for _, t := range targets {
 		// injecting http chaos inside target container
 		if err = injectChaos(experimentsDetails, t); err != nil {
-			return err
+			return stacktrace.Propagate(err, "could not inject chaos")
 		}
 		log.Infof("successfully injected chaos on target: {name: %s, namespace: %v, container: %v}", t.Name, t.Namespace, t.TargetContainer)
 		if err = result.AnnotateChaosResult(resultDetails.Name, chaosDetails.ChaosNamespace, "injected", "pod", t.Name); err != nil {
-			if revertErr := revertChaos(experimentsDetails, t); err != nil {
-				return fmt.Errorf("failed to revert and annotate the result, err: %v", fmt.Sprintf("%s, %s", err.Error(), revertErr.Error()))
+			if revertErr := revertChaos(experimentsDetails, t); revertErr != nil {
+				return cerrors.PreserveError{ErrString: fmt.Sprintf("[%s,%s]", stacktrace.RootCause(err).Error(), stacktrace.RootCause(revertErr).Error())}
 			}
-			return fmt.Errorf("failed to annotate the result, err: %v", err)
+			return stacktrace.Propagate(err, "could not annotate chaosresult")
 		}
 	}
 
@@ -134,7 +138,7 @@ func prepareK8sHttpChaos(experimentsDetails *experimentTypes.ExperimentDetails, 
 
 	var errList []string
 	for _, t := range targets {
-		// cleaning the netem process after chaos injection
+		// cleaning the ip rules process after chaos injection
 		err := revertChaos(experimentsDetails, t)
 		if err != nil {
 			errList = append(errList, err.Error())
@@ -146,7 +150,7 @@ func prepareK8sHttpChaos(experimentsDetails *experimentTypes.ExperimentDetails, 
 	}
 
 	if len(errList) != 0 {
-		return fmt.Errorf("failed to revert chaos, err: %v", strings.Join(errList, ","))
+		return cerrors.PreserveError{ErrString: fmt.Sprintf("[%s]", strings.Join(errList, ","))}
 	}
 	return nil
 }
@@ -154,12 +158,18 @@ func prepareK8sHttpChaos(experimentsDetails *experimentTypes.ExperimentDetails, 
 // injectChaos inject the http chaos in target container and add ruleset to the iptables to redirect the ports
 func injectChaos(experimentDetails *experimentTypes.ExperimentDetails, t targetDetails) error {
 	if err := startProxy(experimentDetails, t.Pid); err != nil {
-		_ = killProxy(t.Pid)
-		return errors.Errorf("failed to start proxy, err: %v", err)
+		killErr := killProxy(t.Pid, t.Source)
+		if killErr != nil {
+			return cerrors.PreserveError{ErrString: fmt.Sprintf("[%s,%s]", stacktrace.RootCause(err).Error(), stacktrace.RootCause(killErr).Error())}
+		}
+		return stacktrace.Propagate(err, "could not start proxy server")
 	}
 	if err := addIPRuleSet(experimentDetails, t.Pid); err != nil {
-		_ = killProxy(t.Pid)
-		return errors.Errorf("failed to add ip rule set, err: %v", err)
+		killErr := killProxy(t.Pid, t.Source)
+		if killErr != nil {
+			return cerrors.PreserveError{ErrString: fmt.Sprintf("[%s,%s]", stacktrace.RootCause(err).Error(), stacktrace.RootCause(killErr).Error())}
+		}
+		return stacktrace.Propagate(err, "could not add ip rules")
 	}
 	return nil
 }
@@ -167,21 +177,17 @@ func injectChaos(experimentDetails *experimentTypes.ExperimentDetails, t targetD
 // revertChaos revert the http chaos in target container
 func revertChaos(experimentDetails *experimentTypes.ExperimentDetails, t targetDetails) error {
 
-	var revertError error
+	var errList []string
 
 	if err := removeIPRuleSet(experimentDetails, t.Pid); err != nil {
-		revertError = errors.Errorf("failed to remove ip rule set, err: %v", err)
+		errList = append(errList, err.Error())
 	}
 
-	if err := killProxy(t.Pid); err != nil {
-		if revertError != nil {
-			revertError = errors.Errorf("%v and failed to kill proxy server, err: %v", revertError, err)
-		} else {
-			revertError = errors.Errorf("failed to kill proxy server, err: %v", err)
-		}
+	if err := killProxy(t.Pid, t.Source); err != nil {
+		errList = append(errList, err.Error())
 	}
-	if revertError != nil {
-		return revertError
+	if len(errList) != 0 {
+		return cerrors.PreserveError{ErrString: fmt.Sprintf("[%s]", strings.Join(errList, ","))}
 	}
 	log.Infof("successfully reverted chaos on target: {name: %s, namespace: %v, container: %v}", t.Name, t.Namespace, t.TargetContainer)
 	return nil
@@ -205,7 +211,7 @@ func startProxy(experimentDetails *experimentTypes.ExperimentDetails, pid int) e
 
 	log.Infof("[Chaos]: Starting proxy server")
 
-	if err := runCommand(chaosCommand); err != nil {
+	if err := common.RunBashCommand(chaosCommand, "failed to start proxy server", experimentDetails.ChaosPodName); err != nil {
 		return err
 	}
 
@@ -218,11 +224,11 @@ const NoProxyToKill = "you need to specify whom to kill"
 // killProxy kills the proxy process inside the target container
 // it is using nsenter command to enter into network namespace of target container
 // and execute the proxy related command inside it.
-func killProxy(pid int) error {
+func killProxy(pid int, source string) error {
 	stopProxyServerCommand := fmt.Sprintf("sudo nsenter -t %d -n sudo kill -9 $(ps aux | grep [t]oxiproxy | awk 'FNR==1{print $1}')", pid)
 	log.Infof("[Chaos]: Stopping proxy server")
 
-	if err := runCommand(stopProxyServerCommand); err != nil {
+	if err := common.RunBashCommand(stopProxyServerCommand, "failed to stop proxy server", source); err != nil {
 		return err
 	}
 
@@ -240,7 +246,7 @@ func addIPRuleSet(experimentDetails *experimentTypes.ExperimentDetails, pid int)
 	addIPRuleSetCommand := fmt.Sprintf("(sudo nsenter -t %d -n iptables -t nat -I PREROUTING -i %v -p tcp --dport %d -j REDIRECT --to-port %d)", pid, experimentDetails.NetworkInterface, experimentDetails.TargetServicePort, experimentDetails.ProxyPort)
 	log.Infof("[Chaos]: Adding IPtables ruleset")
 
-	if err := runCommand(addIPRuleSetCommand); err != nil {
+	if err := common.RunBashCommand(addIPRuleSetCommand, "failed to add ip rules", experimentDetails.ChaosPodName); err != nil {
 		return err
 	}
 
@@ -257,7 +263,7 @@ func removeIPRuleSet(experimentDetails *experimentTypes.ExperimentDetails, pid i
 	removeIPRuleSetCommand := fmt.Sprintf("sudo nsenter -t %d -n iptables -t nat -D PREROUTING -i %v -p tcp --dport %d -j REDIRECT --to-port %d", pid, experimentDetails.NetworkInterface, experimentDetails.TargetServicePort, experimentDetails.ProxyPort)
 	log.Infof("[Chaos]: Removing IPtables ruleset")
 
-	if err := runCommand(removeIPRuleSetCommand); err != nil {
+	if err := common.RunBashCommand(removeIPRuleSetCommand, "failed to remove ip rules", experimentDetails.ChaosPodName); err != nil {
 		return err
 	}
 
@@ -280,25 +286,6 @@ func getENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.TargetServicePort, _ = strconv.Atoi(types.Getenv("TARGET_SERVICE_PORT", ""))
 	experimentDetails.ProxyPort, _ = strconv.Atoi(types.Getenv("PROXY_PORT", ""))
 	experimentDetails.Toxicity, _ = strconv.Atoi(types.Getenv("TOXICITY", "100"))
-}
-
-func runCommand(chaosCommand string) error {
-	var stdout, stderr bytes.Buffer
-
-	cmd := exec.Command("/bin/bash", "-c", chaosCommand)
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	err = cmd.Run()
-	errStr := stderr.String()
-	if err != nil {
-		// if we get standard error then, return the same
-		if errStr != "" {
-			return errors.New(errStr)
-		}
-		// if not standard error found, return error
-		return err
-	}
-	return nil
 }
 
 // abortWatcher continuously watch for the abort signals
@@ -336,4 +323,5 @@ type targetDetails struct {
 	TargetContainer string
 	ContainerId     string
 	Pid             int
+	Source          string
 }

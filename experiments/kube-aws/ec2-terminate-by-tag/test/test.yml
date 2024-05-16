@@ -21,9 +21,6 @@ spec:
           - sleep 
           - "3600"
         env:
-          - name: LIB
-            value: 'litmus'
-
           # value: key:value ex: team:devops
           - name: INSTANCE_TAG
             value: ''

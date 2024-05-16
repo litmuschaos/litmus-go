@@ -9,24 +9,17 @@ type ExperimentDetails struct {
 	ExperimentName     string
 	EngineName         string
 	RampTime           int
-	AppNS              string
-	AppLabel           string
-	AppKind            string
-	AuxiliaryAppInfo   string
-	ChaosLib           string
 	ChaosDuration      int
 	ChaosInterval      int
 	ChaosUID           clientTypes.UID
 	InstanceID         string
 	ChaosNamespace     string
 	ChaosPodName       string
-	TargetContainer    string
 	Timeout            int
 	Delay              int
 	AzureInstanceNames string
 	ResourceGroup      string
 	SubscriptionID     string
 	ScaleSet           string
-	LIBImagePullPolicy string
 	Sequence           string
 }

@@ -10,11 +10,11 @@ import (
 
 	"github.com/kyokomi/emoji"
 	"github.com/litmuschaos/chaos-operator/api/litmuschaos/v1alpha1"
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/types"
-	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
-	"github.com/pkg/errors"
+	"github.com/palantir/stacktrace"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -26,7 +26,7 @@ var err error
 func RunProbes(chaosDetails *types.ChaosDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, phase string, eventsDetails *types.EventDetails) error {
 
 	// get the probes details from the chaosengine
-	probes, err := getProbesFromEngine(chaosDetails, clients)
+	probes, err := getProbesFromChaosEngine(chaosDetails, clients)
 	if err != nil {
 		return err
 	}
@@ -55,18 +55,20 @@ func RunProbes(chaosDetails *types.ChaosDetails, clients clients.ClientSets, res
 		// execute the probes for the postchaos phase
 		// it first evaluate the onchaos and continuous modes then it evaluates the other modes
 		// as onchaos and continuous probes are already completed
-		var probeError []error
+		var probeError []string
+		// call cancel function from chaosDetails context
+		chaosDetails.ProbeContext.CancelFunc()
 		for _, probe := range probes {
 			// evaluate continuous and onchaos probes
 			switch strings.ToLower(probe.Mode) {
 			case "onchaos", "continuous":
 				if err := execute(probe, chaosDetails, clients, resultDetails, phase); err != nil {
-					probeError = append(probeError, err)
+					probeError = append(probeError, stacktrace.RootCause(err).Error())
 				}
 			}
 		}
 		if len(probeError) != 0 {
-			return errors.Errorf("probes failed, err: %v", probeError)
+			return cerrors.PreserveError{ErrString: fmt.Sprintf("[%s]", strings.Join(probeError, ","))}
 		}
 		// executes the eot and edge modes
 		for _, probe := range probes {
@@ -81,90 +83,61 @@ func RunProbes(chaosDetails *types.ChaosDetails, clients clients.ClientSets, res
 	return nil
 }
 
-//setProbeVerdict mark the verdict of the probe in the chaosresult as passed
+// setProbeVerdict mark the verdict of the probe in the chaosresult as passed
 // on the basis of phase(pre/post chaos)
-func setProbeVerdict(resultDetails *types.ResultDetails, probe v1alpha1.ProbeAttributes, verdict v1alpha1.ProbeVerdict, description string) {
+func setProbeVerdict(resultDetails *types.ResultDetails, probe v1alpha1.ProbeAttributes, verdict v1alpha1.ProbeVerdict, description, phase string) {
 	for index, probes := range resultDetails.ProbeDetails {
 		if probes.Name == probe.Name && probes.Type == probe.Type {
-			if probes.Mode == "Edge" && probes.Status.Verdict == v1alpha1.ProbeVerdictFailed {
-				return
+			// in edge mode, it will not update the verdict to pass in prechaos mode as probe verdict should be evaluated based on both the prechaos and postchaos results
+			// in postchaos it will not override the verdict if verdict is already failed in prechaos
+			if probes.Mode == "Edge" {
+				if (phase == "PreChaos" && verdict != v1alpha1.ProbeVerdictFailed) || (phase == "PostChaos" && probes.Status.Verdict == v1alpha1.ProbeVerdictFailed) {
+					return
+				}
 			}
-			resultDetails.ProbeDetails[index].Status = v1alpha1.ProbeStatus{
-				Verdict:     verdict,
-				Description: description,
+			resultDetails.ProbeDetails[index].Status.Verdict = verdict
+			if description != "" {
+				resultDetails.ProbeDetails[index].Status.Description = description
 			}
 			break
 		}
 	}
 }
 
-//SetProbeVerdictAfterFailure mark the verdict of all the failed/unrun probes as failed
+// setProbeDescription sets the description to probe
+func setProbeDescription(resultDetails *types.ResultDetails, probe v1alpha1.ProbeAttributes, description string) {
+	for index, probes := range resultDetails.ProbeDetails {
+		if probes.Name == probe.Name && probes.Type == probe.Type {
+			resultDetails.ProbeDetails[index].Status.Description = description
+			break
+		}
+	}
+}
+
+// SetProbeVerdictAfterFailure mark the verdict of all the failed/unrun probes as failed
 func SetProbeVerdictAfterFailure(result *v1alpha1.ChaosResult) {
 	for index := range result.Status.ProbeStatuses {
 		if result.Status.ProbeStatuses[index].Status.Verdict == v1alpha1.ProbeVerdictAwaited {
 			result.Status.ProbeStatuses[index].Status.Verdict = v1alpha1.ProbeVerdictNA
-			result.Status.ProbeStatuses[index].Status.Description = "either probe is not executed or not evaluated"
+			result.Status.ProbeStatuses[index].Status.Description = "Either probe is not executed or not evaluated"
 		}
 	}
 }
 
-// getProbesFromEngine fetch the details of the probes from the chaosengines
-func getProbesFromEngine(chaosDetails *types.ChaosDetails, clients clients.ClientSets) ([]v1alpha1.ProbeAttributes, error) {
-
-	var Probes []v1alpha1.ProbeAttributes
-
-	if err := retry.
-		Times(uint(chaosDetails.Timeout / chaosDetails.Delay)).
-		Wait(time.Duration(chaosDetails.Delay) * time.Second).
-		Try(func(attempt uint) error {
-			engine, err := clients.LitmusClient.ChaosEngines(chaosDetails.ChaosNamespace).Get(context.Background(), chaosDetails.EngineName, v1.GetOptions{})
-			if err != nil {
-				return fmt.Errorf("unable to Get the chaosengine, err: %v", err)
-			}
-			// get all the probes defined inside chaosengine for the corresponding experiment
-			for _, experiment := range engine.Spec.Experiments {
-				if experiment.Name == chaosDetails.ExperimentName {
-					Probes = experiment.Spec.Probe
-				}
-			}
-			return nil
-		}); err != nil {
+func getProbesFromChaosEngine(chaosDetails *types.ChaosDetails, clients clients.ClientSets) ([]v1alpha1.ProbeAttributes, error) {
+	engine, err := types.GetChaosEngine(chaosDetails, clients)
+	if err != nil {
 		return nil, err
 	}
-
-	return Probes, nil
-}
-
-// InitializeProbesInChaosResultDetails set the probe inside chaos result
-// it fetch the probe details from the chaosengine and set into the chaosresult
-func InitializeProbesInChaosResultDetails(chaosDetails *types.ChaosDetails, clients clients.ClientSets, chaosresult *types.ResultDetails) error {
-
-	var probeDetails []types.ProbeDetails
-	// get the probes from the chaosengine
-	probes, err := getProbesFromEngine(chaosDetails, clients)
-	if err != nil {
-		return err
-	}
-
-	// set the probe details for k8s probe
-	for _, probe := range probes {
-		tempProbe := types.ProbeDetails{}
-		tempProbe.Name = probe.Name
-		tempProbe.Type = probe.Type
-		tempProbe.Mode = probe.Mode
-		tempProbe.RunCount = 0
-		tempProbe.Status = v1alpha1.ProbeStatus{
-			Verdict: "Awaited",
+	for _, exp := range engine.Spec.Experiments {
+		if exp.Name == chaosDetails.ExperimentName {
+			return exp.Spec.Probe, nil
 		}
-		probeDetails = append(probeDetails, tempProbe)
 	}
-
-	chaosresult.ProbeDetails = probeDetails
-	chaosresult.ProbeArtifacts = map[string]types.ProbeArtifact{}
-	return nil
+	return nil, nil
 }
 
-//getAndIncrementRunCount return the run count for the specified probe
+// getAndIncrementRunCount return the run count for the specified probe
 func getAndIncrementRunCount(resultDetails *types.ResultDetails, probeName string) int {
 	for index, probe := range resultDetails.ProbeDetails {
 		if probeName == probe.Name {
@@ -175,7 +148,7 @@ func getAndIncrementRunCount(resultDetails *types.ResultDetails, probeName strin
 	return 0
 }
 
-//getRunIDFromProbe return the run_id for the dedicated probe
+// getRunIDFromProbe return the run_id for the dedicated probe
 // which will used in the continuous cmd probe, run_id is used as suffix in the external pod name
 func getRunIDFromProbe(resultDetails *types.ResultDetails, probeName, probeType string) string {
 
@@ -187,10 +160,9 @@ func getRunIDFromProbe(resultDetails *types.ResultDetails, probeName, probeType 
 	return ""
 }
 
-//setRunIDForProbe set the run_id for the dedicated probe.
+// setRunIDForProbe set the run_id for the dedicated probe.
 // which will used in the continuous cmd probe, run_id is used as suffix in the external pod name
 func setRunIDForProbe(resultDetails *types.ResultDetails, probeName, probeType, runid string) {
-
 	for index, probe := range resultDetails.ProbeDetails {
 		if probe.Name == probeName && probe.Type == probeType {
 			resultDetails.ProbeDetails[index].RunID = runid
@@ -232,28 +204,79 @@ func markedVerdictInEnd(err error, resultDetails *types.ResultDetails, probe v1a
 			"ProbeInstance": phase,
 			"ProbeStatus":   probeVerdict,
 		})
-		description = getDescription(strings.ToLower(probe.Mode), phase)
+		description = getDescription(err)
 	}
 
-	setProbeVerdict(resultDetails, probe, probeVerdict, description)
-	if !probe.RunProperties.StopOnFailure {
-		return nil
+	setProbeVerdict(resultDetails, probe, probeVerdict, description, phase)
+
+	if err != nil {
+		switch probe.RunProperties.StopOnFailure {
+		case true:
+			// adding signal to communicate that experiment is stopped because of error in probe
+			if probeDetails := getProbeByName(probe.Name, resultDetails.ProbeDetails); probeDetails != nil {
+				probeDetails.Stopped = true
+			}
+			return err
+		default:
+			if probeDetails := getProbeByName(probe.Name, resultDetails.ProbeDetails); probeDetails != nil {
+				probeDetails.IsProbeFailedWithError = err
+			}
+			return nil
+		}
 	}
-	return err
+	return nil
 }
 
-func getDescription(mode, phase string) string {
-	switch mode {
-	case "edge":
-		return fmt.Sprintf("'%v' Probe didn't met the passing criteria", phase)
-	default:
-		return "Probe didn't met the passing criteria"
+// getProbeByName returns the probe details of a probe given its name
+func getProbeByName(name string, probeDetails []*types.ProbeDetails) *types.ProbeDetails {
+	for _, p := range probeDetails {
+		if p.Name == name {
+			return p
+		}
 	}
+	return nil
 }
 
-//CheckForErrorInContinuousProbe check for the error in the continuous probes
-func checkForErrorInContinuousProbe(resultDetails *types.ResultDetails, probeName string) error {
+func getProbeTimeouts(name string, probeDetails []*types.ProbeDetails) types.ProbeTimeouts {
+	probe := getProbeByName(name, probeDetails)
+	if probe != nil {
+		return probe.Timeouts
+	}
+	return types.ProbeTimeouts{}
+}
 
+func getDescription(err error) string {
+	rootCause := stacktrace.RootCause(err)
+	if error, ok := rootCause.(cerrors.Error); ok {
+		return error.Reason
+	}
+	return rootCause.Error()
+}
+
+// CheckForErrorInContinuousProbe check for the error in the continuous probes
+func checkForErrorInContinuousProbe(resultDetails *types.ResultDetails, probeName string, delay int, timeout int) error {
+
+	probe := getProbeByName(probeName, resultDetails.ProbeDetails)
+	startTime := time.Now()
+	timeoutSignal := time.After(time.Duration(timeout) * time.Second)
+
+loop:
+	for {
+		select {
+		case <-timeoutSignal:
+			return cerrors.Error{
+				ErrorCode: cerrors.FailureTypeProbeTimeout,
+				Target:    fmt.Sprintf("{probe: %s, timeout: %ds}", probeName, timeout),
+				Reason:    "Probe is failed due to timeout",
+			}
+		default:
+			if probe.HasProbeCompleted {
+				break loop
+			}
+			log.Infof("[Probe]: Waiting for %s probe to finish or timeout (Elapsed time: %v s)", probeName, time.Since(startTime).Seconds())
+			time.Sleep(time.Duration(delay) * time.Second)
+		}
+	}
 	for index, probe := range resultDetails.ProbeDetails {
 		if probe.Name == probeName {
 			return resultDetails.ProbeDetails[index].IsProbeFailedWithError
@@ -273,7 +296,7 @@ func parseCommand(templatedCommand string, resultDetails *types.ResultDetails) (
 	// store the parsed output in the buffer
 	var out bytes.Buffer
 	if err := t.Execute(&out, register); err != nil {
-		return "", err
+		return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("failed to parse the templated command, %s", err.Error())}
 	}
 
 	return out.String(), nil
@@ -282,17 +305,24 @@ func parseCommand(templatedCommand string, resultDetails *types.ResultDetails) (
 // stopChaosEngine update the probe status and patch the chaosengine to stop state
 func stopChaosEngine(probe v1alpha1.ProbeAttributes, clients clients.ClientSets, chaosresult *types.ResultDetails, chaosDetails *types.ChaosDetails) error {
 	// it will check for the error, It will detect the error if any error encountered in probe during chaos
-	err = checkForErrorInContinuousProbe(chaosresult, probe.Name)
+	if err = checkForErrorInContinuousProbe(chaosresult, probe.Name, chaosDetails.Timeout, chaosDetails.Delay); err != nil && cerrors.GetErrorType(err) != cerrors.FailureTypeProbeTimeout {
+		return err
+	}
+
 	// failing the probe, if the success condition doesn't met after the retry & timeout combinations
 	markedVerdictInEnd(err, chaosresult, probe, "PostChaos")
 	//patch chaosengine's state to stop
 	engine, err := clients.LitmusClient.ChaosEngines(chaosDetails.ChaosNamespace).Get(context.Background(), chaosDetails.EngineName, v1.GetOptions{})
 	if err != nil {
-		return err
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("failed to get chaosengine, %s", err.Error())}
 	}
 	engine.Spec.EngineState = v1alpha1.EngineStateStop
 	_, err = clients.LitmusClient.ChaosEngines(chaosDetails.ChaosNamespace).Update(context.Background(), engine, v1.UpdateOptions{})
-	return err
+	if err != nil {
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("failed to patch the chaosengine to `stop` state, %v", err.Error())}
+	}
+
+	return nil
 }
 
 // execute contains steps to execute & evaluate probes in different modes at different phases
@@ -301,25 +331,25 @@ func execute(probe v1alpha1.ProbeAttributes, chaosDetails *types.ChaosDetails, c
 	case "k8sprobe":
 		// it contains steps to prepare the k8s probe
 		if err = prepareK8sProbe(probe, resultDetails, clients, phase, chaosDetails); err != nil {
-			return errors.Errorf("probes failed, err: %v", err)
+			return stacktrace.Propagate(err, "probes failed")
 		}
 	case "cmdprobe":
 		// it contains steps to prepare cmd probe
 		if err = prepareCmdProbe(probe, clients, chaosDetails, resultDetails, phase); err != nil {
-			return errors.Errorf("probes failed, err: %v", err)
+			return stacktrace.Propagate(err, "probes failed")
 		}
 	case "httpprobe":
 		// it contains steps to prepare http probe
 		if err = prepareHTTPProbe(probe, clients, chaosDetails, resultDetails, phase); err != nil {
-			return errors.Errorf("probes failed, err: %v", err)
+			return stacktrace.Propagate(err, "probes failed")
 		}
 	case "promprobe":
 		// it contains steps to prepare prom probe
 		if err = preparePromProbe(probe, clients, chaosDetails, resultDetails, phase); err != nil {
-			return errors.Errorf("probes failed, err: %v", err)
+			return stacktrace.Propagate(err, "probes failed")
 		}
 	default:
-		return errors.Errorf("No supported probe type found, type: %v", probe.Type)
+		return stacktrace.Propagate(err, "%v probe type not supported", probe.Type)
 	}
 	return nil
 }
@@ -331,4 +361,43 @@ func getProbeVerdict(resultDetails *types.ResultDetails, name, probeType string)
 		}
 	}
 	return v1alpha1.ProbeVerdictNA
+}
+
+func addProbePhase(err error, phase string) error {
+	rootCause := stacktrace.RootCause(err)
+	if error, ok := rootCause.(cerrors.Error); ok {
+		error.Phase = phase
+		err = error
+	}
+	return err
+}
+
+func getAttempts(attempt, retries int) int {
+	if attempt == 0 && retries == 0 {
+		return 1
+	}
+	if attempt == 0 {
+		return retries
+	}
+	return attempt
+}
+
+func IsProbeFailed(reason string) bool {
+	if strings.Contains(reason, string(cerrors.FailureTypeK8sProbe)) || strings.Contains(reason, string(cerrors.FailureTypePromProbe)) ||
+		strings.Contains(reason, string(cerrors.FailureTypeCmdProbe)) || strings.Contains(reason, string(cerrors.FailureTypeHttpProbe)) {
+		return true
+	}
+	return false
+}
+
+func checkProbeTimeoutError(name string, code cerrors.ErrorType, probeErr error) error {
+	log.Infof("name: %s, err: %v", name, probeErr)
+	if cerrors.GetErrorType(probeErr) == cerrors.ErrorTypeTimeout {
+		return cerrors.Error{
+			ErrorCode: code,
+			Target:    fmt.Sprintf("{name: %s}", name),
+			Reason:    "probe failed due to timeout",
+		}
+	}
+	return probeErr
 }

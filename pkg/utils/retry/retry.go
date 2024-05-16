@@ -2,6 +2,7 @@ package retry
 
 import (
 	"fmt"
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	"time"
 
 	"github.com/pkg/errors"
@@ -14,7 +15,7 @@ type Action func(attempt uint) error
 type Model struct {
 	retry    uint
 	waitTime time.Duration
-	timeout  int64
+	timeout  time.Duration
 }
 
 // Times is used to define the retry count
@@ -47,14 +48,14 @@ func (model *Model) Wait(waitTime time.Duration) *Model {
 
 // Timeout is used to define the timeout duration for each iteration of retry
 // it will run if the instance of model is not present before
-func Timeout(timeout int64) *Model {
+func Timeout(timeout time.Duration) *Model {
 	model := Model{}
 	return model.Timeout(timeout)
 }
 
 // Timeout is used to define the timeout duration for each iteration of retry
 // it will run if the instance of model is already present
-func (model *Model) Timeout(timeout int64) *Model {
+func (model *Model) Timeout(timeout time.Duration) *Model {
 	model.timeout = timeout
 	return model
 }
@@ -66,7 +67,7 @@ func (model Model) Try(action Action) error {
 	}
 
 	var err error
-	for attempt := uint(0); (attempt == 0 || err != nil) && attempt <= model.retry; attempt++ {
+	for attempt := uint(0); (attempt == 0 || err != nil) && attempt < model.retry; attempt++ {
 		err = action(attempt)
 		if model.waitTime > 0 {
 			time.Sleep(model.waitTime)
@@ -79,25 +80,27 @@ func (model Model) Try(action Action) error {
 	return err
 }
 
-// TryWithTimeout is used to run a action with retries
-// for each iteration of retry there will be some timeout
+// TryWithTimeout is used to run an action with retries
+// for each iteration of attempt there will be some timeout
 func (model Model) TryWithTimeout(action Action) error {
 	if action == nil {
 		return fmt.Errorf("no action specified")
 	}
 	var err error
 	err = nil
-	for attempt := uint(0); (attempt == 0 || err != nil) && attempt <= model.retry; attempt++ {
-		startTime := time.Now().Unix()
-		currentTime := time.Now().Unix()
-		for trial := uint(0); (trial == 0 || err != nil) && currentTime < startTime+model.timeout; trial++ {
-			err = action(attempt)
-			if model.waitTime > 0 {
-				time.Sleep(model.waitTime)
+	for attempt := uint(0); (attempt == 0 || err != nil) && attempt < model.retry; {
+		startTime := time.Now().UnixMilli()
+		err = action(attempt)
+		if err == nil && time.Now().UnixMilli()-startTime >= model.timeout.Milliseconds() {
+			err = cerrors.Error{
+				ErrorCode: cerrors.ErrorTypeTimeout,
+				Reason:    "action timeout",
 			}
-			currentTime = time.Now().Unix()
 		}
-
+		attempt++
+		if model.waitTime > 0 && attempt < model.retry {
+			time.Sleep(model.waitTime)
+		}
 	}
 
 	return err

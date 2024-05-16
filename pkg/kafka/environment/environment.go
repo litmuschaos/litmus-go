@@ -9,7 +9,7 @@ import (
 	clientTypes "k8s.io/apimachinery/pkg/types"
 )
 
-//GetENV fetches all the env variables from the runner pod
+// GetENV fetches all the env variables from the runner pod
 func GetENV(kafkaDetails *kafkaTypes.ExperimentDetails) {
 
 	var ChaoslibDetail exp.ExperimentDetails
@@ -20,7 +20,6 @@ func GetENV(kafkaDetails *kafkaTypes.ExperimentDetails) {
 	ChaoslibDetail.ChaosDuration, _ = strconv.Atoi(types.Getenv("TOTAL_CHAOS_DURATION", "60"))
 	ChaoslibDetail.ChaosInterval = types.Getenv("CHAOS_INTERVAL", "10")
 	ChaoslibDetail.RampTime, _ = strconv.Atoi(types.Getenv("RAMP_TIME", "0"))
-	ChaoslibDetail.ChaosLib = types.Getenv("LIB", "litmus")
 	ChaoslibDetail.ChaosServiceAccount = types.Getenv("CHAOS_SERVICE_ACCOUNT", "")
 	ChaoslibDetail.TargetContainer = types.Getenv("TARGET_CONTAINER", "")
 	ChaoslibDetail.ChaosUID = clientTypes.UID(types.Getenv("CHAOS_UID", ""))
@@ -39,7 +38,7 @@ func GetENV(kafkaDetails *kafkaTypes.ExperimentDetails) {
 	kafkaDetails.KafkaLivenessStream = types.Getenv("KAFKA_LIVENESS_STREAM", "enable")
 	kafkaDetails.KafkaLivenessImage = types.Getenv("KAFKA_LIVENESS_IMAGE", "litmuschaos/kafka-client:latest")
 	kafkaDetails.KafkaConsumerTimeout, _ = strconv.Atoi(types.Getenv("KAFKA_CONSUMER_TIMEOUT", "60000"))
-	kafkaDetails.KafkaInstanceName = types.Getenv("KAFKA_INSTANCE_NAME", "kafka")
+	kafkaDetails.KafkaInstanceName = types.Getenv("KAFKA_INSTANCE_NAME", "")
 	kafkaDetails.KafkaNamespace = types.Getenv("KAFKA_NAMESPACE", "default")
 	kafkaDetails.KafkaLabel = types.Getenv("KAFKA_LABEL", "")
 	kafkaDetails.KafkaBroker = types.Getenv("KAFKA_BROKER", "")
@@ -50,7 +49,6 @@ func GetENV(kafkaDetails *kafkaTypes.ExperimentDetails) {
 	kafkaDetails.ZookeeperLabel = types.Getenv("ZOOKEEPER_LABEL", "")
 	kafkaDetails.ZookeeperService = types.Getenv("ZOOKEEPER_SERVICE", "")
 	kafkaDetails.ZookeeperPort = types.Getenv("ZOOKEEPER_PORT", "")
-	kafkaDetails.Lib = types.Getenv("LIB", "litmus")
 	kafkaDetails.RunID = types.Getenv("RunID", "")
 
 }

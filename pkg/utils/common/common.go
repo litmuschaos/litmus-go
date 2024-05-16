@@ -1,11 +1,16 @@
 package common
 
 import (
+	"bytes"
 	"fmt"
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
+	"github.com/palantir/stacktrace"
 	"math/rand"
 	"os"
+	"os/exec"
 	"os/signal"
 	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
 	"syscall"
@@ -17,7 +22,6 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/math"
 	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/types"
-	"github.com/pkg/errors"
 	apiv1 "k8s.io/api/core/v1"
 )
 
@@ -26,13 +30,17 @@ type ENVDetails struct {
 	ENV []apiv1.EnvVar
 }
 
-//WaitForDuration waits for the given time duration (in seconds)
+// WaitForDuration waits for the given time duration (in seconds)
 func WaitForDuration(duration int) {
 	time.Sleep(time.Duration(duration) * time.Second)
 }
 
 // RandomInterval wait for the random interval lies between lower & upper bounds
 func RandomInterval(interval string) error {
+	re := regexp.MustCompile(`^\d+(-\d+)?$`)
+	if re.MatchString(interval) == false {
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: "could not parse CHAOS_INTERVAL env, bad input"}
+	}
 	intervals := strings.Split(interval, "-")
 	var lowerBound, upperBound int
 	switch len(intervals) {
@@ -43,24 +51,16 @@ func RandomInterval(interval string) error {
 		lowerBound, _ = strconv.Atoi(intervals[0])
 		upperBound, _ = strconv.Atoi(intervals[1])
 	default:
-		return errors.Errorf("unable to parse CHAOS_INTERVAL, provide in valid format")
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: "could not parse CHAOS_INTERVAL env, invalid format"}
 	}
 	rand.Seed(time.Now().UnixNano())
+	if upperBound < 1 {
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: "invalid CHAOS_INTERVAL env value, value below lower limit"}
+	}
 	waitTime := lowerBound + rand.Intn(upperBound-lowerBound)
 	log.Infof("[Wait]: Wait for the random chaos interval %vs", waitTime)
 	WaitForDuration(waitTime)
 	return nil
-}
-
-// GetRunID generate a random string
-func GetRunID() string {
-	var letterRunes = []rune("abcdefghijklmnopqrstuvwxyz")
-	runID := make([]rune, 6)
-	rand.Seed(time.Now().UnixNano())
-	for i := range runID {
-		runID[i] = letterRunes[rand.Intn(len(letterRunes))]
-	}
-	return string(runID)
 }
 
 // AbortWatcher continuously watch for the abort signals
@@ -84,7 +84,7 @@ func AbortWatcherWithoutExit(expname string, clients clients.ClientSets, resultD
 	log.Info("[Chaos]: Chaos Experiment Abortion started because of terminated signal received")
 	// updating the chaosresult after stopped
 	failStep := "Chaos injection stopped!"
-	types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep)
+	types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep, cerrors.ErrorTypeExperimentAborted)
 	if err := result.ChaosResult(chaosDetails, clients, resultDetails, "EOT"); err != nil {
 		log.Errorf("[ABORT]: Failed to update result, err: %v", err)
 	}
@@ -106,7 +106,7 @@ func AbortWatcherWithoutExit(expname string, clients clients.ClientSets, resultD
 	}
 }
 
-//FilterBasedOnPercentage return the slice of list based on the the provided percentage
+// FilterBasedOnPercentage return the slice of list based on the the provided percentage
 func FilterBasedOnPercentage(percentage int, list []string) []string {
 
 	var finalList []string
@@ -159,11 +159,14 @@ func getEnvSource(apiVersion string, fieldPath string) apiv1.EnvVarSource {
 }
 
 // HelperFailedError return the helper pod error message
-func HelperFailedError(err error) error {
+func HelperFailedError(err error, appLabel, namespace string, podLevel bool) error {
 	if err != nil {
-		return errors.Errorf("helper pod failed, err: %v", err)
+		return stacktrace.Propagate(err, "helper pod failed")
 	}
-	return errors.Errorf("helper pod failed")
+	if podLevel {
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeHelperPodFailed, Target: fmt.Sprintf("{podLabel: %s, namespace: %s}", appLabel, namespace), Reason: "helper pod failed"}
+	}
+	return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Target: fmt.Sprintf("{podLabel: %s, namespace: %s}", appLabel, namespace), Reason: "helper pod failed"}
 }
 
 // GetStatusMessage returns the event message
@@ -180,7 +183,7 @@ func GetStatusMessage(defaultCheck bool, defaultMsg, probeStatus string) string 
 	return "Probes: " + probeStatus
 }
 
-//GetRandomSequence will gives a random value for sequence
+// GetRandomSequence will gives a random value for sequence
 func GetRandomSequence(sequence string) string {
 	if strings.ToLower(sequence) == "random" {
 		rand.Seed(time.Now().UnixNano())
@@ -191,7 +194,7 @@ func GetRandomSequence(sequence string) string {
 	return sequence
 }
 
-//ValidateRange validates the given range of numbers
+// ValidateRange validates the given range of numbers
 func ValidateRange(a string) string {
 	var lb, ub int
 	intervals := strings.Split(a, "-")
@@ -209,7 +212,7 @@ func ValidateRange(a string) string {
 	}
 }
 
-//getRandomValue gives a random value between two integers
+// getRandomValue gives a random value between two integers
 func getRandomValue(a, b int) int {
 	rand.Seed(time.Now().Unix())
 	return (a + rand.Intn(b-a+1))
@@ -235,4 +238,87 @@ func Contains(val interface{}, slice interface{}) bool {
 		}
 	}
 	return false
+}
+
+func RunBashCommand(command string, failMsg string, source string) error {
+	cmd := exec.Command("/bin/bash", "-c", command)
+	return RunCLICommands(cmd, source, "", failMsg, cerrors.ErrorTypeHelper)
+}
+
+func RunCLICommands(cmd *exec.Cmd, source, target, failMsg string, errorCode cerrors.ErrorType) error {
+	var out, stdErr bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &stdErr
+	if err = cmd.Run(); err != nil {
+		return cerrors.Error{ErrorCode: errorCode, Target: target, Source: source, Reason: fmt.Sprintf("%s: %s", failMsg, stdErr.String())}
+	}
+	return nil
+}
+
+// BuildSidecar builds the sidecar containers list
+func BuildSidecar(chaosDetails *types.ChaosDetails) []apiv1.Container {
+	var sidecars []apiv1.Container
+
+	for _, c := range chaosDetails.SideCar {
+		container := apiv1.Container{
+			Name:            c.Name,
+			Image:           c.Image,
+			ImagePullPolicy: c.ImagePullPolicy,
+			Env:             c.ENV,
+			EnvFrom:         c.EnvFrom,
+		}
+		if len(c.Secrets) != 0 {
+			var volMounts []apiv1.VolumeMount
+			for _, v := range c.Secrets {
+				volMounts = append(volMounts, apiv1.VolumeMount{
+					Name:      v.Name,
+					MountPath: v.MountPath,
+				})
+			}
+			container.VolumeMounts = volMounts
+		}
+		sidecars = append(sidecars, container)
+	}
+	return sidecars
+}
+
+// GetSidecarVolumes get the list of all the unique volumes from the sidecar
+func GetSidecarVolumes(chaosDetails *types.ChaosDetails) []apiv1.Volume {
+	var volumes []apiv1.Volume
+	k := int32(420)
+
+	secretMap := make(map[string]bool)
+	for _, c := range chaosDetails.SideCar {
+		if len(c.Secrets) != 0 {
+			for _, v := range c.Secrets {
+				if _, ok := secretMap[v.Name]; ok {
+					continue
+				}
+				secretMap[v.Name] = true
+				volumes = append(volumes, apiv1.Volume{
+					Name: v.Name,
+					VolumeSource: apiv1.VolumeSource{
+						Secret: &apiv1.SecretVolumeSource{
+							SecretName:  v.Name,
+							DefaultMode: &k,
+						},
+					},
+				})
+			}
+		}
+	}
+
+	return volumes
+}
+
+// GetContainerNames gets the name of the main and sidecar containers
+func GetContainerNames(chaosDetails *types.ChaosDetails) []string {
+	containerNames := []string{chaosDetails.ExperimentName}
+	if len(chaosDetails.SideCar) == 0 {
+		return containerNames
+	}
+	for _, c := range chaosDetails.SideCar {
+		containerNames = append(containerNames, c.Name)
+	}
+	return containerNames
 }
