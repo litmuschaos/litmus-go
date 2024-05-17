@@ -532,7 +532,7 @@ func addProcessToCgroup(pid int, control interface{}) error {
 }
 
 func injectChaos(t targetDetails, stressors string) (*exec.Cmd, error) {
-	stressCommand := "pause nsutil -t " + strconv.Itoa(t.Pid) + " -p -- " + stressors
+	stressCommand := "pause nsutil -t " + strconv.Itoa(t.Pid) + " -p -m -- " + stressors
 	log.Infof("[Info]: starting process: %v", stressCommand)
 
 	// launch the stress-ng process on the target container in paused mode
