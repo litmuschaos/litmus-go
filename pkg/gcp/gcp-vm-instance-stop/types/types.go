@@ -11,7 +11,6 @@ type ExperimentDetails struct {
 	ChaosDuration            int
 	ChaosInterval            int
 	RampTime                 int
-	ChaosLib                 string
 	ChaosUID                 clientTypes.UID
 	InstanceID               string
 	ChaosNamespace           string
@@ -20,7 +19,7 @@ type ExperimentDetails struct {
 	Delay                    int
 	VMInstanceName           string
 	GCPProjectID             string
-	InstanceZone             string
+	Zones                    string
 	ManagedInstanceGroup     string
 	Sequence                 string
 	TargetContainer          string

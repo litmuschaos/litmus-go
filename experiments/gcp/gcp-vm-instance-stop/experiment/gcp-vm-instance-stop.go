@@ -3,7 +3,7 @@ package experiment
 import (
 	"os"
 
-	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
+	"github.com/litmuschaos/chaos-operator/api/litmuschaos/v1alpha1"
 	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/gcp-vm-instance-stop/lib"
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/cloud/gcp"
@@ -43,8 +43,8 @@ func VMInstanceStop(clients clients.ClientSets) {
 	types.SetResultAttributes(&resultDetails, chaosDetails)
 
 	if experimentsDetails.EngineName != "" {
-		// Initialize the probe details. Bail out upon error, as we haven't entered exp business logic yet
-		if err := probe.InitializeProbesInChaosResultDetails(&chaosDetails, clients, &resultDetails); err != nil {
+		// Get values from chaosengine. Bail out upon error, as we haven't entered exp business logic yet
+		if err := types.GetValuesFromChaosEngine(&chaosDetails, clients, &resultDetails); err != nil {
 			log.Errorf("Unable to initialize the probes, err: %v", err)
 			return
 		}
@@ -54,8 +54,7 @@ func VMInstanceStop(clients clients.ClientSets) {
 	log.Infof("[PreReq]: Updating the chaos result of %v experiment (SOT)", experimentsDetails.ExperimentName)
 	if err := result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT"); err != nil {
 		log.Errorf("Unable to Create the Chaos Result, err: %v", err)
-		failStep := "[pre-chaos]: Failed to update the chaos result of gcp vm instance stop experiment (SOT), err: " + err.Error()
-		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 		return
 	}
 
@@ -73,7 +72,7 @@ func VMInstanceStop(clients clients.ClientSets) {
 	//DISPLAY THE INSTANCE INFORMATION
 	log.InfoWithValues("The vm instance information is as follows", logrus.Fields{
 		"Instance Names": experimentsDetails.VMInstanceName,
-		"Zones":          experimentsDetails.InstanceZone,
+		"Zones":          experimentsDetails.Zones,
 		"Sequence":       experimentsDetails.Sequence,
 	})
 
@@ -86,11 +85,10 @@ func VMInstanceStop(clients clients.ClientSets) {
 
 			if err := probe.RunProbes(&chaosDetails, clients, &resultDetails, "PreChaos", &eventsDetails); err != nil {
 				log.Errorf("Probe Failed, err: %v", err)
-				failStep := "[pre-chaos]: Failed while running probes, err: " + err.Error()
 				msg := "AUT: Running, Probes: Unsuccessful"
 				types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, msg, "Warning", &chaosDetails)
 				events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
-				result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+				result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 				return
 			}
 			msg = "AUT: Running, Probes: Successful"
@@ -103,50 +101,45 @@ func VMInstanceStop(clients clients.ClientSets) {
 	// Create a compute service to access the compute engine resources
 	computeService, err = gcp.GetGCPComputeService()
 	if err != nil {
-		log.Errorf("failed to obtain a gcp compute service, err: %v", err)
-		failStep := "[pre-chaos]: Failed to obtain a gcp compute service, err: " + err.Error()
-		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+		log.Errorf("Failed to obtain a gcp compute service, err: %v", err)
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 		return
 	}
 
 	// Verify that the GCP VM instance(s) is in RUNNING state (pre-chaos)
-	if err := gcp.InstanceStatusCheckByName(computeService, experimentsDetails.ManagedInstanceGroup, experimentsDetails.Delay, experimentsDetails.Timeout, "pre-chaos", experimentsDetails.VMInstanceName, experimentsDetails.GCPProjectID, experimentsDetails.InstanceZone); err != nil {
-		log.Errorf("failed to get the vm instance status, err: %v", err)
-		failStep := "[pre-chaos]: Failed to verify the GCP VM instance status, err: " + err.Error()
-		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-		return
-	}
-
-	log.Info("[Status]: VM instance is in running state (pre-chaos)")
-
-	// Including the litmus lib for GCP vm-instance-stop
-	switch experimentsDetails.ChaosLib {
-	case "litmus":
-		if err := litmusLIB.PrepareVMStop(computeService, &experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
-			log.Errorf("Chaos injection failed, err: %v", err)
-			failStep := "[chaos]: Failed inside the chaoslib, err: " + err.Error()
-			result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+	if chaosDetails.DefaultHealthCheck {
+		if err := gcp.InstanceStatusCheckByName(computeService, experimentsDetails.ManagedInstanceGroup, experimentsDetails.Delay, experimentsDetails.Timeout, "pre-chaos", experimentsDetails.VMInstanceName, experimentsDetails.GCPProjectID, experimentsDetails.Zones); err != nil {
+			log.Errorf("Failed to get the vm instance status, err: %v", err)
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 			return
 		}
-	default:
-		log.Error("[Invalid]: Please Provide the correct LIB")
-		failStep := "[chaos]: no match was found for the specified lib"
-		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+
+		log.Info("[Status]: VM instance is in running state (pre-chaos)")
+	}
+
+	chaosDetails.Phase = types.ChaosInjectPhase
+
+	if err := litmusLIB.PrepareVMStop(computeService, &experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
+		log.Errorf("Chaos injection failed, err: %v", err)
+		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 		return
 	}
 
 	log.Infof("[Confirmation]: %v chaos has been injected successfully", experimentsDetails.ExperimentName)
 	resultDetails.Verdict = v1alpha1.ResultVerdictPassed
 
-	//Verify the GCP VM instance is in RUNNING status (post-chaos)
-	if err := gcp.InstanceStatusCheckByName(computeService, experimentsDetails.ManagedInstanceGroup, experimentsDetails.Delay, experimentsDetails.Timeout, "post-chaos", experimentsDetails.VMInstanceName, experimentsDetails.GCPProjectID, experimentsDetails.InstanceZone); err != nil {
-		log.Errorf("failed to get the vm instance status, err: %v", err)
-		failStep := "[post-chaos]: Failed to verify the GCP VM instance status, err: " + err.Error()
-		result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
-		return
-	}
+	chaosDetails.Phase = types.PostChaosPhase
 
-	log.Info("[Status]: VM instance is in running state (post-chaos)")
+	//Verify the GCP VM instance is in RUNNING status (post-chaos)
+	if chaosDetails.DefaultHealthCheck {
+		if err := gcp.InstanceStatusCheckByName(computeService, experimentsDetails.ManagedInstanceGroup, experimentsDetails.Delay, experimentsDetails.Timeout, "post-chaos", experimentsDetails.VMInstanceName, experimentsDetails.GCPProjectID, experimentsDetails.Zones); err != nil {
+			log.Errorf("failed to get the vm instance status, err: %v", err)
+			result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
+			return
+		}
+
+		log.Info("[Status]: VM instance is in running state (post-chaos)")
+	}
 
 	if experimentsDetails.EngineName != "" {
 		// marking AUT as running, as we already checked the status of application under test
@@ -156,11 +149,10 @@ func VMInstanceStop(clients clients.ClientSets) {
 		if len(resultDetails.ProbeDetails) != 0 {
 			if err := probe.RunProbes(&chaosDetails, clients, &resultDetails, "PostChaos", &eventsDetails); err != nil {
 				log.Errorf("Probes Failed, err: %v", err)
-				failStep := "[post-chaos]: Failed while running probes, err: " + err.Error()
 				msg := "AUT: Running, Probes: Unsuccessful"
 				types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, msg, "Warning", &chaosDetails)
 				events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
-				result.RecordAfterFailure(&chaosDetails, &resultDetails, failStep, clients, &eventsDetails)
+				result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 				return
 			}
 			msg = "AUT: Running, Probes: Successful"
@@ -180,12 +172,7 @@ func VMInstanceStop(clients clients.ClientSets) {
 
 	// generating the event in chaosresult to marked the verdict as pass/fail
 	msg = "experiment: " + experimentsDetails.ExperimentName + ", Result: " + string(resultDetails.Verdict)
-	reason := types.PassVerdict
-	eventType := "Normal"
-	if resultDetails.Verdict != "Pass" {
-		reason = types.FailVerdict
-		eventType = "Warning"
-	}
+	reason, eventType := types.GetChaosResultVerdictEvent(resultDetails.Verdict)
 	types.SetResultEventAttributes(&eventsDetails, reason, msg, eventType, &resultDetails)
 	events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosResult")
 

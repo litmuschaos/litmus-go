@@ -2,37 +2,47 @@ package azure
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/profiles/latest/compute/mgmt/compute"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/azure/auth"
 	"github.com/litmuschaos/litmus-go/pkg/azure/disk-loss/types"
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	"github.com/litmuschaos/litmus-go/pkg/cloud/azure/common"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
-	"github.com/pkg/errors"
+	"github.com/palantir/stacktrace"
 )
 
 // DetachDisks will detach the list of disk provided for the specific VM instance or scale set vm instance
 func DetachDisks(subscriptionID, resourceGroup, azureInstanceName, scaleSet string, diskNameList []string) error {
 
+	authorizer, err := auth.NewAuthorizerFromFile(azure.PublicCloud.ResourceManagerEndpoint)
+	if err != nil {
+		return cerrors.Error{
+			ErrorCode: cerrors.ErrorTypeChaosInject,
+			Reason:    fmt.Sprintf("authorization set up failed: %v", err),
+			Target:    fmt.Sprintf("{Azure Instance Name: %v, Resource Group: %v}", azureInstanceName, resourceGroup),
+		}
+	}
+
 	// if the instance is virtual machine scale set (aks node)
 	if scaleSet == "enable" {
 		// Setup and authorize vm client
 		vmssClient := compute.NewVirtualMachineScaleSetVMsClient(subscriptionID)
-		authorizer, err := auth.NewAuthorizerFromFile(azure.PublicCloud.ResourceManagerEndpoint)
-
-		if err != nil {
-			return errors.Errorf("fail to setup authorization, err: %v", err)
-		}
 		vmssClient.Authorizer = authorizer
 
 		// Fetch the vm instance
 		scaleSetName, vmId := common.GetScaleSetNameAndInstanceId(azureInstanceName)
 		vm, err := vmssClient.Get(context.TODO(), resourceGroup, scaleSetName, vmId, compute.InstanceViewTypes("instanceView"))
 		if err != nil {
-			return errors.Errorf("fail get instance, err: %v", err)
+			return cerrors.Error{
+				ErrorCode: cerrors.ErrorTypeChaosInject,
+				Reason:    fmt.Sprintf("failed to get instance: %v", err),
+				Target:    fmt.Sprintf("{Azure Instance Name: %v, Resource Group: %v}", azureInstanceName, resourceGroup),
+			}
 		}
 		// Create list of Disks that are not to be detached
 		var keepAttachedList []compute.DataDisk
@@ -55,23 +65,26 @@ func DetachDisks(subscriptionID, resourceGroup, azureInstanceName, scaleSet stri
 		// Update the VM with the keepAttachedList to detach the specified disks
 		_, err = vmssClient.Update(context.TODO(), resourceGroup, scaleSetName, vmId, vm)
 		if err != nil {
-			return errors.Errorf("cannot detach disk, err: %v", err)
+			return cerrors.Error{
+				ErrorCode: cerrors.ErrorTypeChaosInject,
+				Reason:    fmt.Sprintf("cannot detach disk: %v", err),
+				Target:    fmt.Sprintf("{Azure Instance Name: %v, Resource Group: %v}", azureInstanceName, resourceGroup),
+			}
 		}
 
 	} else {
 		// Setup and authorize vm client
 		vmClient := compute.NewVirtualMachinesClient(subscriptionID)
-		authorizer, err := auth.NewAuthorizerFromFile(azure.PublicCloud.ResourceManagerEndpoint)
-
-		if err != nil {
-			return errors.Errorf("fail to setup authorization, err: %v", err)
-		}
 		vmClient.Authorizer = authorizer
 
 		// Fetch the vm instance
 		vm, err := vmClient.Get(context.TODO(), resourceGroup, azureInstanceName, compute.InstanceViewTypes("instanceView"))
 		if err != nil {
-			return errors.Errorf("fail get instance, err: %v", err)
+			return cerrors.Error{
+				ErrorCode: cerrors.ErrorTypeChaosInject,
+				Reason:    fmt.Sprintf("failed to get instance: %v", err),
+				Target:    fmt.Sprintf("{Azure Instance Name: %v, Resource Group: %v}", azureInstanceName, resourceGroup),
+			}
 		}
 		// Create list of Disks that are not to be detached
 		var keepAttachedList []compute.DataDisk
@@ -92,7 +105,11 @@ func DetachDisks(subscriptionID, resourceGroup, azureInstanceName, scaleSet stri
 		// Update the VM with the keepAttachedList to detach the specified disks
 		_, err = vmClient.CreateOrUpdate(context.TODO(), resourceGroup, azureInstanceName, vm)
 		if err != nil {
-			return errors.Errorf("cannot detach disk, err: %v", err)
+			return cerrors.Error{
+				ErrorCode: cerrors.ErrorTypeChaosInject,
+				Reason:    fmt.Sprintf("cannot detach disk(s): %v", err),
+				Target:    fmt.Sprintf("{Azure Instance Name: %v, Resource Group: %v}", azureInstanceName, resourceGroup),
+			}
 		}
 	}
 	return nil
@@ -101,22 +118,30 @@ func DetachDisks(subscriptionID, resourceGroup, azureInstanceName, scaleSet stri
 // AttachDisk will attach the list of disk provided for the specific VM instance
 func AttachDisk(subscriptionID, resourceGroup, azureInstanceName, scaleSet string, diskList *[]compute.DataDisk) error {
 
+	authorizer, err := auth.NewAuthorizerFromFile(azure.PublicCloud.ResourceManagerEndpoint)
+	if err != nil {
+		return cerrors.Error{
+			ErrorCode: cerrors.ErrorTypeChaosRevert,
+			Reason:    fmt.Sprintf("authorization set up failed: %v", err),
+			Target:    fmt.Sprintf("{Azure Instance Name: %v, Resource Group: %v}", azureInstanceName, resourceGroup),
+		}
+	}
+
 	// if the instance is virtual machine scale set (aks node)
 	if scaleSet == "enable" {
 		// Setup and authorize vm client
 		vmClient := compute.NewVirtualMachineScaleSetVMsClient(subscriptionID)
-		authorizer, err := auth.NewAuthorizerFromFile(azure.PublicCloud.ResourceManagerEndpoint)
-
-		if err != nil {
-			return errors.Errorf("fail to setup authorization, err: %v", err)
-		}
 		vmClient.Authorizer = authorizer
 
 		// Fetch the vm instance
 		scaleSetName, vmId := common.GetScaleSetNameAndInstanceId(azureInstanceName)
 		vm, err := vmClient.Get(context.TODO(), resourceGroup, scaleSetName, vmId, compute.InstanceViewTypes("instanceView"))
 		if err != nil {
-			return errors.Errorf("fail get instance, err: %v", err)
+			return cerrors.Error{
+				ErrorCode: cerrors.ErrorTypeChaosRevert,
+				Reason:    fmt.Sprintf("failed to get instance: %v", err),
+				Target:    fmt.Sprintf("{Azure Instance Name: %v, Resource Group: %v}", azureInstanceName, resourceGroup),
+			}
 		}
 		vm.VirtualMachineScaleSetVMProperties.StorageProfile.DataDisks = diskList
 
@@ -126,22 +151,23 @@ func AttachDisk(subscriptionID, resourceGroup, azureInstanceName, scaleSet strin
 		// Update the VM properties
 		_, err = vmClient.Update(context.TODO(), resourceGroup, scaleSetName, vmId, vm)
 		if err != nil {
-			return errors.Errorf("cannot attach disk, err: %v", err)
+			return cerrors.Error{
+				ErrorCode: cerrors.ErrorTypeChaosRevert,
+				Reason:    fmt.Sprintf("cannot attach disk: %v", err),
+				Target:    fmt.Sprintf("{Azure Instance Name: %v, Resource Group: %v}", azureInstanceName, resourceGroup)}
 		}
 	} else {
 		// Setup and authorize vm client
 		vmClient := compute.NewVirtualMachinesClient(subscriptionID)
-		authorizer, err := auth.NewAuthorizerFromFile(azure.PublicCloud.ResourceManagerEndpoint)
-
-		if err != nil {
-			return errors.Errorf("fail to setup authorization, err: %v", err)
-		}
 		vmClient.Authorizer = authorizer
 
 		// Fetch the vm instance
 		vm, err := vmClient.Get(context.TODO(), resourceGroup, azureInstanceName, compute.InstanceViewTypes("instanceView"))
 		if err != nil {
-			return errors.Errorf("fail get instance, err: %v", err)
+			return cerrors.Error{
+				ErrorCode: cerrors.ErrorTypeChaosRevert,
+				Reason:    fmt.Sprintf("failed to get instance: %v", err),
+				Target:    fmt.Sprintf("{Azure Instance Name: %v, Resource Group: %v}", azureInstanceName, resourceGroup)}
 		}
 
 		// Attach the disk to VM properties
@@ -150,7 +176,10 @@ func AttachDisk(subscriptionID, resourceGroup, azureInstanceName, scaleSet strin
 		// Update the VM properties
 		_, err = vmClient.CreateOrUpdate(context.TODO(), resourceGroup, azureInstanceName, vm)
 		if err != nil {
-			return errors.Errorf("cannot attach disk, err: %v", err)
+			return cerrors.Error{
+				ErrorCode: cerrors.ErrorTypeChaosRevert,
+				Reason:    fmt.Sprintf("cannot attach disk(s): %v", err),
+				Target:    fmt.Sprintf("{Azure Instance Name: %v, Resource Group: %v}", azureInstanceName, resourceGroup)}
 		}
 	}
 	return nil
@@ -164,11 +193,15 @@ func WaitForDiskToAttach(experimentsDetails *types.ExperimentDetails, diskName s
 		Try(func(attempt uint) error {
 			diskState, err := GetDiskStatus(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, diskName)
 			if err != nil {
-				return errors.Errorf("failed to get the disk status, err: %v", err)
+				return stacktrace.Propagate(err, "failed to get the disk status")
 			}
 			if diskState != "Attached" {
-				log.Infof("[Status]: Disk %v is not yet attached, state: %v", diskName, diskState)
-				return errors.Errorf("Disk %v is not yet attached, state: %v", diskName, diskState)
+				log.Infof("[Status]: Disk %v is not yet attached, current state: %v", diskName, diskState)
+				return cerrors.Error{
+					ErrorCode: cerrors.ErrorTypeChaosRevert,
+					Reason:    fmt.Sprintf("Disk is not attached within timeout, disk state: %s", diskState),
+					Target:    fmt.Sprintf("{Azure Disk Name: %v, Resource Group: %v}", diskName, experimentsDetails.ResourceGroup),
+				}
 			}
 			log.Infof("[Status]: Disk %v is Attached", diskName)
 			return nil
@@ -183,11 +216,15 @@ func WaitForDiskToDetach(experimentsDetails *types.ExperimentDetails, diskName s
 		Try(func(attempt uint) error {
 			diskState, err := GetDiskStatus(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, diskName)
 			if err != nil {
-				return errors.Errorf("failed to get the disk status, err: %v", err)
+				return stacktrace.Propagate(err, "failed to get the disk status")
 			}
 			if diskState != "Unattached" {
 				log.Infof("[Status]: Disk %v is not yet detached, state: %v", diskName, diskState)
-				return errors.Errorf("Disk %v is not yet detached, state: %v", diskName, diskState)
+				return cerrors.Error{
+					ErrorCode: cerrors.ErrorTypeChaosInject,
+					Reason:    fmt.Sprintf("Disk is not detached within timeout, disk state: %s", diskState),
+					Target:    fmt.Sprintf("{Azure Disk Name: %v, Resource Group: %v}", diskName, experimentsDetails.ResourceGroup),
+				}
 			}
 			log.Infof("[Status]: Disk %v is Detached", diskName)
 			return nil

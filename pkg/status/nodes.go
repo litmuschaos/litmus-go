@@ -1,44 +1,42 @@
 package status
 
 import (
+	"context"
+	"fmt"
 	"strings"
 	"time"
+
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
-	"github.com/pkg/errors"
 	logrus "github.com/sirupsen/logrus"
 	apiv1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // CheckNodeStatus checks the status of the node
 func CheckNodeStatus(nodes string, timeout, delay int, clients clients.ClientSets) error {
 
-	nodeList := apiv1.NodeList{}
 	return retry.
 		Times(uint(timeout / delay)).
 		Wait(time.Duration(delay) * time.Second).
 		Try(func(attempt uint) error {
+			nodeList := apiv1.NodeList{}
 			if nodes != "" {
 				targetNodes := strings.Split(nodes, ",")
 				for index := range targetNodes {
-					node, err := clients.KubeClient.CoreV1().Nodes().Get(targetNodes[index], metav1.GetOptions{})
+					node, err := clients.KubeClient.CoreV1().Nodes().Get(context.Background(), targetNodes[index], metav1.GetOptions{})
 					if err != nil {
-						if apierrors.IsNotFound(err) {
-							return errors.Errorf("[Info]: The node: %v does not exist", targetNodes[index])
-						} else {
-							return err
-						}
+						return cerrors.Error{ErrorCode: cerrors.ErrorTypeStatusChecks, Target: fmt.Sprintf("{nodeName: %s}", targetNodes[index]), Reason: err.Error()}
 					}
 					nodeList.Items = append(nodeList.Items, *node)
 				}
 			} else {
-				nodes, err := clients.KubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
+				nodes, err := clients.KubeClient.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
 				if err != nil {
-					return err
+					return cerrors.Error{ErrorCode: cerrors.ErrorTypeStatusChecks, Reason: fmt.Sprintf("failed to list all nodes: %s", err.Error())}
 				}
 				nodeList = *nodes
 			}
@@ -52,7 +50,7 @@ func CheckNodeStatus(nodes string, timeout, delay int, clients clients.ClientSet
 					}
 				}
 				if !isReady {
-					return errors.Errorf("Node is not in ready state")
+					return cerrors.Error{ErrorCode: cerrors.ErrorTypeStatusChecks, Target: fmt.Sprintf("{nodeName: %s}", node.Name), Reason: "node is not in ready state"}
 				}
 				log.InfoWithValues("The Node status are as follows", logrus.Fields{
 					"Node": node.Name, "Ready": isReady})
@@ -67,9 +65,9 @@ func CheckNodeNotReadyState(nodeName string, timeout, delay int, clients clients
 		Times(uint(timeout / delay)).
 		Wait(time.Duration(delay) * time.Second).
 		Try(func(attempt uint) error {
-			node, err := clients.KubeClient.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+			node, err := clients.KubeClient.CoreV1().Nodes().Get(context.Background(), nodeName, metav1.GetOptions{})
 			if err != nil {
-				return err
+				return cerrors.Error{ErrorCode: cerrors.ErrorTypeStatusChecks, Target: fmt.Sprintf("{nodeName: %s}", nodeName), Reason: err.Error()}
 			}
 			conditions := node.Status.Conditions
 			isReady := false
@@ -79,9 +77,9 @@ func CheckNodeNotReadyState(nodeName string, timeout, delay int, clients clients
 					break
 				}
 			}
-			// It will retries until the node becomes NotReady
+			// It will retry until the node becomes NotReady
 			if isReady {
-				return errors.Errorf("Node is not in NotReady state")
+				return cerrors.Error{ErrorCode: cerrors.ErrorTypeStatusChecks, Target: fmt.Sprintf("{nodeName: %s}", nodeName), Reason: "node is not in NotReady state during chaos"}
 			}
 			log.InfoWithValues("The Node status are as follows", logrus.Fields{
 				"Node": node.Name, "Ready": isReady})

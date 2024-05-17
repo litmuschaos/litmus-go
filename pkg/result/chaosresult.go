@@ -2,13 +2,17 @@ package result
 
 import (
 	"bytes"
+	"context"
+	"fmt"
 	"os/exec"
-	"reflect"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/litmuschaos/chaos-operator/pkg/apis/litmuschaos/v1alpha1"
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
+	"github.com/palantir/stacktrace"
+
+	"github.com/litmuschaos/chaos-operator/api/litmuschaos/v1alpha1"
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
@@ -16,28 +20,25 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
-	"github.com/pkg/errors"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-//ChaosResult Create and Update the chaos result
+// ChaosResult Create and Update the chaos result
 func ChaosResult(chaosDetails *types.ChaosDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, state string) error {
 	experimentLabel := map[string]string{}
 
-	// It try to get the chaosresult, if available
-	// it will retries until it got chaos result or met the timeout(3 mins)
-	var result *v1alpha1.ChaosResult
+	// It tries to get the chaosresult, if available
+	// it will retry until it got chaos result or met the timeout(3 mins)
 	isResultAvailable := false
 	if err := retry.
 		Times(90).
 		Wait(2 * time.Second).
 		Try(func(attempt uint) error {
-			resultObj, err := clients.LitmusClient.ChaosResults(chaosDetails.ChaosNamespace).Get(resultDetails.Name, v1.GetOptions{})
+			_, err := clients.LitmusClient.ChaosResults(chaosDetails.ChaosNamespace).Get(context.Background(), resultDetails.Name, v1.GetOptions{})
 			if err != nil && !k8serrors.IsNotFound(err) {
-				return errors.Errorf("unable to get %v chaosresult in %v namespace, err: %v", resultDetails.Name, chaosDetails.ChaosNamespace, err)
+				return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosResultCRUD, Target: fmt.Sprintf("{name: %s, namespace: %s}", resultDetails.Name, chaosDetails.ChaosNamespace), Reason: err.Error()}
 			} else if err == nil {
-				result = resultObj
 				isResultAvailable = true
 			}
 			return nil
@@ -49,9 +50,9 @@ func ChaosResult(chaosDetails *types.ChaosDetails, clients clients.ClientSets, r
 	// skipping the derivation of labels from chaos pod, if phase is stopped
 	if chaosDetails.EngineName != "" && resultDetails.Phase != "Stopped" {
 		// Getting chaos pod label and passing it in chaos result
-		chaosPod, err := clients.KubeClient.CoreV1().Pods(chaosDetails.ChaosNamespace).Get(chaosDetails.ChaosPodName, v1.GetOptions{})
+		chaosPod, err := clients.KubeClient.CoreV1().Pods(chaosDetails.ChaosNamespace).Get(context.Background(), chaosDetails.ChaosPodName, v1.GetOptions{})
 		if err != nil {
-			return errors.Errorf("failed to find chaos pod with name: %v, err: %v", chaosDetails.ChaosPodName, err)
+			return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Target: fmt.Sprintf("{name: %s, namespace: %s}", chaosDetails.ChaosPodName, chaosDetails.ChaosNamespace), Reason: fmt.Sprintf("failed to get experiment pod :%s", err.Error())}
 		}
 		experimentLabel = chaosPod.Labels
 	}
@@ -65,19 +66,18 @@ func ChaosResult(chaosDetails *types.ChaosDetails, clients clients.ClientSets, r
 	// the chaos-result is already present with matching labels
 	// it will patch the new parameters in the same chaos-result
 	if state == "SOT" {
-		updateHistory(result)
-		return PatchChaosResult(result, clients, chaosDetails, resultDetails, experimentLabel)
+		return PatchChaosResult(clients, chaosDetails, resultDetails, experimentLabel)
 	}
-
-	// it will patch the chaos-result in the end of experiment
-	resultDetails.Phase = v1alpha1.ResultPhaseCompleted
-	return PatchChaosResult(result, clients, chaosDetails, resultDetails, experimentLabel)
+	if resultDetails.Phase == v1alpha1.ResultPhaseRunning {
+		resultDetails.Phase = v1alpha1.ResultPhaseCompleted
+	}
+	return PatchChaosResult(clients, chaosDetails, resultDetails, experimentLabel)
 }
 
-//InitializeChaosResult create the chaos result
+// InitializeChaosResult create the chaos result
 func InitializeChaosResult(chaosDetails *types.ChaosDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, chaosResultLabel map[string]string) error {
 
-	_, probeStatus := GetProbeStatus(resultDetails)
+	_, _, probeStatus := GetProbeStatus(resultDetails)
 	chaosResult := &v1alpha1.ChaosResult{
 		ObjectMeta: v1.ObjectMeta{
 			Name:      resultDetails.Name,
@@ -95,8 +95,8 @@ func InitializeChaosResult(chaosDetails *types.ChaosDetails, clients clients.Cli
 				Verdict:                resultDetails.Verdict,
 				ProbeSuccessPercentage: "Awaited",
 			},
-			ProbeStatus: probeStatus,
-			History: v1alpha1.HistoryDetails{
+			ProbeStatuses: probeStatus,
+			History: &v1alpha1.HistoryDetails{
 				PassedRuns:  0,
 				FailedRuns:  0,
 				StoppedRuns: 0,
@@ -106,85 +106,98 @@ func InitializeChaosResult(chaosDetails *types.ChaosDetails, clients clients.Cli
 	}
 
 	// It will create a new chaos-result CR
-	_, err := clients.LitmusClient.ChaosResults(chaosDetails.ChaosNamespace).Create(chaosResult)
+	_, err := clients.LitmusClient.ChaosResults(chaosDetails.ChaosNamespace).Create(context.Background(), chaosResult, v1.CreateOptions{})
 
 	// if the chaos result is already present, it will patch the new parameters with the existing chaos result CR
 	// Note: We have added labels inside chaos result and looking for matching labels to list the chaos-result
-	// these labels were not present inside earlier releases so giving a retry/update if someone have a exiting result CR
+	// these labels were not present inside earlier releases so giving a retry/update if someone has an exiting result CR
 	// in his cluster, which was created earlier with older release/version of litmus.
 	// it will override the params and add the labels to it so that it will work as desired.
 	if k8serrors.IsAlreadyExists(err) {
-		chaosResult, err = clients.LitmusClient.ChaosResults(chaosDetails.ChaosNamespace).Get(resultDetails.Name, v1.GetOptions{})
+		_, err = clients.LitmusClient.ChaosResults(chaosDetails.ChaosNamespace).Get(context.Background(), resultDetails.Name, v1.GetOptions{})
 		if err != nil {
-			return errors.Errorf("Unable to find the chaosresult with name %v in %v namespace, err: %v", resultDetails.Name, chaosDetails.ChaosNamespace, err)
+			return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosResultCRUD, Target: fmt.Sprintf("{name: %s, namespace: %s}", resultDetails.Name, chaosDetails.ChaosNamespace), Reason: err.Error()}
 		}
 
 		// updating the chaosresult with new values
-		if err = PatchChaosResult(chaosResult, clients, chaosDetails, resultDetails, chaosResultLabel); err != nil {
-			return err
+		if err = PatchChaosResult(clients, chaosDetails, resultDetails, chaosResultLabel); err != nil {
+			return stacktrace.Propagate(err, "could not update chaos result")
 		}
 	}
 	return nil
 }
 
-//GetProbeStatus fetch status of all probes
-func GetProbeStatus(resultDetails *types.ResultDetails) (bool, []v1alpha1.ProbeStatus) {
+// GetProbeStatus fetch status of all probes
+func GetProbeStatus(resultDetails *types.ResultDetails) (bool, bool, []v1alpha1.ProbeStatuses) {
 	isAllProbePassed := true
+	experimentStopped := false
 
-	probeStatus := []v1alpha1.ProbeStatus{}
+	probeStatus := []v1alpha1.ProbeStatuses{}
 	for _, probe := range resultDetails.ProbeDetails {
-		probes := v1alpha1.ProbeStatus{}
+		probes := v1alpha1.ProbeStatuses{}
 		probes.Name = probe.Name
 		probes.Type = probe.Type
+		probes.Mode = probe.Mode
 		probes.Status = probe.Status
 		probeStatus = append(probeStatus, probes)
-		if probe.Phase == "Failed" {
+		if probe.Status.Verdict == v1alpha1.ProbeVerdictFailed {
 			isAllProbePassed = false
+			if probe.Stopped {
+				experimentStopped = probe.Stopped
+			}
 		}
 	}
-	return isAllProbePassed, probeStatus
+	return isAllProbePassed, experimentStopped, probeStatus
 }
 
-//PatchChaosResult Update the chaos result
-func PatchChaosResult(result *v1alpha1.ChaosResult, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, chaosResultLabel map[string]string) error {
-
-	annotations, err := GetChaosStatus(resultDetails, chaosDetails, clients)
+func updateResultAttributes(clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, chaosResultLabel map[string]string) (*v1alpha1.ChaosResult, error) {
+	result, err := GetChaosStatus(resultDetails, chaosDetails, clients)
 	if err != nil {
-		return err
+		return nil, stacktrace.Propagate(err, "could not get chaos status")
 	}
 
-	var isAllProbePassed bool
+	updateHistory(result)
+	var isAllProbePassed, experimentStopped bool
 	result.Status.ExperimentStatus.Phase = resultDetails.Phase
 	result.Spec.InstanceID = chaosDetails.InstanceID
-	result.Status.ExperimentStatus.FailStep = resultDetails.FailStep
+	if resultDetails.ErrorOutput != nil || resultDetails.Phase == v1alpha1.ResultPhaseRunning {
+		result.Status.ExperimentStatus.ErrorOutput = resultDetails.ErrorOutput
+	}
+
 	// for existing chaos result resource it will patch the label
 	result.ObjectMeta.Labels = chaosResultLabel
-	result.ObjectMeta.Annotations = annotations
 	result.Status.History.Targets = chaosDetails.Targets
-	isAllProbePassed, result.Status.ProbeStatus = GetProbeStatus(resultDetails)
+	isAllProbePassed, experimentStopped, result.Status.ProbeStatuses = GetProbeStatus(resultDetails)
 	result.Status.ExperimentStatus.Verdict = resultDetails.Verdict
 
 	switch strings.ToLower(string(resultDetails.Phase)) {
-	case "completed":
+	case "completed", "error", "stopped":
 		if !isAllProbePassed {
-			resultDetails.Verdict = "Fail"
-			result.Status.ExperimentStatus.Verdict = "Fail"
+			result.Status.ExperimentStatus.Phase = v1alpha1.ResultPhaseCompletedWithProbeFailure
+			resultDetails.Verdict = v1alpha1.ResultVerdictFailed
+			if experimentStopped {
+				result.Status.ExperimentStatus.Phase = v1alpha1.ResultPhaseStopped
+				resultDetails.Verdict = v1alpha1.ResultVerdictStopped
+			}
+			result.Status.ExperimentStatus.Verdict = resultDetails.Verdict
 		}
 		switch strings.ToLower(string(resultDetails.Verdict)) {
 		case "pass":
 			result.Status.ExperimentStatus.ProbeSuccessPercentage = "100"
 			result.Status.History.PassedRuns++
-		case "fail":
-			result.Status.History.FailedRuns++
-			probe.SetProbeVerdictAfterFailure(resultDetails)
-			if len(resultDetails.ProbeDetails) != 0 {
+		case "fail", "error":
+			if resultDetails.Verdict == v1alpha1.ResultVerdictFailed {
+				result.Status.History.FailedRuns++
+			}
+			probe.SetProbeVerdictAfterFailure(result)
+			if len(resultDetails.ProbeDetails) != 0 && resultDetails.Verdict == v1alpha1.ResultVerdictFailed {
 				result.Status.ExperimentStatus.ProbeSuccessPercentage = strconv.Itoa((resultDetails.PassedProbeCount * 100) / len(resultDetails.ProbeDetails))
 			} else {
 				result.Status.ExperimentStatus.ProbeSuccessPercentage = "0"
 			}
 		case "stopped":
 			result.Status.History.StoppedRuns++
-			probe.SetProbeVerdictAfterFailure(resultDetails)
+			probe.SetProbeVerdictAfterFailure(result)
 			if len(resultDetails.ProbeDetails) != 0 {
 				result.Status.ExperimentStatus.ProbeSuccessPercentage = strconv.Itoa((resultDetails.PassedProbeCount * 100) / len(resultDetails.ProbeDetails))
 			} else {
@@ -194,16 +207,32 @@ func PatchChaosResult(result *v1alpha1.ChaosResult, clients clients.ClientSets, 
 	default:
 		result.Status.ExperimentStatus.ProbeSuccessPercentage = "Awaited"
 	}
+	return result, nil
+}
+
+// PatchChaosResult Update the chaos result
+func PatchChaosResult(clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, chaosResultLabel map[string]string) error {
+
+	result, err := updateResultAttributes(clients, chaosDetails, resultDetails, chaosResultLabel)
+	if err != nil {
+		return stacktrace.Propagate(err, "could not update chaosresult attributes")
+	}
 
 	// It will update the existing chaos-result CR with new values
-	// it will retries until it will able to update successfully or met the timeout(3 mins)
+	// it will retry until it will be able to update successfully or met the timeout(3 mins)
 	return retry.
-		Times(90).
-		Wait(2 * time.Second).
+		Times(uint(chaosDetails.Timeout / chaosDetails.Delay)).
+		Wait(time.Duration(chaosDetails.Delay) * time.Second).
 		Try(func(attempt uint) error {
-			_, err := clients.LitmusClient.ChaosResults(result.Namespace).Update(result)
-			if err != nil {
-				return errors.Errorf("Unable to update the chaosresult, err: %v", err)
+			_, updateErr := clients.LitmusClient.ChaosResults(result.Namespace).Update(context.Background(), result, v1.UpdateOptions{})
+			if updateErr != nil {
+				if k8serrors.IsConflict(updateErr) {
+					result, err = updateResultAttributes(clients, chaosDetails, resultDetails, chaosResultLabel)
+					if err != nil {
+						return stacktrace.Propagate(err, "could not update chaosresult attributes")
+					}
+				}
+				return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosResultCRUD, Phase: getExperimentPhaseFromResultPhase(resultDetails.Phase), Target: fmt.Sprintf("{name: %s, namespace: %s}", resultDetails.Name, chaosDetails.ChaosNamespace), Reason: updateErr.Error()}
 			}
 			return nil
 		})
@@ -212,45 +241,56 @@ func PatchChaosResult(result *v1alpha1.ChaosResult, clients clients.ClientSets, 
 // SetResultUID sets the ResultUID into the ResultDetails structure
 func SetResultUID(resultDetails *types.ResultDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
 
-	result, err := clients.LitmusClient.ChaosResults(chaosDetails.ChaosNamespace).Get(resultDetails.Name, v1.GetOptions{})
+	result, err := clients.LitmusClient.ChaosResults(chaosDetails.ChaosNamespace).Get(context.Background(), resultDetails.Name, v1.GetOptions{})
 	if err != nil {
-		return err
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosResultCRUD, Target: fmt.Sprintf("{name: %s, namespace: %s}", resultDetails.Name, chaosDetails.ChaosNamespace), Reason: err.Error()}
 	}
 
 	resultDetails.ResultUID = result.UID
 	return nil
 }
 
-//RecordAfterFailure update the chaosresult and create the summary events
-func RecordAfterFailure(chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, failStep string, clients clients.ClientSets, eventsDetails *types.EventDetails) {
-
+// RecordAfterFailure update the chaosresult and create the summary events
+func RecordAfterFailure(chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, err error, clients clients.ClientSets, eventsDetails *types.EventDetails) {
+	failStep, errorCode := cerrors.GetRootCauseAndErrorCode(err, string(chaosDetails.Phase))
+	phase := v1alpha1.ResultPhaseError
+	verdict := v1alpha1.ResultVerdictError
+	if probe.IsProbeFailed(failStep) {
+		phase = v1alpha1.ResultPhaseCompleted
+		verdict = v1alpha1.ResultVerdictFailed
+	}
 	// update the chaos result
-	types.SetResultAfterCompletion(resultDetails, "Fail", "Completed", failStep)
-	ChaosResult(chaosDetails, clients, resultDetails, "EOT")
+	types.SetResultAfterCompletion(resultDetails, verdict, phase, failStep, errorCode)
+	if err := ChaosResult(chaosDetails, clients, resultDetails, "EOT"); err != nil {
+		log.Errorf("failed to update chaosresult, err: %v", err)
+	}
 
 	// add the summary event in chaos result
 	msg := "experiment: " + chaosDetails.ExperimentName + ", Result: " + string(resultDetails.Verdict)
-	types.SetResultEventAttributes(eventsDetails, types.FailVerdict, msg, "Warning", resultDetails)
-	events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosResult")
+	reason, eventType := types.GetChaosResultVerdictEvent(resultDetails.Verdict)
+	types.SetResultEventAttributes(eventsDetails, reason, msg, eventType, resultDetails)
+	if err := events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosResult"); err != nil {
+		log.Errorf("failed to create %v event inside chaosresult", types.FailVerdict)
+	}
 
 	// add the summary event in chaos engine
 	if chaosDetails.EngineName != "" {
 		types.SetEngineEventAttributes(eventsDetails, types.Summary, msg, "Warning", chaosDetails)
-		events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
+		if err := events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine"); err != nil {
+			log.Errorf("failed to create %v event inside chaosengine", types.Summary)
+		}
 	}
-
 }
 
 // updateHistory initialise the history for the older results
 func updateHistory(result *v1alpha1.ChaosResult) {
-	if reflect.DeepEqual(result.Status.History, v1alpha1.HistoryDetails{}) {
-		history := v1alpha1.HistoryDetails{
+	if result.Status.History == nil {
+		result.Status.History = &v1alpha1.HistoryDetails{
 			PassedRuns:  0,
 			FailedRuns:  0,
 			StoppedRuns: 0,
 			Targets:     []v1alpha1.TargetDetails{},
 		}
-		result.Status.History = history
 	}
 }
 
@@ -263,35 +303,89 @@ func AnnotateChaosResult(resultName, namespace, status, kind, name string) error
 	command.Stderr = &stderr
 	if err := command.Run(); err != nil {
 		log.Infof("Error String: %v", stderr.String())
-		return errors.Errorf("unable to annotate the %v chaosresult, err: %v", resultName, err)
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosResultCRUD, Target: fmt.Sprintf("{name: %s, namespace: %s}", resultName, namespace), Reason: out.String()}
 	}
 	return nil
 }
 
 // GetChaosStatus get the chaos status based on annotations in chaosresult
-func GetChaosStatus(resultDetails *types.ResultDetails, chaosDetails *types.ChaosDetails, clients clients.ClientSets) (map[string]string, error) {
+func GetChaosStatus(resultDetails *types.ResultDetails, chaosDetails *types.ChaosDetails, clients clients.ClientSets) (*v1alpha1.ChaosResult, error) {
 
-	result, err := clients.LitmusClient.ChaosResults(chaosDetails.ChaosNamespace).Get(resultDetails.Name, v1.GetOptions{})
+	result, err := clients.LitmusClient.ChaosResults(chaosDetails.ChaosNamespace).Get(context.Background(), resultDetails.Name, v1.GetOptions{})
 	if err != nil {
-		return nil, err
+		return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosResultCRUD, Target: fmt.Sprintf("{name: %s, namespace: %s}", resultDetails.Name, chaosDetails.ChaosNamespace), Reason: err.Error()}
 	}
 	annotations := result.ObjectMeta.Annotations
-	targetList := []v1alpha1.TargetDetails{}
+	targetList := chaosDetails.Targets
 	for k, v := range annotations {
 		switch strings.ToLower(v) {
 		case "injected", "reverted", "targeted":
 			kind := strings.TrimSpace(strings.Split(k, "/")[0])
 			name := strings.TrimSpace(strings.Split(k, "/")[1])
-			target := v1alpha1.TargetDetails{
-				Name:        name,
-				Kind:        kind,
-				ChaosStatus: v,
+			if !updateTargets(name, v, targetList) {
+				targetList = append(targetList, v1alpha1.TargetDetails{
+					Name:        name,
+					Kind:        kind,
+					ChaosStatus: v,
+				})
 			}
-			targetList = append(targetList, target)
 			delete(annotations, k)
 		}
 	}
 
-	chaosDetails.Targets = append(chaosDetails.Targets, targetList...)
-	return annotations, nil
+	chaosDetails.Targets = targetList
+	result.Annotations = annotations
+	return result, nil
+}
+
+func UpdateFailedStepFromHelper(resultDetails *types.ResultDetails, chaosDetails *types.ChaosDetails, client clients.ClientSets, err error) error {
+	rootCause, errCode := cerrors.GetRootCauseAndErrorCode(err, string(chaosDetails.Phase))
+	return retry.
+		Times(uint(chaosDetails.Timeout / chaosDetails.Delay)).
+		Wait(time.Duration(chaosDetails.Delay) * time.Second).
+		Try(func(attempt uint) error {
+			chaosResult, err := client.LitmusClient.ChaosResults(chaosDetails.ChaosNamespace).Get(context.Background(), resultDetails.Name, v1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			if chaosResult.Status.ExperimentStatus.ErrorOutput != nil {
+				chaosResult.Status.ExperimentStatus.ErrorOutput.Reason = appendErrorOutput(chaosResult.Status.ExperimentStatus.ErrorOutput.Reason, rootCause)
+			} else {
+				chaosResult.Status.ExperimentStatus.ErrorOutput = &v1alpha1.ErrorOutput{
+					Reason:    rootCause,
+					ErrorCode: string(errCode),
+				}
+			}
+			_, err = client.LitmusClient.ChaosResults(chaosDetails.ChaosNamespace).Update(context.Background(), chaosResult, v1.UpdateOptions{})
+			return err
+		})
+}
+
+func appendErrorOutput(failStep string, rootCause string) string {
+	failStep = strings.TrimPrefix(failStep, "[")
+	failStep = strings.TrimSuffix(failStep, "]")
+	return fmt.Sprintf("[%s,%s]", failStep, rootCause)
+}
+
+// updates the chaos status of targets which is already present inside history.targets
+func updateTargets(name, status string, data []v1alpha1.TargetDetails) bool {
+	for i := range data {
+		if data[i].Name == name {
+			data[i].ChaosStatus = status
+			return true
+		}
+	}
+	return false
+}
+
+func getExperimentPhaseFromResultPhase(phase v1alpha1.ResultPhase) string {
+	switch phase {
+	case v1alpha1.ResultPhaseRunning:
+		return "PreChaos"
+	case v1alpha1.ResultPhaseCompleted:
+		return "PostChaos"
+	case v1alpha1.ResultPhaseStopped:
+		return "Abort"
+	}
+	return ""
 }

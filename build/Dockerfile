@@ -1,6 +1,6 @@
 # Multi-stage docker build
 # Build stage
-FROM golang:1.17 AS builder
+FROM golang:1.18 AS builder
 
 ARG TARGETOS=linux
 ARG TARGETARCH
@@ -19,7 +19,9 @@ FROM alpine:3.15.0 AS dep
 # Install generally useful things
 RUN apk --update add \
         sudo \
-        iproute2
+        iproute2 \
+        iptables
+
 
 # Packaging stage
 # Image source: https://github.com/litmuschaos/test-tools/blob/master/custom/hardened-alpine/experiment/Dockerfile
@@ -29,8 +31,10 @@ FROM litmuschaos/experiment-alpine
 LABEL maintainer="LitmusChaos"
 
 COPY --from=builder /output/ /litmus
-COPY --from=dep /usr/bin/sudo /usr/bin/
+COPY --from=dep /usr/bin/sudo /usr/bin/sudo
+COPY --from=dep /usr/lib/sudo /usr/lib/sudo
 COPY --from=dep /sbin/tc /sbin/
+COPY --from=dep /sbin/iptables /sbin/
 
-#Copying Necessary Files
+# Copying Necessary Files
 COPY ./pkg/cloud/aws/common/ssm-docs/LitmusChaos-AWS-SSM-Docs.yml .

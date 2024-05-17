@@ -1,0 +1,91 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: litmus-experiment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: litmus-experiment
+  template:
+    metadata:
+      labels: 
+        app: litmus-experiment
+    spec:
+      serviceAccountName: pod-http-modify-body-sa
+      containers:
+      - name: gotest
+        image: busybox 
+        command: 
+          - sleep
+          - "3600"
+        env:
+
+          # provide application namespace
+          - name: APP_NAMESPACE
+            value: ''
+
+          # provide application labels
+          - name: APP_LABEL
+            value: ''
+ 
+          # provide application kind
+          - name: APP_KIND
+            value: '' 
+
+          - name: TARGET_CONTAINER
+            value: ''
+
+          # provide lib image
+          - name: LIB_IMAGE
+            value: 'litmuschaos/go-runner:latest' 
+
+          - name: RESPONSE_BODY
+            value: '' #in ms
+
+          # port of the target service
+          - name: TARGET_SERVICE_PORT
+            value: "80"
+
+          # port on which the proxy will listen
+          - name: PROXY_PORT
+            value: "2002"
+
+          - name: TOTAL_CHAOS_DURATION
+            value: '60' # in seconds
+
+          # Time period to wait before and after injection of chaos in sec
+          - name: RAMP_TIME
+            value: ''
+
+          ## percentage of total pods to target
+          - name: PODS_AFFECTED_PERC
+            value: ''
+
+          - name: TARGET_PODS
+            value: ''
+
+          # provide the name of container runtime
+           # it supports docker, containerd, and crio
+          - name: CONTAINER_RUNTIME
+            value: 'containerd'
+
+          # provide the socket file path
+          - name: SOCKET_PATH
+            value: '/run/containerd/containerd.sock'
+
+          # To select pods on specific node(s)
+          - name: NODE_LABEL
+            value: ''
+
+          ## it defines the sequence of chaos execution for multiple target pods
+          ## supported values: serial, parallel
+          - name: SEQUENCE
+            value: 'parallel'
+
+          - name: CHAOS_SERVICE_ACCOUNT
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.serviceAccountName
+

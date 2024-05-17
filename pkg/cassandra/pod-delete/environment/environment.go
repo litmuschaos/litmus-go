@@ -9,7 +9,7 @@ import (
 	clientTypes "k8s.io/apimachinery/pkg/types"
 )
 
-//GetENV fetches all the env variables from the runner pod
+// GetENV fetches all the env variables from the runner pod
 func GetENV(cassandraDetails *cassandraTypes.ExperimentDetails) {
 
 	var ChaoslibDetail exp.ExperimentDetails
@@ -20,11 +20,7 @@ func GetENV(cassandraDetails *cassandraTypes.ExperimentDetails) {
 	ChaoslibDetail.ChaosDuration, _ = strconv.Atoi(types.Getenv("TOTAL_CHAOS_DURATION", "30"))
 	ChaoslibDetail.ChaosInterval = types.Getenv("CHAOS_INTERVAL", "10")
 	ChaoslibDetail.RampTime, _ = strconv.Atoi(types.Getenv("RAMP_TIME", "0"))
-	ChaoslibDetail.ChaosLib = types.Getenv("LIB", "litmus")
 	ChaoslibDetail.ChaosServiceAccount = types.Getenv("CHAOS_SERVICE_ACCOUNT", "")
-	ChaoslibDetail.AppNS = types.Getenv("APP_NAMESPACE", "")
-	ChaoslibDetail.AppLabel = types.Getenv("APP_LABEL", "")
-	ChaoslibDetail.AppKind = types.Getenv("APP_KIND", "")
 	ChaoslibDetail.ChaosUID = clientTypes.UID(types.Getenv("CHAOS_UID", ""))
 	ChaoslibDetail.InstanceID = types.Getenv("INSTANCE_ID", "")
 	ChaoslibDetail.ChaosPodName = types.Getenv("POD_NAME", "")
@@ -42,4 +38,15 @@ func GetENV(cassandraDetails *cassandraTypes.ExperimentDetails) {
 	cassandraDetails.CassandraLivenessImage = types.Getenv("CASSANDRA_LIVENESS_IMAGE", "litmuschaos/cassandra-client:latest")
 	cassandraDetails.CassandraLivenessCheck = types.Getenv("CASSANDRA_LIVENESS_CHECK", "")
 	cassandraDetails.RunID = types.Getenv("RunID", "")
+
+	ChaoslibDetail.AppNS, ChaoslibDetail.AppKind, ChaoslibDetail.AppLabel = getAppDetails()
+}
+
+func getAppDetails() (string, string, string) {
+	targets := types.Getenv("TARGETS", "")
+	app := types.GetTargets(targets)
+	if len(app) != 0 {
+		return app[0].Namespace, app[0].Kind, app[0].Labels[0]
+	}
+	return "", "", ""
 }

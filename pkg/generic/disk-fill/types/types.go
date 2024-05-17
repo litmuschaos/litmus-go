@@ -10,7 +10,6 @@ type ExperimentDetails struct {
 	EngineName                    string
 	ChaosDuration                 int
 	RampTime                      int
-	ChaosLib                      string
 	AppNS                         string
 	AppLabel                      string
 	AppKind                       string
@@ -19,9 +18,9 @@ type ExperimentDetails struct {
 	ChaosNamespace                string
 	ChaosPodName                  string
 	TargetContainer               string
-	AuxiliaryAppInfo              string
 	FillPercentage                string
-	ContainerPath                 string
+	ContainerRuntime              string
+	SocketPath                    string
 	RunID                         string
 	Timeout                       int
 	Delay                         int

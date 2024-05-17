@@ -1,9 +1,13 @@
 package lib
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
+	"github.com/palantir/stacktrace"
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
@@ -13,11 +17,10 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
-	"github.com/pkg/errors"
+	"github.com/litmuschaos/litmus-go/pkg/utils/stringutils"
 	"github.com/sirupsen/logrus"
 	apiv1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	corev1 "k8s.io/kubernetes/pkg/apis/core"
 )
 
 var err error
@@ -31,6 +34,7 @@ const (
 
 	privateKeySecret string = "private-key-cm-"
 	emptyDirVolume   string = "empty-dir-"
+	ObjectNameField         = "metadata.name"
 )
 
 // PrepareNodeRestart contains preparation steps before chaos injection
@@ -41,7 +45,7 @@ func PrepareNodeRestart(experimentsDetails *experimentTypes.ExperimentDetails, c
 		//Select node for node-restart
 		experimentsDetails.TargetNode, err = common.GetNodeName(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.NodeLabel, clients)
 		if err != nil {
-			return err
+			return stacktrace.Propagate(err, "could not get node name")
 		}
 	}
 
@@ -49,7 +53,7 @@ func PrepareNodeRestart(experimentsDetails *experimentTypes.ExperimentDetails, c
 	if experimentsDetails.TargetNodeIP == "" {
 		experimentsDetails.TargetNodeIP, err = getInternalIP(experimentsDetails.TargetNode, clients)
 		if err != nil {
-			return err
+			return stacktrace.Propagate(err, "could not get internal ip")
 		}
 	}
 
@@ -58,8 +62,7 @@ func PrepareNodeRestart(experimentsDetails *experimentTypes.ExperimentDetails, c
 		"Target Node IP": experimentsDetails.TargetNodeIP,
 	})
 
-	experimentsDetails.RunID = common.GetRunID()
-	appLabel := "name=" + experimentsDetails.ExperimentName + "-helper-" + experimentsDetails.RunID
+	experimentsDetails.RunID = stringutils.GetRunID()
 
 	//Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
@@ -79,14 +82,16 @@ func PrepareNodeRestart(experimentsDetails *experimentTypes.ExperimentDetails, c
 
 	// Creating the helper pod to perform node restart
 	if err = createHelperPod(experimentsDetails, chaosDetails, clients); err != nil {
-		return errors.Errorf("unable to create the helper pod, err: %v", err)
+		return stacktrace.Propagate(err, "could not create helper pod")
 	}
+
+	appLabel := fmt.Sprintf("app=%s-helper-%s", experimentsDetails.ExperimentName, experimentsDetails.RunID)
 
 	//Checking the status of helper pod
 	log.Info("[Status]: Checking the status of the helper pod")
 	if err = status.CheckHelperStatus(experimentsDetails.ChaosNamespace, appLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
 		common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-helper-"+experimentsDetails.RunID, appLabel, chaosDetails, clients)
-		return errors.Errorf("helper pod is not in running state, err: %v", err)
+		return stacktrace.Propagate(err, "could not check helper status")
 	}
 
 	common.SetTargets(experimentsDetails.TargetNode, "targeted", "node", chaosDetails)
@@ -101,16 +106,16 @@ func PrepareNodeRestart(experimentsDetails *experimentTypes.ExperimentDetails, c
 
 	// Wait till the completion of helper pod
 	log.Info("[Wait]: Waiting till the completion of the helper pod")
-	podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, appLabel, clients, experimentsDetails.ChaosDuration+experimentsDetails.Timeout, experimentsDetails.ExperimentName)
+	podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, appLabel, clients, experimentsDetails.ChaosDuration+experimentsDetails.Timeout, common.GetContainerNames(chaosDetails)...)
 	if err != nil || podStatus == "Failed" {
 		common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-helper-"+experimentsDetails.RunID, appLabel, chaosDetails, clients)
-		return common.HelperFailedError(err)
+		return common.HelperFailedError(err, appLabel, chaosDetails.ChaosNamespace, false)
 	}
 
 	//Deleting the helper pod
 	log.Info("[Cleanup]: Deleting the helper pod")
 	if err = common.DeletePod(experimentsDetails.ExperimentName+"-helper-"+experimentsDetails.RunID, appLabel, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients); err != nil {
-		return errors.Errorf("unable to delete the helper pod, err: %v", err)
+		return stacktrace.Propagate(err, "could not delete helper pod")
 	}
 
 	//Waiting for the ramp time after chaos injection
@@ -133,7 +138,7 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, chao
 		ObjectMeta: v1.ObjectMeta{
 			Name:        experimentsDetails.ExperimentName + "-helper-" + experimentsDetails.RunID,
 			Namespace:   experimentsDetails.ChaosNamespace,
-			Labels:      common.GetHelperLabels(chaosDetails.Labels, experimentsDetails.RunID, "", experimentsDetails.ExperimentName),
+			Labels:      common.GetHelperLabels(chaosDetails.Labels, experimentsDetails.RunID, experimentsDetails.ExperimentName),
 			Annotations: chaosDetails.Annotations,
 		},
 		Spec: apiv1.PodSpec{
@@ -147,7 +152,7 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, chao
 							{
 								MatchFields: []apiv1.NodeSelectorRequirement{
 									{
-										Key:      corev1.ObjectNameField,
+										Key:      ObjectNameField,
 										Operator: apiv1.NodeSelectorOpNotIn,
 										Values:   []string{experimentsDetails.TargetNode},
 									},
@@ -198,20 +203,28 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, chao
 		},
 	}
 
-	_, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Create(helperPod)
-	return err
+	if len(chaosDetails.SideCar) != 0 {
+		helperPod.Spec.Containers = append(helperPod.Spec.Containers, common.BuildSidecar(chaosDetails)...)
+		helperPod.Spec.Volumes = append(helperPod.Spec.Volumes, common.GetSidecarVolumes(chaosDetails)...)
+	}
+
+	_, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Create(context.Background(), helperPod, v1.CreateOptions{})
+	if err != nil {
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("unable to create helper pod: %s", err.Error())}
+	}
+	return nil
 }
 
 // getInternalIP gets the internal ip of the given node
 func getInternalIP(nodeName string, clients clients.ClientSets) (string, error) {
-	node, err := clients.KubeClient.CoreV1().Nodes().Get(nodeName, v1.GetOptions{})
+	node, err := clients.KubeClient.CoreV1().Nodes().Get(context.Background(), nodeName, v1.GetOptions{})
 	if err != nil {
-		return "", err
+		return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Target: fmt.Sprintf("{nodeName: %s}", nodeName), Reason: err.Error()}
 	}
 	for _, addr := range node.Status.Addresses {
 		if strings.ToLower(string(addr.Type)) == "internalip" {
 			return addr.Address, nil
 		}
 	}
-	return "", errors.Errorf("unable to find the internal ip of the %v node", nodeName)
+	return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Target: fmt.Sprintf("{nodeName: %s}", nodeName), Reason: "failed to get the internal ip of the target node"}
 }

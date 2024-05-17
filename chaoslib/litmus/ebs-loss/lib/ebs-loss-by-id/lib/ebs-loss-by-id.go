@@ -1,18 +1,20 @@
 package lib
 
 import (
+	"fmt"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
 
 	ebsloss "github.com/litmuschaos/litmus-go/chaoslib/litmus/ebs-loss/lib"
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/kube-aws/ebs-loss/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
-	"github.com/pkg/errors"
+	"github.com/palantir/stacktrace"
 )
 
 var (
@@ -20,7 +22,7 @@ var (
 	inject, abort chan os.Signal
 )
 
-//PrepareEBSLossByID contains the prepration and injection steps for the experiment
+// PrepareEBSLossByID contains the prepration and injection steps for the experiment
 func PrepareEBSLossByID(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	// inject channel is used to transmit signal notifications.
@@ -48,7 +50,7 @@ func PrepareEBSLossByID(experimentsDetails *experimentTypes.ExperimentDetails, c
 		//get the volume id or list of instance ids
 		volumeIDList := strings.Split(experimentsDetails.EBSVolumeID, ",")
 		if len(volumeIDList) == 0 {
-			return errors.Errorf("no volume id found to detach")
+			return cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Reason: "no volume id found to detach"}
 		}
 		// watching for the abort signal and revert the chaos
 		go ebsloss.AbortWatcher(experimentsDetails, volumeIDList, abort, chaosDetails)
@@ -56,14 +58,14 @@ func PrepareEBSLossByID(experimentsDetails *experimentTypes.ExperimentDetails, c
 		switch strings.ToLower(experimentsDetails.Sequence) {
 		case "serial":
 			if err = ebsloss.InjectChaosInSerialMode(experimentsDetails, volumeIDList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
-				return err
+				return stacktrace.Propagate(err, "could not run chaos in serial mode")
 			}
 		case "parallel":
 			if err = ebsloss.InjectChaosInParallelMode(experimentsDetails, volumeIDList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
-				return err
+				return stacktrace.Propagate(err, "could not run chaos in parallel mode")
 			}
 		default:
-			return errors.Errorf("%v sequence is not supported", experimentsDetails.Sequence)
+			return cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Reason: fmt.Sprintf("'%s' sequence is not supported", experimentsDetails.Sequence)}
 		}
 
 		//Waiting for the ramp time after chaos injection

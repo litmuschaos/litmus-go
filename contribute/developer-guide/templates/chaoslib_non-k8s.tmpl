@@ -1,0 +1,221 @@
+package lib
+
+import (
+	"os"
+	"os/signal"
+	"strings"
+	"syscall"
+	"time"
+
+	clients "github.com/litmuschaos/litmus-go/pkg/clients"
+	"github.com/litmuschaos/litmus-go/pkg/events"
+	"github.com/litmuschaos/litmus-go/pkg/log"
+	"github.com/litmuschaos/litmus-go/pkg/probe"
+	experimentTypes "github.com/litmuschaos/litmus-go/pkg/{{ .Category }}/{{ .Name }}/types"
+	"github.com/litmuschaos/litmus-go/pkg/types"
+	"github.com/litmuschaos/litmus-go/pkg/utils/common"
+)
+
+var (
+	err           error
+	inject, abort chan os.Signal
+)
+
+//PrepareChaos contains the preparation and injection steps for the experiment
+func PrepareChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+
+	// inject channel is used to transmit signal notifications.
+	inject = make(chan os.Signal, 1)
+	// Catch and relay certain signal(s) to inject channel.
+	signal.Notify(inject, os.Interrupt, syscall.SIGTERM)
+
+	// abort channel is used to transmit signal notifications.
+	abort = make(chan os.Signal, 1)
+	// Catch and relay certain signal(s) to abort channel.
+	signal.Notify(abort, os.Interrupt, syscall.SIGTERM)
+
+	//Waiting for the ramp time before chaos injection
+	if experimentsDetails.RampTime != 0 {
+		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", experimentsDetails.RampTime)
+		common.WaitForDuration(experimentsDetails.RampTime)
+	}
+
+    // @TODO: user FILTER THE TARGETS
+    // FILTER OUT THE TARGET SERVICES EITHER BY ID OR BY TAGS 
+	// THIS TEMPLATE CONTAINS THE SELECTION BY ID FOR TAG YOU NEED TO ADD/CALL A FUNCTION HERE
+	targetIDList := strings.Split(experimentsDetails.TargetID, ",")
+	if experimentsDetails.TargetID == "" {
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Reason: "no target id found"}
+	}
+
+	// watching for the abort signal and revert the chaos
+	go abortWatcher(experimentsDetails, targetIDList, chaosDetails)
+
+	switch strings.ToLower(experimentsDetails.Sequence) {
+	case "serial":
+		if err = injectChaosInSerialMode(experimentsDetails, targetIDList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+			return stacktrace.Propagate(err, "could not run chaos in serial mode")
+		}
+	case "parallel":
+		if err = injectChaosInParallelMode(experimentsDetails, targetIDList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+			return stacktrace.Propagate(err, "could not run chaos in parallel mode")
+		}
+	default:
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("'%s' sequence is not supported", experimentsDetails.Sequence)}
+	}
+
+	//Waiting for the ramp time after chaos injection
+	if experimentsDetails.RampTime != 0 {
+		log.Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", experimentsDetails.RampTime)
+		common.WaitForDuration(experimentsDetails.RampTime)
+	}
+	return nil
+}
+
+//injectChaosInSerialMode will inject the chaos on the target one after other 
+func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, targetIDList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+
+	select {
+	case <-inject:
+		// stopping the chaos execution, if abort signal received
+		os.Exit(0)
+	default:
+		//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
+		ChaosStartTimeStamp := time.Now()
+		duration := int(time.Since(ChaosStartTimeStamp).Seconds())
+
+		for duration < experimentsDetails.ChaosDuration {
+
+			log.Infof("[Info]: Target ID list, %v", targetIDList)
+
+			if experimentsDetails.EngineName != "" {
+				msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on target"
+				types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
+				events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
+			}
+
+			for i, id := range targetIDList {
+
+				// @TODO: user CHAOS-INJECTION-LOGIC
+				// PLACE YOUR CHAOS-INJECTION-LOGIC HERE BASED ON YOUR HYPOTHESIS
+				// FOR EXAMPLE TO PERFORM INSTANCE STOP CALL STOP API HERE
+
+
+				// @TODO: REPLACE THE TARGET WITH THE SERVICE UNDER CHAOS
+				common.SetTargets(id, "injected", "TARGET", chaosDetails)
+
+				log.Infof("[Wait]: Wait for chaos to be injected completely on: '%v'", id)
+
+				// @TODO: user WAIT-FOR-CHAOS-INJECTION
+				// WAIT UNTIL THE CHAOS IS INJECTED COMPLETLY 
+
+				// The OnChaos probes execution will start in the first iteration and keep running for the entire chaos duration
+				if len(resultDetails.ProbeDetails) != 0 && i == 0 {
+					if err = probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+						return err
+					}
+				}
+
+				log.Infof("[Wait]: Waiting for chaos interval of %vs", experimentsDetails.ChaosInterval)
+				time.Sleep(time.Duration(experimentsDetails.ChaosInterval) * time.Second)
+
+				// @TODO: user REVERT-CHAOS TO NORMAL STATE
+				// ADD THE LOGIC TO REMOVE THE CHAOS AND GET THE SERVICE IN HEALTHY STATE 
+
+
+				// @TODO: user WITH-FOR-CHAOS-REVERT
+				// WAIT UNTIL THE CHAOS IS COMPLETLY REMOVED AND SERVICE IS AGAIN HEALTHY
+
+				// @TODO: REPLACE THE TARGET WITH THE SERVICE UNDER CHAOS
+				common.SetTargets(id, "reverted", "TARGET", chaosDetails)
+			}
+			duration = int(time.Since(ChaosStartTimeStamp).Seconds())
+		}
+	}
+	return nil
+}
+
+// injectChaosInParallelMode will inject the chaos on the target all at once
+func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, targetIDList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+
+	select {
+	case <-inject:
+		// stopping the chaos execution, if abort signal received
+		os.Exit(0)
+	default:
+		//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
+		ChaosStartTimeStamp := time.Now()
+		duration := int(time.Since(ChaosStartTimeStamp).Seconds())
+
+		for duration < experimentsDetails.ChaosDuration {
+
+			log.Infof("[Info]: Target ID list, %v", targetIDList)
+
+			if experimentsDetails.EngineName != "" {
+				msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on target"
+				types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
+				events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
+			}
+
+
+			for _, id := range targetIDList {
+
+				// @TODO: user CHAOS-INJECTION-LOGIC
+				// PLACE YOUR CHAOS-INJECTION-LOGIC HERE BASED ON YOUR HYPOTHESIS
+				// FOR EXAMPLE TO PERFORM INSTANCE STOP CALL STOP API HERE
+
+				// @TODO: REPLACE THE TARGET WITH THE SERVICE UNDER CHAOS
+				common.SetTargets(id, "injected", "TARGET", chaosDetails)
+			}
+
+			for _, id := range targetIDList {
+
+				// @TODO: user WAIT-FOR-CHAOS-INJECTION
+				// WAIT UNTIL THE CHAOS IS INJECTED COMPLETLY 
+
+			}
+
+			// run the probes during chaos
+			if len(resultDetails.ProbeDetails) != 0 {
+				if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+					return err
+				}
+			}
+
+			//Wait for chaos interval
+			log.Infof("[Wait]: Waiting for chaos interval of %vs", experimentsDetails.ChaosInterval)
+			time.Sleep(time.Duration(experimentsDetails.ChaosInterval) * time.Second)
+
+				// @TODO: user REVERT-CHAOS TO NORMAL STATE
+				// ADD THE LOGIC TO REMOVE THE CHAOS AND GET THE SERVICE IN HEALTHY STATE 
+
+				// @TODO: user WITH-FOR-CHAOS-REVERT
+				// WAIT UNTIL THE CHAOS IS COMPLETLY REMOVED AND SERVICE IS AGAIN HEALTHY
+				
+			for _, id := range targetIDList {
+				// @TODO: REPLACE THE TARGET WITH THE SERVICE UNDER CHAOS
+				common.SetTargets(id, "reverted", "TARGET", chaosDetails)
+			}
+			duration = int(time.Since(ChaosStartTimeStamp).Seconds())
+		}
+	}
+	return nil
+}
+
+// watching for the abort signal and revert the chaos
+func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, targetIDList []string, chaosDetails *types.ChaosDetails) {
+
+	<-abort
+
+	log.Info("[Abort]: Chaos Revert Started")
+	for _, id := range targetIDList {
+
+		// @TODO: user REVERT-CHAOS TO NORMAL STATE
+		// ADD THE LOGIC TO REMOVE THE CHAOS AND GET THE SERVICE IN HEALTHY STATE 
+
+        // @TODO: REPLACE THE TARGET WITH THE SERVICE UNDER CHAOS
+		common.SetTargets(id, "reverted", "TARGET", chaosDetails)
+	}
+	log.Info("[Abort]: Chaos Revert Completed")
+	os.Exit(1)
+}

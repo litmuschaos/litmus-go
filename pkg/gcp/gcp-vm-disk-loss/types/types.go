@@ -11,7 +11,6 @@ type ExperimentDetails struct {
 	ChaosDuration               int
 	ChaosInterval               int
 	RampTime                    int
-	ChaosLib                    string
 	ChaosUID                    clientTypes.UID
 	InstanceID                  string
 	ChaosNamespace              string
@@ -22,7 +21,7 @@ type ExperimentDetails struct {
 	TargetContainer             string
 	GCPProjectID                string
 	DiskVolumeNames             string
-	DiskZones                   string
+	Zones                       string
 	DiskVolumeLabel             string
 	TargetDiskVolumeNamesList   []string
 	TargetDiskInstanceNamesList []string

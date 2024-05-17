@@ -1,10 +1,16 @@
 package lib
 
 import (
+	"context"
+	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
+
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
+	"github.com/palantir/stacktrace"
 
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-network-partition/types"
@@ -14,7 +20,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
-	"github.com/pkg/errors"
+	"github.com/litmuschaos/litmus-go/pkg/utils/stringutils"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	networkv1 "k8s.io/api/networking/v1"
@@ -25,7 +31,7 @@ var (
 	inject, abort chan os.Signal
 )
 
-//PrepareAndInjectChaos contains the prepration & injection steps
+// PrepareAndInjectChaos contains the prepration & injection steps
 func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	// inject channel is used to transmit signal notifications.
@@ -39,13 +45,14 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 	signal.Notify(abort, os.Interrupt, syscall.SIGTERM)
 
 	// validate the appLabels
-	if chaosDetails.AppDetail.Label == "" {
-		return errors.Errorf("please provide the appLabel")
+	if chaosDetails.AppDetail == nil {
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Reason: "provide the appLabel"}
 	}
+
 	// Get the target pod details for the chaos execution
-	targetPodList, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).List(v1.ListOptions{LabelSelector: experimentsDetails.AppLabel})
+	targetPodList, err := common.GetPodList("", 100, clients, chaosDetails)
 	if err != nil {
-		return err
+		return stacktrace.Propagate(err, "could not get target pods")
 	}
 
 	podNames := []string{}
@@ -55,7 +62,7 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 	log.Infof("Target pods list for chaos, %v", podNames)
 
 	// generate a unique string
-	runID := common.GetRunID()
+	runID := stringutils.GetRunID()
 
 	//Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
@@ -66,7 +73,7 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 	// collect all the data for the network policy
 	np := initialize()
 	if err := np.getNetworkPolicyDetails(experimentsDetails); err != nil {
-		return err
+		return stacktrace.Propagate(err, "could not get network policy details")
 	}
 
 	//DISPLAY THE NETWORK POLICY DETAILS
@@ -80,7 +87,7 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 	})
 
 	// watching for the abort signal and revert the chaos
-	go abortWatcher(experimentsDetails, clients, chaosDetails, resultDetails, targetPodList, runID)
+	go abortWatcher(experimentsDetails, clients, chaosDetails, resultDetails, &targetPodList, runID)
 
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
@@ -96,7 +103,7 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 	default:
 		// creating the network policy to block the traffic
 		if err := createNetworkPolicy(experimentsDetails, clients, np, runID); err != nil {
-			return err
+			return stacktrace.Propagate(err, "could not create network policy")
 		}
 		// updating chaos status to injected for the target pods
 		for _, pod := range targetPodList.Items {
@@ -105,16 +112,16 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 	}
 
 	// verify the presence of network policy inside cluster
-	if err := checkExistanceOfPolicy(experimentsDetails, clients, experimentsDetails.Timeout, experimentsDetails.Delay, runID); err != nil {
-		return err
+	if err := checkExistenceOfPolicy(experimentsDetails, clients, experimentsDetails.Timeout, experimentsDetails.Delay, runID); err != nil {
+		return stacktrace.Propagate(err, "could not check existence of network policy")
 	}
 
 	log.Infof("[Wait]: Wait for %v chaos duration", experimentsDetails.ChaosDuration)
 	common.WaitForDuration(experimentsDetails.ChaosDuration)
 
 	// deleting the network policy after chaos duration over
-	if err := deleteNetworkPolicy(experimentsDetails, clients, targetPodList, chaosDetails, experimentsDetails.Timeout, experimentsDetails.Delay, runID); err != nil {
-		return err
+	if err := deleteNetworkPolicy(experimentsDetails, clients, &targetPodList, chaosDetails, experimentsDetails.Timeout, experimentsDetails.Delay, runID); err != nil {
+		return stacktrace.Propagate(err, "could not delete network policy")
 	}
 
 	// updating chaos status to reverted for the target pods
@@ -155,25 +162,30 @@ func createNetworkPolicy(experimentsDetails *experimentTypes.ExperimentDetails, 
 		},
 	}
 
-	_, err := clients.KubeClient.NetworkingV1().NetworkPolicies(experimentsDetails.AppNS).Create(np)
-	return err
+	_, err := clients.KubeClient.NetworkingV1().NetworkPolicies(experimentsDetails.AppNS).Create(context.Background(), np, v1.CreateOptions{})
+	if err != nil {
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Reason: fmt.Sprintf("failed to create network policy: %s", err.Error())}
+	}
+	return nil
 }
 
 // deleteNetworkPolicy deletes the network policy and wait until the network policy deleted completely
 func deleteNetworkPolicy(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, targetPodList *corev1.PodList, chaosDetails *types.ChaosDetails, timeout, delay int, runID string) error {
 	name := experimentsDetails.ExperimentName + "-np-" + runID
 	labels := "name=" + experimentsDetails.ExperimentName + "-np-" + runID
-	if err := clients.KubeClient.NetworkingV1().NetworkPolicies(experimentsDetails.AppNS).Delete(name, &v1.DeleteOptions{}); err != nil {
-		return err
+	if err := clients.KubeClient.NetworkingV1().NetworkPolicies(experimentsDetails.AppNS).Delete(context.Background(), name, v1.DeleteOptions{}); err != nil {
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosRevert, Target: fmt.Sprintf("{name: %s, namespace: %s}", name, experimentsDetails.AppNS), Reason: fmt.Sprintf("failed to delete network policy: %s", err.Error())}
 	}
 
 	err := retry.
 		Times(uint(timeout / delay)).
 		Wait(time.Duration(delay) * time.Second).
 		Try(func(attempt uint) error {
-			npList, err := clients.KubeClient.NetworkingV1().NetworkPolicies(experimentsDetails.AppNS).List(v1.ListOptions{LabelSelector: labels})
-			if err != nil || len(npList.Items) != 0 {
-				return errors.Errorf("Unable to delete the network policy, err: %v", err)
+			npList, err := clients.KubeClient.NetworkingV1().NetworkPolicies(experimentsDetails.AppNS).List(context.Background(), v1.ListOptions{LabelSelector: labels})
+			if err != nil {
+				return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosRevert, Target: fmt.Sprintf("{labels: %s, namespace: %s}", labels, experimentsDetails.AppNS), Reason: fmt.Sprintf("failed to list network policies: %s", err.Error())}
+			} else if len(npList.Items) != 0 {
+				return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosRevert, Target: fmt.Sprintf("{labels: %s, namespace: %s}", labels, experimentsDetails.AppNS), Reason: "network policies are not deleted within timeout"}
 			}
 			return nil
 		})
@@ -188,17 +200,19 @@ func deleteNetworkPolicy(experimentsDetails *experimentTypes.ExperimentDetails, 
 	return nil
 }
 
-// checkExistanceOfPolicy validate the presence of network policy inside the application namespace
-func checkExistanceOfPolicy(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, timeout, delay int, runID string) error {
+// checkExistenceOfPolicy validate the presence of network policy inside the application namespace
+func checkExistenceOfPolicy(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, timeout, delay int, runID string) error {
 	labels := "name=" + experimentsDetails.ExperimentName + "-np-" + runID
 
 	return retry.
 		Times(uint(timeout / delay)).
 		Wait(time.Duration(delay) * time.Second).
 		Try(func(attempt uint) error {
-			npList, err := clients.KubeClient.NetworkingV1().NetworkPolicies(experimentsDetails.AppNS).List(v1.ListOptions{LabelSelector: labels})
-			if err != nil || len(npList.Items) == 0 {
-				return errors.Errorf("no network policy found, err: %v", err)
+			npList, err := clients.KubeClient.NetworkingV1().NetworkPolicies(experimentsDetails.AppNS).List(context.Background(), v1.ListOptions{LabelSelector: labels})
+			if err != nil {
+				return cerrors.Error{ErrorCode: cerrors.ErrorTypeStatusChecks, Target: fmt.Sprintf("{labels: %s, namespace: %s}", labels, experimentsDetails.AppNS), Reason: fmt.Sprintf("failed to list network policies: %s", err.Error())}
+			} else if len(npList.Items) == 0 {
+				return cerrors.Error{ErrorCode: cerrors.ErrorTypeStatusChecks, Target: fmt.Sprintf("{labels: %s, namespace: %s}", labels, experimentsDetails.AppNS), Reason: "no network policy found with matching labels"}
 			}
 			return nil
 		})
@@ -214,8 +228,13 @@ func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, clients
 	// retry thrice for the chaos revert
 	retry := 3
 	for retry > 0 {
-		if err := checkExistanceOfPolicy(experimentsDetails, clients, 2, 1, runID); err != nil {
-			log.Infof("no active network policy found, err: %v", err)
+		if err := checkExistenceOfPolicy(experimentsDetails, clients, 2, 1, runID); err != nil {
+			if error, ok := err.(cerrors.Error); ok {
+				if strings.Contains(error.Reason, "no network policy found with matching labels") {
+					break
+				}
+			}
+			log.Infof("no active network policy found, err: %v", err.Error())
 			retry--
 			continue
 		}
@@ -223,10 +242,12 @@ func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, clients
 		if err := deleteNetworkPolicy(experimentsDetails, clients, targetPodList, chaosDetails, 2, 1, runID); err != nil {
 			log.Errorf("unable to delete network policy, err: %v", err)
 		}
+		retry--
 	}
 	// updating the chaosresult after stopped
-	failStep := "Chaos injection stopped!"
-	types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep)
+	err := cerrors.Error{ErrorCode: cerrors.ErrorTypeExperimentAborted, Reason: "experiment is aborted"}
+	failStep, errCode := cerrors.GetRootCauseAndErrorCode(err, string(chaosDetails.Phase))
+	types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep, errCode)
 	result.ChaosResult(chaosDetails, clients, resultDetails, "EOT")
 	log.Info("Chaos Revert Completed")
 	os.Exit(0)

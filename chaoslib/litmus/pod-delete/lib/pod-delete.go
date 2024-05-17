@@ -1,9 +1,15 @@
 package lib
 
 import (
+	"context"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
+	"github.com/litmuschaos/litmus-go/pkg/workloads"
+	"github.com/palantir/stacktrace"
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
@@ -12,15 +18,12 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
-	"github.com/litmuschaos/litmus-go/pkg/utils/annotation"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	apiv1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-//PreparePodDelete contains the prepration steps before chaos injection
+// PreparePodDelete contains the prepration steps before chaos injection
 func PreparePodDelete(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	//Waiting for the ramp time before chaos injection
@@ -29,7 +32,7 @@ func PreparePodDelete(experimentsDetails *experimentTypes.ExperimentDetails, cli
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 
-	//setup the tunables if provided in range
+	//set up the tunables if provided in range
 	SetChaosTunables(experimentsDetails)
 
 	log.InfoWithValues("[Info]: The chaos tunables are:", logrus.Fields{
@@ -40,14 +43,14 @@ func PreparePodDelete(experimentsDetails *experimentTypes.ExperimentDetails, cli
 	switch strings.ToLower(experimentsDetails.Sequence) {
 	case "serial":
 		if err := injectChaosInSerialMode(experimentsDetails, clients, chaosDetails, eventsDetails, resultDetails); err != nil {
-			return err
+			return stacktrace.Propagate(err, "could not run chaos in serial mode")
 		}
 	case "parallel":
 		if err := injectChaosInParallelMode(experimentsDetails, clients, chaosDetails, eventsDetails, resultDetails); err != nil {
-			return err
+			return stacktrace.Propagate(err, "could not run chaos in parallel mode")
 		}
 	default:
-		return errors.Errorf("%v sequence is not supported", experimentsDetails.Sequence)
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("'%s' sequence is not supported", experimentsDetails.Sequence)}
 	}
 
 	//Waiting for the ramp time after chaos injection
@@ -61,9 +64,6 @@ func PreparePodDelete(experimentsDetails *experimentTypes.ExperimentDetails, cli
 // injectChaosInSerialMode delete the target application pods serial mode(one by one)
 func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, eventsDetails *types.EventDetails, resultDetails *types.ResultDetails) error {
 
-	targetPodList := apiv1.PodList{}
-	var err error
-	var podsAffectedPerc int
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
 		if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
@@ -79,49 +79,26 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 	for duration < experimentsDetails.ChaosDuration {
 		// Get the target pod details for the chaos execution
 		// if the target pod is not defined it will derive the random target pod list using pod affected percentage
-		if experimentsDetails.TargetPods == "" && chaosDetails.AppDetail.Label == "" {
-			return errors.Errorf("please provide one of the appLabel or TARGET_PODS")
+		if experimentsDetails.TargetPods == "" && chaosDetails.AppDetail == nil {
+			return cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Reason: "provide one of the appLabel or TARGET_PODS"}
 		}
-		podsAffectedPerc, _ = strconv.Atoi(experimentsDetails.PodsAffectedPerc)
-		if experimentsDetails.NodeLabel == "" {
-			targetPodList, err = common.GetPodList(experimentsDetails.TargetPods, podsAffectedPerc, clients, chaosDetails)
-			if err != nil {
-				return err
-			}
-		} else {
-			if experimentsDetails.TargetPods == "" {
-				targetPodList, err = common.GetPodListFromSpecifiedNodes(experimentsDetails.TargetPods, podsAffectedPerc, experimentsDetails.NodeLabel, clients, chaosDetails)
-				if err != nil {
-					return err
-				}
-			} else {
-				log.Infof("TARGET_PODS env is provided, overriding the NODE_LABEL input")
-				targetPodList, err = common.GetPodList(experimentsDetails.TargetPods, podsAffectedPerc, clients, chaosDetails)
-				if err != nil {
-					return err
-				}
-			}
+
+		targetPodList, err := common.GetTargetPods(experimentsDetails.NodeLabel, experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, clients, chaosDetails)
+		if err != nil {
+			return stacktrace.Propagate(err, "could not get target pods")
 		}
 
 		// deriving the parent name of the target resources
-		if chaosDetails.AppDetail.Kind != "" {
-			for _, pod := range targetPodList.Items {
-				parentName, err := annotation.GetParentName(clients, pod, chaosDetails)
-				if err != nil {
-					return err
-				}
-				common.SetParentName(parentName, chaosDetails)
-			}
-			for _, target := range chaosDetails.ParentsResources {
-				common.SetTargets(target, "targeted", chaosDetails.AppDetail.Kind, chaosDetails)
-			}
-		}
-
-		podNames := []string{}
 		for _, pod := range targetPodList.Items {
-			podNames = append(podNames, pod.Name)
+			kind, parentName, err := workloads.GetPodOwnerTypeAndName(&pod, clients.DynamicClient)
+			if err != nil {
+				return stacktrace.Propagate(err, "could not get pod owner name and kind")
+			}
+			common.SetParentName(parentName, kind, pod.Namespace, chaosDetails)
 		}
-		log.Infof("Target pods list: %v", podNames)
+		for _, target := range chaosDetails.ParentsResources {
+			common.SetTargets(target.Name, "targeted", target.Kind, chaosDetails)
+		}
 
 		if experimentsDetails.EngineName != "" {
 			msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on application pod"
@@ -136,18 +113,18 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 				"PodName": pod.Name})
 
 			if experimentsDetails.Force {
-				err = clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Delete(pod.Name, &v1.DeleteOptions{GracePeriodSeconds: &GracePeriod})
+				err = clients.KubeClient.CoreV1().Pods(pod.Namespace).Delete(context.Background(), pod.Name, v1.DeleteOptions{GracePeriodSeconds: &GracePeriod})
 			} else {
-				err = clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Delete(pod.Name, &v1.DeleteOptions{})
+				err = clients.KubeClient.CoreV1().Pods(pod.Namespace).Delete(context.Background(), pod.Name, v1.DeleteOptions{})
 			}
 			if err != nil {
-				return err
+				return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Target: fmt.Sprintf("{podName: %s, namespace: %s}", pod.Name, pod.Namespace), Reason: fmt.Sprintf("failed to delete the target pod: %s", err.Error())}
 			}
 
 			switch chaosDetails.Randomness {
 			case true:
 				if err := common.RandomInterval(experimentsDetails.ChaosInterval); err != nil {
-					return err
+					return stacktrace.Propagate(err, "could not get random chaos interval")
 				}
 			default:
 				//Waiting for the chaos interval after chaos injection
@@ -160,8 +137,15 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 
 			//Verify the status of pod after the chaos injection
 			log.Info("[Status]: Verification for the recreation of application pod")
-			if err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
-				return err
+			for _, parent := range chaosDetails.ParentsResources {
+				target := types.AppDetails{
+					Names:     []string{parent.Name},
+					Kind:      parent.Kind,
+					Namespace: parent.Namespace,
+				}
+				if err = status.CheckUnTerminatedPodStatusesByWorkloadName(target, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
+					return stacktrace.Propagate(err, "could not check pod statuses by workload names")
+				}
 			}
 
 			duration = int(time.Since(ChaosStartTimeStamp).Seconds())
@@ -177,9 +161,6 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 // injectChaosInParallelMode delete the target application pods in parallel mode (all at once)
 func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, eventsDetails *types.EventDetails, resultDetails *types.ResultDetails) error {
 
-	targetPodList := apiv1.PodList{}
-	var err error
-	var podsAffectedPerc int
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
 		if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
@@ -195,49 +176,25 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 	for duration < experimentsDetails.ChaosDuration {
 		// Get the target pod details for the chaos execution
 		// if the target pod is not defined it will derive the random target pod list using pod affected percentage
-		if experimentsDetails.TargetPods == "" && chaosDetails.AppDetail.Label == "" {
-			return errors.Errorf("please provide one of the appLabel or TARGET_PODS")
+		if experimentsDetails.TargetPods == "" && chaosDetails.AppDetail == nil {
+			return cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Reason: "please provide one of the appLabel or TARGET_PODS"}
 		}
-		podsAffectedPerc, _ = strconv.Atoi(experimentsDetails.PodsAffectedPerc)
-		if experimentsDetails.NodeLabel == "" {
-			targetPodList, err = common.GetPodList(experimentsDetails.TargetPods, podsAffectedPerc, clients, chaosDetails)
-			if err != nil {
-				return err
-			}
-		} else {
-			if experimentsDetails.TargetPods == "" {
-				targetPodList, err = common.GetPodListFromSpecifiedNodes(experimentsDetails.TargetPods, podsAffectedPerc, experimentsDetails.NodeLabel, clients, chaosDetails)
-				if err != nil {
-					return err
-				}
-			} else {
-				log.Infof("TARGET_PODS env is provided, overriding the NODE_LABEL input")
-				targetPodList, err = common.GetPodList(experimentsDetails.TargetPods, podsAffectedPerc, clients, chaosDetails)
-				if err != nil {
-					return err
-				}
-			}
+		targetPodList, err := common.GetTargetPods(experimentsDetails.NodeLabel, experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, clients, chaosDetails)
+		if err != nil {
+			return stacktrace.Propagate(err, "could not get target pods")
 		}
 
 		// deriving the parent name of the target resources
-		if chaosDetails.AppDetail.Kind != "" {
-			for _, pod := range targetPodList.Items {
-				parentName, err := annotation.GetParentName(clients, pod, chaosDetails)
-				if err != nil {
-					return err
-				}
-				common.SetParentName(parentName, chaosDetails)
-			}
-			for _, target := range chaosDetails.ParentsResources {
-				common.SetTargets(target, "targeted", chaosDetails.AppDetail.Kind, chaosDetails)
-			}
-		}
-
-		podNames := []string{}
 		for _, pod := range targetPodList.Items {
-			podNames = append(podNames, pod.Name)
+			kind, parentName, err := workloads.GetPodOwnerTypeAndName(&pod, clients.DynamicClient)
+			if err != nil {
+				return stacktrace.Propagate(err, "could not get pod owner name and kind")
+			}
+			common.SetParentName(parentName, kind, pod.Namespace, chaosDetails)
 		}
-		log.Infof("Target pods list: %v", podNames)
+		for _, target := range chaosDetails.ParentsResources {
+			common.SetTargets(target.Name, "targeted", target.Kind, chaosDetails)
+		}
 
 		if experimentsDetails.EngineName != "" {
 			msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on application pod"
@@ -252,19 +209,19 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 				"PodName": pod.Name})
 
 			if experimentsDetails.Force {
-				err = clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Delete(pod.Name, &v1.DeleteOptions{GracePeriodSeconds: &GracePeriod})
+				err = clients.KubeClient.CoreV1().Pods(pod.Namespace).Delete(context.Background(), pod.Name, v1.DeleteOptions{GracePeriodSeconds: &GracePeriod})
 			} else {
-				err = clients.KubeClient.CoreV1().Pods(experimentsDetails.AppNS).Delete(pod.Name, &v1.DeleteOptions{})
+				err = clients.KubeClient.CoreV1().Pods(pod.Namespace).Delete(context.Background(), pod.Name, v1.DeleteOptions{})
 			}
 			if err != nil {
-				return err
+				return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Target: fmt.Sprintf("{podName: %s, namespace: %s}", pod.Name, pod.Namespace), Reason: fmt.Sprintf("failed to delete the target pod: %s", err.Error())}
 			}
 		}
 
 		switch chaosDetails.Randomness {
 		case true:
 			if err := common.RandomInterval(experimentsDetails.ChaosInterval); err != nil {
-				return err
+				return stacktrace.Propagate(err, "could not get random chaos interval")
 			}
 		default:
 			//Waiting for the chaos interval after chaos injection
@@ -277,8 +234,15 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 
 		//Verify the status of pod after the chaos injection
 		log.Info("[Status]: Verification for the recreation of application pod")
-		if err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
-			return err
+		for _, parent := range chaosDetails.ParentsResources {
+			target := types.AppDetails{
+				Names:     []string{parent.Name},
+				Kind:      parent.Kind,
+				Namespace: parent.Namespace,
+			}
+			if err = status.CheckUnTerminatedPodStatusesByWorkloadName(target, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
+				return stacktrace.Propagate(err, "could not check pod statuses by workload names")
+			}
 		}
 		duration = int(time.Since(ChaosStartTimeStamp).Seconds())
 	}
@@ -288,8 +252,8 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 	return nil
 }
 
-//SetChaosTunables will setup a random value within a given range of values
-//If the value is not provided in range it'll setup the initial provided value.
+// SetChaosTunables will setup a random value within a given range of values
+// If the value is not provided in range it'll setup the initial provided value.
 func SetChaosTunables(experimentsDetails *experimentTypes.ExperimentDetails) {
 	experimentsDetails.PodsAffectedPerc = common.ValidateRange(experimentsDetails.PodsAffectedPerc)
 	experimentsDetails.Sequence = common.GetRandomSequence(experimentsDetails.Sequence)

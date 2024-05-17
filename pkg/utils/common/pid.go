@@ -1,14 +1,16 @@
 package common
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
+	"github.com/palantir/stacktrace"
 	"os/exec"
 	"strconv"
 	"strings"
 
 	"github.com/litmuschaos/litmus-go/pkg/log"
-	"github.com/pkg/errors"
 )
 
 // CrictlInspectResponse JSON representation of crictl inspect command output
@@ -50,91 +52,124 @@ type StateDetails struct {
 	PID int `json:"pid"`
 }
 
-//GetPID extract out the PID of the target container
-func GetPID(runtime, containerID, socketPath string) (int, error) {
-	var PID int
-
-	switch runtime {
-	case "docker":
-		host := "unix://" + socketPath
-		// deriving pid from the inspect out of target container
-		out, err := exec.Command("sudo", "docker", "--host", host, "inspect", containerID).CombinedOutput()
-		if err != nil {
-			log.Error(fmt.Sprintf("[docker]: Failed to run docker inspect: %s", string(out)))
-			return 0, err
-		}
-		// parsing data from the json output of inspect command
-		PID, err = parsePIDFromJSON(out, runtime)
-		if err != nil {
-			log.Error(fmt.Sprintf("[docker]: Failed to parse json from docker inspect output: %s", string(out)))
-			return 0, err
-		}
-	case "containerd", "crio":
-		// deriving pid from the inspect out of target container
-		endpoint := "unix://" + socketPath
-		out, err := exec.Command("sudo", "crictl", "-i", endpoint, "-r", endpoint, "inspect", containerID).CombinedOutput()
-		if err != nil {
-			log.Error(fmt.Sprintf("[cri]: Failed to run crictl: %s", string(out)))
-			return 0, err
-		}
-		// parsing data from the json output of inspect command
-		PID, err = parsePIDFromJSON(out, runtime)
-		if err != nil {
-			log.Errorf(fmt.Sprintf("[cri]: Failed to parse json from crictl output: %s", string(out)))
-			return 0, err
-		}
-	default:
-		return 0, errors.Errorf("%v container runtime not suported", runtime)
+func getDockerPID(containerID, socketPath, source string) (int, error) {
+	cmd := exec.Command("sudo", "docker", "--host", fmt.Sprintf("unix://%s", socketPath), "inspect", containerID)
+	out, err := inspect(cmd, containerID, source)
+	if err != nil {
+		return 0, stacktrace.Propagate(err, "could not inspect container id")
 	}
 
-	log.Info(fmt.Sprintf("[Info]: Container ID=%s has process PID=%d", containerID, PID))
-
-	return PID, nil
+	// in docker, pid is present inside state.pid attribute of inspect output
+	var resp []DockerInspectResponse
+	if err := json.Unmarshal(out, &resp); err != nil {
+		return 0, cerrors.Error{ErrorCode: cerrors.ErrorTypeContainerRuntime, Source: source, Target: fmt.Sprintf("containerID: %s", containerID), Reason: fmt.Sprintf("failed to parse pid: %s", err.Error())}
+	}
+	pid := resp[0].State.PID
+	return pid, nil
 }
 
-//parsePIDFromJSON extract the pid from the json output
-func parsePIDFromJSON(j []byte, runtime string) (int, error) {
+func getContainerdSandboxPID(containerID, socketPath, source string) (int, error) {
 	var pid int
-	// namespaces are present inside `info.runtimeSpec.linux.namespaces` of inspect output
-	// linux namespace of type network contains pid, in the form of `/proc/<pid>/ns/net`
-	switch runtime {
-	case "docker":
-		// in docker, pid is present inside state.pid attribute of inspect output
-		var resp []DockerInspectResponse
-		if err := json.Unmarshal(j, &resp); err != nil {
-			return 0, err
-		}
-		pid = resp[0].State.PID
-	case "containerd":
-		var resp CrictlInspectResponse
-		if err := json.Unmarshal(j, &resp); err != nil {
-			return 0, err
-		}
-		for _, namespace := range resp.Info.RuntimeSpec.Linux.Namespaces {
-			if namespace.Type == "network" {
-				value := strings.Split(namespace.Path, "/")[2]
-				pid, _ = strconv.Atoi(value)
-			}
-		}
-	case "crio":
-		var info InfoDetails
-		if err := json.Unmarshal(j, &info); err != nil {
-			return 0, err
-		}
-		pid = info.PID
-		if pid == 0 {
-			var resp CrictlInspectResponse
-			if err := json.Unmarshal(j, &resp); err != nil {
-				return 0, err
-			}
-			pid = resp.Info.PID
-		}
-	default:
-		return 0, errors.Errorf("[cri]: unsupported container runtime, runtime: %v", runtime)
-	}
-	if pid == 0 {
-		return 0, errors.Errorf("[cri]: No running target container found, pid: %d", pid)
+	cmd := exec.Command("sudo", "crictl", "-i", fmt.Sprintf("unix://%s", socketPath), "-r", fmt.Sprintf("unix://%s", socketPath), "inspect", containerID)
+	out, err := inspect(cmd, containerID, source)
+	if err != nil {
+		return 0, stacktrace.Propagate(err, "could not inspect container id")
 	}
 
+	var resp CrictlInspectResponse
+	if err := json.Unmarshal(out, &resp); err != nil {
+		return 0, cerrors.Error{ErrorCode: cerrors.ErrorTypeContainerRuntime, Source: source, Target: fmt.Sprintf("containerID: %s", containerID), Reason: fmt.Sprintf("failed to parse pid: %s", err.Error())}
+	}
+	for _, namespace := range resp.Info.RuntimeSpec.Linux.Namespaces {
+		if namespace.Type == "network" {
+			value := strings.Split(namespace.Path, "/")[2]
+			pid, _ = strconv.Atoi(value)
+		}
+	}
 	return pid, nil
+}
+
+func getContainerdPID(containerID, socketPath, source string) (int, error) {
+	var pid int
+	cmd := exec.Command("sudo", "crictl", "-i", fmt.Sprintf("unix://%s", socketPath), "-r", fmt.Sprintf("unix://%s", socketPath), "inspect", containerID)
+	out, err := inspect(cmd, containerID, source)
+	if err != nil {
+		return 0, stacktrace.Propagate(err, "could not inspect container id")
+	}
+
+	var resp CrictlInspectResponse
+	if err := json.Unmarshal(out, &resp); err != nil {
+		return 0, cerrors.Error{ErrorCode: cerrors.ErrorTypeContainerRuntime, Source: source, Target: fmt.Sprintf("{containerID: %s}", containerID), Reason: fmt.Sprintf("failed to parse pid: %s", err.Error())}
+	}
+	pid = resp.Info.PID
+	if pid == 0 {
+		return 0, cerrors.Error{ErrorCode: cerrors.ErrorTypeContainerRuntime, Source: source, Target: fmt.Sprintf("{containerID: %s}", containerID), Reason: fmt.Sprintf("no running target container found")}
+	}
+	return pid, nil
+}
+
+func getCRIOPID(containerID, socketPath, source string) (int, error) {
+	var pid int
+	cmd := exec.Command("sudo", "crictl", "-i", fmt.Sprintf("unix://%s", socketPath), "-r", fmt.Sprintf("unix://%s", socketPath), "inspect", containerID)
+	out, err := inspect(cmd, containerID, source)
+	if err != nil {
+		return 0, stacktrace.Propagate(err, "could not inspect container id")
+	}
+
+	var info InfoDetails
+	if err := json.Unmarshal(out, &info); err != nil {
+		return 0, cerrors.Error{ErrorCode: cerrors.ErrorTypeContainerRuntime, Source: source, Target: fmt.Sprintf("containerID: %s", containerID), Reason: fmt.Sprintf("failed to parse pid: %s", err.Error())}
+	}
+	pid = info.PID
+	if pid == 0 {
+		var resp CrictlInspectResponse
+		if err := json.Unmarshal(out, &resp); err != nil {
+			return 0, cerrors.Error{ErrorCode: cerrors.ErrorTypeContainerRuntime, Source: source, Target: fmt.Sprintf("containerID: %s", containerID), Reason: fmt.Sprintf("failed to parse pid: %s", err.Error())}
+		}
+		pid = resp.Info.PID
+	}
+	return pid, nil
+}
+
+// GetPauseAndSandboxPID extract out the PID of the target container
+func GetPauseAndSandboxPID(runtime, containerID, socketPath, source string) (int, error) {
+	var pid int
+
+	switch runtime {
+	case "docker":
+		pid, err = getDockerPID(containerID, socketPath, source)
+	case "containerd":
+		pid, err = getContainerdSandboxPID(containerID, socketPath, source)
+	case "crio":
+		pid, err = getCRIOPID(containerID, socketPath, source)
+	default:
+		return 0, cerrors.Error{ErrorCode: cerrors.ErrorTypeHelper, Source: source, Reason: fmt.Sprintf("unsupported container runtime: %s", runtime)}
+	}
+	if err != nil {
+		return 0, err
+	}
+
+	if pid == 0 {
+		return 0, cerrors.Error{ErrorCode: cerrors.ErrorTypeHelper, Source: source, Target: fmt.Sprintf("containerID: %s", containerID), Reason: fmt.Sprintf("no running target container found")}
+	}
+
+	log.Info(fmt.Sprintf("[Info]: Container ID=%s has process PID=%d", containerID, pid))
+	return pid, nil
+}
+
+func GetPID(runtime, containerID, socketPath, source string) (int, error) {
+	if runtime == "containerd" {
+		return getContainerdPID(containerID, socketPath, source)
+	}
+	return GetPauseAndSandboxPID(runtime, containerID, socketPath, source)
+}
+
+func inspect(cmd *exec.Cmd, containerID, source string) ([]byte, error) {
+	var out, stdErr bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &stdErr
+	if err := cmd.Run(); err != nil {
+		return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeContainerRuntime, Source: source, Target: fmt.Sprintf("{containerID: %s}", containerID), Reason: fmt.Sprintf("failed to get container pid: %s", stdErr.String())}
+	}
+	return out.Bytes(), nil
 }

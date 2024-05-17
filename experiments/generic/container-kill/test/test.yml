@@ -48,9 +48,6 @@ spec:
           - name: RAMP_TIME
             value: ''
 
-          - name: LIB 
-            value: 'litmus'
-
           # provide the container runtime path
           # applicable only for containerd and crio runtime
           - name: SOCKET_PATH
@@ -58,9 +55,9 @@ spec:
 
           # provide the name of container runtime
           # it supports docker, containerd, crio
-          # default to docker
+          # defaults to containerd
           - name: CONTAINER_RUNTIME
-            value: 'docker'
+            value: 'containerd'
 
            ## percentage of total pods to target
           - name: PODS_AFFECTED_PERC

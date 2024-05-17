@@ -12,7 +12,7 @@ jobs:
       # Install golang
       - uses: actions/setup-go@v2
         with:
-          go-version: 1.17
+          go-version: 1.18
 
       - uses: actions/checkout@v2
         with:
@@ -49,22 +49,6 @@ jobs:
           tar -zxvf gitleaks_8.18.2_linux_x64.tar.gz && \
           sudo mv gitleaks /usr/local/bin && gitleaks detect --source . -v
 
-  security:
-    container:
-      image: litmuschaos/snyk:1.0
-      volumes:
-      - /home/runner/work/_actions/:/home/runner/work/_actions/
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - uses: snyk/actions/setup@master
-      - run: snyk auth ${SNYK_TOKEN}
-      - uses: actions/setup-go@v1
-        with:
-          go-version: '1.17'
-      - name: Snyk monitor
-        run: snyk test
-
   build:
     needs: pre-checks
     runs-on: ubuntu-latest
@@ -72,7 +56,7 @@ jobs:
       # Install golang
       - uses: actions/setup-go@v2
         with:
-          go-version: 1.17
+          go-version: 1.18
 
       - uses: actions/checkout@v2
         with:

@@ -31,7 +31,7 @@ deps: _build_check_docker
 
 _build_check_docker:
 	@echo "------------------"
-	@echo "--> Check the Docker deps" 
+	@echo "--> Check the Docker deps"
 	@echo "------------------"
 	@if [ $(IS_DOCKER_INSTALLED) -eq 1 ]; \
 		then echo "" \
@@ -56,7 +56,7 @@ unused-package-check:
 .PHONY: docker.buildx
 docker.buildx:
 	@echo "------------------------------"
-	@echo "--> Setting up Builder        " 
+	@echo "--> Setting up Builder        "
 	@echo "------------------------------"
 	@if ! docker buildx ls | grep -q multibuilder; then\
 		docker buildx create --name multibuilder;\
@@ -69,7 +69,7 @@ push: docker.buildx image-push
 
 image-push:
 	@echo "------------------------"
-	@echo "--> Push go-runner image" 
+	@echo "--> Push go-runner image"
 	@echo "------------------------"
 	@echo "Pushing $(DOCKER_REPO)/$(DOCKER_IMAGE):$(DOCKER_TAG)"
 	@docker buildx build . --push --file build/Dockerfile --progress plane --platform linux/arm64,linux/amd64 --no-cache --tag $(DOCKER_REGISTRY)/$(DOCKER_REPO)/$(DOCKER_IMAGE):$(DOCKER_TAG)
@@ -78,7 +78,7 @@ image-push:
 .PHONY: build-amd64
 build-amd64:
 	@echo "-------------------------"
-	@echo "--> Build go-runner image" 
+	@echo "--> Build go-runner image"
 	@echo "-------------------------"
 	@sudo docker build --file build/Dockerfile --tag $(DOCKER_REGISTRY)/$(DOCKER_REPO)/$(DOCKER_IMAGE):$(DOCKER_TAG) . --build-arg TARGETARCH=amd64
 
@@ -86,10 +86,10 @@ build-amd64:
 push-amd64:
 
 	@echo "------------------------------"
-	@echo "--> Pushing image" 
+	@echo "--> Pushing image"
 	@echo "------------------------------"
 	@sudo docker push $(DOCKER_REGISTRY)/$(DOCKER_REPO)/$(DOCKER_IMAGE):$(DOCKER_TAG)
-		
+
 .PHONY: trivy-check
 trivy-check:
 
