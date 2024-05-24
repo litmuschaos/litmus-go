@@ -224,6 +224,14 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 						},
 					},
 				},
+				{
+					Name: "netns",
+					VolumeSource: apiv1.VolumeSource{
+						HostPath: &apiv1.HostPathVolumeSource{
+							Path: "/var/run/netns",
+						},
+					},
+				},
 			},
 
 			Containers: []apiv1.Container{
@@ -244,6 +252,10 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 						{
 							Name:      "cri-socket",
 							MountPath: experimentsDetails.SocketPath,
+						},
+						{
+							Name:      "netns",
+							MountPath: "/var/run/netns",
 						},
 					},
 					SecurityContext: &apiv1.SecurityContext{

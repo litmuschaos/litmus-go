@@ -35,6 +35,7 @@ COPY --from=dep /usr/bin/sudo /usr/bin/sudo
 COPY --from=dep /usr/lib/sudo /usr/lib/sudo
 COPY --from=dep /sbin/tc /sbin/
 COPY --from=dep /sbin/iptables /sbin/
+COPY --from=dep /sbin/ip /sbin/
 
 # Copying Necessary Files
 COPY ./pkg/cloud/aws/common/ssm-docs/LitmusChaos-AWS-SSM-Docs.yml .
