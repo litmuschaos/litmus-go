@@ -88,7 +88,7 @@ func GetNetNS(pid int, source string) (string, error) {
 	if err := cmd.Run(); err != nil {
 		return "", err
 	}
-	
+
 	netns := out.String()
 	// Removing trailing newline character
 	netnstrim := netns[:len(netns)-1]
