@@ -35,7 +35,6 @@ COPY --from=dep /usr/bin/sudo /usr/bin/
 COPY --from=dep /usr/lib/sudo /usr/lib/sudo
 COPY --from=dep /sbin/tc /sbin/
 COPY --from=dep /sbin/iptables /sbin/
-COPY --from=dep /sbin/iptables /sbin/
 COPY --from=dep /sbin/ip /sbin/
 
 #Copying Necessary Files
