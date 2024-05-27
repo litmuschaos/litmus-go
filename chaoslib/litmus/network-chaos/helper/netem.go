@@ -78,7 +78,7 @@ func Helper(clients clients.ClientSets) {
 }
 
 // Retrieve ID of the network namespace of the target container
-func GetNetNS(pid int, source string) (string, error) {
+func GetNetNS(pid int) (string, error) {
 
 	cmd := exec.Command("sudo", "ip", "netns", "identify", fmt.Sprintf("%d", pid))
 
@@ -131,7 +131,7 @@ func preparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetail
 			return stacktrace.Propagate(err, "could not get container pid")
 		}
 
-		td.NetNS, err = GetNetNS(td.Pid, td.Source)
+		td.NetNS, err = GetNetNS(td.Pid)
 		if err != nil {
 			return stacktrace.Propagate(err, "could not get netns id")
 		}
