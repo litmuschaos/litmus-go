@@ -21,6 +21,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
 	"github.com/palantir/stacktrace"
+	"github.com/pkg/errors"
 )
 
 var (
@@ -48,6 +49,9 @@ func PrepareChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients
 	}
 
 	//get the disk name  or list of disk names
+	if strings.Count(experimentsDetails.VirtualDiskNames, ",") == len(experimentsDetails.VirtualDiskNames) {
+		return errors.Errorf("variable contains only one or more commas")
+	}
 	diskNameList := strings.Split(experimentsDetails.VirtualDiskNames, ",")
 	if experimentsDetails.VirtualDiskNames == "" || len(diskNameList) == 0 {
 		return cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Reason: "no volume names found to detach"}

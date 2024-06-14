@@ -15,6 +15,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/palantir/stacktrace"
+	"github.com/pkg/errors"
 )
 
 var (
@@ -48,6 +49,9 @@ func PrepareEBSLossByID(experimentsDetails *experimentTypes.ExperimentDetails, c
 	default:
 
 		//get the volume id or list of instance ids
+		if strings.Count(experimentsDetails.EBSVolumeID, ",") == len(experimentsDetails.EBSVolumeID) {
+			return errors.Errorf("variable contains only one or more commas")
+		}
 		volumeIDList := strings.Split(experimentsDetails.EBSVolumeID, ",")
 		if len(volumeIDList) == 0 {
 			return cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Reason: "no volume id found to detach"}
