@@ -1,6 +1,8 @@
 package experiment
 
 import (
+	"os"
+
 	"github.com/litmuschaos/chaos-operator/api/litmuschaos/v1alpha1"
 	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/pod-delete/lib"
 	"github.com/litmuschaos/litmus-go/pkg/clients"
@@ -14,12 +16,10 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/sirupsen/logrus"
-	"os"
 )
 
 // PodDelete inject the pod-delete chaos
 func PodDelete(clients clients.ClientSets) {
-
 	experimentsDetails := experimentTypes.ExperimentDetails{}
 	resultDetails := types.ResultDetails{}
 	eventsDetails := types.EventDetails{}
@@ -58,7 +58,7 @@ func PodDelete(clients clients.ClientSets) {
 		return
 	}
 
-	// generating the event in chaosresult to marked the verdict as awaited
+	// generating the event in chaosresult to mark the verdict as awaited
 	msg := "experiment: " + experimentsDetails.ExperimentName + ", Result: Awaited"
 	types.SetResultEventAttributes(&eventsDetails, types.AwaitedVerdict, msg, "Normal", &resultDetails)
 	if err := events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosResult"); err != nil {

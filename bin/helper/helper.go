@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"flag"
 	// Uncomment to load all auth plugins
 	// _ "k8s.io/client-go/plugin/pkg/client/auth"
@@ -17,8 +19,9 @@ import (
 	networkChaos "github.com/litmuschaos/litmus-go/chaoslib/litmus/network-chaos/helper"
 	dnsChaos "github.com/litmuschaos/litmus-go/chaoslib/litmus/pod-dns-chaos/helper"
 	stressChaos "github.com/litmuschaos/litmus-go/chaoslib/litmus/stress-chaos/helper"
+	"github.com/litmuschaos/litmus-go/pkg/telemetry"
 
-	"github.com/litmuschaos/litmus-go/pkg/clients"
+	cli "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/sirupsen/logrus"
 )
@@ -33,8 +36,22 @@ func init() {
 }
 
 func main() {
+	ctx := context.Background()
+	// Set up Observability.
+	shutdown, err := telemetry.InitOTelSDK(ctx, false)
+	if err != nil {
+		return
+	}
+	// Handle shutdown properly so nothing leaks.
+	defer func() {
+		err = errors.Join(err, shutdown(ctx))
+	}()
 
-	clients := clients.ClientSets{}
+	ctx = telemetry.GetTraceParentContext()
+	clients := cli.ClientSets{Context: ctx}
+
+	span := telemetry.StartTracing(clients, "ExecuteExperimentHelper")
+	defer span.End()
 
 	// parse the helper name
 	helperName := flag.String("name", "", "name of the helper pod")

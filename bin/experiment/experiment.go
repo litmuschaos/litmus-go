@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"flag"
 	// Uncomment to load all auth plugins
 	// _ "k8s.io/client-go/plugin/pkg/client/auth"
@@ -59,9 +61,9 @@ import (
 	k6Loadgen "github.com/litmuschaos/litmus-go/experiments/load/k6-loadgen/experiment"
 	springBootFaults "github.com/litmuschaos/litmus-go/experiments/spring-boot/spring-boot-faults/experiment"
 	vmpoweroff "github.com/litmuschaos/litmus-go/experiments/vmware/vm-poweroff/experiment"
-
-	"github.com/litmuschaos/litmus-go/pkg/clients"
+	cli "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/log"
+	"github.com/litmuschaos/litmus-go/pkg/telemetry"
 	"github.com/sirupsen/logrus"
 )
 
@@ -75,8 +77,22 @@ func init() {
 }
 
 func main() {
+	ctx := context.Background()
+	// Set up Observability.
+	shutdown, err := telemetry.InitOTelSDK(ctx, true)
+	if err != nil {
+		return
+	}
+	// Handle shutdown properly so nothing leaks.
+	defer func() {
+		err = errors.Join(err, shutdown(ctx))
+	}()
 
-	clients := clients.ClientSets{}
+	ctx = telemetry.GetTraceParentContext()
+	clients := cli.ClientSets{Context: ctx}
+
+	span := telemetry.StartTracing(clients, "ExecuteExperiment")
+	defer span.End()
 
 	// parse the experiment name
 	experimentName := flag.String("name", "pod-delete", "name of the chaos experiment")
