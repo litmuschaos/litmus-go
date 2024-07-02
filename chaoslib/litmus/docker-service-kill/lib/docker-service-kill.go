@@ -6,9 +6,10 @@ import (
 	"strconv"
 
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
+	"github.com/litmuschaos/litmus-go/pkg/telemetry"
 	"github.com/palantir/stacktrace"
 
-	clients "github.com/litmuschaos/litmus-go/pkg/clients"
+	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/docker-service-kill/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
@@ -24,6 +25,8 @@ import (
 
 // PrepareDockerServiceKill contains prepration steps before chaos injection
 func PrepareDockerServiceKill(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	span := telemetry.StartTracing(clients, "InjectDockerServiceKillChaos")
+	defer span.End()
 
 	var err error
 	if experimentsDetails.TargetNode == "" {
@@ -111,6 +114,8 @@ func PrepareDockerServiceKill(experimentsDetails *experimentTypes.ExperimentDeta
 
 // createHelperPod derive the attributes for helper pod and create the helper pod
 func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, appNodeName string) error {
+	span := telemetry.StartTracing(clients, "CreateDockerServiceKillHelperPod")
+	defer span.End()
 
 	privileged := true
 	terminationGracePeriodSeconds := int64(experimentsDetails.TerminationGracePeriodSeconds)

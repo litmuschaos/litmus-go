@@ -12,6 +12,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/status"
+	"github.com/litmuschaos/litmus-go/pkg/telemetry"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/litmuschaos/litmus-go/pkg/utils/stringutils"
@@ -69,6 +70,9 @@ func experimentExecution(experimentsDetails *experimentTypes.ExperimentDetails, 
 
 // PrepareChaos contains the preparation steps before chaos injection
 func PrepareChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	span := telemetry.StartTracing(clients, "InjectK6LoadGenChaos")
+	defer span.End()
+
 	// Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
 		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", experimentsDetails.RampTime)
@@ -90,6 +94,9 @@ func PrepareChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients
 
 // createHelperPod derive the attributes for helper pod and create the helper pod
 func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, runID string) error {
+	span := telemetry.StartTracing(clients, "CreateK6LoadGenHelperPod")
+	defer span.End()
+
 	const volumeName = "script-volume"
 	const mountPath = "/mnt"
 	helperPod := &corev1.Pod{

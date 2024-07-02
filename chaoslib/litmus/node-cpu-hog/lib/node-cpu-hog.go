@@ -7,9 +7,10 @@ import (
 	"strings"
 
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
+	"github.com/litmuschaos/litmus-go/pkg/telemetry"
 	"github.com/palantir/stacktrace"
 
-	clients "github.com/litmuschaos/litmus-go/pkg/clients"
+	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/node-cpu-hog/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
@@ -25,6 +26,8 @@ import (
 
 // PrepareNodeCPUHog contains preparation steps before chaos injection
 func PrepareNodeCPUHog(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	span := telemetry.StartTracing(clients, "InjectNodeCPUHogChaos")
+	defer span.End()
 
 	//set up the tunables if provided in range
 	setChaosTunables(experimentsDetails)
@@ -229,6 +232,8 @@ func setCPUCapacity(experimentsDetails *experimentTypes.ExperimentDetails, appNo
 
 // createHelperPod derive the attributes for helper pod and create the helper pod
 func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, chaosDetails *types.ChaosDetails, appNode string, clients clients.ClientSets) error {
+	span := telemetry.StartTracing(clients, "CreateNodeCPUHogHelperPod")
+	defer span.End()
 
 	terminationGracePeriodSeconds := int64(experimentsDetails.TerminationGracePeriodSeconds)
 
