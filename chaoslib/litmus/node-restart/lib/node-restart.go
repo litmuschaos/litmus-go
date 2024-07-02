@@ -7,9 +7,10 @@ import (
 	"strings"
 
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
+	"github.com/litmuschaos/litmus-go/pkg/telemetry"
 	"github.com/palantir/stacktrace"
 
-	clients "github.com/litmuschaos/litmus-go/pkg/clients"
+	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/node-restart/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
@@ -39,6 +40,8 @@ const (
 
 // PrepareNodeRestart contains preparation steps before chaos injection
 func PrepareNodeRestart(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	span := telemetry.StartTracing(clients, "InjectNodeRestartChaos")
+	defer span.End()
 
 	//Select the node
 	if experimentsDetails.TargetNode == "" {
@@ -131,6 +134,8 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, chao
 	// This method is attaching emptyDir along with secret volume, and copy data from secret
 	// to the emptyDir, because secret is mounted as readonly and with 777 perms and it can't be changed
 	// because of: https://github.com/kubernetes/kubernetes/issues/57923
+	span := telemetry.StartTracing(clients, "CreateNodeRestartHelperPod")
+	defer span.End()
 
 	terminationGracePeriodSeconds := int64(experimentsDetails.TerminationGracePeriodSeconds)
 

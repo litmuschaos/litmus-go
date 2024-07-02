@@ -2,16 +2,18 @@ package statuscode
 
 import (
 	"fmt"
-	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	"math"
 	"math/rand"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
+	"github.com/litmuschaos/litmus-go/pkg/telemetry"
+
 	http_chaos "github.com/litmuschaos/litmus-go/chaoslib/litmus/http-chaos/lib"
 	body "github.com/litmuschaos/litmus-go/chaoslib/litmus/http-chaos/lib/modify-body"
-	clients "github.com/litmuschaos/litmus-go/pkg/clients"
+	"github.com/litmuschaos/litmus-go/pkg/clients"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/http-chaos/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/types"
@@ -27,6 +29,8 @@ var acceptedStatusCodes = []string{
 
 // PodHttpStatusCodeChaos contains the steps to prepare and inject http status code chaos
 func PodHttpStatusCodeChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	span := telemetry.StartTracing(clients, "InjectPodHTTPStatusCodeChaos")
+	defer span.End()
 
 	// responseBodyMaxLength defines the max length of response body string to be printed. It is taken as
 	// the min of length of body and 120 characters to avoid printing large response body.

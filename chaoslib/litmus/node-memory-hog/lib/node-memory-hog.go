@@ -7,9 +7,10 @@ import (
 	"strings"
 
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
+	"github.com/litmuschaos/litmus-go/pkg/telemetry"
 	"github.com/palantir/stacktrace"
 
-	clients "github.com/litmuschaos/litmus-go/pkg/clients"
+	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/node-memory-hog/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
@@ -26,6 +27,8 @@ import (
 
 // PrepareNodeMemoryHog contains preparation steps before chaos injection
 func PrepareNodeMemoryHog(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	span := telemetry.StartTracing(clients, "InjectNodeMemoryHogChaos")
+	defer span.End()
 
 	//set up the tunables if provided in range
 	setChaosTunables(experimentsDetails)
@@ -313,6 +316,8 @@ func calculateMemoryConsumption(experimentsDetails *experimentTypes.ExperimentDe
 
 // createHelperPod derive the attributes for helper pod and create the helper pod
 func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, chaosDetails *types.ChaosDetails, appNode string, clients clients.ClientSets, MemoryConsumption string) error {
+	span := telemetry.StartTracing(clients, "CreateNodeMemoryHogHelperPod")
+	defer span.End()
 
 	terminationGracePeriodSeconds := int64(experimentsDetails.TerminationGracePeriodSeconds)
 
