@@ -9,7 +9,7 @@ IS_DOCKER_INSTALLED = $(shell which docker >> /dev/null 2>&1; echo $$?)
 
 # Docker info
 DOCKER_REGISTRY ?= docker.io
-DOCKER_REPO ?= litmuschaos
+DOCKER_REPO ?= dusdjhyeon
 DOCKER_IMAGE ?= go-runner
 DOCKER_TAG ?= ci
 
@@ -80,7 +80,7 @@ build-amd64:
 	@echo "-------------------------"
 	@echo "--> Build go-runner image"
 	@echo "-------------------------"
-	@sudo docker build --file build/Dockerfile --tag $(DOCKER_REGISTRY)/$(DOCKER_REPO)/$(DOCKER_IMAGE):$(DOCKER_TAG) . --build-arg TARGETARCH=amd64 LITMUS_VERSION=v3.9.0
+	@sudo docker build --file build/Dockerfile --tag $(DOCKER_REGISTRY)/$(DOCKER_REPO)/$(DOCKER_IMAGE):$(DOCKER_TAG) . --build-arg TARGETARCH=amd64 --build-arg LITMUS_VERSION=3.9.0
 
 .PHONY: push-amd64
 push-amd64:
