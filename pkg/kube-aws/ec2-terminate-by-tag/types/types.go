@@ -17,7 +17,7 @@ type ExperimentDetails struct {
 	ChaosPodName         string
 	Timeout              int
 	Delay                int
-	InstanceTag          string
+	Ec2InstanceTag       string
 	Region               string
 	InstanceAffectedPerc int
 	ManagedNodegroup     string

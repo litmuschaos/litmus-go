@@ -25,7 +25,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.Timeout, _ = strconv.Atoi(types.Getenv("STATUS_CHECK_TIMEOUT", "180"))
 	experimentDetails.Region = types.Getenv("REGION", "")
 	experimentDetails.ManagedNodegroup = types.Getenv("MANAGED_NODEGROUP", "disable")
-	experimentDetails.InstanceTag = strings.TrimSpace(types.Getenv("INSTANCE_TAG", ""))
+	experimentDetails.Ec2InstanceTag = strings.TrimSpace(types.Getenv("EC2_INSTANCE_TAG", ""))
 	experimentDetails.InstanceAffectedPerc, _ = strconv.Atoi(types.Getenv("INSTANCE_AFFECTED_PERC", "0"))
 	experimentDetails.Sequence = types.Getenv("SEQUENCE", "parallel")
 }
