@@ -207,7 +207,7 @@ func disableChaosMonkey(chaosMonkeyPort string, chaosMonkeyPath string, pod core
 		return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosRevert, Target: fmt.Sprintf("{podName: %s, namespace: %s}", pod.Name, pod.Namespace), Reason: fmt.Sprintf("failed to disable chaos monkey endpoint (status: %d)", resp.StatusCode)}
 	}
 
-	return nil
+	return err
 }
 
 // injectChaosInSerialMode injects chaos monkey assault on pods in serial mode(one by one)
