@@ -71,7 +71,7 @@ func EC2TerminateByTag(clients clients.ClientSets) {
 	log.InfoWithValues("The instance information is as follows", logrus.Fields{
 		"Chaos Duration":               experimentsDetails.ChaosDuration,
 		"Chaos Namespace":              experimentsDetails.ChaosNamespace,
-		"Instance Tag":                 experimentsDetails.InstanceTag,
+		"Instance Tag":                 experimentsDetails.Ec2InstanceTag,
 		"Instance Affected Percentage": experimentsDetails.InstanceAffectedPerc,
 		"Sequence":                     experimentsDetails.Sequence,
 	})
