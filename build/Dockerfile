@@ -42,13 +42,13 @@ RUN yum install -y https://yum.oracle.com/repo/OracleLinux/OL9/appstream/$(uname
 RUN yum install -y https://yum.oracle.com/repo/OracleLinux/OL9/appstream/$(uname -m)/getPackage/stress-ng-0.14.00-2.el9.$(uname -m).rpm
 
 #Installing Kubectl
-ENV KUBE_LATEST_VERSION="v1.30.3"
+ENV KUBE_LATEST_VERSION="v1.31.0"
 RUN curl -L https://storage.googleapis.com/kubernetes-release/release/${KUBE_LATEST_VERSION}/bin/linux/${TARGETARCH}/kubectl -o     /usr/bin/kubectl && \
     chmod 755 /usr/bin/kubectl
 
 #Installing crictl binaries
-RUN curl -L https://github.com/kubernetes-sigs/cri-tools/releases/download/v1.30.1/crictl-v1.30.1-linux-${TARGETARCH}.tar.gz --output crictl-v1.30.1-linux-${TARGETARCH}.tar.gz && \
-    tar zxvf crictl-v1.30.1-linux-${TARGETARCH}.tar.gz -C /sbin && \
+RUN curl -L https://github.com/kubernetes-sigs/cri-tools/releases/download/v1.31.1/crictl-v1.31.1-linux-${TARGETARCH}.tar.gz --output crictl-v1.31.1-linux-${TARGETARCH}.tar.gz && \
+    tar zxvf crictl-v1.31.1-linux-${TARGETARCH}.tar.gz -C /sbin && \
     chmod 755 /sbin/crictl
 
 #Installing promql cli binaries
