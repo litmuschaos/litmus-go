@@ -1,6 +1,6 @@
 # Multi-stage docker build
 # Build stage
-FROM golang:1.18 AS builder
+FROM golang:1.20 AS builder
 
 ARG TARGETOS=linux
 ARG TARGETARCH
@@ -64,15 +64,15 @@ RUN curl -L https://github.com/litmuschaos/test-tools/releases/download/${LITMUS
 RUN curl -L https://github.com/litmuschaos/test-tools/releases/download/${LITMUS_VERSION}/nsutil-linux-${TARGETARCH} --output /sbin/nsutil && chmod 755 /sbin/nsutil
 
 #Installing nsutil shared lib
-RUN curl -L https://github.com/litmuschaos/test-tools/releases/download/${LITMUS_VERSION}/nsutil_${TARGETARCH}.so --output /sbin/nsutil.so && chmod 755 /sbin/nsutil.so
+RUN curl -L https://github.com/litmuschaos/test-tools/releases/download/${LITMUS_VERSION}/nsutil_${TARGETARCH}.so --output /usr/local/lib/nsutil.so && chmod 755 /usr/local/lib/nsutil.so
 
 # Installing toxiproxy binaries
-RUN curl -L https://litmus-http-proxy.s3.amazonaws.com/cli/toxiproxy-cli-linux-${TARGETARCH}.tar.gz --output toxiproxy-cli-linux-${TARGETARCH}.tar.gz && \
+RUN curl -L https://litmus-http-proxy.s3.amazonaws.com/cli/cli/toxiproxy-cli-linux-${TARGETARCH}.tar.gz --output toxiproxy-cli-linux-${TARGETARCH}.tar.gz && \
     tar zxvf toxiproxy-cli-linux-${TARGETARCH}.tar.gz -C /sbin/ && \
     chmod 755 /sbin/toxiproxy-cli
-RUN curl -L https://litmus-http-proxy.s3.amazonaws.com/server/toxiproxy-server-linux-${TARGETARCH}.tar.gz --output toxiproxy-server-linux-${TARGETARCH}.tar.gz && \
+RUN curl -L https://litmus-http-proxy.s3.amazonaws.com/server/server/toxiproxy-server-linux-${TARGETARCH}.tar.gz --output toxiproxy-server-linux-${TARGETARCH}.tar.gz && \
     tar zxvf toxiproxy-server-linux-${TARGETARCH}.tar.gz -C /sbin/ && \
-    chmod 755 /sbin/toxiproxy-server
+    chmod 755 /sbin/toxiproxy-server 
 
 ENV APP_USER=litmus
 ENV APP_DIR="/$APP_USER"
