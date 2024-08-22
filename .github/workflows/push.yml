@@ -70,3 +70,4 @@ jobs:
           file: build/Dockerfile
           platforms: linux/amd64,linux/arm64
           tags: litmuschaos/go-runner:ci
+          build-args: LITMUS_VERSION=3.10.0
