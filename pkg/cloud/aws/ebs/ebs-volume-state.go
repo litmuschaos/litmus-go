@@ -12,6 +12,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
 	"github.com/palantir/stacktrace"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -116,7 +117,9 @@ func GetEBSStatus(ebsVolumeID, ec2InstanceID, region string) (string, error) {
 
 // EBSStateCheckByID will check the attachment state of the given volume
 func EBSStateCheckByID(volumeIDs, region string) error {
-
+	if strings.Count(volumeIDs, ",") == len(volumeIDs) {
+		return errors.Errorf("no volumeID provided, please provide a volume to detach")
+	}
 	volumeIDList := strings.Split(volumeIDs, ",")
 	if len(volumeIDList) == 0 {
 		return cerrors.Error{
