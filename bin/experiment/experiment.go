@@ -51,6 +51,7 @@ import (
 	podNetworkLatency "github.com/litmuschaos/litmus-go/experiments/generic/pod-network-latency/experiment"
 	podNetworkLoss "github.com/litmuschaos/litmus-go/experiments/generic/pod-network-loss/experiment"
 	podNetworkPartition "github.com/litmuschaos/litmus-go/experiments/generic/pod-network-partition/experiment"
+	volumeFill "github.com/litmuschaos/litmus-go/experiments/generic/volume-fill/experiment"
 	kafkaBrokerPodFailure "github.com/litmuschaos/litmus-go/experiments/kafka/kafka-broker-pod-failure/experiment"
 	ebsLossByID "github.com/litmuschaos/litmus-go/experiments/kube-aws/ebs-loss-by-id/experiment"
 	ebsLossByTag "github.com/litmuschaos/litmus-go/experiments/kube-aws/ebs-loss-by-tag/experiment"
@@ -95,6 +96,8 @@ func main() {
 		containerKill.ContainerKill(clients)
 	case "disk-fill":
 		diskFill.DiskFill(clients)
+	case "volume-fill":
+		volumeFill.VolumeFill(clients)
 	case "kafka-broker-pod-failure":
 		kafkaBrokerPodFailure.KafkaBrokerPodFailure(clients)
 	case "kubelet-service-kill":
