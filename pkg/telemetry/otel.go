@@ -64,7 +64,6 @@ func newTracerProvider(ctx context.Context, isExperiment bool) (*trace.TracerPro
 	serviceName := OTELExperimentJobHelperServiceName
 	if isExperiment {
 		serviceName = OTELExperimentJobServiceName
-
 	}
 	res, err := resource.New(ctx,
 		resource.WithAttributes(
