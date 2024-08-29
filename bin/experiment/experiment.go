@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"flag"
+	"os"
+
 	// Uncomment to load all auth plugins
 	// _ "k8s.io/client-go/plugin/pkg/client/auth"
 
@@ -64,6 +66,7 @@ import (
 	cli "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/telemetry"
+	"github.com/litmuschaos/litmus-go/pkg/utils"
 	"github.com/sirupsen/logrus"
 )
 
@@ -78,17 +81,19 @@ func init() {
 
 func main() {
 	ctx := context.Background()
-	// Set up Observability.
-	shutdown, err := telemetry.InitOTelSDK(ctx, true)
-	if err != nil {
-		return
-	}
-	// Handle shutdown properly so nothing leaks.
-	defer func() {
-		err = errors.Join(err, shutdown(ctx))
-	}()
 
-	ctx = telemetry.GetTraceParentContext()
+	// Set up Observability.
+	if otelExporterEndpoint := os.Getenv(utils.OTELExporterOTLPEndpoint); otelExporterEndpoint != "" {
+		shutdown, err := telemetry.InitOTelSDK(ctx, true, otelExporterEndpoint)
+		if err != nil {
+			return
+		}
+		defer func() {
+			err = errors.Join(err, shutdown(ctx))
+		}()
+		ctx = telemetry.GetTraceParentContext()
+	}
+
 	clients := cli.ClientSets{Context: ctx}
 
 	span := telemetry.StartTracing(clients, "ExecuteExperiment")

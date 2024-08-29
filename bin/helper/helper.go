@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"flag"
+	"os"
+
 	// Uncomment to load all auth plugins
 	// _ "k8s.io/client-go/plugin/pkg/client/auth"
 
@@ -20,6 +22,7 @@ import (
 	dnsChaos "github.com/litmuschaos/litmus-go/chaoslib/litmus/pod-dns-chaos/helper"
 	stressChaos "github.com/litmuschaos/litmus-go/chaoslib/litmus/stress-chaos/helper"
 	"github.com/litmuschaos/litmus-go/pkg/telemetry"
+	"github.com/litmuschaos/litmus-go/pkg/utils"
 
 	cli "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/log"
@@ -38,16 +41,17 @@ func init() {
 func main() {
 	ctx := context.Background()
 	// Set up Observability.
-	shutdown, err := telemetry.InitOTelSDK(ctx, false)
-	if err != nil {
-		return
+	if otelExporterEndpoint := os.Getenv(utils.OTELExporterOTLPEndpoint); otelExporterEndpoint != "" {
+		shutdown, err := telemetry.InitOTelSDK(ctx, true, otelExporterEndpoint)
+		if err != nil {
+			return
+		}
+		defer func() {
+			err = errors.Join(err, shutdown(ctx))
+		}()
+		ctx = telemetry.GetTraceParentContext()
 	}
-	// Handle shutdown properly so nothing leaks.
-	defer func() {
-		err = errors.Join(err, shutdown(ctx))
-	}()
 
-	ctx = telemetry.GetTraceParentContext()
 	clients := cli.ClientSets{Context: ctx}
 
 	span := telemetry.StartTracing(clients, "ExecuteExperimentHelper")

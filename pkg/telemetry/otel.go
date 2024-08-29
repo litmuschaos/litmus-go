@@ -3,7 +3,6 @@ package telemetry
 import (
 	"context"
 	"errors"
-	"os"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
@@ -15,12 +14,11 @@ import (
 )
 
 const (
-	OTELExporterOTLPEndpoint           = "OTEL_EXPORTER_OTLP_ENDPOINT"
 	OTELExperimentJobServiceName       = "chaos_experiment_job"
 	OTELExperimentJobHelperServiceName = "chaos_experiment_job_helper"
 )
 
-func InitOTelSDK(ctx context.Context, isExperiment bool) (shutdown func(context.Context) error, err error) {
+func InitOTelSDK(ctx context.Context, isExperiment bool, endpoint string) (shutdown func(context.Context) error, err error) {
 	var shutdownFuncs []func(context.Context) error
 
 	shutdown = func(ctx context.Context) error {
@@ -36,7 +34,7 @@ func InitOTelSDK(ctx context.Context, isExperiment bool) (shutdown func(context.
 		err = errors.Join(inErr, shutdown(ctx))
 	}
 
-	tracerProvider, err := newTracerProvider(ctx, isExperiment)
+	tracerProvider, err := newTracerProvider(ctx, isExperiment, endpoint)
 	if err != nil {
 		handleErr(err)
 		return
@@ -59,8 +57,7 @@ func newPropagator() propagation.TextMapPropagator {
 	)
 }
 
-func newTracerProvider(ctx context.Context, isExperiment bool) (*trace.TracerProvider, error) {
-	endpoint := os.Getenv(OTELExporterOTLPEndpoint)
+func newTracerProvider(ctx context.Context, isExperiment bool, endpoint string) (*trace.TracerProvider, error) {
 	serviceName := OTELExperimentJobHelperServiceName
 	if isExperiment {
 		serviceName = OTELExperimentJobServiceName
