@@ -221,14 +221,14 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 // SetTargetInstance will select the target instance which are in running state and filtered from the given instance tag
 func SetTargetInstance(experimentsDetails *experimentTypes.ExperimentDetails) error {
 
-	instanceIDList, err := awslib.GetInstanceList(experimentsDetails.InstanceTag, experimentsDetails.Region)
+	instanceIDList, err := awslib.GetInstanceList(experimentsDetails.Ec2InstanceTag, experimentsDetails.Region)
 	if err != nil {
 		return stacktrace.Propagate(err, "failed to get the instance id list")
 	}
 	if len(instanceIDList) == 0 {
 		return cerrors.Error{
 			ErrorCode: cerrors.ErrorTypeTargetSelection,
-			Reason:    fmt.Sprintf("no instance found with the given tag %v, in region %v", experimentsDetails.InstanceTag, experimentsDetails.Region),
+			Reason:    fmt.Sprintf("no instance found with the given tag %v, in region %v", experimentsDetails.Ec2InstanceTag, experimentsDetails.Region),
 		}
 	}
 
@@ -246,7 +246,7 @@ func SetTargetInstance(experimentsDetails *experimentTypes.ExperimentDetails) er
 		return cerrors.Error{
 			ErrorCode: cerrors.ErrorTypeChaosInject,
 			Reason:    "failed to get any running instance",
-			Target:    fmt.Sprintf("EC2 Instance Tag: %v", experimentsDetails.InstanceTag)}
+			Target:    fmt.Sprintf("EC2 Instance Tag: %v", experimentsDetails.Ec2InstanceTag)}
 	}
 
 	log.InfoWithValues("[Info]: Targeting the running instances filtered from instance tag", logrus.Fields{

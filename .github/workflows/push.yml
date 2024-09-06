@@ -13,7 +13,7 @@ jobs:
       # Install golang
       - uses: actions/setup-go@v2
         with:
-          go-version: 1.18
+          go-version: '1.20'
       - uses: actions/checkout@v2
 
       #TODO: Add Dockerfile linting
@@ -43,7 +43,7 @@ jobs:
       # Install golang
       - uses: actions/setup-go@v2
         with:
-          go-version: 1.18
+          go-version: '1.20'
       - uses: actions/checkout@v2
 
       - name: Set up QEMU
@@ -70,3 +70,4 @@ jobs:
           file: build/Dockerfile
           platforms: linux/amd64,linux/arm64
           tags: litmuschaos/go-runner:ci
+          build-args: LITMUS_VERSION=3.10.0

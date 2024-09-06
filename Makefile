@@ -73,7 +73,7 @@ image-push:
 	@echo "--> Push go-runner image"
 	@echo "------------------------"
 	@echo "Pushing $(DOCKER_REPO)/$(DOCKER_IMAGE):$(DOCKER_TAG)"
-	@docker buildx build . --push --file build/Dockerfile --progress plane --platform linux/arm64,linux/amd64 --no-cache --tag $(DOCKER_REGISTRY)/$(DOCKER_REPO)/$(DOCKER_IMAGE):$(DOCKER_TAG)
+	@docker buildx build . --push --file build/Dockerfile --progress plain --platform linux/arm64,linux/amd64 --no-cache --tag $(DOCKER_REGISTRY)/$(DOCKER_REPO)/$(DOCKER_IMAGE):$(DOCKER_TAG)
 
 
 .PHONY: build-amd64
@@ -81,7 +81,7 @@ build-amd64:
 	@echo "-------------------------"
 	@echo "--> Build go-runner image"
 	@echo "-------------------------"
-	@sudo docker build --file build/Dockerfile --tag $(DOCKER_REGISTRY)/$(DOCKER_REPO)/$(DOCKER_IMAGE):$(DOCKER_TAG) . --build-arg TARGETARCH=amd64
+	@sudo docker build --file build/Dockerfile --tag $(DOCKER_REGISTRY)/$(DOCKER_REPO)/$(DOCKER_IMAGE):$(DOCKER_TAG) . --build-arg TARGETARCH=amd64 --build-arg LITMUS_VERSION=3.9.0
 
 .PHONY: push-amd64
 push-amd64:
