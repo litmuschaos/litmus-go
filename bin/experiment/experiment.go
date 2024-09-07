@@ -56,6 +56,7 @@ import (
 	ebsLossByTag "github.com/litmuschaos/litmus-go/experiments/kube-aws/ebs-loss-by-tag/experiment"
 	ec2TerminateByID "github.com/litmuschaos/litmus-go/experiments/kube-aws/ec2-terminate-by-id/experiment"
 	ec2TerminateByTag "github.com/litmuschaos/litmus-go/experiments/kube-aws/ec2-terminate-by-tag/experiment"
+	rdsInstanceStop "github.com/litmuschaos/litmus-go/experiments/kube-aws/rds-instance-stop/experiment"
 	k6Loadgen "github.com/litmuschaos/litmus-go/experiments/load/k6-loadgen/experiment"
 	springBootFaults "github.com/litmuschaos/litmus-go/experiments/spring-boot/spring-boot-faults/experiment"
 	vmpoweroff "github.com/litmuschaos/litmus-go/experiments/vmware/vm-poweroff/experiment"
@@ -149,6 +150,8 @@ func main() {
 		ebsLossByID.EBSLossByID(clients)
 	case "ebs-loss-by-tag":
 		ebsLossByTag.EBSLossByTag(clients)
+	case "rds-instance-stop":
+		rdsInstanceStop.RDSInstanceStop(clients)
 	case "node-restart":
 		nodeRestart.NodeRestart(clients)
 	case "pod-dns-error":
