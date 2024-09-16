@@ -9,6 +9,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	"github.com/litmuschaos/litmus-go/pkg/telemetry"
 	"github.com/palantir/stacktrace"
+	"go.opentelemetry.io/otel"
 
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
@@ -39,8 +40,8 @@ const (
 )
 
 // PrepareNodeRestart contains preparation steps before chaos injection
-func PrepareNodeRestart(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	span := telemetry.StartTracing(clients, "InjectNodeRestartChaos")
+func PrepareNodeRestart(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectNodeRestartChaos")
 	defer span.End()
 
 	//Select the node
@@ -84,7 +85,7 @@ func PrepareNodeRestart(experimentsDetails *experimentTypes.ExperimentDetails, c
 	}
 
 	// Creating the helper pod to perform node restart
-	if err = createHelperPod(experimentsDetails, chaosDetails, clients); err != nil {
+	if err = createHelperPod(ctx, experimentsDetails, chaosDetails, clients); err != nil {
 		return stacktrace.Propagate(err, "could not create helper pod")
 	}
 
@@ -101,7 +102,7 @@ func PrepareNodeRestart(experimentsDetails *experimentTypes.ExperimentDetails, c
 
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
-		if err = probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+		if err = probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
 			common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
 			return err
 		}
@@ -130,11 +131,11 @@ func PrepareNodeRestart(experimentsDetails *experimentTypes.ExperimentDetails, c
 }
 
 // createHelperPod derive the attributes for helper pod and create the helper pod
-func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, chaosDetails *types.ChaosDetails, clients clients.ClientSets) error {
+func createHelperPod(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, chaosDetails *types.ChaosDetails, clients clients.ClientSets) error {
 	// This method is attaching emptyDir along with secret volume, and copy data from secret
 	// to the emptyDir, because secret is mounted as readonly and with 777 perms and it can't be changed
 	// because of: https://github.com/kubernetes/kubernetes/issues/57923
-	span := telemetry.StartTracing(clients, "CreateNodeRestartHelperPod")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "CreateNodeRestartHelperPod")
 	defer span.End()
 
 	terminationGracePeriodSeconds := int64(experimentsDetails.TerminationGracePeriodSeconds)

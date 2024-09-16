@@ -1,6 +1,7 @@
 package lib
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/signal"
@@ -16,6 +17,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/palantir/stacktrace"
+	"go.opentelemetry.io/otel"
 )
 
 var (
@@ -24,8 +26,8 @@ var (
 )
 
 // PrepareEBSLossByTag contains the prepration and injection steps for the experiment
-func PrepareEBSLossByTag(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	span := telemetry.StartTracing(clients, "InjectEBSLossByTagChaos")
+func PrepareEBSLossByTag(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectEBSLossByTagChaos")
 	defer span.End()
 
 	// inject channel is used to transmit signal notifications.
@@ -58,11 +60,11 @@ func PrepareEBSLossByTag(experimentsDetails *experimentTypes.ExperimentDetails, 
 
 		switch strings.ToLower(experimentsDetails.Sequence) {
 		case "serial":
-			if err = ebsloss.InjectChaosInSerialMode(experimentsDetails, targetEBSVolumeIDList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+			if err = ebsloss.InjectChaosInSerialMode(ctx, experimentsDetails, targetEBSVolumeIDList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
 				return stacktrace.Propagate(err, "could not run chaos in serial mode")
 			}
 		case "parallel":
-			if err = ebsloss.InjectChaosInParallelMode(experimentsDetails, targetEBSVolumeIDList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+			if err = ebsloss.InjectChaosInParallelMode(ctx, experimentsDetails, targetEBSVolumeIDList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
 				return stacktrace.Propagate(err, "could not run chaos in parallel mode")
 			}
 		default:

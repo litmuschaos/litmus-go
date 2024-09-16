@@ -9,6 +9,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	"github.com/litmuschaos/litmus-go/pkg/telemetry"
 	"github.com/palantir/stacktrace"
+	"go.opentelemetry.io/otel"
 
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
@@ -25,8 +26,8 @@ import (
 )
 
 // PrepareNodeIOStress contains preparation steps before chaos injection
-func PrepareNodeIOStress(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	span := telemetry.StartTracing(clients, "InjectNodeIOStressChaos")
+func PrepareNodeIOStress(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectNodeIOStressChaos")
 	defer span.End()
 	//set up the tunables if provided in range
 	setChaosTunables(experimentsDetails)
@@ -65,11 +66,11 @@ func PrepareNodeIOStress(experimentsDetails *experimentTypes.ExperimentDetails, 
 
 	switch strings.ToLower(experimentsDetails.Sequence) {
 	case "serial":
-		if err = injectChaosInSerialMode(experimentsDetails, targetNodeList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+		if err = injectChaosInSerialMode(ctx, experimentsDetails, targetNodeList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
 			return stacktrace.Propagate(err, "could not run chaos in serial mode")
 		}
 	case "parallel":
-		if err = injectChaosInParallelMode(experimentsDetails, targetNodeList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+		if err = injectChaosInParallelMode(ctx, experimentsDetails, targetNodeList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
 			return stacktrace.Propagate(err, "could not run chaos in parallel mode")
 		}
 	default:
@@ -85,11 +86,11 @@ func PrepareNodeIOStress(experimentsDetails *experimentTypes.ExperimentDetails, 
 }
 
 // injectChaosInSerialMode stress the io of all the target nodes serially (one by one)
-func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, targetNodeList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, targetNodeList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
-		if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+		if err := probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
 			return err
 		}
 	}
@@ -111,7 +112,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		experimentsDetails.RunID = stringutils.GetRunID()
 
 		// Creating the helper pod to perform node io stress
-		if err := createHelperPod(experimentsDetails, chaosDetails, appNode, clients); err != nil {
+		if err := createHelperPod(ctx, experimentsDetails, chaosDetails, appNode, clients); err != nil {
 			return stacktrace.Propagate(err, "could not create helper pod")
 		}
 
@@ -143,11 +144,11 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 }
 
 // injectChaosInParallelMode stress the io of all the target nodes in parallel mode (all at once)
-func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, targetNodeList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, targetNodeList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
-		if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+		if err := probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
 			return err
 		}
 	}
@@ -169,7 +170,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		})
 
 		// Creating the helper pod to perform node io stress
-		if err := createHelperPod(experimentsDetails, chaosDetails, appNode, clients); err != nil {
+		if err := createHelperPod(ctx, experimentsDetails, chaosDetails, appNode, clients); err != nil {
 			return stacktrace.Propagate(err, "could not create helper pod")
 		}
 	}
@@ -207,8 +208,8 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 }
 
 // createHelperPod derive the attributes for helper pod and create the helper pod
-func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, chaosDetails *types.ChaosDetails, appNode string, clients clients.ClientSets) error {
-	span := telemetry.StartTracing(clients, "CreateNodeIOStressHelperPod")
+func createHelperPod(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, chaosDetails *types.ChaosDetails, appNode string, clients clients.ClientSets) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "CreateNodeIOStressHelperPod")
 	defer span.End()
 	terminationGracePeriodSeconds := int64(experimentsDetails.TerminationGracePeriodSeconds)
 

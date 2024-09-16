@@ -8,6 +8,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	"github.com/litmuschaos/litmus-go/pkg/telemetry"
 	"github.com/palantir/stacktrace"
+	"go.opentelemetry.io/otel"
 
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
@@ -24,8 +25,8 @@ import (
 )
 
 // PrepareKubeletKill contains prepration steps before chaos injection
-func PrepareKubeletKill(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	span := telemetry.StartTracing(clients, "InjectKubeletServiceKillChaos")
+func PrepareKubeletKill(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectKubeletServiceKillChaos")
 	defer span.End()
 
 	var err error
@@ -62,7 +63,7 @@ func PrepareKubeletKill(experimentsDetails *experimentTypes.ExperimentDetails, c
 	}
 
 	// Creating the helper pod to perform node memory hog
-	if err = createHelperPod(experimentsDetails, clients, chaosDetails, experimentsDetails.TargetNode); err != nil {
+	if err = createHelperPod(ctx, experimentsDetails, clients, chaosDetails, experimentsDetails.TargetNode); err != nil {
 		return stacktrace.Propagate(err, "could not create helper pod")
 	}
 
@@ -79,7 +80,7 @@ func PrepareKubeletKill(experimentsDetails *experimentTypes.ExperimentDetails, c
 
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
-		if err = probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+		if err = probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
 			common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
 			return err
 		}
@@ -115,8 +116,8 @@ func PrepareKubeletKill(experimentsDetails *experimentTypes.ExperimentDetails, c
 }
 
 // createHelperPod derive the attributes for helper pod and create the helper pod
-func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, appNodeName string) error {
-	span := telemetry.StartTracing(clients, "CreateKubeletServiceKillHelperPod")
+func createHelperPod(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, appNodeName string) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "CreateKubeletServiceKillHelperPod")
 	defer span.End()
 
 	privileged := true

@@ -25,6 +25,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/telemetry"
 	"github.com/sirupsen/logrus"
+	"go.opentelemetry.io/otel"
 )
 
 func init() {
@@ -50,9 +51,9 @@ func main() {
 		ctx = telemetry.GetTraceParentContext()
 	}
 
-	clients := cli.ClientSets{Context: ctx}
+	clients := cli.ClientSets{}
 
-	span := telemetry.StartTracing(clients, "ExecuteExperimentHelper")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "ExecuteExperimentHelper")
 	defer span.End()
 
 	// parse the helper name

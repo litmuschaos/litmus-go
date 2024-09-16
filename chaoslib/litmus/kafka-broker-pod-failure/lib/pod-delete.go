@@ -11,6 +11,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/telemetry"
 	"github.com/litmuschaos/litmus-go/pkg/workloads"
 	"github.com/palantir/stacktrace"
+	"go.opentelemetry.io/otel"
 
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
@@ -25,8 +26,8 @@ import (
 )
 
 // PreparePodDelete contains the prepration steps before chaos injection
-func PreparePodDelete(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	span := telemetry.StartTracing(clients, "InjectKafkaPodDeleteChaos")
+func PreparePodDelete(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectKafkaPodDeleteChaos")
 	defer span.End()
 
 	//Waiting for the ramp time before chaos injection
@@ -37,11 +38,11 @@ func PreparePodDelete(experimentsDetails *experimentTypes.ExperimentDetails, cli
 
 	switch strings.ToLower(experimentsDetails.ChaoslibDetail.Sequence) {
 	case "serial":
-		if err := injectChaosInSerialMode(experimentsDetails, clients, chaosDetails, eventsDetails, resultDetails); err != nil {
+		if err := injectChaosInSerialMode(ctx, experimentsDetails, clients, chaosDetails, eventsDetails, resultDetails); err != nil {
 			return stacktrace.Propagate(err, "could not run chaos in serial mode")
 		}
 	case "parallel":
-		if err := injectChaosInParallelMode(experimentsDetails, clients, chaosDetails, eventsDetails, resultDetails); err != nil {
+		if err := injectChaosInParallelMode(ctx, experimentsDetails, clients, chaosDetails, eventsDetails, resultDetails); err != nil {
 			return stacktrace.Propagate(err, "could not run chaos in parallel mode")
 		}
 	default:
@@ -57,11 +58,11 @@ func PreparePodDelete(experimentsDetails *experimentTypes.ExperimentDetails, cli
 }
 
 // injectChaosInSerialMode delete the kafka broker pods in serial mode(one by one)
-func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, eventsDetails *types.EventDetails, resultDetails *types.ResultDetails) error {
+func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, eventsDetails *types.EventDetails, resultDetails *types.ResultDetails) error {
 
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
-		if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+		if err := probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
 			return err
 		}
 	}
@@ -152,11 +153,11 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 }
 
 // injectChaosInParallelMode delete the kafka broker pods in parallel mode (all at once)
-func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, eventsDetails *types.EventDetails, resultDetails *types.ResultDetails) error {
+func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, eventsDetails *types.EventDetails, resultDetails *types.ResultDetails) error {
 
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
-		if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+		if err := probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
 			return err
 		}
 	}

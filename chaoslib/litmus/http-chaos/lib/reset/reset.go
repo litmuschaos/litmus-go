@@ -1,6 +1,7 @@
 package reset
 
 import (
+	"context"
 	"strconv"
 
 	http_chaos "github.com/litmuschaos/litmus-go/chaoslib/litmus/http-chaos/lib"
@@ -10,11 +11,12 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/telemetry"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/sirupsen/logrus"
+	"go.opentelemetry.io/otel"
 )
 
 // PodHttpResetPeerChaos contains the steps to prepare and inject http reset peer chaos
-func PodHttpResetPeerChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	span := telemetry.StartTracing(clients, "InjectPodHTTPResetPeerChaos")
+func PodHttpResetPeerChaos(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectPodHTTPResetPeerChaos")
 	defer span.End()
 
 	log.InfoWithValues("[Info]: The chaos tunables are:", logrus.Fields{
@@ -27,5 +29,5 @@ func PodHttpResetPeerChaos(experimentsDetails *experimentTypes.ExperimentDetails
 	})
 
 	args := "-t reset_peer -a timeout=" + strconv.Itoa(experimentsDetails.ResetTimeout)
-	return http_chaos.PrepareAndInjectChaos(experimentsDetails, clients, resultDetails, eventsDetails, chaosDetails, args)
+	return http_chaos.PrepareAndInjectChaos(ctx, experimentsDetails, clients, resultDetails, eventsDetails, chaosDetails, args)
 }

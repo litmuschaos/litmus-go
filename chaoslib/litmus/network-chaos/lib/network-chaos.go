@@ -11,6 +11,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	"github.com/litmuschaos/litmus-go/pkg/telemetry"
 	"github.com/palantir/stacktrace"
+	"go.opentelemetry.io/otel"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 
 	"github.com/litmuschaos/litmus-go/pkg/clients"
@@ -31,7 +32,7 @@ var destIpsSvcMesh string
 var destIps string
 
 // PrepareAndInjectChaos contains the preparation & injection steps
-func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, args string) error {
+func PrepareAndInjectChaos(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, args string) error {
 
 	var err error
 	// Get the target pod details for the chaos execution
@@ -71,11 +72,11 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 	experimentsDetails.IsTargetContainerProvided = experimentsDetails.TargetContainer != ""
 	switch strings.ToLower(experimentsDetails.Sequence) {
 	case "serial":
-		if err = injectChaosInSerialMode(experimentsDetails, targetPodList, clients, chaosDetails, args, resultDetails, eventsDetails); err != nil {
+		if err = injectChaosInSerialMode(ctx, experimentsDetails, targetPodList, clients, chaosDetails, args, resultDetails, eventsDetails); err != nil {
 			return stacktrace.Propagate(err, "could not run chaos in serial mode")
 		}
 	case "parallel":
-		if err = injectChaosInParallelMode(experimentsDetails, targetPodList, clients, chaosDetails, args, resultDetails, eventsDetails); err != nil {
+		if err = injectChaosInParallelMode(ctx, experimentsDetails, targetPodList, clients, chaosDetails, args, resultDetails, eventsDetails); err != nil {
 			return stacktrace.Propagate(err, "could not run chaos in parallel mode")
 		}
 	default:
@@ -86,10 +87,10 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 }
 
 // injectChaosInSerialMode inject the network chaos in all target application serially (one by one)
-func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, args string, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
+func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, args string, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
-		if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+		if err := probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
 			return err
 		}
 	}
@@ -109,7 +110,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 
 		runID := stringutils.GetRunID()
 
-		if err := createHelperPod(experimentsDetails, clients, chaosDetails, fmt.Sprintf("%s:%s:%s:%s", pod.Name, pod.Namespace, experimentsDetails.TargetContainer, serviceMesh), pod.Spec.NodeName, runID, args); err != nil {
+		if err := createHelperPod(ctx, experimentsDetails, clients, chaosDetails, fmt.Sprintf("%s:%s:%s:%s", pod.Name, pod.Namespace, experimentsDetails.TargetContainer, serviceMesh), pod.Spec.NodeName, runID, args); err != nil {
 			return stacktrace.Propagate(err, "could not create helper pod")
 		}
 
@@ -142,12 +143,12 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 }
 
 // injectChaosInParallelMode inject the network chaos in all target application in parallel mode (all at once)
-func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, args string, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
+func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, args string, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
 	var err error
 
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
-		if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+		if err := probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
 			return err
 		}
 	}
@@ -165,7 +166,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 			targetsPerNode = append(targetsPerNode, fmt.Sprintf("%s:%s:%s:%s", k.Name, k.Namespace, k.TargetContainer, k.ServiceMesh))
 		}
 
-		if err := createHelperPod(experimentsDetails, clients, chaosDetails, strings.Join(targetsPerNode, ";"), node, runID, args); err != nil {
+		if err := createHelperPod(ctx, experimentsDetails, clients, chaosDetails, strings.Join(targetsPerNode, ";"), node, runID, args); err != nil {
 			return stacktrace.Propagate(err, "could not create helper pod")
 		}
 	}
@@ -198,8 +199,8 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 }
 
 // createHelperPod derive the attributes for helper pod and create the helper pod
-func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, targets string, nodeName, runID, args string) error {
-	span := telemetry.StartTracing(clients, "CreateNetworkChaosHelperPod")
+func createHelperPod(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, targets string, nodeName, runID, args string) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "CreateNetworkChaosHelperPod")
 	defer span.End()
 
 	privilegedEnable := true
@@ -243,7 +244,7 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 						"./helpers -name network-chaos",
 					},
 					Resources: chaosDetails.Resources,
-					Env:       getPodEnv(clients.Context, experimentsDetails, targets, args),
+					Env:       getPodEnv(ctx, experimentsDetails, targets, args),
 					VolumeMounts: []apiv1.VolumeMount{
 						{
 							Name:      "cri-socket",

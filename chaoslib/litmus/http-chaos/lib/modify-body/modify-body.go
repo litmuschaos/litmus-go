@@ -1,6 +1,7 @@
 package modifybody
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"strings"
@@ -12,11 +13,12 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/telemetry"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/sirupsen/logrus"
+	"go.opentelemetry.io/otel"
 )
 
 // PodHttpModifyBodyChaos contains the steps to prepare and inject http modify body chaos
-func PodHttpModifyBodyChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	span := telemetry.StartTracing(clients, "InjectPodHTTPModifyBodyChaos")
+func PodHttpModifyBodyChaos(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectPodHTTPModifyBodyChaos")
 	defer span.End()
 
 	// responseBodyMaxLength defines the max length of response body string to be printed. It is taken as
@@ -37,7 +39,7 @@ func PodHttpModifyBodyChaos(experimentsDetails *experimentTypes.ExperimentDetail
 	args := fmt.Sprintf(
 		`-t modify_body -a body="%v" -a content_type=%v -a content_encoding=%v`,
 		EscapeQuotes(experimentsDetails.ResponseBody), experimentsDetails.ContentType, experimentsDetails.ContentEncoding)
-	return http_chaos.PrepareAndInjectChaos(experimentsDetails, clients, resultDetails, eventsDetails, chaosDetails, args)
+	return http_chaos.PrepareAndInjectChaos(ctx, experimentsDetails, clients, resultDetails, eventsDetails, chaosDetails, args)
 }
 
 // EscapeQuotes escapes the quotes in the given string

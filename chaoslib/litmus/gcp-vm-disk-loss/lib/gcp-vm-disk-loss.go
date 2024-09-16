@@ -1,6 +1,7 @@
 package lib
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/signal"
@@ -20,6 +21,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/palantir/stacktrace"
 	"github.com/pkg/errors"
+	"go.opentelemetry.io/otel"
 	"google.golang.org/api/compute/v1"
 )
 
@@ -29,8 +31,8 @@ var (
 )
 
 // PrepareDiskVolumeLoss contains the prepration and injection steps for the experiment
-func PrepareDiskVolumeLoss(computeService *compute.Service, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	span := telemetry.StartTracing(clients, "InjectVMDiskLossChaos")
+func PrepareDiskVolumeLoss(ctx context.Context, computeService *compute.Service, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectVMDiskLossChaos")
 	defer span.End()
 
 	// inject channel is used to transmit signal notifications.
@@ -71,11 +73,11 @@ func PrepareDiskVolumeLoss(computeService *compute.Service, experimentsDetails *
 
 		switch strings.ToLower(experimentsDetails.Sequence) {
 		case "serial":
-			if err = injectChaosInSerialMode(computeService, experimentsDetails, diskNamesList, diskZonesList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+			if err = injectChaosInSerialMode(ctx, computeService, experimentsDetails, diskNamesList, diskZonesList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
 				return stacktrace.Propagate(err, "could not run chaos in serial mode")
 			}
 		case "parallel":
-			if err = injectChaosInParallelMode(computeService, experimentsDetails, diskNamesList, diskZonesList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+			if err = injectChaosInParallelMode(ctx, computeService, experimentsDetails, diskNamesList, diskZonesList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
 				return stacktrace.Propagate(err, "could not run chaos in parallel mode")
 			}
 		default:
@@ -93,7 +95,7 @@ func PrepareDiskVolumeLoss(computeService *compute.Service, experimentsDetails *
 }
 
 // injectChaosInSerialMode will inject the disk loss chaos in serial mode which means one after the other
-func injectChaosInSerialMode(computeService *compute.Service, experimentsDetails *experimentTypes.ExperimentDetails, targetDiskVolumeNamesList, diskZonesList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+func injectChaosInSerialMode(ctx context.Context, computeService *compute.Service, experimentsDetails *experimentTypes.ExperimentDetails, targetDiskVolumeNamesList, diskZonesList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
 	ChaosStartTimeStamp := time.Now()
@@ -125,7 +127,7 @@ func injectChaosInSerialMode(computeService *compute.Service, experimentsDetails
 			// run the probes during chaos
 			// the OnChaos probes execution will start in the first iteration and keep running for the entire chaos duration
 			if len(resultDetails.ProbeDetails) != 0 && i == 0 {
-				if err = probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+				if err = probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
 					return err
 				}
 			}
@@ -164,7 +166,7 @@ func injectChaosInSerialMode(computeService *compute.Service, experimentsDetails
 }
 
 // injectChaosInParallelMode will inject the disk loss chaos in parallel mode that means all at once
-func injectChaosInParallelMode(computeService *compute.Service, experimentsDetails *experimentTypes.ExperimentDetails, targetDiskVolumeNamesList, diskZonesList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+func injectChaosInParallelMode(ctx context.Context, computeService *compute.Service, experimentsDetails *experimentTypes.ExperimentDetails, targetDiskVolumeNamesList, diskZonesList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
 	ChaosStartTimeStamp := time.Now()
@@ -200,7 +202,7 @@ func injectChaosInParallelMode(computeService *compute.Service, experimentsDetai
 
 		// run the probes during chaos
 		if len(resultDetails.ProbeDetails) != 0 {
-			if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+			if err := probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
 				return err
 			}
 		}

@@ -1,6 +1,7 @@
 package lib
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/signal"
@@ -11,6 +12,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	"github.com/litmuschaos/litmus-go/pkg/telemetry"
 	"github.com/palantir/stacktrace"
+	"go.opentelemetry.io/otel"
 
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
@@ -28,8 +30,8 @@ import (
 var inject chan os.Signal
 
 // PrepareCPUExecStress contains the chaos preparation and injection steps
-func PrepareCPUExecStress(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	span := telemetry.StartTracing(clients, "InjectCPUExecStressChaos")
+func PrepareCPUExecStress(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectCPUExecStressChaos")
 	defer span.End()
 	// inject channel is used to transmit signal notifications.
 	inject = make(chan os.Signal, 1)
@@ -42,7 +44,7 @@ func PrepareCPUExecStress(experimentsDetails *experimentTypes.ExperimentDetails,
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 	//Starting the CPU stress experiment
-	if err := experimentCPU(experimentsDetails, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+	if err := experimentCPU(ctx, experimentsDetails, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
 		return stacktrace.Propagate(err, "could not stress cpu")
 	}
 	//Waiting for the ramp time after chaos injection
@@ -66,7 +68,7 @@ func stressCPU(experimentsDetails *experimentTypes.ExperimentDetails, podName, n
 }
 
 // experimentCPU function orchestrates the experiment by calling the StressCPU function for every core, of every container, of every pod that is targeted
-func experimentCPU(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+func experimentCPU(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	// Get the target pod details for the chaos execution
 	// if the target pod is not defined it will derive the random target pod list using pod affected percentage
@@ -88,11 +90,11 @@ func experimentCPU(experimentsDetails *experimentTypes.ExperimentDetails, client
 	experimentsDetails.IsTargetContainerProvided = experimentsDetails.TargetContainer != ""
 	switch strings.ToLower(experimentsDetails.Sequence) {
 	case "serial":
-		if err = injectChaosInSerialMode(experimentsDetails, targetPodList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+		if err = injectChaosInSerialMode(ctx, experimentsDetails, targetPodList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
 			return stacktrace.Propagate(err, "could not run chaos in serial mode")
 		}
 	case "parallel":
-		if err = injectChaosInParallelMode(experimentsDetails, targetPodList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+		if err = injectChaosInParallelMode(ctx, experimentsDetails, targetPodList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
 			return stacktrace.Propagate(err, "could not run chaos in parallel mode")
 		}
 	default:
@@ -103,11 +105,11 @@ func experimentCPU(experimentsDetails *experimentTypes.ExperimentDetails, client
 }
 
 // injectChaosInSerialMode stressed the cpu of all target application serially (one by one)
-func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList corev1.PodList, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, targetPodList corev1.PodList, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
-		if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+		if err := probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
 			return err
 		}
 	}
@@ -200,13 +202,13 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 }
 
 // injectChaosInParallelMode stressed the cpu of all target application in parallel mode (all at once)
-func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList corev1.PodList, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, targetPodList corev1.PodList, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 	// creating err channel to receive the error from the go routine
 	stressErr := make(chan error)
 
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
-		if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+		if err := probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
 			return err
 		}
 	}

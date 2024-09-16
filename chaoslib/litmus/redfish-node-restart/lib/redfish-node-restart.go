@@ -1,6 +1,7 @@
 package lib
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/palantir/stacktrace"
+	"go.opentelemetry.io/otel"
 )
 
 // injectChaos initiates node restart chaos on the target node
@@ -23,11 +25,11 @@ func injectChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients 
 }
 
 // experimentExecution function orchestrates the experiment by calling the injectChaos function
-func experimentExecution(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+func experimentExecution(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
-		if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+		if err := probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
 			return err
 		}
 	}
@@ -48,8 +50,8 @@ func experimentExecution(experimentsDetails *experimentTypes.ExperimentDetails, 
 }
 
 // PrepareChaos contains the chaos prepration and injection steps
-func PrepareChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	span := telemetry.StartTracing(clients, "InjectRedfishNodeRestartChaos")
+func PrepareChaos(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectRedfishNodeRestartChaos")
 	defer span.End()
 
 	//Waiting for the ramp time before chaos injection
@@ -58,7 +60,7 @@ func PrepareChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 	//Starting the Redfish node restart experiment
-	if err := experimentExecution(experimentsDetails, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+	if err := experimentExecution(ctx, experimentsDetails, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
 		return err
 	}
 	common.SetTargets(experimentsDetails.IPMIIP, "targeted", "node", chaosDetails)

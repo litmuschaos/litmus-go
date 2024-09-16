@@ -1,12 +1,13 @@
 package lib
 
 import (
+	"context"
 	"os"
 	"strings"
 	"time"
 
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/aws-ssm/aws-ssm-chaos/types"
-	clients "github.com/litmuschaos/litmus-go/pkg/clients"
+	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/cloud/aws/ssm"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	"github.com/litmuschaos/litmus-go/pkg/log"
@@ -17,7 +18,7 @@ import (
 )
 
 // InjectChaosInSerialMode will inject the aws ssm chaos in serial mode that is one after other
-func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, instanceIDList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, inject chan os.Signal) error {
+func InjectChaosInSerialMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, instanceIDList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, inject chan os.Signal) error {
 
 	select {
 	case <-inject:
@@ -60,7 +61,7 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 
 				// run the probes during chaos
 				if len(resultDetails.ProbeDetails) != 0 && i == 0 {
-					if err = probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+					if err = probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
 						return stacktrace.Propagate(err, "failed to run probes")
 					}
 				}
@@ -85,7 +86,7 @@ func InjectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 }
 
 // InjectChaosInParallelMode will inject the aws ssm chaos in parallel mode that is all at once
-func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, instanceIDList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, inject chan os.Signal) error {
+func InjectChaosInParallelMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, instanceIDList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, inject chan os.Signal) error {
 
 	select {
 	case <-inject:
@@ -125,7 +126,7 @@ func InjectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 
 			// run the probes during chaos
 			if len(resultDetails.ProbeDetails) != 0 {
-				if err = probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+				if err = probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
 					return stacktrace.Propagate(err, "failed to run probes")
 				}
 			}

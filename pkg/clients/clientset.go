@@ -1,7 +1,6 @@
 package clients
 
 import (
-	"context"
 	"flag"
 
 	chaosClient "github.com/litmuschaos/chaos-operator/pkg/client/clientset/versioned/typed/litmuschaos/v1alpha1"
@@ -21,7 +20,6 @@ type ClientSets struct {
 	LitmusClient  *chaosClient.LitmuschaosV1alpha1Client
 	KubeConfig    *rest.Config
 	DynamicClient dynamic.Interface
-	Context       context.Context
 }
 
 // GenerateClientSetFromKubeConfig will generation both ClientSets (k8s, and Litmus) as well as the KubeConfig

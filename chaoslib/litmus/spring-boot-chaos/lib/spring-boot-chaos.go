@@ -2,6 +2,7 @@ package lib
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -14,6 +15,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	"github.com/litmuschaos/litmus-go/pkg/telemetry"
 	"github.com/palantir/stacktrace"
+	"go.opentelemetry.io/otel"
 	corev1 "k8s.io/api/core/v1"
 
 	"github.com/litmuschaos/litmus-go/pkg/clients"
@@ -52,8 +54,8 @@ func SetTargetPodList(experimentsDetails *experimentTypes.ExperimentDetails, cli
 }
 
 // PrepareChaos contains the preparation steps before chaos injection
-func PrepareChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	span := telemetry.StartTracing(clients, "InjectSpringBootChaos")
+func PrepareChaos(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectSpringBootChaos")
 	defer span.End()
 
 	// Waiting for the ramp time before chaos injection
@@ -73,11 +75,11 @@ func PrepareChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients
 
 	switch strings.ToLower(experimentsDetails.Sequence) {
 	case "serial":
-		if err := injectChaosInSerialMode(experimentsDetails, clients, chaosDetails, eventsDetails, resultDetails); err != nil {
+		if err := injectChaosInSerialMode(ctx, experimentsDetails, clients, chaosDetails, eventsDetails, resultDetails); err != nil {
 			return stacktrace.Propagate(err, "could not run chaos in serial mode")
 		}
 	case "parallel":
-		if err := injectChaosInParallelMode(experimentsDetails, clients, chaosDetails, eventsDetails, resultDetails); err != nil {
+		if err := injectChaosInParallelMode(ctx, experimentsDetails, clients, chaosDetails, eventsDetails, resultDetails); err != nil {
 			return stacktrace.Propagate(err, "could not run chaos in parallel mode")
 		}
 	default:
@@ -191,7 +193,7 @@ func setChaosMonkeyAssault(chaosMonkeyPort string, chaosMonkeyPath string, assau
 }
 
 // disableChaosMonkey disables chaos monkey on selected pods
-func disableChaosMonkey(chaosMonkeyPort string, chaosMonkeyPath string, pod corev1.Pod) error {
+func disableChaosMonkey(ctx context.Context, chaosMonkeyPort string, chaosMonkeyPath string, pod corev1.Pod) error {
 	log.Infof("[Chaos]: disabling assaults on pod %s", pod.Name)
 	jsonValue, err := json.Marshal(revertAssault)
 	if err != nil {
@@ -215,11 +217,11 @@ func disableChaosMonkey(chaosMonkeyPort string, chaosMonkeyPath string, pod core
 }
 
 // injectChaosInSerialMode injects chaos monkey assault on pods in serial mode(one by one)
-func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, eventsDetails *types.EventDetails, resultDetails *types.ResultDetails) error {
+func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, eventsDetails *types.EventDetails, resultDetails *types.ResultDetails) error {
 
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
-		if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+		if err := probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
 			return err
 		}
 	}
@@ -273,7 +275,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 				select {
 				case <-signChan:
 					log.Info("[Chaos]: Revert Started")
-					if err := disableChaosMonkey(experimentsDetails.ChaosMonkeyPort, experimentsDetails.ChaosMonkeyPath, pod); err != nil {
+					if err := disableChaosMonkey(ctx, experimentsDetails.ChaosMonkeyPort, experimentsDetails.ChaosMonkeyPath, pod); err != nil {
 						log.Errorf("Error in disabling chaos monkey, err: %v", err)
 					} else {
 						common.SetTargets(pod.Name, "reverted", "pod", chaosDetails)
@@ -291,7 +293,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 				}
 			}
 
-			if err := disableChaosMonkey(experimentsDetails.ChaosMonkeyPort, experimentsDetails.ChaosMonkeyPath, pod); err != nil {
+			if err := disableChaosMonkey(ctx, experimentsDetails.ChaosMonkeyPort, experimentsDetails.ChaosMonkeyPath, pod); err != nil {
 				return err
 			}
 
@@ -303,11 +305,11 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 }
 
 // injectChaosInParallelMode injects chaos monkey assault on pods in parallel mode (all at once)
-func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, eventsDetails *types.EventDetails, resultDetails *types.ResultDetails) error {
+func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, eventsDetails *types.EventDetails, resultDetails *types.ResultDetails) error {
 
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
-		if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+		if err := probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
 			return err
 		}
 	}
@@ -362,7 +364,7 @@ loop:
 		case <-signChan:
 			log.Info("[Chaos]: Revert Started")
 			for _, pod := range experimentsDetails.TargetPodList.Items {
-				if err := disableChaosMonkey(experimentsDetails.ChaosMonkeyPort, experimentsDetails.ChaosMonkeyPath, pod); err != nil {
+				if err := disableChaosMonkey(ctx, experimentsDetails.ChaosMonkeyPort, experimentsDetails.ChaosMonkeyPath, pod); err != nil {
 					log.Errorf("Error in disabling chaos monkey, err: %v", err)
 				} else {
 					common.SetTargets(pod.Name, "reverted", "pod", chaosDetails)
@@ -383,7 +385,7 @@ loop:
 
 	var errorList []string
 	for _, pod := range experimentsDetails.TargetPodList.Items {
-		if err := disableChaosMonkey(experimentsDetails.ChaosMonkeyPort, experimentsDetails.ChaosMonkeyPath, pod); err != nil {
+		if err := disableChaosMonkey(ctx, experimentsDetails.ChaosMonkeyPort, experimentsDetails.ChaosMonkeyPath, pod); err != nil {
 			errorList = append(errorList, err.Error())
 			continue
 		}

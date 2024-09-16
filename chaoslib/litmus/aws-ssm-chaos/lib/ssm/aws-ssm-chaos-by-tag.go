@@ -1,6 +1,7 @@
 package ssm
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/signal"
@@ -17,11 +18,12 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/palantir/stacktrace"
+	"go.opentelemetry.io/otel"
 )
 
 // PrepareAWSSSMChaosByTag contains the prepration and injection steps for the experiment
-func PrepareAWSSSMChaosByTag(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	span := telemetry.StartTracing(clients, "InjectAWSSSMChaosByTagChaos")
+func PrepareAWSSSMChaosByTag(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectAWSSSMChaosByTagChaos")
 	defer span.End()
 
 	// inject channel is used to transmit signal notifications.
@@ -58,11 +60,11 @@ func PrepareAWSSSMChaosByTag(experimentsDetails *experimentTypes.ExperimentDetai
 
 	switch strings.ToLower(experimentsDetails.Sequence) {
 	case "serial":
-		if err = lib.InjectChaosInSerialMode(experimentsDetails, instanceIDList, clients, resultDetails, eventsDetails, chaosDetails, inject); err != nil {
+		if err = lib.InjectChaosInSerialMode(ctx, experimentsDetails, instanceIDList, clients, resultDetails, eventsDetails, chaosDetails, inject); err != nil {
 			return stacktrace.Propagate(err, "could not run chaos in serial mode")
 		}
 	case "parallel":
-		if err = lib.InjectChaosInParallelMode(experimentsDetails, instanceIDList, clients, resultDetails, eventsDetails, chaosDetails, inject); err != nil {
+		if err = lib.InjectChaosInParallelMode(ctx, experimentsDetails, instanceIDList, clients, resultDetails, eventsDetails, chaosDetails, inject); err != nil {
 			return stacktrace.Propagate(err, "could not run chaos in parallel mode")
 		}
 	default:

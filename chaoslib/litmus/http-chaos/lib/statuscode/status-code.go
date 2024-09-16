@@ -1,6 +1,7 @@
 package statuscode
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"math/rand"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	"github.com/litmuschaos/litmus-go/pkg/telemetry"
+	"go.opentelemetry.io/otel"
 
 	http_chaos "github.com/litmuschaos/litmus-go/chaoslib/litmus/http-chaos/lib"
 	body "github.com/litmuschaos/litmus-go/chaoslib/litmus/http-chaos/lib/modify-body"
@@ -28,8 +30,8 @@ var acceptedStatusCodes = []string{
 }
 
 // PodHttpStatusCodeChaos contains the steps to prepare and inject http status code chaos
-func PodHttpStatusCodeChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	span := telemetry.StartTracing(clients, "InjectPodHTTPStatusCodeChaos")
+func PodHttpStatusCodeChaos(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectPodHTTPStatusCodeChaos")
 	defer span.End()
 
 	// responseBodyMaxLength defines the max length of response body string to be printed. It is taken as
@@ -53,7 +55,7 @@ func PodHttpStatusCodeChaos(experimentsDetails *experimentTypes.ExperimentDetail
 		`-t status_code -a status_code=%s -a modify_response_body=%d -a response_body="%v" -a content_type=%s -a content_encoding=%s`,
 		experimentsDetails.StatusCode, stringBoolToInt(experimentsDetails.ModifyResponseBody), body.EscapeQuotes(experimentsDetails.ResponseBody),
 		experimentsDetails.ContentType, experimentsDetails.ContentEncoding)
-	return http_chaos.PrepareAndInjectChaos(experimentsDetails, clients, resultDetails, eventsDetails, chaosDetails, args)
+	return http_chaos.PrepareAndInjectChaos(ctx, experimentsDetails, clients, resultDetails, eventsDetails, chaosDetails, args)
 }
 
 // GetStatusCode performs two functions:

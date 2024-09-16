@@ -17,11 +17,12 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/litmuschaos/litmus-go/pkg/utils/stringutils"
 	"github.com/palantir/stacktrace"
+	"go.opentelemetry.io/otel"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func experimentExecution(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+func experimentExecution(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 	if experimentsDetails.EngineName != "" {
 		msg := "Injecting " + experimentsDetails.ExperimentName + " chaos"
 		types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
@@ -29,7 +30,7 @@ func experimentExecution(experimentsDetails *experimentTypes.ExperimentDetails, 
 	}
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
-		if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+		if err := probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
 			return err
 		}
 	}
@@ -37,7 +38,7 @@ func experimentExecution(experimentsDetails *experimentTypes.ExperimentDetails, 
 	runID := stringutils.GetRunID()
 
 	// creating the helper pod to perform k6-loadgen chaos
-	if err := createHelperPod(experimentsDetails, clients, chaosDetails, runID); err != nil {
+	if err := createHelperPod(ctx, experimentsDetails, clients, chaosDetails, runID); err != nil {
 		return stacktrace.Propagate(err, "could not create helper pod")
 	}
 
@@ -69,8 +70,8 @@ func experimentExecution(experimentsDetails *experimentTypes.ExperimentDetails, 
 }
 
 // PrepareChaos contains the preparation steps before chaos injection
-func PrepareChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	span := telemetry.StartTracing(clients, "InjectK6LoadGenChaos")
+func PrepareChaos(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectK6LoadGenChaos")
 	defer span.End()
 
 	// Waiting for the ramp time before chaos injection
@@ -80,7 +81,7 @@ func PrepareChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients
 	}
 
 	// Starting the k6-loadgen experiment
-	if err := experimentExecution(experimentsDetails, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+	if err := experimentExecution(ctx, experimentsDetails, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
 		return stacktrace.Propagate(err, "could not execute chaos")
 	}
 
@@ -93,8 +94,8 @@ func PrepareChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients
 }
 
 // createHelperPod derive the attributes for helper pod and create the helper pod
-func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, runID string) error {
-	span := telemetry.StartTracing(clients, "CreateK6LoadGenHelperPod")
+func createHelperPod(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, runID string) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "CreateK6LoadGenHelperPod")
 	defer span.End()
 
 	const volumeName = "script-volume"

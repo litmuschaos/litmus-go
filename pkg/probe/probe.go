@@ -17,6 +17,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/palantir/stacktrace"
 	"github.com/sirupsen/logrus"
+	"go.opentelemetry.io/otel"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -24,8 +25,8 @@ var err error
 
 // RunProbes contains the steps to trigger the probes
 // It contains steps to trigger all three probes: k8sprobe, httpprobe, cmdprobe
-func RunProbes(chaosDetails *types.ChaosDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, phase string, eventsDetails *types.EventDetails) error {
-	span := telemetry.StartTracing(clients, "RunProbes")
+func RunProbes(ctx context.Context, chaosDetails *types.ChaosDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, phase string, eventsDetails *types.EventDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "RunProbes")
 	defer span.End()
 
 	// get the probes details from the chaosengine

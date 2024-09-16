@@ -1,6 +1,7 @@
 package lib
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/signal"
@@ -20,13 +21,14 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/palantir/stacktrace"
 	"github.com/sirupsen/logrus"
+	"go.opentelemetry.io/otel"
 )
 
 var inject, abort chan os.Signal
 
 // PrepareEC2TerminateByTag contains the prepration and injection steps for the experiment
-func PrepareEC2TerminateByTag(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	span := telemetry.StartTracing(clients, "InjectEC2TerminateByTagChaos")
+func PrepareEC2TerminateByTag(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectEC2TerminateByTagChaos")
 	defer span.End()
 
 	// inject channel is used to transmit signal notifications.
@@ -53,11 +55,11 @@ func PrepareEC2TerminateByTag(experimentsDetails *experimentTypes.ExperimentDeta
 
 	switch strings.ToLower(experimentsDetails.Sequence) {
 	case "serial":
-		if err := injectChaosInSerialMode(experimentsDetails, instanceIDList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+		if err := injectChaosInSerialMode(ctx, experimentsDetails, instanceIDList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
 			return stacktrace.Propagate(err, "could not run chaos in serial mode")
 		}
 	case "parallel":
-		if err := injectChaosInParallelMode(experimentsDetails, instanceIDList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+		if err := injectChaosInParallelMode(ctx, experimentsDetails, instanceIDList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
 			return stacktrace.Propagate(err, "could not run chaos in parallel mode")
 		}
 	default:
@@ -73,7 +75,7 @@ func PrepareEC2TerminateByTag(experimentsDetails *experimentTypes.ExperimentDeta
 }
 
 // injectChaosInSerialMode will inject the ce2 instance termination in serial mode that is one after other
-func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, instanceIDList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, instanceIDList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	select {
 	case <-inject:
@@ -114,7 +116,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 				// run the probes during chaos
 				// the OnChaos probes execution will start in the first iteration and keep running for the entire chaos duration
 				if len(resultDetails.ProbeDetails) != 0 && i == 0 {
-					if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+					if err := probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
 						return stacktrace.Propagate(err, "failed to run probes")
 					}
 				}
@@ -145,7 +147,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 }
 
 // injectChaosInParallelMode will inject the ce2 instance termination in parallel mode that is all at once
-func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, instanceIDList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, instanceIDList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	select {
 	case <-inject:
@@ -185,7 +187,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 
 			// run the probes during chaos
 			if len(resultDetails.ProbeDetails) != 0 {
-				if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+				if err := probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
 					return stacktrace.Propagate(err, "failed to run probes")
 				}
 			}

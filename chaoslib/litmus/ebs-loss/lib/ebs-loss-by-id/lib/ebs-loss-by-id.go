@@ -1,6 +1,7 @@
 package lib
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/signal"
@@ -16,6 +17,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/palantir/stacktrace"
+	"go.opentelemetry.io/otel"
 )
 
 var (
@@ -24,8 +26,8 @@ var (
 )
 
 // PrepareEBSLossByID contains the prepration and injection steps for the experiment
-func PrepareEBSLossByID(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	span := telemetry.StartTracing(clients, "InjectEBSLossByIDChaos")
+func PrepareEBSLossByID(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectEBSLossByIDChaos")
 	defer span.End()
 
 	// inject channel is used to transmit signal notifications.
@@ -60,11 +62,11 @@ func PrepareEBSLossByID(experimentsDetails *experimentTypes.ExperimentDetails, c
 
 		switch strings.ToLower(experimentsDetails.Sequence) {
 		case "serial":
-			if err = ebsloss.InjectChaosInSerialMode(experimentsDetails, volumeIDList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+			if err = ebsloss.InjectChaosInSerialMode(ctx, experimentsDetails, volumeIDList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
 				return stacktrace.Propagate(err, "could not run chaos in serial mode")
 			}
 		case "parallel":
-			if err = ebsloss.InjectChaosInParallelMode(experimentsDetails, volumeIDList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+			if err = ebsloss.InjectChaosInParallelMode(ctx, experimentsDetails, volumeIDList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
 				return stacktrace.Propagate(err, "could not run chaos in parallel mode")
 			}
 		default:
