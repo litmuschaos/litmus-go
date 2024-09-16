@@ -176,15 +176,7 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 			},
 			Tolerations: []apiv1.Toleration{
 				{
-					Key:               "node.kubernetes.io/not-ready",
 					Operator:          apiv1.TolerationOperator("Exists"),
-					Effect:            apiv1.TaintEffect("NoExecute"),
-					TolerationSeconds: ptrint64(int64(experimentsDetails.ChaosDuration) + 60),
-				},
-				{
-					Key:               "node.kubernetes.io/unreachable",
-					Operator:          apiv1.TolerationOperator("Exists"),
-					Effect:            apiv1.TaintEffect("NoExecute"),
 					TolerationSeconds: ptrint64(int64(experimentsDetails.ChaosDuration) + 60),
 				},
 			},
