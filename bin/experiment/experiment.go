@@ -66,7 +66,6 @@ import (
 	cli "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/telemetry"
-	"github.com/litmuschaos/litmus-go/pkg/utils"
 	"github.com/sirupsen/logrus"
 )
 
@@ -83,7 +82,7 @@ func main() {
 	ctx := context.Background()
 
 	// Set up Observability.
-	if otelExporterEndpoint := os.Getenv(utils.OTELExporterOTLPEndpoint); otelExporterEndpoint != "" {
+	if otelExporterEndpoint := os.Getenv(telemetry.OTELExporterOTLPEndpoint); otelExporterEndpoint != "" {
 		shutdown, err := telemetry.InitOTelSDK(ctx, true, otelExporterEndpoint)
 		if err != nil {
 			return

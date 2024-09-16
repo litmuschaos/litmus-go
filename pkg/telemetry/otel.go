@@ -16,6 +16,7 @@ import (
 const (
 	OTELExperimentJobServiceName       = "chaos_experiment_job"
 	OTELExperimentJobHelperServiceName = "chaos_experiment_job_helper"
+	OTELExporterOTLPEndpoint           = "OTEL_EXPORTER_OTLP_ENDPOINT"
 )
 
 func InitOTelSDK(ctx context.Context, isExperiment bool, endpoint string) (shutdown func(context.Context) error, err error) {

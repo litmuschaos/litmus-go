@@ -21,11 +21,9 @@ import (
 	networkChaos "github.com/litmuschaos/litmus-go/chaoslib/litmus/network-chaos/helper"
 	dnsChaos "github.com/litmuschaos/litmus-go/chaoslib/litmus/pod-dns-chaos/helper"
 	stressChaos "github.com/litmuschaos/litmus-go/chaoslib/litmus/stress-chaos/helper"
-	"github.com/litmuschaos/litmus-go/pkg/telemetry"
-	"github.com/litmuschaos/litmus-go/pkg/utils"
-
 	cli "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/log"
+	"github.com/litmuschaos/litmus-go/pkg/telemetry"
 	"github.com/sirupsen/logrus"
 )
 
@@ -41,7 +39,7 @@ func init() {
 func main() {
 	ctx := context.Background()
 	// Set up Observability.
-	if otelExporterEndpoint := os.Getenv(utils.OTELExporterOTLPEndpoint); otelExporterEndpoint != "" {
+	if otelExporterEndpoint := os.Getenv(telemetry.OTELExporterOTLPEndpoint); otelExporterEndpoint != "" {
 		shutdown, err := telemetry.InitOTelSDK(ctx, true, otelExporterEndpoint)
 		if err != nil {
 			return

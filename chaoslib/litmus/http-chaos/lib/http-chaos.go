@@ -9,7 +9,6 @@ import (
 
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	"github.com/litmuschaos/litmus-go/pkg/telemetry"
-	"github.com/litmuschaos/litmus-go/pkg/utils"
 	"github.com/palantir/stacktrace"
 
 	"github.com/litmuschaos/litmus-go/pkg/clients"
@@ -284,7 +283,7 @@ func getPodEnv(ctx context.Context, experimentsDetails *experimentTypes.Experime
 		SetEnv("TARGET_SERVICE_PORT", strconv.Itoa(experimentsDetails.TargetServicePort)).
 		SetEnv("PROXY_PORT", strconv.Itoa(experimentsDetails.ProxyPort)).
 		SetEnv("TOXICITY", strconv.Itoa(experimentsDetails.Toxicity)).
-		SetEnv("OTEL_EXPORTER_OTLP_ENDPOINT", os.Getenv(utils.OTELExporterOTLPEndpoint)).
+		SetEnv("OTEL_EXPORTER_OTLP_ENDPOINT", os.Getenv(telemetry.OTELExporterOTLPEndpoint)).
 		SetEnv("TRACE_PARENT", telemetry.GetMarshalledSpanFromContext(ctx)).
 		SetEnvFromDownwardAPI("v1", "metadata.name")
 

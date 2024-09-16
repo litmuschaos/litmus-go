@@ -26,6 +26,10 @@ func StartTracing(clients clients.ClientSets, spanName string) trace.Span {
 func GetTraceParentContext() context.Context {
 	traceParent := os.Getenv(TraceParent)
 
+	if traceParent == "" {
+		return context.Background()
+	}
+
 	pro := otel.GetTextMapPropagator()
 	carrier := make(map[string]string)
 	if err := json.Unmarshal([]byte(traceParent), &carrier); err != nil {
