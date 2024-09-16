@@ -19,7 +19,7 @@ import (
     v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func experimentExecution(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+func experimentExecution(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
     // Get the target pod details for the chaos execution
 	// if the target pod is not defined it will derive the random target pod list using pod affected percentage
@@ -54,10 +54,10 @@ func experimentExecution(experimentsDetails *experimentTypes.ExperimentDetails, 
     		}
     	}
 
-	return runChaos(experimentsDetails, targetPodList, clients, resultDetails, eventsDetails, chaosDetails)
+	return runChaos(ctx, experimentsDetails, targetPodList, clients, resultDetails, eventsDetails, chaosDetails)
 }
 
-func runChaos(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList corev1.PodList, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+func runChaos(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, targetPodList corev1.PodList, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 	if experimentsDetails.EngineName != "" {
     		msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on target pod"
     		types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
@@ -66,7 +66,7 @@ func runChaos(experimentsDetails *experimentTypes.ExperimentDetails, targetPodLi
 
     // run the probes during chaos
     if len(resultDetails.ProbeDetails) != 0 {
-        if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+        if err := probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
             return err
         }
     }
@@ -89,7 +89,7 @@ func runChaos(experimentsDetails *experimentTypes.ExperimentDetails, targetPodLi
             "Target Container": experimentsDetails.TargetContainer,
         })
 
-        if err := createHelperPod(experimentsDetails, clients, chaosDetails, pod.Name, pod.Spec.NodeName, runID); err != nil {
+        if err := createHelperPod(ctx, experimentsDetails, clients, chaosDetails, pod.Name, pod.Spec.NodeName, runID); err != nil {
             return stacktrace.Propagate(err, "could not create helper pod")
         }
 
@@ -124,7 +124,10 @@ func runChaos(experimentsDetails *experimentTypes.ExperimentDetails, targetPodLi
 }
 
 //PrepareChaos contains the preparation steps before chaos injection
-func PrepareChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+func PrepareChaos(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+    // @TODO: setup tracing
+    // ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "name-your-chaos-fault")
+    // defer span.End()
 
 	//Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
@@ -132,7 +135,7 @@ func PrepareChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 	//Starting the CPU stress experiment
-	if err := experimentExecution(experimentsDetails, clients, resultDetails, eventsDetails, chaosDetails);err != nil {
+	if err := experimentExecution(ctx, experimentsDetails, clients, resultDetails, eventsDetails, chaosDetails);err != nil {
 		return stacktrace.Propagate(err, "could not execute chaos")
 	}
 	//Waiting for the ramp time after chaos injection
@@ -144,7 +147,10 @@ func PrepareChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients
 }
 
 // createHelperPod derive the attributes for helper pod and create the helper pod
-func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, targets, nodeName, runID string) error {
+func createHelperPod(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, targets, nodeName, runID string) error {
+    // @TODO: setup tracing
+    // ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "CreateHelperPod")
+    // defer span.End()
 
 	helperPod := &corev1.Pod{
 		ObjectMeta: v1.ObjectMeta{
