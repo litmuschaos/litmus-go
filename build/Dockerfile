@@ -33,7 +33,7 @@ RUN yum install -y https://dl.rockylinux.org/pub/rocky/9/devel/$(uname -m)/os/Pa
 RUN yum install -y https://dl.rockylinux.org/pub/rocky/9/devel/$(uname -m)/os/Packages/i/iproute-tc-6.2.0-6.el9_4.$(uname -m).rpm 
     
 # iptables
-RUN yum install -y https://dl.rockylinux.org/pub/rocky/9/devel/$(uname -m)/os/Packages/i/iptables-libs-1.8.10-2.el9.$(uname -m).rpm
+RUN yum install -y https://dl.rockylinux.org/vault/rocky/9.4/devel/$(uname -m)/os/Packages/i/iptables-libs-1.8.10-2.el9.$(uname -m).rpm
 RUN yum install -y https://dl.fedoraproject.org/pub/epel/9/Everything/$(uname -m)/Packages/i/iptables-legacy-libs-1.8.10-2.2.el9.$(uname -m).rpm
 RUN yum install -y https://dl.fedoraproject.org/pub/epel/9/Everything/$(uname -m)/Packages/i/iptables-legacy-1.8.10-2.2.el9.$(uname -m).rpm
 
