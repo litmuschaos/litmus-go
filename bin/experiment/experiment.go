@@ -80,23 +80,23 @@ func init() {
 }
 
 func main() {
-	ctx := context.Background()
+	initCtx := context.Background()
 
 	// Set up Observability.
 	if otelExporterEndpoint := os.Getenv(telemetry.OTELExporterOTLPEndpoint); otelExporterEndpoint != "" {
-		shutdown, err := telemetry.InitOTelSDK(ctx, true, otelExporterEndpoint)
+		shutdown, err := telemetry.InitOTelSDK(initCtx, true, otelExporterEndpoint)
 		if err != nil {
 			return
 		}
 		defer func() {
-			err = errors.Join(err, shutdown(ctx))
+			err = errors.Join(err, shutdown(initCtx))
 		}()
-		ctx = telemetry.GetTraceParentContext()
+		initCtx = telemetry.GetTraceParentContext()
 	}
 
 	clients := cli.ClientSets{}
 
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "ExecuteExperiment")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(initCtx, "ExecuteExperiment")
 	defer span.End()
 
 	// parse the experiment name
