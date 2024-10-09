@@ -86,6 +86,7 @@ func main() {
 	if otelExporterEndpoint := os.Getenv(telemetry.OTELExporterOTLPEndpoint); otelExporterEndpoint != "" {
 		shutdown, err := telemetry.InitOTelSDK(initCtx, true, otelExporterEndpoint)
 		if err != nil {
+			log.Errorf("Failed to initialize OTel SDK: %v", err)
 			return
 		}
 		defer func() {
