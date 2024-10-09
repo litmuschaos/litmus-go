@@ -27,7 +27,7 @@ import (
 
 // PrepareContainerKill contains the preparation steps before chaos injection
 func PrepareContainerKill(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectContainerKillChaos")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PrepareContainerKillFault")
 	defer span.End()
 
 	var err error
@@ -93,6 +93,8 @@ func PrepareContainerKill(ctx context.Context, experimentsDetails *experimentTyp
 
 // injectChaosInSerialMode kill the container of all target application serially (one by one)
 func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectContainerKillFaultInSerialMode")
+	defer span.End()
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
 		if err := probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
@@ -143,6 +145,8 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 
 // injectChaosInParallelMode kill the container of all target application in parallel mode (all at once)
 func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectContainerKillFaultInParallelMode")
+	defer span.End()
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
 		if err := probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
@@ -193,7 +197,7 @@ func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experime
 
 // createHelperPod derive the attributes for helper pod and create the helper pod
 func createHelperPod(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, targets, nodeName, runID string) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "CreateContainerKillHelperPod")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "CreateContainerKillFaultHelperPod")
 	defer span.End()
 
 	privilegedEnable := false

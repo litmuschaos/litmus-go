@@ -30,7 +30,7 @@ var (
 
 // PrepareEC2TerminateByID contains the prepration and injection steps for the experiment
 func PrepareEC2TerminateByID(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectEC2TerminateByIDChaos")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PrepareAWSEC2TerminateFaultByID")
 	defer span.End()
 
 	// inject channel is used to transmit signal notifications.
@@ -81,6 +81,8 @@ func PrepareEC2TerminateByID(ctx context.Context, experimentsDetails *experiment
 
 // injectChaosInSerialMode will inject the ec2 instance termination in serial mode that is one after other
 func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, instanceIDList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectAWSEC2TerminateFaultByIDInSerialMode")
+	defer span.End()
 
 	select {
 	case <-inject:
@@ -153,6 +155,8 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 
 // injectChaosInParallelMode will inject the ec2 instance termination in parallel mode that is all at once
 func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, instanceIDList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectAWSEC2TerminateFaultByIDInParallelMode")
+	defer span.End()
 
 	select {
 	case <-inject:

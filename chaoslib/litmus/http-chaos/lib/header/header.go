@@ -15,7 +15,7 @@ import (
 
 // PodHttpModifyHeaderChaos contains the steps to prepare and inject http modify header chaos
 func PodHttpModifyHeaderChaos(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectPodHTTPModifyHeaderChaos")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PreparePodHTTPModifyHeaderFault")
 	defer span.End()
 
 	log.InfoWithValues("[Info]: The chaos tunables are:", logrus.Fields{

@@ -31,7 +31,7 @@ var (
 
 // PrepareDiskVolumeLossByLabel contains the prepration and injection steps for the experiment
 func PrepareDiskVolumeLossByLabel(ctx context.Context, computeService *compute.Service, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectDiskVolumeLossByLabelChaos")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PrepareGCPDiskVolumeLossFaultByLabel")
 	defer span.End()
 
 	// inject channel is used to transmit signal notifications.
@@ -91,6 +91,8 @@ func PrepareDiskVolumeLossByLabel(ctx context.Context, computeService *compute.S
 
 // injectChaosInSerialMode will inject the disk loss chaos in serial mode which means one after the other
 func injectChaosInSerialMode(ctx context.Context, computeService *compute.Service, experimentsDetails *experimentTypes.ExperimentDetails, targetDiskVolumeNamesList, instanceNamesList []string, zone string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectGCPDiskVolumeLossFaultByLabelInSerialMode")
+	defer span.End()
 
 	//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
 	ChaosStartTimeStamp := time.Now()
@@ -166,6 +168,8 @@ func injectChaosInSerialMode(ctx context.Context, computeService *compute.Servic
 
 // injectChaosInParallelMode will inject the disk loss chaos in parallel mode that means all at once
 func injectChaosInParallelMode(ctx context.Context, computeService *compute.Service, experimentsDetails *experimentTypes.ExperimentDetails, targetDiskVolumeNamesList, instanceNamesList []string, zone string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectGCPDiskVolumeLossFaultByLabelInParallelMode")
+	defer span.End()
 
 	//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
 	ChaosStartTimeStamp := time.Now()

@@ -88,6 +88,9 @@ func PrepareAndInjectChaos(ctx context.Context, experimentsDetails *experimentTy
 
 // injectChaosInSerialMode inject the network chaos in all target application serially (one by one)
 func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, args string, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectPodNetworkFaultInSerialMode")
+	defer span.End()
+
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
 		if err := probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
@@ -144,6 +147,8 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 
 // injectChaosInParallelMode inject the network chaos in all target application in parallel mode (all at once)
 func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, args string, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectPodNetworkFaultInParallelMode")
+	defer span.End()
 	var err error
 
 	// run the probes during chaos
@@ -200,7 +205,7 @@ func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experime
 
 // createHelperPod derive the attributes for helper pod and create the helper pod
 func createHelperPod(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, targets string, nodeName, runID, args string) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "CreateNetworkChaosHelperPod")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "CreatePodNetworkFaultHelperPod")
 	defer span.End()
 
 	privilegedEnable := true

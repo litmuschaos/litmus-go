@@ -36,7 +36,7 @@ var (
 
 // PrepareNodeDrain contains the preparation steps before chaos injection
 func PrepareNodeDrain(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectNodeDrainChaos")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PrepareNodeDrainFault")
 	defer span.End()
 
 	// inject channel is used to transmit signal notifications.
@@ -80,7 +80,7 @@ func PrepareNodeDrain(ctx context.Context, experimentsDetails *experimentTypes.E
 	go abortWatcher(experimentsDetails, clients, resultDetails, chaosDetails, eventsDetails)
 
 	// Drain the application node
-	if err := drainNode(experimentsDetails, clients, chaosDetails); err != nil {
+	if err := drainNode(ctx, experimentsDetails, clients, chaosDetails); err != nil {
 		log.Info("[Revert]: Reverting chaos because error during draining of node")
 		if uncordonErr := uncordonNode(experimentsDetails, clients, chaosDetails); uncordonErr != nil {
 			return cerrors.PreserveError{ErrString: fmt.Sprintf("[%s,%s]", stacktrace.RootCause(err).Error(), stacktrace.RootCause(uncordonErr).Error())}
@@ -130,7 +130,9 @@ func PrepareNodeDrain(ctx context.Context, experimentsDetails *experimentTypes.E
 }
 
 // drainNode drain the target node
-func drainNode(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
+func drainNode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectNodeDrainFault")
+	defer span.End()
 
 	select {
 	case <-inject:

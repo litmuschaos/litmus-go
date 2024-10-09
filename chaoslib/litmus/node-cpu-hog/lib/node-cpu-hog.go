@@ -27,7 +27,7 @@ import (
 
 // PrepareNodeCPUHog contains preparation steps before chaos injection
 func PrepareNodeCPUHog(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectNodeCPUHogChaos")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PrepareNodeCPUHogFault")
 	defer span.End()
 
 	//set up the tunables if provided in range
@@ -87,6 +87,8 @@ func PrepareNodeCPUHog(ctx context.Context, experimentsDetails *experimentTypes.
 
 // injectChaosInSerialMode stress the cpu of all the target nodes serially (one by one)
 func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, targetNodeList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectNodeCPUHogFaultInSerialMode")
+	defer span.End()
 
 	nodeCPUCores := experimentsDetails.NodeCPUcores
 
@@ -154,6 +156,9 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 
 // injectChaosInParallelMode stress the cpu of  all the target nodes in parallel mode (all at once)
 func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, targetNodeList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectNodeCPUHogFaultInParallelMode")
+	defer span.End()
+
 	nodeCPUCores := experimentsDetails.NodeCPUcores
 
 	// run the probes during chaos
@@ -233,7 +238,7 @@ func setCPUCapacity(experimentsDetails *experimentTypes.ExperimentDetails, appNo
 
 // createHelperPod derive the attributes for helper pod and create the helper pod
 func createHelperPod(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, chaosDetails *types.ChaosDetails, appNode string, clients clients.ClientSets) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "CreateNodeCPUHogHelperPod")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "CreateNodeCPUHogFaultHelperPod")
 	defer span.End()
 
 	terminationGracePeriodSeconds := int64(experimentsDetails.TerminationGracePeriodSeconds)

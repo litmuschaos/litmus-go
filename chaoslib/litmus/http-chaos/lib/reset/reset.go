@@ -16,7 +16,7 @@ import (
 
 // PodHttpResetPeerChaos contains the steps to prepare and inject http reset peer chaos
 func PodHttpResetPeerChaos(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectPodHTTPResetPeerChaos")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PreparePodHTTPResetPeerFault")
 	defer span.End()
 
 	log.InfoWithValues("[Info]: The chaos tunables are:", logrus.Fields{

@@ -23,6 +23,9 @@ import (
 )
 
 func experimentExecution(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectK6LoadGenFault")
+	defer span.End()
+
 	if experimentsDetails.EngineName != "" {
 		msg := "Injecting " + experimentsDetails.ExperimentName + " chaos"
 		types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
@@ -71,7 +74,7 @@ func experimentExecution(ctx context.Context, experimentsDetails *experimentType
 
 // PrepareChaos contains the preparation steps before chaos injection
 func PrepareChaos(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectK6LoadGenChaos")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PrepareK6LoadGenFault")
 	defer span.End()
 
 	// Waiting for the ramp time before chaos injection
@@ -95,7 +98,7 @@ func PrepareChaos(ctx context.Context, experimentsDetails *experimentTypes.Exper
 
 // createHelperPod derive the attributes for helper pod and create the helper pod
 func createHelperPod(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, runID string) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "CreateK6LoadGenHelperPod")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "CreateK6LoadGenFaultHelperPod")
 	defer span.End()
 
 	const volumeName = "script-volume"

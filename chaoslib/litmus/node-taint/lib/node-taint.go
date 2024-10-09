@@ -33,7 +33,7 @@ var (
 
 // PrepareNodeTaint contains the preparation steps before chaos injection
 func PrepareNodeTaint(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectNodeTaintChaos")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PrepareNodeTaintFault")
 	defer span.End()
 
 	// inject channel is used to transmit signal notifications.
@@ -77,7 +77,7 @@ func PrepareNodeTaint(ctx context.Context, experimentsDetails *experimentTypes.E
 	go abortWatcher(experimentsDetails, clients, resultDetails, chaosDetails, eventsDetails)
 
 	// taint the application node
-	if err := taintNode(experimentsDetails, clients, chaosDetails); err != nil {
+	if err := taintNode(ctx, experimentsDetails, clients, chaosDetails); err != nil {
 		return stacktrace.Propagate(err, "could not taint node")
 	}
 
@@ -122,7 +122,9 @@ func PrepareNodeTaint(ctx context.Context, experimentsDetails *experimentTypes.E
 }
 
 // taintNode taint the application node
-func taintNode(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
+func taintNode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectNodeTaintFault")
+	defer span.End()
 
 	// get the taint labels & effect
 	taintKey, taintValue, taintEffect := getTaintDetails(experimentsDetails)

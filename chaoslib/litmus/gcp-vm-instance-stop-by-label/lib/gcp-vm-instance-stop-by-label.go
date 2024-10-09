@@ -28,7 +28,7 @@ var inject, abort chan os.Signal
 
 // PrepareVMStopByLabel executes the experiment steps by injecting chaos into target VM instances
 func PrepareVMStopByLabel(ctx context.Context, computeService *compute.Service, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectVMInstanceStopByLabelChaos")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PrepareGCPVMInstanceStopFaultByLabel")
 	defer span.End()
 
 	// inject channel is used to transmit signal notifications.
@@ -77,6 +77,8 @@ func PrepareVMStopByLabel(ctx context.Context, computeService *compute.Service, 
 
 // injectChaosInSerialMode stops VM instances in serial mode i.e. one after the other
 func injectChaosInSerialMode(ctx context.Context, computeService *compute.Service, experimentsDetails *experimentTypes.ExperimentDetails, instanceNamesList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectGCPVMInstanceStopFaultByLabelInSerialMode")
+	defer span.End()
 
 	select {
 	case <-inject:
@@ -162,7 +164,8 @@ func injectChaosInSerialMode(ctx context.Context, computeService *compute.Servic
 
 // injectChaosInParallelMode will inject the VM instance termination in serial mode that is one after other
 func injectChaosInParallelMode(ctx context.Context, computeService *compute.Service, experimentsDetails *experimentTypes.ExperimentDetails, instanceNamesList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectGCPVMInstanceStopFaultByLabelInParallelMode")
+	defer span.End()
 	select {
 	case <-inject:
 		// stopping the chaos execution, if abort signal received

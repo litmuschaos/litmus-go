@@ -28,7 +28,7 @@ import (
 
 // PrepareAndInjectChaos contains the preparation & injection steps
 func PrepareAndInjectChaos(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectPodDNSChaos")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PreparePodDNSFault")
 	defer span.End()
 	// Get the target pod details for the chaos execution
 	// if the target pod is not defined it will derive the random target pod list using pod affected percentage
@@ -85,6 +85,8 @@ func PrepareAndInjectChaos(ctx context.Context, experimentsDetails *experimentTy
 
 // injectChaosInSerialMode inject the DNS Chaos in all target application serially (one by one)
 func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectPodDNSFaultInSerialMode")
+	defer span.End()
 
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
@@ -141,6 +143,8 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 
 // injectChaosInParallelMode inject the DNS Chaos in all target application in parallel mode (all at once)
 func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectPodDNSFaultInParallelMode")
+	defer span.End()
 
 	var err error
 	// run the probes during chaos
@@ -197,7 +201,7 @@ func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experime
 
 // createHelperPod derive the attributes for helper pod and create the helper pod
 func createHelperPod(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, targets, nodeName, runID string) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "CreatePodDNSChaosHelperPod")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "CreatePodDNSFaultHelperPod")
 	defer span.End()
 	privilegedEnable := true
 	terminationGracePeriodSeconds := int64(experimentsDetails.TerminationGracePeriodSeconds)

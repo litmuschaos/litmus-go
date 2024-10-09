@@ -31,7 +31,7 @@ var (
 
 // PrepareVMStop contains the prepration and injection steps for the experiment
 func PrepareVMStop(ctx context.Context, computeService *compute.Service, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectVMInstanceStopChaos")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PrepareVMInstanceStopFault")
 	defer span.End()
 
 	// inject channel is used to transmit signal notifications.
@@ -82,6 +82,8 @@ func PrepareVMStop(ctx context.Context, computeService *compute.Service, experim
 
 // injectChaosInSerialMode stops VM instances in serial mode i.e. one after the other
 func injectChaosInSerialMode(ctx context.Context, computeService *compute.Service, experimentsDetails *experimentTypes.ExperimentDetails, instanceNamesList []string, instanceZonesList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectVMInstanceStopFaultInSerialMode")
+	defer span.End()
 
 	select {
 	case <-inject:
@@ -167,6 +169,8 @@ func injectChaosInSerialMode(ctx context.Context, computeService *compute.Servic
 
 // injectChaosInParallelMode stops VM instances in parallel mode i.e. all at once
 func injectChaosInParallelMode(ctx context.Context, computeService *compute.Service, experimentsDetails *experimentTypes.ExperimentDetails, instanceNamesList []string, instanceZonesList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectVMInstanceStopFaultInParallelMode")
+	defer span.End()
 
 	select {
 	case <-inject:

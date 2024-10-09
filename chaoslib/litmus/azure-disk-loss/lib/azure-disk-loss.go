@@ -33,7 +33,7 @@ var (
 
 // PrepareChaos contains the prepration and injection steps for the experiment
 func PrepareChaos(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectAzureDiskLossChaos")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PrepareAzureDiskLossFault")
 	defer span.End()
 
 	// inject channel is used to transmit signal notifications.
@@ -106,6 +106,8 @@ func PrepareChaos(ctx context.Context, experimentsDetails *experimentTypes.Exper
 
 // injectChaosInParallelMode will inject the Azure disk loss chaos in parallel mode that is all at once
 func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, instanceNamesWithDiskNames map[string][]string, attachedDisksWithInstance map[string]*[]compute.DataDisk, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectAzureDiskLossFaultInParallelMode")
+	defer span.End()
 
 	//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
 	ChaosStartTimeStamp := time.Now()
@@ -184,6 +186,8 @@ func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experime
 
 // injectChaosInSerialMode will inject the Azure disk loss chaos in serial mode that is one after other
 func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, instanceNamesWithDiskNames map[string][]string, attachedDisksWithInstance map[string]*[]compute.DataDisk, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectAzureDiskLossFaultInSerialMode")
+	defer span.End()
 
 	//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
 	ChaosStartTimeStamp := time.Now()

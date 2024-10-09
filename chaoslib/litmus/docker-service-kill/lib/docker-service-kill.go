@@ -26,7 +26,7 @@ import (
 
 // PrepareDockerServiceKill contains prepration steps before chaos injection
 func PrepareDockerServiceKill(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectDockerServiceKillChaos")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PrepareDockerServiceKillFault")
 	defer span.End()
 
 	var err error
@@ -115,7 +115,7 @@ func PrepareDockerServiceKill(ctx context.Context, experimentsDetails *experimen
 
 // createHelperPod derive the attributes for helper pod and create the helper pod
 func createHelperPod(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, appNodeName string) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "CreateDockerServiceKillHelperPod")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "CreateDockerServiceKillFaultHelperPod")
 	defer span.End()
 
 	privileged := true

@@ -28,7 +28,7 @@ var (
 
 // PrepareAWSSSMChaosByID contains the prepration and injection steps for the experiment
 func PrepareAWSSSMChaosByID(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectAWSChaosByIDChaos")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PrepareAWSSSMFaultByID")
 	defer span.End()
 
 	// inject channel is used to transmit signal notifications.

@@ -19,7 +19,10 @@ import (
 )
 
 // injectChaos initiates node restart chaos on the target node
-func injectChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) error {
+func injectChaos(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectRedfishNodeRestartFault")
+	defer span.End()
+
 	URL := fmt.Sprintf("https://%v/redfish/v1/Systems/System.Embedded.1/Actions/ComputerSystem.Reset", experimentsDetails.IPMIIP)
 	return redfishLib.RebootNode(URL, experimentsDetails.User, experimentsDetails.Password)
 }
@@ -40,7 +43,7 @@ func experimentExecution(ctx context.Context, experimentsDetails *experimentType
 		events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 	}
 
-	if err := injectChaos(experimentsDetails, clients); err != nil {
+	if err := injectChaos(ctx, experimentsDetails, clients); err != nil {
 		return stacktrace.Propagate(err, "chaos injection failed")
 	}
 
@@ -51,7 +54,7 @@ func experimentExecution(ctx context.Context, experimentsDetails *experimentType
 
 // PrepareChaos contains the chaos prepration and injection steps
 func PrepareChaos(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectRedfishNodeRestartChaos")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PrepareRedfishNodeRestartFault")
 	defer span.End()
 
 	//Waiting for the ramp time before chaos injection

@@ -29,7 +29,7 @@ import (
 
 // PrepareChaos contains the chaos preparation and injection steps
 func PrepareChaos(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectPidFIOStressChaos")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PreparePodFIOStressFault")
 	defer span.End()
 
 	//Waiting for the ramp time before chaos injection
@@ -110,6 +110,9 @@ func experimentExecution(ctx context.Context, experimentsDetails *experimentType
 
 // injectChaosInSerialMode stressed the storage of all target application in serial mode (one by one)
 func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, targetPodList corev1.PodList, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectPodFIOStressFaultInSerialMode")
+	defer span.End()
+
 	// creating err channel to receive the error from the go routine
 	stressErr := make(chan error)
 	// run the probes during chaos
@@ -191,6 +194,9 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 
 // injectChaosInParallelMode stressed the storage of all target application in parallel mode (all at once)
 func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, targetPodList corev1.PodList, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectPodFIOStressFaultInParallelMode")
+	defer span.End()
+
 	// creating err channel to receive the error from the go routine
 	stressErr := make(chan error)
 	// run the probes during chaos

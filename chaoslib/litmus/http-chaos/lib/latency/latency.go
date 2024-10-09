@@ -16,7 +16,7 @@ import (
 
 // PodHttpLatencyChaos contains the steps to prepare and inject http latency chaos
 func PodHttpLatencyChaos(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectPodHTTPLatencyChaos")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PreparePodHttpLatencyFault")
 	defer span.End()
 
 	log.InfoWithValues("[Info]: The chaos tunables are:", logrus.Fields{

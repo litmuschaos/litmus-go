@@ -36,7 +36,7 @@ var (
 
 // PreparePodAutoscaler contains the preparation steps and chaos injection steps
 func PreparePodAutoscaler(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectPodAutoScalerChaos")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PreparePodAutoscalerFault")
 	defer span.End()
 
 	//Waiting for the ramp time before chaos injection

@@ -27,7 +27,7 @@ var (
 
 // PrepareEBSLossByTag contains the prepration and injection steps for the experiment
 func PrepareEBSLossByTag(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectEBSLossByTagChaos")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PrepareAWSEBSLossFaultByTag")
 	defer span.End()
 
 	// inject channel is used to transmit signal notifications.

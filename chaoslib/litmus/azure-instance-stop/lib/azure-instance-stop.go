@@ -31,7 +31,7 @@ var (
 
 // PrepareAzureStop will initialize instanceNameList and start chaos injection based on sequence method selected
 func PrepareAzureStop(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectAzureInstanceStopChaos")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PrepareAzureInstanceStopFault")
 	defer span.End()
 
 	// inject channel is used to transmit signal notifications
@@ -81,6 +81,9 @@ func PrepareAzureStop(ctx context.Context, experimentsDetails *experimentTypes.E
 
 // injectChaosInSerialMode will inject the Azure instance termination in serial mode that is one after the other
 func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, instanceNameList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectAzureInstanceStopFaultInSerialMode")
+	defer span.End()
+
 	select {
 	case <-inject:
 		// stopping the chaos execution, if abort signal received
@@ -159,6 +162,9 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 
 // injectChaosInParallelMode will inject the Azure instance termination in parallel mode that is all at once
 func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, instanceNameList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectAzureInstanceStopFaultInParallelMode")
+	defer span.End()
+
 	select {
 	case <-inject:
 		// Stopping the chaos execution, if abort signal received

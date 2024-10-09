@@ -27,7 +27,7 @@ import (
 
 // PrepareNodeIOStress contains preparation steps before chaos injection
 func PrepareNodeIOStress(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectNodeIOStressChaos")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PrepareNodeIOStressFault")
 	defer span.End()
 	//set up the tunables if provided in range
 	setChaosTunables(experimentsDetails)
@@ -87,6 +87,8 @@ func PrepareNodeIOStress(ctx context.Context, experimentsDetails *experimentType
 
 // injectChaosInSerialMode stress the io of all the target nodes serially (one by one)
 func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, targetNodeList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectNodeIOStressFaultInSerialMode")
+	defer span.End()
 
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
@@ -145,6 +147,8 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 
 // injectChaosInParallelMode stress the io of all the target nodes in parallel mode (all at once)
 func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, targetNodeList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectNodeIOStressFaultInParallelMode")
+	defer span.End()
 
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
@@ -209,7 +213,7 @@ func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experime
 
 // createHelperPod derive the attributes for helper pod and create the helper pod
 func createHelperPod(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, chaosDetails *types.ChaosDetails, appNode string, clients clients.ClientSets) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "CreateNodeIOStressHelperPod")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "CreateNodeIOStressFaultHelperPod")
 	defer span.End()
 	terminationGracePeriodSeconds := int64(experimentsDetails.TerminationGracePeriodSeconds)
 

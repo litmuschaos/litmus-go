@@ -28,7 +28,7 @@ import (
 
 // PrepareDiskFill contains the preparation steps before chaos injection
 func PrepareDiskFill(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectDiskFillChaos")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PrepareDiskFillFault")
 	defer span.End()
 
 	var err error
@@ -98,7 +98,8 @@ func PrepareDiskFill(ctx context.Context, experimentsDetails *experimentTypes.Ex
 
 // injectChaosInSerialMode fill the ephemeral storage of all target application serially (one by one)
 func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, execCommandDetails exec.PodDetails, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
-
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectDiskFillFaultInSerialMode")
+	defer span.End()
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
 		if err := probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
@@ -150,7 +151,8 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 
 // injectChaosInParallelMode fill the ephemeral storage of of all target application in parallel mode (all at once)
 func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, execCommandDetails exec.PodDetails, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
-
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectDiskFillFaultInParallelMode")
+	defer span.End()
 	var err error
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
@@ -202,7 +204,7 @@ func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experime
 
 // createHelperPod derive the attributes for helper pod and create the helper pod
 func createHelperPod(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, targets, appNodeName, runID string) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "CreateDiskFillHelperPod")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "CreateDiskFillFaultHelperPod")
 	defer span.End()
 
 	privilegedEnable := true

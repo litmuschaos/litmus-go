@@ -41,7 +41,7 @@ const (
 
 // PrepareNodeRestart contains preparation steps before chaos injection
 func PrepareNodeRestart(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectNodeRestartChaos")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PrepareNodeRestartFault")
 	defer span.End()
 
 	//Select the node
@@ -135,7 +135,7 @@ func createHelperPod(ctx context.Context, experimentsDetails *experimentTypes.Ex
 	// This method is attaching emptyDir along with secret volume, and copy data from secret
 	// to the emptyDir, because secret is mounted as readonly and with 777 perms and it can't be changed
 	// because of: https://github.com/kubernetes/kubernetes/issues/57923
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "CreateNodeRestartHelperPod")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "CreateNodeRestartFaultHelperPod")
 	defer span.End()
 
 	terminationGracePeriodSeconds := int64(experimentsDetails.TerminationGracePeriodSeconds)

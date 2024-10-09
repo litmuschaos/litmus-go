@@ -31,7 +31,7 @@ var inject chan os.Signal
 
 // PrepareCPUExecStress contains the chaos preparation and injection steps
 func PrepareCPUExecStress(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectCPUExecStressChaos")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PreparePodCPUHogExecFault")
 	defer span.End()
 	// inject channel is used to transmit signal notifications.
 	inject = make(chan os.Signal, 1)
@@ -59,7 +59,7 @@ func PrepareCPUExecStress(ctx context.Context, experimentsDetails *experimentTyp
 // The function will be constantly increasing the CPU utilisation until it reaches the maximum available or allowed number.
 // Using the TOTAL_CHAOS_DURATION we will need to specify for how long this experiment will last
 func stressCPU(experimentsDetails *experimentTypes.ExperimentDetails, podName, ns string, clients clients.ClientSets, stressErr chan error) {
-	// It will contains all the pod & container details required for exec command
+	// It will contain all the pod & container details required for exec command
 	execCommandDetails := litmusexec.PodDetails{}
 	command := []string{"/bin/sh", "-c", experimentsDetails.ChaosInjectCmd}
 	litmusexec.SetExecCommandAttributes(&execCommandDetails, podName, experimentsDetails.TargetContainer, ns)
@@ -69,7 +69,6 @@ func stressCPU(experimentsDetails *experimentTypes.ExperimentDetails, podName, n
 
 // experimentCPU function orchestrates the experiment by calling the StressCPU function for every core, of every container, of every pod that is targeted
 func experimentCPU(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-
 	// Get the target pod details for the chaos execution
 	// if the target pod is not defined it will derive the random target pod list using pod affected percentage
 	if experimentsDetails.TargetPods == "" && chaosDetails.AppDetail == nil {
@@ -106,6 +105,8 @@ func experimentCPU(ctx context.Context, experimentsDetails *experimentTypes.Expe
 
 // injectChaosInSerialMode stressed the cpu of all target application serially (one by one)
 func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, targetPodList corev1.PodList, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectPodCPUHogExecFaultInSerialMode")
+	defer span.End()
 
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
@@ -203,6 +204,9 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 
 // injectChaosInParallelMode stressed the cpu of all target application in parallel mode (all at once)
 func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, targetPodList corev1.PodList, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectPodCPUHogExecFaultInParallelMode")
+	defer span.End()
+
 	// creating err channel to receive the error from the go routine
 	stressErr := make(chan error)
 

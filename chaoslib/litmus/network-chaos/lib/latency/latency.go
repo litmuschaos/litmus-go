@@ -14,7 +14,7 @@ import (
 
 // PodNetworkLatencyChaos contains the steps to prepare and inject chaos
 func PodNetworkLatencyChaos(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectPodNetworkLatencyChaos")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PreparePodNetworkLatencyFault")
 	defer span.End()
 
 	args := "delay " + strconv.Itoa(experimentsDetails.NetworkLatency) + "ms " + strconv.Itoa(experimentsDetails.Jitter) + "ms"

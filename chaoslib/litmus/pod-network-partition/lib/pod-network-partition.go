@@ -35,7 +35,7 @@ var (
 
 // PrepareAndInjectChaos contains the prepration & injection steps
 func PrepareAndInjectChaos(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectPodNetworkPartitionChaos")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PreparePodNetworkPartitionFault")
 	defer span.End()
 
 	// inject channel is used to transmit signal notifications.
@@ -106,7 +106,7 @@ func PrepareAndInjectChaos(ctx context.Context, experimentsDetails *experimentTy
 		os.Exit(0)
 	default:
 		// creating the network policy to block the traffic
-		if err := createNetworkPolicy(experimentsDetails, clients, np, runID); err != nil {
+		if err := createNetworkPolicy(ctx, experimentsDetails, clients, np, runID); err != nil {
 			return stacktrace.Propagate(err, "could not create network policy")
 		}
 		// updating chaos status to injected for the target pods
@@ -144,7 +144,9 @@ func PrepareAndInjectChaos(ctx context.Context, experimentsDetails *experimentTy
 
 // createNetworkPolicy creates the network policy in the application namespace
 // it blocks ingress/egress traffic for the targeted application for specific/all IPs
-func createNetworkPolicy(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, networkPolicy *NetworkPolicy, runID string) error {
+func createNetworkPolicy(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, networkPolicy *NetworkPolicy, runID string) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectPodNetworkPartitionFault")
+	defer span.End()
 
 	np := &networkv1.NetworkPolicy{
 		ObjectMeta: v1.ObjectMeta{

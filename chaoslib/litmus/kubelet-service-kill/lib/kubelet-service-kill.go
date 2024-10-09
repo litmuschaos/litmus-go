@@ -26,7 +26,7 @@ import (
 
 // PrepareKubeletKill contains prepration steps before chaos injection
 func PrepareKubeletKill(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectKubeletServiceKillChaos")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PrepareKubeletServiceKillFault")
 	defer span.End()
 
 	var err error
@@ -117,7 +117,7 @@ func PrepareKubeletKill(ctx context.Context, experimentsDetails *experimentTypes
 
 // createHelperPod derive the attributes for helper pod and create the helper pod
 func createHelperPod(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, appNodeName string) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "CreateKubeletServiceKillHelperPod")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "CreateKubeletServiceKillFaultHelperPod")
 	defer span.End()
 
 	privileged := true

@@ -28,7 +28,7 @@ import (
 
 // PrepareNodeMemoryHog contains preparation steps before chaos injection
 func PrepareNodeMemoryHog(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectNodeMemoryHogChaos")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PrepareNodeMemoryHogFault")
 	defer span.End()
 
 	//set up the tunables if provided in range
@@ -89,6 +89,8 @@ func PrepareNodeMemoryHog(ctx context.Context, experimentsDetails *experimentTyp
 
 // injectChaosInSerialMode stress the memory of all the target nodes serially (one by one)
 func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, targetNodeList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectNodeMemoryHogFaultInSerialMode")
+	defer span.End()
 
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
@@ -163,6 +165,8 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 
 // injectChaosInParallelMode stress the memory all the target nodes in parallel mode (all at once)
 func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, targetNodeList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectNodeMemoryHogFaultInParallelMode")
+	defer span.End()
 
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
@@ -317,7 +321,7 @@ func calculateMemoryConsumption(experimentsDetails *experimentTypes.ExperimentDe
 
 // createHelperPod derive the attributes for helper pod and create the helper pod
 func createHelperPod(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, chaosDetails *types.ChaosDetails, appNode string, clients clients.ClientSets, MemoryConsumption string) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "CreateNodeMemoryHogHelperPod")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "CreateNodeMemoryHogFaultHelperPod")
 	defer span.End()
 
 	terminationGracePeriodSeconds := int64(experimentsDetails.TerminationGracePeriodSeconds)

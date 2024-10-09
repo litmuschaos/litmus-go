@@ -27,7 +27,7 @@ import (
 
 // PreparePodDelete contains the prepration steps before chaos injection
 func PreparePodDelete(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectKafkaPodDeleteChaos")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PrepareKafkaPodDeleteFault")
 	defer span.End()
 
 	//Waiting for the ramp time before chaos injection
@@ -59,7 +59,8 @@ func PreparePodDelete(ctx context.Context, experimentsDetails *experimentTypes.E
 
 // injectChaosInSerialMode delete the kafka broker pods in serial mode(one by one)
 func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, eventsDetails *types.EventDetails, resultDetails *types.ResultDetails) error {
-
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectKafkaPodDeleteFaultInSerialMode")
+	defer span.End()
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
 		if err := probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
@@ -154,7 +155,8 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 
 // injectChaosInParallelMode delete the kafka broker pods in parallel mode (all at once)
 func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, eventsDetails *types.EventDetails, resultDetails *types.ResultDetails) error {
-
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectKafkaPodDeleteFaultInParallelMode")
+	defer span.End()
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
 		if err := probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {

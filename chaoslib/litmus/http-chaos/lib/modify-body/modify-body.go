@@ -18,7 +18,7 @@ import (
 
 // PodHttpModifyBodyChaos contains the steps to prepare and inject http modify body chaos
 func PodHttpModifyBodyChaos(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectPodHTTPModifyBodyChaos")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PreparePodHTTPModifyBodyFault")
 	defer span.End()
 
 	// responseBodyMaxLength defines the max length of response body string to be printed. It is taken as

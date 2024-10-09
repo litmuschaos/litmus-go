@@ -55,7 +55,7 @@ func SetTargetPodList(experimentsDetails *experimentTypes.ExperimentDetails, cli
 
 // PrepareChaos contains the preparation steps before chaos injection
 func PrepareChaos(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectSpringBootChaos")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PrepareSpringBootFault")
 	defer span.End()
 
 	// Waiting for the ramp time before chaos injection
@@ -218,6 +218,8 @@ func disableChaosMonkey(ctx context.Context, chaosMonkeyPort string, chaosMonkey
 
 // injectChaosInSerialMode injects chaos monkey assault on pods in serial mode(one by one)
 func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, eventsDetails *types.EventDetails, resultDetails *types.ResultDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectSpringBootFaultInSerialMode")
+	defer span.End()
 
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
@@ -306,6 +308,8 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 
 // injectChaosInParallelMode injects chaos monkey assault on pods in parallel mode (all at once)
 func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, eventsDetails *types.EventDetails, resultDetails *types.ResultDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectSpringBootFaultInParallelMode")
+	defer span.End()
 
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {

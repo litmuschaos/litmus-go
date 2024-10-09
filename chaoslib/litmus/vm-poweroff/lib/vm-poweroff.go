@@ -27,7 +27,7 @@ var inject, abort chan os.Signal
 
 // InjectVMPowerOffChaos injects the chaos in serial or parallel mode
 func InjectVMPowerOffChaos(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, cookie string) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectVMPowerOffChaos")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PrepareVMPowerOffFault")
 	defer span.End()
 	// inject channel is used to transmit signal notifications.
 	inject = make(chan os.Signal, 1)
@@ -75,6 +75,9 @@ func InjectVMPowerOffChaos(ctx context.Context, experimentsDetails *experimentTy
 
 // injectChaosInSerialMode stops VMs in serial mode i.e. one after the other
 func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, vmIdList []string, cookie string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "injectVMPowerOffFaultInSerialMode")
+	defer span.End()
+
 	select {
 	case <-inject:
 		// stopping the chaos execution, if abort signal received
@@ -146,6 +149,8 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 
 // injectChaosInParallelMode stops VMs in parallel mode i.e. all at once
 func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, vmIdList []string, cookie string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "injectVMPowerOffFaultInParallelMode")
+	defer span.End()
 
 	select {
 	case <-inject:

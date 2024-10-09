@@ -13,7 +13,7 @@ import (
 
 // PodNetworkDuplicationChaos contains the steps to prepare and inject chaos
 func PodNetworkDuplicationChaos(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectPodNetworkDuplicationChaos")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PreparePodNetworkDuplicationFault")
 	defer span.End()
 
 	args := "duplicate " + experimentsDetails.NetworkPacketDuplicationPercentage

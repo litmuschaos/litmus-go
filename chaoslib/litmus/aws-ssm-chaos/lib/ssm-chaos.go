@@ -12,13 +12,17 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
+	"github.com/litmuschaos/litmus-go/pkg/telemetry"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/palantir/stacktrace"
+	"go.opentelemetry.io/otel"
 )
 
 // InjectChaosInSerialMode will inject the aws ssm chaos in serial mode that is one after other
 func InjectChaosInSerialMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, instanceIDList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, inject chan os.Signal) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectAWSSSMFaultInSerialMode")
+	defer span.End()
 
 	select {
 	case <-inject:
@@ -87,6 +91,8 @@ func InjectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 
 // InjectChaosInParallelMode will inject the aws ssm chaos in parallel mode that is all at once
 func InjectChaosInParallelMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, instanceIDList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, inject chan os.Signal) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectAWSSSMFaultInParallelMode")
+	defer span.End()
 
 	select {
 	case <-inject:

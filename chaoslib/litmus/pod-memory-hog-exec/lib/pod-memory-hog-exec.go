@@ -32,7 +32,7 @@ var inject chan os.Signal
 
 // PrepareMemoryExecStress contains the chaos preparation and injection steps
 func PrepareMemoryExecStress(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectPodMemoryHogChaos")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PreparePodMemoryHogExecFault")
 	defer span.End()
 
 	// inject channel is used to transmit signal notifications.
@@ -115,6 +115,8 @@ func experimentMemory(ctx context.Context, experimentsDetails *experimentTypes.E
 
 // injectChaosInSerialMode stressed the memory of all target application serially (one by one)
 func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, targetPodList corev1.PodList, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectPodMemoryHogExecFaultInSerialMode")
+	defer span.End()
 
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
@@ -209,6 +211,9 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 
 // injectChaosInParallelMode stressed the memory of all target application in parallel mode (all at once)
 func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, targetPodList corev1.PodList, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectPodMemoryHogExecFaultInParallelMode")
+	defer span.End()
+
 	// creating err channel to receive the error from the go routine
 	stressErr := make(chan error)
 	// run the probes during chaos
