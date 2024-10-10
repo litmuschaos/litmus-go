@@ -6,9 +6,11 @@ import (
 	"strconv"
 
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
+	"github.com/litmuschaos/litmus-go/pkg/telemetry"
 	"github.com/palantir/stacktrace"
+	"go.opentelemetry.io/otel"
 
-	clients "github.com/litmuschaos/litmus-go/pkg/clients"
+	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/docker-service-kill/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
@@ -23,7 +25,9 @@ import (
 )
 
 // PrepareDockerServiceKill contains prepration steps before chaos injection
-func PrepareDockerServiceKill(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+func PrepareDockerServiceKill(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PrepareDockerServiceKillFault")
+	defer span.End()
 
 	var err error
 	if experimentsDetails.TargetNode == "" {
@@ -59,7 +63,7 @@ func PrepareDockerServiceKill(experimentsDetails *experimentTypes.ExperimentDeta
 	}
 
 	// Creating the helper pod to perform docker-service-kill
-	if err = createHelperPod(experimentsDetails, clients, chaosDetails, experimentsDetails.TargetNode); err != nil {
+	if err = createHelperPod(ctx, experimentsDetails, clients, chaosDetails, experimentsDetails.TargetNode); err != nil {
 		return stacktrace.Propagate(err, "could not create helper pod")
 	}
 
@@ -74,7 +78,7 @@ func PrepareDockerServiceKill(experimentsDetails *experimentTypes.ExperimentDeta
 
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
-		if err = probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+		if err = probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
 			common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
 			return err
 		}
@@ -110,7 +114,9 @@ func PrepareDockerServiceKill(experimentsDetails *experimentTypes.ExperimentDeta
 }
 
 // createHelperPod derive the attributes for helper pod and create the helper pod
-func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, appNodeName string) error {
+func createHelperPod(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, appNodeName string) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "CreateDockerServiceKillFaultHelperPod")
+	defer span.End()
 
 	privileged := true
 	terminationGracePeriodSeconds := int64(experimentsDetails.TerminationGracePeriodSeconds)

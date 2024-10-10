@@ -1,12 +1,13 @@
 package experiment
 
 import (
+	"context"
 	"os"
 	"strings"
 
 	"github.com/litmuschaos/chaos-operator/api/litmuschaos/v1alpha1"
 	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/ec2-terminate-by-id/lib"
-	clients "github.com/litmuschaos/litmus-go/pkg/clients"
+	"github.com/litmuschaos/litmus-go/pkg/clients"
 	aws "github.com/litmuschaos/litmus-go/pkg/cloud/aws/ec2"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentEnv "github.com/litmuschaos/litmus-go/pkg/kube-aws/ec2-terminate-by-id/environment"
@@ -20,7 +21,7 @@ import (
 )
 
 // EC2TerminateByID inject the ebs volume loss chaos
-func EC2TerminateByID(clients clients.ClientSets) {
+func EC2TerminateByID(ctx context.Context, clients clients.ClientSets) {
 
 	var (
 		err                  error
@@ -86,7 +87,7 @@ func EC2TerminateByID(clients clients.ClientSets) {
 		// run the probes in the pre-chaos check
 		if len(resultDetails.ProbeDetails) != 0 {
 
-			if err = probe.RunProbes(&chaosDetails, clients, &resultDetails, "PreChaos", &eventsDetails); err != nil {
+			if err = probe.RunProbes(ctx, &chaosDetails, clients, &resultDetails, "PreChaos", &eventsDetails); err != nil {
 				log.Errorf("Probe Failed: %v", err)
 				msg := "AUT: Running, Probes: Unsuccessful"
 				types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, msg, "Warning", &chaosDetails)
@@ -129,7 +130,7 @@ func EC2TerminateByID(clients clients.ClientSets) {
 
 	chaosDetails.Phase = types.ChaosInjectPhase
 
-	if err = litmusLIB.PrepareEC2TerminateByID(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
+	if err = litmusLIB.PrepareEC2TerminateByID(ctx, &experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
 		log.Errorf("Chaos injection failed: %v", err)
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 		return
@@ -167,7 +168,7 @@ func EC2TerminateByID(clients clients.ClientSets) {
 
 		// run the probes in the post-chaos check
 		if len(resultDetails.ProbeDetails) != 0 {
-			if err = probe.RunProbes(&chaosDetails, clients, &resultDetails, "PostChaos", &eventsDetails); err != nil {
+			if err = probe.RunProbes(ctx, &chaosDetails, clients, &resultDetails, "PostChaos", &eventsDetails); err != nil {
 				log.Errorf("Probes Failed: %v", err)
 				msg := "AUT: Running, Probes: Unsuccessful"
 				types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, msg, "Warning", &chaosDetails)

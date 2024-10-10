@@ -4,13 +4,14 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os/exec"
+	"strconv"
+	"time"
+
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/palantir/stacktrace"
 	"github.com/sirupsen/logrus"
-	"os/exec"
-	"strconv"
-	"time"
 
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"

@@ -12,15 +12,20 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/status"
+	"github.com/litmuschaos/litmus-go/pkg/telemetry"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/litmuschaos/litmus-go/pkg/utils/stringutils"
 	"github.com/palantir/stacktrace"
+	"go.opentelemetry.io/otel"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func experimentExecution(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+func experimentExecution(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectK6LoadGenFault")
+	defer span.End()
+
 	if experimentsDetails.EngineName != "" {
 		msg := "Injecting " + experimentsDetails.ExperimentName + " chaos"
 		types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
@@ -28,7 +33,7 @@ func experimentExecution(experimentsDetails *experimentTypes.ExperimentDetails, 
 	}
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
-		if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+		if err := probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
 			return err
 		}
 	}
@@ -36,7 +41,7 @@ func experimentExecution(experimentsDetails *experimentTypes.ExperimentDetails, 
 	runID := stringutils.GetRunID()
 
 	// creating the helper pod to perform k6-loadgen chaos
-	if err := createHelperPod(experimentsDetails, clients, chaosDetails, runID); err != nil {
+	if err := createHelperPod(ctx, experimentsDetails, clients, chaosDetails, runID); err != nil {
 		return stacktrace.Propagate(err, "could not create helper pod")
 	}
 
@@ -68,7 +73,10 @@ func experimentExecution(experimentsDetails *experimentTypes.ExperimentDetails, 
 }
 
 // PrepareChaos contains the preparation steps before chaos injection
-func PrepareChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+func PrepareChaos(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PrepareK6LoadGenFault")
+	defer span.End()
+
 	// Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
 		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", experimentsDetails.RampTime)
@@ -76,7 +84,7 @@ func PrepareChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients
 	}
 
 	// Starting the k6-loadgen experiment
-	if err := experimentExecution(experimentsDetails, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+	if err := experimentExecution(ctx, experimentsDetails, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
 		return stacktrace.Propagate(err, "could not execute chaos")
 	}
 
@@ -89,7 +97,10 @@ func PrepareChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients
 }
 
 // createHelperPod derive the attributes for helper pod and create the helper pod
-func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, runID string) error {
+func createHelperPod(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, runID string) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "CreateK6LoadGenFaultHelperPod")
+	defer span.End()
+
 	const volumeName = "script-volume"
 	const mountPath = "/mnt"
 	helperPod := &corev1.Pod{
