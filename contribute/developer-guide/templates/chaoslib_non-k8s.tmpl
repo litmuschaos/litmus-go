@@ -25,7 +25,7 @@ var (
 //PrepareChaos contains the preparation and injection steps for the experiment
 func PrepareChaos(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
     // @TODO: setup tracing
-    // ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectChaos")
+    // ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "Prepare[name-your-chaos]Fault")
     // defer span.End()
 
 	// inject channel is used to transmit signal notifications.
@@ -78,6 +78,9 @@ func PrepareChaos(ctx context.Context, experimentsDetails *experimentTypes.Exper
 
 //injectChaosInSerialMode will inject the chaos on the target one after other 
 func injectChaosInSerialMode(ctx context.Contxt, experimentsDetails *experimentTypes.ExperimentDetails, targetIDList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+    // @TODO: setup tracing
+    // ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "Inject[name-your-chaos]FaultInSerialMode")
+    // defer span.End()
 
 	select {
 	case <-inject:
@@ -141,6 +144,9 @@ func injectChaosInSerialMode(ctx context.Contxt, experimentsDetails *experimentT
 
 // injectChaosInParallelMode will inject the chaos on the target all at once
 func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, targetIDList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+    // @TODO: setup tracing
+    // ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "Inject[name-your-chaos]FaultInParallelMode")
+    // defer span.End()
 
 	select {
 	case <-inject:
