@@ -27,17 +27,17 @@ RUN yum install -y \
     sudo \
     sshpass \
     procps
-    
-# tc binary
-RUN yum install -y https://dl.rockylinux.org/pub/rocky/9/devel/$(uname -m)/os/Packages/i/iproute-6.2.0-6.el9_4.$(uname -m).rpm
-RUN yum install -y https://dl.rockylinux.org/pub/rocky/9/devel/$(uname -m)/os/Packages/i/iproute-tc-6.2.0-6.el9_4.$(uname -m).rpm 
-    
-# iptables
-RUN yum install -y https://dl.rockylinux.org/pub/rocky/9/devel/$(uname -m)/os/Packages/i/iptables-libs-1.8.10-2.el9.$(uname -m).rpm
-RUN yum install -y https://dl.fedoraproject.org/pub/epel/9/Everything/$(uname -m)/Packages/i/iptables-legacy-libs-1.8.10-2.2.el9.$(uname -m).rpm
-RUN yum install -y https://dl.fedoraproject.org/pub/epel/9/Everything/$(uname -m)/Packages/i/iptables-legacy-1.8.10-2.2.el9.$(uname -m).rpm
 
-# stress-ng 
+# tc binary
+RUN yum install -y https://dl.rockylinux.org/vault/rocky/9.3/devel/$(uname -m)/os/Packages/i/iproute-6.2.0-5.el9.$(uname -m).rpm
+RUN yum install -y https://dl.rockylinux.org/vault/rocky/9.3/devel/$(uname -m)/os/Packages/i/iproute-tc-6.2.0-5.el9.$(uname -m).rpm
+
+# iptables
+RUN yum install -y https://dl.rockylinux.org/vault/rocky/9.3/devel/$(uname -m)/os/Packages/i/iptables-libs-1.8.8-6.el9_1.$(uname -m).rpm
+RUN yum install -y https://dl.fedoraproject.org/pub/archive/epel/9.3/Everything/$(uname -m)/Packages/i/iptables-legacy-libs-1.8.8-6.el9.2.$(uname -m).rpm
+RUN yum install -y https://dl.fedoraproject.org/pub/archive/epel/9.3/Everything/$(uname -m)/Packages/i/iptables-legacy-1.8.8-6.el9.2.$(uname -m).rpm
+
+# stress-ng
 RUN yum install -y https://yum.oracle.com/repo/OracleLinux/OL9/appstream/$(uname -m)/getPackage/Judy-1.0.5-28.el9.$(uname -m).rpm
 RUN yum install -y https://yum.oracle.com/repo/OracleLinux/OL9/appstream/$(uname -m)/getPackage/stress-ng-0.14.00-2.el9.$(uname -m).rpm
 
@@ -72,7 +72,7 @@ RUN curl -L https://litmus-http-proxy.s3.amazonaws.com/cli/cli/toxiproxy-cli-lin
     chmod 755 /sbin/toxiproxy-cli
 RUN curl -L https://litmus-http-proxy.s3.amazonaws.com/server/server/toxiproxy-server-linux-${TARGETARCH}.tar.gz --output toxiproxy-server-linux-${TARGETARCH}.tar.gz && \
     tar zxvf toxiproxy-server-linux-${TARGETARCH}.tar.gz -C /sbin/ && \
-    chmod 755 /sbin/toxiproxy-server 
+    chmod 755 /sbin/toxiproxy-server
 
 ENV APP_USER=litmus
 ENV APP_DIR="/$APP_USER"
@@ -93,7 +93,7 @@ WORKDIR $APP_DIR
 COPY --from=builder /output/ .
 
 COPY --from=docker:27.0.3 /usr/local/bin/docker /sbin/docker
-RUN chmod 755 /sbin/docker 
+RUN chmod 755 /sbin/docker
 
 # Set permissions and ownership for the copied binaries
 RUN chmod 755 ./experiments ./helpers && \
