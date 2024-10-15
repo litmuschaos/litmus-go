@@ -185,8 +185,9 @@ func fillDisk(t targetDetails, bs int) error {
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		log.Error(err.Error())
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Source: t.Source, Target: fmt.Sprintf("{podName: %s, namespace: %s, container: %s}", t.Name, t.Namespace, t.TargetContainer), Reason: string(out)}
 	}
-	return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Source: t.Source, Target: fmt.Sprintf("{podName: %s, namespace: %s, container: %s}", t.Name, t.Namespace, t.TargetContainer), Reason: string(out)}
+	return nil
 }
 
 // getEphemeralStorageAttributes derive the ephemeral storage attributes from the target pod
