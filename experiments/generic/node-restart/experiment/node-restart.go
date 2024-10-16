@@ -1,11 +1,12 @@
 package experiment
 
 import (
+	"context"
 	"os"
 
 	"github.com/litmuschaos/chaos-operator/api/litmuschaos/v1alpha1"
 	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/node-restart/lib"
-	clients "github.com/litmuschaos/litmus-go/pkg/clients"
+	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentEnv "github.com/litmuschaos/litmus-go/pkg/generic/node-restart/environment"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/node-restart/types"
@@ -19,7 +20,7 @@ import (
 )
 
 // NodeRestart inject the node-restart chaos
-func NodeRestart(clients clients.ClientSets) {
+func NodeRestart(ctx context.Context, clients clients.ClientSets) {
 
 	experimentsDetails := experimentTypes.ExperimentDetails{}
 	resultDetails := types.ResultDetails{}
@@ -107,7 +108,7 @@ func NodeRestart(clients clients.ClientSets) {
 		// run the probes in the pre-chaos check
 		if len(resultDetails.ProbeDetails) != 0 {
 
-			if err := probe.RunProbes(&chaosDetails, clients, &resultDetails, "PreChaos", &eventsDetails); err != nil {
+			if err := probe.RunProbes(ctx, &chaosDetails, clients, &resultDetails, "PreChaos", &eventsDetails); err != nil {
 				log.Errorf("Probe Failed, err: %v", err)
 				msg := "NUT: Ready, Probes: Unsuccessful"
 				types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, msg, "Warning", &chaosDetails)
@@ -123,7 +124,7 @@ func NodeRestart(clients clients.ClientSets) {
 	}
 
 	chaosDetails.Phase = types.ChaosInjectPhase
-	if err := litmusLIB.PrepareNodeRestart(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
+	if err := litmusLIB.PrepareNodeRestart(ctx, &experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
 		log.Errorf("[Error]: Node restart failed, err: %v", err)
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 		return
@@ -167,7 +168,7 @@ func NodeRestart(clients clients.ClientSets) {
 
 		// run the probes in the post-chaos check
 		if len(resultDetails.ProbeDetails) != 0 {
-			if err := probe.RunProbes(&chaosDetails, clients, &resultDetails, "PostChaos", &eventsDetails); err != nil {
+			if err := probe.RunProbes(ctx, &chaosDetails, clients, &resultDetails, "PostChaos", &eventsDetails); err != nil {
 				log.Errorf("Probes Failed, err: %v", err)
 				msg := "NUT: Ready, Probes: Unsuccessful"
 				types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, msg, "Warning", &chaosDetails)

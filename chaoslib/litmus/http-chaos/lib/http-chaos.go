@@ -3,13 +3,16 @@ package lib
 import (
 	"context"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
+	"github.com/litmuschaos/litmus-go/pkg/telemetry"
 	"github.com/palantir/stacktrace"
+	"go.opentelemetry.io/otel"
 
-	clients "github.com/litmuschaos/litmus-go/pkg/clients"
+	"github.com/litmuschaos/litmus-go/pkg/clients"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/http-chaos/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
@@ -23,7 +26,7 @@ import (
 )
 
 // PrepareAndInjectChaos contains the preparation & injection steps
-func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, args string) error {
+func PrepareAndInjectChaos(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, args string) error {
 
 	var err error
 	// Get the target pod details for the chaos execution
@@ -63,11 +66,11 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 
 	switch strings.ToLower(experimentsDetails.Sequence) {
 	case "serial":
-		if err = injectChaosInSerialMode(experimentsDetails, targetPodList, args, clients, chaosDetails, resultDetails, eventsDetails); err != nil {
+		if err = injectChaosInSerialMode(ctx, experimentsDetails, targetPodList, args, clients, chaosDetails, resultDetails, eventsDetails); err != nil {
 			return stacktrace.Propagate(err, "could not run chaos in serial mode")
 		}
 	case "parallel":
-		if err = injectChaosInParallelMode(experimentsDetails, targetPodList, args, clients, chaosDetails, resultDetails, eventsDetails); err != nil {
+		if err = injectChaosInParallelMode(ctx, experimentsDetails, targetPodList, args, clients, chaosDetails, resultDetails, eventsDetails); err != nil {
 			return stacktrace.Propagate(err, "could not run chaos in parallel mode")
 		}
 	default:
@@ -78,11 +81,13 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 }
 
 // injectChaosInSerialMode inject the http chaos in all target application serially (one by one)
-func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, args string, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
+func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, args string, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectPodHTTPFaultInSerialMode")
+	defer span.End()
 
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
-		if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+		if err := probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
 			return err
 		}
 	}
@@ -102,7 +107,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		})
 
 		runID := stringutils.GetRunID()
-		if err := createHelperPod(experimentsDetails, clients, chaosDetails, fmt.Sprintf("%s:%s:%s", pod.Name, pod.Namespace, experimentsDetails.TargetContainer), pod.Spec.NodeName, runID, args); err != nil {
+		if err := createHelperPod(ctx, experimentsDetails, clients, chaosDetails, fmt.Sprintf("%s:%s:%s", pod.Name, pod.Namespace, experimentsDetails.TargetContainer), pod.Spec.NodeName, runID, args); err != nil {
 			return stacktrace.Propagate(err, "could not create helper pod")
 		}
 
@@ -135,11 +140,13 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 }
 
 // injectChaosInParallelMode inject the http chaos in all target application in parallel mode (all at once)
-func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, args string, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
+func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, args string, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectPodHTTPFaultInParallelMode")
+	defer span.End()
 
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
-		if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+		if err := probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
 			return err
 		}
 	}
@@ -153,7 +160,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 			targetsPerNode = append(targetsPerNode, fmt.Sprintf("%s:%s:%s", k.Name, k.Namespace, k.TargetContainer))
 		}
 
-		if err := createHelperPod(experimentsDetails, clients, chaosDetails, strings.Join(targetsPerNode, ";"), node, runID, args); err != nil {
+		if err := createHelperPod(ctx, experimentsDetails, clients, chaosDetails, strings.Join(targetsPerNode, ";"), node, runID, args); err != nil {
 			return stacktrace.Propagate(err, "could not create helper pod")
 		}
 	}
@@ -186,7 +193,9 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 }
 
 // createHelperPod derive the attributes for helper pod and create the helper pod
-func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, targets, nodeName, runID, args string) error {
+func createHelperPod(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, targets, nodeName, runID, args string) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "CreateHTTPChaosHelperPod")
+	defer span.End()
 
 	privilegedEnable := true
 	terminationGracePeriodSeconds := int64(experimentsDetails.TerminationGracePeriodSeconds)
@@ -229,7 +238,7 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 						"./helpers -name http-chaos",
 					},
 					Resources: chaosDetails.Resources,
-					Env:       getPodEnv(experimentsDetails, targets, args),
+					Env:       getPodEnv(ctx, experimentsDetails, targets, args),
 					VolumeMounts: []apiv1.VolumeMount{
 						{
 							Name:      "cri-socket",
@@ -263,7 +272,7 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 }
 
 // getPodEnv derive all the env required for the helper pod
-func getPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, targets, args string) []apiv1.EnvVar {
+func getPodEnv(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, targets, args string) []apiv1.EnvVar {
 
 	var envDetails common.ENVDetails
 	envDetails.SetEnv("TARGETS", targets).
@@ -279,6 +288,8 @@ func getPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, targets, a
 		SetEnv("TARGET_SERVICE_PORT", strconv.Itoa(experimentsDetails.TargetServicePort)).
 		SetEnv("PROXY_PORT", strconv.Itoa(experimentsDetails.ProxyPort)).
 		SetEnv("TOXICITY", strconv.Itoa(experimentsDetails.Toxicity)).
+		SetEnv("OTEL_EXPORTER_OTLP_ENDPOINT", os.Getenv(telemetry.OTELExporterOTLPEndpoint)).
+		SetEnv("TRACE_PARENT", telemetry.GetMarshalledSpanFromContext(ctx)).
 		SetEnvFromDownwardAPI("v1", "metadata.name")
 
 	return envDetails.ENV

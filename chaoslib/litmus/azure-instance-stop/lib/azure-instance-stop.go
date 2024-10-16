@@ -1,6 +1,7 @@
 package lib
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/signal"
@@ -10,15 +11,17 @@ import (
 
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/azure/instance-stop/types"
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
-	clients "github.com/litmuschaos/litmus-go/pkg/clients"
+	"github.com/litmuschaos/litmus-go/pkg/clients"
 	azureCommon "github.com/litmuschaos/litmus-go/pkg/cloud/azure/common"
 	azureStatus "github.com/litmuschaos/litmus-go/pkg/cloud/azure/instance"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
+	"github.com/litmuschaos/litmus-go/pkg/telemetry"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/palantir/stacktrace"
+	"go.opentelemetry.io/otel"
 )
 
 var (
@@ -27,7 +30,9 @@ var (
 )
 
 // PrepareAzureStop will initialize instanceNameList and start chaos injection based on sequence method selected
-func PrepareAzureStop(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+func PrepareAzureStop(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PrepareAzureInstanceStopFault")
+	defer span.End()
 
 	// inject channel is used to transmit signal notifications
 	inject = make(chan os.Signal, 1)
@@ -55,11 +60,11 @@ func PrepareAzureStop(experimentsDetails *experimentTypes.ExperimentDetails, cli
 
 	switch strings.ToLower(experimentsDetails.Sequence) {
 	case "serial":
-		if err = injectChaosInSerialMode(experimentsDetails, instanceNameList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+		if err = injectChaosInSerialMode(ctx, experimentsDetails, instanceNameList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
 			return stacktrace.Propagate(err, "could not run chaos in serial mode")
 		}
 	case "parallel":
-		if err = injectChaosInParallelMode(experimentsDetails, instanceNameList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+		if err = injectChaosInParallelMode(ctx, experimentsDetails, instanceNameList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
 			return stacktrace.Propagate(err, "could not run chaos in parallel mode")
 		}
 	default:
@@ -75,7 +80,10 @@ func PrepareAzureStop(experimentsDetails *experimentTypes.ExperimentDetails, cli
 }
 
 // injectChaosInSerialMode will inject the Azure instance termination in serial mode that is one after the other
-func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, instanceNameList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, instanceNameList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectAzureInstanceStopFaultInSerialMode")
+	defer span.End()
+
 	select {
 	case <-inject:
 		// stopping the chaos execution, if abort signal received
@@ -119,7 +127,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 				// Run the probes during chaos
 				// the OnChaos probes execution will start in the first iteration and keep running for the entire chaos duration
 				if len(resultDetails.ProbeDetails) != 0 && i == 0 {
-					if err = probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+					if err = probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
 						return stacktrace.Propagate(err, "failed to run probes")
 					}
 				}
@@ -153,7 +161,10 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 }
 
 // injectChaosInParallelMode will inject the Azure instance termination in parallel mode that is all at once
-func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, instanceNameList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, instanceNameList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectAzureInstanceStopFaultInParallelMode")
+	defer span.End()
+
 	select {
 	case <-inject:
 		// Stopping the chaos execution, if abort signal received
@@ -198,7 +209,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 
 			// Run probes during chaos
 			if len(resultDetails.ProbeDetails) != 0 {
-				if err = probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+				if err = probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
 					return stacktrace.Propagate(err, "failed to run probes")
 				}
 			}
