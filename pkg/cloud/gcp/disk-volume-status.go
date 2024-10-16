@@ -10,6 +10,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
 	"github.com/palantir/stacktrace"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/api/compute/v1"
 )
@@ -104,12 +105,16 @@ func DiskVolumeStateCheck(computeService *compute.Service, experimentsDetails *e
 	if experimentsDetails.GCPProjectID == "" {
 		return cerrors.Error{ErrorCode: cerrors.ErrorTypeStatusChecks, Target: fmt.Sprintf("{projectId: %s}", experimentsDetails.GCPProjectID), Reason: "no gcp project id provided, please provide the project id"}
 	}
-
+	if strings.Count(experimentsDetails.DiskVolumeNames, ",") == len(experimentsDetails.DiskVolumeNames) {
+		return errors.Errorf("no disk name provided, please provide the name of the disk")
+	}
 	diskNamesList := strings.Split(experimentsDetails.DiskVolumeNames, ",")
 	if len(diskNamesList) == 0 {
 		return cerrors.Error{ErrorCode: cerrors.ErrorTypeStatusChecks, Target: fmt.Sprintf("{diskNames: %v}", diskNamesList), Reason: "no disk name provided, please provide the name of the disk"}
 	}
-
+	if strings.Count(experimentsDetails.Zones, ",") == len(experimentsDetails.Zones) {
+		return errors.Errorf("no zone provided, please provide the zone of the disk")
+	}
 	zonesList := strings.Split(experimentsDetails.Zones, ",")
 	if len(zonesList) == 0 {
 		return cerrors.Error{ErrorCode: cerrors.ErrorTypeStatusChecks, Target: fmt.Sprintf("{zones: %v}", zonesList), Reason: "no zone provided, please provide the zone of the disk"}
@@ -131,7 +136,9 @@ func DiskVolumeStateCheck(computeService *compute.Service, experimentsDetails *e
 
 // SetTargetDiskInstanceNames fetches the vm instances to which the disks are attached
 func SetTargetDiskInstanceNames(computeService *compute.Service, experimentsDetails *experimentTypes.ExperimentDetails) error {
-
+	if strings.Count(experimentsDetails.DiskVolumeNames, ",") == len(experimentsDetails.DiskVolumeNames) {
+		return errors.Errorf("no disk name provided, please provide the name of the disk")
+	}
 	diskNamesList := strings.Split(experimentsDetails.DiskVolumeNames, ",")
 	zonesList := strings.Split(experimentsDetails.Zones, ",")
 

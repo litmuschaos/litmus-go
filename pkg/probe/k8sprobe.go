@@ -15,6 +15,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/math"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -67,6 +68,9 @@ func triggerK8sProbe(probe v1alpha1.ProbeAttributes, clients clients.ClientSets,
 
 	parsedResourceNames := []string{}
 	if inputs.ResourceNames != "" {
+		if strings.Count(inputs.ResourceNames, ",") == len(inputs.ResourceNames) {
+			return errors.Errorf("resource names cannot be empty")
+		}
 		parsedResourceNames = strings.Split(inputs.ResourceNames, ",")
 		for i := range parsedResourceNames {
 			parsedResourceNames[i] = strings.TrimSpace(parsedResourceNames[i])

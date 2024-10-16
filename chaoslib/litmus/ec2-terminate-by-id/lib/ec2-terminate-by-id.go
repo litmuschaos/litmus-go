@@ -18,6 +18,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/palantir/stacktrace"
+	"github.com/pkg/errors"
 )
 
 var (
@@ -45,6 +46,9 @@ func PrepareEC2TerminateByID(experimentsDetails *experimentTypes.ExperimentDetai
 	}
 
 	//get the instance id or list of instance ids
+	if strings.Count(experimentsDetails.Ec2InstanceID, ",") == len(experimentsDetails.Ec2InstanceID) {
+		return errors.Errorf("variable contains only one or more commas")
+	}
 	instanceIDList := strings.Split(experimentsDetails.Ec2InstanceID, ",")
 	if experimentsDetails.Ec2InstanceID == "" || len(instanceIDList) == 0 {
 		return cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Reason: "no EC2 instance ID found to terminate"}

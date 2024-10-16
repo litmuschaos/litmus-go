@@ -47,9 +47,15 @@ func PrepareDiskVolumeLoss(computeService *compute.Service, experimentsDetails *
 	}
 
 	//get the disk volume names list
+	if strings.Count(experimentsDetails.DiskVolumeNames, ",") == len(experimentsDetails.DiskVolumeNames) {
+		return errors.Errorf("variable contains only one or more commas")
+	}
 	diskNamesList := strings.Split(experimentsDetails.DiskVolumeNames, ",")
 
 	//get the disk zones list
+	if strings.TrimSpace(experimentsDetails.Zones) == "" {
+		return errors.Errorf("no zones found for chaos injection")
+	}
 	diskZonesList := strings.Split(experimentsDetails.Zones, ",")
 
 	//get the device names for the given disks

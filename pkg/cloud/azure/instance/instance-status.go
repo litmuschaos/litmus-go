@@ -11,6 +11,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	"github.com/litmuschaos/litmus-go/pkg/cloud/azure/common"
 	"github.com/palantir/stacktrace"
+	"github.com/pkg/errors"
 
 	"github.com/litmuschaos/litmus-go/pkg/log"
 )
@@ -97,6 +98,9 @@ func GetAzureScaleSetInstanceStatus(subscriptionID, resourceGroup, virtualMachin
 
 // InstanceStatusCheckByName is used to check the instance status of all the instance under chaos
 func InstanceStatusCheckByName(azureInstanceNames, scaleSet, subscriptionID, resourceGroup string) error {
+	if strings.Count(azureInstanceNames, ",") == len(azureInstanceNames) {
+		return errors.Errorf("no instance provided")
+	}
 	instanceNameList := strings.Split(azureInstanceNames, ",")
 	if azureInstanceNames == "" || len(instanceNameList) == 0 {
 		return cerrors.Error{

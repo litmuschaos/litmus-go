@@ -3,8 +3,6 @@ package lib
 import (
 	"context"
 	"fmt"
-	"github.com/litmuschaos/litmus-go/pkg/cerrors"
-	"github.com/palantir/stacktrace"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -12,6 +10,10 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
+	"github.com/palantir/stacktrace"
+	"github.com/pkg/errors"
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
@@ -160,7 +162,9 @@ func drainNode(experimentsDetails *experimentTypes.ExperimentDetails, clients cl
 
 // uncordonNode uncordon the application node
 func uncordonNode(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
-
+	if strings.Count(experimentsDetails.TargetNode, ",") == len(experimentsDetails.TargetNode) {
+		return errors.Errorf("variable contains only one or more commas")
+	}
 	targetNodes := strings.Split(experimentsDetails.TargetNode, ",")
 	for _, targetNode := range targetNodes {
 
@@ -188,6 +192,9 @@ func uncordonNode(experimentsDetails *experimentTypes.ExperimentDetails, clients
 		Times(uint(experimentsDetails.Timeout / experimentsDetails.Delay)).
 		Wait(time.Duration(experimentsDetails.Delay) * time.Second).
 		Try(func(attempt uint) error {
+			if strings.Count(experimentsDetails.TargetNode, ",") == len(experimentsDetails.TargetNode) {
+				return errors.Errorf("variable contains only one or more commas")
+			}
 			targetNodes := strings.Split(experimentsDetails.TargetNode, ",")
 			for _, targetNode := range targetNodes {
 				nodeSpec, err := clients.KubeClient.CoreV1().Nodes().Get(context.Background(), targetNode, v1.GetOptions{})

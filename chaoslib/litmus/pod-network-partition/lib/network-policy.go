@@ -2,10 +2,12 @@ package lib
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/palantir/stacktrace"
-	"strings"
+	"github.com/pkg/errors"
 
 	network_chaos "github.com/litmuschaos/litmus-go/chaoslib/litmus/network-chaos/lib"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-network-partition/types"
@@ -113,6 +115,9 @@ func (np *NetworkPolicy) setPolicy(policy string) *NetworkPolicy {
 // setPodSelector sets the pod labels selector
 func (np *NetworkPolicy) setPodSelector(podLabel string) *NetworkPolicy {
 	podSelector := map[string]string{}
+	if strings.Count(podLabel, ",") == len(podLabel) {
+		return nil
+	}
 	labels := strings.Split(podLabel, ",")
 	for i := range labels {
 		key, value := getKeyValue(labels[i])
@@ -127,6 +132,9 @@ func (np *NetworkPolicy) setPodSelector(podLabel string) *NetworkPolicy {
 // setNamespaceSelector sets the namespace labels selector
 func (np *NetworkPolicy) setNamespaceSelector(nsLabel string) *NetworkPolicy {
 	nsSelector := map[string]string{}
+	if strings.Count(nsLabel, ",") == len(nsLabel) {
+		return nil
+	}
 	labels := strings.Split(nsLabel, ",")
 	for i := range labels {
 		key, value := getKeyValue(labels[i])
@@ -186,7 +194,9 @@ func (np *NetworkPolicy) setExceptIPs(experimentsDetails *experimentTypes.Experi
 	if err != nil {
 		return stacktrace.Propagate(err, "could not get destination ips")
 	}
-
+	if strings.TrimSpace(destinationIPs) == "" {
+		return errors.Errorf("destination ips cannot be empty")
+	}
 	ips := strings.Split(destinationIPs, ",")
 	var uniqueIps []string
 	// removing all the duplicates and ipv6 ips from the list, if any
