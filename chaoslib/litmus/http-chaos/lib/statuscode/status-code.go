@@ -1,17 +1,21 @@
 package statuscode
 
 import (
+	"context"
 	"fmt"
-	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	"math"
 	"math/rand"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
+	"github.com/litmuschaos/litmus-go/pkg/telemetry"
+	"go.opentelemetry.io/otel"
+
 	http_chaos "github.com/litmuschaos/litmus-go/chaoslib/litmus/http-chaos/lib"
 	body "github.com/litmuschaos/litmus-go/chaoslib/litmus/http-chaos/lib/modify-body"
-	clients "github.com/litmuschaos/litmus-go/pkg/clients"
+	"github.com/litmuschaos/litmus-go/pkg/clients"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/http-chaos/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/types"
@@ -26,7 +30,9 @@ var acceptedStatusCodes = []string{
 }
 
 // PodHttpStatusCodeChaos contains the steps to prepare and inject http status code chaos
-func PodHttpStatusCodeChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+func PodHttpStatusCodeChaos(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PreparePodHttpStatusCodeFault")
+	defer span.End()
 
 	// responseBodyMaxLength defines the max length of response body string to be printed. It is taken as
 	// the min of length of body and 120 characters to avoid printing large response body.
@@ -49,7 +55,7 @@ func PodHttpStatusCodeChaos(experimentsDetails *experimentTypes.ExperimentDetail
 		`-t status_code -a status_code=%s -a modify_response_body=%d -a response_body="%v" -a content_type=%s -a content_encoding=%s`,
 		experimentsDetails.StatusCode, stringBoolToInt(experimentsDetails.ModifyResponseBody), body.EscapeQuotes(experimentsDetails.ResponseBody),
 		experimentsDetails.ContentType, experimentsDetails.ContentEncoding)
-	return http_chaos.PrepareAndInjectChaos(experimentsDetails, clients, resultDetails, eventsDetails, chaosDetails, args)
+	return http_chaos.PrepareAndInjectChaos(ctx, experimentsDetails, clients, resultDetails, eventsDetails, chaosDetails, args)
 }
 
 // GetStatusCode performs two functions:
