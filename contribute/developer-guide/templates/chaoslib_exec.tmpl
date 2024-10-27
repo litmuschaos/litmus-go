@@ -133,6 +133,9 @@ func PrepareChaos(ctx context.Context, experimentsDetails *experimentTypes.Exper
 	}
 	//Starting the CPU stress experiment
 	if err := experimentExecution(ctx, experimentsDetails, clients, resultDetails, eventsDetails, chaosDetails);err != nil {
+		// @TODO: setup tracing
+		// span.SetStatus(codes.Error, "could not execute experiment")
+		// span.RecordError(err)
 		return stacktrace.Propagate(err, "could not execute experiment")
 	}
 	//Waiting for the ramp time after chaos injection

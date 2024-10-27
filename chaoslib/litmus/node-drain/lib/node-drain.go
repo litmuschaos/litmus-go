@@ -15,6 +15,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/telemetry"
 	"github.com/palantir/stacktrace"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/codes"
 
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
@@ -59,6 +60,8 @@ func PrepareNodeDrain(ctx context.Context, experimentsDetails *experimentTypes.E
 		//Select node for kubelet-service-kill
 		experimentsDetails.TargetNode, err = common.GetNodeName(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.NodeLabel, clients)
 		if err != nil {
+			span.SetStatus(codes.Error, "could not get node name")
+			span.RecordError(err)
 			return stacktrace.Propagate(err, "could not get node name")
 		}
 	}
@@ -72,6 +75,8 @@ func PrepareNodeDrain(ctx context.Context, experimentsDetails *experimentTypes.E
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
 		if err = probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+			span.SetStatus(codes.Error, "Probe failed")
+			span.RecordError(err)
 			return err
 		}
 	}
@@ -83,7 +88,10 @@ func PrepareNodeDrain(ctx context.Context, experimentsDetails *experimentTypes.E
 	if err := drainNode(ctx, experimentsDetails, clients, chaosDetails); err != nil {
 		log.Info("[Revert]: Reverting chaos because error during draining of node")
 		if uncordonErr := uncordonNode(experimentsDetails, clients, chaosDetails); uncordonErr != nil {
-			return cerrors.PreserveError{ErrString: fmt.Sprintf("[%s,%s]", stacktrace.RootCause(err).Error(), stacktrace.RootCause(uncordonErr).Error())}
+			span.SetStatus(codes.Error, "could not drain node")
+			err := cerrors.PreserveError{ErrString: fmt.Sprintf("[%s,%s]", stacktrace.RootCause(err).Error(), stacktrace.RootCause(uncordonErr).Error())}
+			span.RecordError(err)
+			return err
 		}
 		return stacktrace.Propagate(err, "could not drain node")
 	}
@@ -93,7 +101,10 @@ func PrepareNodeDrain(ctx context.Context, experimentsDetails *experimentTypes.E
 	if err = status.AUTStatusCheck(clients, chaosDetails); err != nil {
 		log.Info("[Revert]: Reverting chaos because application status check failed")
 		if uncordonErr := uncordonNode(experimentsDetails, clients, chaosDetails); uncordonErr != nil {
-			return cerrors.PreserveError{ErrString: fmt.Sprintf("[%s,%s]", stacktrace.RootCause(err).Error(), stacktrace.RootCause(uncordonErr).Error())}
+			span.SetStatus(codes.Error, "could not check application status")
+			err := cerrors.PreserveError{ErrString: fmt.Sprintf("[%s,%s]", stacktrace.RootCause(err).Error(), stacktrace.RootCause(uncordonErr).Error())}
+			span.RecordError(err)
+			return err
 		}
 		return err
 	}
@@ -104,7 +115,10 @@ func PrepareNodeDrain(ctx context.Context, experimentsDetails *experimentTypes.E
 		if err = status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
 			log.Info("[Revert]: Reverting chaos because auxiliary application status check failed")
 			if uncordonErr := uncordonNode(experimentsDetails, clients, chaosDetails); uncordonErr != nil {
-				return cerrors.PreserveError{ErrString: fmt.Sprintf("[%s,%s]", stacktrace.RootCause(err).Error(), stacktrace.RootCause(uncordonErr).Error())}
+				span.SetStatus(codes.Error, "could not check auxiliary application status")
+				err := cerrors.PreserveError{ErrString: fmt.Sprintf("[%s,%s]", stacktrace.RootCause(err).Error(), stacktrace.RootCause(uncordonErr).Error())}
+				span.RecordError(err)
+				return err
 			}
 			return err
 		}
@@ -118,6 +132,8 @@ func PrepareNodeDrain(ctx context.Context, experimentsDetails *experimentTypes.E
 
 	// Uncordon the application node
 	if err := uncordonNode(experimentsDetails, clients, chaosDetails); err != nil {
+		span.SetStatus(codes.Error, "could not uncordon the target node")
+		span.RecordError(err)
 		return stacktrace.Propagate(err, "could not uncordon the target node")
 	}
 
@@ -143,6 +159,8 @@ func drainNode(ctx context.Context, experimentsDetails *experimentTypes.Experime
 
 		command := exec.Command("kubectl", "drain", experimentsDetails.TargetNode, "--ignore-daemonsets", "--delete-emptydir-data", "--force", "--timeout", strconv.Itoa(experimentsDetails.ChaosDuration)+"s")
 		if err := common.RunCLICommands(command, "", fmt.Sprintf("{node: %s}", experimentsDetails.TargetNode), "failed to drain the target node", cerrors.ErrorTypeChaosInject); err != nil {
+			span.SetStatus(codes.Error, "could not drain the target node")
+			span.RecordError(err)
 			return err
 		}
 
@@ -154,10 +172,16 @@ func drainNode(ctx context.Context, experimentsDetails *experimentTypes.Experime
 			Try(func(attempt uint) error {
 				nodeSpec, err := clients.KubeClient.CoreV1().Nodes().Get(context.Background(), experimentsDetails.TargetNode, v1.GetOptions{})
 				if err != nil {
-					return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Target: fmt.Sprintf("{node: %s}", experimentsDetails.TargetNode), Reason: err.Error()}
+					span.SetStatus(codes.Error, "could not get node details")
+					err := cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Target: fmt.Sprintf("{node: %s}", experimentsDetails.TargetNode), Reason: err.Error()}
+					span.RecordError(err)
+					return err
 				}
 				if !nodeSpec.Spec.Unschedulable {
-					return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Target: fmt.Sprintf("{node: %s}", experimentsDetails.TargetNode), Reason: "node is not in unschedule state"}
+					span.SetStatus(codes.Error, "target node is not in unschedule state")
+					err := cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Target: fmt.Sprintf("{node: %s}", experimentsDetails.TargetNode), Reason: "target node is not in unschedule state"}
+					span.RecordError(err)
+					return err
 				}
 				return nil
 			})

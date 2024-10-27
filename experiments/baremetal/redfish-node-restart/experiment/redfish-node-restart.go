@@ -18,10 +18,13 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/sirupsen/logrus"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // NodeRestart contains steps to inject chaos
 func NodeRestart(ctx context.Context, clients clients.ClientSets) {
+	span := trace.SpanFromContext(ctx)
 
 	experimentsDetails := experimentTypes.ExperimentDetails{}
 	resultDetails := types.ResultDetails{}
@@ -42,6 +45,8 @@ func NodeRestart(ctx context.Context, clients clients.ClientSets) {
 		// Get values from chaosengine. Bail out upon error, as we haven't entered exp business logic yet
 		if err := types.GetValuesFromChaosEngine(&chaosDetails, clients, &resultDetails); err != nil {
 			log.Errorf("Unable to initialize the probes, err: %v", err)
+			span.SetStatus(codes.Error, "Unable to initialize the probes")
+			span.RecordError(err)
 			return
 		}
 	}
@@ -51,6 +56,8 @@ func NodeRestart(ctx context.Context, clients clients.ClientSets) {
 	if err := result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT"); err != nil {
 		log.Errorf("Unable to Create the Chaos Result, err: %v", err)
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
+		span.SetStatus(codes.Error, "Unable to Create the Chaos Result")
+		span.RecordError(err)
 		return
 	}
 
@@ -77,6 +84,8 @@ func NodeRestart(ctx context.Context, clients clients.ClientSets) {
 		if err := status.AUTStatusCheck(clients, &chaosDetails); err != nil {
 			log.Errorf("Application status check failed, err: %v", err)
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
+			span.SetStatus(codes.Error, "Application status check failed")
+			span.RecordError(err)
 			return
 		}
 	}
@@ -87,6 +96,8 @@ func NodeRestart(ctx context.Context, clients clients.ClientSets) {
 		if err := status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
 			log.Errorf("Auxiliary Application status check failed, err: %v", err)
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
+			span.SetStatus(codes.Error, "Auxiliary Application status check failed")
+			span.RecordError(err)
 			return
 		}
 	}
@@ -97,11 +108,15 @@ func NodeRestart(ctx context.Context, clients clients.ClientSets) {
 	if err != nil {
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 		log.Errorf("[Verification]: Unable to get node power status(pre-chaos). Error: %v", err)
+		span.SetStatus(codes.Error, "Unable to get node power status")
+		span.RecordError(err)
 		return
 	}
 	if nodeStatus != "On" {
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 		log.Errorf("[Verification]: Node is not in running state(pre-chaos)")
+		span.SetStatus(codes.Error, "Node is not in running state")
+		span.RecordError(err)
 		return
 	}
 	log.Info("[Verification]: Node is in running state(pre-chaos)")
@@ -119,6 +134,8 @@ func NodeRestart(ctx context.Context, clients clients.ClientSets) {
 				types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, msg, "Warning", &chaosDetails)
 				events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 				result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
+				span.SetStatus(codes.Error, "Probe Failed")
+				span.RecordError(err)
 				return
 			}
 			msg = "NUT: Running, Probes: Successful"
@@ -133,6 +150,8 @@ func NodeRestart(ctx context.Context, clients clients.ClientSets) {
 	if err := litmusLIB.PrepareChaos(ctx, &experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 		log.Errorf("Chaos injection failed, err: %v", err)
+		span.SetStatus(codes.Error, "Chaos injection failed")
+		span.RecordError(err)
 		return
 	}
 
@@ -147,6 +166,8 @@ func NodeRestart(ctx context.Context, clients clients.ClientSets) {
 		if err = status.AUTStatusCheck(clients, &chaosDetails); err != nil {
 			log.Errorf("Application status check failed, err: %v", err)
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
+			span.SetStatus(codes.Error, "Application status check failed")
+			span.RecordError(err)
 			return
 		}
 	}
@@ -157,6 +178,8 @@ func NodeRestart(ctx context.Context, clients clients.ClientSets) {
 		if err := status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
 			log.Errorf("Auxiliary Application status check failed, err: %v", err)
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
+			span.SetStatus(codes.Error, "Auxiliary Application status check failed")
+			span.RecordError(err)
 			return
 		}
 	}
@@ -167,11 +190,15 @@ func NodeRestart(ctx context.Context, clients clients.ClientSets) {
 	if err != nil {
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 		log.Errorf("[Verification]: Unable to get node power status. Error: %v ", err)
+		span.SetStatus(codes.Error, "Unable to get node power status")
+		span.RecordError(err)
 		return
 	}
 	if nodeStatus != "On" {
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 		log.Errorf("[Verification]: Node is not in running state(post-chaos)")
+		span.SetStatus(codes.Error, "Node is not in running state")
+		span.RecordError(err)
 		return
 	}
 	log.Info("[Verification]: Node is in running state(post-chaos)")
@@ -188,6 +215,8 @@ func NodeRestart(ctx context.Context, clients clients.ClientSets) {
 				types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, msg, "Warning", &chaosDetails)
 				events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 				result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
+				span.SetStatus(codes.Error, "Probes Failed")
+				span.RecordError(err)
 				return
 			}
 			msg = "NUT: Running, Probes: Successful"
@@ -202,6 +231,8 @@ func NodeRestart(ctx context.Context, clients clients.ClientSets) {
 	log.Infof("[The End]: Updating the chaos result of %v experiment (EOT)", experimentsDetails.ExperimentName)
 	if err := result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT"); err != nil {
 		log.Errorf("Unable to Update the Chaos Result, err: %v", err)
+		span.SetStatus(codes.Error, "Unable to Update the Chaos Result")
+		span.RecordError(err)
 		return
 	}
 

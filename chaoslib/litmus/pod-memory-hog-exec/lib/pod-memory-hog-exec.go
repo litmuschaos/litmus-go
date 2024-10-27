@@ -14,6 +14,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/telemetry"
 	"github.com/palantir/stacktrace"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/codes"
 
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
@@ -47,6 +48,8 @@ func PrepareMemoryExecStress(ctx context.Context, experimentsDetails *experiment
 	}
 	//Starting the Memory stress experiment
 	if err := experimentMemory(ctx, experimentsDetails, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+		span.SetStatus(codes.Error, "Chaos injection failed")
+		span.RecordError(err)
 		return stacktrace.Propagate(err, "could not stress memory")
 	}
 	//Waiting for the ramp time after chaos injection
@@ -121,6 +124,8 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
 		if err := probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+			span.SetStatus(codes.Error, "Probe failed")
+			span.RecordError(err)
 			return err
 		}
 	}
@@ -179,7 +184,9 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 							log.Warn("Chaos process OOM killed")
 							return nil
 						}
-						return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Target: fmt.Sprintf("podName: %s, namespace: %s, container: %s", pod.Name, pod.Namespace, experimentsDetails.TargetContainer), Reason: fmt.Sprintf("failed to stress memory of target pod: %s", err.Error())}
+						span.SetStatus(codes.Error, "Chaos injection failed")
+						err := cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Target: fmt.Sprintf("podName: %s, namespace: %s, container: %s", pod.Name, pod.Namespace, experimentsDetails.TargetContainer), Reason: fmt.Sprintf("failed to stress memory of target pod: %s", err.Error())}
+						return err
 					}
 				case <-signChan:
 					log.Info("[Chaos]: Revert Started")
@@ -202,6 +209,8 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 				}
 			}
 			if err := killStressMemorySerial(experimentsDetails.TargetContainer, pod.Name, pod.Namespace, experimentsDetails.ChaosKillCmd, clients, chaosDetails); err != nil {
+				span.SetStatus(codes.Error, "could not revert memory stress")
+				span.RecordError(err)
 				return stacktrace.Propagate(err, "could not revert memory stress")
 			}
 		}
@@ -219,6 +228,8 @@ func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experime
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
 		if err := probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+			span.SetStatus(codes.Error, "Probe failed")
+			span.RecordError(err)
 			return err
 		}
 	}
@@ -276,7 +287,10 @@ loop:
 					log.Warn("Chaos process OOM killed")
 					return nil
 				}
-				return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Reason: fmt.Sprintf("failed to stress memory of target pod: %s", err.Error())}
+				span.SetStatus(codes.Error, "failed to stress memory of target pod")
+				err := cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Reason: fmt.Sprintf("failed to stress memory of target pod: %s", err.Error())}
+				span.RecordError(err)
+				return err
 			}
 		case <-signChan:
 			log.Info("[Chaos]: Revert Started")

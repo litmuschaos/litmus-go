@@ -4,8 +4,11 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+
 	"github.com/litmuschaos/litmus-go/pkg/telemetry"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/codes"
+
 	"os/exec"
 	"strconv"
 	"time"
@@ -52,8 +55,12 @@ func Helper(ctx context.Context, clients clients.ClientSets) {
 	if err := killContainer(&experimentsDetails, clients, &eventsDetails, &chaosDetails, &resultDetails); err != nil {
 		// update failstep inside chaosresult
 		if resultErr := result.UpdateFailedStepFromHelper(&resultDetails, &chaosDetails, clients, err); resultErr != nil {
+			span.SetStatus(codes.Error, "helper pod failed")
+			span.RecordError(resultErr)
 			log.Fatalf("helper pod failed, err: %v, resultErr: %v", err, resultErr)
 		}
+		span.SetStatus(codes.Error, "helper pod failed")
+		span.RecordError(err)
 		log.Fatalf("helper pod failed, err: %v", err)
 	}
 }

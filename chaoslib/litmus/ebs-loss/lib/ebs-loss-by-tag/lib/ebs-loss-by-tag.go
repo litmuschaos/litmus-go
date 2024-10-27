@@ -18,6 +18,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/palantir/stacktrace"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/codes"
 )
 
 var (
@@ -61,14 +62,21 @@ func PrepareEBSLossByTag(ctx context.Context, experimentsDetails *experimentType
 		switch strings.ToLower(experimentsDetails.Sequence) {
 		case "serial":
 			if err = ebsloss.InjectChaosInSerialMode(ctx, experimentsDetails, targetEBSVolumeIDList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+				span.SetStatus(codes.Error, "could not run chaos in serial mode")
+				span.RecordError(err)
 				return stacktrace.Propagate(err, "could not run chaos in serial mode")
 			}
 		case "parallel":
 			if err = ebsloss.InjectChaosInParallelMode(ctx, experimentsDetails, targetEBSVolumeIDList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+				span.SetStatus(codes.Error, "could not run chaos in parallel mode")
+				span.RecordError(err)
 				return stacktrace.Propagate(err, "could not run chaos in parallel mode")
 			}
 		default:
-			return cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Reason: fmt.Sprintf("'%s' sequence is not supported", experimentsDetails.Sequence)}
+			span.SetStatus(codes.Error, "sequence is not supported")
+			err := cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Reason: fmt.Sprintf("'%s' sequence is not supported", experimentsDetails.Sequence)}
+			span.RecordError(err)
+			return err
 		}
 		//Waiting for the ramp time after chaos injection
 		if experimentsDetails.RampTime != 0 {

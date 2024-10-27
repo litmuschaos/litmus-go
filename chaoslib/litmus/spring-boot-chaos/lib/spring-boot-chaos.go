@@ -16,6 +16,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/telemetry"
 	"github.com/palantir/stacktrace"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/codes"
 	corev1 "k8s.io/api/core/v1"
 
 	"github.com/litmuschaos/litmus-go/pkg/clients"
@@ -76,14 +77,21 @@ func PrepareChaos(ctx context.Context, experimentsDetails *experimentTypes.Exper
 	switch strings.ToLower(experimentsDetails.Sequence) {
 	case "serial":
 		if err := injectChaosInSerialMode(ctx, experimentsDetails, clients, chaosDetails, eventsDetails, resultDetails); err != nil {
+			span.SetStatus(codes.Error, "could not run chaos in serial mode")
+			span.RecordError(err)
 			return stacktrace.Propagate(err, "could not run chaos in serial mode")
 		}
 	case "parallel":
 		if err := injectChaosInParallelMode(ctx, experimentsDetails, clients, chaosDetails, eventsDetails, resultDetails); err != nil {
+			span.SetStatus(codes.Error, "could not run chaos in parallel mode")
+			span.RecordError(err)
 			return stacktrace.Propagate(err, "could not run chaos in parallel mode")
 		}
 	default:
-		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("'%s' sequence is not supported", experimentsDetails.Sequence)}
+		span.SetStatus(codes.Error, "sequence not supported")
+		err := cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("'%s' sequence is not supported", experimentsDetails.Sequence)}
+		span.RecordError(err)
+		return err
 	}
 
 	// Waiting for the ramp time after chaos injection
@@ -255,16 +263,22 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 
 			if err := setChaosMonkeyWatchers(experimentsDetails.ChaosMonkeyPort, experimentsDetails.ChaosMonkeyPath, experimentsDetails.ChaosMonkeyWatchers, pod); err != nil {
 				log.Errorf("[Chaos]: Failed to set watchers, err: %v ", err)
+				span.SetStatus(codes.Error, "failed to set watchers")
+				span.RecordError(err)
 				return err
 			}
 
 			if err := startAssault(experimentsDetails.ChaosMonkeyPort, experimentsDetails.ChaosMonkeyPath, experimentsDetails.ChaosMonkeyAssault, pod); err != nil {
 				log.Errorf("[Chaos]: Failed to set assault, err: %v ", err)
+				span.SetStatus(codes.Error, "failed to set assault")
+				span.RecordError(err)
 				return err
 			}
 
 			if err := enableChaosMonkey(experimentsDetails.ChaosMonkeyPort, experimentsDetails.ChaosMonkeyPath, pod); err != nil {
 				log.Errorf("[Chaos]: Failed to enable chaos, err: %v ", err)
+				span.SetStatus(codes.Error, "failed to enable chaos")
+				span.RecordError(err)
 				return err
 			}
 			common.SetTargets(pod.Name, "injected", "pod", chaosDetails)
@@ -296,6 +310,8 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 			}
 
 			if err := disableChaosMonkey(ctx, experimentsDetails.ChaosMonkeyPort, experimentsDetails.ChaosMonkeyPath, pod); err != nil {
+				span.SetStatus(codes.Error, "failed to disable chaos monkey")
+				span.RecordError(err)
 				return err
 			}
 
@@ -314,6 +330,8 @@ func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experime
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
 		if err := probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+			span.SetStatus(codes.Error, "probe failed")
+			span.RecordError(err)
 			return err
 		}
 	}
@@ -345,16 +363,22 @@ func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experime
 
 			if err := setChaosMonkeyWatchers(experimentsDetails.ChaosMonkeyPort, experimentsDetails.ChaosMonkeyPath, experimentsDetails.ChaosMonkeyWatchers, pod); err != nil {
 				log.Errorf("[Chaos]: Failed to set watchers, err: %v", err)
+				span.SetStatus(codes.Error, "failed to set watchers")
+				span.RecordError(err)
 				return err
 			}
 
 			if err := startAssault(experimentsDetails.ChaosMonkeyPort, experimentsDetails.ChaosMonkeyPath, experimentsDetails.ChaosMonkeyAssault, pod); err != nil {
 				log.Errorf("[Chaos]: Failed to set assault, err: %v", err)
+				span.SetStatus(codes.Error, "failed to set assault")
+				span.RecordError(err)
 				return err
 			}
 
 			if err := enableChaosMonkey(experimentsDetails.ChaosMonkeyPort, experimentsDetails.ChaosMonkeyPath, pod); err != nil {
 				log.Errorf("[Chaos]: Failed to enable chaos, err: %v", err)
+				span.SetStatus(codes.Error, "failed to enable chaos")
+				span.RecordError(err)
 				return err
 			}
 			common.SetTargets(pod.Name, "injected", "pod", chaosDetails)
@@ -397,7 +421,10 @@ loop:
 	}
 
 	if len(errorList) != 0 {
-		return cerrors.PreserveError{ErrString: fmt.Sprintf("error in disabling chaos monkey, [%s]", strings.Join(errorList, ","))}
+		span.SetStatus(codes.Error, "failed to disable chaos monkey")
+		err := cerrors.PreserveError{ErrString: fmt.Sprintf("error in disabling chaos monkey, [%s]", strings.Join(errorList, ","))}
+		span.RecordError(err)
+		return err
 	}
 	return nil
 }

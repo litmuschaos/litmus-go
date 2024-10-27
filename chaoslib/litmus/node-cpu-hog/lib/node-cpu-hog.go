@@ -10,6 +10,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/telemetry"
 	"github.com/palantir/stacktrace"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/codes"
 
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
@@ -50,6 +51,8 @@ func PrepareNodeCPUHog(ctx context.Context, experimentsDetails *experimentTypes.
 	nodesAffectedPerc, _ := strconv.Atoi(experimentsDetails.NodesAffectedPerc)
 	targetNodeList, err := common.GetNodeList(experimentsDetails.TargetNodes, experimentsDetails.NodeLabel, nodesAffectedPerc, clients)
 	if err != nil {
+		span.SetStatus(codes.Error, "could not get node list")
+		span.RecordError(err)
 		return stacktrace.Propagate(err, "could not get node list")
 	}
 
@@ -60,6 +63,8 @@ func PrepareNodeCPUHog(ctx context.Context, experimentsDetails *experimentTypes.
 
 	if experimentsDetails.EngineName != "" {
 		if err := common.SetHelperData(chaosDetails, experimentsDetails.SetHelperData, clients); err != nil {
+			span.SetStatus(codes.Error, "could not set helper data")
+			span.RecordError(err)
 			return stacktrace.Propagate(err, "could not set helper data")
 		}
 	}
@@ -67,10 +72,14 @@ func PrepareNodeCPUHog(ctx context.Context, experimentsDetails *experimentTypes.
 	switch strings.ToLower(experimentsDetails.Sequence) {
 	case "serial":
 		if err = injectChaosInSerialMode(ctx, experimentsDetails, targetNodeList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+			span.SetStatus(codes.Error, "could not run chaos in serial mode")
+			span.RecordError(err)
 			return stacktrace.Propagate(err, "could not run chaos in serial mode")
 		}
 	case "parallel":
 		if err = injectChaosInParallelMode(ctx, experimentsDetails, targetNodeList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+			span.SetStatus(codes.Error, "could not run chaos in parallel mode")
+			span.RecordError(err)
 			return stacktrace.Propagate(err, "could not run chaos in parallel mode")
 		}
 	default:
@@ -95,6 +104,8 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
 		if err := probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+			span.SetStatus(codes.Error, "Probe failed")
+			span.RecordError(err)
 			return err
 		}
 	}
@@ -110,6 +121,8 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 		// When number of cpu cores for hogging is not defined , it will take it from node capacity
 		if nodeCPUCores == "0" {
 			if err := setCPUCapacity(experimentsDetails, appNode, clients); err != nil {
+				span.SetStatus(codes.Error, "could not get node cpu capacity")
+				span.RecordError(err)
 				return stacktrace.Propagate(err, "could not get node cpu capacity")
 			}
 		}
@@ -123,6 +136,8 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 
 		// Creating the helper pod to perform node cpu hog
 		if err := createHelperPod(ctx, experimentsDetails, chaosDetails, appNode, clients); err != nil {
+			span.SetStatus(codes.Error, "could not create helper pod")
+			span.RecordError(err)
 			return stacktrace.Propagate(err, "could not create helper pod")
 		}
 
@@ -132,6 +147,8 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 		log.Info("[Status]: Checking the status of the helper pod")
 		if err := status.CheckHelperStatus(experimentsDetails.ChaosNamespace, appLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
 			common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
+			span.SetStatus(codes.Error, "could not check helper status")
+			span.RecordError(err)
 			return stacktrace.Propagate(err, "could not check helper status")
 		}
 
@@ -142,12 +159,17 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 		podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, appLabel, clients, experimentsDetails.ChaosDuration+experimentsDetails.Timeout, experimentsDetails.ExperimentName)
 		if err != nil || podStatus == "Failed" {
 			common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
-			return common.HelperFailedError(err, appLabel, chaosDetails.ChaosNamespace, false)
+			err := common.HelperFailedError(err, appLabel, experimentsDetails.ChaosNamespace, false)
+			span.SetStatus(codes.Error, "helper pod failed")
+			span.RecordError(err)
+			return err
 		}
 
 		//Deleting the helper pod
 		log.Info("[Cleanup]: Deleting the helper pod")
 		if err := common.DeleteAllPod(appLabel, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients); err != nil {
+			span.SetStatus(codes.Error, "could not delete helper pod(s)")
+			span.RecordError(err)
 			return stacktrace.Propagate(err, "could not delete helper pod(s)")
 		}
 	}
@@ -164,6 +186,8 @@ func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experime
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
 		if err := probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+			span.SetStatus(codes.Error, "Probe failed")
+			span.RecordError(err)
 			return err
 		}
 	}
@@ -181,6 +205,8 @@ func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experime
 		// When number of cpu cores for hogging is not defined , it will take it from node capacity
 		if nodeCPUCores == "0" {
 			if err := setCPUCapacity(experimentsDetails, appNode, clients); err != nil {
+				span.SetStatus(codes.Error, "could not get node cpu capacity")
+				span.RecordError(err)
 				return stacktrace.Propagate(err, "could not get node cpu capacity")
 			}
 		}
@@ -192,6 +218,8 @@ func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experime
 
 		// Creating the helper pod to perform node cpu hog
 		if err := createHelperPod(ctx, experimentsDetails, chaosDetails, appNode, clients); err != nil {
+			span.SetStatus(codes.Error, "could not create helper pod")
+			span.RecordError(err)
 			return stacktrace.Propagate(err, "could not create helper pod")
 		}
 	}
@@ -202,6 +230,8 @@ func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experime
 	log.Info("[Status]: Checking the status of the helper pods")
 	if err := status.CheckHelperStatus(experimentsDetails.ChaosNamespace, appLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
 		common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
+		span.SetStatus(codes.Error, "could not check helper status")
+		span.RecordError(err)
 		return stacktrace.Propagate(err, "could not check helper status")
 	}
 
@@ -214,12 +244,17 @@ func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experime
 	podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, appLabel, clients, experimentsDetails.ChaosDuration+experimentsDetails.Timeout, common.GetContainerNames(chaosDetails)...)
 	if err != nil || podStatus == "Failed" {
 		common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
-		return common.HelperFailedError(err, appLabel, chaosDetails.ChaosNamespace, false)
+		err := common.HelperFailedError(err, appLabel, experimentsDetails.ChaosNamespace, true)
+		span.SetStatus(codes.Error, "helper pod failed")
+		span.RecordError(err)
+		return err
 	}
 
 	//Deleting the helper pod
 	log.Info("[Cleanup]: Deleting the helper pod")
 	if err = common.DeleteAllPod(appLabel, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients); err != nil {
+		span.SetStatus(codes.Error, "could not delete helper pod(s)")
+		span.RecordError(err)
 		return stacktrace.Propagate(err, "could not delete helper pod(s)")
 	}
 
@@ -284,7 +319,10 @@ func createHelperPod(ctx context.Context, experimentsDetails *experimentTypes.Ex
 
 	_, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Create(context.Background(), helperPod, v1.CreateOptions{})
 	if err != nil {
-		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("unable to create helper pod: %s", err.Error())}
+		span.SetStatus(codes.Error, "could not create helper pod")
+		err := cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("unable to create helper pod: %s", err.Error())}
+		span.RecordError(err)
+		return err
 	}
 	return nil
 }

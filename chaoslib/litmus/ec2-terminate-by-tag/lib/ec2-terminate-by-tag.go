@@ -22,6 +22,7 @@ import (
 	"github.com/palantir/stacktrace"
 	"github.com/sirupsen/logrus"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/codes"
 )
 
 var inject, abort chan os.Signal
@@ -56,14 +57,21 @@ func PrepareEC2TerminateByTag(ctx context.Context, experimentsDetails *experimen
 	switch strings.ToLower(experimentsDetails.Sequence) {
 	case "serial":
 		if err := injectChaosInSerialMode(ctx, experimentsDetails, instanceIDList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+			span.SetStatus(codes.Error, "could not run chaos in serial mode")
+			span.RecordError(err)
 			return stacktrace.Propagate(err, "could not run chaos in serial mode")
 		}
 	case "parallel":
 		if err := injectChaosInParallelMode(ctx, experimentsDetails, instanceIDList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+			span.SetStatus(codes.Error, "could not run chaos in parallel mode")
+			span.RecordError(err)
 			return stacktrace.Propagate(err, "could not run chaos in parallel mode")
 		}
 	default:
-		return cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Reason: fmt.Sprintf("'%s' sequence is not supported", experimentsDetails.Sequence)}
+		span.SetStatus(codes.Error, "sequence is not valid")
+		err := cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Reason: fmt.Sprintf("'%s' sequence is not supported", experimentsDetails.Sequence)}
+		span.RecordError(err)
+		return err
 	}
 
 	//Waiting for the ramp time after chaos injection
@@ -104,6 +112,8 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 				//Stopping the EC2 instance
 				log.Info("[Chaos]: Stopping the desired EC2 instance")
 				if err := awslib.EC2Stop(id, experimentsDetails.Region); err != nil {
+					span.SetStatus(codes.Error, "ec2 instance failed to stop")
+					span.RecordError(err)
 					return stacktrace.Propagate(err, "ec2 instance failed to stop")
 				}
 
@@ -112,6 +122,8 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 				//Wait for ec2 instance to completely stop
 				log.Infof("[Wait]: Wait for EC2 instance '%v' to get in stopped state", id)
 				if err := awslib.WaitForEC2Down(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.ManagedNodegroup, experimentsDetails.Region, id); err != nil {
+					span.SetStatus(codes.Error, "ec2 instance failed to stop")
+					span.RecordError(err)
 					return stacktrace.Propagate(err, "ec2 instance failed to stop")
 				}
 
@@ -119,6 +131,8 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 				// the OnChaos probes execution will start in the first iteration and keep running for the entire chaos duration
 				if len(resultDetails.ProbeDetails) != 0 && i == 0 {
 					if err := probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+						span.SetStatus(codes.Error, "failed to run probes")
+						span.RecordError(err)
 						return stacktrace.Propagate(err, "failed to run probes")
 					}
 				}
@@ -131,12 +145,16 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 				if experimentsDetails.ManagedNodegroup != "enable" {
 					log.Info("[Chaos]: Starting back the EC2 instance")
 					if err := awslib.EC2Start(id, experimentsDetails.Region); err != nil {
+						span.SetStatus(codes.Error, "ec2 instance failed to start")
+						span.RecordError(err)
 						return stacktrace.Propagate(err, "ec2 instance failed to start")
 					}
 
 					//Wait for ec2 instance to get in running state
 					log.Infof("[Wait]: Wait for EC2 instance '%v' to get in running state", id)
 					if err := awslib.WaitForEC2Up(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.ManagedNodegroup, experimentsDetails.Region, id); err != nil {
+						span.SetStatus(codes.Error, "ec2 instance failed to start")
+						span.RecordError(err)
 						return stacktrace.Propagate(err, "ec2 instance failed to start")
 					}
 				}
@@ -176,6 +194,8 @@ func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experime
 				//Stopping the EC2 instance
 				log.Info("[Chaos]: Stopping the desired EC2 instance")
 				if err := awslib.EC2Stop(id, experimentsDetails.Region); err != nil {
+					span.SetStatus(codes.Error, "ec2 instance failed to stop")
+					span.RecordError(err)
 					return stacktrace.Propagate(err, "ec2 instance failed to stop")
 				}
 				common.SetTargets(id, "injected", "EC2", chaosDetails)
@@ -185,6 +205,8 @@ func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experime
 				//Wait for ec2 instance to completely stop
 				log.Infof("[Wait]: Wait for EC2 instance '%v' to get in stopped state", id)
 				if err := awslib.WaitForEC2Down(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.ManagedNodegroup, experimentsDetails.Region, id); err != nil {
+					span.SetStatus(codes.Error, "ec2 instance failed to stop")
+					span.RecordError(err)
 					return stacktrace.Propagate(err, "ec2 instance failed to stop")
 				}
 			}
@@ -192,6 +214,8 @@ func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experime
 			// run the probes during chaos
 			if len(resultDetails.ProbeDetails) != 0 {
 				if err := probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+					span.SetStatus(codes.Error, "failed to run probes")
+					span.RecordError(err)
 					return stacktrace.Propagate(err, "failed to run probes")
 				}
 			}
@@ -206,6 +230,8 @@ func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experime
 				for _, id := range instanceIDList {
 					log.Info("[Chaos]: Starting back the EC2 instance")
 					if err := awslib.EC2Start(id, experimentsDetails.Region); err != nil {
+						span.SetStatus(codes.Error, "ec2 instance failed to start")
+						span.RecordError(err)
 						return stacktrace.Propagate(err, "ec2 instance failed to start")
 					}
 				}
@@ -214,6 +240,8 @@ func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experime
 					//Wait for ec2 instance to get in running state
 					log.Infof("[Wait]: Wait for EC2 instance '%v' to get in running state", id)
 					if err := awslib.WaitForEC2Up(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.ManagedNodegroup, experimentsDetails.Region, id); err != nil {
+						span.SetStatus(codes.Error, "ec2 instance failed to start")
+						span.RecordError(err)
 						return stacktrace.Propagate(err, "ec2 instance failed to start")
 					}
 				}

@@ -16,6 +16,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/palantir/stacktrace"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/codes"
 )
 
 // injectChaos initiates node restart chaos on the target node
@@ -64,6 +65,8 @@ func PrepareChaos(ctx context.Context, experimentsDetails *experimentTypes.Exper
 	}
 	//Starting the Redfish node restart experiment
 	if err := experimentExecution(ctx, experimentsDetails, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+		span.SetStatus(codes.Error, "Chaos injection failed")
+		span.RecordError(err)
 		return err
 	}
 	common.SetTargets(experimentsDetails.IPMIIP, "targeted", "node", chaosDetails)

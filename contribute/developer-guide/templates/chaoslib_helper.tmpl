@@ -136,6 +136,9 @@ func PrepareChaos(ctx context.Context, experimentsDetails *experimentTypes.Exper
 	}
 	//Starting the CPU stress experiment
 	if err := experimentExecution(ctx, experimentsDetails, clients, resultDetails, eventsDetails, chaosDetails);err != nil {
+        // @TODO: setup tracing
+        // span.SetStatus(codes.Error, "could not execute chaoss")
+        // span.RecordError(err)
 		return stacktrace.Propagate(err, "could not execute chaos")
 	}
 	//Waiting for the ramp time after chaos injection
@@ -185,6 +188,11 @@ func createHelperPod(ctx context.Context, experimentsDetails *experimentTypes.Ex
 
 	_, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Create(context.Background(), helperPod, v1.CreateOptions{})
 	if err != nil {
+            // @TODO: setup tracing
+            // span.SetStatus(codes.Error, "could not create helper pod")
+            // err := cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("unable to create helper pod: %s", err.Error())}
+            // span.RecordError(err)
+            // return err
     		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("unable to create helper pod: %s", err.Error())}
     }
     return nil
