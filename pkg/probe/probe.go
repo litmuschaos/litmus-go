@@ -18,6 +18,7 @@ import (
 	"github.com/palantir/stacktrace"
 	"github.com/sirupsen/logrus"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/codes"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -32,6 +33,8 @@ func RunProbes(ctx context.Context, chaosDetails *types.ChaosDetails, clients cl
 	// get the probes details from the chaosengine
 	probes, err := getProbesFromChaosEngine(chaosDetails, clients)
 	if err != nil {
+		span.SetStatus(codes.Error, "getProbesFromChaosEngine failed")
+		span.RecordError(err)
 		return err
 	}
 
@@ -42,6 +45,8 @@ func RunProbes(ctx context.Context, chaosDetails *types.ChaosDetails, clients cl
 			switch strings.ToLower(probe.Mode) {
 			case "sot", "edge", "continuous":
 				if err := execute(probe, chaosDetails, clients, resultDetails, phase); err != nil {
+					span.SetStatus(codes.Error, fmt.Sprintf("%s mode %s probe execute failed", probe.Mode, probe.Name))
+					span.RecordError(err)
 					return err
 				}
 			}
@@ -51,6 +56,8 @@ func RunProbes(ctx context.Context, chaosDetails *types.ChaosDetails, clients cl
 		for _, probe := range probes {
 			if strings.ToLower(probe.Mode) == "onchaos" {
 				if err := execute(probe, chaosDetails, clients, resultDetails, phase); err != nil {
+					span.SetStatus(codes.Error, fmt.Sprintf("%s mode %s probe execute failed", probe.Mode, probe.Name))
+					span.RecordError(err)
 					return err
 				}
 			}
@@ -72,13 +79,19 @@ func RunProbes(ctx context.Context, chaosDetails *types.ChaosDetails, clients cl
 			}
 		}
 		if len(probeError) != 0 {
-			return cerrors.PreserveError{ErrString: fmt.Sprintf("[%s]", strings.Join(probeError, ","))}
+			errString := fmt.Sprintf("[%s]", strings.Join(probeError, ","))
+			span.SetStatus(codes.Error, errString)
+			err := cerrors.PreserveError{ErrString: errString}
+			span.RecordError(err)
+			return err
 		}
 		// executes the eot and edge modes
 		for _, probe := range probes {
 			switch strings.ToLower(probe.Mode) {
 			case "eot", "edge":
 				if err := execute(probe, chaosDetails, clients, resultDetails, phase); err != nil {
+					span.SetStatus(codes.Error, fmt.Sprintf("%s mode %s probe execute failed", probe.Mode, probe.Name))
+					span.RecordError(err)
 					return err
 				}
 			}
