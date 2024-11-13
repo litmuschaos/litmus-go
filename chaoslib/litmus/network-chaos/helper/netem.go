@@ -1,10 +1,13 @@
 package helper
 
 import (
+	"context"
 	"fmt"
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	"github.com/litmuschaos/litmus-go/pkg/events"
+	"github.com/litmuschaos/litmus-go/pkg/telemetry"
 	"github.com/palantir/stacktrace"
+	"go.opentelemetry.io/otel"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -34,7 +37,9 @@ var (
 )
 
 // Helper injects the network chaos
-func Helper(clients clients.ClientSets) {
+func Helper(ctx context.Context, clients clients.ClientSets) {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "SimulatePodNetworkFault")
+	defer span.End()
 
 	experimentsDetails := experimentTypes.ExperimentDetails{}
 	eventsDetails := types.EventDetails{}
