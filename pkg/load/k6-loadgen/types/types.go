@@ -8,6 +8,7 @@ type ExperimentDetails struct {
 	RampTime           int
 	ChaosNamespace     string
 	Timeout            int
+	Delay              int
 	LIBImagePullPolicy string
 	LIBImage           string
 	ScriptSecretName   string
