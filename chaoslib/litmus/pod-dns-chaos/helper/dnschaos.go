@@ -2,9 +2,12 @@ package helper
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
+	"github.com/litmuschaos/litmus-go/pkg/telemetry"
 	"github.com/palantir/stacktrace"
+	"go.opentelemetry.io/otel"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -34,7 +37,9 @@ const (
 )
 
 // Helper injects the dns chaos
-func Helper(clients clients.ClientSets) {
+func Helper(ctx context.Context, clients clients.ClientSets) {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "SimulatePodDNSFault")
+	defer span.End()
 
 	experimentsDetails := experimentTypes.ExperimentDetails{}
 	eventsDetails := types.EventDetails{}

@@ -3,9 +3,12 @@ package helper
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"fmt"
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
+	"github.com/litmuschaos/litmus-go/pkg/telemetry"
 	"github.com/palantir/stacktrace"
+	"go.opentelemetry.io/otel"
 	"io"
 	"os"
 	"os/exec"
@@ -51,7 +54,9 @@ const (
 )
 
 // Helper injects the stress chaos
-func Helper(clients clients.ClientSets) {
+func Helper(ctx context.Context, clients clients.ClientSets) {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "SimulatePodStressFault")
+	defer span.End()
 
 	experimentsDetails := experimentTypes.ExperimentDetails{}
 	eventsDetails := types.EventDetails{}
