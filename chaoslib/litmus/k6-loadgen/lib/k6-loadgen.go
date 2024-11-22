@@ -119,7 +119,7 @@ func createHelperPod(ctx context.Context, experimentsDetails *experimentTypes.Ex
 		envs = []corev1.EnvVar{
 			{
 				Name:  "K6_OTEL_METRIC_PREFIX",
-				Value: "k6_",
+				Value: experimentsDetails.OTELMetricPrefix,
 			},
 			{
 				Name:  "K6_OTEL_GRPC_EXPORTER_INSECURE",
