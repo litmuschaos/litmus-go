@@ -63,8 +63,6 @@ func Experiment(ctx context.Context, clients clients.ClientSets) {
 
 	//DISPLAY THE APP INFORMATION
 	log.InfoWithValues("[Info]: The application information is as follows", logrus.Fields{
-		"Namespace":      experimentsDetails.AppNS,
-		"Label":          experimentsDetails.AppLabel,
 		"Chaos Duration": experimentsDetails.ChaosDuration,
 	})
 
