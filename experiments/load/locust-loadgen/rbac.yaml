@@ -1,0 +1,37 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: locust-loadgen-sa
+  namespace: default
+  labels:
+    name: locust-loadgen-sa
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: locust-loadgen-sa
+  namespace: default
+  labels:
+    name: locust-loadgen-sa
+rules:
+- apiGroups: ["","litmuschaos.io","batch","apps"]
+  resources: ["pods","configmaps","jobs","pods/exec","pods/log","events","chaosengines","chaosexperiments","chaosresults"]
+  verbs: ["create","list","get","patch","update","delete","deletecollection"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: locust-loadgen-sa
+  namespace: default
+  labels:
+    name: locust-loadgen-sa
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: locust-loadgen-sa
+subjects:
+- kind: ServiceAccount
+  name: locust-loadgen-sa
+  namespace: default
+
