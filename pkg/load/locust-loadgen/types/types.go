@@ -16,10 +16,4 @@ type ExperimentDetails struct {
 	ConfigMapName      string
 	Users              int
 	SpawnRate          int
-
-	// need or pass
-	Replica   int
-	LoadType  string
-	GrantType string
-	NodeNames string
 }

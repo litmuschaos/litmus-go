@@ -9,7 +9,7 @@ import (
 
 // GetENV fetches all the env variables from the runner pod
 func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
-	experimentDetails.ExperimentName = types.Getenv("EXPERIMENT_NAME", "locust-loadgen")
+	experimentDetails.ExperimentName = types.Getenv("EXPERIMENT_NAME", "")
 	experimentDetails.ChaosNamespace = types.Getenv("CHAOS_NAMESPACE", "litmus")
 	experimentDetails.EngineName = types.Getenv("CHAOSENGINE", "")
 	experimentDetails.ChaosDuration, _ = strconv.Atoi(types.Getenv("TOTAL_CHAOS_DURATION", "30"))
@@ -19,12 +19,8 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.Timeout, _ = strconv.Atoi(types.Getenv("STATUS_CHECK_TIMEOUT", "180"))
 	experimentDetails.LIBImage = types.Getenv("LIB_IMAGE", "locustio/locust")
 	experimentDetails.LIBImagePullPolicy = types.Getenv("LIB_IMAGE_PULL_POLICY", "Always")
-	experimentDetails.Host = types.Getenv("HOST", "http://my-nginx.default.svc.cluster.local/")
-	experimentDetails.ConfigMapName = types.Getenv("CONFIG_MAP_FILE", "locust-script")
+	experimentDetails.Host = types.Getenv("HOST", "")
+	experimentDetails.ConfigMapName = types.Getenv("CONFIG_MAP_NAME", "locust-script")
 	experimentDetails.Users, _ = strconv.Atoi(types.Getenv("USERS", "40"))
 	experimentDetails.SpawnRate, _ = strconv.Atoi(types.Getenv("SPAWN_RATE", "30"))
-	experimentDetails.Replica, _ = strconv.Atoi(types.Getenv("REPLICA", "1"))
-	experimentDetails.LoadType = types.Getenv("LOAD_TYPE", "load")
-	experimentDetails.GrantType = types.Getenv("GRANT_TYPE", "")
-	experimentDetails.NodeNames = types.Getenv("NODE_NAMES", "")
 }
