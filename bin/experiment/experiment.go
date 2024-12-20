@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"flag"
+	"go.opentelemetry.io/otel/attribute"
 	"os"
 
 	// Uncomment to load all auth plugins
@@ -108,6 +109,8 @@ func main() {
 		log.Errorf("Unable to Get the kubeconfig, err: %v", err)
 		return
 	}
+
+	span.SetAttributes(attribute.String("experiment.name", *experimentName))
 
 	log.Infof("Experiment Name: %v", *experimentName)
 
