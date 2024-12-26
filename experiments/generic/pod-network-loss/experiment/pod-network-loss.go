@@ -17,10 +17,14 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/sirupsen/logrus"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // PodNetworkLoss inject the pod-network-loss chaos
 func PodNetworkLoss(ctx context.Context, clients clients.ClientSets) {
+	span := trace.SpanFromContext(ctx)
+
 	experimentsDetails := experimentTypes.ExperimentDetails{}
 	resultDetails := types.ResultDetails{}
 	chaosDetails := types.ChaosDetails{}
@@ -40,6 +44,8 @@ func PodNetworkLoss(ctx context.Context, clients clients.ClientSets) {
 		// Get values from chaosengine. Bail out upon error, as we haven't entered exp business logic yet
 		if err := types.GetValuesFromChaosEngine(&chaosDetails, clients, &resultDetails); err != nil {
 			log.Errorf("Unable to initialize the probes, err: %v", err)
+			span.SetStatus(codes.Error, "Unable to initialize the probes")
+			span.RecordError(err)
 			return
 		}
 	}
@@ -49,6 +55,8 @@ func PodNetworkLoss(ctx context.Context, clients clients.ClientSets) {
 	if err := result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT"); err != nil {
 		log.Errorf("Unable to Create the Chaos Result, err: %v", err)
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
+		span.SetStatus(codes.Error, "Unable to create the chaosresult")
+		span.RecordError(err)
 		return
 	}
 
@@ -80,6 +88,8 @@ func PodNetworkLoss(ctx context.Context, clients clients.ClientSets) {
 			types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, "AUT: Not Running", "Warning", &chaosDetails)
 			events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
+			span.SetStatus(codes.Error, "Application status check failed")
+			span.RecordError(err)
 			return
 		}
 	}
@@ -97,6 +107,8 @@ func PodNetworkLoss(ctx context.Context, clients clients.ClientSets) {
 				types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, msg, "Warning", &chaosDetails)
 				events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 				result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
+				span.SetStatus(codes.Error, "Probe Failed")
+				span.RecordError(err)
 				return
 			}
 			msg = common.GetStatusMessage(chaosDetails.DefaultHealthCheck, "AUT: Running", "Successful")
@@ -110,6 +122,8 @@ func PodNetworkLoss(ctx context.Context, clients clients.ClientSets) {
 	if err := litmusLIB.PodNetworkLossChaos(ctx, &experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
 		log.Errorf("Chaos injection failed, err: %v", err)
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
+		span.SetStatus(codes.Error, "Chaos injection failed")
+		span.RecordError(err)
 		return
 	}
 
@@ -125,6 +139,8 @@ func PodNetworkLoss(ctx context.Context, clients clients.ClientSets) {
 			types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, "AUT: Not Running", "Warning", &chaosDetails)
 			events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
+			span.SetStatus(codes.Error, "Application status check failed")
+			span.RecordError(err)
 			return
 		}
 	}
@@ -141,6 +157,8 @@ func PodNetworkLoss(ctx context.Context, clients clients.ClientSets) {
 				types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, msg, "Warning", &chaosDetails)
 				events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 				result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
+				span.SetStatus(codes.Error, "Probes Failed")
+				span.RecordError(err)
 				return
 			}
 			msg = common.GetStatusMessage(chaosDetails.DefaultHealthCheck, "AUT: Running", "Successful")
@@ -156,6 +174,8 @@ func PodNetworkLoss(ctx context.Context, clients clients.ClientSets) {
 	if err := result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT"); err != nil {
 		log.Errorf("Unable to Update the Chaos Result, err: %v", err)
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
+		span.SetStatus(codes.Error, "Unable to Update the Chaos Result")
+		span.RecordError(err)
 		return
 	}
 

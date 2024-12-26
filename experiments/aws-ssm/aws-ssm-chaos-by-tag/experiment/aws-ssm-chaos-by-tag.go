@@ -18,10 +18,13 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/sirupsen/logrus"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // AWSSSMChaosByTag inject the ssm chaos on ec2 instance
 func AWSSSMChaosByTag(ctx context.Context, clients clients.ClientSets) {
+	span := trace.SpanFromContext(ctx)
 
 	experimentsDetails := experimentTypes.ExperimentDetails{}
 	resultDetails := types.ResultDetails{}
@@ -42,6 +45,8 @@ func AWSSSMChaosByTag(ctx context.Context, clients clients.ClientSets) {
 		// Get values from chaosengine. Bail out upon error, as we haven't entered exp business logic yet
 		if err := types.GetValuesFromChaosEngine(&chaosDetails, clients, &resultDetails); err != nil {
 			log.Errorf("Unable to initialize the probes: %v", err)
+			span.SetStatus(codes.Error, "Unable to initialize the probes")
+			span.RecordError(err)
 			return
 		}
 	}
@@ -51,6 +56,8 @@ func AWSSSMChaosByTag(ctx context.Context, clients clients.ClientSets) {
 	if err := result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT"); err != nil {
 		log.Errorf("Unable to create the chaosresult: %v", err)
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
+		span.SetStatus(codes.Error, "Unable to create the chaosresult")
+		span.RecordError(err)
 		return
 	}
 
@@ -79,6 +86,8 @@ func AWSSSMChaosByTag(ctx context.Context, clients clients.ClientSets) {
 	if err := ssm.CheckInstanceInformation(&experimentsDetails); err != nil {
 		log.Errorf("Target instance status check failed: %v", err)
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
+		span.SetStatus(codes.Error, "Target instance status check failed")
+		span.RecordError(err)
 		return
 	}
 
@@ -97,6 +106,8 @@ func AWSSSMChaosByTag(ctx context.Context, clients clients.ClientSets) {
 					log.Errorf("Failed to create %v event inside chaosengine", types.PreChaosCheck)
 				}
 				result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
+				span.SetStatus(codes.Error, "Probe Failed")
+				span.RecordError(err)
 				return
 			}
 			msg = "AUT: Running, Probes: Successful"
@@ -120,6 +131,8 @@ func AWSSSMChaosByTag(ctx context.Context, clients clients.ClientSets) {
 				log.Errorf("Failed to delete ssm document: %v", err)
 			}
 		}
+		span.SetStatus(codes.Error, "Chaos injection failed")
+		span.RecordError(err)
 		return
 	}
 
@@ -133,6 +146,8 @@ func AWSSSMChaosByTag(ctx context.Context, clients clients.ClientSets) {
 		if err := ec2.InstanceStatusCheck(experimentsDetails.TargetInstanceIDList, experimentsDetails.Region); err != nil {
 			log.Errorf("Failed to get the ec2 instance status: %v", err)
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
+			span.SetStatus(codes.Error, "Failed to get the ec2 instance status")
+			span.RecordError(err)
 			return
 		}
 		log.Info("[Status]: EC2 instance is in running state (post chaos)")
@@ -152,6 +167,8 @@ func AWSSSMChaosByTag(ctx context.Context, clients clients.ClientSets) {
 					log.Errorf("Failed to create %v event inside chaosengine", types.PostChaosCheck)
 				}
 				result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
+				span.SetStatus(codes.Error, "Probes Failed")
+				span.RecordError(err)
 				return
 			}
 			msg = "AUT: Running, Probes: Successful"
@@ -167,6 +184,8 @@ func AWSSSMChaosByTag(ctx context.Context, clients clients.ClientSets) {
 	log.Infof("[The End]: Updating the chaos result of %v experiment (EOT)", experimentsDetails.ExperimentName)
 	if err := result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT"); err != nil {
 		log.Errorf("Unable to update the chaosresult:  %v", err)
+		span.SetStatus(codes.Error, "Unable to Update the Chaos Result")
+		span.RecordError(err)
 		return
 	}
 
