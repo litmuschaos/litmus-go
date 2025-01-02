@@ -175,6 +175,8 @@ func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experime
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
 		if err := probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+			span.SetStatus(codes.Error, "failed to run probes")
+			span.RecordError(err)
 			return err
 		}
 	}

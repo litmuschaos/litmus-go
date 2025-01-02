@@ -64,7 +64,7 @@ func PrepareChaos(ctx context.Context, experimentsDetails *experimentTypes.Exper
 	instanceNamesWithDiskNames, err := diskStatus.GetInstanceNameForDisks(diskNameList, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup)
 
 	if err != nil {
-		span.SetStatus(codes.Error, "failed to get instance names for disks")
+		span.SetStatus(codes.Error, "error fetching attached instances for disks")
 		span.RecordError(err)
 		return stacktrace.Propagate(err, "error fetching attached instances for disks")
 	}
@@ -75,7 +75,7 @@ func PrepareChaos(ctx context.Context, experimentsDetails *experimentTypes.Exper
 	for instanceName := range instanceNamesWithDiskNames {
 		attachedDisksWithInstance[instanceName], err = diskStatus.GetInstanceDiskList(experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, experimentsDetails.ScaleSet, instanceName)
 		if err != nil {
-			span.SetStatus(codes.Error, "failed to get attached disks")
+			span.SetStatus(codes.Error, "error fetching virtual disks")
 			span.RecordError(err)
 			return stacktrace.Propagate(err, "error fetching virtual disks")
 		}
@@ -93,13 +93,13 @@ func PrepareChaos(ctx context.Context, experimentsDetails *experimentTypes.Exper
 		switch strings.ToLower(experimentsDetails.Sequence) {
 		case "serial":
 			if err = injectChaosInSerialMode(ctx, experimentsDetails, instanceNamesWithDiskNames, attachedDisksWithInstance, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
-				span.SetStatus(codes.Error, "failed to run chaos in serial mode")
+				span.SetStatus(codes.Error, "could not run chaos in serial mode")
 				span.RecordError(err)
 				return stacktrace.Propagate(err, "could not run chaos in serial mode")
 			}
 		case "parallel":
 			if err = injectChaosInParallelMode(ctx, experimentsDetails, instanceNamesWithDiskNames, attachedDisksWithInstance, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
-				span.SetStatus(codes.Error, "failed to run chaos in parallel mode")
+				span.SetStatus(codes.Error, "could not run chaos in parallel mode")
 				span.RecordError(err)
 				return stacktrace.Propagate(err, "could not run chaos in parallel mode")
 			}
@@ -150,7 +150,7 @@ func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experime
 			for _, diskName := range diskNameList {
 				log.Infof("[Wait]: Waiting for Disk '%v' to detach", diskName)
 				if err := diskStatus.WaitForDiskToDetach(experimentsDetails, diskName); err != nil {
-					span.SetStatus(codes.Error, "failed to detach disks")
+					span.SetStatus(codes.Error, "disk detachment check failed")
 					span.RecordError(err)
 					return stacktrace.Propagate(err, "disk detachment check failed")
 				}
@@ -190,7 +190,7 @@ func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experime
 				for _, diskName := range diskNameList {
 					log.Infof("[Wait]: Waiting for Disk '%v' to attach", diskName)
 					if err := diskStatus.WaitForDiskToAttach(experimentsDetails, diskName); err != nil {
-						span.SetStatus(codes.Error, "failed to attach disks")
+						span.SetStatus(codes.Error, "disk attachment check failed")
 						span.RecordError(err)
 						return stacktrace.Propagate(err, "disk attachment check failed")
 					}
@@ -242,7 +242,7 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 				// Waiting for disk to be detached
 				log.Infof("[Wait]: Waiting for Disk '%v' to detach", diskName)
 				if err := diskStatus.WaitForDiskToDetach(experimentsDetails, diskName); err != nil {
-					span.SetStatus(codes.Error, "failed to detach disks")
+					span.SetStatus(codes.Error, "disk detachment check failed")
 					span.RecordError(err)
 					return stacktrace.Propagate(err, "disk detachment check failed")
 				}
@@ -253,6 +253,8 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 				// the OnChaos probes execution will start in the first iteration and keep running for the entire chaos duration
 				if len(resultDetails.ProbeDetails) != 0 && i == 0 {
 					if err := probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+						span.SetStatus(codes.Error, "failed to run probes")
+						span.RecordError(err)
 						return stacktrace.Propagate(err, "failed to run probes")
 					}
 				}
@@ -272,7 +274,7 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 				// Waiting for disk to be attached
 				log.Infof("[Wait]: Waiting for Disk '%v' to attach", diskName)
 				if err := diskStatus.WaitForDiskToAttach(experimentsDetails, diskName); err != nil {
-					span.SetStatus(codes.Error, "failed to attach disks")
+					span.SetStatus(codes.Error, "disk attachment check failed")
 					span.RecordError(err)
 					return stacktrace.Propagate(err, "disk attachment check failed")
 				}

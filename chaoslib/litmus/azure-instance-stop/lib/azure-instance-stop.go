@@ -62,13 +62,13 @@ func PrepareAzureStop(ctx context.Context, experimentsDetails *experimentTypes.E
 	switch strings.ToLower(experimentsDetails.Sequence) {
 	case "serial":
 		if err = injectChaosInSerialMode(ctx, experimentsDetails, instanceNameList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
-			span.SetStatus(codes.Error, "failed to run chaos in serial mode")
+			span.SetStatus(codes.Error, "could not run chaos in serial mode")
 			span.RecordError(err)
 			return stacktrace.Propagate(err, "could not run chaos in serial mode")
 		}
 	case "parallel":
 		if err = injectChaosInParallelMode(ctx, experimentsDetails, instanceNameList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
-			span.SetStatus(codes.Error, "failed to run chaos in parallel mode")
+			span.SetStatus(codes.Error, "could not run chaos in parallel mode")
 			span.RecordError(err)
 			return stacktrace.Propagate(err, "could not run chaos in parallel mode")
 		}
@@ -118,13 +118,13 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 				log.Infof("[Chaos]: Stopping the Azure instance: %v", vmName)
 				if experimentsDetails.ScaleSet == "enable" {
 					if err := azureStatus.AzureScaleSetInstanceStop(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, vmName); err != nil {
-						span.SetStatus(codes.Error, "failed to stop the Azure instance")
+						span.SetStatus(codes.Error, "unable to stop the Azure instance")
 						span.RecordError(err)
 						return stacktrace.Propagate(err, "unable to stop the Azure instance")
 					}
 				} else {
 					if err := azureStatus.AzureInstanceStop(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, vmName); err != nil {
-						span.SetStatus(codes.Error, "failed to stop the Azure instance")
+						span.SetStatus(codes.Error, "unable to stop the Azure instance")
 						span.RecordError(err)
 						return stacktrace.Propagate(err, "unable to stop the Azure instance")
 					}
@@ -133,7 +133,7 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 				// Wait for Azure instance to completely stop
 				log.Infof("[Wait]: Waiting for Azure instance '%v' to get in the stopped state", vmName)
 				if err := azureStatus.WaitForAzureComputeDown(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.ScaleSet, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, vmName); err != nil {
-					span.SetStatus(codes.Error, "failed to check instance poweroff status")
+					span.SetStatus(codes.Error, "instance poweroff status check failed")
 					span.RecordError(err)
 					return stacktrace.Propagate(err, "instance poweroff status check failed")
 				}
@@ -156,13 +156,13 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 				log.Info("[Chaos]: Starting back the Azure instance")
 				if experimentsDetails.ScaleSet == "enable" {
 					if err := azureStatus.AzureScaleSetInstanceStart(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, vmName); err != nil {
-						span.SetStatus(codes.Error, "failed to start the Azure instance")
+						span.SetStatus(codes.Error, "unable to start the Azure instance")
 						span.RecordError(err)
 						return stacktrace.Propagate(err, "unable to start the Azure instance")
 					}
 				} else {
 					if err := azureStatus.AzureInstanceStart(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, vmName); err != nil {
-						span.SetStatus(codes.Error, "failed to start the Azure instance")
+						span.SetStatus(codes.Error, "unable to start the Azure instance")
 						span.RecordError(err)
 						return stacktrace.Propagate(err, "unable to start the Azure instance")
 					}
@@ -171,7 +171,7 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 				// Wait for Azure instance to get in running state
 				log.Infof("[Wait]: Waiting for Azure instance '%v' to get in the running state", vmName)
 				if err := azureStatus.WaitForAzureComputeUp(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.ScaleSet, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, vmName); err != nil {
-					span.SetStatus(codes.Error, "failed to check instance power on status")
+					span.SetStatus(codes.Error, "instance power on status check failed")
 					span.RecordError(err)
 					return stacktrace.Propagate(err, "instance power on status check failed")
 				}
@@ -212,13 +212,13 @@ func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experime
 				log.Infof("[Chaos]: Stopping the Azure instance: %v", vmName)
 				if experimentsDetails.ScaleSet == "enable" {
 					if err := azureStatus.AzureScaleSetInstanceStop(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, vmName); err != nil {
-						span.SetStatus(codes.Error, "failed to stop the Azure instance")
+						span.SetStatus(codes.Error, "unable to stop Azure instance")
 						span.RecordError(err)
 						return stacktrace.Propagate(err, "unable to stop Azure instance")
 					}
 				} else {
 					if err := azureStatus.AzureInstanceStop(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, vmName); err != nil {
-						span.SetStatus(codes.Error, "failed to stop the Azure instance")
+						span.SetStatus(codes.Error, "unable to stop Azure instance")
 						span.RecordError(err)
 						return stacktrace.Propagate(err, "unable to stop Azure instance")
 					}
@@ -229,7 +229,7 @@ func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experime
 			for _, vmName := range instanceNameList {
 				log.Infof("[Wait]: Waiting for Azure instance '%v' to get in the stopped state", vmName)
 				if err := azureStatus.WaitForAzureComputeDown(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.ScaleSet, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, vmName); err != nil {
-					span.SetStatus(codes.Error, "failed to check instance poweroff status")
+					span.SetStatus(codes.Error, "instance poweroff status check failed")
 					span.RecordError(err)
 					return stacktrace.Propagate(err, "instance poweroff status check failed")
 				}
@@ -253,13 +253,13 @@ func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experime
 				log.Infof("[Chaos]: Starting back the Azure instance: %v", vmName)
 				if experimentsDetails.ScaleSet == "enable" {
 					if err := azureStatus.AzureScaleSetInstanceStart(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, vmName); err != nil {
-						span.SetStatus(codes.Error, "failed to start the Azure instance")
+						span.SetStatus(codes.Error, "unable to start the Azure instance")
 						span.RecordError(err)
 						return stacktrace.Propagate(err, "unable to start the Azure instance")
 					}
 				} else {
 					if err := azureStatus.AzureInstanceStart(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, vmName); err != nil {
-						span.SetStatus(codes.Error, "failed to start the Azure instance")
+						span.SetStatus(codes.Error, "unable to start the Azure instancee")
 						span.RecordError(err)
 						return stacktrace.Propagate(err, "unable to start the Azure instance")
 					}
@@ -270,7 +270,7 @@ func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experime
 			for _, vmName := range instanceNameList {
 				log.Infof("[Wait]: Waiting for Azure instance '%v' to get in the running state", vmName)
 				if err := azureStatus.WaitForAzureComputeUp(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.ScaleSet, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, vmName); err != nil {
-					span.SetStatus(codes.Error, "failed to check instance power on status")
+					span.SetStatus(codes.Error, "instance power on status check failed")
 					span.RecordError(err)
 					return stacktrace.Propagate(err, "instance power on status check failed")
 				}
