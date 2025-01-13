@@ -102,17 +102,6 @@ func createHelperPod(ctx context.Context, experimentsDetails *experimentTypes.Ex
 	const volumeName = "script-volume"
 	const mountPath = "/mnt"
 
-	args := []string{
-		"--users", strconv.Itoa(experimentsDetails.Users),
-		"--spawn-rate", strconv.Itoa(experimentsDetails.SpawnRate),
-		"-H", experimentsDetails.Host,
-		"-t", strconv.Itoa(experimentsDetails.ChaosDuration) + "s",
-	}
-
-	if experimentsDetails.ConfigMapName != "" {
-		args = append(args, "-f", mountPath+"/config.py")
-	}
-
 	helperPod := &corev1.Pod{
 		ObjectMeta: v1.ObjectMeta{
 			GenerateName: experimentsDetails.ExperimentName + "-helper-",
@@ -132,7 +121,13 @@ func createHelperPod(ctx context.Context, experimentsDetails *experimentTypes.Ex
 						"locust",
 						"--headless",
 					},
-					Args:      args,
+					Args: []string{
+						"--users", strconv.Itoa(experimentsDetails.Users),
+						"--spawn-rate", strconv.Itoa(experimentsDetails.SpawnRate),
+						"-H", experimentsDetails.Host,
+						"-t", strconv.Itoa(experimentsDetails.ChaosDuration) + "s",
+						"-f", mountPath + "/" + experimentsDetails.ConfigMapKey,
+					},
 					Resources: chaosDetails.Resources,
 					VolumeMounts: []corev1.VolumeMount{
 						{

@@ -6,7 +6,6 @@ type ExperimentDetails struct {
 	ChaosNamespace     string
 	EngineName         string
 	ChaosDuration      int
-	ChaosInterval      int
 	RampTime           int
 	Delay              int
 	Timeout            int
@@ -14,6 +13,7 @@ type ExperimentDetails struct {
 	LIBImagePullPolicy string
 	Host               string
 	ConfigMapName      string
+	ConfigMapKey       string
 	Users              int
 	SpawnRate          int
 }

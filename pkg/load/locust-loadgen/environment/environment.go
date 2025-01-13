@@ -13,7 +13,6 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.ChaosNamespace = types.Getenv("CHAOS_NAMESPACE", "litmus")
 	experimentDetails.EngineName = types.Getenv("CHAOSENGINE", "")
 	experimentDetails.ChaosDuration, _ = strconv.Atoi(types.Getenv("TOTAL_CHAOS_DURATION", "30"))
-	experimentDetails.ChaosInterval, _ = strconv.Atoi(types.Getenv("CHAOS_INTERVAL", "10"))
 	experimentDetails.RampTime, _ = strconv.Atoi(types.Getenv("RAMP_TIME", "0"))
 	experimentDetails.Delay, _ = strconv.Atoi(types.Getenv("STATUS_CHECK_DELAY", "2"))
 	experimentDetails.Timeout, _ = strconv.Atoi(types.Getenv("STATUS_CHECK_TIMEOUT", "180"))
@@ -21,6 +20,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.LIBImagePullPolicy = types.Getenv("LIB_IMAGE_PULL_POLICY", "Always")
 	experimentDetails.Host = types.Getenv("HOST", "")
 	experimentDetails.ConfigMapName = types.Getenv("CONFIG_MAP_NAME", "locust-script")
+	experimentDetails.ConfigMapKey = types.Getenv("CONFIG_MAP_KEY", "locust.py")
 	experimentDetails.Users, _ = strconv.Atoi(types.Getenv("USERS", "40"))
 	experimentDetails.SpawnRate, _ = strconv.Atoi(types.Getenv("SPAWN_RATE", "30"))
 }
