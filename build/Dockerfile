@@ -26,7 +26,8 @@ ARG LITMUS_VERSION
 RUN yum install -y \
     sudo \
     sshpass \
-    procps
+    procps \
+    openssh-clients
 
 # tc binary
 RUN yum install -y https://dl.rockylinux.org/vault/rocky/9.3/devel/$(uname -m)/os/Packages/i/iproute-6.2.0-5.el9.$(uname -m).rpm
