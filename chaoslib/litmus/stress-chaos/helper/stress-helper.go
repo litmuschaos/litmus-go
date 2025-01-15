@@ -151,7 +151,7 @@ func prepareStressChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 	done := make(chan error, 1)
 
 	for index, t := range targets {
-		targets[index].Cmd, err = injectChaos(t, stressors)
+		targets[index].Cmd, err = injectChaos(t, stressors, experimentsDetails.StressType)
 		if err != nil {
 			return stacktrace.Propagate(err, "could not inject chaos")
 		}
@@ -536,8 +536,13 @@ func addProcessToCgroup(pid int, control interface{}) error {
 	return cgroup1.Add(cgroups.Process{Pid: pid})
 }
 
-func injectChaos(t targetDetails, stressors string) (*exec.Cmd, error) {
-	stressCommand := "pause nsutil -t " + strconv.Itoa(t.Pid) + " -p -m -- " + stressors
+func injectChaos(t targetDetails, stressors, stressType string) (*exec.Cmd, error) {
+	stressCommand := fmt.Sprintf("pause nsutil -t %v -p -- %v", strconv.Itoa(t.Pid), stressors)
+	// for io stress,we need to enter into mount ns of the target container
+	// enabling it by passing -m flag
+	if stressType == "pod-io-stress" {
+		stressCommand = fmt.Sprintf("pause nsutil -t %v -p -m -- %v", strconv.Itoa(t.Pid), stressors)
+	}
 	log.Infof("[Info]: starting process: %v", stressCommand)
 
 	// launch the stress-ng process on the target container in paused mode
