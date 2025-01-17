@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
 	"syscall"
@@ -29,13 +30,17 @@ type ENVDetails struct {
 	ENV []apiv1.EnvVar
 }
 
-//WaitForDuration waits for the given time duration (in seconds)
+// WaitForDuration waits for the given time duration (in seconds)
 func WaitForDuration(duration int) {
 	time.Sleep(time.Duration(duration) * time.Second)
 }
 
 // RandomInterval wait for the random interval lies between lower & upper bounds
 func RandomInterval(interval string) error {
+	re := regexp.MustCompile(`^\d+(-\d+)?$`)
+	if re.MatchString(interval) == false {
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: "could not parse CHAOS_INTERVAL env, bad input"}
+	}
 	intervals := strings.Split(interval, "-")
 	var lowerBound, upperBound int
 	switch len(intervals) {
@@ -49,6 +54,9 @@ func RandomInterval(interval string) error {
 		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: "could not parse CHAOS_INTERVAL env, invalid format"}
 	}
 	rand.Seed(time.Now().UnixNano())
+	if upperBound < 1 {
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: "invalid CHAOS_INTERVAL env value, value below lower limit"}
+	}
 	waitTime := lowerBound + rand.Intn(upperBound-lowerBound)
 	log.Infof("[Wait]: Wait for the random chaos interval %vs", waitTime)
 	WaitForDuration(waitTime)
@@ -98,7 +106,7 @@ func AbortWatcherWithoutExit(expname string, clients clients.ClientSets, resultD
 	}
 }
 
-//FilterBasedOnPercentage return the slice of list based on the the provided percentage
+// FilterBasedOnPercentage return the slice of list based on the the provided percentage
 func FilterBasedOnPercentage(percentage int, list []string) []string {
 
 	var finalList []string
@@ -175,7 +183,7 @@ func GetStatusMessage(defaultCheck bool, defaultMsg, probeStatus string) string 
 	return "Probes: " + probeStatus
 }
 
-//GetRandomSequence will gives a random value for sequence
+// GetRandomSequence will gives a random value for sequence
 func GetRandomSequence(sequence string) string {
 	if strings.ToLower(sequence) == "random" {
 		rand.Seed(time.Now().UnixNano())
@@ -186,7 +194,7 @@ func GetRandomSequence(sequence string) string {
 	return sequence
 }
 
-//ValidateRange validates the given range of numbers
+// ValidateRange validates the given range of numbers
 func ValidateRange(a string) string {
 	var lb, ub int
 	intervals := strings.Split(a, "-")
@@ -204,7 +212,7 @@ func ValidateRange(a string) string {
 	}
 }
 
-//getRandomValue gives a random value between two integers
+// getRandomValue gives a random value between two integers
 func getRandomValue(a, b int) int {
 	rand.Seed(time.Now().Unix())
 	return (a + rand.Intn(b-a+1))

@@ -1,6 +1,7 @@
 package experiment
 
 import (
+	"context"
 	"os"
 
 	"github.com/litmuschaos/chaos-operator/api/litmuschaos/v1alpha1"
@@ -18,8 +19,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-//NodeDrain inject the node-drain chaos
-func NodeDrain(clients clients.ClientSets) {
+// NodeDrain inject the node-drain chaos
+func NodeDrain(ctx context.Context, clients clients.ClientSets) {
 
 	experimentsDetails := experimentTypes.ExperimentDetails{}
 	resultDetails := types.ResultDetails{}
@@ -107,7 +108,7 @@ func NodeDrain(clients clients.ClientSets) {
 		// run the probes in the pre-chaos check
 		if len(resultDetails.ProbeDetails) != 0 {
 
-			if err := probe.RunProbes(&chaosDetails, clients, &resultDetails, "PreChaos", &eventsDetails); err != nil {
+			if err := probe.RunProbes(ctx, &chaosDetails, clients, &resultDetails, "PreChaos", &eventsDetails); err != nil {
 				log.Errorf("Probe Failed, err: %v", err)
 				msg := "NUT: Ready, Probes: Unsuccessful"
 				types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, msg, "Warning", &chaosDetails)
@@ -123,7 +124,7 @@ func NodeDrain(clients clients.ClientSets) {
 	}
 
 	chaosDetails.Phase = types.ChaosInjectPhase
-	if err := litmusLIB.PrepareNodeDrain(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
+	if err := litmusLIB.PrepareNodeDrain(ctx, &experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
 		log.Errorf("Chaos injection failed, err: %v", err)
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 		return
@@ -167,7 +168,7 @@ func NodeDrain(clients clients.ClientSets) {
 
 		// run the probes in the post-chaos check
 		if len(resultDetails.ProbeDetails) != 0 {
-			if err := probe.RunProbes(&chaosDetails, clients, &resultDetails, "PostChaos", &eventsDetails); err != nil {
+			if err := probe.RunProbes(ctx, &chaosDetails, clients, &resultDetails, "PostChaos", &eventsDetails); err != nil {
 				log.Errorf("Probes Failed, err: %v", err)
 				msg := "NUT: Ready, Probes: Unsuccessful"
 				types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, msg, "Warning", &chaosDetails)

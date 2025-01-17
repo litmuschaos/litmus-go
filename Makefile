@@ -9,9 +9,9 @@ IS_DOCKER_INSTALLED = $(shell which docker >> /dev/null 2>&1; echo $$?)
 
 # Docker info
 DOCKER_REGISTRY ?= docker.io
-DOCKER_REPO ?= shubh214
+DOCKER_REPO ?= litmuschaos
 DOCKER_IMAGE ?= go-runner
-DOCKER_TAG ?= fix-sudo
+DOCKER_TAG ?= ci
 
 .PHONY: help
 help:
@@ -72,7 +72,7 @@ image-push:
 	@echo "--> Push go-runner image"
 	@echo "------------------------"
 	@echo "Pushing $(DOCKER_REPO)/$(DOCKER_IMAGE):$(DOCKER_TAG)"
-	@docker buildx build . --push --file build/Dockerfile --progress plane --platform linux/arm64,linux/amd64 --no-cache --tag $(DOCKER_REGISTRY)/$(DOCKER_REPO)/$(DOCKER_IMAGE):$(DOCKER_TAG)
+	@docker buildx build . --push --file build/Dockerfile --progress plain --platform linux/arm64,linux/amd64 --no-cache --tag $(DOCKER_REGISTRY)/$(DOCKER_REPO)/$(DOCKER_IMAGE):$(DOCKER_TAG)
 
 
 .PHONY: build-amd64
@@ -80,7 +80,7 @@ build-amd64:
 	@echo "-------------------------"
 	@echo "--> Build go-runner image"
 	@echo "-------------------------"
-	@sudo docker build --file build/Dockerfile --tag $(DOCKER_REGISTRY)/$(DOCKER_REPO)/$(DOCKER_IMAGE):$(DOCKER_TAG) . --build-arg TARGETARCH=amd64
+	@sudo docker build --file build/Dockerfile --tag $(DOCKER_REGISTRY)/$(DOCKER_REPO)/$(DOCKER_IMAGE):$(DOCKER_TAG) . --build-arg TARGETARCH=amd64 --build-arg LITMUS_VERSION=3.9.0
 
 .PHONY: push-amd64
 push-amd64:

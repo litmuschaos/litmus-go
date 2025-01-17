@@ -22,7 +22,7 @@ spec:
           - "3600"
         env:
           # value: key:value ex: team:devops
-          - name: INSTANCE_TAG
+          - name: EC2_INSTANCE_TAG
             value: ''
 
           - name: CHAOS_NAMESPACE

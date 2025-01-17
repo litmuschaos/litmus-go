@@ -156,6 +156,7 @@ loop:
 				for index := range chaosresult.ProbeDetails {
 					if chaosresult.ProbeDetails[index].Name == probe.Name {
 						chaosresult.ProbeDetails[index].IsProbeFailedWithError = err
+						chaosresult.ProbeDetails[index].HasProbeCompleted = true
 						chaosresult.ProbeDetails[index].Status.Description = getDescription(err)
 						log.Errorf("the %v k8s probe has been Failed, err: %v", probe.Name, err)
 						isExperimentFailed = true
@@ -435,6 +436,7 @@ loop:
 				for index := range chaosresult.ProbeDetails {
 					if chaosresult.ProbeDetails[index].Name == probe.Name {
 						chaosresult.ProbeDetails[index].IsProbeFailedWithError = err
+						chaosresult.ProbeDetails[index].HasProbeCompleted = true
 						chaosresult.ProbeDetails[index].Status.Description = getDescription(err)
 						log.Errorf("The %v k8s probe has been Failed, err: %v", probe.Name, err)
 						isExperimentFailed = true

@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
+	"github.com/litmuschaos/litmus-go/pkg/telemetry"
 	"github.com/palantir/stacktrace"
+	"go.opentelemetry.io/otel"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -29,7 +31,9 @@ import (
 var inject, abort chan os.Signal
 
 // Helper injects the disk-fill chaos
-func Helper(clients clients.ClientSets) {
+func Helper(ctx context.Context, clients clients.ClientSets) {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "SimulateDiskFillFault")
+	defer span.End()
 
 	experimentsDetails := experimentTypes.ExperimentDetails{}
 	eventsDetails := types.EventDetails{}
@@ -185,8 +189,9 @@ func fillDisk(t targetDetails, bs int) error {
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		log.Error(err.Error())
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Source: t.Source, Target: fmt.Sprintf("{podName: %s, namespace: %s, container: %s}", t.Name, t.Namespace, t.TargetContainer), Reason: string(out)}
 	}
-	return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Source: t.Source, Target: fmt.Sprintf("{podName: %s, namespace: %s, container: %s}", t.Name, t.Namespace, t.TargetContainer), Reason: string(out)}
+	return nil
 }
 
 // getEphemeralStorageAttributes derive the ephemeral storage attributes from the target pod

@@ -1,13 +1,14 @@
 package experiment
 
 import (
+	"context"
 	"os"
 
 	"github.com/litmuschaos/chaos-operator/api/litmuschaos/v1alpha1"
 	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/azure-instance-stop/lib"
 	experimentEnv "github.com/litmuschaos/litmus-go/pkg/azure/instance-stop/environment"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/azure/instance-stop/types"
-	clients "github.com/litmuschaos/litmus-go/pkg/clients"
+	"github.com/litmuschaos/litmus-go/pkg/clients"
 	azureCommon "github.com/litmuschaos/litmus-go/pkg/cloud/azure/common"
 	azureStatus "github.com/litmuschaos/litmus-go/pkg/cloud/azure/instance"
 
@@ -21,7 +22,7 @@ import (
 )
 
 // AzureInstanceStop inject the azure instance stop chaos
-func AzureInstanceStop(clients clients.ClientSets) {
+func AzureInstanceStop(ctx context.Context, clients clients.ClientSets) {
 
 	var err error
 	experimentsDetails := experimentTypes.ExperimentDetails{}
@@ -90,7 +91,7 @@ func AzureInstanceStop(clients clients.ClientSets) {
 		// run the probes in the pre-chaos check
 		if len(resultDetails.ProbeDetails) != 0 {
 
-			err = probe.RunProbes(&chaosDetails, clients, &resultDetails, "PreChaos", &eventsDetails)
+			err = probe.RunProbes(ctx, &chaosDetails, clients, &resultDetails, "PreChaos", &eventsDetails)
 			if err != nil {
 				log.Errorf("Probe Failed: %v", err)
 				msg := "AUT: Running, Probes: Unsuccessful"
@@ -122,7 +123,7 @@ func AzureInstanceStop(clients clients.ClientSets) {
 
 	chaosDetails.Phase = types.ChaosInjectPhase
 
-	if err = litmusLIB.PrepareAzureStop(&experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
+	if err = litmusLIB.PrepareAzureStop(ctx, &experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
 		log.Errorf("Chaos injection failed: %v", err)
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 		return
@@ -149,7 +150,7 @@ func AzureInstanceStop(clients clients.ClientSets) {
 
 		// run the probes in the post-chaos check
 		if len(resultDetails.ProbeDetails) != 0 {
-			err = probe.RunProbes(&chaosDetails, clients, &resultDetails, "PostChaos", &eventsDetails)
+			err = probe.RunProbes(ctx, &chaosDetails, clients, &resultDetails, "PostChaos", &eventsDetails)
 			if err != nil {
 				log.Errorf("Probes Failed: %v", err)
 				msg := "AUT: Running, Probes: Unsuccessful"

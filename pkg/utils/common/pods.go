@@ -562,22 +562,35 @@ func FilterPodsForNodes(targetPodList core_v1.PodList, containerName string) map
 
 	for _, pod := range targetPodList.Items {
 
-		td := target{
-			Name:            pod.Name,
-			Namespace:       pod.Namespace,
-			TargetContainer: containerName,
-		}
+		var containerNames []string
 
-		if td.TargetContainer == "" {
-			td.TargetContainer = pod.Spec.Containers[0].Name
-		}
-
-		if targets[pod.Spec.NodeName] == nil {
-			targets[pod.Spec.NodeName] = &TargetsDetails{
-				Target: []target{td},
+		switch containerName {
+		case "ALL":
+			for _, container := range pod.Spec.Containers {
+				containerNames = append(containerNames, container.Name)
 			}
-		} else {
-			targets[pod.Spec.NodeName].Target = append(targets[pod.Spec.NodeName].Target, td)
+		case "":
+			containerNames = append(containerNames, pod.Spec.Containers[0].Name)
+		default:
+			containerNames = append(containerNames, containerName)
+		}
+
+		for _, targetName := range containerNames {
+
+			td := target{
+				Name:            pod.Name,
+				Namespace:       pod.Namespace,
+				TargetContainer: targetName,
+			}
+
+			if targets[pod.Spec.NodeName] == nil {
+				targets[pod.Spec.NodeName] = &TargetsDetails{
+					Target: []target{td},
+				}
+			} else {
+				targets[pod.Spec.NodeName].Target = append(targets[pod.Spec.NodeName].Target, td)
+			}
+
 		}
 	}
 	return targets

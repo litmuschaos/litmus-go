@@ -4,13 +4,16 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/litmuschaos/litmus-go/pkg/telemetry"
+	"go.opentelemetry.io/otel"
+	"os/exec"
+	"strconv"
+	"time"
+
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/palantir/stacktrace"
 	"github.com/sirupsen/logrus"
-	"os/exec"
-	"strconv"
-	"time"
 
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
@@ -26,7 +29,9 @@ import (
 var err error
 
 // Helper injects the container-kill chaos
-func Helper(clients clients.ClientSets) {
+func Helper(ctx context.Context, clients clients.ClientSets) {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "SimulateContainerKillFault")
+	defer span.End()
 
 	experimentsDetails := experimentTypes.ExperimentDetails{}
 	eventsDetails := types.EventDetails{}
@@ -171,7 +176,7 @@ func validate(t targetDetails, timeout, delay int, clients clients.ClientSets) e
 	return verifyRestartCount(t, timeout, delay, clients, t.RestartCountBefore)
 }
 
-//stopContainerdContainer kill the application container
+// stopContainerdContainer kill the application container
 func stopContainerdContainer(containerIDs []string, socketPath, signal, source string) error {
 	if signal != "SIGKILL" && signal != "SIGTERM" {
 		return cerrors.Error{ErrorCode: cerrors.ErrorTypeHelper, Source: source, Reason: fmt.Sprintf("unsupported signal %s, use either SIGTERM or SIGKILL", signal)}
@@ -192,7 +197,7 @@ func stopContainerdContainer(containerIDs []string, socketPath, signal, source s
 	return nil
 }
 
-//stopDockerContainer kill the application container
+// stopDockerContainer kill the application container
 func stopDockerContainer(containerIDs []string, socketPath, signal, source string) error {
 	var errOut, out bytes.Buffer
 	cmd := exec.Command("sudo", "docker", "--host", fmt.Sprintf("unix://%s", socketPath), "kill", "--signal", signal)
@@ -205,7 +210,7 @@ func stopDockerContainer(containerIDs []string, socketPath, signal, source strin
 	return nil
 }
 
-//getRestartCount return the restart count of target container
+// getRestartCount return the restart count of target container
 func getRestartCount(target targetDetails, clients clients.ClientSets) (int, error) {
 	pod, err := clients.KubeClient.CoreV1().Pods(target.Namespace).Get(context.Background(), target.Name, v1.GetOptions{})
 	if err != nil {
@@ -221,7 +226,7 @@ func getRestartCount(target targetDetails, clients clients.ClientSets) (int, err
 	return restartCount, nil
 }
 
-//verifyRestartCount verify the restart count of target container that it is restarted or not after chaos injection
+// verifyRestartCount verify the restart count of target container that it is restarted or not after chaos injection
 func verifyRestartCount(t targetDetails, timeout, delay int, clients clients.ClientSets, restartCountBefore int) error {
 
 	restartCountAfter := 0
@@ -247,7 +252,7 @@ func verifyRestartCount(t targetDetails, timeout, delay int, clients clients.Cli
 		})
 }
 
-//getENV fetches all the env variables from the runner pod
+// getENV fetches all the env variables from the runner pod
 func getENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.ExperimentName = types.Getenv("EXPERIMENT_NAME", "")
 	experimentDetails.InstanceID = types.Getenv("INSTANCE_ID", "")

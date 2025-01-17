@@ -1,9 +1,12 @@
 package helper
 
 import (
+	"context"
 	"fmt"
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
+	"github.com/litmuschaos/litmus-go/pkg/telemetry"
 	"github.com/palantir/stacktrace"
+	"go.opentelemetry.io/otel"
 	"os"
 	"os/signal"
 	"strconv"
@@ -27,7 +30,9 @@ var (
 )
 
 // Helper injects the http chaos
-func Helper(clients clients.ClientSets) {
+func Helper(ctx context.Context, clients clients.ClientSets) {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "SimulatePodHTTPFault")
+	defer span.End()
 
 	experimentsDetails := experimentTypes.ExperimentDetails{}
 	eventsDetails := types.EventDetails{}
@@ -225,7 +230,7 @@ const NoProxyToKill = "you need to specify whom to kill"
 // it is using nsenter command to enter into network namespace of target container
 // and execute the proxy related command inside it.
 func killProxy(pid int, source string) error {
-	stopProxyServerCommand := fmt.Sprintf("sudo nsenter -t %d -n sudo kill -9 $(ps aux | grep [t]oxiproxy | awk 'FNR==1{print $1}')", pid)
+	stopProxyServerCommand := fmt.Sprintf("sudo nsenter -t %d -n sudo kill -9 $(ps aux | grep [t]oxiproxy | awk 'FNR==2{print $2}')", pid)
 	log.Infof("[Chaos]: Stopping proxy server")
 
 	if err := common.RunBashCommand(stopProxyServerCommand, "failed to stop proxy server", source); err != nil {

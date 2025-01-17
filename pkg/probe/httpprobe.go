@@ -3,6 +3,7 @@ package probe
 import (
 	"bytes"
 	"fmt"
+	"github.com/litmuschaos/litmus-go/pkg/utils"
 	"os/exec"
 	"reflect"
 	"strconv"
@@ -115,6 +116,9 @@ func httpGet(probe v1alpha1.ProbeAttributes, client *http.Client, resultDetails 
 			// getting the response from the given url
 			resp, err := client.Get(probe.HTTPProbeInputs.URL)
 			if err != nil {
+				if utils.HttpTimeout(err) {
+					return cerrors.Error{ErrorCode: cerrors.FailureTypeHttpProbe, Target: fmt.Sprintf("{name: %v}", probe.Name), Reason: err.Error()}
+				}
 				return cerrors.Error{ErrorCode: cerrors.ErrorTypeHttpProbe, Target: fmt.Sprintf("{name: %v}", probe.Name), Reason: err.Error()}
 			}
 
@@ -159,6 +163,9 @@ func httpPost(probe v1alpha1.ProbeAttributes, client *http.Client, resultDetails
 		Try(func(attempt uint) error {
 			resp, err := client.Post(probe.HTTPProbeInputs.URL, probe.HTTPProbeInputs.Method.Post.ContentType, strings.NewReader(body))
 			if err != nil {
+				if utils.HttpTimeout(err) {
+					return cerrors.Error{ErrorCode: cerrors.FailureTypeHttpProbe, Target: fmt.Sprintf("{name: %v}", probe.Name), Reason: err.Error()}
+				}
 				return cerrors.Error{ErrorCode: cerrors.ErrorTypeHttpProbe, Target: fmt.Sprintf("{name: %v}", probe.Name), Reason: err.Error()}
 			}
 			code := strconv.Itoa(resp.StatusCode)
@@ -244,6 +251,7 @@ loop:
 				for index := range chaosresult.ProbeDetails {
 					if chaosresult.ProbeDetails[index].Name == probe.Name {
 						chaosresult.ProbeDetails[index].IsProbeFailedWithError = err
+						chaosresult.ProbeDetails[index].HasProbeCompleted = true
 						chaosresult.ProbeDetails[index].Status.Description = getDescription(err)
 						log.Errorf("The %v http probe has been Failed, err: %v", probe.Name, err)
 						isExperimentFailed = true
@@ -395,6 +403,7 @@ loop:
 				for index := range chaosresult.ProbeDetails {
 					if chaosresult.ProbeDetails[index].Name == probe.Name {
 						chaosresult.ProbeDetails[index].IsProbeFailedWithError = err
+						chaosresult.ProbeDetails[index].HasProbeCompleted = true
 						chaosresult.ProbeDetails[index].Status.Description = getDescription(err)
 						isExperimentFailed = true
 						break loop
