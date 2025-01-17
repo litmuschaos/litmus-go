@@ -21,6 +21,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/palantir/stacktrace"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/codes"
 	"google.golang.org/api/compute/v1"
 )
 
@@ -69,14 +70,21 @@ func PrepareDiskVolumeLossByLabel(ctx context.Context, computeService *compute.S
 		switch strings.ToLower(experimentsDetails.Sequence) {
 		case "serial":
 			if err = injectChaosInSerialMode(ctx, computeService, experimentsDetails, diskVolumeNamesList, experimentsDetails.TargetDiskInstanceNamesList, experimentsDetails.Zones, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+				span.SetStatus(codes.Error, "failed to run chaos in serial mode")
+				span.RecordError(err)
 				return stacktrace.Propagate(err, "could not run chaos in serial mode")
 			}
 		case "parallel":
 			if err = injectChaosInParallelMode(ctx, computeService, experimentsDetails, diskVolumeNamesList, experimentsDetails.TargetDiskInstanceNamesList, experimentsDetails.Zones, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+				span.SetStatus(codes.Error, "failed to run chaos in parallel mode")
+				span.RecordError(err)
 				return stacktrace.Propagate(err, "could not run chaos in parallel mode")
 			}
 		default:
-			return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("'%s' sequence is not supported", experimentsDetails.Sequence)}
+			span.SetStatus(codes.Error, "sequence is not supported")
+			err := cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("'%s' sequence is not supported", experimentsDetails.Sequence)}
+			span.RecordError(err)
+			return err
 		}
 	}
 
@@ -111,6 +119,8 @@ func injectChaosInSerialMode(ctx context.Context, computeService *compute.Servic
 			//Detaching the disk volume from the instance
 			log.Info("[Chaos]: Detaching the disk volume from the instance")
 			if err = gcp.DiskVolumeDetach(computeService, instanceNamesList[i], experimentsDetails.GCPProjectID, zone, experimentsDetails.DeviceNamesList[i]); err != nil {
+				span.SetStatus(codes.Error, "failed to detach the disk volume from the vm instance")
+				span.RecordError(err)
 				return stacktrace.Propagate(err, "disk detachment failed")
 			}
 
@@ -119,6 +129,8 @@ func injectChaosInSerialMode(ctx context.Context, computeService *compute.Servic
 			//Wait for disk volume detachment
 			log.Infof("[Wait]: Wait for disk volume detachment for volume %v", targetDiskVolumeNamesList[i])
 			if err = gcp.WaitForVolumeDetachment(computeService, targetDiskVolumeNamesList[i], experimentsDetails.GCPProjectID, instanceNamesList[i], zone, experimentsDetails.Delay, experimentsDetails.Timeout); err != nil {
+				span.SetStatus(codes.Error, "failed to detach the disk volume from the vm instance")
+				span.RecordError(err)
 				return stacktrace.Propagate(err, "unable to detach the disk volume from the vm instance")
 			}
 
@@ -126,6 +138,8 @@ func injectChaosInSerialMode(ctx context.Context, computeService *compute.Servic
 			// the OnChaos probes execution will start in the first iteration and keep running for the entire chaos duration
 			if len(resultDetails.ProbeDetails) != 0 && i == 0 {
 				if err = probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+					span.SetStatus(codes.Error, "failed to run probes")
+					span.RecordError(err)
 					return err
 				}
 			}
@@ -137,6 +151,8 @@ func injectChaosInSerialMode(ctx context.Context, computeService *compute.Servic
 			//Getting the disk volume attachment status
 			diskState, err := gcp.GetDiskVolumeState(computeService, targetDiskVolumeNamesList[i], experimentsDetails.GCPProjectID, instanceNamesList[i], zone)
 			if err != nil {
+				span.SetStatus(codes.Error, "failed to get the disk volume status")
+				span.RecordError(err)
 				return stacktrace.Propagate(err, "failed to get the disk volume status")
 			}
 
@@ -147,12 +163,16 @@ func injectChaosInSerialMode(ctx context.Context, computeService *compute.Servic
 				//Attaching the disk volume to the instance
 				log.Info("[Chaos]: Attaching the disk volume back to the instance")
 				if err = gcp.DiskVolumeAttach(computeService, instanceNamesList[i], experimentsDetails.GCPProjectID, zone, experimentsDetails.DeviceNamesList[i], targetDiskVolumeNamesList[i]); err != nil {
+					span.SetStatus(codes.Error, "disk attachment failed")
+					span.RecordError(err)
 					return stacktrace.Propagate(err, "disk attachment failed")
 				}
 
 				//Wait for disk volume attachment
 				log.Infof("[Wait]: Wait for disk volume attachment for %v volume", targetDiskVolumeNamesList[i])
 				if err = gcp.WaitForVolumeAttachment(computeService, targetDiskVolumeNamesList[i], experimentsDetails.GCPProjectID, instanceNamesList[i], zone, experimentsDetails.Delay, experimentsDetails.Timeout); err != nil {
+					span.SetStatus(codes.Error, "failed to attach the disk volume to the vm instance")
+					span.RecordError(err)
 					return stacktrace.Propagate(err, "unable to attach the disk volume to the vm instance")
 				}
 			}
@@ -188,6 +208,8 @@ func injectChaosInParallelMode(ctx context.Context, computeService *compute.Serv
 			//Detaching the disk volume from the instance
 			log.Info("[Chaos]: Detaching the disk volume from the instance")
 			if err = gcp.DiskVolumeDetach(computeService, instanceNamesList[i], experimentsDetails.GCPProjectID, zone, experimentsDetails.DeviceNamesList[i]); err != nil {
+				span.SetStatus(codes.Error, "disk detachment failed")
+				span.RecordError(err)
 				return stacktrace.Propagate(err, "disk detachment failed")
 			}
 
@@ -199,6 +221,8 @@ func injectChaosInParallelMode(ctx context.Context, computeService *compute.Serv
 			//Wait for disk volume detachment
 			log.Infof("[Wait]: Wait for disk volume detachment for volume %v", targetDiskVolumeNamesList[i])
 			if err = gcp.WaitForVolumeDetachment(computeService, targetDiskVolumeNamesList[i], experimentsDetails.GCPProjectID, instanceNamesList[i], zone, experimentsDetails.Delay, experimentsDetails.Timeout); err != nil {
+				span.SetStatus(codes.Error, "unable to detach the disk volume from the vm instance")
+				span.RecordError(err)
 				return stacktrace.Propagate(err, "unable to detach the disk volume from the vm instance")
 			}
 		}
@@ -206,6 +230,8 @@ func injectChaosInParallelMode(ctx context.Context, computeService *compute.Serv
 		// run the probes during chaos
 		if len(resultDetails.ProbeDetails) != 0 {
 			if err := probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+				span.SetStatus(codes.Error, "failed to run probes")
+				span.RecordError(err)
 				return err
 			}
 		}
@@ -219,6 +245,8 @@ func injectChaosInParallelMode(ctx context.Context, computeService *compute.Serv
 			//Getting the disk volume attachment status
 			diskState, err := gcp.GetDiskVolumeState(computeService, targetDiskVolumeNamesList[i], experimentsDetails.GCPProjectID, instanceNamesList[i], zone)
 			if err != nil {
+				span.SetStatus(codes.Error, "failed to get the disk status")
+				span.RecordError(err)
 				return stacktrace.Propagate(err, "failed to get the disk status")
 			}
 
@@ -229,12 +257,16 @@ func injectChaosInParallelMode(ctx context.Context, computeService *compute.Serv
 				//Attaching the disk volume to the instance
 				log.Info("[Chaos]: Attaching the disk volume to the instance")
 				if err = gcp.DiskVolumeAttach(computeService, instanceNamesList[i], experimentsDetails.GCPProjectID, zone, experimentsDetails.DeviceNamesList[i], targetDiskVolumeNamesList[i]); err != nil {
+					span.SetStatus(codes.Error, "disk attachment failed")
+					span.RecordError(err)
 					return stacktrace.Propagate(err, "disk attachment failed")
 				}
 
 				//Wait for disk volume attachment
 				log.Infof("[Wait]: Wait for disk volume attachment for volume %v", targetDiskVolumeNamesList[i])
 				if err = gcp.WaitForVolumeAttachment(computeService, targetDiskVolumeNamesList[i], experimentsDetails.GCPProjectID, instanceNamesList[i], zone, experimentsDetails.Delay, experimentsDetails.Timeout); err != nil {
+					span.SetStatus(codes.Error, "unable to attach the disk volume to the vm instance")
+					span.RecordError(err)
 					return stacktrace.Propagate(err, "unable to attach the disk volume to the vm instance")
 				}
 			}

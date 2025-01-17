@@ -11,6 +11,8 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	azureCommon "github.com/litmuschaos/litmus-go/pkg/cloud/azure/common"
 	azureStatus "github.com/litmuschaos/litmus-go/pkg/cloud/azure/instance"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	"github.com/litmuschaos/litmus-go/pkg/log"
@@ -23,6 +25,7 @@ import (
 
 // AzureInstanceStop inject the azure instance stop chaos
 func AzureInstanceStop(ctx context.Context, clients clients.ClientSets) {
+	span := trace.SpanFromContext(ctx)
 
 	var err error
 	experimentsDetails := experimentTypes.ExperimentDetails{}
@@ -44,6 +47,8 @@ func AzureInstanceStop(ctx context.Context, clients clients.ClientSets) {
 		// Get values from chaosengine. Bail out upon error, as we haven't entered exp business logic yet
 		if err = types.GetValuesFromChaosEngine(&chaosDetails, clients, &resultDetails); err != nil {
 			log.Errorf("Unable to initialize the probes: %v", err)
+			span.SetStatus(codes.Error, "Unable to initialize the probes")
+			span.RecordError(err)
 		}
 	}
 
@@ -53,6 +58,8 @@ func AzureInstanceStop(ctx context.Context, clients clients.ClientSets) {
 	if err != nil {
 		log.Errorf("Unable to create the chaosresult: %v", err)
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
+		span.SetStatus(codes.Error, "Unable to create the chaosresult")
+		span.RecordError(err)
 		return
 	}
 
@@ -74,6 +81,8 @@ func AzureInstanceStop(ctx context.Context, clients clients.ClientSets) {
 	if experimentsDetails.SubscriptionID, err = azureCommon.GetSubscriptionID(); err != nil {
 		log.Errorf("Failed to get the subscription id: %v", err)
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
+		span.SetStatus(codes.Error, "fail to get the subscription id")
+		span.RecordError(err)
 		return
 	}
 
@@ -100,6 +109,8 @@ func AzureInstanceStop(ctx context.Context, clients clients.ClientSets) {
 					log.Errorf("Failed to create %v event inside chaosengine", types.PreChaosCheck)
 				}
 				result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
+				span.SetStatus(codes.Error, "Probe Failed")
+				span.RecordError(err)
 				return
 			}
 			msg = "AUT: Running, Probes: Successful"
@@ -116,6 +127,8 @@ func AzureInstanceStop(ctx context.Context, clients clients.ClientSets) {
 		if err = azureStatus.InstanceStatusCheckByName(experimentsDetails.AzureInstanceNames, experimentsDetails.ScaleSet, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup); err != nil {
 			log.Errorf("Azure instance status check failed: %v", err)
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
+			span.SetStatus(codes.Error, "Azure instance status check failed")
+			span.RecordError(err)
 			return
 		}
 		log.Info("[Status]: Azure instance(s) is in running state (pre-chaos)")
@@ -126,6 +139,8 @@ func AzureInstanceStop(ctx context.Context, clients clients.ClientSets) {
 	if err = litmusLIB.PrepareAzureStop(ctx, &experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
 		log.Errorf("Chaos injection failed: %v", err)
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
+		span.SetStatus(codes.Error, "Chaos injection failed")
+		span.RecordError(err)
 		return
 	}
 
@@ -139,6 +154,8 @@ func AzureInstanceStop(ctx context.Context, clients clients.ClientSets) {
 		if err = azureStatus.InstanceStatusCheckByName(experimentsDetails.AzureInstanceNames, experimentsDetails.ScaleSet, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup); err != nil {
 			log.Errorf("Azure instance status check failed: %v", err)
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
+			span.SetStatus(codes.Error, "Azure instance status check failed")
+			span.RecordError(err)
 			return
 		}
 		log.Info("[Status]: Azure instance is in running state (post chaos)")
@@ -159,6 +176,8 @@ func AzureInstanceStop(ctx context.Context, clients clients.ClientSets) {
 					log.Errorf("Failed to create %v event inside chaosengine", types.PostChaosCheck)
 				}
 				result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
+				span.SetStatus(codes.Error, "Probes Failed")
+				span.RecordError(err)
 				return
 			}
 			msg = "AUT: Running, Probes: Successful"

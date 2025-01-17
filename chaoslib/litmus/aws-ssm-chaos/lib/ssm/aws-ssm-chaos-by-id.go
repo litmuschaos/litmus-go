@@ -19,6 +19,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/palantir/stacktrace"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/codes"
 )
 
 var (
@@ -49,6 +50,8 @@ func PrepareAWSSSMChaosByID(ctx context.Context, experimentsDetails *experimentT
 
 	//create and upload the ssm document on the given aws service monitoring docs
 	if err = ssm.CreateAndUploadDocument(experimentsDetails.DocumentName, experimentsDetails.DocumentType, experimentsDetails.DocumentFormat, experimentsDetails.DocumentPath, experimentsDetails.Region); err != nil {
+		span.SetStatus(codes.Error, "could not create and upload the ssm document")
+		span.RecordError(err)
 		return stacktrace.Propagate(err, "could not create and upload the ssm document")
 	}
 	experimentsDetails.IsDocsUploaded = true
@@ -60,25 +63,37 @@ func PrepareAWSSSMChaosByID(ctx context.Context, experimentsDetails *experimentT
 	//get the instance id or list of instance ids
 	instanceIDList := strings.Split(experimentsDetails.EC2InstanceID, ",")
 	if experimentsDetails.EC2InstanceID == "" || len(instanceIDList) == 0 {
-		return cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Reason: "no instance id found for chaos injection"}
+		span.SetStatus(codes.Error, "no instance id found for chaos injection")
+		err := cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Reason: "no instance id found for chaos injection"}
+		span.RecordError(err)
+		return err
 	}
 
 	switch strings.ToLower(experimentsDetails.Sequence) {
 	case "serial":
 		if err = lib.InjectChaosInSerialMode(ctx, experimentsDetails, instanceIDList, clients, resultDetails, eventsDetails, chaosDetails, inject); err != nil {
+			span.SetStatus(codes.Error, "could not run chaos in serial mode")
+			span.RecordError(err)
 			return stacktrace.Propagate(err, "could not run chaos in serial mode")
 		}
 	case "parallel":
 		if err = lib.InjectChaosInParallelMode(ctx, experimentsDetails, instanceIDList, clients, resultDetails, eventsDetails, chaosDetails, inject); err != nil {
+			span.SetStatus(codes.Error, "could not run chaos in parallel mode")
+			span.RecordError(err)
 			return stacktrace.Propagate(err, "could not run chaos in parallel mode")
 		}
 	default:
-		return cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Reason: fmt.Sprintf("'%s' sequence is not supported", experimentsDetails.Sequence)}
+		span.SetStatus(codes.Error, "sequence is not supported")
+		err := cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Reason: fmt.Sprintf("'%s' sequence is not supported", experimentsDetails.Sequence)}
+		span.RecordError(err)
+		return err
 	}
 
 	//Delete the ssm document on the given aws service monitoring docs
 	err = ssm.SSMDeleteDocument(experimentsDetails.DocumentName, experimentsDetails.Region)
 	if err != nil {
+		span.SetStatus(codes.Error, "failed to delete ssm doc")
+		span.RecordError(err)
 		return stacktrace.Propagate(err, "failed to delete ssm doc")
 	}
 

@@ -17,11 +17,14 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/sirupsen/logrus"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/api/compute/v1"
 )
 
 // VMDiskLoss injects the disk volume loss chaos
 func VMDiskLoss(ctx context.Context, clients clients.ClientSets) {
+	span := trace.SpanFromContext(ctx)
 
 	var (
 		computeService *compute.Service
@@ -47,6 +50,8 @@ func VMDiskLoss(ctx context.Context, clients clients.ClientSets) {
 		// Get values from chaosengine. Bail out upon error, as we haven't entered exp business logic yet
 		if err = types.GetValuesFromChaosEngine(&chaosDetails, clients, &resultDetails); err != nil {
 			log.Errorf("Unable to initialize the probes, err: %v", err)
+			span.SetStatus(codes.Error, "Unable to initialize the probes")
+			span.RecordError(err)
 			return
 		}
 	}
@@ -56,6 +61,8 @@ func VMDiskLoss(ctx context.Context, clients clients.ClientSets) {
 	if err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT"); err != nil {
 		log.Errorf("Unable to create the Chaos Result, err: %v", err)
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
+		span.SetStatus(codes.Error, "Unable to create the Chaos Result")
+		span.RecordError(err)
 		return
 	}
 
@@ -90,6 +97,8 @@ func VMDiskLoss(ctx context.Context, clients clients.ClientSets) {
 				types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, msg, "Warning", &chaosDetails)
 				events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 				result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
+				span.SetStatus(codes.Error, "Probe Failed")
+				span.RecordError(err)
 				return
 			}
 			msg = "AUT: Running, Probes: Successful"
@@ -104,6 +113,8 @@ func VMDiskLoss(ctx context.Context, clients clients.ClientSets) {
 	if err != nil {
 		log.Errorf("Failed to obtain a gcp compute service, err: %v", err)
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
+		span.SetStatus(codes.Error, "Failed to obtain a gcp compute service")
+		span.RecordError(err)
 		return
 	}
 
@@ -112,6 +123,8 @@ func VMDiskLoss(ctx context.Context, clients clients.ClientSets) {
 		if err := gcp.DiskVolumeStateCheck(computeService, &experimentsDetails); err != nil {
 			log.Errorf("Volume status check failed pre chaos, err: %v", err)
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
+			span.SetStatus(codes.Error, "Volume status check failed pre chaos")
+			span.RecordError(err)
 			return
 		}
 		log.Info("[Status]: Disk volumes are attached to the VM instances (pre-chaos)")
@@ -121,6 +134,8 @@ func VMDiskLoss(ctx context.Context, clients clients.ClientSets) {
 	if err := gcp.SetTargetDiskInstanceNames(computeService, &experimentsDetails); err != nil {
 		log.Errorf("Failed to fetch the disk instance names, err: %v", err)
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
+		span.SetStatus(codes.Error, "Failed to fetch the disk instance names")
+		span.RecordError(err)
 		return
 	}
 
@@ -129,6 +144,8 @@ func VMDiskLoss(ctx context.Context, clients clients.ClientSets) {
 	if err = litmusLIB.PrepareDiskVolumeLoss(ctx, computeService, &experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
 		log.Errorf("Chaos injection failed, err: %v", err)
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
+		span.SetStatus(codes.Error, "Chaos injection failed")
+		span.RecordError(err)
 		return
 	}
 
@@ -142,6 +159,8 @@ func VMDiskLoss(ctx context.Context, clients clients.ClientSets) {
 		if err := gcp.DiskVolumeStateCheck(computeService, &experimentsDetails); err != nil {
 			log.Errorf("Volume status check failed post chaos, err: %v", err)
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
+			span.SetStatus(codes.Error, "Volume status check failed post chaos")
+			span.RecordError(err)
 			return
 		}
 		log.Info("[Status]: Disk volumes are attached to the VM instances (post-chaos)")
@@ -159,6 +178,8 @@ func VMDiskLoss(ctx context.Context, clients clients.ClientSets) {
 				types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, msg, "Warning", &chaosDetails)
 				events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 				result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
+				span.SetStatus(codes.Error, "Probes Failed")
+				span.RecordError(err)
 				return
 			}
 			msg = "AUT: Running, Probes: Successful"
@@ -173,6 +194,8 @@ func VMDiskLoss(ctx context.Context, clients clients.ClientSets) {
 	log.Infof("[The End]: Updating the chaos result of %v experiment (EOT)", experimentsDetails.ExperimentName)
 	if err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT"); err != nil {
 		log.Errorf("unable to Update the Chaos Result, err: %v", err)
+		span.SetStatus(codes.Error, "Unable to Update the Chaos Result")
+		span.RecordError(err)
 		return
 	}
 
