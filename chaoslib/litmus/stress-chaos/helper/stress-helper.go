@@ -111,7 +111,7 @@ func prepareStressChaos(experimentsDetails *experimentTypes.ExperimentDetails, c
 	}
 
 	var (
-		targets   []targetDetails
+		targets []targetDetails
 	)
 
 	for _, t := range targetList.Target {
@@ -504,7 +504,7 @@ func abortWatcher(targets []targetDetails, resultName, chaosNS string) {
 func getCGroupManager(t targetDetails) (interface{}, error, string) {
 	if cgroups.Mode() == cgroups.Unified {
 		groupPath := ""
-		output, err := exec.Command("bash", "-c", fmt.Sprintf("nsenter -t 1 -C -m -- cat /proc/%v/cgroup", t.Pids[index])).CombinedOutput()
+		output, err := exec.Command("bash", "-c", fmt.Sprintf("nsenter -t 1 -C -m -- cat /proc/%v/cgroup", t.Pid)).CombinedOutput()
 		if err != nil {
 			return nil, errors.Errorf("Error in getting groupPath,%s", string(output)), ""
 		}
@@ -518,7 +518,7 @@ func getCGroupManager(t targetDetails) (interface{}, error, string) {
 
 		log.Infof("group path: %s", groupPath)
 
-		cgroup2, err := cgroupsv2.LoadManager("/sys/fs/cgroup", string(groupPath))
+		cgroup2, err := cgroupsv2.LoadManager("/sys/fs/cgroup", groupPath)
 		if err != nil {
 			return nil, errors.Errorf("Error loading cgroup v2 manager, %v", err), ""
 		}
@@ -541,7 +541,7 @@ func getCGroupManager(t targetDetails) (interface{}, error, string) {
 // By default it will add to v1 cgroup
 func addProcessToCgroup(pid int, control interface{}, groupPath string) error {
 	if cgroups.Mode() == cgroups.Unified {
-	  args := []string{"-t", "1", "-C", "--", "sudo", "sh", "-c", fmt.Sprintf("echo %d >> /sys/fs/cgroup%s/cgroup.procs", pid, strings.ReplaceAll(groupPath, "\n", ""))}
+		args := []string{"-t", "1", "-C", "--", "sudo", "sh", "-c", fmt.Sprintf("echo %d >> /sys/fs/cgroup%s/cgroup.procs", pid, strings.ReplaceAll(groupPath, "\n", ""))}
 		output, err := exec.Command("nsenter", args...).CombinedOutput()
 		if err != nil {
 			return cerrors.Error{
@@ -554,7 +554,6 @@ func addProcessToCgroup(pid int, control interface{}, groupPath string) error {
 	var cgroup1 = control.(cgroups.Cgroup)
 	return cgroup1.Add(cgroups.Process{Pid: pid})
 }
-
 
 func injectChaos(t targetDetails, stressors, stressType string) (*exec.Cmd, error) {
 	stressCommand := fmt.Sprintf("pause nsutil -t %v -p -- %v", strconv.Itoa(t.Pid), stressors)
@@ -605,5 +604,5 @@ type targetDetails struct {
 	CGroupManager   interface{}
 	Cmd             *exec.Cmd
 	Source          string
-  GroupPath       string
+	GroupPath       string
 }
