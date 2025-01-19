@@ -13,7 +13,6 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/result"
-	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/sirupsen/logrus"
@@ -69,18 +68,6 @@ func Experiment(ctx context.Context, clients clients.ClientSets) {
 	// Calling AbortWatcher go routine, it will continuously watch for the abort signal and generate the required events and result
 	go common.AbortWatcher(experimentsDetails.ExperimentName, clients, &resultDetails, &chaosDetails, &eventsDetails)
 
-	//PRE-CHAOS APPLICATION STATUS CHECK
-	if chaosDetails.DefaultHealthCheck {
-		log.Info("[Status]: Verify that the AUT (Application Under Test) is running (pre-chaos)")
-		if err := status.AUTStatusCheck(clients, &chaosDetails); err != nil {
-			log.Errorf("Application status check failed, err: %v", err)
-			types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, "AUT: Not Running", "Warning", &chaosDetails)
-			events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
-			result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
-			return
-		}
-	}
-
 	if experimentsDetails.EngineName != "" {
 		// marking AUT as running, as we already checked the status of application under test
 		msg := "AUT: Running"
@@ -111,18 +98,6 @@ func Experiment(ctx context.Context, clients clients.ClientSets) {
 	log.Infof("[Confirmation]: %v chaos has been injected successfully", experimentsDetails.ExperimentName)
 	resultDetails.Verdict = v1alpha1.ResultVerdictPassed
 	chaosDetails.Phase = types.PostChaosPhase
-
-	//POST-CHAOS APPLICATION STATUS CHECK
-	if chaosDetails.DefaultHealthCheck {
-		log.Info("[Status]: Verify that the AUT (Application Under Test) is running (post-chaos)")
-		if err := status.AUTStatusCheck(clients, &chaosDetails); err != nil {
-			log.Errorf("Application status check failed, err: %v", err)
-			types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, "AUT: Not Running", "Warning", &chaosDetails)
-			events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
-			result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
-			return
-		}
-	}
 
 	if experimentsDetails.EngineName != "" {
 		// marking AUT as running, as we already checked the status of application under test
