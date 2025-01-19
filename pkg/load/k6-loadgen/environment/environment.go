@@ -25,5 +25,5 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.LIBImage = types.Getenv("LIB_IMAGE", "ghcr.io/grafana/k6-operator:latest-runner")
 	experimentDetails.ScriptSecretName = types.Getenv("SCRIPT_SECRET_NAME", "k6-script")
 	experimentDetails.ScriptSecretKey = types.Getenv("SCRIPT_SECRET_KEY", "script.js")
-
+	experimentDetails.OTELMetricPrefix = types.Getenv("OTEL_METRIC_PREFIX", "k6_")
 }

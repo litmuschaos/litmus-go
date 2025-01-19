@@ -1,10 +1,13 @@
 package helper
 
 import (
+	"context"
 	"fmt"
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	"github.com/litmuschaos/litmus-go/pkg/events"
+	"github.com/litmuschaos/litmus-go/pkg/telemetry"
 	"github.com/palantir/stacktrace"
+	"go.opentelemetry.io/otel"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -34,7 +37,9 @@ var (
 )
 
 // Helper injects the network chaos
-func Helper(clients clients.ClientSets) {
+func Helper(ctx context.Context, clients clients.ClientSets) {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "SimulatePodNetworkFault")
+	defer span.End()
 
 	experimentsDetails := experimentTypes.ExperimentDetails{}
 	eventsDetails := types.EventDetails{}
@@ -130,7 +135,7 @@ func preparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetail
 		}
 		log.Infof("successfully injected chaos on target: {name: %s, namespace: %v, container: %v}", t.Name, t.Namespace, t.TargetContainer)
 		if err = result.AnnotateChaosResult(resultDetails.Name, chaosDetails.ChaosNamespace, "injected", "pod", t.Name); err != nil {
-			if _, revertErr := killnetem(t, experimentsDetails.NetworkInterface); err != nil {
+			if _, revertErr := killnetem(t, experimentsDetails.NetworkInterface); revertErr != nil {
 				return cerrors.PreserveError{ErrString: fmt.Sprintf("[%s,%s]", stacktrace.RootCause(err).Error(), stacktrace.RootCause(revertErr).Error())}
 			}
 			return stacktrace.Propagate(err, "could not annotate chaosresult")
