@@ -3,6 +3,7 @@ package lib
 import (
 	"context"
 	"fmt"
+	"go.opentelemetry.io/otel/attribute"
 	"strconv"
 	"strings"
 	"time"
@@ -113,6 +114,10 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 
 		//Deleting the application pod
 		for _, pod := range targetPodList.Items {
+			span.SetAttributes(
+				attribute.String("pod.name", pod.Name),
+				attribute.String("pod.namespace", pod.Namespace),
+			)
 
 			log.InfoWithValues("[Info]: Killing the following pods", logrus.Fields{
 				"PodName": pod.Name})
@@ -211,6 +216,10 @@ func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experime
 
 		//Deleting the application pod
 		for _, pod := range targetPodList.Items {
+			span.SetAttributes(
+				attribute.String("pod.name", pod.Name),
+				attribute.String("pod.namespace", pod.Namespace),
+			)
 
 			log.InfoWithValues("[Info]: Killing the following pods", logrus.Fields{
 				"PodName": pod.Name})
