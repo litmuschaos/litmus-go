@@ -3,6 +3,7 @@ package lib
 import (
 	"context"
 	"fmt"
+	"os"
 	"strconv"
 
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
@@ -103,6 +104,35 @@ func createHelperPod(ctx context.Context, experimentsDetails *experimentTypes.Ex
 
 	const volumeName = "script-volume"
 	const mountPath = "/mnt"
+
+	var envs []corev1.EnvVar
+	args := []string{
+		mountPath + "/" + experimentsDetails.ScriptSecretKey,
+		"-q",
+		"--duration",
+		strconv.Itoa(experimentsDetails.ChaosDuration) + "s",
+		"--tag",
+		"trace_id=" + span.SpanContext().TraceID().String(),
+	}
+
+	if otelExporterEndpoint := os.Getenv(telemetry.OTELExporterOTLPEndpoint); otelExporterEndpoint != "" {
+		envs = []corev1.EnvVar{
+			{
+				Name:  "K6_OTEL_METRIC_PREFIX",
+				Value: experimentsDetails.OTELMetricPrefix,
+			},
+			{
+				Name:  "K6_OTEL_GRPC_EXPORTER_INSECURE",
+				Value: "true",
+			},
+			{
+				Name:  "K6_OTEL_GRPC_EXPORTER_ENDPOINT",
+				Value: otelExporterEndpoint,
+			},
+		}
+		args = append(args, "--out", "experimental-opentelemetry")
+	}
+
 	helperPod := &corev1.Pod{
 		ObjectMeta: v1.ObjectMeta{
 			GenerateName: experimentsDetails.ExperimentName + "-helper-",
@@ -122,12 +152,8 @@ func createHelperPod(ctx context.Context, experimentsDetails *experimentTypes.Ex
 						"k6",
 						"run",
 					},
-					Args: []string{
-						mountPath + "/" + experimentsDetails.ScriptSecretKey,
-						"-q",
-						"--duration",
-						strconv.Itoa(experimentsDetails.ChaosDuration) + "s",
-					},
+					Args:      args,
+					Env:       envs,
 					Resources: chaosDetails.Resources,
 					VolumeMounts: []corev1.VolumeMount{
 						{
