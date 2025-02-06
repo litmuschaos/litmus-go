@@ -13,6 +13,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/telemetry"
 	"github.com/palantir/stacktrace"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/codes"
 
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-network-partition/types"
@@ -50,12 +51,17 @@ func PrepareAndInjectChaos(ctx context.Context, experimentsDetails *experimentTy
 
 	// validate the appLabels
 	if chaosDetails.AppDetail == nil {
-		return cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Reason: "provide the appLabel"}
+		span.SetStatus(codes.Error, "appDetail is empty")
+		err := cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Reason: "provide the appLabel"}
+		span.RecordError(err)
+		return err
 	}
 
 	// Get the target pod details for the chaos execution
 	targetPodList, err := common.GetPodList("", 100, clients, chaosDetails)
 	if err != nil {
+		span.SetStatus(codes.Error, "could not get target pods")
+		span.RecordError(err)
 		return stacktrace.Propagate(err, "could not get target pods")
 	}
 
@@ -77,6 +83,8 @@ func PrepareAndInjectChaos(ctx context.Context, experimentsDetails *experimentTy
 	// collect all the data for the network policy
 	np := initialize()
 	if err := np.getNetworkPolicyDetails(experimentsDetails); err != nil {
+		span.SetStatus(codes.Error, "could not get network policy details")
+		span.RecordError(err)
 		return stacktrace.Propagate(err, "could not get network policy details")
 	}
 
@@ -96,6 +104,8 @@ func PrepareAndInjectChaos(ctx context.Context, experimentsDetails *experimentTy
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
 		if err := probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+			span.SetStatus(codes.Error, "probe failed")
+			span.RecordError(err)
 			return err
 		}
 	}
@@ -107,6 +117,8 @@ func PrepareAndInjectChaos(ctx context.Context, experimentsDetails *experimentTy
 	default:
 		// creating the network policy to block the traffic
 		if err := createNetworkPolicy(ctx, experimentsDetails, clients, np, runID); err != nil {
+			span.SetStatus(codes.Error, "could not create network policy")
+			span.RecordError(err)
 			return stacktrace.Propagate(err, "could not create network policy")
 		}
 		// updating chaos status to injected for the target pods
@@ -117,6 +129,8 @@ func PrepareAndInjectChaos(ctx context.Context, experimentsDetails *experimentTy
 
 	// verify the presence of network policy inside cluster
 	if err := checkExistenceOfPolicy(experimentsDetails, clients, experimentsDetails.Timeout, experimentsDetails.Delay, runID); err != nil {
+		span.SetStatus(codes.Error, "could not check existence of network policy")
+		span.RecordError(err)
 		return stacktrace.Propagate(err, "could not check existence of network policy")
 	}
 
@@ -125,6 +139,8 @@ func PrepareAndInjectChaos(ctx context.Context, experimentsDetails *experimentTy
 
 	// deleting the network policy after chaos duration over
 	if err := deleteNetworkPolicy(experimentsDetails, clients, &targetPodList, chaosDetails, experimentsDetails.Timeout, experimentsDetails.Delay, runID); err != nil {
+		span.SetStatus(codes.Error, "could not delete network policy")
+		span.RecordError(err)
 		return stacktrace.Propagate(err, "could not delete network policy")
 	}
 
@@ -170,7 +186,10 @@ func createNetworkPolicy(ctx context.Context, experimentsDetails *experimentType
 
 	_, err := clients.KubeClient.NetworkingV1().NetworkPolicies(experimentsDetails.AppNS).Create(context.Background(), np, v1.CreateOptions{})
 	if err != nil {
-		return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Reason: fmt.Sprintf("failed to create network policy: %s", err.Error())}
+		span.SetStatus(codes.Error, "could not create network policy")
+		err := cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Reason: fmt.Sprintf("failed to create network policy: %s", err.Error())}
+		span.RecordError(err)
+		return err
 	}
 	return nil
 }

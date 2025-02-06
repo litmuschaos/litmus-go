@@ -12,6 +12,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/workloads"
 	"github.com/palantir/stacktrace"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/codes"
 
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
@@ -39,14 +40,21 @@ func PreparePodDelete(ctx context.Context, experimentsDetails *experimentTypes.E
 	switch strings.ToLower(experimentsDetails.ChaoslibDetail.Sequence) {
 	case "serial":
 		if err := injectChaosInSerialMode(ctx, experimentsDetails, clients, chaosDetails, eventsDetails, resultDetails); err != nil {
+			span.SetStatus(codes.Error, "could not run chaos in serial mode")
+			span.RecordError(err)
 			return stacktrace.Propagate(err, "could not run chaos in serial mode")
 		}
 	case "parallel":
 		if err := injectChaosInParallelMode(ctx, experimentsDetails, clients, chaosDetails, eventsDetails, resultDetails); err != nil {
+			span.SetStatus(codes.Error, "could not run chaos in parallel mode")
+			span.RecordError(err)
 			return stacktrace.Propagate(err, "could not run chaos in parallel mode")
 		}
 	default:
-		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("'%s' sequence is not supported", experimentsDetails.ChaoslibDetail.Sequence)}
+		span.SetStatus(codes.Error, "sequence is not supported")
+		err := cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("'%s' sequence is not supported", experimentsDetails.ChaoslibDetail.Sequence)}
+		span.RecordError(err)
+		return err
 	}
 
 	//Waiting for the ramp time after chaos injection
@@ -64,6 +72,8 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
 		if err := probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+			span.SetStatus(codes.Error, "probe failed")
+			span.RecordError(err)
 			return err
 		}
 	}
@@ -77,12 +87,17 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 		// Get the target pod details for the chaos execution
 		// if the target pod is not defined it will derive the random target pod list using pod affected percentage
 		if experimentsDetails.KafkaBroker == "" && chaosDetails.AppDetail == nil {
-			return cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Reason: "please provide one of the appLabel or KAFKA_BROKER"}
+			span.SetStatus(codes.Error, "target selection error")
+			err := cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Reason: "please provide one of the appLabel or KAFKA_BROKER"}
+			span.RecordError(err)
+			return err
 		}
 
 		podsAffectedPerc, _ := strconv.Atoi(experimentsDetails.ChaoslibDetail.PodsAffectedPerc)
 		targetPodList, err := common.GetPodList(experimentsDetails.KafkaBroker, podsAffectedPerc, clients, chaosDetails)
 		if err != nil {
+			span.SetStatus(codes.Error, "could not get target pods")
+			span.RecordError(err)
 			return err
 		}
 
@@ -90,6 +105,8 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 		for _, pod := range targetPodList.Items {
 			kind, parentName, err := workloads.GetPodOwnerTypeAndName(&pod, clients.DynamicClient)
 			if err != nil {
+				span.SetStatus(codes.Error, "could not get pod owner name and kind")
+				span.RecordError(err)
 				return err
 			}
 			common.SetParentName(parentName, kind, pod.Namespace, chaosDetails)
@@ -116,12 +133,16 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 				err = clients.KubeClient.CoreV1().Pods(pod.Namespace).Delete(context.Background(), pod.Name, v1.DeleteOptions{})
 			}
 			if err != nil {
-				return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Target: fmt.Sprintf("{podName: %s, namespace: %s}", pod.Name, pod.Namespace), Reason: fmt.Sprintf("failed to delete the target pod: %s", err.Error())}
+				span.SetStatus(codes.Error, "could not delete the target pod")
+				err := cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Target: fmt.Sprintf("{podName: %s, namespace: %s}", pod.Name, pod.Namespace), Reason: fmt.Sprintf("failed to delete the target pod: %s", err.Error())}
+				return err
 			}
 
 			switch chaosDetails.Randomness {
 			case true:
 				if err := common.RandomInterval(experimentsDetails.ChaoslibDetail.ChaosInterval); err != nil {
+					span.SetStatus(codes.Error, "could not get random chaos interval")
+					span.RecordError(err)
 					return stacktrace.Propagate(err, "could not get random chaos interval")
 				}
 			default:
@@ -142,6 +163,8 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 					Namespace: parent.Namespace,
 				}
 				if err = status.CheckUnTerminatedPodStatusesByWorkloadName(target, experimentsDetails.ChaoslibDetail.Timeout, experimentsDetails.ChaoslibDetail.Delay, clients); err != nil {
+					span.SetStatus(codes.Error, "could not check pod statuses by workload names")
+					span.RecordError(err)
 					return stacktrace.Propagate(err, "could not check pod statuses by workload names")
 				}
 			}
@@ -160,6 +183,8 @@ func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experime
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
 		if err := probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+			span.SetStatus(codes.Error, "probe failed")
+			span.RecordError(err)
 			return err
 		}
 	}
@@ -178,6 +203,8 @@ func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experime
 		podsAffectedPerc, _ := strconv.Atoi(experimentsDetails.ChaoslibDetail.PodsAffectedPerc)
 		targetPodList, err := common.GetPodList(experimentsDetails.KafkaBroker, podsAffectedPerc, clients, chaosDetails)
 		if err != nil {
+			span.SetStatus(codes.Error, "could not get target pods")
+			span.RecordError(err)
 			return stacktrace.Propagate(err, "could not get target pods")
 		}
 
@@ -185,6 +212,8 @@ func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experime
 		for _, pod := range targetPodList.Items {
 			kind, parentName, err := workloads.GetPodOwnerTypeAndName(&pod, clients.DynamicClient)
 			if err != nil {
+				span.SetStatus(codes.Error, "could not get pod owner name and kind")
+				span.RecordError(err)
 				return stacktrace.Propagate(err, "could not get pod owner name and kind")
 			}
 			common.SetParentName(parentName, kind, pod.Namespace, chaosDetails)
@@ -211,13 +240,17 @@ func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experime
 				err = clients.KubeClient.CoreV1().Pods(pod.Namespace).Delete(context.Background(), pod.Name, v1.DeleteOptions{})
 			}
 			if err != nil {
-				return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Target: fmt.Sprintf("{podName: %s, namespace: %s}", pod.Name, pod.Namespace), Reason: fmt.Sprintf("failed to delete the target pod: %s", err.Error())}
+				span.SetStatus(codes.Error, "could not delete the target pod")
+				err := cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Target: fmt.Sprintf("{podName: %s, namespace: %s}", pod.Name, pod.Namespace), Reason: fmt.Sprintf("failed to delete the target pod: %s", err.Error())}
+				return err
 			}
 		}
 
 		switch chaosDetails.Randomness {
 		case true:
 			if err := common.RandomInterval(experimentsDetails.ChaoslibDetail.ChaosInterval); err != nil {
+				span.SetStatus(codes.Error, "could not get random chaos interval")
+				span.RecordError(err)
 				return stacktrace.Propagate(err, "could not get random chaos interval")
 			}
 		default:
@@ -238,6 +271,8 @@ func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experime
 				Namespace: parent.Namespace,
 			}
 			if err = status.CheckUnTerminatedPodStatusesByWorkloadName(target, experimentsDetails.ChaoslibDetail.Timeout, experimentsDetails.ChaoslibDetail.Delay, clients); err != nil {
+				span.SetStatus(codes.Error, "could not check pod statuses by workload names")
+				span.RecordError(err)
 				return stacktrace.Propagate(err, "could not check pod statuses by workload names")
 			}
 		}

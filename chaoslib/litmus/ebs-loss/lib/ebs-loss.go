@@ -18,6 +18,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/palantir/stacktrace"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/codes"
 )
 
 // InjectChaosInSerialMode will inject the ebs loss chaos in serial mode which means one after other
@@ -41,12 +42,16 @@ func InjectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 			//Get volume attachment details
 			ec2InstanceID, device, err := ebs.GetVolumeAttachmentDetails(volumeID, experimentsDetails.VolumeTag, experimentsDetails.Region)
 			if err != nil {
+				span.SetStatus(codes.Error, "failed to get the attachment info")
+				span.RecordError(err)
 				return stacktrace.Propagate(err, "failed to get the attachment info")
 			}
 
 			//Detaching the ebs volume from the instance
 			log.Info("[Chaos]: Detaching the EBS volume from the instance")
 			if err = ebs.EBSVolumeDetach(volumeID, experimentsDetails.Region); err != nil {
+				span.SetStatus(codes.Error, "ebs detachment failed")
+				span.RecordError(err)
 				return stacktrace.Propagate(err, "ebs detachment failed")
 			}
 
@@ -55,6 +60,8 @@ func InjectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 			//Wait for ebs volume detachment
 			log.Infof("[Wait]: Wait for EBS volume detachment for volume %v", volumeID)
 			if err = ebs.WaitForVolumeDetachment(volumeID, ec2InstanceID, experimentsDetails.Region, experimentsDetails.Delay, experimentsDetails.Timeout); err != nil {
+				span.SetStatus(codes.Error, "ebs detachment failed")
+				span.RecordError(err)
 				return stacktrace.Propagate(err, "ebs detachment failed")
 			}
 
@@ -62,6 +69,8 @@ func InjectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 			// the OnChaos probes execution will start in the first iteration and keep running for the entire chaos duration
 			if len(resultDetails.ProbeDetails) != 0 && i == 0 {
 				if err = probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+					span.SetStatus(codes.Error, "failed to run probes")
+					span.RecordError(err)
 					return stacktrace.Propagate(err, "failed to run probes")
 				}
 			}
@@ -73,6 +82,8 @@ func InjectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 			//Getting the EBS volume attachment status
 			ebsState, err := ebs.GetEBSStatus(volumeID, ec2InstanceID, experimentsDetails.Region)
 			if err != nil {
+				span.SetStatus(codes.Error, "failed to get the ebs status")
+				span.RecordError(err)
 				return stacktrace.Propagate(err, "failed to get the ebs status")
 			}
 
@@ -83,12 +94,16 @@ func InjectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 				//Attaching the ebs volume from the instance
 				log.Info("[Chaos]: Attaching the EBS volume back to the instance")
 				if err = ebs.EBSVolumeAttach(volumeID, ec2InstanceID, device, experimentsDetails.Region); err != nil {
+					span.SetStatus(codes.Error, "ebs attachment failed")
+					span.RecordError(err)
 					return stacktrace.Propagate(err, "ebs attachment failed")
 				}
 
 				//Wait for ebs volume attachment
 				log.Infof("[Wait]: Wait for EBS volume attachment for %v volume", volumeID)
 				if err = ebs.WaitForVolumeAttachment(volumeID, ec2InstanceID, experimentsDetails.Region, experimentsDetails.Delay, experimentsDetails.Timeout); err != nil {
+					span.SetStatus(codes.Error, "ebs attachment failed")
+					span.RecordError(err)
 					return stacktrace.Propagate(err, "ebs attachment failed")
 				}
 			}
@@ -139,6 +154,8 @@ func InjectChaosInParallelMode(ctx context.Context, experimentsDetails *experime
 			//Detaching the ebs volume from the instance
 			log.Info("[Chaos]: Detaching the EBS volume from the instance")
 			if err := ebs.EBSVolumeDetach(volumeID, experimentsDetails.Region); err != nil {
+				span.SetStatus(codes.Error, "ebs detachment failed")
+				span.RecordError(err)
 				return stacktrace.Propagate(err, "ebs detachment failed")
 			}
 			common.SetTargets(volumeID, "injected", "EBS", chaosDetails)
@@ -146,6 +163,8 @@ func InjectChaosInParallelMode(ctx context.Context, experimentsDetails *experime
 
 		log.Info("[Info]: Checking if the detachment process initiated")
 		if err := ebs.CheckEBSDetachmentInitialisation(targetEBSVolumeIDList, ec2InstanceIDList, experimentsDetails.Region); err != nil {
+			span.SetStatus(codes.Error, "failed to initialise the detachment")
+			span.RecordError(err)
 			return stacktrace.Propagate(err, "failed to initialise the detachment")
 		}
 
@@ -153,6 +172,8 @@ func InjectChaosInParallelMode(ctx context.Context, experimentsDetails *experime
 			//Wait for ebs volume detachment
 			log.Infof("[Wait]: Wait for EBS volume detachment for volume %v", volumeID)
 			if err := ebs.WaitForVolumeDetachment(volumeID, ec2InstanceIDList[i], experimentsDetails.Region, experimentsDetails.Delay, experimentsDetails.Timeout); err != nil {
+				span.SetStatus(codes.Error, "ebs detachment failed")
+				span.RecordError(err)
 				return stacktrace.Propagate(err, "ebs detachment failed")
 			}
 		}
@@ -160,6 +181,8 @@ func InjectChaosInParallelMode(ctx context.Context, experimentsDetails *experime
 		// run the probes during chaos
 		if len(resultDetails.ProbeDetails) != 0 {
 			if err := probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+				span.SetStatus(codes.Error, "failed to run probes")
+				span.RecordError(err)
 				return stacktrace.Propagate(err, "failed to run probes")
 			}
 		}
@@ -173,6 +196,8 @@ func InjectChaosInParallelMode(ctx context.Context, experimentsDetails *experime
 			//Getting the EBS volume attachment status
 			ebsState, err := ebs.GetEBSStatus(volumeID, ec2InstanceIDList[i], experimentsDetails.Region)
 			if err != nil {
+				span.SetStatus(codes.Error, "failed to get the ebs status")
+				span.RecordError(err)
 				return stacktrace.Propagate(err, "failed to get the ebs status")
 			}
 
@@ -183,12 +208,16 @@ func InjectChaosInParallelMode(ctx context.Context, experimentsDetails *experime
 				//Attaching the ebs volume from the instance
 				log.Info("[Chaos]: Attaching the EBS volume from the instance")
 				if err = ebs.EBSVolumeAttach(volumeID, ec2InstanceIDList[i], deviceList[i], experimentsDetails.Region); err != nil {
+					span.SetStatus(codes.Error, "ebs attachment failed")
+					span.RecordError(err)
 					return stacktrace.Propagate(err, "ebs attachment failed")
 				}
 
 				//Wait for ebs volume attachment
 				log.Infof("[Wait]: Wait for EBS volume attachment for volume %v", volumeID)
 				if err = ebs.WaitForVolumeAttachment(volumeID, ec2InstanceIDList[i], experimentsDetails.Region, experimentsDetails.Delay, experimentsDetails.Timeout); err != nil {
+					span.SetStatus(codes.Error, "ebs attachment failed")
+					span.RecordError(err)
 					return stacktrace.Propagate(err, "ebs attachment failed")
 				}
 			}

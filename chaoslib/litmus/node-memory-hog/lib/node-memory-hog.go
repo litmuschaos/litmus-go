@@ -10,6 +10,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/telemetry"
 	"github.com/palantir/stacktrace"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/codes"
 
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
@@ -52,6 +53,8 @@ func PrepareNodeMemoryHog(ctx context.Context, experimentsDetails *experimentTyp
 	nodesAffectedPerc, _ := strconv.Atoi(experimentsDetails.NodesAffectedPerc)
 	targetNodeList, err := common.GetNodeList(experimentsDetails.TargetNodes, experimentsDetails.NodeLabel, nodesAffectedPerc, clients)
 	if err != nil {
+		span.SetStatus(codes.Error, "could not get node list")
+		span.RecordError(err)
 		return stacktrace.Propagate(err, "could not get node list")
 	}
 
@@ -62,6 +65,8 @@ func PrepareNodeMemoryHog(ctx context.Context, experimentsDetails *experimentTyp
 
 	if experimentsDetails.EngineName != "" {
 		if err := common.SetHelperData(chaosDetails, experimentsDetails.SetHelperData, clients); err != nil {
+			span.SetStatus(codes.Error, "could not set helper data")
+			span.RecordError(err)
 			return stacktrace.Propagate(err, "could not set helper data")
 		}
 	}
@@ -69,14 +74,21 @@ func PrepareNodeMemoryHog(ctx context.Context, experimentsDetails *experimentTyp
 	switch strings.ToLower(experimentsDetails.Sequence) {
 	case "serial":
 		if err = injectChaosInSerialMode(ctx, experimentsDetails, targetNodeList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+			span.SetStatus(codes.Error, "could not run chaos in serial mode")
+			span.RecordError(err)
 			return stacktrace.Propagate(err, "could not run chaos in serial mode")
 		}
 	case "parallel":
 		if err = injectChaosInParallelMode(ctx, experimentsDetails, targetNodeList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+			span.SetStatus(codes.Error, "could not run chaos in parallel mode")
+			span.RecordError(err)
 			return stacktrace.Propagate(err, "could not run chaos in parallel mode")
 		}
 	default:
-		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("'%s' sequence is not supported", experimentsDetails.Sequence)}
+		span.SetStatus(codes.Error, "sequence is not supported")
+		err := cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("'%s' sequence is not supported", experimentsDetails.Sequence)}
+		span.RecordError(err)
+		return err
 	}
 
 	//Waiting for the ramp time after chaos injection
@@ -95,6 +107,8 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
 		if err := probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+			span.SetStatus(codes.Error, "probe failed")
+			span.RecordError(err)
 			return err
 		}
 	}
@@ -118,17 +132,23 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 		//Getting node memory details
 		memoryCapacity, memoryAllocatable, err := getNodeMemoryDetails(appNode, clients)
 		if err != nil {
+			span.SetStatus(codes.Error, "could not get node memory details")
+			span.RecordError(err)
 			return stacktrace.Propagate(err, "could not get node memory details")
 		}
 
 		//Getting the exact memory value to exhaust
 		MemoryConsumption, err := calculateMemoryConsumption(experimentsDetails, memoryCapacity, memoryAllocatable)
 		if err != nil {
+			span.SetStatus(codes.Error, "could not calculate memory consumption value")
+			span.RecordError(err)
 			return stacktrace.Propagate(err, "could not calculate memory consumption value")
 		}
 
 		// Creating the helper pod to perform node memory hog
 		if err = createHelperPod(ctx, experimentsDetails, chaosDetails, appNode, clients, MemoryConsumption); err != nil {
+			span.SetStatus(codes.Error, "could not create helper pod")
+			span.RecordError(err)
 			return stacktrace.Propagate(err, "could not create helper pod")
 		}
 
@@ -138,6 +158,8 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 		log.Info("[Status]: Checking the status of the helper pod")
 		if err := status.CheckHelperStatus(experimentsDetails.ChaosNamespace, appLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
 			common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
+			span.SetStatus(codes.Error, "could not check helper status")
+			span.RecordError(err)
 			return stacktrace.Propagate(err, "could not check helper status")
 		}
 
@@ -148,15 +170,23 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 		podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, appLabel, clients, experimentsDetails.ChaosDuration+experimentsDetails.Timeout, experimentsDetails.ExperimentName)
 		if err != nil {
 			common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
-			return common.HelperFailedError(err, appLabel, chaosDetails.ChaosNamespace, false)
+			err := common.HelperFailedError(err, appLabel, chaosDetails.ChaosNamespace, false)
+			span.SetStatus(codes.Error, "helper pod failed")
+			span.RecordError(err)
+			return err
 		} else if podStatus == "Failed" {
 			common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
-			return errors.Errorf("helper pod status is %v", podStatus)
+			err := errors.Errorf("helper pod status is %v", podStatus)
+			span.SetStatus(codes.Error, "helper pod failed")
+			span.RecordError(err)
+			return err
 		}
 
 		//Deleting the helper pod
 		log.Info("[Cleanup]: Deleting the helper pod")
 		if err := common.DeleteAllPod(appLabel, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients); err != nil {
+			span.SetStatus(codes.Error, "could not delete helper pod(s)")
+			span.RecordError(err)
 			return stacktrace.Propagate(err, "could not delete helper pod(s)")
 		}
 	}
@@ -171,6 +201,8 @@ func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experime
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
 		if err := probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+			span.SetStatus(codes.Error, "probe failed")
+			span.RecordError(err)
 			return err
 		}
 	}
@@ -194,17 +226,23 @@ func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experime
 		//Getting node memory details
 		memoryCapacity, memoryAllocatable, err := getNodeMemoryDetails(appNode, clients)
 		if err != nil {
+			span.SetStatus(codes.Error, "could not get node memory details")
+			span.RecordError(err)
 			return stacktrace.Propagate(err, "could not get node memory details")
 		}
 
 		//Getting the exact memory value to exhaust
 		MemoryConsumption, err := calculateMemoryConsumption(experimentsDetails, memoryCapacity, memoryAllocatable)
 		if err != nil {
+			span.SetStatus(codes.Error, "could not calculate memory consumption value")
+			span.RecordError(err)
 			return stacktrace.Propagate(err, "could not calculate memory consumption value")
 		}
 
 		// Creating the helper pod to perform node memory hog
 		if err = createHelperPod(ctx, experimentsDetails, chaosDetails, appNode, clients, MemoryConsumption); err != nil {
+			span.SetStatus(codes.Error, "could not create helper pod")
+			span.RecordError(err)
 			return stacktrace.Propagate(err, "could not create helper pod")
 		}
 	}
@@ -215,6 +253,8 @@ func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experime
 	log.Info("[Status]: Checking the status of the helper pod")
 	if err := status.CheckHelperStatus(experimentsDetails.ChaosNamespace, appLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
 		common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
+		span.SetStatus(codes.Error, "could not check helper status")
+		span.RecordError(err)
 		return stacktrace.Propagate(err, "could not check helper status")
 	}
 
@@ -227,12 +267,17 @@ func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experime
 	podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, appLabel, clients, experimentsDetails.ChaosDuration+experimentsDetails.Timeout, common.GetContainerNames(chaosDetails)...)
 	if err != nil || podStatus == "Failed" {
 		common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
-		return common.HelperFailedError(err, appLabel, chaosDetails.ChaosNamespace, false)
+		err := common.HelperFailedError(err, appLabel, experimentsDetails.ChaosNamespace, true)
+		span.SetStatus(codes.Error, "helper pod failed")
+		span.RecordError(err)
+		return err
 	}
 
 	//Deleting the helper pod
 	log.Info("[Cleanup]: Deleting the helper pod")
 	if err = common.DeleteAllPod(appLabel, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients); err != nil {
+		span.SetStatus(codes.Error, "could not delete helper pod(s)")
+		span.RecordError(err)
 		return stacktrace.Propagate(err, "could not delete helper pod(s)")
 	}
 
@@ -367,7 +412,10 @@ func createHelperPod(ctx context.Context, experimentsDetails *experimentTypes.Ex
 
 	_, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Create(context.Background(), helperPod, v1.CreateOptions{})
 	if err != nil {
-		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("unable to create helper pod: %s", err.Error())}
+		span.SetStatus(codes.Error, "could not create helper pod")
+		err := cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("unable to create helper pod: %s", err.Error())}
+		span.RecordError(err)
+		return err
 	}
 	return nil
 }

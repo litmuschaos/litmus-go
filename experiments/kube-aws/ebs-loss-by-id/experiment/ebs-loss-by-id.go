@@ -17,10 +17,13 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/sirupsen/logrus"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // EBSLossByID inject the ebs volume loss chaos
 func EBSLossByID(ctx context.Context, clients clients.ClientSets) {
+	span := trace.SpanFromContext(ctx)
 
 	var err error
 	experimentsDetails := experimentTypes.ExperimentDetails{}
@@ -42,6 +45,8 @@ func EBSLossByID(ctx context.Context, clients clients.ClientSets) {
 		// Get values from chaosengine. Bail out upon error, as we haven't entered exp business logic yet
 		if err = types.GetValuesFromChaosEngine(&chaosDetails, clients, &resultDetails); err != nil {
 			log.Errorf("Unable to initialize the probes: %v", err)
+			span.SetStatus(codes.Error, "Unable to initialize the probes")
+			span.RecordError(err)
 			return
 		}
 	}
@@ -51,6 +56,8 @@ func EBSLossByID(ctx context.Context, clients clients.ClientSets) {
 	if err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT"); err != nil {
 		log.Errorf("Unable to create the chaosresult: %v", err)
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
+		span.SetStatus(codes.Error, "Unable to create the chaosresult")
+		span.RecordError(err)
 		return
 	}
 
@@ -80,6 +87,8 @@ func EBSLossByID(ctx context.Context, clients clients.ClientSets) {
 		if err = aws.EBSStateCheckByID(experimentsDetails.EBSVolumeID, experimentsDetails.Region); err != nil {
 			log.Errorf("Volume status check failed pre chaos: %v", err)
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
+			span.SetStatus(codes.Error, "Volume status check failed pre chaos")
+			span.RecordError(err)
 			return
 		}
 	}
@@ -99,6 +108,8 @@ func EBSLossByID(ctx context.Context, clients clients.ClientSets) {
 					log.Errorf("Failed to create %v event inside chaosengine", types.PreChaosCheck)
 				}
 				result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
+				span.SetStatus(codes.Error, "Probe Failed")
+				span.RecordError(err)
 				return
 			}
 			msg = "AUT: Running, Probes: Successful"
@@ -115,6 +126,8 @@ func EBSLossByID(ctx context.Context, clients clients.ClientSets) {
 	if err = litmusLIB.PrepareEBSLossByID(ctx, &experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
 		log.Errorf("Chaos injection failed: %v", err)
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
+		span.SetStatus(codes.Error, "Chaos injection failed")
+		span.RecordError(err)
 		return
 	}
 
@@ -128,6 +141,8 @@ func EBSLossByID(ctx context.Context, clients clients.ClientSets) {
 		if err = aws.EBSStateCheckByID(experimentsDetails.EBSVolumeID, experimentsDetails.Region); err != nil {
 			log.Errorf("Volume status check failed post chaos: %v", err)
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
+			span.SetStatus(codes.Error, "Volume status check failed post chaos")
+			span.RecordError(err)
 			return
 		}
 	}
@@ -146,6 +161,8 @@ func EBSLossByID(ctx context.Context, clients clients.ClientSets) {
 					log.Errorf("Failed to create %v event inside chaosengine", types.PostChaosCheck)
 				}
 				result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
+				span.SetStatus(codes.Error, "Probes Failed")
+				span.RecordError(err)
 				return
 			}
 			msg = "AUT: Running, Probes: Successful"
@@ -162,6 +179,8 @@ func EBSLossByID(ctx context.Context, clients clients.ClientSets) {
 	log.Infof("[The End]: Updating the chaos result of %v experiment (EOT)", experimentsDetails.ExperimentName)
 	if err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT"); err != nil {
 		log.Errorf("Unable to update the chaosresult: %v", err)
+		span.SetStatus(codes.Error, "Unable to update the chaosresult")
+		span.RecordError(err)
 		return
 	}
 

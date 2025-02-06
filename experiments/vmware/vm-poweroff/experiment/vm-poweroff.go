@@ -16,6 +16,8 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	experimentEnv "github.com/litmuschaos/litmus-go/pkg/vmware/vm-poweroff/environment"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/vmware/vm-poweroff/types"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/sirupsen/logrus"
 )
@@ -24,6 +26,7 @@ var err error
 
 // VMPoweroff contains steps to inject vm-power-off chaos
 func VMPoweroff(ctx context.Context, clients clients.ClientSets) {
+	span := trace.SpanFromContext(ctx)
 
 	experimentsDetails := experimentTypes.ExperimentDetails{}
 	resultDetails := types.ResultDetails{}
@@ -44,6 +47,8 @@ func VMPoweroff(ctx context.Context, clients clients.ClientSets) {
 		// Get values from chaosengine. Bail out upon error, as we haven't entered exp business logic yet
 		if err := types.GetValuesFromChaosEngine(&chaosDetails, clients, &resultDetails); err != nil {
 			log.Errorf("Unable to initialize the probes: %v", err)
+			span.SetStatus(codes.Error, "Unable to initialize the probes")
+			span.RecordError(err)
 			return
 		}
 	}
@@ -53,6 +58,8 @@ func VMPoweroff(ctx context.Context, clients clients.ClientSets) {
 	if err := result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT"); err != nil {
 		log.Errorf("Unable to create the chaosresult: %v", err)
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
+		span.SetStatus(codes.Error, "Unable to create the chaosresult")
+		span.RecordError(err)
 		return
 	}
 
@@ -72,6 +79,8 @@ func VMPoweroff(ctx context.Context, clients clients.ClientSets) {
 		if err != nil {
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 			log.Errorf("Unable to get the VM ID, err: %v", err)
+			span.SetStatus(codes.Error, "Unable to get the VM ID")
+			span.RecordError(err)
 			return
 		}
 	}
@@ -91,6 +100,8 @@ func VMPoweroff(ctx context.Context, clients clients.ClientSets) {
 	if err != nil {
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 		log.Errorf("Vcenter Login failed: %v", err)
+		span.SetStatus(codes.Error, "Vcenter Login failed")
+		span.RecordError(err)
 		return
 	}
 
@@ -99,6 +110,8 @@ func VMPoweroff(ctx context.Context, clients clients.ClientSets) {
 		if err := vmware.VMStatusCheck(experimentsDetails.VcenterServer, experimentsDetails.VMIds, cookie); err != nil {
 			log.Errorf("VM status check failed: %v", err)
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
+			span.SetStatus(codes.Error, "VM status check failed")
+			span.RecordError(err)
 			return
 		}
 		log.Info("[Verification]: VMs are in running state (pre-chaos)")
@@ -119,6 +132,8 @@ func VMPoweroff(ctx context.Context, clients clients.ClientSets) {
 					log.Errorf("Failed to create %v event inside chaosengine", types.PreChaosCheck)
 				}
 				result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
+				span.SetStatus(codes.Error, "Probe Failed")
+				span.RecordError(err)
 				return
 			}
 			msg = "IUT: Running, Probes: Successful"
@@ -135,6 +150,8 @@ func VMPoweroff(ctx context.Context, clients clients.ClientSets) {
 	if err = litmusLIB.InjectVMPowerOffChaos(ctx, &experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails, cookie); err != nil {
 		log.Errorf("Chaos injection failed: %v", err)
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
+		span.SetStatus(codes.Error, "Chaos injection failed")
+		span.RecordError(err)
 		return
 	}
 
@@ -149,6 +166,8 @@ func VMPoweroff(ctx context.Context, clients clients.ClientSets) {
 		if err := vmware.VMStatusCheck(experimentsDetails.VcenterServer, experimentsDetails.VMIds, cookie); err != nil {
 			log.Errorf("VM status check failed: %v", err)
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
+			span.SetStatus(codes.Error, "VM status check failed")
+			span.RecordError(err)
 			return
 		}
 		log.Info("[Verification]: VMs are in running state (post-chaos)")
@@ -168,6 +187,8 @@ func VMPoweroff(ctx context.Context, clients clients.ClientSets) {
 					log.Errorf("Failed to create %v event inside chaosengine", types.PostChaosCheck)
 				}
 				result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
+				span.SetStatus(codes.Error, "Probes Failed")
+				span.RecordError(err)
 				return
 			}
 			msg = "IUT: Running, Probes: Successful"
@@ -184,6 +205,8 @@ func VMPoweroff(ctx context.Context, clients clients.ClientSets) {
 	log.Infof("[The End]: Updating the chaos result of %v experiment (EOT)", experimentsDetails.ExperimentName)
 	if err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT"); err != nil {
 		log.Errorf("Unable to update the chaosresult: %v", err)
+		span.SetStatus(codes.Error, "Unable to update the chaosresult")
+		span.RecordError(err)
 		return
 	}
 

@@ -17,10 +17,13 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/sirupsen/logrus"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // NodeMemoryHog inject the node-memory-hog chaos
 func NodeMemoryHog(ctx context.Context, clients clients.ClientSets) {
+	span := trace.SpanFromContext(ctx)
 
 	experimentsDetails := experimentTypes.ExperimentDetails{}
 	resultDetails := types.ResultDetails{}
@@ -41,6 +44,8 @@ func NodeMemoryHog(ctx context.Context, clients clients.ClientSets) {
 		// Get values from chaosengine. Bail out upon error, as we haven't entered exp business logic yet
 		if err := types.GetValuesFromChaosEngine(&chaosDetails, clients, &resultDetails); err != nil {
 			log.Errorf("Unable to initialize the probes, err: %v", err)
+			span.SetStatus(codes.Error, "Unable to initialize the probes")
+			span.RecordError(err)
 			return
 		}
 	}
@@ -50,6 +55,8 @@ func NodeMemoryHog(ctx context.Context, clients clients.ClientSets) {
 	if err := result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT"); err != nil {
 		log.Errorf("Unable to Create the Chaos Result, err: %v", err)
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
+		span.SetStatus(codes.Error, "Unable to create the chaosresult")
+		span.RecordError(err)
 		return
 	}
 
@@ -79,6 +86,8 @@ func NodeMemoryHog(ctx context.Context, clients clients.ClientSets) {
 		if err := status.AUTStatusCheck(clients, &chaosDetails); err != nil {
 			log.Errorf("Application status check failed, err: %v", err)
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
+			span.SetStatus(codes.Error, "Application status check failed")
+			span.RecordError(err)
 			return
 		}
 
@@ -88,6 +97,8 @@ func NodeMemoryHog(ctx context.Context, clients clients.ClientSets) {
 			if err := status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
 				log.Errorf("Auxiliary Application status check failed, err: %v", err)
 				result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
+				span.SetStatus(codes.Error, "Auxiliary Application status check failed")
+				span.RecordError(err)
 				return
 			}
 		}
@@ -99,6 +110,8 @@ func NodeMemoryHog(ctx context.Context, clients clients.ClientSets) {
 			types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, "NUT: Not Ready", "Warning", &chaosDetails)
 			events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
+			span.SetStatus(codes.Error, "Target nodes are not in the ready state")
+			span.RecordError(err)
 			return
 		}
 	}
@@ -116,6 +129,8 @@ func NodeMemoryHog(ctx context.Context, clients clients.ClientSets) {
 				types.SetEngineEventAttributes(&eventsDetails, types.PreChaosCheck, msg, "Warning", &chaosDetails)
 				events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 				result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
+				span.SetStatus(codes.Error, "Probe Failed")
+				span.RecordError(err)
 				return
 			}
 			msg = "NUT: Ready, Probes: Successful"
@@ -129,6 +144,8 @@ func NodeMemoryHog(ctx context.Context, clients clients.ClientSets) {
 	if err := litmusLIB.PrepareNodeMemoryHog(ctx, &experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
 		log.Errorf("[Error]: node memory hog failed, err: %v", err)
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
+		span.SetStatus(codes.Error, "Chaos injection failed")
+		span.RecordError(err)
 		return
 	}
 
@@ -142,6 +159,8 @@ func NodeMemoryHog(ctx context.Context, clients clients.ClientSets) {
 		if err := status.AUTStatusCheck(clients, &chaosDetails); err != nil {
 			log.Infof("Application status check failed, err: %v", err)
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
+			span.SetStatus(codes.Error, "Application status check failed")
+			span.RecordError(err)
 			return
 		}
 
@@ -151,6 +170,8 @@ func NodeMemoryHog(ctx context.Context, clients clients.ClientSets) {
 			if err := status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
 				log.Errorf("Auxiliary Application status check failed, err: %v", err)
 				result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
+				span.SetStatus(codes.Error, "Auxiliary Application status check failed")
+				span.RecordError(err)
 				return
 			}
 		}
@@ -176,6 +197,8 @@ func NodeMemoryHog(ctx context.Context, clients clients.ClientSets) {
 				types.SetEngineEventAttributes(&eventsDetails, types.PostChaosCheck, msg, "Warning", &chaosDetails)
 				events.GenerateEvents(&eventsDetails, clients, &chaosDetails, "ChaosEngine")
 				result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
+				span.SetStatus(codes.Error, "Probes Failed")
+				span.RecordError(err)
 				return
 			}
 			msg = "NUT: Ready, Probes: Successful"
@@ -191,6 +214,8 @@ func NodeMemoryHog(ctx context.Context, clients clients.ClientSets) {
 	if err := result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT"); err != nil {
 		log.Errorf("Unable to Update the Chaos Result, err: %v", err)
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
+		span.SetStatus(codes.Error, "Unable to Update the Chaos Result")
+		span.RecordError(err)
 		return
 	}
 

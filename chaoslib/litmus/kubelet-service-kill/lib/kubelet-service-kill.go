@@ -9,6 +9,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/telemetry"
 	"github.com/palantir/stacktrace"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/codes"
 
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
@@ -58,12 +59,16 @@ func PrepareKubeletKill(ctx context.Context, experimentsDetails *experimentTypes
 
 	if experimentsDetails.EngineName != "" {
 		if err := common.SetHelperData(chaosDetails, experimentsDetails.SetHelperData, clients); err != nil {
+			span.SetStatus(codes.Error, "could not set helper data")
+			span.RecordError(err)
 			return stacktrace.Propagate(err, "could not set helper data")
 		}
 	}
 
 	// Creating the helper pod to perform node memory hog
 	if err = createHelperPod(ctx, experimentsDetails, clients, chaosDetails, experimentsDetails.TargetNode); err != nil {
+		span.SetStatus(codes.Error, "could not create helper pod")
+		span.RecordError(err)
 		return stacktrace.Propagate(err, "could not create helper pod")
 	}
 
@@ -73,6 +78,8 @@ func PrepareKubeletKill(ctx context.Context, experimentsDetails *experimentTypes
 	log.Info("[Status]: Checking the status of the helper pod")
 	if err = status.CheckHelperStatus(experimentsDetails.ChaosNamespace, appLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
 		common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-helper-"+experimentsDetails.RunID, appLabel, chaosDetails, clients)
+		span.SetStatus(codes.Error, "could not check helper status")
+		span.RecordError(err)
 		return stacktrace.Propagate(err, "could not check helper status")
 	}
 
@@ -82,6 +89,8 @@ func PrepareKubeletKill(ctx context.Context, experimentsDetails *experimentTypes
 	if len(resultDetails.ProbeDetails) != 0 {
 		if err = probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
 			common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
+			span.SetStatus(codes.Error, "probe failed")
+			span.RecordError(err)
 			return err
 		}
 	}
@@ -90,6 +99,8 @@ func PrepareKubeletKill(ctx context.Context, experimentsDetails *experimentTypes
 	log.Info("[Status]: Check for the node to be in NotReady state")
 	if err = status.CheckNodeNotReadyState(experimentsDetails.TargetNode, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
 		common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-helper-"+experimentsDetails.RunID, appLabel, chaosDetails, clients)
+		span.SetStatus(codes.Error, "could not check for NOT READY state")
+		span.RecordError(err)
 		return stacktrace.Propagate(err, "could not check for NOT READY state")
 	}
 
@@ -98,12 +109,17 @@ func PrepareKubeletKill(ctx context.Context, experimentsDetails *experimentTypes
 	podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, appLabel, clients, experimentsDetails.ChaosDuration+experimentsDetails.Timeout, common.GetContainerNames(chaosDetails)...)
 	if err != nil || podStatus == "Failed" {
 		common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-helper-"+experimentsDetails.RunID, appLabel, chaosDetails, clients)
-		return common.HelperFailedError(err, appLabel, chaosDetails.ChaosNamespace, false)
+		err := common.HelperFailedError(err, appLabel, chaosDetails.ChaosNamespace, false)
+		span.SetStatus(codes.Error, "helper pod failed")
+		span.RecordError(err)
+		return err
 	}
 
 	//Deleting the helper pod
 	log.Info("[Cleanup]: Deleting the helper pod")
 	if err = common.DeletePod(experimentsDetails.ExperimentName+"-helper-"+experimentsDetails.RunID, appLabel, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients); err != nil {
+		span.SetStatus(codes.Error, "could not delete helper pod")
+		span.RecordError(err)
 		return stacktrace.Propagate(err, "could not delete helper pod")
 	}
 
@@ -206,7 +222,10 @@ func createHelperPod(ctx context.Context, experimentsDetails *experimentTypes.Ex
 
 	_, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Create(context.Background(), helperPod, v1.CreateOptions{})
 	if err != nil {
-		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("unable to create helper pod: %s", err.Error())}
+		span.SetStatus(codes.Error, "could not create helper pod")
+		err := cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("unable to create helper pod: %s", err.Error())}
+		span.RecordError(err)
+		return err
 	}
 	return nil
 }

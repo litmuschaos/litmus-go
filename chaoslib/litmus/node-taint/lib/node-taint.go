@@ -13,6 +13,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/telemetry"
 	"github.com/palantir/stacktrace"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/codes"
 
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
@@ -56,6 +57,8 @@ func PrepareNodeTaint(ctx context.Context, experimentsDetails *experimentTypes.E
 		//Select node for kubelet-service-kill
 		experimentsDetails.TargetNode, err = common.GetNodeName(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.NodeLabel, clients)
 		if err != nil {
+			span.SetStatus(codes.Error, "could not get node name")
+			span.RecordError(err)
 			return stacktrace.Propagate(err, "could not get node name")
 		}
 	}
@@ -69,6 +72,8 @@ func PrepareNodeTaint(ctx context.Context, experimentsDetails *experimentTypes.E
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
 		if err = probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+			span.SetStatus(codes.Error, "Probe failed")
+			span.RecordError(err)
 			return err
 		}
 	}
@@ -78,6 +83,8 @@ func PrepareNodeTaint(ctx context.Context, experimentsDetails *experimentTypes.E
 
 	// taint the application node
 	if err := taintNode(ctx, experimentsDetails, clients, chaosDetails); err != nil {
+		span.SetStatus(codes.Error, "could not taint node")
+		span.RecordError(err)
 		return stacktrace.Propagate(err, "could not taint node")
 	}
 
@@ -86,7 +93,10 @@ func PrepareNodeTaint(ctx context.Context, experimentsDetails *experimentTypes.E
 	if err = status.AUTStatusCheck(clients, chaosDetails); err != nil {
 		log.Info("[Revert]: Reverting chaos because application status check failed")
 		if taintErr := removeTaintFromNode(experimentsDetails, clients, chaosDetails); taintErr != nil {
-			return cerrors.PreserveError{ErrString: fmt.Sprintf("[%s,%s]", stacktrace.RootCause(err).Error(), stacktrace.RootCause(taintErr).Error())}
+			span.SetStatus(codes.Error, "could not remove taint from node")
+			err := cerrors.PreserveError{ErrString: fmt.Sprintf("[%s,%s]", stacktrace.RootCause(err).Error(), stacktrace.RootCause(taintErr).Error())}
+			span.RecordError(err)
+			return err
 		}
 		return err
 	}
@@ -96,7 +106,10 @@ func PrepareNodeTaint(ctx context.Context, experimentsDetails *experimentTypes.E
 		if err = status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
 			log.Info("[Revert]: Reverting chaos because auxiliary application status check failed")
 			if taintErr := removeTaintFromNode(experimentsDetails, clients, chaosDetails); taintErr != nil {
-				return cerrors.PreserveError{ErrString: fmt.Sprintf("[%s,%s]", stacktrace.RootCause(err).Error(), stacktrace.RootCause(taintErr).Error())}
+				span.SetStatus(codes.Error, "could not remove taint from node")
+				err := cerrors.PreserveError{ErrString: fmt.Sprintf("[%s,%s]", stacktrace.RootCause(err).Error(), stacktrace.RootCause(taintErr).Error())}
+				span.RecordError(err)
+				return err
 			}
 			return err
 		}
@@ -110,6 +123,8 @@ func PrepareNodeTaint(ctx context.Context, experimentsDetails *experimentTypes.E
 
 	// remove taint from the application node
 	if err := removeTaintFromNode(experimentsDetails, clients, chaosDetails); err != nil {
+		span.SetStatus(codes.Error, "could not remove taint from node")
+		span.RecordError(err)
 		return stacktrace.Propagate(err, "could not remove taint from node")
 	}
 
@@ -134,6 +149,9 @@ func taintNode(ctx context.Context, experimentsDetails *experimentTypes.Experime
 	// get the node details
 	node, err := clients.KubeClient.CoreV1().Nodes().Get(context.Background(), experimentsDetails.TargetNode, v1.GetOptions{})
 	if err != nil {
+		span.SetStatus(codes.Error, "could not get node details")
+		err := cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Target: fmt.Sprintf("{nodeName: %s}", experimentsDetails.TargetNode), Reason: err.Error()}
+		span.RecordError(err)
 		return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Target: fmt.Sprintf("{nodeName: %s}", experimentsDetails.TargetNode), Reason: err.Error()}
 	}
 
@@ -160,7 +178,10 @@ func taintNode(ctx context.Context, experimentsDetails *experimentTypes.Experime
 
 			_, err := clients.KubeClient.CoreV1().Nodes().Update(context.Background(), node, v1.UpdateOptions{})
 			if err != nil {
-				return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Target: fmt.Sprintf("{nodeName: %s}", node.Name), Reason: fmt.Sprintf("failed to add taints: %s", err.Error())}
+				span.SetStatus(codes.Error, "failed to add taints")
+				err := cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Target: fmt.Sprintf("{nodeName: %s}", node.Name), Reason: fmt.Sprintf("failed to add taints: %s", err.Error())}
+				span.RecordError(err)
+				return err
 			}
 		}
 

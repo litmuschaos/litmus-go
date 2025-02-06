@@ -18,10 +18,13 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/sirupsen/logrus"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // AzureDiskLoss contains steps to inject chaos
 func AzureDiskLoss(ctx context.Context, clients clients.ClientSets) {
+	span := trace.SpanFromContext(ctx)
 
 	var err error
 	experimentsDetails := experimentTypes.ExperimentDetails{}
@@ -43,6 +46,8 @@ func AzureDiskLoss(ctx context.Context, clients clients.ClientSets) {
 		// Get values from chaosengine. Bail out upon error, as we haven't entered exp business logic yet
 		if err = types.GetValuesFromChaosEngine(&chaosDetails, clients, &resultDetails); err != nil {
 			log.Errorf("Unable to initialize the probes: %v", err)
+			span.SetStatus(codes.Error, "Unable to initialize the probes")
+			span.RecordError(err)
 			return
 		}
 	}
@@ -52,6 +57,8 @@ func AzureDiskLoss(ctx context.Context, clients clients.ClientSets) {
 	if err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "SOT"); err != nil {
 		log.Errorf("Unable to create the chaosresult: %v", err)
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
+		span.SetStatus(codes.Error, "Unable to create the chaosresult")
+		span.RecordError(err)
 		return
 	}
 
@@ -80,6 +87,8 @@ func AzureDiskLoss(ctx context.Context, clients clients.ClientSets) {
 	if experimentsDetails.SubscriptionID, err = azureCommon.GetSubscriptionID(); err != nil {
 		log.Errorf("fail to get the subscription id: %v", err)
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
+		span.SetStatus(codes.Error, "fail to get the subscription id")
+		span.RecordError(err)
 		return
 	}
 
@@ -89,6 +98,8 @@ func AzureDiskLoss(ctx context.Context, clients clients.ClientSets) {
 		if err = azureStatus.CheckVirtualDiskWithInstance(experimentsDetails.SubscriptionID, experimentsDetails.VirtualDiskNames, experimentsDetails.ResourceGroup); err != nil {
 			log.Errorf("Virtual disk status check failed: %v", err)
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
+			span.SetStatus(codes.Error, "Virtual disk status check failed")
+			span.RecordError(err)
 			return
 		}
 	}
@@ -108,6 +119,8 @@ func AzureDiskLoss(ctx context.Context, clients clients.ClientSets) {
 					log.Errorf("Failed to create %v event inside chaosengine", types.PreChaosCheck)
 				}
 				result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
+				span.SetStatus(codes.Error, "Probe Failed")
+				span.RecordError(err)
 				return
 			}
 			msg = "AUT: Running, Probes: Successful"
@@ -124,6 +137,8 @@ func AzureDiskLoss(ctx context.Context, clients clients.ClientSets) {
 	if err = litmusLIB.PrepareChaos(ctx, &experimentsDetails, clients, &resultDetails, &eventsDetails, &chaosDetails); err != nil {
 		result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
 		log.Errorf("Chaos injection failed: %v", err)
+		span.SetStatus(codes.Error, "Chaos injection failed")
+		span.RecordError(err)
 		return
 	}
 
@@ -138,6 +153,8 @@ func AzureDiskLoss(ctx context.Context, clients clients.ClientSets) {
 		if err = azureStatus.CheckVirtualDiskWithInstance(experimentsDetails.SubscriptionID, experimentsDetails.VirtualDiskNames, experimentsDetails.ResourceGroup); err != nil {
 			log.Errorf("Virtual disk status check failed: %v", err)
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
+			span.SetStatus(codes.Error, "Virtual disk status check failed")
+			span.RecordError(err)
 			return
 		}
 	}
@@ -156,6 +173,8 @@ func AzureDiskLoss(ctx context.Context, clients clients.ClientSets) {
 					log.Errorf("Failed to create %v event inside chaosengine", types.PostChaosCheck)
 				}
 				result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
+				span.SetStatus(codes.Error, "Probes Failed")
+				span.RecordError(err)
 				return
 			}
 			msg = "AUT: Running, Probes: Successful"
@@ -172,6 +191,8 @@ func AzureDiskLoss(ctx context.Context, clients clients.ClientSets) {
 	log.Infof("[The End]: Updating the chaos result of %v experiment (EOT)", experimentsDetails.ExperimentName)
 	if err = result.ChaosResult(&chaosDetails, clients, &resultDetails, "EOT"); err != nil {
 		log.Errorf("Unable to update the chaosresult: %v", err)
+		span.SetStatus(codes.Error, "Unable to Update the chaosresult")
+		span.RecordError(err)
 		return
 	}
 

@@ -21,6 +21,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/palantir/stacktrace"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/codes"
 	"google.golang.org/api/compute/v1"
 )
 
@@ -61,14 +62,21 @@ func PrepareVMStop(ctx context.Context, computeService *compute.Service, experim
 	switch strings.ToLower(experimentsDetails.Sequence) {
 	case "serial":
 		if err = injectChaosInSerialMode(ctx, computeService, experimentsDetails, instanceNamesList, instanceZonesList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+			span.SetStatus(codes.Error, "could not run chaos in serial mode")
+			span.RecordError(err)
 			return stacktrace.Propagate(err, "could not run chaos in serial mode")
 		}
 	case "parallel":
 		if err = injectChaosInParallelMode(ctx, computeService, experimentsDetails, instanceNamesList, instanceZonesList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+			span.SetStatus(codes.Error, "could not run chaos in parallel mode")
+			span.RecordError(err)
 			return stacktrace.Propagate(err, "could not run chaos in parallel mode")
 		}
 	default:
-		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("'%s' sequence is not supported", experimentsDetails.Sequence)}
+		span.SetStatus(codes.Error, "sequence is not supported")
+		err := cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("'%s' sequence is not supported", experimentsDetails.Sequence)}
+		span.RecordError(err)
+		return err
 	}
 
 	// wait for the ramp time after chaos injection
@@ -110,6 +118,8 @@ func injectChaosInSerialMode(ctx context.Context, computeService *compute.Servic
 				//Stopping the VM instance
 				log.Infof("[Chaos]: Stopping %s VM instance", instanceNamesList[i])
 				if err := gcplib.VMInstanceStop(computeService, instanceNamesList[i], experimentsDetails.GCPProjectID, instanceZonesList[i]); err != nil {
+					span.SetStatus(codes.Error, "vm instance failed to stop")
+					span.RecordError(err)
 					return stacktrace.Propagate(err, "vm instance failed to stop")
 				}
 
@@ -118,6 +128,8 @@ func injectChaosInSerialMode(ctx context.Context, computeService *compute.Servic
 				//Wait for VM instance to completely stop
 				log.Infof("[Wait]: Wait for VM instance %s to get in stopped state", instanceNamesList[i])
 				if err := gcplib.WaitForVMInstanceDown(computeService, experimentsDetails.Timeout, experimentsDetails.Delay, instanceNamesList[i], experimentsDetails.GCPProjectID, instanceZonesList[i]); err != nil {
+					span.SetStatus(codes.Error, "vm instance failed to fully shutdown")
+					span.RecordError(err)
 					return stacktrace.Propagate(err, "vm instance failed to fully shutdown")
 				}
 
@@ -125,6 +137,8 @@ func injectChaosInSerialMode(ctx context.Context, computeService *compute.Servic
 				// the OnChaos probes execution will start in the first iteration and keep running for the entire chaos duration
 				if len(resultDetails.ProbeDetails) != 0 && i == 0 {
 					if err = probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+						span.SetStatus(codes.Error, "failed to run probes")
+						span.RecordError(err)
 						return err
 					}
 				}
@@ -139,12 +153,16 @@ func injectChaosInSerialMode(ctx context.Context, computeService *compute.Servic
 					// starting the VM instance
 					log.Infof("[Chaos]: Starting back %s VM instance", instanceNamesList[i])
 					if err := gcplib.VMInstanceStart(computeService, instanceNamesList[i], experimentsDetails.GCPProjectID, instanceZonesList[i]); err != nil {
+						span.SetStatus(codes.Error, "vm instance failed to start")
+						span.RecordError(err)
 						return stacktrace.Propagate(err, "vm instance failed to start")
 					}
 
 					// wait for VM instance to get in running state
 					log.Infof("[Wait]: Wait for VM instance %s to get in running state", instanceNamesList[i])
 					if err := gcplib.WaitForVMInstanceUp(computeService, experimentsDetails.Timeout, experimentsDetails.Delay, instanceNamesList[i], experimentsDetails.GCPProjectID, instanceZonesList[i]); err != nil {
+						span.SetStatus(codes.Error, "unable to start vm instance")
+						span.RecordError(err)
 						return stacktrace.Propagate(err, "unable to start vm instance")
 					}
 
@@ -153,6 +171,8 @@ func injectChaosInSerialMode(ctx context.Context, computeService *compute.Servic
 					// wait for VM instance to get in running state
 					log.Infof("[Wait]: Wait for VM instance %s to get in running state", instanceNamesList[i])
 					if err := gcplib.WaitForVMInstanceUp(computeService, experimentsDetails.Timeout, experimentsDetails.Delay, instanceNamesList[i], experimentsDetails.GCPProjectID, instanceZonesList[i]); err != nil {
+						span.SetStatus(codes.Error, "unable to start vm instance")
+						span.RecordError(err)
 						return stacktrace.Propagate(err, "unable to start vm instance")
 					}
 				}
@@ -197,6 +217,8 @@ func injectChaosInParallelMode(ctx context.Context, computeService *compute.Serv
 				// stopping the VM instance
 				log.Infof("[Chaos]: Stopping %s VM instance", instanceNamesList[i])
 				if err := gcplib.VMInstanceStop(computeService, instanceNamesList[i], experimentsDetails.GCPProjectID, instanceZonesList[i]); err != nil {
+					span.SetStatus(codes.Error, "vm instance failed to stop")
+					span.RecordError(err)
 					return stacktrace.Propagate(err, "vm instance failed to stop")
 				}
 
@@ -208,6 +230,8 @@ func injectChaosInParallelMode(ctx context.Context, computeService *compute.Serv
 				// wait for VM instance to completely stop
 				log.Infof("[Wait]: Wait for VM instance %s to get in stopped state", instanceNamesList[i])
 				if err := gcplib.WaitForVMInstanceDown(computeService, experimentsDetails.Timeout, experimentsDetails.Delay, instanceNamesList[i], experimentsDetails.GCPProjectID, instanceZonesList[i]); err != nil {
+					span.SetStatus(codes.Error, "vm instance failed to fully shutdown")
+					span.RecordError(err)
 					return stacktrace.Propagate(err, "vm instance failed to fully shutdown")
 				}
 			}
@@ -215,6 +239,8 @@ func injectChaosInParallelMode(ctx context.Context, computeService *compute.Serv
 			// run the probes during chaos
 			if len(resultDetails.ProbeDetails) != 0 {
 				if err = probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+					span.SetStatus(codes.Error, "failed to run probes")
+					span.RecordError(err)
 					return err
 				}
 			}
@@ -230,6 +256,8 @@ func injectChaosInParallelMode(ctx context.Context, computeService *compute.Serv
 				for i := range instanceNamesList {
 					log.Infof("[Chaos]: Starting back %s VM instance", instanceNamesList[i])
 					if err := gcplib.VMInstanceStart(computeService, instanceNamesList[i], experimentsDetails.GCPProjectID, instanceZonesList[i]); err != nil {
+						span.SetStatus(codes.Error, "vm instance failed to start")
+						span.RecordError(err)
 						return stacktrace.Propagate(err, "vm instance failed to start")
 					}
 				}
@@ -239,6 +267,8 @@ func injectChaosInParallelMode(ctx context.Context, computeService *compute.Serv
 
 					log.Infof("[Wait]: Wait for VM instance %s to get in running state", instanceNamesList[i])
 					if err := gcplib.WaitForVMInstanceUp(computeService, experimentsDetails.Timeout, experimentsDetails.Delay, instanceNamesList[i], experimentsDetails.GCPProjectID, instanceZonesList[i]); err != nil {
+						span.SetStatus(codes.Error, "unable to start vm instance")
+						span.RecordError(err)
 						return stacktrace.Propagate(err, "unable to start vm instance")
 					}
 
@@ -252,6 +282,8 @@ func injectChaosInParallelMode(ctx context.Context, computeService *compute.Serv
 
 					log.Infof("[Wait]: Wait for VM instance %s to get in running state", instanceNamesList[i])
 					if err := gcplib.WaitForVMInstanceUp(computeService, experimentsDetails.Timeout, experimentsDetails.Delay, instanceNamesList[i], experimentsDetails.GCPProjectID, instanceZonesList[i]); err != nil {
+						span.SetStatus(codes.Error, "unable to start vm instance")
+						span.RecordError(err)
 						return stacktrace.Propagate(err, "unable to start vm instance")
 					}
 

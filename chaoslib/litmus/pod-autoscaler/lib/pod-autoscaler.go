@@ -13,6 +13,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/telemetry"
 	"github.com/palantir/stacktrace"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/codes"
 
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-autoscaler/types"
@@ -54,6 +55,8 @@ func PreparePodAutoscaler(ctx context.Context, experimentsDetails *experimentTyp
 
 		appsUnderTest, err := getDeploymentDetails(experimentsDetails)
 		if err != nil {
+			span.SetStatus(codes.Error, "could not get deployment details")
+			span.RecordError(err)
 			return stacktrace.Propagate(err, "could not get deployment details")
 		}
 
@@ -70,10 +73,14 @@ func PreparePodAutoscaler(ctx context.Context, experimentsDetails *experimentTyp
 		go abortPodAutoScalerChaos(appsUnderTest, experimentsDetails, clients, resultDetails, eventsDetails, chaosDetails)
 
 		if err = podAutoscalerChaosInDeployment(ctx, experimentsDetails, clients, appsUnderTest, resultDetails, eventsDetails, chaosDetails); err != nil {
+			span.SetStatus(codes.Error, "could not scale deployment")
+			span.RecordError(err)
 			return stacktrace.Propagate(err, "could not scale deployment")
 		}
 
 		if err = autoscalerRecoveryInDeployment(experimentsDetails, clients, appsUnderTest, chaosDetails); err != nil {
+			span.SetStatus(codes.Error, "could not revert scaling in deployment")
+			span.RecordError(err)
 			return stacktrace.Propagate(err, "could not revert scaling in deployment")
 		}
 
@@ -81,6 +88,8 @@ func PreparePodAutoscaler(ctx context.Context, experimentsDetails *experimentTyp
 
 		appsUnderTest, err := getStatefulsetDetails(experimentsDetails)
 		if err != nil {
+			span.SetStatus(codes.Error, "could not get statefulset details")
+			span.RecordError(err)
 			return stacktrace.Propagate(err, "could not get statefulset details")
 		}
 
@@ -97,15 +106,22 @@ func PreparePodAutoscaler(ctx context.Context, experimentsDetails *experimentTyp
 		go abortPodAutoScalerChaos(appsUnderTest, experimentsDetails, clients, resultDetails, eventsDetails, chaosDetails)
 
 		if err = podAutoscalerChaosInStatefulset(ctx, experimentsDetails, clients, appsUnderTest, resultDetails, eventsDetails, chaosDetails); err != nil {
+			span.SetStatus(codes.Error, "could not scale statefulset")
+			span.RecordError(err)
 			return stacktrace.Propagate(err, "could not scale statefulset")
 		}
 
 		if err = autoscalerRecoveryInStatefulset(experimentsDetails, clients, appsUnderTest, chaosDetails); err != nil {
+			span.SetStatus(codes.Error, "could not revert scaling in statefulset")
+			span.RecordError(err)
 			return stacktrace.Propagate(err, "could not revert scaling in statefulset")
 		}
 
 	default:
-		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Target: fmt.Sprintf("{kind: %s}", experimentsDetails.AppKind), Reason: "application type is not supported"}
+		span.SetStatus(codes.Error, "application type is not supported")
+		err := cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Target: fmt.Sprintf("{kind: %s}", experimentsDetails.AppKind), Reason: "application type is not supported"}
+		span.RecordError(err)
+		return err
 	}
 
 	//Waiting for the ramp time after chaos injection

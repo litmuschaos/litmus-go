@@ -17,6 +17,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/palantir/stacktrace"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/codes"
 )
 
 // InjectChaosInSerialMode will inject the aws ssm chaos in serial mode that is one after other
@@ -51,6 +52,8 @@ func InjectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 				ec2IDList := strings.Fields(ec2ID)
 				commandId, err := ssm.SendSSMCommand(experimentsDetails, ec2IDList)
 				if err != nil {
+					span.SetStatus(codes.Error, "failed to send ssm command")
+					span.RecordError(err)
 					return stacktrace.Propagate(err, "failed to send ssm command")
 				}
 				//prepare commands for abort recovery
@@ -59,6 +62,8 @@ func InjectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 				//wait for the ssm command to get in running state
 				log.Info("[Wait]: Waiting for the ssm command to get in InProgress state")
 				if err := ssm.WaitForCommandStatus("InProgress", commandId, ec2ID, experimentsDetails.Region, experimentsDetails.ChaosDuration+experimentsDetails.Timeout, experimentsDetails.Delay); err != nil {
+					span.SetStatus(codes.Error, "failed to start ssm command")
+					span.RecordError(err)
 					return stacktrace.Propagate(err, "failed to start ssm command")
 				}
 				common.SetTargets(ec2ID, "injected", "EC2", chaosDetails)
@@ -66,6 +71,8 @@ func InjectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 				// run the probes during chaos
 				if len(resultDetails.ProbeDetails) != 0 && i == 0 {
 					if err = probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+						span.SetStatus(codes.Error, "failed to run probes")
+						span.RecordError(err)
 						return stacktrace.Propagate(err, "failed to run probes")
 					}
 				}
@@ -73,6 +80,8 @@ func InjectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 				//wait for the ssm command to get succeeded in the given chaos duration
 				log.Info("[Wait]: Waiting for the ssm command to get completed")
 				if err := ssm.WaitForCommandStatus("Success", commandId, ec2ID, experimentsDetails.Region, experimentsDetails.ChaosDuration+experimentsDetails.Timeout, experimentsDetails.Delay); err != nil {
+					span.SetStatus(codes.Error, "failed to send ssm command")
+					span.RecordError(err)
 					return stacktrace.Propagate(err, "failed to send ssm command")
 				}
 				common.SetTargets(ec2ID, "reverted", "EC2", chaosDetails)
@@ -117,6 +126,8 @@ func InjectChaosInParallelMode(ctx context.Context, experimentsDetails *experime
 			log.Info("[Chaos]: Starting the ssm command")
 			commandId, err := ssm.SendSSMCommand(experimentsDetails, instanceIDList)
 			if err != nil {
+				span.SetStatus(codes.Error, "failed to send ssm command")
+				span.RecordError(err)
 				return stacktrace.Propagate(err, "failed to send ssm command")
 			}
 			//prepare commands for abort recovery
@@ -126,6 +137,8 @@ func InjectChaosInParallelMode(ctx context.Context, experimentsDetails *experime
 				//wait for the ssm command to get in running state
 				log.Info("[Wait]: Waiting for the ssm command to get in InProgress state")
 				if err := ssm.WaitForCommandStatus("InProgress", commandId, ec2ID, experimentsDetails.Region, experimentsDetails.ChaosDuration+experimentsDetails.Timeout, experimentsDetails.Delay); err != nil {
+					span.SetStatus(codes.Error, "failed to start ssm command")
+					span.RecordError(err)
 					return stacktrace.Propagate(err, "failed to start ssm command")
 				}
 			}
@@ -133,6 +146,8 @@ func InjectChaosInParallelMode(ctx context.Context, experimentsDetails *experime
 			// run the probes during chaos
 			if len(resultDetails.ProbeDetails) != 0 {
 				if err = probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+					span.SetStatus(codes.Error, "failed to run probes")
+					span.RecordError(err)
 					return stacktrace.Propagate(err, "failed to run probes")
 				}
 			}
@@ -141,6 +156,8 @@ func InjectChaosInParallelMode(ctx context.Context, experimentsDetails *experime
 				//wait for the ssm command to get succeeded in the given chaos duration
 				log.Info("[Wait]: Waiting for the ssm command to get completed")
 				if err := ssm.WaitForCommandStatus("Success", commandId, ec2ID, experimentsDetails.Region, experimentsDetails.ChaosDuration+experimentsDetails.Timeout, experimentsDetails.Delay); err != nil {
+					span.SetStatus(codes.Error, "failed to send ssm command")
+					span.RecordError(err)
 					return stacktrace.Propagate(err, "failed to send ssm command")
 				}
 			}
