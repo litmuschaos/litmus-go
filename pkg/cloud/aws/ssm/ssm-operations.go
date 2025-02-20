@@ -126,9 +126,8 @@ func getSSMCommandStatus(commandID, ec2InstanceID, region string) (string, error
 	return *cmdOutput.Status, nil
 }
 
-// CheckInstanceInformation will check if the instance has permission to do smm api calls
+// CheckInstanceInformation checks if the instance has permission to do SSM API calls,
 func CheckInstanceInformation(experimentsDetails *experimentTypes.ExperimentDetails) error {
-
 	var instanceIDList []string
 	switch {
 	case experimentsDetails.EC2InstanceID != "":
@@ -138,36 +137,42 @@ func CheckInstanceInformation(experimentsDetails *experimentTypes.ExperimentDeta
 			return stacktrace.Propagate(err, "failed to check target instance(s) status")
 		}
 		instanceIDList = experimentsDetails.TargetInstanceIDList
-
 	}
+
 	sesh := common.GetAWSSession(experimentsDetails.Region)
 	ssmClient := ssm.New(sesh)
+
+	// Use a map to record instance IDs found in paginated responses.
+	foundInstances := make(map[string]bool)
+	input := &ssm.DescribeInstanceInformationInput{}
+
+	// Paginate through all results.
+	err := ssmClient.DescribeInstanceInformationPages(input,
+		func(page *ssm.DescribeInstanceInformationOutput, lastPage bool) bool {
+			for _, instanceDetails := range page.InstanceInformationList {
+				foundInstances[*instanceDetails.InstanceId] = true
+			}
+			return true // continue to next page
+		})
+	if err != nil {
+		return cerrors.Error{
+			ErrorCode: cerrors.ErrorTypeChaosInject,
+			Reason:    fmt.Sprintf("failed to get instance information: %v", common.CheckAWSError(err).Error()),
+			Target:    fmt.Sprintf("{Region: %v}", experimentsDetails.Region),
+		}
+	}
+
+	// Validate that each target instance is present.
 	for _, ec2ID := range instanceIDList {
-		res, err := ssmClient.DescribeInstanceInformation(&ssm.DescribeInstanceInformationInput{})
-		if err != nil {
+		if !foundInstances[ec2ID] {
 			return cerrors.Error{
 				ErrorCode: cerrors.ErrorTypeChaosInject,
-				Reason:    fmt.Sprintf("failed to get instance information: %v", common.CheckAWSError(err).Error()),
+				Reason:    fmt.Sprintf("the instance %v might not have suitable permission or IAM attached to it. Run command `aws ssm describe-instance-information` to check for available instances", ec2ID),
 				Target:    fmt.Sprintf("{EC2 Instance ID: %v, Region: %v}", ec2ID, experimentsDetails.Region),
 			}
 		}
-		isInstanceFound := false
-		if len(res.InstanceInformationList) != 0 {
-			for _, instanceDetails := range res.InstanceInformationList {
-				if *instanceDetails.InstanceId == ec2ID {
-					isInstanceFound = true
-					break
-				}
-			}
-			if !isInstanceFound {
-				return cerrors.Error{
-					ErrorCode: cerrors.ErrorTypeChaosInject,
-					Reason:    fmt.Sprintf("the instance %v might not have suitable permission or IAM attached to it. Run command `aws ssm describe-instance-information` to check for available instances", ec2ID),
-					Target:    fmt.Sprintf("{EC2 Instance ID: %v, Region: %v}", ec2ID, experimentsDetails.Region),
-				}
-			}
-		}
 	}
+
 	log.Info("[Info]: The target instance have permission to perform SSM API calls")
 	return nil
 }
