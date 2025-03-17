@@ -4,6 +4,9 @@ import (
 	"context"
 	"fmt"
 	"time"
+	"os"
+	"strings"
+	"encoding/base64"
 
 	"github.com/Azure/azure-sdk-for-go/profiles/latest/compute/mgmt/compute"
 	"github.com/Azure/go-autorest/autorest/azure"
@@ -193,5 +196,59 @@ func WaitForAzureComputeUp(timeout, delay int, scaleSet, subscriptionID, resourc
 				}
 			}
 			return nil
-		})
+			})
+}
+
+// AzureInstanceRunPowershell runs a PowerShell script on the target instance
+func AzureInstanceRunPowershell(subscriptionID, resourceGroup, azureInstanceName, scriptContent string, isBase64 bool, scriptParams []string) error {
+	vmClient := compute.NewVirtualMachinesClient(subscriptionID)
+
+	authorizer, err := auth.NewAuthorizerFromFile(azure.PublicCloud.ResourceManagerEndpoint)
+	if err != nil {
+		return cerrors.Error{
+			ErrorCode: cerrors.ErrorTypeChaosInject,
+			Reason:    fmt.Sprintf("authorization set up failed: %v", err),
+			Target:    fmt.Sprintf("{Azure Instance Name: %v, Resource Group: %v}", azureInstanceName, resourceGroup),
+		}
+	}
+
+	vmClient.Authorizer = authorizer
+
+	var script string
+	if isBase64 {
+		decodedScript, err := base64.StdEncoding.DecodeString(scriptContent)
+		if err != nil {
+			return cerrors.Error{
+				ErrorCode: cerrors.ErrorTypeChaosInject,
+				Reason:    fmt.Sprintf("failed to decode the base64 script content: %v", err),
+				Target:    fmt.Sprintf("{Azure Instance Name: %v, Resource Group: %v}", azureInstanceName, resourceGroup),
+			}
+		}
+		script = string(decodedScript)
+	} else {
+		script = scriptContent
+	}
+
+	runCommandParameters := compute.RunCommandInput{
+		CommandID: "RunPowerShellScript",
+		Script:    []string{script},
+		Parameters: &[]compute.RunCommandInputParameter{
+			{
+				Name:  "params",
+				Value: strings.Join(scriptParams, " "),
+			},
+		},
+	}
+
+	log.Info("[Info]: Running PowerShell script on the instance")
+	_, err = vmClient.RunCommand(context.TODO(), resourceGroup, azureInstanceName, runCommandParameters)
+	if err != nil {
+		return cerrors.Error{
+			ErrorCode: cerrors.ErrorTypeChaosInject,
+			Reason:    fmt.Sprintf("failed to run PowerShell script: %v", err),
+			Target:    fmt.Sprintf("{Azure Instance Name: %v, Resource Group: %v}", azureInstanceName, resourceGroup),
+		}
+	}
+
+	return nil
 }
