@@ -2,6 +2,8 @@ package ssm
 
 import (
 	"fmt"
+	"math"
+	"math/rand"
 	"strconv"
 	"strings"
 	"time"
@@ -141,23 +143,55 @@ func CheckInstanceInformation(experimentsDetails *experimentTypes.ExperimentDeta
 
 	sesh := common.GetAWSSession(experimentsDetails.Region)
 	ssmClient := ssm.New(sesh)
-
-	// Use a map to record instance IDs found in paginated responses.
 	foundInstances := make(map[string]bool)
 	input := &ssm.DescribeInstanceInformationInput{}
 
-	// Paginate through all results.
-	err := ssmClient.DescribeInstanceInformationPages(input,
-		func(page *ssm.DescribeInstanceInformationOutput, lastPage bool) bool {
-			for _, instanceDetails := range page.InstanceInformationList {
-				foundInstances[*instanceDetails.InstanceId] = true
+	var err error
+	maxRetries := 5
+	maxRetryDuration := time.Second * 30
+	startTime := time.Now()
+
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		if time.Since(startTime) > maxRetryDuration {
+			break
+		}
+
+		err = ssmClient.DescribeInstanceInformationPages(input,
+			func(page *ssm.DescribeInstanceInformationOutput, lastPage bool) bool {
+				for _, instanceDetails := range page.InstanceInformationList {
+					foundInstances[*instanceDetails.InstanceId] = true
+				}
+				return true // continue to next page
+			})
+
+		if err != nil {
+			awsErr := common.CheckAWSError(err)
+			if strings.Contains(awsErr.Error(), "Throttling") ||
+				strings.Contains(awsErr.Error(), "Rate exceeded") {
+				// Calculate exponential backoff with jitter
+				backoffTime := time.Duration(math.Pow(2, float64(attempt))) * time.Second
+				jitter := time.Duration(rand.Intn(1000)) * time.Millisecond
+				sleepTime := backoffTime + jitter
+
+				log.Infof("AWS API rate limit hit, retrying in %v (attempt %d/%d)", sleepTime, attempt+1, maxRetries)
+				time.Sleep(sleepTime)
+				continue
 			}
-			return true // continue to next page
-		})
+
+			return cerrors.Error{
+				ErrorCode: cerrors.ErrorTypeChaosInject,
+				Reason:    fmt.Sprintf("failed to get instance information: %v", awsErr.Error()),
+				Target:    fmt.Sprintf("{Region: %v}", experimentsDetails.Region),
+			}
+		}
+
+		break
+	}
+
 	if err != nil {
 		return cerrors.Error{
 			ErrorCode: cerrors.ErrorTypeChaosInject,
-			Reason:    fmt.Sprintf("failed to get instance information: %v", common.CheckAWSError(err).Error()),
+			Reason:    fmt.Sprintf("failed to get instance information after retries: %v", common.CheckAWSError(err).Error()),
 			Target:    fmt.Sprintf("{Region: %v}", experimentsDetails.Region),
 		}
 	}
