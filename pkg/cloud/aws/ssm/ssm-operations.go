@@ -154,13 +154,14 @@ func CheckInstanceInformation(experimentsDetails *experimentTypes.ExperimentDeta
 
 	sesh := common.GetAWSSession(experimentsDetails.Region)
 	ssmClient := ssm.New(sesh)
-	foundInstances := make(map[string]bool)
-	input := &ssm.DescribeInstanceInformationInput{}
-
-	var err error
-	maxRetries := 5
-	maxRetryDuration := time.Second * 30
-	startTime := time.Now()
+        var (
+ 	    foundInstances make(map[string]bool)
+	    input &ssm.DescribeInstanceInformationInput{}
+	    err error
+	    maxRetries = 5
+	    maxRetryDuration = time.Second * 30
+	    startTime = time.Now()
+      )
 
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		if time.Since(startTime) > maxRetryDuration {
