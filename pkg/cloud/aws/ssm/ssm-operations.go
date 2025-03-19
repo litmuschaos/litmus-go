@@ -9,7 +9,10 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/service/ssm"
+
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/aws-ssm/aws-ssm-chaos/types"
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	"github.com/litmuschaos/litmus-go/pkg/cloud/aws/common"
@@ -24,6 +27,14 @@ const (
 	// DefaultSSMDocsDirectory contains path of the ssm docs
 	DefaultSSMDocsDirectory = "LitmusChaos-AWS-SSM-Docs.yml"
 )
+
+// awsErrHasCode checks if an AWS error has a specific error code
+func awsErrHasCode(err error, code string) bool {
+	if aerr, ok := err.(awserr.Error); ok {
+		return aerr.Code() == code
+	}
+	return false
+}
 
 // SendSSMCommand will create and add the ssm document in aws service monitoring docs.
 func SendSSMCommand(experimentsDetails *experimentTypes.ExperimentDetails, ec2InstanceID []string) (string, error) {
@@ -159,15 +170,22 @@ func CheckInstanceInformation(experimentsDetails *experimentTypes.ExperimentDeta
 		err = ssmClient.DescribeInstanceInformationPages(input,
 			func(page *ssm.DescribeInstanceInformationOutput, lastPage bool) bool {
 				for _, instanceDetails := range page.InstanceInformationList {
-					foundInstances[*instanceDetails.InstanceId] = true
+					if instanceDetails.InstanceId != nil {
+						foundInstances[*instanceDetails.InstanceId] = true
+					}
 				}
 				return true // continue to next page
 			})
 
 		if err != nil {
 			awsErr := common.CheckAWSError(err)
-			if strings.Contains(awsErr.Error(), "Throttling") ||
-				strings.Contains(awsErr.Error(), "Rate exceeded") {
+			if request.IsErrorThrottle(err) ||
+				awsErrHasCode(awsErr, "ThrottlingException") ||
+				awsErrHasCode(awsErr, "RequestThrottledException") ||
+				awsErrHasCode(awsErr, "Throttling") ||
+				awsErrHasCode(awsErr, "TooManyRequestsException") ||
+				awsErrHasCode(awsErr, "RequestLimitExceeded") {
+
 				// Calculate exponential backoff with jitter
 				backoffTime := time.Duration(math.Pow(2, float64(attempt))) * time.Second
 				jitter := time.Duration(rand.Intn(1000)) * time.Millisecond
@@ -198,7 +216,7 @@ func CheckInstanceInformation(experimentsDetails *experimentTypes.ExperimentDeta
 
 	// Validate that each target instance is present.
 	for _, ec2ID := range instanceIDList {
-		if !foundInstances[ec2ID] {
+		if _, exists := foundInstances[ec2ID]; !exists {
 			return cerrors.Error{
 				ErrorCode: cerrors.ErrorTypeChaosInject,
 				Reason:    fmt.Sprintf("the instance %v might not have suitable permission or IAM attached to it. Run command `aws ssm describe-instance-information` to check for available instances", ec2ID),
