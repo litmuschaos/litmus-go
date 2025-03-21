@@ -6,7 +6,8 @@ import (
 
 	clientTypes "k8s.io/apimachinery/pkg/types"
 
-	experimentTypes "github.com/litmuschaos/litmus-go/pkg/azure/instance-runscript/types"
+	experimentTypes "pkg/azure/instance-runscript/types"
+
 	"github.com/litmuschaos/litmus-go/pkg/types"
 )
 
@@ -25,9 +26,12 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.Timeout, _ = strconv.Atoi(types.Getenv("STATUS_CHECK_TIMEOUT", "180"))
 	experimentDetails.AzureInstanceNames = strings.TrimSpace(types.Getenv("AZURE_INSTANCE_NAMES", ""))
 	experimentDetails.ResourceGroup = types.Getenv("RESOURCE_GROUP", "")
-	experimentDetails.IsBase64 = strconv.ParseBool(isBase64Str)
-	experimentDetails.PowershellChaosStartParams = strings.Split(types.Getenv("POWERSHELL_CHAOS_START_PARAMS", ""))
-	experimentDetails.PowershellChaosEndParams = strings.Split(types.Getenv("POWERSHELL_CHAOS_END_PARAMS", ""))
+	isBase64Str := types.Getenv("IS_BASE64", "false")
+	experimentDetails.IsBase64, _ = strconv.ParseBool(isBase64Str)
+	experimentDetails.PowershellChaosStartParamNames = strings.Split(types.Getenv("POWERSHELL_CHAOS_START_PARAMNAMES", ""))
+	experimentDetails.PowershellChaosEndParamNames = strings.Split(types.Getenv("POWERSHELL_CHAOS_END_PARAMNAMES", ""))
+	experimentDetails.PowershellChaosStartParamValues = strings.Split(types.Getenv("POWERSHELL_CHAOS_START_PARAMVALUES", ""))
+	experimentDetails.PowershellChaosEndParamValues = strings.Split(types.Getenv("POWERSHELL_CHAOS_END_PARAMVALUES", ""))
 	experimentDetails.PowershellChaosStartBase64OrPsFilePath = types.Getenv("POWERSHELL_CHAOS_START_SCRIPT_BASE64_STR_OR_PS_FILE_PATH", "")
 	experimentDetails.PowershellChaosEndBase64OrPsFilePath = types.Getenv("POWERSHELL_CHAOS_END_SCRIPT_BASE64_STR_OR_PS_FILE_PATH", "")
 	experimentDetails.ScaleSet = types.Getenv("SCALE_SET", "disable")

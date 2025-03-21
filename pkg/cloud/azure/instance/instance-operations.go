@@ -2,11 +2,9 @@ package azure
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"time"
-	"os"
-	"strings"
-	"encoding/base64"
 
 	"github.com/Azure/azure-sdk-for-go/profiles/latest/compute/mgmt/compute"
 	"github.com/Azure/go-autorest/autorest/azure"
@@ -196,11 +194,11 @@ func WaitForAzureComputeUp(timeout, delay int, scaleSet, subscriptionID, resourc
 				}
 			}
 			return nil
-			})
+		})
 }
 
 // AzureInstanceRunPowershell runs a PowerShell script on the target instance
-func AzureInstanceRunPowershell(subscriptionID, resourceGroup, azureInstanceName, scriptContent string, isBase64 bool, scriptParams []string) error {
+func AzureInstanceRunPowershell(subscriptionID, resourceGroup, azureInstanceName, scriptContent string, isBase64 bool, scriptParamNames []string, scriptParamValues []string) error {
 	vmClient := compute.NewVirtualMachinesClient(subscriptionID)
 
 	authorizer, err := auth.NewAuthorizerFromFile(azure.PublicCloud.ResourceManagerEndpoint)
@@ -229,15 +227,23 @@ func AzureInstanceRunPowershell(subscriptionID, resourceGroup, azureInstanceName
 		script = scriptContent
 	}
 
+	scriptId := "RunPowerShellScript"
+	params := make([]compute.RunCommandInputParameter, len(scriptParamNames))
+	for i, name := range scriptParamNames {
+		value := ""
+		if i < len(scriptParamValues) {
+			value = scriptParamValues[i]
+		}
+		params[i] = compute.RunCommandInputParameter{
+			Name:  &name,
+			Value: &value,
+		}
+	}
+
 	runCommandParameters := compute.RunCommandInput{
-		CommandID: "RunPowerShellScript",
-		Script:    []string{script},
-		Parameters: &[]compute.RunCommandInputParameter{
-			{
-				Name:  "params",
-				Value: strings.Join(scriptParams, " "),
-			},
-		},
+		CommandID:  &scriptId,
+		Script:     &[]string{script},
+		Parameters: &params,
 	}
 
 	log.Info("[Info]: Running PowerShell script on the instance")

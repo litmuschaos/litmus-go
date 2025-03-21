@@ -9,11 +9,11 @@ import (
 	"syscall"
 	"time"
 
+	instanceRunScript "pkg/azure/instance-runscript"
+
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/azure/instance-runscript/types"
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	"github.com/litmuschaos/litmus-go/pkg/clients"
-	azureCommon "github.com/litmuschaos/litmus-go/pkg/cloud/azure/common"
-	azureStatus "github.com/litmuschaos/litmus-go/pkg/cloud/azure/instance"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
@@ -109,9 +109,9 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 				//Running start Script the Azure instance
 				log.Infof("[Chaos]:Running Script the Azure instance: %v", vmName)
 				if experimentsDetails.ScaleSet == "enable" {
-					return notImplementedError("scale set instance run script not implemented")
+					// Yet to implement
 				} else {
-					if err := azureStatus.AzureInstanceRunScript(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, vmName, experimentDetails.PowershellChaosStartBase64OrPsFilePath, experimentDetails.IsBase64, experimentDetails.PowershellChaosStartParams); err != nil {
+					if err := instanceRunScript.AzureInstanceRunScript(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, vmName, experimentDetails.PowershellChaosStartBase64OrPsFilePath, experimentDetails.IsBase64, experimentDetails.PowershellChaosStartParamNames, experimentDetails.PowershellChaosStartParamValues); err != nil {
 						return stacktrace.Propagate(err, "unable to run script in the Azure instance")
 					}
 				}
@@ -131,9 +131,9 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 				// Running the end PS Script in the Azure instance
 				log.Info("[Chaos]: Starting back the Azure instance")
 				if experimentsDetails.ScaleSet == "enable" {
-					return notImplementedError("scale set instance run script not implemented")
+					//scale set instance run script not implemented
 				} else {
-					if err := azureStatus.AzureInstanceRunScript(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, vmName, experimentDetails.PowershellChaosEndBase64OrPsFilePath, experimentDetails.IsBase64, experimentDetails.PowershellChaosEndParams); err != nil {
+					if err := instanceRunScript.AzureInstanceRunScript(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, vmName, experimentDetails.PowershellChaosEndBase64OrPsFilePath, experimentDetails.IsBase64, experimentDetails.PowershellChaosEndParamNames, experimentDetails.PowershellChaosEndParamValues); err != nil {
 						return stacktrace.Propagate(err, "unable to run the script in the Azure instance")
 					}
 				}
@@ -148,12 +148,12 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, instanceNameList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectAzureInstanceRunScriptFaultInParallelMode")
 	defer span.End()
-	return notImplementedError("scale set instance run script not implemented so parallel mode run script also not implemented.")
+	//scale set instance run script not implemented so parallel mode run script also not implemented
 }
 
 // watching for the abort signal and revert the chaos
 func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, instanceNameList []string) {
 	<-abort
 
-	return notImplementedError("Abort run script not implemented")
+	//Abort run script not implemented
 }

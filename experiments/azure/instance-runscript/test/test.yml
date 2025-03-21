@@ -55,16 +55,24 @@ spec:
           - name: SCALE_SET
             value: 'disable'
           
-          # provide the Powershell params for Chaos Start powershell script
-          - name: PowershellChaosStartParams
+          # provide the Powershell paramNames for Chaos Start powershell script
+          - name: PowershellChaosStartParamNames
+            value: ''
+          
+          # provide the Powershell paramValues for Chaos Start powershell script
+          - name: PowershellChaosStartParamValues
             value: ''
           
           # provide the Powershell script file path or script itself as a Base64 string for Chaos Start powershell script
           - name: PowershellChaosStartBase64OrPsFilePath
             value: ''
           
-          # provide the Powershell params for Chaos End powershell script
-          - name: PowershellChaosEndParams
+          # provide the Powershell paramNames for Chaos End powershell script
+          - name: PowershellChaosEndParamNames
+            value: ''
+          
+          # provide the Powershell paramValues for Chaos End powershell script
+          - name: PowershellChaosEndParamValues
             value: ''
           
           # provide the Powershell script file path or script itself as a Base64 string for Chaos End powershell script
