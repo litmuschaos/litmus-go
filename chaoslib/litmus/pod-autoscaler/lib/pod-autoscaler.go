@@ -161,6 +161,8 @@ func getStatefulsetDetails(experimentsDetails *experimentTypes.ExperimentDetails
 
 // podAutoscalerChaosInDeployment scales up the replicas of deployment and verify the status
 func podAutoscalerChaosInDeployment(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, appsUnderTest []experimentTypes.ApplicationUnderTest, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectPodAutoscalerInDeploymentFault")
+	defer span.End()
 
 	// Scale Application
 	retryErr := retries.RetryOnConflict(retries.DefaultRetry, func() error {
@@ -192,6 +194,8 @@ func podAutoscalerChaosInDeployment(ctx context.Context, experimentsDetails *exp
 
 // podAutoscalerChaosInStatefulset scales up the replicas of statefulset and verify the status
 func podAutoscalerChaosInStatefulset(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, appsUnderTest []experimentTypes.ApplicationUnderTest, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectPodAutoscalerInStatefulsetFault")
+	defer span.End()
 
 	// Scale Application
 	retryErr := retries.RetryOnConflict(retries.DefaultRetry, func() error {
