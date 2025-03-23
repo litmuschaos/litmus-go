@@ -103,14 +103,13 @@ func main() {
 
 	// parse the experiment name
 	experimentName := flag.String("name", "pod-delete", "name of the chaos experiment")
+	span.SetAttributes(attribute.String("experiment.name", *experimentName))
 
 	//Getting kubeConfig and Generate ClientSets
 	if err := clients.GenerateClientSetFromKubeConfig(); err != nil {
 		log.Errorf("Unable to Get the kubeconfig, err: %v", err)
 		return
 	}
-
-	span.SetAttributes(attribute.String("experiment.name", *experimentName))
 
 	log.Infof("Experiment Name: %v", *experimentName)
 

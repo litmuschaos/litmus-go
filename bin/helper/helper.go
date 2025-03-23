@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"flag"
+	"go.opentelemetry.io/otel/attribute"
 	"os"
 
 	// Uncomment to load all auth plugins
@@ -59,6 +60,7 @@ func main() {
 
 	// parse the helper name
 	helperName := flag.String("name", "", "name of the helper pod")
+	span.SetAttributes(attribute.String("helper.name", *helperName))
 
 	//Getting kubeConfig and Generate ClientSets
 	if err := clients.GenerateClientSetFromKubeConfig(); err != nil {

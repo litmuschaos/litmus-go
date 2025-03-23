@@ -7,6 +7,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/telemetry"
 	"github.com/palantir/stacktrace"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -63,6 +64,8 @@ func Helper(ctx context.Context, clients clients.ClientSets) {
 
 	// Set the chaos result uid
 	result.SetResultUID(&resultDetails, clients, &chaosDetails)
+
+	span.SetAttributes(attribute.String("container.runtime", experimentsDetails.ContainerRuntime))
 
 	if err := diskFill(&experimentsDetails, clients, &eventsDetails, &chaosDetails, &resultDetails); err != nil {
 		// update failstep inside chaosresult

@@ -3,6 +3,8 @@ package modifybody
 import (
 	"context"
 	"fmt"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"math"
 	"strings"
 
@@ -18,7 +20,9 @@ import (
 
 // PodHttpModifyBodyChaos contains the steps to prepare and inject http modify body chaos
 func PodHttpModifyBodyChaos(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PreparePodHTTPModifyBodyFault")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PreparePodHTTPModifyBodyFault",
+		trace.WithAttributes(attribute.Int("experiment.ramptime", experimentsDetails.RampTime)),
+	)
 	defer span.End()
 
 	// responseBodyMaxLength defines the max length of response body string to be printed. It is taken as

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"strconv"
 	"strings"
 	"time"
@@ -27,7 +28,9 @@ import (
 
 // PreparePodDelete contains the preparation steps before chaos injection
 func PreparePodDelete(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PreparePodDeleteFault")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PreparePodDeleteFault",
+		trace.WithAttributes(attribute.Int("experiment.ramptime", experimentsDetails.RampTime)),
+	)
 	defer span.End()
 
 	//Waiting for the ramp time before chaos injection
@@ -67,7 +70,13 @@ func PreparePodDelete(ctx context.Context, experimentsDetails *experimentTypes.E
 
 // injectChaosInSerialMode delete the target application pods serial mode(one by one)
 func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, eventsDetails *types.EventDetails, resultDetails *types.ResultDetails) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectPodDeleteFaultInSerialMode")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectPodDeleteFaultInSerialMode",
+		trace.WithAttributes(
+			attribute.Int("chaos.duration", experimentsDetails.ChaosDuration),
+			attribute.String("chaos.interval", experimentsDetails.ChaosInterval),
+			attribute.String("chaos.namespace", experimentsDetails.ChaosNamespace),
+		),
+	)
 	defer span.End()
 
 	// run the probes during chaos
@@ -114,10 +123,6 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 
 		//Deleting the application pod
 		for _, pod := range targetPodList.Items {
-			span.SetAttributes(
-				attribute.String("pod.name", pod.Name),
-				attribute.String("pod.namespace", pod.Namespace),
-			)
 
 			log.InfoWithValues("[Info]: Killing the following pods", logrus.Fields{
 				"PodName": pod.Name})
@@ -170,7 +175,13 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 
 // injectChaosInParallelMode delete the target application pods in parallel mode (all at once)
 func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, eventsDetails *types.EventDetails, resultDetails *types.ResultDetails) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectPodDeleteFaultInParallelMode")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectPodDeleteFaultInParallelMode",
+		trace.WithAttributes(
+			attribute.Int("chaos.duration", experimentsDetails.ChaosDuration),
+			attribute.String("chaos.interval", experimentsDetails.ChaosInterval),
+			attribute.String("chaos.namespace", experimentsDetails.ChaosNamespace),
+		),
+	)
 	defer span.End()
 
 	// run the probes during chaos
@@ -216,10 +227,6 @@ func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experime
 
 		//Deleting the application pod
 		for _, pod := range targetPodList.Items {
-			span.SetAttributes(
-				attribute.String("pod.name", pod.Name),
-				attribute.String("pod.namespace", pod.Namespace),
-			)
 
 			log.InfoWithValues("[Info]: Killing the following pods", logrus.Fields{
 				"PodName": pod.Name})
@@ -261,8 +268,8 @@ func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experime
 			}
 		}
 		duration = int(time.Since(ChaosStartTimeStamp).Seconds())
-	}
 
+	}
 	log.Infof("[Completion]: %v chaos is done", experimentsDetails.ExperimentName)
 
 	return nil

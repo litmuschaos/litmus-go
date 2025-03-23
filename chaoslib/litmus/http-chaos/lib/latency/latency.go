@@ -2,6 +2,8 @@ package latency
 
 import (
 	"context"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"strconv"
 
 	http_chaos "github.com/litmuschaos/litmus-go/chaoslib/litmus/http-chaos/lib"
@@ -16,7 +18,9 @@ import (
 
 // PodHttpLatencyChaos contains the steps to prepare and inject http latency chaos
 func PodHttpLatencyChaos(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PreparePodHttpLatencyFault")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PreparePodHttpLatencyFault",
+		trace.WithAttributes(attribute.Int("experiment.ramptime", experimentsDetails.RampTime)),
+	)
 	defer span.End()
 
 	log.InfoWithValues("[Info]: The chaos tunables are:", logrus.Fields{

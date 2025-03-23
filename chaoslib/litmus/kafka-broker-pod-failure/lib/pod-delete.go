@@ -3,6 +3,8 @@ package lib
 import (
 	"context"
 	"fmt"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"strconv"
 	"strings"
 	"time"
@@ -27,7 +29,9 @@ import (
 
 // PreparePodDelete contains the prepration steps before chaos injection
 func PreparePodDelete(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PrepareKafkaPodDeleteFault")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PrepareKafkaPodDeleteFault",
+		trace.WithAttributes(attribute.Int("experiment.ramptime", experimentsDetails.ChaoslibDetail.RampTime)),
+	)
 	defer span.End()
 
 	//Waiting for the ramp time before chaos injection
@@ -59,7 +63,12 @@ func PreparePodDelete(ctx context.Context, experimentsDetails *experimentTypes.E
 
 // injectChaosInSerialMode delete the kafka broker pods in serial mode(one by one)
 func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, eventsDetails *types.EventDetails, resultDetails *types.ResultDetails) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectKafkaPodDeleteFaultInSerialMode")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectKafkaPodDeleteFaultInSerialMode",
+		trace.WithAttributes(
+			attribute.Int("chaos.duration", experimentsDetails.ChaoslibDetail.ChaosDuration),
+			attribute.String("chaos.interval", experimentsDetails.ChaoslibDetail.ChaosInterval),
+		),
+	)
 	defer span.End()
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
@@ -155,7 +164,12 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 
 // injectChaosInParallelMode delete the kafka broker pods in parallel mode (all at once)
 func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, eventsDetails *types.EventDetails, resultDetails *types.ResultDetails) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectKafkaPodDeleteFaultInParallelMode")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectKafkaPodDeleteFaultInParallelMode",
+		trace.WithAttributes(
+			attribute.Int("chaos.duration", experimentsDetails.ChaoslibDetail.ChaosDuration),
+			attribute.String("chaos.interval", experimentsDetails.ChaoslibDetail.ChaosInterval),
+		),
+	)
 	defer span.End()
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
