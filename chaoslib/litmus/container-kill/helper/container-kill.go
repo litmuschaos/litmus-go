@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/litmuschaos/litmus-go/pkg/telemetry"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 	"os/exec"
 	"strconv"
 	"time"
@@ -48,6 +49,11 @@ func Helper(ctx context.Context, clients clients.ClientSets) {
 
 	// Initialise Chaos Result Parameters
 	types.SetResultAttributes(&resultDetails, chaosDetails)
+
+	span.SetAttributes(
+		attribute.String("container.runtime", experimentsDetails.ContainerRuntime),
+		attribute.String("kill.signal", experimentsDetails.Signal),
+	)
 
 	if err := killContainer(&experimentsDetails, clients, &eventsDetails, &chaosDetails, &resultDetails); err != nil {
 		// update failstep inside chaosresult

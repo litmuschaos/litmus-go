@@ -3,6 +3,8 @@ package lib
 import (
 	"context"
 	"fmt"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"os"
 	"os/signal"
 	"strings"
@@ -27,7 +29,9 @@ var (
 
 // PrepareEBSLossByTag contains the prepration and injection steps for the experiment
 func PrepareEBSLossByTag(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PrepareAWSEBSLossFaultByTag")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PrepareAWSEBSLossFaultByTag",
+		trace.WithAttributes(attribute.Int("experiment.ramptime", experimentsDetails.RampTime)),
+	)
 	defer span.End()
 
 	// inject channel is used to transmit signal notifications.

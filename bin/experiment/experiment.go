@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"flag"
+	"go.opentelemetry.io/otel/attribute"
 	"os"
 
 	// Uncomment to load all auth plugins
@@ -102,6 +103,7 @@ func main() {
 
 	// parse the experiment name
 	experimentName := flag.String("name", "pod-delete", "name of the chaos experiment")
+	span.SetAttributes(attribute.String("experiment.name", *experimentName))
 
 	//Getting kubeConfig and Generate ClientSets
 	if err := clients.GenerateClientSetFromKubeConfig(); err != nil {

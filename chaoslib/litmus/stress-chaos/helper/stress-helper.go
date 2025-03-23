@@ -9,6 +9,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/telemetry"
 	"github.com/palantir/stacktrace"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 	"io"
 	"os"
 	"os/exec"
@@ -86,6 +87,8 @@ func Helper(ctx context.Context, clients clients.ClientSets) {
 
 	// Set the chaos result uid
 	result.SetResultUID(&resultDetails, clients, &chaosDetails)
+
+	span.SetAttributes(attribute.String("container.runtime", experimentsDetails.ContainerRuntime))
 
 	if err := prepareStressChaos(&experimentsDetails, clients, &eventsDetails, &chaosDetails, &resultDetails); err != nil {
 		// update failstep inside chaosresult
@@ -562,7 +565,6 @@ func injectChaos(t targetDetails, stressors, stressType string) (*exec.Cmd, erro
 	if stressType == "pod-io-stress" {
 		stressCommand = fmt.Sprintf("pause nsutil -t %v -p -m -- %v", strconv.Itoa(t.Pid), stressors)
 	}
-
 	log.Infof("[Info]: starting process: %v", stressCommand)
 
 	// launch the stress-ng process on the target container in paused mode

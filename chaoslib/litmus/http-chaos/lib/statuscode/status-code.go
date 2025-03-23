@@ -3,6 +3,8 @@ package statuscode
 import (
 	"context"
 	"fmt"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"math"
 	"math/rand"
 	"strconv"
@@ -31,7 +33,9 @@ var acceptedStatusCodes = []string{
 
 // PodHttpStatusCodeChaos contains the steps to prepare and inject http status code chaos
 func PodHttpStatusCodeChaos(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PreparePodHttpStatusCodeFault")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PreparePodHttpStatusCodeFault",
+		trace.WithAttributes(attribute.Int("experiment.ramptime", experimentsDetails.RampTime)),
+	)
 	defer span.End()
 
 	// responseBodyMaxLength defines the max length of response body string to be printed. It is taken as

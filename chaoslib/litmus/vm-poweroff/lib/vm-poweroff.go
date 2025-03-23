@@ -3,6 +3,8 @@ package lib
 import (
 	"context"
 	"fmt"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"os"
 	"os/signal"
 	"strings"
@@ -27,7 +29,9 @@ var inject, abort chan os.Signal
 
 // InjectVMPowerOffChaos injects the chaos in serial or parallel mode
 func InjectVMPowerOffChaos(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, cookie string) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PrepareVMPowerOffFault")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PrepareVMPowerOffFault",
+		trace.WithAttributes(attribute.Int("experiment.ramptime", experimentsDetails.RampTime)),
+	)
 	defer span.End()
 	// inject channel is used to transmit signal notifications.
 	inject = make(chan os.Signal, 1)
@@ -75,7 +79,14 @@ func InjectVMPowerOffChaos(ctx context.Context, experimentsDetails *experimentTy
 
 // injectChaosInSerialMode stops VMs in serial mode i.e. one after the other
 func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, vmIdList []string, cookie string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "injectVMPowerOffFaultInSerialMode")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "injectVMPowerOffFaultInSerialMode",
+		trace.WithAttributes(
+			attribute.Int("chaos.duration", experimentsDetails.ChaosDuration),
+			attribute.Int("chaos.interval", experimentsDetails.ChaosInterval),
+			attribute.String("chaos.namespace", experimentsDetails.ChaosNamespace),
+			attribute.String("vmware.vm.id", experimentsDetails.VMIds),
+		),
+	)
 	defer span.End()
 
 	select {
@@ -149,7 +160,14 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 
 // injectChaosInParallelMode stops VMs in parallel mode i.e. all at once
 func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, vmIdList []string, cookie string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "injectVMPowerOffFaultInParallelMode")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "injectVMPowerOffFaultInParallelMode",
+		trace.WithAttributes(
+			attribute.Int("chaos.duration", experimentsDetails.ChaosDuration),
+			attribute.Int("chaos.interval", experimentsDetails.ChaosInterval),
+			attribute.String("chaos.namespace", experimentsDetails.ChaosNamespace),
+			attribute.String("vmware.vm.id", experimentsDetails.VMIds),
+		),
+	)
 	defer span.End()
 
 	select {

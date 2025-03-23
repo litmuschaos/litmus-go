@@ -3,6 +3,8 @@ package lib
 import (
 	"context"
 	"fmt"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"os"
 	"strconv"
 
@@ -24,7 +26,14 @@ import (
 )
 
 func experimentExecution(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectK6LoadGenFault")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectK6LoadGenFault",
+		trace.WithAttributes(
+			attribute.Int("chaos.duration", experimentsDetails.ChaosDuration),
+			attribute.Int("chaos.interval", experimentsDetails.ChaosInterval),
+			attribute.String("chaos.namespace", experimentsDetails.ChaosNamespace),
+			attribute.String("k6.script", experimentsDetails.ScriptSecretName),
+		),
+	)
 	defer span.End()
 
 	if experimentsDetails.EngineName != "" {
@@ -75,7 +84,9 @@ func experimentExecution(ctx context.Context, experimentsDetails *experimentType
 
 // PrepareChaos contains the preparation steps before chaos injection
 func PrepareChaos(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PrepareK6LoadGenFault")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PrepareK6LoadGenFault",
+		trace.WithAttributes(attribute.Int("experiment.ramptime", experimentsDetails.RampTime)),
+	)
 	defer span.End()
 
 	// Waiting for the ramp time before chaos injection
@@ -176,9 +187,14 @@ func createHelperPod(ctx context.Context, experimentsDetails *experimentTypes.Ex
 		},
 	}
 
-	_, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Create(context.Background(), helperPod, v1.CreateOptions{})
+	createdHelperPod, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Create(context.Background(), helperPod, v1.CreateOptions{})
 	if err != nil {
 		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("unable to create helper pod: %s", err.Error())}
 	}
+	span.SetAttributes(
+		attribute.String("helper.pod.name", createdHelperPod.Name),
+		attribute.String("helper.image.name", createdHelperPod.Spec.Containers[0].Image),
+	)
+
 	return nil
 }
