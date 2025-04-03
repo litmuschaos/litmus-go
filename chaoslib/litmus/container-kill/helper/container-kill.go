@@ -1,14 +1,14 @@
 package helper
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"github.com/litmuschaos/litmus-go/pkg/telemetry"
-	"go.opentelemetry.io/otel"
 	"os/exec"
 	"strconv"
 	"time"
+
+	"github.com/litmuschaos/litmus-go/pkg/telemetry"
+	"go.opentelemetry.io/otel"
 
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	"github.com/litmuschaos/litmus-go/pkg/result"
@@ -187,27 +187,14 @@ func stopContainerdContainer(containerIDs []string, socketPath, signal, source s
 		cmd.Args = append(cmd.Args, "--timeout=0")
 	}
 	cmd.Args = append(cmd.Args, containerIDs...)
-
-	var errOut, out bytes.Buffer
-	cmd.Stderr = &errOut
-	cmd.Stdout = &out
-	if err := cmd.Run(); err != nil {
-		return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Source: source, Reason: fmt.Sprintf("failed to stop container :%s", out.String())}
-	}
-	return nil
+	return common.RunCLICommands(cmd, source, "", "failed to stop container", cerrors.ErrorTypeChaosInject)
 }
 
 // stopDockerContainer kill the application container
 func stopDockerContainer(containerIDs []string, socketPath, signal, source string) error {
-	var errOut, out bytes.Buffer
 	cmd := exec.Command("sudo", "docker", "--host", fmt.Sprintf("unix://%s", socketPath), "kill", "--signal", signal)
 	cmd.Args = append(cmd.Args, containerIDs...)
-	cmd.Stderr = &errOut
-	cmd.Stdout = &out
-	if err := cmd.Run(); err != nil {
-		return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Source: source, Reason: fmt.Sprintf("failed to stop container :%s", out.String())}
-	}
-	return nil
+	return common.RunCLICommands(cmd, source, "", "failed to stop container", cerrors.ErrorTypeChaosInject)
 }
 
 // getRestartCount return the restart count of target container
