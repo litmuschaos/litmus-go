@@ -20,6 +20,9 @@ import (
 )
 
 func experimentExecution(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+    // @TODO: setup tracing
+    // ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "experimentExecution[name-your-chaos]Fault")
+    // defer span.End()
 
     // Get the target pod details for the chaos execution
 	// if the target pod is not defined it will derive the random target pod list using pod affected percentage
@@ -58,6 +61,10 @@ func experimentExecution(ctx context.Context, experimentsDetails *experimentType
 }
 
 func runChaos(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, targetPodList corev1.PodList, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+    // @TODO: setup tracing
+    // ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "experimentExecution[name-your-chaos]Fault")
+    // defer span.End()
+
 	if experimentsDetails.EngineName != "" {
     		msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on target pod"
     		types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
