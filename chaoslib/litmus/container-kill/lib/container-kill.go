@@ -285,6 +285,7 @@ func getPodEnv(ctx context.Context, experimentsDetails *experimentTypes.Experime
 		SetEnv("STATUS_CHECK_DELAY", strconv.Itoa(experimentsDetails.Delay)).
 		SetEnv("STATUS_CHECK_TIMEOUT", strconv.Itoa(experimentsDetails.Timeout)).
 		SetEnv("EXPERIMENT_NAME", experimentsDetails.ExperimentName).
+		SetEnv("CONTAINER_API_TIMEOUT", strconv.Itoa(experimentsDetails.ContainerAPITimeout)).
 		SetEnv("INSTANCE_ID", experimentsDetails.InstanceID).
 		SetEnv("OTEL_EXPORTER_OTLP_ENDPOINT", os.Getenv(telemetry.OTELExporterOTLPEndpoint)).
 		SetEnv("TRACE_PARENT", telemetry.GetMarshalledSpanFromContext(ctx)).
