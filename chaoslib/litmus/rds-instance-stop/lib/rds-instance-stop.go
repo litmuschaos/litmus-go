@@ -82,7 +82,7 @@ func PrepareRDSInstanceStop(ctx context.Context, experimentsDetails *experimentT
 	return nil
 }
 
-// injectChaosInSerialMode will inject the rds instance termination in serial mode that is one after other
+// injectChaosInSerialMode will inject the rds instance state in serial mode that is one after other
 func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, instanceIdentifierList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
 	select {
