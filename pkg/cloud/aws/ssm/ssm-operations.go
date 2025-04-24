@@ -142,21 +142,43 @@ func getSSMCommandStatus(commandID, ec2InstanceID, region string) (string, error
 // CheckInstanceInformation checks if the instance has permission to do SSM API calls,
 func CheckInstanceInformation(experimentsDetails *experimentTypes.ExperimentDetails) error {
 	var instanceIDList []string
+	var input *ssm.DescribeInstanceInformationInput
+	
 	switch {
 	case experimentsDetails.EC2InstanceID != "":
+		// If specific instance IDs are provided, use instance ID filter
 		instanceIDList = strings.Split(experimentsDetails.EC2InstanceID, ",")
+		
+		input = &ssm.DescribeInstanceInformationInput{
+			Filters: []*ssm.InstanceInformationStringFilter{
+				{
+					Key:    aws.String("InstanceIds"),
+					Values: aws.StringSlice(instanceIDList),
+				},
+			},
+		}
 	default:
+		// If using tags, first verify we have valid targets
 		if err := CheckTargetInstanceStatus(experimentsDetails); err != nil {
 			return stacktrace.Propagate(err, "failed to check target instance(s) status")
 		}
 		instanceIDList = experimentsDetails.TargetInstanceIDList
+		
+		// For filtering by instance IDs that we collected from tags
+		input = &ssm.DescribeInstanceInformationInput{
+			Filters: []*ssm.InstanceInformationStringFilter{
+				{
+					Key:    aws.String("InstanceIds"),
+					Values: aws.StringSlice(instanceIDList),
+				},
+			},
+		}
 	}
 
 	sesh := common.GetAWSSession(experimentsDetails.Region)
 	ssmClient := ssm.New(sesh)
 	var (
 		foundInstances   = make(map[string]bool)
-		input            = &ssm.DescribeInstanceInformationInput{}
 		err              error
 		maxRetries       = 5
 		maxRetryDuration = time.Second * 30
