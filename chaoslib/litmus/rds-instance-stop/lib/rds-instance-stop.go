@@ -106,7 +106,7 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 
 			for i, identifier := range instanceIdentifierList {
 
-				// Deleting the RDS instance
+				// Stopping the RDS instance
 				log.Info("[Chaos]: Stopping the desired RDS instance")
 				if err := awslib.RDSInstanceStop(identifier, experimentsDetails.Region); err != nil {
 					return stacktrace.Propagate(err, "rds instance failed to stop")
