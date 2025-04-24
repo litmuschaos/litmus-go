@@ -1,14 +1,15 @@
 package helper
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"github.com/litmuschaos/litmus-go/pkg/telemetry"
-	"go.opentelemetry.io/otel"
 	"os/exec"
 	"strconv"
+	"strings"
 	"time"
+
+	"github.com/litmuschaos/litmus-go/pkg/telemetry"
+	"go.opentelemetry.io/otel"
 
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	"github.com/litmuschaos/litmus-go/pkg/result"
@@ -154,10 +155,16 @@ func kill(experimentsDetails *experimentTypes.ExperimentDetails, containerIds []
 	switch experimentsDetails.ContainerRuntime {
 	case "docker":
 		if err := stopDockerContainer(containerIds, experimentsDetails.SocketPath, experimentsDetails.Signal, experimentsDetails.ChaosPodName); err != nil {
+			if isContextDeadlineExceeded(err) {
+				return nil
+			}
 			return stacktrace.Propagate(err, "could not stop container")
 		}
 	case "containerd", "crio":
-		if err := stopContainerdContainer(containerIds, experimentsDetails.SocketPath, experimentsDetails.Signal, experimentsDetails.ChaosPodName); err != nil {
+		if err := stopContainerdContainer(containerIds, experimentsDetails.SocketPath, experimentsDetails.Signal, experimentsDetails.ChaosPodName, experimentsDetails.Timeout); err != nil {
+			if isContextDeadlineExceeded(err) {
+				return nil
+			}
 			return stacktrace.Propagate(err, "could not stop container")
 		}
 	default:
@@ -177,7 +184,7 @@ func validate(t targetDetails, timeout, delay int, clients clients.ClientSets) e
 }
 
 // stopContainerdContainer kill the application container
-func stopContainerdContainer(containerIDs []string, socketPath, signal, source string) error {
+func stopContainerdContainer(containerIDs []string, socketPath, signal, source string, timeout int) error {
 	if signal != "SIGKILL" && signal != "SIGTERM" {
 		return cerrors.Error{ErrorCode: cerrors.ErrorTypeHelper, Source: source, Reason: fmt.Sprintf("unsupported signal %s, use either SIGTERM or SIGKILL", signal)}
 	}
@@ -185,29 +192,18 @@ func stopContainerdContainer(containerIDs []string, socketPath, signal, source s
 	cmd := exec.Command("sudo", "crictl", "-i", fmt.Sprintf("unix://%s", socketPath), "-r", fmt.Sprintf("unix://%s", socketPath), "stop")
 	if signal == "SIGKILL" {
 		cmd.Args = append(cmd.Args, "--timeout=0")
+	} else if timeout != -1 {
+		cmd.Args = append(cmd.Args, fmt.Sprintf("--timeout=%v", timeout))
 	}
 	cmd.Args = append(cmd.Args, containerIDs...)
-
-	var errOut, out bytes.Buffer
-	cmd.Stderr = &errOut
-	cmd.Stdout = &out
-	if err := cmd.Run(); err != nil {
-		return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Source: source, Reason: fmt.Sprintf("failed to stop container :%s", out.String())}
-	}
-	return nil
+	return common.RunCLICommands(cmd, source, "", "failed to stop container", cerrors.ErrorTypeChaosInject)
 }
 
 // stopDockerContainer kill the application container
 func stopDockerContainer(containerIDs []string, socketPath, signal, source string) error {
-	var errOut, out bytes.Buffer
 	cmd := exec.Command("sudo", "docker", "--host", fmt.Sprintf("unix://%s", socketPath), "kill", "--signal", signal)
 	cmd.Args = append(cmd.Args, containerIDs...)
-	cmd.Stderr = &errOut
-	cmd.Stdout = &out
-	if err := cmd.Run(); err != nil {
-		return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Source: source, Reason: fmt.Sprintf("failed to stop container :%s", out.String())}
-	}
-	return nil
+	return common.RunCLICommands(cmd, source, "", "failed to stop container", cerrors.ErrorTypeChaosInject)
 }
 
 // getRestartCount return the restart count of target container
@@ -267,6 +263,7 @@ func getENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.Signal = types.Getenv("SIGNAL", "SIGKILL")
 	experimentDetails.Delay, _ = strconv.Atoi(types.Getenv("STATUS_CHECK_DELAY", "2"))
 	experimentDetails.Timeout, _ = strconv.Atoi(types.Getenv("STATUS_CHECK_TIMEOUT", "180"))
+	experimentDetails.ContainerAPITimeout, _ = strconv.Atoi(types.Getenv("CONTAINER_API_TIMEOUT", "-1"))
 }
 
 type targetDetails struct {
@@ -275,4 +272,8 @@ type targetDetails struct {
 	TargetContainer    string
 	RestartCountBefore int
 	Source             string
+}
+
+func isContextDeadlineExceeded(err error) bool {
+	return strings.Contains(err.Error(), "context deadline exceeded")
 }
