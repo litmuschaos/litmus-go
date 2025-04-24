@@ -189,8 +189,8 @@ func CheckInstanceInformation(experimentsDetails *experimentTypes.ExperimentDeta
 
 				// Calculate exponential backoff with jitter
 				backoffTime := time.Duration(math.Pow(2, float64(attempt))) * time.Second
-				 rnd := rand.New(rand.NewSource(time.Now().UnixNano()))
-                                 jitter := time.Duration(rnd.Intn(1000)) * time.Millisecond
+				rnd := rand.New(rand.NewSource(time.Now().UnixNano()))
+				jitter := time.Duration(rnd.Intn(1000)) * time.Millisecond
 				sleepTime := backoffTime + jitter
 
 				log.Infof("AWS API rate limit hit, retrying in %v (attempt %d/%d)", sleepTime, attempt+1, maxRetries)
