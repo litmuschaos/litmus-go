@@ -15,6 +15,8 @@ import (
 	// _ "k8s.io/client-go/plugin/pkg/client/auth/oidc"
 	// _ "k8s.io/client-go/plugin/pkg/client/auth/openstack"
 
+	"go.opentelemetry.io/otel"
+
 	awsSSMChaosByID "github.com/litmuschaos/litmus-go/experiments/aws-ssm/aws-ssm-chaos-by-id/experiment"
 	awsSSMChaosByTag "github.com/litmuschaos/litmus-go/experiments/aws-ssm/aws-ssm-chaos-by-tag/experiment"
 	azureDiskLoss "github.com/litmuschaos/litmus-go/experiments/azure/azure-disk-loss/experiment"
@@ -60,6 +62,7 @@ import (
 	ebsLossByTag "github.com/litmuschaos/litmus-go/experiments/kube-aws/ebs-loss-by-tag/experiment"
 	ec2TerminateByID "github.com/litmuschaos/litmus-go/experiments/kube-aws/ec2-terminate-by-id/experiment"
 	ec2TerminateByTag "github.com/litmuschaos/litmus-go/experiments/kube-aws/ec2-terminate-by-tag/experiment"
+	rdsInstanceStop "github.com/litmuschaos/litmus-go/experiments/kube-aws/rds-instance-stop/experiment"
 	k6Loadgen "github.com/litmuschaos/litmus-go/experiments/load/k6-loadgen/experiment"
 	locustLoadgen "github.com/litmuschaos/litmus-go/experiments/load/locust-loadgen/experiment"
 	springBootFaults "github.com/litmuschaos/litmus-go/experiments/spring-boot/spring-boot-faults/experiment"
@@ -68,7 +71,6 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/telemetry"
 	"github.com/sirupsen/logrus"
-	"go.opentelemetry.io/otel"
 )
 
 func init() {
@@ -172,6 +174,8 @@ func main() {
 		ebsLossByID.EBSLossByID(ctx, clients)
 	case "ebs-loss-by-tag":
 		ebsLossByTag.EBSLossByTag(ctx, clients)
+	case "rds-instance-stop":
+		rdsInstanceStop.RDSInstanceStop(ctx, clients)
 	case "node-restart":
 		nodeRestart.NodeRestart(ctx, clients)
 	case "pod-dns-error":
