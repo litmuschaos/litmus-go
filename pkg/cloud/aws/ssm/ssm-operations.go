@@ -143,12 +143,12 @@ func getSSMCommandStatus(commandID, ec2InstanceID, region string) (string, error
 func CheckInstanceInformation(experimentsDetails *experimentTypes.ExperimentDetails) error {
 	var instanceIDList []string
 	var input *ssm.DescribeInstanceInformationInput
-	
+
 	switch {
 	case experimentsDetails.EC2InstanceID != "":
 		// If specific instance IDs are provided, use instance ID filter
 		instanceIDList = strings.Split(experimentsDetails.EC2InstanceID, ",")
-		
+
 		input = &ssm.DescribeInstanceInformationInput{
 			Filters: []*ssm.InstanceInformationStringFilter{
 				{
@@ -163,7 +163,7 @@ func CheckInstanceInformation(experimentsDetails *experimentTypes.ExperimentDeta
 			return stacktrace.Propagate(err, "failed to check target instance(s) status")
 		}
 		instanceIDList = experimentsDetails.TargetInstanceIDList
-		
+
 		// For filtering by instance IDs that we collected from tags
 		input = &ssm.DescribeInstanceInformationInput{
 			Filters: []*ssm.InstanceInformationStringFilter{
