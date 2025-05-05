@@ -1,0 +1,6 @@
+Manifest-Version: 1.0
+Agent-Class: com.github.litmuschaos.litmusgo.JvmFaultInjectorAgent
+Can-Redefine-Classes: true
+Can-Retransform-Classes: true
+Main-Class: com.github.litmuschaos.litmusgo.JvmFaultInjectorMain
+
