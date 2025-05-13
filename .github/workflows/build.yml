@@ -12,18 +12,11 @@ jobs:
       # Install golang
       - uses: actions/setup-go@v2
         with:
-          go-version: 1.18
+          go-version: '1.20'
 
       - uses: actions/checkout@v2
         with:
           ref: ${{ github.event.pull_request.head.sha }}
-
-      #TODO: Add Dockerfile linting
-      # Running go-lint
-      - name: Checking Go-Lint
-        run : |
-          sudo apt-get update && sudo apt-get install golint
-          make gotasks
 
       - name: gofmt check
         run: |
@@ -33,7 +26,7 @@ jobs:
            gofmt -s -l .
            exit 1
           fi
-          
+
       - name: golangci-lint
         uses: reviewdog/action-golangci-lint@v1
 
@@ -56,7 +49,7 @@ jobs:
       # Install golang
       - uses: actions/setup-go@v2
         with:
-          go-version: 1.18
+          go-version: '1.20'
 
       - uses: actions/checkout@v2
         with:
@@ -80,6 +73,7 @@ jobs:
           file: build/Dockerfile
           platforms: linux/amd64,linux/arm64
           tags: litmuschaos/go-runner:ci
+          build-args: LITMUS_VERSION=3.10.0
 
   trivy:
     needs: pre-checks
@@ -91,8 +85,8 @@ jobs:
 
       - name: Build an image from Dockerfile
         run: |
-          docker build -f build/Dockerfile -t docker.io/litmuschaos/go-runner:${{ github.sha }} . --build-arg TARGETARCH=amd64
-      
+          docker build -f build/Dockerfile -t docker.io/litmuschaos/go-runner:${{ github.sha }} . --build-arg TARGETARCH=amd64 --build-arg LITMUS_VERSION=3.10.0
+
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
         with:

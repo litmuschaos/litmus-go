@@ -246,11 +246,11 @@ func RunBashCommand(command string, failMsg string, source string) error {
 }
 
 func RunCLICommands(cmd *exec.Cmd, source, target, failMsg string, errorCode cerrors.ErrorType) error {
-	var out, stdErr bytes.Buffer
-	cmd.Stdout = &out
+	var stdErr bytes.Buffer
+	cmd.Stdout = os.Stdout
 	cmd.Stderr = &stdErr
 	if err = cmd.Run(); err != nil {
-		return cerrors.Error{ErrorCode: errorCode, Target: target, Source: source, Reason: fmt.Sprintf("%s: %s", failMsg, stdErr.String())}
+		return cerrors.Error{ErrorCode: errorCode, Target: target, Source: source, Reason: fmt.Sprintf("%s: %s: %s", failMsg, stdErr.String(), err)}
 	}
 	return nil
 }

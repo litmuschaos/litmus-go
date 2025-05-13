@@ -13,15 +13,8 @@ jobs:
       # Install golang
       - uses: actions/setup-go@v2
         with:
-          go-version: 1.18
+          go-version: '1.20'
       - uses: actions/checkout@v2
-
-      #TODO: Add Dockerfile linting
-      # Running go-lint
-      - name: Checking Go-Lint
-        run : |
-          sudo apt-get update && sudo apt-get install golint
-          make gotasks
 
       - name: gofmt check
         run: |
@@ -31,9 +24,9 @@ jobs:
            gofmt -s -l .
            exit 1
           fi
-          
+
       - name: golangci-lint
-        uses: reviewdog/action-golangci-lint@v1       
+        uses: reviewdog/action-golangci-lint@v1
 
   push:
     needs: pre-checks
@@ -43,7 +36,7 @@ jobs:
       # Install golang
       - uses: actions/setup-go@v2
         with:
-          go-version: 1.18
+          go-version: '1.20'
       - uses: actions/checkout@v2
 
       - name: Set up QEMU
@@ -70,3 +63,4 @@ jobs:
           file: build/Dockerfile
           platforms: linux/amd64,linux/arm64
           tags: litmuschaos/go-runner:ci
+          build-args: LITMUS_VERSION=3.10.0
