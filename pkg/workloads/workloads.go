@@ -26,7 +26,7 @@ var (
 	gvrrc = schema.GroupVersionResource{
 		Group:    "",
 		Version:  "v1",
-		Resource: "replicacontrollers",
+		Resource: "replicationcontrollers",
 	}
 
 	gvrrs = schema.GroupVersionResource{
@@ -82,7 +82,7 @@ func GetPodOwnerTypeAndName(pod *kcorev1.Pod, dynamicClient dynamic.Interface) (
 			return getParent(owner.Name, pod.Namespace, gvrrs, dynamicClient)
 		}
 
-		if owner.Kind == "ReplicaController" {
+		if owner.Kind == "ReplicationController" {
 			return getParent(owner.Name, pod.Namespace, gvrrc, dynamicClient)
 		}
 	}
