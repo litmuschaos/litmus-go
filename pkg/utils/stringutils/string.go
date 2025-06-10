@@ -3,6 +3,8 @@ package stringutils
 import (
 	"math/rand"
 	"time"
+	"strings"
+	"fmt"
 )
 
 const (
@@ -32,4 +34,13 @@ func RandStringBytesMask(n int, src rand.Source) string {
 	}
 
 	return string(b)
+}
+
+func FormatHostnames(input string) string {
+	// Split the input by comma and trim spaces
+	parts := strings.Split(input, ",")
+	for i, name := range parts {
+		parts[i] = fmt.Sprintf("\"%s\"", strings.TrimSpace(name))
+	}
+	return fmt.Sprintf("[%s]", strings.Join(parts, ", "))
 }
