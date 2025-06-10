@@ -4,10 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/litmuschaos/litmus-go/pkg/cerrors"
-	"github.com/litmuschaos/litmus-go/pkg/telemetry"
-	"github.com/palantir/stacktrace"
-	"go.opentelemetry.io/otel"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -16,6 +12,11 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
+	"github.com/litmuschaos/litmus-go/pkg/telemetry"
+	"github.com/palantir/stacktrace"
+	"go.opentelemetry.io/otel"
+
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-dns-chaos/types"
@@ -23,6 +24,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
+	"github.com/litmuschaos/litmus-go/pkg/utils/stringutils"
 	clientTypes "k8s.io/apimachinery/pkg/types"
 )
 
@@ -212,7 +214,7 @@ func injectChaos(experimentsDetails *experimentTypes.ExperimentDetails, t target
 
 	// prepare dns interceptor
 	var out bytes.Buffer
-	commandTemplate := fmt.Sprintf("sudo TARGET_PID=%d CHAOS_TYPE=%s SPOOF_MAP='%s' TARGET_HOSTNAMES='%s' CHAOS_DURATION=%d MATCH_SCHEME=%s nsutil -p -n -t %d -- dns_interceptor", t.Pid, experimentsDetails.ChaosType, experimentsDetails.SpoofMap, experimentsDetails.TargetHostNames, experimentsDetails.ChaosDuration, experimentsDetails.MatchScheme, t.Pid)
+	commandTemplate := fmt.Sprintf("sudo TARGET_PID=%d CHAOS_TYPE=%s SPOOF_MAP='%s' TARGET_HOSTNAMES='%s' CHAOS_DURATION=%d MATCH_SCHEME=%s nsutil -p -n -t %d -- dns_interceptor", t.Pid, experimentsDetails.ChaosType, experimentsDetails.SpoofMap, stringutils.FormatHostnames(experimentsDetails.TargetHostNames), experimentsDetails.ChaosDuration, experimentsDetails.MatchScheme, t.Pid)
 	cmd := exec.Command("/bin/bash", "-c", commandTemplate)
 	log.Info(cmd.String())
 	cmd.Stdout = &out
