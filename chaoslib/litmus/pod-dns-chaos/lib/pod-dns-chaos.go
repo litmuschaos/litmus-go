@@ -30,6 +30,13 @@ import (
 func PrepareAndInjectChaos(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PreparePodDNSFault")
 	defer span.End()
+
+	// Validate the experiment target hostnames
+	var err error
+	experimentsDetails.TargetHostNames, err = stringutils.ParseHostnames(experimentsDetails.TargetHostNames)
+	if err != nil {
+		return stacktrace.Propagate(err, "failed to parse target hostnames")
+	}
 	// Get the target pod details for the chaos execution
 	// if the target pod is not defined it will derive the random target pod list using pod affected percentage
 	if experimentsDetails.TargetPods == "" && chaosDetails.AppDetail == nil {
