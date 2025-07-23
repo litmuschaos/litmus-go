@@ -2,8 +2,8 @@ package stringutils
 
 import (
 	"math/rand"
-	"testing"
 	"strings"
+	"testing"
 )
 
 func TestRandStringBytesMask(t *testing.T) {
