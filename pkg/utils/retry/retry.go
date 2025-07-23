@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	"time"
-
 )
 
 // Action defines the prototype of action function, function as a value
@@ -75,7 +74,7 @@ func (model Model) Try(action Action) error {
 		if err != nil && err.Error() == "container is in terminated state" {
 			break
 		}
-		
+
 	}
 
 	return err
