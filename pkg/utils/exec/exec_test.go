@@ -17,8 +17,8 @@ func TestSetExecCommandAttributes(t *testing.T) {
 }
 
 func TestCheckPodStatus(t *testing.T) {
-	// I am checking these three conditions - 
-	
+	// I am checking these three conditions -
+
 	// Pod not running
 	pod1 := &apiv1.Pod{
 		Status: apiv1.PodStatus{Phase: apiv1.PodPending},
