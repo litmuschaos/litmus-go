@@ -17,42 +17,67 @@ func TestSetExecCommandAttributes(t *testing.T) {
 }
 
 func TestCheckPodStatus(t *testing.T) {
-	// I am checking these three conditions -
-
-	// Pod not running
-	pod1 := &apiv1.Pod{
-		Status: apiv1.PodStatus{Phase: apiv1.PodPending},
-	}
-	err := checkPodStatus(pod1, "container1")
-	if err == nil {
-		t.Error("Expected error for non-running pod")
-	}
-
-	// Container not ready
-	pod2 := &apiv1.Pod{
-		Status: apiv1.PodStatus{
-			Phase: apiv1.PodRunning,
-			ContainerStatuses: []apiv1.ContainerStatus{
-				{Name: "container1", Ready: false},
+	tests := []struct {
+		name      string
+		pod       *apiv1.Pod
+		container string
+		wantErr   bool
+	}{
+		{
+			name: "Pod not running",
+			pod: &apiv1.Pod{
+				Status: apiv1.PodStatus{Phase: apiv1.PodPending},
 			},
+			container: "container1",
+			wantErr:   true,
+		},
+		{
+			name: "Container not ready",
+			pod: &apiv1.Pod{
+				Status: apiv1.PodStatus{
+					Phase: apiv1.PodRunning,
+					ContainerStatuses: []apiv1.ContainerStatus{
+						{Name: "container1", Ready: false},
+					},
+				},
+			},
+			container: "container1",
+			wantErr:   true,
+		},
+		{
+			name: "Healthy pod and container",
+			pod: &apiv1.Pod{
+				Status: apiv1.PodStatus{
+					Phase: apiv1.PodRunning,
+					ContainerStatuses: []apiv1.ContainerStatus{
+						{Name: "container1", Ready: true},
+					},
+				},
+			},
+			container: "container1",
+			wantErr:   false,
+		},
+		{
+			name: "Container name not matching",
+			pod: &apiv1.Pod{
+				Status: apiv1.PodStatus{
+					Phase: apiv1.PodRunning,
+					ContainerStatuses: []apiv1.ContainerStatus{
+						{Name: "other-container", Ready: true},
+					},
+				},
+			},
+			container: "container1",
+			wantErr:   true,
 		},
 	}
-	err = checkPodStatus(pod2, "container1")
-	if err == nil {
-		t.Error("Expected error for not-ready container")
-	}
 
-	// Healthy pod
-	pod3 := &apiv1.Pod{
-		Status: apiv1.PodStatus{
-			Phase: apiv1.PodRunning,
-			ContainerStatuses: []apiv1.ContainerStatus{
-				{Name: "container1", Ready: true},
-			},
-		},
-	}
-	err = checkPodStatus(pod3, "container1")
-	if err != nil {
-		t.Errorf("Unexpected error for healthy pod: %v", err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := checkPodStatus(tt.pod, tt.container)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("checkPodStatus() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
 	}
 }
