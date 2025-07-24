@@ -59,13 +59,12 @@ func ParseHostnames(input string) (string, error) {
 
 	// If not in JSON format, fallback to comma-separated logic
 	parts := strings.Split(input, ",")
-	for i := range parts {
-		parts[i] = strings.TrimSpace(parts[i])
-		if parts[i] != "" {
-			//remove empty parts
-			parsed = append(parsed, parts[i])
-		}		
-	}
+	for part := range parts {
+            part = strings.TrimSpace(part)
+            if part != "" {
+                parsed = append(parsed, part)
+            }
+        }
 
 	// Rebuild as JSON array of strings
 	jsonBytes, err := json.Marshal(parsed)
