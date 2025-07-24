@@ -3,8 +3,6 @@ package common
 import (
 	"bytes"
 	"fmt"
-	"github.com/litmuschaos/litmus-go/pkg/cerrors"
-	"github.com/palantir/stacktrace"
 	"math/rand"
 	"os"
 	"os/exec"
@@ -15,6 +13,9 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
+	"github.com/palantir/stacktrace"
 
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
@@ -38,7 +39,7 @@ func WaitForDuration(duration int) {
 // RandomInterval wait for the random interval lies between lower & upper bounds
 func RandomInterval(interval string) error {
 	re := regexp.MustCompile(`^\d+(-\d+)?$`)
-	if re.MatchString(interval) == false {
+	if !re.MatchString(interval) {
 		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: "could not parse CHAOS_INTERVAL env, bad input"}
 	}
 	intervals := strings.Split(interval, "-")
