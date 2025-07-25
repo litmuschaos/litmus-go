@@ -131,6 +131,7 @@ type ChaosDetails struct {
 	Annotations          map[string]string
 	Resources            corev1.ResourceRequirements
 	ImagePullSecrets     []corev1.LocalObjectReference
+	Tolerations          []corev1.Toleration
 	Labels               map[string]string
 	Phase                ExperimentPhase
 	ProbeContext         ProbeContext

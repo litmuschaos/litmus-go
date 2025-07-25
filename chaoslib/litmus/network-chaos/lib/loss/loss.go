@@ -2,6 +2,7 @@ package loss
 
 import (
 	"context"
+	"fmt"
 
 	network_chaos "github.com/litmuschaos/litmus-go/chaoslib/litmus/network-chaos/lib"
 	"github.com/litmuschaos/litmus-go/pkg/clients"
@@ -16,6 +17,10 @@ func PodNetworkLossChaos(ctx context.Context, experimentsDetails *experimentType
 	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PreparePodNetworkLossFault")
 	defer span.End()
 
-	args := "loss " + experimentsDetails.NetworkPacketLossPercentage
+	args := "netem loss " + experimentsDetails.NetworkPacketLossPercentage
+	if experimentsDetails.Correlation > 0 {
+		args = fmt.Sprintf("%s %d", args, experimentsDetails.Correlation)
+	}
+
 	return network_chaos.PrepareAndInjectChaos(ctx, experimentsDetails, clients, resultDetails, eventsDetails, chaosDetails, args)
 }
