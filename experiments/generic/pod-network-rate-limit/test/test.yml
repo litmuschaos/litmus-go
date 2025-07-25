@@ -1,0 +1,95 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: litmus-experiment
+spec:
+  replicas: 1
+  selector: 
+    matchLabels:
+      app: litmus-experiment
+  template:
+    metadata:
+      labels:
+        app: litmus-experiment
+    spec:
+      serviceAccountName: pod-network-rate-limit-sa
+      containers:
+      - name: gotest
+        image: busybox
+        command:
+          - sleep 
+          - "3600"
+        env:
+          - name: APP_NAMESPACE
+            value: 'default'
+
+          - name: APP_LABEL
+            value: 'run=nginx'
+
+          - name: TARGET_CONTAINER
+            value: 'nginx'
+
+          - name: APP_KIND
+            value: 'deployment'
+
+          - name: NETWORK_INTERFACE
+            value: 'eth0'
+
+          - name: TC_IMAGE
+            value: 'gaiadocker/iproute2'
+
+          - name: NETWORK_BANDWIDTH
+            value: "1mbit"
+
+          - name: BURST
+            value: "32kb"
+
+          - name: LIMIT
+            value: "2mb"
+
+          - name: MIN_BURST
+            value: ""
+
+          - name: PEAK_RATE
+            value: ""
+
+          - name: TOTAL_CHAOS_DURATION
+            value: '60' 
+
+          - name: TARGET_POD
+            value: ''
+
+          - name: LIB_IMAGE
+            value: 'litmuschaos/go-runner:ci'
+
+          - name: CHAOS_NAMESPACE
+            value: 'default'
+
+          - name: RAMP_TIME
+            value: ''
+
+           ## percentage of total pods to target
+          - name: PODS_AFFECTED_PERC
+            value: ''
+
+          # provide the name of container runtime
+          # it supports docker, containerd, crio
+          # defaults to containerd
+          - name: CONTAINER_RUNTIME
+            value: 'containerd'
+
+          # provide the container runtime path
+          # applicable only for containerd and crio runtime
+          - name: SOCKET_PATH
+            value: '/run/containerd/containerd.sock'
+
+          - name: CHAOS_SERVICE_ACCOUNT
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.serviceAccountName
+
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name

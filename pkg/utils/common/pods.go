@@ -90,6 +90,7 @@ func SetHelperData(chaosDetails *types.ChaosDetails, setHelperData string, clien
 			delete(labels, label)
 		}
 	}
+
 	chaosDetails.Labels = labels
 
 	switch setHelperData {
@@ -97,19 +98,29 @@ func SetHelperData(chaosDetails *types.ChaosDetails, setHelperData string, clien
 		return nil
 
 	default:
-
 		// Get Chaos Pod Annotation
 		chaosDetails.Annotations = pod.Annotations
 
 		// Get ImagePullSecrets
 		chaosDetails.ImagePullSecrets = pod.Spec.ImagePullSecrets
 
+		//Get Tolerations
+		chaosDetails.Tolerations = pod.Spec.Tolerations
+
 		// Get Resource Requirements
 		chaosDetails.Resources, err = getChaosPodResourceRequirements(pod, chaosDetails.ExperimentName)
 		if err != nil {
 			return stacktrace.Propagate(err, "could not inherit resource requirements")
 		}
-		return nil
+
+		switch setHelperData {
+		case "false":
+			return nil
+		default:
+			// Get Chaos Pod Annotation
+			chaosDetails.Annotations = pod.Annotations
+			return nil
+		}
 	}
 }
 
@@ -358,14 +369,16 @@ func DeleteHelperPodBasedOnJobCleanupPolicy(podName, podLabel string, chaosDetai
 }
 
 // DeleteAllHelperPodBasedOnJobCleanupPolicy delete all the helper pods w/ matching label based on jobCleanupPolicy
-func DeleteAllHelperPodBasedOnJobCleanupPolicy(podLabel string, chaosDetails *types.ChaosDetails, clients clients.ClientSets) {
-
+func DeleteAllHelperPodBasedOnJobCleanupPolicy(podLabel string, chaosDetails *types.ChaosDetails, clients clients.ClientSets) error {
 	if chaosDetails.JobCleanupPolicy == "delete" {
 		log.Info("[Cleanup]: Deleting all the helper pods")
 		if err := DeleteAllPod(podLabel, chaosDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients); err != nil {
-			log.Errorf("Unable to delete the helper pods, err: %v", err)
+			return stacktrace.Propagate(err, "could not delete helper pod(s)")
 		}
+	} else {
+		log.Infof("[Cleanup]: Skipping deletion of helper pods as JOB_CLEANUP_POLICY is set to %s", chaosDetails.JobCleanupPolicy)
 	}
+	return nil
 }
 
 // GetServiceAccount derive the serviceAccountName for the helper pod
@@ -379,7 +392,7 @@ func GetServiceAccount(chaosNamespace, chaosPodName string, clients clients.Clie
 
 // GetExperimentPod fetch the experiment pod
 func GetExperimentPod(name, namespace string, clients clients.ClientSets) (*core_v1.Pod, error) {
-	pod, err := clients.KubeClient.CoreV1().Pods(namespace).Get(context.Background(), name, v1.GetOptions{})
+	pod, err := clients.GetPod(namespace, name, 180, 2)
 	if err != nil {
 		return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Target: fmt.Sprintf("{podName: %s, namespace: %s}", name, namespace), Reason: fmt.Sprintf("failed to get experiment pod: %s", err.Error())}
 	}
@@ -388,8 +401,7 @@ func GetExperimentPod(name, namespace string, clients clients.ClientSets) (*core
 
 // GetContainerID  derive the container id of the application container
 func GetContainerID(appNamespace, targetPod, targetContainer string, clients clients.ClientSets, source string) (string, error) {
-
-	pod, err := clients.KubeClient.CoreV1().Pods(appNamespace).Get(context.Background(), targetPod, v1.GetOptions{})
+	pod, err := clients.GetPod(appNamespace, targetPod, 180, 2)
 	if err != nil {
 		return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeHelper, Source: source, Target: fmt.Sprintf("{podName: %s, namespace: %s}", targetPod, appNamespace), Reason: err.Error()}
 	}
@@ -405,7 +417,7 @@ func GetContainerID(appNamespace, targetPod, targetContainer string, clients cli
 		}
 	}
 	if containerID == "" {
-		return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeContainerRuntime, Source: source, Target: fmt.Sprintf("{podName: %s, namespace: %s, container: %s}", targetPod, appNamespace, targetContainer), Reason: fmt.Sprintf("no container found with specified name")}
+		return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeContainerRuntime, Source: source, Target: fmt.Sprintf("{podName: %s, namespace: %s, container: %s}", targetPod, appNamespace, targetContainer), Reason: "no container found with specified name"}
 	}
 	return containerID, nil
 }
@@ -640,4 +652,14 @@ func GetAppDetailsForLogging(appDetails []types.AppDetails) string {
 		return fmt.Sprintf("[%v]", strings.Join(result, ","))
 	}
 	return ""
+}
+
+func ManagerHelperLifecycle(label string, chaosDetails *types.ChaosDetails, clients clients.ClientSets, podLevel bool) error {
+	err := checkHelperStatus(label, chaosDetails, clients)
+	if err != nil {
+		return err
+	}
+
+	// waiting till the completion of helper pod and delete the helper pods based on job cleanup policy
+	return WaitForCompletionAndDeleteHelperPods(label, chaosDetails, clients, podLevel)
 }

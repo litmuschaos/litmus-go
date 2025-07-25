@@ -26,6 +26,7 @@ type ExperimentDetails struct {
 	NetworkLatency                     int
 	NetworkPacketLossPercentage        string
 	NetworkPacketCorruptionPercentage  string
+	Correlation                        int
 	Timeout                            int
 	Delay                              int
 	TargetPods                         string
@@ -44,4 +45,9 @@ type ExperimentDetails struct {
 	SetHelperData                      string
 	SourcePorts                        string
 	DestinationPorts                   string
+	NetworkBandwidth                   string
+	Burst                              string
+	Limit                              string
+	PeakRate                           string
+	MinBurst                           string
 }
