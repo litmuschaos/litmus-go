@@ -52,7 +52,7 @@ func PrepareAndInjectChaos(ctx context.Context, experimentsDetails *experimentTy
 	if experimentsDetails.ChaosServiceAccount == "" {
 		experimentsDetails.ChaosServiceAccount, err = common.GetServiceAccount(experimentsDetails.ChaosNamespace, experimentsDetails.ChaosPodName, clients)
 		if err != nil {
-			return stacktrace.Propagate(err, "could not  experiment service account")
+			return stacktrace.Propagate(err, "could not get experiment service account")
 		}
 	}
 

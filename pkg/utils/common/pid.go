@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/litmuschaos/litmus-go/pkg/cerrors"
-	"github.com/palantir/stacktrace"
 	"os/exec"
 	"strconv"
 	"strings"
+
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
+	"github.com/palantir/stacktrace"
 
 	"github.com/litmuschaos/litmus-go/pkg/log"
 )
@@ -103,7 +104,7 @@ func getContainerdPID(containerID, socketPath, source string) (int, error) {
 	}
 	pid = resp.Info.PID
 	if pid == 0 {
-		return 0, cerrors.Error{ErrorCode: cerrors.ErrorTypeContainerRuntime, Source: source, Target: fmt.Sprintf("{containerID: %s}", containerID), Reason: fmt.Sprintf("no running target container found")}
+		return 0, cerrors.Error{ErrorCode: cerrors.ErrorTypeContainerRuntime, Source: source, Target: fmt.Sprintf("{containerID: %s}", containerID), Reason: "no running target container found"}
 	}
 	return pid, nil
 }
@@ -150,7 +151,7 @@ func GetPauseAndSandboxPID(runtime, containerID, socketPath, source string) (int
 	}
 
 	if pid == 0 {
-		return 0, cerrors.Error{ErrorCode: cerrors.ErrorTypeHelper, Source: source, Target: fmt.Sprintf("containerID: %s", containerID), Reason: fmt.Sprintf("no running target container found")}
+		return 0, cerrors.Error{ErrorCode: cerrors.ErrorTypeHelper, Source: source, Target: fmt.Sprintf("containerID: %s", containerID), Reason: "no running target container found"}
 	}
 
 	log.Info(fmt.Sprintf("[Info]: Container ID=%s has process PID=%d", containerID, pid))

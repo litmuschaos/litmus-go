@@ -59,7 +59,7 @@ func PrepareContainerKill(ctx context.Context, experimentsDetails *experimentTyp
 	if experimentsDetails.ChaosServiceAccount == "" {
 		experimentsDetails.ChaosServiceAccount, err = common.GetServiceAccount(experimentsDetails.ChaosNamespace, experimentsDetails.ChaosPodName, clients)
 		if err != nil {
-			return stacktrace.Propagate(err, "could not  experiment service account")
+			return stacktrace.Propagate(err, "could not get experiment service account")
 		}
 	}
 
