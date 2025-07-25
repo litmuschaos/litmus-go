@@ -57,6 +57,7 @@ import (
 	podNetworkLatency "github.com/litmuschaos/litmus-go/experiments/generic/pod-network-latency/experiment"
 	podNetworkLoss "github.com/litmuschaos/litmus-go/experiments/generic/pod-network-loss/experiment"
 	podNetworkPartition "github.com/litmuschaos/litmus-go/experiments/generic/pod-network-partition/experiment"
+	podNetworkRateLimit "github.com/litmuschaos/litmus-go/experiments/generic/pod-network-rate-limit/experiment"
 	kafkaBrokerPodFailure "github.com/litmuschaos/litmus-go/experiments/kafka/kafka-broker-pod-failure/experiment"
 	ebsLossByID "github.com/litmuschaos/litmus-go/experiments/kube-aws/ebs-loss-by-id/experiment"
 	ebsLossByTag "github.com/litmuschaos/litmus-go/experiments/kube-aws/ebs-loss-by-tag/experiment"
@@ -155,6 +156,8 @@ func main() {
 		podNetworkLoss.PodNetworkLoss(ctx, clients)
 	case "pod-network-partition":
 		podNetworkPartition.PodNetworkPartition(ctx, clients)
+	case "pod-network-rate-limit":
+		podNetworkRateLimit.PodNetworkRateLimit(ctx, clients)
 	case "pod-memory-hog":
 		podMemoryHog.PodMemoryHog(ctx, clients)
 	case "pod-cpu-hog":

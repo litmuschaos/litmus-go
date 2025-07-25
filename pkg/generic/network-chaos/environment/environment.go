@@ -37,6 +37,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string
 	experimentDetails.SetHelperData = types.Getenv("SET_HELPER_DATA", "true")
 	experimentDetails.SourcePorts = types.Getenv("SOURCE_PORTS", "")
 	experimentDetails.DestinationPorts = types.Getenv("DESTINATION_PORTS", "")
+	experimentDetails.Correlation, _ = strconv.Atoi(types.Getenv("CORRELATION", "0"))
 
 	switch expName {
 	case "pod-network-loss":
@@ -55,5 +56,13 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string
 	case "pod-network-duplication":
 		experimentDetails.NetworkPacketDuplicationPercentage = types.Getenv("NETWORK_PACKET_DUPLICATION_PERCENTAGE", "100")
 		experimentDetails.NetworkChaosType = "network-duplication"
+
+	case "pod-network-rate-limit":
+		experimentDetails.NetworkBandwidth = types.Getenv("NETWORK_BANDWIDTH", "1mbit")
+		experimentDetails.Burst = types.Getenv("BURST", "32kb")
+		experimentDetails.Limit = types.Getenv("LIMIT", "2mb")
+		experimentDetails.MinBurst = types.Getenv("MIN_BURST", "")
+		experimentDetails.PeakRate = types.Getenv("PEAK_RATE", "")
+		experimentDetails.NetworkChaosType = "network-rate-limit"
 	}
 }
