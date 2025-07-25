@@ -2,12 +2,17 @@ package ssm
 
 import (
 	"fmt"
+	"math"
+	"math/rand"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/service/ssm"
+
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/aws-ssm/aws-ssm-chaos/types"
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	"github.com/litmuschaos/litmus-go/pkg/cloud/aws/common"
@@ -22,6 +27,14 @@ const (
 	// DefaultSSMDocsDirectory contains path of the ssm docs
 	DefaultSSMDocsDirectory = "LitmusChaos-AWS-SSM-Docs.yml"
 )
+
+// awsErrHasCode checks if an AWS error has a specific error code
+func awsErrHasCode(err error, code string) bool {
+	if aerr, ok := err.(awserr.Error); ok {
+		return aerr.Code() == code
+	}
+	return false
+}
 
 // SendSSMCommand will create and add the ssm document in aws service monitoring docs.
 func SendSSMCommand(experimentsDetails *experimentTypes.ExperimentDetails, ec2InstanceID []string) (string, error) {
@@ -126,48 +139,116 @@ func getSSMCommandStatus(commandID, ec2InstanceID, region string) (string, error
 	return *cmdOutput.Status, nil
 }
 
-// CheckInstanceInformation will check if the instance has permission to do smm api calls
+// CheckInstanceInformation checks if the instance has permission to do SSM API calls,
 func CheckInstanceInformation(experimentsDetails *experimentTypes.ExperimentDetails) error {
-
 	var instanceIDList []string
+	var input *ssm.DescribeInstanceInformationInput
+
 	switch {
 	case experimentsDetails.EC2InstanceID != "":
+		// If specific instance IDs are provided, use instance ID filter
 		instanceIDList = strings.Split(experimentsDetails.EC2InstanceID, ",")
+
+		input = &ssm.DescribeInstanceInformationInput{
+			Filters: []*ssm.InstanceInformationStringFilter{
+				{
+					Key:    aws.String("InstanceIds"),
+					Values: aws.StringSlice(instanceIDList),
+				},
+			},
+		}
 	default:
+		// If using tags, first verify we have valid targets
 		if err := CheckTargetInstanceStatus(experimentsDetails); err != nil {
 			return stacktrace.Propagate(err, "failed to check target instance(s) status")
 		}
 		instanceIDList = experimentsDetails.TargetInstanceIDList
 
+		// For filtering by instance IDs that we collected from tags
+		input = &ssm.DescribeInstanceInformationInput{
+			Filters: []*ssm.InstanceInformationStringFilter{
+				{
+					Key:    aws.String("InstanceIds"),
+					Values: aws.StringSlice(instanceIDList),
+				},
+			},
+		}
 	}
+
 	sesh := common.GetAWSSession(experimentsDetails.Region)
 	ssmClient := ssm.New(sesh)
-	for _, ec2ID := range instanceIDList {
-		res, err := ssmClient.DescribeInstanceInformation(&ssm.DescribeInstanceInformationInput{})
+	var (
+		foundInstances   = make(map[string]bool)
+		err              error
+		maxRetries       = 5
+		maxRetryDuration = time.Second * 30
+		startTime        = time.Now()
+	)
+
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		if time.Since(startTime) > maxRetryDuration {
+			break
+		}
+
+		err = ssmClient.DescribeInstanceInformationPages(input,
+			func(page *ssm.DescribeInstanceInformationOutput, lastPage bool) bool {
+				for _, instanceDetails := range page.InstanceInformationList {
+					if instanceDetails.InstanceId != nil {
+						foundInstances[*instanceDetails.InstanceId] = true
+					}
+				}
+				return true // continue to next page
+			})
+
 		if err != nil {
+			awsErr := common.CheckAWSError(err)
+			if request.IsErrorThrottle(err) ||
+				awsErrHasCode(awsErr, "ThrottlingException") ||
+				awsErrHasCode(awsErr, "RequestThrottledException") ||
+				awsErrHasCode(awsErr, "Throttling") ||
+				awsErrHasCode(awsErr, "TooManyRequestsException") ||
+				awsErrHasCode(awsErr, "RequestLimitExceeded") {
+
+				// Calculate exponential backoff with jitter
+				backoffTime := time.Duration(math.Pow(2, float64(attempt))) * time.Second
+				rnd := rand.New(rand.NewSource(time.Now().UnixNano()))
+				jitter := time.Duration(rnd.Intn(1000)) * time.Millisecond
+				sleepTime := backoffTime + jitter
+
+				log.Infof("AWS API rate limit hit, retrying in %v (attempt %d/%d)", sleepTime, attempt+1, maxRetries)
+				time.Sleep(sleepTime)
+				continue
+			}
+
 			return cerrors.Error{
 				ErrorCode: cerrors.ErrorTypeChaosInject,
-				Reason:    fmt.Sprintf("failed to get instance information: %v", common.CheckAWSError(err).Error()),
+				Reason:    fmt.Sprintf("failed to get instance information: %v", awsErr.Error()),
+				Target:    fmt.Sprintf("{Region: %v}", experimentsDetails.Region),
+			}
+		}
+
+		break
+	}
+
+	if err != nil {
+		return cerrors.Error{
+			ErrorCode: cerrors.ErrorTypeChaosInject,
+			Reason:    fmt.Sprintf("failed to get instance information after retries: %v", common.CheckAWSError(err).Error()),
+			Target:    fmt.Sprintf("{Region: %v}", experimentsDetails.Region),
+		}
+	}
+
+	// Validate that each target instance is present.
+	for _, ec2ID := range instanceIDList {
+		if _, exists := foundInstances[ec2ID]; !exists {
+			return cerrors.Error{
+				ErrorCode: cerrors.ErrorTypeChaosInject,
+				Reason:    fmt.Sprintf("the instance %v might not have suitable permission or IAM attached to it. Run command `aws ssm describe-instance-information` to check for available instances", ec2ID),
 				Target:    fmt.Sprintf("{EC2 Instance ID: %v, Region: %v}", ec2ID, experimentsDetails.Region),
 			}
 		}
-		isInstanceFound := false
-		if len(res.InstanceInformationList) != 0 {
-			for _, instanceDetails := range res.InstanceInformationList {
-				if *instanceDetails.InstanceId == ec2ID {
-					isInstanceFound = true
-					break
-				}
-			}
-			if !isInstanceFound {
-				return cerrors.Error{
-					ErrorCode: cerrors.ErrorTypeChaosInject,
-					Reason:    fmt.Sprintf("the instance %v might not have suitable permission or IAM attached to it. Run command `aws ssm describe-instance-information` to check for available instances", ec2ID),
-					Target:    fmt.Sprintf("{EC2 Instance ID: %v, Region: %v}", ec2ID, experimentsDetails.Region),
-				}
-			}
-		}
 	}
+
 	log.Info("[Info]: The target instance have permission to perform SSM API calls")
 	return nil
 }
