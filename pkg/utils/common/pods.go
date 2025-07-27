@@ -119,8 +119,8 @@ func GetHelperLabels(labels map[string]string, runID, experimentName string) map
 	return labels
 }
 
-// VerifyExistanceOfPods check the availibility of list of pods
-func VerifyExistanceOfPods(namespace, pods string, clients clients.ClientSets) (bool, error) {
+// VerifyExistenceOfPods check the availability of list of pods
+func VerifyExistenceOfPods(namespace, pods string, clients clients.ClientSets) (bool, error) {
 
 	if strings.TrimSpace(pods) == "" {
 		return false, nil
@@ -150,7 +150,7 @@ func GetPodList(targetPods string, podAffPerc int, clients clients.ClientSets, c
 		namespace = chaosDetails.ChaosNamespace
 	}
 
-	isPodsAvailable, err := VerifyExistanceOfPods(namespace, targetPods, clients)
+	isPodsAvailable, err := VerifyExistenceOfPods(namespace, targetPods, clients)
 	if err != nil {
 		return core_v1.PodList{}, stacktrace.Propagate(err, "could not verify existence of TARGET_PODS")
 	}
@@ -274,12 +274,26 @@ func GetTargetPodsWhenTargetPodsENVNotSet(podAffPerc int, clients clients.Client
 	for _, target := range chaosDetails.AppDetail {
 		switch target.Kind {
 		case "pod":
-			for _, name := range target.Names {
-				pod, err := clients.KubeClient.CoreV1().Pods(target.Namespace).Get(context.Background(), name, v1.GetOptions{})
-				if err != nil {
-					return finalPods, cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Target: fmt.Sprintf("{podName: %s, namespace: %s}", name, target.Namespace), Reason: err.Error()}
+			if target.Names != nil {
+				for _, name := range target.Names {
+					pod, err := clients.KubeClient.CoreV1().Pods(target.Namespace).Get(context.Background(), name, v1.GetOptions{})
+					if err != nil {
+						return finalPods, cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Target: fmt.Sprintf("{podName: %s, namespace: %s}", name, target.Namespace), Reason: err.Error()}
+					}
+					finalPods.Items = append(finalPods.Items, *pod)
 				}
-				finalPods.Items = append(finalPods.Items, *pod)
+			} else {
+				for _, label := range target.Labels {
+					pods, err := clients.KubeClient.CoreV1().Pods(target.Namespace).List(context.Background(), v1.ListOptions{LabelSelector: label})
+					if err != nil {
+						return finalPods, cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Target: fmt.Sprintf("{podLabel: %s, namespace: %s}", label, target.Namespace), Reason: err.Error()}
+					}
+					filteredPods, err := filterPodsByOwnerKind(pods.Items, target, clients)
+					if err != nil {
+						return finalPods, stacktrace.Propagate(err, "could not identify parent type from pod")
+					}
+					finalPods.Items = append(finalPods.Items, filteredPods...)
+				}
 			}
 			podKind = true
 		default:

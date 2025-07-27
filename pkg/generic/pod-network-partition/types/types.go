@@ -12,7 +12,6 @@ type ExperimentDetails struct {
 	RampTime           int
 	AppNS              string
 	AppLabel           string
-	AppKind            string
 	ChaosUID           clientTypes.UID
 	InstanceID         string
 	LIBImagePullPolicy string
@@ -26,5 +25,5 @@ type ExperimentDetails struct {
 	PolicyTypes        string
 	PodSelector        string
 	NamespaceSelector  string
-	PORTS              string
+	Ports              string
 }
