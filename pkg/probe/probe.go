@@ -129,7 +129,7 @@ func SetProbeVerdictAfterFailure(result *v1alpha1.ChaosResult) {
 }
 
 func getProbesFromChaosEngine(chaosDetails *types.ChaosDetails, clients clients.ClientSets) ([]v1alpha1.ProbeAttributes, error) {
-	engine, err := types.GetChaosEngine(chaosDetails, clients)
+	engine, err := clients.GetChaosEngine(chaosDetails)
 	if err != nil {
 		return nil, err
 	}

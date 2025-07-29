@@ -1,7 +1,6 @@
 package cassandra
 
 import (
-	"context"
 	"fmt"
 	"strings"
 
@@ -12,7 +11,6 @@ import (
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/cassandra/pod-delete/types"
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/log"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // NodeToolStatusCheck checks for the distribution of the load on the ring
@@ -47,7 +45,7 @@ func NodeToolStatusCheck(experimentsDetails *experimentTypes.ExperimentDetails, 
 
 // GetApplicationPodName will return the name of first application pod
 func GetApplicationPodName(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) (string, error) {
-	podList, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaoslibDetail.AppNS).List(context.Background(), metav1.ListOptions{LabelSelector: experimentsDetails.ChaoslibDetail.AppLabel})
+	podList, err := clients.ListPods(experimentsDetails.ChaoslibDetail.AppNS, experimentsDetails.ChaoslibDetail.AppLabel)
 	if err != nil {
 		return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("failed to get the application pod in %v namespace, err: %v", experimentsDetails.ChaoslibDetail.AppNS, err)}
 	} else if len(podList.Items) == 0 {
@@ -59,7 +57,7 @@ func GetApplicationPodName(experimentsDetails *experimentTypes.ExperimentDetails
 
 // GetApplicationReplicaCount will return the replica count of the sts application
 func GetApplicationReplicaCount(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) (int, error) {
-	podList, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaoslibDetail.AppNS).List(context.Background(), metav1.ListOptions{LabelSelector: experimentsDetails.ChaoslibDetail.AppLabel})
+	podList, err := clients.ListPods(experimentsDetails.ChaoslibDetail.AppNS, experimentsDetails.ChaoslibDetail.AppLabel)
 	if err != nil {
 		return 0, cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("failed to get the application pod in %v namespace, err: %v", experimentsDetails.ChaoslibDetail.AppNS, err)}
 	} else if len(podList.Items) == 0 {
