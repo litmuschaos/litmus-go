@@ -275,10 +275,10 @@ func createHelperPod(ctx context.Context, experimentsDetails *experimentTypes.Ex
 		helperPod.Spec.Volumes = append(helperPod.Spec.Volumes, common.GetSidecarVolumes(chaosDetails)...)
 	}
 
-	_, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Create(context.Background(), helperPod, v1.CreateOptions{})
-	if err != nil {
+	if err := clients.CreatePod(experimentsDetails.ChaosNamespace, helperPod); err != nil {
 		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("unable to create helper pod: %s", err.Error())}
 	}
+
 	return nil
 }
 
@@ -344,7 +344,7 @@ func getPodIPFromService(host string, clients clients.ClientSets) ([]string, err
 		return ips, cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Target: fmt.Sprintf("{host: %s}", host), Reason: "provide the valid FQDN for service in '<svc-name>.<namespace>.svc.cluster.local format"}
 	}
 	svcName, svcNs := svcFields[0], svcFields[1]
-	svc, err := clients.KubeClient.CoreV1().Services(svcNs).Get(context.Background(), svcName, v1.GetOptions{})
+	svc, err := clients.GetService(svcNs, svcName)
 	if err != nil {
 		if k8serrors.IsForbidden(err) {
 			log.Warnf("forbidden - failed to get %v service in %v namespace, err: %v", svcName, svcNs, err)
@@ -365,7 +365,7 @@ func getPodIPFromService(host string, clients clients.ClientSets) ([]string, err
 		svcSelector += fmt.Sprintf(",%s=%s", k, v)
 	}
 
-	pods, err := clients.KubeClient.CoreV1().Pods(svcNs).List(context.Background(), v1.ListOptions{LabelSelector: svcSelector})
+	pods, err := clients.ListPods(svcNs, svcSelector)
 	if err != nil {
 		return ips, cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Target: fmt.Sprintf("{svcName: %s,podLabel: %s, namespace: %s}", svcNs, svcSelector, svcNs), Reason: fmt.Sprintf("failed to derive pods from service: %s", err.Error())}
 	}

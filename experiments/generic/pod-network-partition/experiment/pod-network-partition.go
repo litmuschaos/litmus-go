@@ -39,7 +39,7 @@ func PodNetworkPartition(ctx context.Context, clients clients.ClientSets) {
 
 	if experimentsDetails.EngineName != "" {
 		// Get values from chaosengine. Bail out upon error, as we haven't entered exp business logic yet
-		if err := types.GetValuesFromChaosEngine(&chaosDetails, clients, &resultDetails); err != nil {
+		if err := common.GetValuesFromChaosEngine(&chaosDetails, clients, &resultDetails); err != nil {
 			log.Errorf("unable to initialize the probes, err: %v", err)
 			return
 		}

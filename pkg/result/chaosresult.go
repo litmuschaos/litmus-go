@@ -50,7 +50,7 @@ func ChaosResult(chaosDetails *types.ChaosDetails, clients clients.ClientSets, r
 	// skipping the derivation of labels from chaos pod, if phase is stopped
 	if chaosDetails.EngineName != "" && resultDetails.Phase != "Stopped" {
 		// Getting chaos pod label and passing it in chaos result
-		chaosPod, err := clients.KubeClient.CoreV1().Pods(chaosDetails.ChaosNamespace).Get(context.Background(), chaosDetails.ChaosPodName, v1.GetOptions{})
+		chaosPod, err := clients.GetPod(chaosDetails.ChaosNamespace, chaosDetails.ChaosPodName, chaosDetails.Timeout, chaosDetails.Delay)
 		if err != nil {
 			return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Target: fmt.Sprintf("{name: %s, namespace: %s}", chaosDetails.ChaosPodName, chaosDetails.ChaosNamespace), Reason: fmt.Sprintf("failed to get experiment pod :%s", err.Error())}
 		}

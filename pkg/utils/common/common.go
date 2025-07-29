@@ -3,8 +3,6 @@ package common
 import (
 	"bytes"
 	"fmt"
-	"github.com/litmuschaos/litmus-go/pkg/cerrors"
-	"github.com/palantir/stacktrace"
 	"math/rand"
 	"os"
 	"os/exec"
@@ -15,6 +13,9 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
+	"github.com/palantir/stacktrace"
 
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
@@ -321,4 +322,25 @@ func GetContainerNames(chaosDetails *types.ChaosDetails) []string {
 		containerNames = append(containerNames, c.Name)
 	}
 	return containerNames
+}
+
+// GetValuesFromChaosEngine get the values from the chaosengine
+func GetValuesFromChaosEngine(chaosDetails *types.ChaosDetails, clients clients.ClientSets, chaosresult *types.ResultDetails) error {
+	// get the chaosengine instance
+	engine, err := clients.GetChaosEngine(chaosDetails)
+	if err != nil {
+		return stacktrace.Propagate(err, "could not get chaosengine")
+	}
+
+	// get all the probes defined inside chaosengine for the corresponding experiment
+	for _, experiment := range engine.Spec.Experiments {
+		if experiment.Name == chaosDetails.ExperimentName {
+			if err := types.InitializeProbesInChaosResultDetails(chaosresult, experiment.Spec.Probe); err != nil {
+				return stacktrace.Propagate(err, "could not initialize probe")
+			}
+			types.InitializeSidecarDetails(chaosDetails, engine, experiment.Spec.Components.ENV)
+		}
+	}
+
+	return nil
 }

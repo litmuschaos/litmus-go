@@ -95,8 +95,7 @@ func LivenessCleanup(experimentsDetails *experimentTypes.ExperimentDetails, clie
 
 // GetLivenessPodResourceVersion will return the resource version of the liveness pod
 func GetLivenessPodResourceVersion(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) (string, error) {
-
-	livenessPods, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaoslibDetail.AppNS).List(context.Background(), metav1.ListOptions{LabelSelector: "name=cassandra-liveness-deploy-" + experimentsDetails.RunID})
+	livenessPods, err := clients.ListPods(experimentsDetails.ChaoslibDetail.AppNS, fmt.Sprintf("name=cassandra-liveness-deploy-%s", experimentsDetails.RunID))
 	if err != nil {
 		return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("failed to get the liveness pod, %s", err.Error())}
 	} else if len(livenessPods.Items) == 0 {
@@ -109,12 +108,10 @@ func GetLivenessPodResourceVersion(experimentsDetails *experimentTypes.Experimen
 
 // GetServiceClusterIP will return the cluster IP of the liveness service
 func GetServiceClusterIP(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) (string, error) {
-
-	service, err := clients.KubeClient.CoreV1().Services(experimentsDetails.ChaoslibDetail.AppNS).Get(context.Background(), "cassandra-liveness-service-"+experimentsDetails.RunID, metav1.GetOptions{})
+	service, err := clients.GetService(experimentsDetails.ChaoslibDetail.AppNS, fmt.Sprintf("cassandra-liveness-service-%s", experimentsDetails.RunID))
 	if err != nil {
 		return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("failed to fetch the liveness service, %s", err.Error())}
 	}
-
 	return service.Spec.ClusterIP, nil
 }
 
@@ -328,8 +325,8 @@ func CreateLivenessPod(experimentsDetails *experimentTypes.ExperimentDetails, cl
 	}
 
 	// Creating liveness deployment
-	_, err := clients.KubeClient.AppsV1().Deployments(experimentsDetails.ChaoslibDetail.AppNS).Create(context.Background(), liveness, metav1.CreateOptions{})
-	if err != nil {
+	// Creating liveness deployment
+	if err := clients.CreateDeployment(experimentsDetails.ChaoslibDetail.AppNS, liveness); err != nil {
 		return cerrors.Error{ErrorCode: cerrors.ErrorTypeStatusChecks, Target: fmt.Sprintf("{deploymentName: %s, namespace: %s}", liveness.Name, liveness.Namespace), Reason: fmt.Sprintf("unable to create liveness deployment, %s", err.Error())}
 	}
 	log.Info("Liveness Deployment Created successfully!")
@@ -366,8 +363,7 @@ func CreateLivenessService(experimentsDetails *experimentTypes.ExperimentDetails
 	}
 
 	// Creating liveness service
-	_, err := clients.KubeClient.CoreV1().Services(experimentsDetails.ChaoslibDetail.AppNS).Create(context.Background(), livenessSvc, metav1.CreateOptions{})
-	if err != nil {
+	if err := clients.CreateService(experimentsDetails.ChaoslibDetail.AppNS, livenessSvc); err != nil {
 		return cerrors.Error{ErrorCode: cerrors.ErrorTypeStatusChecks, Target: fmt.Sprintf("{serviceName: %s, namespace: %s}", livenessSvc.Name, livenessSvc.Namespace), Reason: fmt.Sprintf("unable to create liveness service, %s", err.Error())}
 	}
 	log.Info("Liveness service created successfully!")
