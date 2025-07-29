@@ -358,14 +358,16 @@ func DeleteHelperPodBasedOnJobCleanupPolicy(podName, podLabel string, chaosDetai
 }
 
 // DeleteAllHelperPodBasedOnJobCleanupPolicy delete all the helper pods w/ matching label based on jobCleanupPolicy
-func DeleteAllHelperPodBasedOnJobCleanupPolicy(podLabel string, chaosDetails *types.ChaosDetails, clients clients.ClientSets) {
-
+func DeleteAllHelperPodBasedOnJobCleanupPolicy(podLabel string, chaosDetails *types.ChaosDetails, clients clients.ClientSets) error {
 	if chaosDetails.JobCleanupPolicy == "delete" {
 		log.Info("[Cleanup]: Deleting all the helper pods")
 		if err := DeleteAllPod(podLabel, chaosDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients); err != nil {
-			log.Errorf("Unable to delete the helper pods, err: %v", err)
+			return stacktrace.Propagate(err, "could not delete helper pod(s)")
 		}
+	} else {
+		log.Infof("[Cleanup]: Skipping deletion of helper pods as JOB_CLEANUP_POLICY is set to %s", chaosDetails.JobCleanupPolicy)
 	}
+	return nil
 }
 
 // GetServiceAccount derive the serviceAccountName for the helper pod
@@ -640,4 +642,14 @@ func GetAppDetailsForLogging(appDetails []types.AppDetails) string {
 		return fmt.Sprintf("[%v]", strings.Join(result, ","))
 	}
 	return ""
+}
+
+func ManagerHelperLifecycle(label string, chaosDetails *types.ChaosDetails, clients clients.ClientSets, podLevel bool) error {
+	err := checkHelperStatus(label, chaosDetails, clients)
+	if err != nil {
+		return err
+	}
+
+	// waiting till the completion of helper pod and delete the helper pods based on job cleanup policy
+	return WaitForCompletionAndDeleteHelperPods(label, chaosDetails, clients, podLevel)
 }
