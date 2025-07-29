@@ -1,20 +1,21 @@
 package workloads
 
 import (
-	"testing"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/dynamic"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime" 
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	dfake "k8s.io/client-go/dynamic/fake"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
+	dfake "k8s.io/client-go/dynamic/fake"
+	"testing"
 )
 
-var fakeDynamicClient dynamic.Interface = nil 
+var fakeDynamicClient dynamic.Interface = nil
+
 func Test_getPodsFromWorkload(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -99,13 +100,13 @@ func Test_getParent(t *testing.T) {
 
 	scheme := runtime.NewScheme()
 	tests := []struct {
-		name           string
-		resourceName   string
-		namespace      string
-		owners         []metav1.OwnerReference
-		expectKind     string
-		expectName     string
-		expectError    bool
+		name         string
+		resourceName string
+		namespace    string
+		owners       []metav1.OwnerReference
+		expectKind   string
+		expectName   string
+		expectError  bool
 	}{
 		{
 			name:         "has deployment owner",
