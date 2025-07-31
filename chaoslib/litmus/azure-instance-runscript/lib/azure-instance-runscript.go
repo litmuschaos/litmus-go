@@ -9,7 +9,7 @@ import (
 	"syscall"
 	"time"
 
-	instanceRunScript "pkg/azure/instance-runscript"
+	instanceRunScript "github.com/litmuschaos/litmus-go/pkg/azure/instance-runscript"
 
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/azure/instance-runscript/types"
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
@@ -111,7 +111,7 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 				if experimentsDetails.ScaleSet == "enable" {
 					// Yet to implement
 				} else {
-					if err := instanceRunScript.AzureInstanceRunScript(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, vmName, experimentDetails.PowershellChaosStartBase64OrPsFilePath, experimentDetails.IsBase64, experimentDetails.PowershellChaosStartParamNames, experimentDetails.PowershellChaosStartParamValues); err != nil {
+					if err := instanceRunScript.AzureInstanceRunScript(experimentsDetails.Timeout, experimentsDetails.Delay, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup, vmName, experimentsDetails.PowershellChaosStartBase64OrPsFilePath, experimentsDetails.IsBase64, experimentsDetails.PowershellChaosStartParamNames, experimentsDetails.PowershellChaosStartParamValues); err != nil {
 						return stacktrace.Propagate(err, "unable to run script in the Azure instance")
 					}
 				}
