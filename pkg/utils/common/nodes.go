@@ -3,18 +3,21 @@ package common
 import (
 	"context"
 	"fmt"
-	"github.com/litmuschaos/litmus-go/pkg/cerrors"
-	"github.com/palantir/stacktrace"
 	"math/rand"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/palantir/stacktrace"
+	apiv1 "k8s.io/api/core/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/math"
-	apiv1 "k8s.io/api/core/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"github.com/litmuschaos/litmus-go/pkg/status"
+	"github.com/litmuschaos/litmus-go/pkg/types"
 )
 
 var err error
@@ -104,4 +107,38 @@ func getNodesByLabels(nodeLabel string, clients clients.ClientSets) (*apiv1.Node
 		return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Target: fmt.Sprintf("{nodeLabel: %s}", nodeLabel), Reason: "no node found with matching labels"}
 	}
 	return nodeList, nil
+}
+
+func checkHelperStatus(appLabel string, chaosDetails *types.ChaosDetails, clients clients.ClientSets) error {
+	// Checking the status of the helper pods
+	// if the pod doesn't transition to the 'running' state within a specified timeout period, consider the experiment unsuccessful
+	log.Info("[Status]: Checking the status of the helper pods")
+	err := status.CheckHelperStatus(chaosDetails.ChaosNamespace, appLabel, chaosDetails.Timeout, chaosDetails.Delay, clients)
+	if err != nil {
+		if deleteErr := DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients); deleteErr != nil {
+			return cerrors.PreserveError{ErrString: fmt.Sprintf("[err: %v, delete error: %v]", err, deleteErr)}
+		}
+		return stacktrace.Propagate(err, "could not check helper status")
+	}
+	return nil
+}
+
+func WaitForCompletionAndDeleteHelperPods(appLabel string, chaosDetails *types.ChaosDetails, clients clients.ClientSets, podLevel bool) error {
+	// Wait till the completion of helper pod
+	log.Info("[Wait]: Waiting till the completion of the helper pod")
+	podStatus, err := status.WaitForCompletion(chaosDetails.ChaosNamespace, appLabel, clients, chaosDetails.ChaosDuration+chaosDetails.Timeout, GetContainerNames(chaosDetails)...)
+	if err != nil || podStatus == "Failed" {
+		err = HelperFailedError(err, appLabel, chaosDetails.ChaosNamespace, podLevel)
+		if deleteErr := DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients); deleteErr != nil {
+			return cerrors.PreserveError{ErrString: fmt.Sprintf("[err: %v, delete error: %v]", err, deleteErr)}
+		}
+		return err
+	}
+
+	// Deleting the helper pod
+	if err := DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients); err != nil {
+		return stacktrace.Propagate(err, "could not delete helper pod")
+	}
+
+	return nil
 }
