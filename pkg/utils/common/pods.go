@@ -95,6 +95,7 @@ func SetHelperData(chaosDetails *types.ChaosDetails, setHelperData string, clien
 			delete(labels, label)
 		}
 	}
+
 	chaosDetails.Labels = labels
 
 	switch setHelperData {
@@ -102,19 +103,29 @@ func SetHelperData(chaosDetails *types.ChaosDetails, setHelperData string, clien
 		return nil
 
 	default:
-
 		// Get Chaos Pod Annotation
 		chaosDetails.Annotations = pod.Annotations
 
 		// Get ImagePullSecrets
 		chaosDetails.ImagePullSecrets = pod.Spec.ImagePullSecrets
 
+		//Get Tolerations
+		chaosDetails.Tolerations = pod.Spec.Tolerations
+
 		// Get Resource Requirements
 		chaosDetails.Resources, err = getChaosPodResourceRequirements(pod, chaosDetails.ExperimentName)
 		if err != nil {
 			return stacktrace.Propagate(err, "could not inherit resource requirements")
 		}
-		return nil
+
+		switch setHelperData {
+		case "false":
+			return nil
+		default:
+			// Get Chaos Pod Annotation
+			chaosDetails.Annotations = pod.Annotations
+			return nil
+		}
 	}
 }
 
@@ -386,7 +397,7 @@ func GetServiceAccount(chaosNamespace, chaosPodName string, clients clients.Clie
 
 // GetExperimentPod fetch the experiment pod
 func GetExperimentPod(name, namespace string, clients clients.ClientSets) (*core_v1.Pod, error) {
-	pod, err := clients.KubeClient.CoreV1().Pods(namespace).Get(context.Background(), name, v1.GetOptions{})
+	pod, err := clients.GetPod(namespace, name, 180, 2)
 	if err != nil {
 		return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Target: fmt.Sprintf("{podName: %s, namespace: %s}", name, namespace), Reason: fmt.Sprintf("failed to get experiment pod: %s", err.Error())}
 	}
@@ -424,7 +435,7 @@ func GetContainerIDs(appNamespace, targetPod string, targetContainers []string, 
 
 // GetContainerID  derive the container id of the application container
 func GetContainerID(appNamespace, targetPod, targetContainer string, clients clients.ClientSets, source string) (string, error) {
-	pod, err := clients.KubeClient.CoreV1().Pods(appNamespace).Get(context.Background(), targetPod, v1.GetOptions{})
+	pod, err := clients.GetPod(appNamespace, targetPod, 180, 2)
 	if err != nil {
 		return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeHelper, Source: source, Target: fmt.Sprintf("{podName: %s, namespace: %s}", targetPod, appNamespace), Reason: err.Error()}
 	}

@@ -243,15 +243,16 @@ func Contains(val interface{}, slice interface{}) bool {
 
 func RunBashCommand(command string, failMsg string, source string) error {
 	cmd := exec.Command("/bin/bash", "-c", command)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	return RunCLICommands(cmd, source, "", failMsg, cerrors.ErrorTypeHelper)
 }
 
 func RunCLICommands(cmd *exec.Cmd, source, target, failMsg string, errorCode cerrors.ErrorType) error {
-	var stdErr bytes.Buffer
-	cmd.Stdout = os.Stdout
+	var out, stdErr bytes.Buffer
+	cmd.Stdout = &out
 	cmd.Stderr = &stdErr
 	if err = cmd.Run(); err != nil {
-		return cerrors.Error{ErrorCode: errorCode, Target: target, Source: source, Reason: fmt.Sprintf("%s: %s: %s", failMsg, stdErr.String(), err)}
+		return cerrors.Error{ErrorCode: errorCode, Target: target, Source: source, Reason: fmt.Sprintf("%s: %s :%s", failMsg, stdErr.String(), out.String())}
 	}
 	return nil
 }

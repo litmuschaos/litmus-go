@@ -174,3 +174,53 @@ func inspect(cmd *exec.Cmd, containerID, source string) ([]byte, error) {
 	}
 	return out.Bytes(), nil
 }
+
+// GetNetworkNsPath  returns the sandbox network ns path
+func GetNetworkNsPath(runtime, containerID, socketPath, source string) (string, error) {
+	switch runtime {
+	case "docker":
+		return getDockerNetworkNsPath(containerID, socketPath, source)
+	case "containerd", "crio":
+		return getContainerdAndCRIONetworkNsPath(containerID, socketPath, source)
+	default:
+		return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeHelper, Source: source, Reason: fmt.Sprintf("unsupported container runtime: %s", runtime)}
+	}
+}
+
+// getContainerdAndCRIONetworkNsPath returns the sandbox network ns path of crio and containerd runtimes
+func getContainerdAndCRIONetworkNsPath(containerID, socketPath, source string) (string, error) {
+	cmd := exec.Command("sudo", "crictl", "-i", fmt.Sprintf("unix://%s", socketPath), "-r", fmt.Sprintf("unix://%s", socketPath), "inspect", containerID)
+	out, err := inspect(cmd, containerID, source)
+	if err != nil {
+		return "", stacktrace.Propagate(err, "could not inspect container id")
+	}
+
+	var resp CrictlInspectResponse
+	if err := json.Unmarshal(out, &resp); err != nil {
+		return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeContainerRuntime, Source: source, Target: fmt.Sprintf("containerID: %s", containerID), Reason: fmt.Sprintf("failed to parse pid: %s", err.Error())}
+	}
+	for _, namespace := range resp.Info.RuntimeSpec.Linux.Namespaces {
+		if namespace.Type == "network" {
+			log.Info(fmt.Sprintf("[Info]: Container ID=%s has process Nspath=%s", containerID, namespace.Path))
+			return namespace.Path, nil
+		}
+	}
+	return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeContainerRuntime, Source: source, Target: fmt.Sprintf("containerID: %s", containerID), Reason: fmt.Sprintf("failed to get the pid")}
+}
+
+// getDockerNetworkNsPath returns the sandbox network ns path of docker runtime
+func getDockerNetworkNsPath(containerID, socketPath, source string) (string, error) {
+	pid, err := getDockerPID(containerID, socketPath, source)
+	if err != nil {
+		return "", err
+	}
+
+	if pid == 0 {
+		return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeContainerRuntime, Source: source, Target: fmt.Sprintf("containerID: %s", containerID), Reason: fmt.Sprintf("failed to get the pid")}
+	}
+
+	nsPath := fmt.Sprintf("/proc/%d/ns/net", pid)
+	log.Info(fmt.Sprintf("[Info]: Container ID=%s has process Nspath=%s", containerID, nsPath))
+
+	return nsPath, nil
+}
