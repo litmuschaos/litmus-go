@@ -24,7 +24,6 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
 	"github.com/litmuschaos/litmus-go/pkg/utils/stringutils"
 	"github.com/sirupsen/logrus"
-	corev1 "k8s.io/api/core/v1"
 	networkv1 "k8s.io/api/networking/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -48,22 +47,10 @@ func PrepareAndInjectChaos(ctx context.Context, experimentsDetails *experimentTy
 	// Catch and relay certain signal(s) to abort channel.
 	signal.Notify(abort, os.Interrupt, syscall.SIGTERM)
 
-	// validate the appLabels
-	if chaosDetails.AppDetail == nil {
-		return cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Reason: "provide the appLabel"}
+	// Network policy will be created based on POD_SELECTOR and NAMESPACE_SELECTOR
+	if experimentsDetails.PodSelector == "" && experimentsDetails.NamespaceSelector == "" {
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Reason: "provide POD_SELECTOR or NAMESPACE_SELECTOR for network policy"}
 	}
-
-	// Get the target pod details for the chaos execution
-	targetPodList, err := common.GetPodList("", 100, clients, chaosDetails)
-	if err != nil {
-		return stacktrace.Propagate(err, "could not get target pods")
-	}
-
-	podNames := []string{}
-	for _, pod := range targetPodList.Items {
-		podNames = append(podNames, pod.Name)
-	}
-	log.Infof("Target pods list for chaos, %v", podNames)
 
 	// generate a unique string
 	runID := stringutils.GetRunID()
@@ -91,7 +78,7 @@ func PrepareAndInjectChaos(ctx context.Context, experimentsDetails *experimentTy
 	})
 
 	// watching for the abort signal and revert the chaos
-	go abortWatcher(experimentsDetails, clients, chaosDetails, resultDetails, &targetPodList, runID)
+	go abortWatcher(experimentsDetails, clients, chaosDetails, resultDetails, runID)
 
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
@@ -109,10 +96,8 @@ func PrepareAndInjectChaos(ctx context.Context, experimentsDetails *experimentTy
 		if err := createNetworkPolicy(ctx, experimentsDetails, clients, np, runID); err != nil {
 			return stacktrace.Propagate(err, "could not create network policy")
 		}
-		// updating chaos status to injected for the target pods
-		for _, pod := range targetPodList.Items {
-			common.SetTargets(pod.Name, "injected", "pod", chaosDetails)
-		}
+		// Set chaos status to injected
+		common.SetTargets("network-policy", "injected", "pod", chaosDetails)
 	}
 
 	// verify the presence of network policy inside cluster
@@ -124,14 +109,12 @@ func PrepareAndInjectChaos(ctx context.Context, experimentsDetails *experimentTy
 	common.WaitForDuration(experimentsDetails.ChaosDuration)
 
 	// deleting the network policy after chaos duration over
-	if err := deleteNetworkPolicy(experimentsDetails, clients, &targetPodList, chaosDetails, experimentsDetails.Timeout, experimentsDetails.Delay, runID); err != nil {
+	if err := deleteNetworkPolicy(experimentsDetails, clients, experimentsDetails.Timeout, experimentsDetails.Delay, runID); err != nil {
 		return stacktrace.Propagate(err, "could not delete network policy")
 	}
 
-	// updating chaos status to reverted for the target pods
-	for _, pod := range targetPodList.Items {
-		common.SetTargets(pod.Name, "reverted", "pod", chaosDetails)
-	}
+	// Set chaos status to reverted
+	common.SetTargets("network-policy", "reverted", "pod", chaosDetails)
 
 	//Waiting for the ramp time after chaos injection
 	if experimentsDetails.RampTime != 0 {
@@ -176,7 +159,7 @@ func createNetworkPolicy(ctx context.Context, experimentsDetails *experimentType
 }
 
 // deleteNetworkPolicy deletes the network policy and wait until the network policy deleted completely
-func deleteNetworkPolicy(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, targetPodList *corev1.PodList, chaosDetails *types.ChaosDetails, timeout, delay int, runID string) error {
+func deleteNetworkPolicy(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, timeout, delay int, runID string) error {
 	name := experimentsDetails.ExperimentName + "-np-" + runID
 	labels := "name=" + experimentsDetails.ExperimentName + "-np-" + runID
 	if err := clients.KubeClient.NetworkingV1().NetworkPolicies(experimentsDetails.AppNS).Delete(context.Background(), name, v1.DeleteOptions{}); err != nil {
@@ -200,9 +183,6 @@ func deleteNetworkPolicy(experimentsDetails *experimentTypes.ExperimentDetails, 
 		return err
 	}
 
-	for _, pod := range targetPodList.Items {
-		common.SetTargets(pod.Name, "reverted", "pod", chaosDetails)
-	}
 	return nil
 }
 
@@ -225,7 +205,7 @@ func checkExistenceOfPolicy(experimentsDetails *experimentTypes.ExperimentDetail
 }
 
 // abortWatcher continuously watch for the abort signals
-func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, targetPodList *corev1.PodList, runID string) {
+func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, runID string) {
 	// waiting till the abort signal received
 	<-abort
 
@@ -245,7 +225,7 @@ func abortWatcher(experimentsDetails *experimentTypes.ExperimentDetails, clients
 			continue
 		}
 
-		if err := deleteNetworkPolicy(experimentsDetails, clients, targetPodList, chaosDetails, 2, 1, runID); err != nil {
+		if err := deleteNetworkPolicy(experimentsDetails, clients, 2, 1, runID); err != nil {
 			log.Errorf("unable to delete network policy, err: %v", err)
 		}
 		retry--

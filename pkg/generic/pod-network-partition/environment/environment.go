@@ -17,8 +17,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.ChaosDuration, _ = strconv.Atoi(types.Getenv("TOTAL_CHAOS_DURATION", "30"))
 	experimentDetails.RampTime, _ = strconv.Atoi(types.Getenv("RAMP_TIME", "0"))
 	experimentDetails.AppNS = types.Getenv("APP_NAMESPACE", "")
-	experimentDetails.AppLabel = types.Getenv("APP_LABEL", "")
-	experimentDetails.AppKind = types.Getenv("APP_KIND", "")
+	experimentDetails.AppLabel = types.Getenv("APP_LABEL", "") // Target pod labels on which network partition will be applied
 	experimentDetails.ChaosUID = clientTypes.UID(types.Getenv("CHAOS_UID", ""))
 	experimentDetails.InstanceID = types.Getenv("INSTANCE_ID", "")
 	experimentDetails.ChaosPodName = types.Getenv("POD_NAME", "")
@@ -29,18 +28,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.DestinationHosts = types.Getenv("DESTINATION_HOSTS", "")
 	experimentDetails.LIBImagePullPolicy = types.Getenv("LIB_IMAGE_PULL_POLICY", "Always")
 	experimentDetails.PolicyTypes = types.Getenv("POLICY_TYPES", "all")
-	experimentDetails.PodSelector = types.Getenv("POD_SELECTOR", "")
-	experimentDetails.NamespaceSelector = types.Getenv("NAMESPACE_SELECTOR", "")
-	experimentDetails.PORTS = types.Getenv("PORTS", "")
-
-	experimentDetails.AppNS, experimentDetails.AppKind, experimentDetails.AppLabel = getAppDetails()
-}
-
-func getAppDetails() (string, string, string) {
-	targets := types.Getenv("TARGETS", "")
-	app := types.GetTargets(targets)
-	if len(app) != 0 {
-		return app[0].Namespace, app[0].Kind, app[0].Labels[0]
-	}
-	return "", "", ""
+	experimentDetails.PodSelector = types.Getenv("POD_SELECTOR", "")             // Pod selector to filter pods for network partition ingress or egress rules
+	experimentDetails.NamespaceSelector = types.Getenv("NAMESPACE_SELECTOR", "") // Namespace selector to filter namespaces for network partition ingress or egress rules
+	experimentDetails.Ports = types.Getenv("PORTS", "")                          // Ports to be used for network partition
 }

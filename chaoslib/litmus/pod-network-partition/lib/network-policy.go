@@ -2,13 +2,13 @@ package lib
 
 import (
 	"fmt"
-	"github.com/litmuschaos/litmus-go/pkg/cerrors"
-	"github.com/litmuschaos/litmus-go/pkg/clients"
-	"github.com/palantir/stacktrace"
 	"strings"
 
 	network_chaos "github.com/litmuschaos/litmus-go/chaoslib/litmus/network-chaos/lib"
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
+	"github.com/litmuschaos/litmus-go/pkg/clients"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-network-partition/types"
+	"github.com/palantir/stacktrace"
 	"gopkg.in/yaml.v2"
 	corev1 "k8s.io/api/core/v1"
 	networkv1 "k8s.io/api/networking/v1"
@@ -53,7 +53,7 @@ func (np *NetworkPolicy) getNetworkPolicyDetails(experimentsDetails *experimentT
 		setNamespaceSelector(experimentsDetails.NamespaceSelector)
 
 	// sets the ports for the traffic control
-	if err := np.setPort(experimentsDetails.PORTS); err != nil {
+	if err := np.setPort(experimentsDetails.Ports); err != nil {
 		return stacktrace.Propagate(err, "could not set port")
 	}
 
