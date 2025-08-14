@@ -196,7 +196,7 @@ func CheckForAvailabilityOfPod(namespace, name string, clients clients.ClientSet
 	if name == "" {
 		return false, nil
 	}
-	_, err := clients.KubeClient.CoreV1().Pods(namespace).Get(context.Background(), name, v1.GetOptions{})
+	_, err := clients.GetPod(namespace, name, 180, 2)
 
 	if err != nil && k8serrors.IsNotFound(err) {
 		return false, nil
@@ -209,7 +209,7 @@ func CheckForAvailabilityOfPod(namespace, name string, clients clients.ClientSet
 // FilterNonChaosPods remove the chaos pods(operator, runner) for the podList
 // it filter when the applabels are not defined and it will select random pods from appns
 func FilterNonChaosPods(ns, labels string, clients clients.ClientSets, chaosDetails *types.ChaosDetails) (core_v1.PodList, error) {
-	podList, err := clients.KubeClient.CoreV1().Pods(ns).List(context.Background(), v1.ListOptions{LabelSelector: labels})
+	podList, err := clients.ListPods(ns, labels)
 	if err != nil {
 		return core_v1.PodList{}, cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Target: fmt.Sprintf("{podLabel: %s, namespace: %s}", labels, ns), Reason: err.Error()}
 	} else if len(podList.Items) == 0 {
@@ -231,7 +231,7 @@ func GetTargetPodsWhenTargetPodsENVSet(targetPods, namespace string, clients cli
 	realPods := core_v1.PodList{}
 
 	for index := range targetPodsList {
-		pod, err := clients.KubeClient.CoreV1().Pods(namespace).Get(context.Background(), strings.TrimSpace(targetPodsList[index]), v1.GetOptions{})
+		pod, err := clients.GetPod(namespace, strings.TrimSpace(targetPodsList[index]), chaosDetails.Timeout, chaosDetails.Delay)
 		if err != nil {
 			return core_v1.PodList{}, cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Target: fmt.Sprintf("{podName: %s, namespace: %s}", targetPodsList[index], namespace), Reason: err.Error()}
 		}
@@ -291,7 +291,7 @@ func GetTargetPodsWhenTargetPodsENVNotSet(podAffPerc int, clients clients.Client
 		switch target.Kind {
 		case "pod":
 			for _, name := range target.Names {
-				pod, err := clients.KubeClient.CoreV1().Pods(target.Namespace).Get(context.Background(), name, v1.GetOptions{})
+				pod, err := clients.GetPod(target.Namespace, name, chaosDetails.Timeout, chaosDetails.Delay)
 				if err != nil {
 					return finalPods, cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Target: fmt.Sprintf("{podName: %s, namespace: %s}", name, target.Namespace), Reason: err.Error()}
 				}
@@ -521,7 +521,7 @@ func GetPodListFromSpecifiedNodes(podAffPerc int, nodeLabel string, clients clie
 	var nodes *core_v1.NodeList
 
 	// identify node list from the provided node label
-	nodes, err = clients.KubeClient.CoreV1().Nodes().List(context.Background(), v1.ListOptions{LabelSelector: nodeLabel})
+	nodes, err = clients.ListNode(nodeLabel, chaosDetails.Timeout, chaosDetails.Delay)
 	if err != nil {
 		return core_v1.PodList{}, cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Target: fmt.Sprintf("{nodeLabel: %s}", nodeLabel), Reason: err.Error()}
 	} else if len(nodes.Items) == 0 {

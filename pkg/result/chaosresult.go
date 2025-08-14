@@ -31,26 +31,20 @@ func ChaosResult(chaosDetails *types.ChaosDetails, clients clients.ClientSets, r
 	// It tries to get the chaosresult, if available
 	// it will retry until it got chaos result or met the timeout(3 mins)
 	isResultAvailable := false
-	if err := retry.
-		Times(90).
-		Wait(2 * time.Second).
-		Try(func(attempt uint) error {
-			_, err := clients.LitmusClient.ChaosResults(chaosDetails.ChaosNamespace).Get(context.Background(), resultDetails.Name, v1.GetOptions{})
-			if err != nil && !k8serrors.IsNotFound(err) {
-				return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosResultCRUD, Target: fmt.Sprintf("{name: %s, namespace: %s}", resultDetails.Name, chaosDetails.ChaosNamespace), Reason: err.Error()}
-			} else if err == nil {
-				isResultAvailable = true
-			}
-			return nil
-		}); err != nil {
-		return err
+	result, err := clients.GetChaosResult(chaosDetails)
+	if err != nil {
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosResultCRUD, Target: fmt.Sprintf("{name: %s, namespace: %s}", resultDetails.Name, chaosDetails.ChaosNamespace), Reason: fmt.Sprintf("failed to get result: %s", err.Error())}
+	}
+
+	if result != nil && result.Name == resultDetails.Name {
+		isResultAvailable = true
 	}
 
 	// as the chaos pod won't be available for stopped phase
 	// skipping the derivation of labels from chaos pod, if phase is stopped
 	if chaosDetails.EngineName != "" && resultDetails.Phase != "Stopped" {
 		// Getting chaos pod label and passing it in chaos result
-		chaosPod, err := clients.KubeClient.CoreV1().Pods(chaosDetails.ChaosNamespace).Get(context.Background(), chaosDetails.ChaosPodName, v1.GetOptions{})
+		chaosPod, err := clients.GetPod(chaosDetails.ChaosNamespace, chaosDetails.ChaosPodName, chaosDetails.Timeout, chaosDetails.Delay)
 		if err != nil {
 			return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Target: fmt.Sprintf("{name: %s, namespace: %s}", chaosDetails.ChaosPodName, chaosDetails.ChaosNamespace), Reason: fmt.Sprintf("failed to get experiment pod :%s", err.Error())}
 		}
@@ -240,8 +234,7 @@ func PatchChaosResult(clients clients.ClientSets, chaosDetails *types.ChaosDetai
 
 // SetResultUID sets the ResultUID into the ResultDetails structure
 func SetResultUID(resultDetails *types.ResultDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
-
-	result, err := clients.LitmusClient.ChaosResults(chaosDetails.ChaosNamespace).Get(context.Background(), resultDetails.Name, v1.GetOptions{})
+	result, err := clients.GetChaosResult(chaosDetails)
 	if err != nil {
 		return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosResultCRUD, Target: fmt.Sprintf("{name: %s, namespace: %s}", resultDetails.Name, chaosDetails.ChaosNamespace), Reason: err.Error()}
 	}
@@ -311,7 +304,7 @@ func AnnotateChaosResult(resultName, namespace, status, kind, name string) error
 // GetChaosStatus get the chaos status based on annotations in chaosresult
 func GetChaosStatus(resultDetails *types.ResultDetails, chaosDetails *types.ChaosDetails, clients clients.ClientSets) (*v1alpha1.ChaosResult, error) {
 
-	result, err := clients.LitmusClient.ChaosResults(chaosDetails.ChaosNamespace).Get(context.Background(), resultDetails.Name, v1.GetOptions{})
+	result, err := clients.GetChaosResult(chaosDetails)
 	if err != nil {
 		return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosResultCRUD, Target: fmt.Sprintf("{name: %s, namespace: %s}", resultDetails.Name, chaosDetails.ChaosNamespace), Reason: err.Error()}
 	}
