@@ -13,6 +13,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
+	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 
@@ -121,6 +122,27 @@ func checkHelperStatus(appLabel string, chaosDetails *types.ChaosDetails, client
 		}
 		return stacktrace.Propagate(err, "could not check helper status")
 	}
+
+	return nil
+}
+
+func CheckHelperStatusAndRunProbes(ctx context.Context, appLabel, node string, chaosDetails *types.ChaosDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
+	if err := checkHelperStatus(appLabel, chaosDetails, clients); err != nil {
+		return err
+	}
+
+	SetTargets(node, "targeted", "node", chaosDetails)
+
+	// run the probes during chaos
+	if len(resultDetails.ProbeDetails) != 0 {
+		if err = probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+			if deleteErr := DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients); deleteErr != nil {
+				return cerrors.PreserveError{ErrString: fmt.Sprintf("[err: %v, delete error: %v]", err, deleteErr)}
+			}
+			return err
+		}
+	}
+
 	return nil
 }
 

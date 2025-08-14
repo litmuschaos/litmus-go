@@ -16,11 +16,9 @@ import (
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-dns-chaos/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
-	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/litmuschaos/litmus-go/pkg/utils/stringutils"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	apiv1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -122,26 +120,8 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 
 		appLabel := fmt.Sprintf("app=%s-helper-%s", experimentsDetails.ExperimentName, runID)
 
-		//checking the status of the helper pods, wait till the pod comes to running state else fail the experiment
-		log.Info("[Status]: Checking the status of the helper pods")
-		if err := status.CheckHelperStatus(experimentsDetails.ChaosNamespace, appLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
-			common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
-			return errors.Errorf("helper pods are not in running state, err: %v", err)
-		}
-
-		// Wait till the completion of the helper pod
-		// set an upper limit for the waiting time
-		log.Info("[Wait]: waiting till the completion of the helper pod")
-		podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, appLabel, clients, experimentsDetails.ChaosDuration+experimentsDetails.Timeout, common.GetContainerNames(chaosDetails)...)
-		if err != nil || podStatus == "Failed" {
-			common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
-			return common.HelperFailedError(err, appLabel, chaosDetails.ChaosNamespace, true)
-		}
-
-		//Deleting all the helper pod for pod-dns chaos
-		log.Info("[Cleanup]: Deleting the helper pod")
-		if err = common.DeleteAllPod(appLabel, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients); err != nil {
-			return stacktrace.Propagate(err, "could not delete helper pod(s)")
+		if err := common.ManagerHelperLifecycle(appLabel, chaosDetails, clients, true); err != nil {
+			return err
 		}
 	}
 
@@ -153,7 +133,6 @@ func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experime
 	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectPodDNSFaultInParallelMode")
 	defer span.End()
 
-	var err error
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
 		if err := probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
@@ -177,30 +156,8 @@ func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experime
 
 	appLabel := fmt.Sprintf("app=%s-helper-%s", experimentsDetails.ExperimentName, runID)
 
-	//checking the status of the helper pods, wait till the pod comes to running state else fail the experiment
-	log.Info("[Status]: Checking the status of the helper pods")
-	if err := status.CheckHelperStatus(experimentsDetails.ChaosNamespace, appLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
-		common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
-		return stacktrace.Propagate(err, "could not check helper status")
-	}
-
-	// Wait till the completion of the helper pod
-	// set an upper limit for the waiting time
-	log.Info("[Wait]: waiting till the completion of the helper pod")
-	containerNames := []string{experimentsDetails.ExperimentName}
-	if chaosDetails.SideCar != nil {
-		containerNames = append(containerNames, experimentsDetails.ExperimentName+"-sidecar")
-	}
-	podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, appLabel, clients, experimentsDetails.ChaosDuration+experimentsDetails.Timeout, containerNames...)
-	if err != nil || podStatus == "Failed" {
-		common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
-		return common.HelperFailedError(err, appLabel, chaosDetails.ChaosNamespace, true)
-	}
-
-	//Deleting all the helper pod for pod-dns chaos
-	log.Info("[Cleanup]: Deleting all the helper pod")
-	if err = common.DeleteAllPod(appLabel, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients); err != nil {
-		return stacktrace.Propagate(err, "could not delete helper pod(s)")
+	if err := common.ManagerHelperLifecycle(appLabel, chaosDetails, clients, true); err != nil {
+		return err
 	}
 
 	return nil
