@@ -199,8 +199,7 @@ func createProbePod(clients clients.ClientSets, chaosDetails *types.ChaosDetails
 		},
 	}
 
-	_, err = clients.KubeClient.CoreV1().Pods(chaosDetails.ChaosNamespace).Create(context.Background(), cmdProbe, v1.CreateOptions{})
-	if err != nil {
+	if err := clients.CreatePod(chaosDetails.ChaosNamespace, cmdProbe); err != nil {
 		return cerrors.Error{ErrorCode: cerrors.ErrorTypeCmdProbe, Target: fmt.Sprintf("{name: %v}", probeName), Reason: err.Error()}
 	}
 
@@ -230,7 +229,7 @@ func getEnvAndVolumeMountFromExperiment(clients clients.ClientSets, chaosNamespa
 	volumeMountList := make([]apiv1.VolumeMount, 0)
 	volumeList := make([]apiv1.Volume, 0)
 
-	expPod, err := clients.KubeClient.CoreV1().Pods(chaosNamespace).Get(context.Background(), podName, v1.GetOptions{})
+	expPod, err := clients.GetPod(chaosNamespace, podName, 180, 2)
 	if err != nil {
 		log.Errorf("Unable to get the experiment pod, err: %v", err)
 		return nil, nil, nil
@@ -845,7 +844,7 @@ func createHelperPod(probe v1alpha1.ProbeAttributes, resultDetails *types.Result
 
 // getServiceAccount derive the serviceAccountName for the probe pod
 func getServiceAccount(chaosNamespace, chaosPodName, probeName string, clients clients.ClientSets) (string, error) {
-	pod, err := clients.KubeClient.CoreV1().Pods(chaosNamespace).Get(context.Background(), chaosPodName, v1.GetOptions{})
+	pod, err := clients.GetPod(chaosNamespace, chaosPodName, 180, 2)
 	if err != nil {
 		return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeCmdProbe, Target: fmt.Sprintf("{name: %v}", probeName), Reason: err.Error()}
 	}
@@ -853,8 +852,5 @@ func getServiceAccount(chaosNamespace, chaosPodName, probeName string, clients c
 }
 
 func isInlineProbe(inputs *v1alpha1.CmdProbeInputs) bool {
-	if inputs.Source == nil {
-		return true
-	}
-	return false
+	return inputs.Source == nil
 }

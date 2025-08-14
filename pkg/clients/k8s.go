@@ -8,6 +8,7 @@ import (
 	core_v1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
 )
 
@@ -181,4 +182,14 @@ func (clients *ClientSets) ListNode(labels string, timeout, delay int) (*core_v1
 	}
 
 	return nodes, nil
+}
+
+func (clients *ClientSets) UpdateNode(chaosDetails *types.ChaosDetails, node *core_v1.Node) error {
+	return retry.
+		Times(uint(chaosDetails.Timeout / chaosDetails.Delay)).
+		Wait(time.Duration(chaosDetails.Delay) * time.Second).
+		Try(func(attempt uint) error {
+			_, err := clients.KubeClient.CoreV1().Nodes().Update(context.Background(), node, v1.UpdateOptions{})
+			return err
+		})
 }

@@ -10,16 +10,14 @@ import (
 
 	"github.com/palantir/stacktrace"
 	apiv1 "k8s.io/api/core/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
-	"github.com/litmuschaos/litmus-go/pkg/probe"
-	"github.com/litmuschaos/litmus-go/pkg/status"
-	"github.com/litmuschaos/litmus-go/pkg/types"
-
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/math"
+	"github.com/litmuschaos/litmus-go/pkg/probe"
+	"github.com/litmuschaos/litmus-go/pkg/status"
+	"github.com/litmuschaos/litmus-go/pkg/types"
 )
 
 var err error
@@ -70,7 +68,7 @@ func GetNodeName(namespace, labels, nodeLabel string, clients clients.ClientSets
 
 	switch nodeLabel {
 	case "":
-		podList, err := clients.KubeClient.CoreV1().Pods(namespace).List(context.Background(), v1.ListOptions{LabelSelector: labels})
+		podList, err := clients.ListPods(namespace, labels)
 		if err != nil {
 			return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Target: fmt.Sprintf("{podLabel: %s, namespace: %s}", labels, namespace), Reason: err.Error()}
 		} else if len(podList.Items) == 0 {
@@ -92,7 +90,7 @@ func GetNodeName(namespace, labels, nodeLabel string, clients clients.ClientSets
 }
 
 func getAllNodes(clients clients.ClientSets) (*apiv1.NodeList, error) {
-	nodeList, err := clients.KubeClient.CoreV1().Nodes().List(context.Background(), v1.ListOptions{})
+	nodeList, err := clients.GetAllNode(180, 2)
 	if err != nil {
 		return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Reason: fmt.Sprintf("failed to list all nodes: %s", err.Error())}
 	} else if len(nodeList.Items) == 0 {
@@ -102,7 +100,7 @@ func getAllNodes(clients clients.ClientSets) (*apiv1.NodeList, error) {
 }
 
 func getNodesByLabels(nodeLabel string, clients clients.ClientSets) (*apiv1.NodeList, error) {
-	nodeList, err := clients.KubeClient.CoreV1().Nodes().List(context.Background(), v1.ListOptions{LabelSelector: nodeLabel})
+	nodeList, err := clients.ListNode(nodeLabel, 180, 2)
 	if err != nil {
 		return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Target: fmt.Sprintf("{nodeLabel: %s}", nodeLabel), Reason: err.Error()}
 	} else if len(nodeList.Items) == 0 {

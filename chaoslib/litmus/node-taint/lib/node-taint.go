@@ -23,7 +23,6 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	apiv1 "k8s.io/api/core/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var (
@@ -132,7 +131,7 @@ func taintNode(ctx context.Context, experimentsDetails *experimentTypes.Experime
 	log.Infof("Add %v taints to the %v node", taintKey+"="+taintValue+":"+taintEffect, experimentsDetails.TargetNode)
 
 	// get the node details
-	node, err := clients.KubeClient.CoreV1().Nodes().Get(context.Background(), experimentsDetails.TargetNode, v1.GetOptions{})
+	node, err := clients.GetNode(experimentsDetails.TargetNode, chaosDetails.Timeout, chaosDetails.Delay)
 	if err != nil {
 		return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Target: fmt.Sprintf("{nodeName: %s}", experimentsDetails.TargetNode), Reason: err.Error()}
 	}
@@ -158,8 +157,7 @@ func taintNode(ctx context.Context, experimentsDetails *experimentTypes.Experime
 				Effect: apiv1.TaintEffect(taintEffect),
 			})
 
-			_, err := clients.KubeClient.CoreV1().Nodes().Update(context.Background(), node, v1.UpdateOptions{})
-			if err != nil {
+			if err := clients.UpdateNode(chaosDetails, node); err != nil {
 				return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Target: fmt.Sprintf("{nodeName: %s}", node.Name), Reason: fmt.Sprintf("failed to add taints: %s", err.Error())}
 			}
 		}
@@ -179,7 +177,7 @@ func removeTaintFromNode(experimentsDetails *experimentTypes.ExperimentDetails, 
 	taintKey := strings.Split(taintLabel[0], "=")[0]
 
 	// get the node details
-	node, err := clients.KubeClient.CoreV1().Nodes().Get(context.Background(), experimentsDetails.TargetNode, v1.GetOptions{})
+	node, err := clients.GetNode(experimentsDetails.TargetNode, chaosDetails.Timeout, chaosDetails.Delay)
 	if err != nil {
 		return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosRevert, Target: fmt.Sprintf("{nodeName: %s}", experimentsDetails.TargetNode), Reason: err.Error()}
 	}
@@ -202,8 +200,7 @@ func removeTaintFromNode(experimentsDetails *experimentTypes.ExperimentDetails, 
 			}
 		}
 		node.Spec.Taints = newTaints
-		updatedNodeWithTaint, err := clients.KubeClient.CoreV1().Nodes().Update(context.Background(), node, v1.UpdateOptions{})
-		if err != nil || updatedNodeWithTaint == nil {
+		if err := clients.UpdateNode(chaosDetails, node); err != nil {
 			return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosRevert, Target: fmt.Sprintf("{nodeName: %s}", node.Name), Reason: fmt.Sprintf("failed to remove taints: %s", err.Error())}
 		}
 	}
