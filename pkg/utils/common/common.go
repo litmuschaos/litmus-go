@@ -3,8 +3,6 @@ package common
 import (
 	"bytes"
 	"fmt"
-	"github.com/litmuschaos/litmus-go/pkg/cerrors"
-	"github.com/palantir/stacktrace"
 	"math/rand"
 	"os"
 	"os/exec"
@@ -15,6 +13,9 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
+	"github.com/palantir/stacktrace"
 
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
@@ -38,7 +39,7 @@ func WaitForDuration(duration int) {
 // RandomInterval wait for the random interval lies between lower & upper bounds
 func RandomInterval(interval string) error {
 	re := regexp.MustCompile(`^\d+(-\d+)?$`)
-	if re.MatchString(interval) == false {
+	if !re.MatchString(interval) {
 		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: "could not parse CHAOS_INTERVAL env, bad input"}
 	}
 	intervals := strings.Split(interval, "-")
@@ -242,15 +243,16 @@ func Contains(val interface{}, slice interface{}) bool {
 
 func RunBashCommand(command string, failMsg string, source string) error {
 	cmd := exec.Command("/bin/bash", "-c", command)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	return RunCLICommands(cmd, source, "", failMsg, cerrors.ErrorTypeHelper)
 }
 
 func RunCLICommands(cmd *exec.Cmd, source, target, failMsg string, errorCode cerrors.ErrorType) error {
-	var stdErr bytes.Buffer
-	cmd.Stdout = os.Stdout
+	var out, stdErr bytes.Buffer
+	cmd.Stdout = &out
 	cmd.Stderr = &stdErr
 	if err = cmd.Run(); err != nil {
-		return cerrors.Error{ErrorCode: errorCode, Target: target, Source: source, Reason: fmt.Sprintf("%s: %s: %s", failMsg, stdErr.String(), err)}
+		return cerrors.Error{ErrorCode: errorCode, Target: target, Source: source, Reason: fmt.Sprintf("%s: %s :%s", failMsg, stdErr.String(), out.String())}
 	}
 	return nil
 }
@@ -321,4 +323,25 @@ func GetContainerNames(chaosDetails *types.ChaosDetails) []string {
 		containerNames = append(containerNames, c.Name)
 	}
 	return containerNames
+}
+
+// GetValuesFromChaosEngine get the values from the chaosengine
+func GetValuesFromChaosEngine(chaosDetails *types.ChaosDetails, clients clients.ClientSets, chaosresult *types.ResultDetails) error {
+	// get the chaosengine instance
+	engine, err := clients.GetChaosEngine(chaosDetails)
+	if err != nil {
+		return stacktrace.Propagate(err, "could not get chaosengine")
+	}
+
+	// get all the probes defined inside chaosengine for the corresponding experiment
+	for _, experiment := range engine.Spec.Experiments {
+		if experiment.Name == chaosDetails.ExperimentName {
+			if err := types.InitializeProbesInChaosResultDetails(chaosresult, experiment.Spec.Probe); err != nil {
+				return stacktrace.Propagate(err, "could not initialize probe")
+			}
+			types.InitializeSidecarDetails(chaosDetails, engine, experiment.Spec.Components.ENV)
+		}
+	}
+
+	return nil
 }

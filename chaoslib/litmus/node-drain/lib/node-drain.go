@@ -172,7 +172,7 @@ func uncordonNode(experimentsDetails *experimentTypes.ExperimentDetails, clients
 	for _, targetNode := range targetNodes {
 
 		//Check node exist before uncordon the node
-		_, err := clients.KubeClient.CoreV1().Nodes().Get(context.Background(), targetNode, v1.GetOptions{})
+		_, err := clients.GetNode(targetNode, chaosDetails.Timeout, chaosDetails.Delay)
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				log.Infof("[Info]: The %v node is no longer exist, skip uncordon the node", targetNode)
