@@ -4,11 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/litmuschaos/litmus-go/pkg/cerrors"
-	"github.com/litmuschaos/litmus-go/pkg/events"
-	"github.com/litmuschaos/litmus-go/pkg/telemetry"
-	"github.com/palantir/stacktrace"
-	"go.opentelemetry.io/otel"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -16,6 +11,12 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
+	"github.com/litmuschaos/litmus-go/pkg/events"
+	"github.com/litmuschaos/litmus-go/pkg/telemetry"
+	"github.com/palantir/stacktrace"
+	"go.opentelemetry.io/otel"
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/network-chaos/types"
@@ -104,7 +105,6 @@ func GetNetNS(pid int) (string, error) {
 
 // preparePodNetworkChaos contains the prepration steps before chaos injection
 func preparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails) error {
-
 	targetEnv := os.Getenv("TARGETS")
 	if targetEnv == "" {
 		return cerrors.Error{ErrorCode: cerrors.ErrorTypeHelper, Source: chaosDetails.ChaosPodName, Reason: "no target found, provide atleast one target"}
@@ -130,10 +130,10 @@ func preparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetail
 			return stacktrace.Propagate(err, "could not get container id")
 		}
 
-		// extract out the pid of the target container
-		td.Pid, err = common.GetPauseAndSandboxPID(experimentsDetails.ContainerRuntime, td.ContainerId, experimentsDetails.SocketPath, td.Source)
+		// extract out the network ns path of the pod sandbox or pause container
+		td.NetworkNsPath, err = common.GetNetworkNsPath(experimentsDetails.ContainerRuntime, td.ContainerId, experimentsDetails.SocketPath, td.Source)
 		if err != nil {
-			return stacktrace.Propagate(err, "could not get container pid")
+			return stacktrace.Propagate(err, "could not get container network ns path")
 		}
 
 		td.NetNS, err = GetNetNS(td.Pid)
@@ -154,14 +154,17 @@ func preparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetail
 	default:
 	}
 
-	for _, t := range targets {
+	for index, t := range targets {
 		// injecting network chaos inside target container
 		if err = injectChaos(experimentsDetails.NetworkInterface, t); err != nil {
+			if revertErr := revertChaosForAllTargets(targets, experimentsDetails.NetworkInterface, resultDetails, chaosDetails.ChaosNamespace, index-1); revertErr != nil {
+				return cerrors.PreserveError{ErrString: fmt.Sprintf("[%s,%s]", stacktrace.RootCause(err).Error(), stacktrace.RootCause(revertErr).Error())}
+			}
 			return stacktrace.Propagate(err, "could not inject chaos")
 		}
 		log.Infof("successfully injected chaos on target: {name: %s, namespace: %v, container: %v}", t.Name, t.Namespace, t.TargetContainer)
 		if err = result.AnnotateChaosResult(resultDetails.Name, chaosDetails.ChaosNamespace, "injected", "pod", t.Name); err != nil {
-			if _, revertErr := killnetem(t, experimentsDetails.NetworkInterface); revertErr != nil {
+			if revertErr := revertChaosForAllTargets(targets, experimentsDetails.NetworkInterface, resultDetails, chaosDetails.ChaosNamespace, index); revertErr != nil {
 				return cerrors.PreserveError{ErrString: fmt.Sprintf("[%s,%s]", stacktrace.RootCause(err).Error(), stacktrace.RootCause(revertErr).Error())}
 			}
 			return stacktrace.Propagate(err, "could not annotate chaosresult")
@@ -178,18 +181,25 @@ func preparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetail
 
 	common.WaitForDuration(experimentsDetails.ChaosDuration)
 
-	log.Info("[Chaos]: duration is over, reverting chaos")
+	log.Info("[Chaos]: Duration is over, reverting chaos")
 
+	if err := revertChaosForAllTargets(targets, experimentsDetails.NetworkInterface, resultDetails, chaosDetails.ChaosNamespace, len(targets)-1); err != nil {
+		return stacktrace.Propagate(err, "could not revert chaos")
+	}
+
+	return nil
+}
+
+func revertChaosForAllTargets(targets []targetDetails, networkInterface string, resultDetails *types.ResultDetails, chaosNs string, index int) error {
 	var errList []string
-	for _, t := range targets {
-		// cleaning the netem process after chaos injection
-		killed, err := killnetem(t, experimentsDetails.NetworkInterface)
+	for i := 0; i <= index; i++ {
+		killed, err := killnetem(targets[i], networkInterface)
 		if !killed && err != nil {
 			errList = append(errList, err.Error())
 			continue
 		}
 		if killed && err == nil {
-			if err = result.AnnotateChaosResult(resultDetails.Name, chaosDetails.ChaosNamespace, "reverted", "pod", t.Name); err != nil {
+			if err = result.AnnotateChaosResult(resultDetails.Name, chaosNs, "reverted", "pod", targets[i].Name); err != nil {
 				errList = append(errList, err.Error())
 			}
 		}
@@ -215,7 +225,6 @@ func injectChaos(netInterface string, target targetDetails) error {
 			return err
 		}
 	} else {
-
 		// Create a priority-based queue
 		// This instantly creates classes 1:1, 1:2, 1:3
 		priority := fmt.Sprintf("sudo ip netns exec %s tc qdisc replace dev %v root handle 1: prio", target.NetNS, netInterface)
@@ -257,13 +266,42 @@ func injectChaos(netInterface string, target targetDetails) error {
 				return err
 			}
 		} else {
-
-			for _, ip := range target.DestinationIps {
-				// redirect traffic to specific IP through band 3
-				tc := fmt.Sprintf("sudo ip netns exec %s tc filter add dev %v protocol ip parent 1:0 prio 3 u32 match ip dst %v flowid 1:3", target.NetNS, netInterface, ip)
-				if strings.Contains(ip, ":") {
-					tc = fmt.Sprintf("sudo ip netns exec %s tc filter add dev %v protocol ip parent 1:0 prio 3 u32 match ip6 dst %v flowid 1:3", target.NetNS, netInterface, ip)
+			for i := range target.DestinationIps {
+				var (
+					ip     = target.DestinationIps[i]
+					ports  []string
+					isIPV6 = strings.Contains(target.DestinationIps[i], ":")
+				)
+				// extracting the destination ports from the ips
+				// ip format is ip(|port1|port2....|portx)
+				if strings.Contains(target.DestinationIps[i], "|") {
+					ip = strings.Split(target.DestinationIps[i], "|")[0]
+					ports = strings.Split(target.DestinationIps[i], "|")[1:]
 				}
+
+				// redirect traffic to specific IP through band 3
+				filter := fmt.Sprintf("match ip dst %v", ip)
+				if isIPV6 {
+					filter = fmt.Sprintf("match ip6 dst %v", ip)
+				}
+
+				if len(ports) != 0 {
+					for _, port := range ports {
+						portFilter := fmt.Sprintf("%s match ip dport %v 0xffff", filter, port)
+						if isIPV6 {
+							portFilter = fmt.Sprintf("%s match ip6 dport %v 0xffff", filter, port)
+						}
+    				tc := fmt.Sprintf("sudo ip netns exec %s tc filter add dev %v protocol ip parent 1:0 prio 3 u32 %s flowid 1:3", target.NetNS, netInterface, portFilter)
+						tc := fmt.Sprintf("sudo nsenter --net=%s tc filter add dev %v protocol ip parent 1:0 prio 3 u32 %s flowid 1:3", target.NetworkNsPath, netInterface, portFilter)
+						log.Info(tc)
+						if err := common.RunBashCommand(tc, "failed to create destination ips match filters", target.Source); err != nil {
+							return err
+						}
+					}
+					continue
+				}
+
+				tc := fmt.Sprintf("sudo nsenter --net=%s tc filter add dev %v protocol ip parent 1:0 prio 3 u32 %s flowid 1:3", target.NetworkNsPath, netInterface, filter)
 				log.Info(tc)
 				if err := common.RunBashCommand(tc, "failed to create destination ips match filters", target.Source); err != nil {
 					return err
@@ -272,7 +310,9 @@ func injectChaos(netInterface string, target targetDetails) error {
 
 			for _, port := range sPorts {
 				//redirect traffic to specific sport through band 3
+
 				tc := fmt.Sprintf("sudo ip netns exec %s tc filter add dev %v protocol ip parent 1:0 prio 3 u32 match ip sport %v 0xffff flowid 1:3", target.NetNS, netInterface, port)
+
 				log.Info(tc)
 				if err := common.RunBashCommand(tc, "failed to create source ports match filters", target.Source); err != nil {
 					return err
@@ -296,8 +336,8 @@ func injectChaos(netInterface string, target targetDetails) error {
 
 // killnetem kill the netem process for all the target containers
 func killnetem(target targetDetails, networkInterface string) (bool, error) {
-
 	tc := fmt.Sprintf("sudo ip netns exec %s tc qdisc delete dev %s root", target.NetNS, networkInterface)
+	tc := fmt.Sprintf("sudo nsenter --net=%s tc qdisc delete dev %s root", target.NetworkNsPath, networkInterface)
 	cmd := exec.Command("/bin/bash", "-c", tc)
 	out, err := cmd.CombinedOutput()
 
@@ -325,6 +365,7 @@ type targetDetails struct {
 	Pid             int
 	NetNS           string
 	Source          string
+	NetworkNsPath   string
 }
 
 // getENV fetches all the env variables from the runner pod
