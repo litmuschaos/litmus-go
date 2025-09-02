@@ -47,28 +47,26 @@ func (clients *ClientSets) UpdateChaosEngine(chaosDetails *types.ChaosDetails, e
 		})
 }
 
-func (clients *ClientSets) GetChaosResult(chaosDetails *types.ChaosDetails) (*v1alpha1.ChaosResult, error) {
-	var result v1alpha1.ChaosResult
+func (clients *ClientSets) GetChaosResult(chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails) (*v1alpha1.ChaosResult, error) {
+	var result *v1alpha1.ChaosResult
 
 	if err := retry.
 		Times(uint(chaosDetails.Timeout / chaosDetails.Delay)).
 		Wait(time.Duration(chaosDetails.Delay) * time.Second).
 		Try(func(attempt uint) error {
-			resultList, err := clients.LitmusClient.ChaosResults(chaosDetails.ChaosNamespace).List(context.Background(),
-				v1.ListOptions{LabelSelector: fmt.Sprintf("chaosUID=%s", chaosDetails.ChaosUID)})
-			if err != nil {
-				return err
+			var err error
+
+			result, err = clients.LitmusClient.ChaosResults(chaosDetails.ChaosNamespace).Get(context.Background(), resultDetails.Name, v1.GetOptions{})
+			if err != nil && !k8serrors.IsNotFound(err) {
+				return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosResultCRUD, Target: fmt.Sprintf("{name: %s, namespace: %s}", resultDetails.Name, chaosDetails.ChaosNamespace), Reason: err.Error()}
 			}
-			if len(resultList.Items) == 0 {
-				return nil
-			}
-			result = resultList.Items[0]
+
 			return nil
 		}); err != nil {
 		return nil, err
 	}
 
-	return &result, nil
+	return result, nil
 }
 
 func (clients *ClientSets) CreateChaosResult(chaosDetails *types.ChaosDetails, result *v1alpha1.ChaosResult) (bool, error) {

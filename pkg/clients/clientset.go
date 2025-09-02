@@ -8,7 +8,6 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/klog"
@@ -77,9 +76,9 @@ func generateLitmusClientSet(config *rest.Config) (*chaosClient.LitmuschaosV1alp
 
 // buildConfigFromFlags is a helper function that builds configs from a master
 // url or a kubeconfig filepath, if nothing is provided it falls back to inClusterConfig
-func buildConfigFromFlags(masterUrl, kubeconfigPath string) (*restclient.Config, error) {
+func buildConfigFromFlags(masterUrl, kubeconfigPath string) (*rest.Config, error) {
 	if kubeconfigPath == "" && masterUrl == "" {
-		kubeconfig, err := restclient.InClusterConfig()
+		kubeconfig, err := rest.InClusterConfig()
 		if err == nil {
 			return kubeconfig, nil
 		}
