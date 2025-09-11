@@ -1,6 +1,7 @@
 package helper
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -82,6 +83,26 @@ func Helper(ctx context.Context, clients clients.ClientSets) {
 
 }
 
+// Retrieve ID of the network namespace of the target container
+func GetNetNS(pid int) (string, error) {
+
+	cmd := exec.Command("sudo", "ip", "netns", "identify", fmt.Sprintf("%d", pid))
+
+	var out, stdErr bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &stdErr
+	if err := cmd.Run(); err != nil {
+		return "", err
+	}
+
+	netns := out.String()
+	// Removing trailing newline character
+	netnstrim := netns[:len(netns)-1]
+	log.Infof("[Info]: Process PID=%d has netns ID=%s", pid, netnstrim)
+
+	return netnstrim, nil
+}
+
 // preparePodNetworkChaos contains the prepration steps before chaos injection
 func preparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails) error {
 	targetEnv := os.Getenv("TARGETS")
@@ -113,6 +134,11 @@ func preparePodNetworkChaos(experimentsDetails *experimentTypes.ExperimentDetail
 		td.NetworkNsPath, err = common.GetNetworkNsPath(experimentsDetails.ContainerRuntime, td.ContainerId, experimentsDetails.SocketPath, td.Source)
 		if err != nil {
 			return stacktrace.Propagate(err, "could not get container network ns path")
+		}
+
+		td.NetNS, err = GetNetNS(td.Pid)
+		if err != nil {
+			return stacktrace.Propagate(err, "could not get netns id")
 		}
 
 		targets = append(targets, td)
@@ -186,14 +212,14 @@ func revertChaosForAllTargets(targets []targetDetails, networkInterface string, 
 }
 
 // injectChaos inject the network chaos in target container
-// it is using nsenter command to enter into network namespace of target container
+// it is using ip netns command to enter into network namespace of target container
 // and execute the netem command inside it.
 func injectChaos(netInterface string, target targetDetails) error {
 
 	netemCommands := os.Getenv("NETEM_COMMAND")
 
 	if len(target.DestinationIps) == 0 && len(sPorts) == 0 && len(dPorts) == 0 && len(whitelistDPorts) == 0 && len(whitelistSPorts) == 0 {
-		tc := fmt.Sprintf("sudo nsenter --net=%s tc qdisc replace dev %s root %v", target.NetworkNsPath, netInterface, netemCommands)
+		tc := fmt.Sprintf("sudo ip netns exec %s tc qdisc replace dev %s root netem %v", target.NetNS, netInterface, netemCommands)
 		log.Info(tc)
 		if err := common.RunBashCommand(tc, "failed to create tc rules", target.Source); err != nil {
 			return err
@@ -201,7 +227,7 @@ func injectChaos(netInterface string, target targetDetails) error {
 	} else {
 		// Create a priority-based queue
 		// This instantly creates classes 1:1, 1:2, 1:3
-		priority := fmt.Sprintf("sudo nsenter --net=%s tc qdisc replace dev %v root handle 1: prio", target.NetworkNsPath, netInterface)
+		priority := fmt.Sprintf("sudo ip netns exec %s tc qdisc replace dev %v root handle 1: prio", target.NetNS, netInterface)
 		log.Info(priority)
 		if err := common.RunBashCommand(priority, "failed to create priority-based queue", target.Source); err != nil {
 			return err
@@ -209,7 +235,7 @@ func injectChaos(netInterface string, target targetDetails) error {
 
 		// Add queueing discipline for 1:3 class.
 		// No traffic is going through 1:3 yet
-		traffic := fmt.Sprintf("sudo nsenter --net=%s tc qdisc replace dev %v parent 1:3 %v", target.NetworkNsPath, netInterface, netemCommands)
+		traffic := fmt.Sprintf("sudo ip netns exec %s tc qdisc replace dev %v parent 1:3 netem %v", target.NetNS, netInterface, netemCommands)
 		log.Info(traffic)
 		if err := common.RunBashCommand(traffic, "failed to create netem queueing discipline", target.Source); err != nil {
 			return err
@@ -218,7 +244,7 @@ func injectChaos(netInterface string, target targetDetails) error {
 		if len(whitelistDPorts) != 0 || len(whitelistSPorts) != 0 {
 			for _, port := range whitelistDPorts {
 				//redirect traffic to specific dport through band 2
-				tc := fmt.Sprintf("sudo nsenter --net=%s tc filter add dev %v protocol ip parent 1:0 prio 2 u32 match ip dport %v 0xffff flowid 1:2", target.NetworkNsPath, netInterface, port)
+				tc := fmt.Sprintf("sudo ip netns exec %s tc filter add dev %v protocol ip parent 1:0 prio 2 u32 match ip dport %v 0xffff flowid 1:2", target.NetNS, netInterface, port)
 				log.Info(tc)
 				if err := common.RunBashCommand(tc, "failed to create whitelist dport match filters", target.Source); err != nil {
 					return err
@@ -227,14 +253,14 @@ func injectChaos(netInterface string, target targetDetails) error {
 
 			for _, port := range whitelistSPorts {
 				//redirect traffic to specific sport through band 2
-				tc := fmt.Sprintf("sudo nsenter --net=%s tc filter add dev %v protocol ip parent 1:0 prio 2 u32 match ip sport %v 0xffff flowid 1:2", target.NetworkNsPath, netInterface, port)
+				tc := fmt.Sprintf("sudo ip netns exec %s tc filter add dev %v protocol ip parent 1:0 prio 2 u32 match ip sport %v 0xffff flowid 1:2", target.NetNS, netInterface, port)
 				log.Info(tc)
 				if err := common.RunBashCommand(tc, "failed to create whitelist sport match filters", target.Source); err != nil {
 					return err
 				}
 			}
 
-			tc := fmt.Sprintf("sudo nsenter --net=%s tc filter add dev %v protocol ip parent 1:0 prio 3 u32 match ip dst 0.0.0.0/0 flowid 1:3", target.NetworkNsPath, netInterface)
+			tc := fmt.Sprintf("sudo ip netns exec %s tc filter add dev %v protocol ip parent 1:0 prio 3 u32 match ip dst 0.0.0.0/0 flowid 1:3", target.NetNS, netInterface)
 			log.Info(tc)
 			if err := common.RunBashCommand(tc, "failed to create rule for all ports match filters", target.Source); err != nil {
 				return err
@@ -265,7 +291,7 @@ func injectChaos(netInterface string, target targetDetails) error {
 						if isIPV6 {
 							portFilter = fmt.Sprintf("%s match ip6 dport %v 0xffff", filter, port)
 						}
-
+    				tc := fmt.Sprintf("sudo ip netns exec %s tc filter add dev %v protocol ip parent 1:0 prio 3 u32 %s flowid 1:3", target.NetNS, netInterface, portFilter)
 						tc := fmt.Sprintf("sudo nsenter --net=%s tc filter add dev %v protocol ip parent 1:0 prio 3 u32 %s flowid 1:3", target.NetworkNsPath, netInterface, portFilter)
 						log.Info(tc)
 						if err := common.RunBashCommand(tc, "failed to create destination ips match filters", target.Source); err != nil {
@@ -284,7 +310,9 @@ func injectChaos(netInterface string, target targetDetails) error {
 
 			for _, port := range sPorts {
 				//redirect traffic to specific sport through band 3
-				tc := fmt.Sprintf("sudo nsenter --net=%s tc filter add dev %v protocol ip parent 1:0 prio 3 u32 match ip sport %v 0xffff flowid 1:3", target.NetworkNsPath, netInterface, port)
+
+				tc := fmt.Sprintf("sudo ip netns exec %s tc filter add dev %v protocol ip parent 1:0 prio 3 u32 match ip sport %v 0xffff flowid 1:3", target.NetNS, netInterface, port)
+
 				log.Info(tc)
 				if err := common.RunBashCommand(tc, "failed to create source ports match filters", target.Source); err != nil {
 					return err
@@ -293,7 +321,7 @@ func injectChaos(netInterface string, target targetDetails) error {
 
 			for _, port := range dPorts {
 				//redirect traffic to specific dport through band 3
-				tc := fmt.Sprintf("sudo nsenter --net=%s tc filter add dev %v protocol ip parent 1:0 prio 3 u32 match ip dport %v 0xffff flowid 1:3", target.NetworkNsPath, netInterface, port)
+				tc := fmt.Sprintf("sudo ip netns exec %s tc filter add dev %v protocol ip parent 1:0 prio 3 u32 match ip dport %v 0xffff flowid 1:3", target.NetNS, netInterface, port)
 				log.Info(tc)
 				if err := common.RunBashCommand(tc, "failed to create destination ports match filters", target.Source); err != nil {
 					return err
@@ -308,6 +336,7 @@ func injectChaos(netInterface string, target targetDetails) error {
 
 // killnetem kill the netem process for all the target containers
 func killnetem(target targetDetails, networkInterface string) (bool, error) {
+	tc := fmt.Sprintf("sudo ip netns exec %s tc qdisc delete dev %s root", target.NetNS, networkInterface)
 	tc := fmt.Sprintf("sudo nsenter --net=%s tc qdisc delete dev %s root", target.NetworkNsPath, networkInterface)
 	cmd := exec.Command("/bin/bash", "-c", tc)
 	out, err := cmd.CombinedOutput()
@@ -333,6 +362,8 @@ type targetDetails struct {
 	DestinationIps  []string
 	TargetContainer string
 	ContainerId     string
+	Pid             int
+	NetNS           string
 	Source          string
 	NetworkNsPath   string
 }
