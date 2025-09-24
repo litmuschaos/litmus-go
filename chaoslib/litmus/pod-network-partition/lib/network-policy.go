@@ -2,12 +2,12 @@ package lib
 
 import (
 	"fmt"
-	"github.com/litmuschaos/litmus-go/pkg/cerrors"
-	"github.com/litmuschaos/litmus-go/pkg/clients"
-	"github.com/palantir/stacktrace"
+	"net"
 	"strings"
 
-	network_chaos "github.com/litmuschaos/litmus-go/chaoslib/litmus/network-chaos/lib"
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
+	"github.com/palantir/stacktrace"
+
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-network-partition/types"
 	"gopkg.in/yaml.v2"
 	corev1 "k8s.io/api/core/v1"
@@ -181,28 +181,47 @@ func getPort(port int32, protocol corev1.Protocol) networkv1.NetworkPolicyPort {
 // setExceptIPs sets all the destination ips
 // for which traffic should be blocked
 func (np *NetworkPolicy) setExceptIPs(experimentsDetails *experimentTypes.ExperimentDetails) error {
-	// get all the target ips
-	destinationIPs, err := network_chaos.GetTargetIps(experimentsDetails.DestinationIPs, experimentsDetails.DestinationHosts, clients.ClientSets{}, false)
-	if err != nil {
-		return stacktrace.Propagate(err, "could not get destination ips")
-	}
-
-	ips := strings.Split(destinationIPs, ",")
-	var uniqueIps []string
-	// removing all the duplicates and ipv6 ips from the list, if any
-	for i := range ips {
-		isPresent := false
-		for j := range uniqueIps {
-			if ips[i] == uniqueIps[j] {
-				isPresent = true
-			}
+	ips := strings.Split(experimentsDetails.DestinationIPs, ",")
+	seen := make(map[string]struct{})
+	var ordered []string
+	for _, raw := range ips {
+		norm, err := normalizeIPOrCIDR(raw)
+		if err != nil {
+			return err
 		}
-		if ips[i] != "" && !isPresent && !strings.Contains(ips[i], ":") {
-			uniqueIps = append(uniqueIps, ips[i]+"/32")
+		if norm == "" {
+			continue
 		}
+		if _, ok := seen[norm]; ok {
+			continue
+		}
+		seen[norm] = struct{}{}
+		ordered = append(ordered, norm)
 	}
-	np.ExceptIPs = uniqueIps
+	np.ExceptIPs = ordered
 	return nil
+}
+
+//It supports both CIDR block and IPv6 now
+func normalizeIPOrCIDR(raw string) (string, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "", nil
+	}
+	if strings.Contains(raw, "/") {
+		if _, _, err := net.ParseCIDR(raw); err != nil {
+			return "", fmt.Errorf("invalid CIDR %q: %w", raw, err)
+		}
+		return raw, nil
+	}
+	ip := net.ParseIP(raw)
+	if ip == nil {
+		return "", fmt.Errorf("invalid IP %q", raw)
+	}
+	if ip.To4() != nil {
+		return raw + "/32", nil
+	}
+	return raw + "/128", nil
 }
 
 // setIngressRules sets the ingress traffic rules
