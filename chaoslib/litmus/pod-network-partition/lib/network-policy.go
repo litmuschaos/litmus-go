@@ -202,7 +202,7 @@ func (np *NetworkPolicy) setExceptIPs(experimentsDetails *experimentTypes.Experi
 	return nil
 }
 
-//It supports both CIDR block and IPv6 now
+// It supports both CIDR block and IPv6 now
 func normalizeIPOrCIDR(raw string) (string, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {

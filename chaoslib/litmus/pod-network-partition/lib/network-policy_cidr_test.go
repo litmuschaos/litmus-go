@@ -20,7 +20,7 @@ func Test_SetExceptIPs_CIDRHandling(t *testing.T) {
 		"10.0.1.0/28",
 		"2001:db8::1/128",
 		"2001:db8::/64",
-		"2001:db8::1/64", 
+		"2001:db8::1/64",
 	}
 	got := np.ExceptIPs
 	if len(got) != len(want) {
