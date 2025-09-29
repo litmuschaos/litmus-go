@@ -202,7 +202,9 @@ func (np *NetworkPolicy) setExceptIPs(experimentsDetails *experimentTypes.Experi
 	return nil
 }
 
-// It supports both CIDR block and IPv6 now
+// normalizeIPOrCIDR validates and normalizes IP addresses or CIDR blocks,
+// adding appropriate subnet masks (/32 for IPv4, /128 for IPv6) to plain IP addresses.
+
 func normalizeIPOrCIDR(raw string) (string, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {

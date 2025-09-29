@@ -49,9 +49,17 @@ func Test_normalizeIPOrCIDR(t *testing.T) {
 			t.Fatalf("normalize %s got %s want %s", in, out, expect)
 		}
 	}
-	bad := []string{"", "foo", "10.0.0.0/33", "2001:db8::/129"}
-	for _, in := range bad {
-		if _, err := normalizeIPOrCIDR(in); err == nil && in != "" {
+
+	// Empty input- expect no error and empty output
+	out, err := normalizeIPOrCIDR("")
+	if err != nil || out != "" {
+		t.Fatalf("empty input: got (%q,%v) want (\"\",nil)", out, err)
+	}
+
+	// Invalid (non-empty) inputs must return error
+	invalid := []string{"foo", "10.0.0.0/33", "2001:db8::/129"}
+	for _, in := range invalid {
+		if _, err := normalizeIPOrCIDR(in); err == nil {
 			t.Fatalf("expected error for %q", in)
 		}
 	}
