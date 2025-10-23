@@ -156,10 +156,11 @@ type ProbeContext struct {
 
 // AppDetails contains all the application related envs
 type AppDetails struct {
-	Namespace string
-	Labels    []string
-	Kind      string
-	Names     []string
+	Namespace      string
+	Labels         []string
+	Kind           string
+	Names          []string
+	LabelMatchMode string
 }
 
 func GetTargets(targets string) []AppDetails {
@@ -171,9 +172,18 @@ func GetTargets(targets string) []AppDetails {
 	for _, k := range t {
 		val := strings.Split(strings.TrimSpace(k), ":")
 		data := AppDetails{
-			Kind:      val[0],
-			Namespace: val[1],
+			Kind:           val[0],
+			Namespace:      val[1],
+			LabelMatchMode: "union",
 		}
+		
+		if len(val) > 3 {
+			mode := strings.TrimSpace(val[3])
+			if mode == "intersection" || mode == "union" {
+				data.LabelMatchMode = mode
+			}
+		}
+		
 		if strings.Contains(val[2], "=") {
 			data.Labels = parse(val[2])
 		} else {
