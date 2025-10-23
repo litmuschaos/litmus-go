@@ -306,16 +306,30 @@ func GetTargetPodsWhenTargetPodsENVNotSet(podAffPerc int, clients clients.Client
 				}
 				finalPods.Items = append(finalPods.Items, pods.Items...)
 			} else {
-				for _, label := range target.Labels {
-					pods, err := clients.KubeClient.CoreV1().Pods(target.Namespace).List(context.Background(), v1.ListOptions{LabelSelector: label})
+				// Check label match mode to determine union vs intersection
+				if target.LabelMatchMode == "intersection" {
+					// INTERSECTION: Get pods matching ALL labels
+					pods, err := getPodsWithIntersectionLabels(target, clients)
 					if err != nil {
-						return finalPods, cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Target: fmt.Sprintf("{podLabel: %s, namespace: %s}", label, target.Namespace), Reason: err.Error()}
+						return finalPods, err
 					}
-					filteredPods, err := filterPodsByOwnerKind(pods.Items, target, clients)
+					filteredPods, err := filterPodsByOwnerKind(pods, target, clients)
 					if err != nil {
 						return finalPods, stacktrace.Propagate(err, "could not identify parent type from pod")
 					}
 					finalPods.Items = append(finalPods.Items, filteredPods...)
+				} else {
+					for _, label := range target.Labels {
+						pods, err := clients.KubeClient.CoreV1().Pods(target.Namespace).List(context.Background(), v1.ListOptions{LabelSelector: label})
+						if err != nil {
+							return finalPods, cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Target: fmt.Sprintf("{podLabel: %s, namespace: %s}", label, target.Namespace), Reason: err.Error()}
+						}
+						filteredPods, err := filterPodsByOwnerKind(pods.Items, target, clients)
+						if err != nil {
+							return finalPods, stacktrace.Propagate(err, "could not identify parent type from pod")
+						}
+						finalPods.Items = append(finalPods.Items, filteredPods...)
+					}
 				}
 			}
 		}
@@ -329,6 +343,77 @@ func GetTargetPodsWhenTargetPodsENVNotSet(podAffPerc int, clients clients.Client
 		return finalPods, nil
 	}
 	return filterPodsByPercentage(finalPods, podAffPerc), nil
+}
+
+// getPodsWithIntersectionLabels returns pods that match ALL the provided labels (intersection)
+func getPodsWithIntersectionLabels(target types.AppDetails, clients clients.ClientSets) ([]core_v1.Pod, error) {
+	if len(target.Labels) == 0 {
+		return nil, cerrors.Error{
+			ErrorCode: cerrors.ErrorTypeTargetSelection,
+			Target:    fmt.Sprintf("{namespace: %s, kind: %s}", target.Namespace, target.Kind),
+			Reason:    "no labels provided for intersection",
+		}
+	}
+
+	// Start with pods matching first label
+	pods, err := clients.KubeClient.CoreV1().Pods(target.Namespace).List(context.Background(), v1.ListOptions{LabelSelector: target.Labels[0]})
+	if err != nil {
+		return nil, cerrors.Error{
+			ErrorCode: cerrors.ErrorTypeTargetSelection,
+			Target:    fmt.Sprintf("{podLabel: %s, namespace: %s}", target.Labels[0], target.Namespace),
+			Reason:    err.Error(),
+		}
+	}
+
+	// If only one label, return the pods
+	if len(target.Labels) == 1 {
+		return pods.Items, nil
+	}
+
+	// Create map for fast lookup using pod name as key
+	podMap := make(map[string]core_v1.Pod)
+	for _, pod := range pods.Items {
+		podMap[pod.Name] = pod
+	}
+
+	// Intersect with each subsequent label
+	for i := 1; i < len(target.Labels); i++ {
+		label := target.Labels[i]
+		pods, err := clients.KubeClient.CoreV1().Pods(target.Namespace).List(context.Background(), v1.ListOptions{LabelSelector: label})
+		if err != nil {
+			return nil, cerrors.Error{
+				ErrorCode: cerrors.ErrorTypeTargetSelection,
+				Target:    fmt.Sprintf("{podLabel: %s, namespace: %s}", label, target.Namespace),
+				Reason:    err.Error(),
+			}
+		}
+
+		// Keep only pods that exist in both the current map and the new query result
+		newPodMap := make(map[string]core_v1.Pod)
+		for _, pod := range pods.Items {
+			if _, exists := podMap[pod.Name]; exists {
+				newPodMap[pod.Name] = pod
+			}
+		}
+		podMap = newPodMap
+
+		// Early exit if no intersection found
+		if len(podMap) == 0 {
+			return nil, cerrors.Error{
+				ErrorCode: cerrors.ErrorTypeTargetSelection,
+				Target:    fmt.Sprintf("{labels: %v, namespace: %s}", target.Labels, target.Namespace),
+				Reason:    fmt.Sprintf("no pods found matching all labels after checking: %s", label),
+			}
+		}
+	}
+
+	// Convert map back to slice
+	var result []core_v1.Pod
+	for _, pod := range podMap {
+		result = append(result, pod)
+	}
+
+	return result, nil
 }
 
 func filterPodsByOwnerKind(pods []core_v1.Pod, target types.AppDetails, clients clients.ClientSets) ([]core_v1.Pod, error) {
