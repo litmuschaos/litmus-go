@@ -31,4 +31,5 @@ type ExperimentDetails struct {
 	TargetContainer               string
 	NodeLabel                     string
 	SetHelperData                 string
+	SSHSecretName                 string
 }
