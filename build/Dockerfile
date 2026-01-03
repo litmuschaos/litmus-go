@@ -1,3 +1,6 @@
+# GLOBAL ARGUMENT: Base Image
+ARG BASE_IMAGE=registry.access.redhat.com/ubi9/ubi:9.4
+
 # Multi-stage docker build
 # Build stage
 FROM golang:1.22 AS builder
@@ -15,7 +18,8 @@ RUN CGO_ENABLED=0 go build -o /output/experiments ./bin/experiment
 RUN CGO_ENABLED=0 go build -o /output/helpers ./bin/helper
 
 # Packaging stage
-FROM registry.access.redhat.com/ubi9/ubi:9.4
+# We set the default to UBI 9.4, but allow it to be overridden via --build-arg
+FROM ${BASE_IMAGE}
 
 LABEL maintainer="LitmusChaos"
 
@@ -26,21 +30,25 @@ ARG LITMUS_VERSION
 RUN yum install -y \
     sudo \
     sshpass \
-    procps \
-    openssh-clients
+    procps-ng \
+    openssh-clients 
+    
+# EPEL repo for stress-ng
+RUN yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-$(rpm -E %rhel).noarch.rpm
 
 # tc binary
-RUN yum install -y https://dl.rockylinux.org/vault/rocky/9.3/devel/$(uname -m)/os/Packages/i/iproute-6.2.0-5.el9.$(uname -m).rpm
-RUN yum install -y https://dl.rockylinux.org/vault/rocky/9.3/devel/$(uname -m)/os/Packages/i/iproute-tc-6.2.0-5.el9.$(uname -m).rpm
+RUN yum install -y iproute
 
 # iptables
-RUN yum install -y https://dl.rockylinux.org/vault/rocky/9.3/devel/$(uname -m)/os/Packages/i/iptables-libs-1.8.8-6.el9_1.$(uname -m).rpm
-RUN yum install -y https://dl.fedoraproject.org/pub/archive/epel/9.3/Everything/$(uname -m)/Packages/i/iptables-legacy-libs-1.8.8-6.el9.2.$(uname -m).rpm
-RUN yum install -y https://dl.fedoraproject.org/pub/archive/epel/9.3/Everything/$(uname -m)/Packages/i/iptables-legacy-1.8.8-6.el9.2.$(uname -m).rpm
+RUN yum install -y iptables iptables-services
 
 # stress-ng
-RUN yum install -y https://yum.oracle.com/repo/OracleLinux/OL9/appstream/$(uname -m)/getPackage/Judy-1.0.5-28.el9.$(uname -m).rpm
-RUN yum install -y https://yum.oracle.com/repo/OracleLinux/OL9/appstream/$(uname -m)/getPackage/stress-ng-0.14.00-2.el9.$(uname -m).rpm
+RUN if [ $(rpm -E %rhel) -eq 9 ]; then \
+      yum install -y https://yum.oracle.com/repo/OracleLinux/OL9/appstream/$(uname -m)/getPackage/Judy-1.0.5-28.el9.$(uname -m).rpm && \
+      yum install -y https://yum.oracle.com/repo/OracleLinux/OL9/appstream/$(uname -m)/getPackage/stress-ng-0.14.00-2.el9.$(uname -m).rpm; \
+    else \
+      yum install -y stress-ng; \
+    fi && yum clean all
 
 #Installing Kubectl
 ENV KUBE_LATEST_VERSION="v1.31.0"
