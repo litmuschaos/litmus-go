@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
+	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/palantir/stacktrace"
 
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-network-partition/types"
@@ -14,6 +15,7 @@ import (
 	networkv1 "k8s.io/api/networking/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	network_chaos "github.com/litmuschaos/litmus-go/chaoslib/litmus/network-chaos/lib"
 )
 
 const (
@@ -181,7 +183,11 @@ func getPort(port int32, protocol corev1.Protocol) networkv1.NetworkPolicyPort {
 // setExceptIPs sets all the destination ips
 // for which traffic should be blocked
 func (np *NetworkPolicy) setExceptIPs(experimentsDetails *experimentTypes.ExperimentDetails) error {
-	ips := strings.Split(experimentsDetails.DestinationIPs, ",")
+	destinationIPs, err := network_chaos.GetTargetIps(experimentsDetails.DestinationIPs, experimentsDetails.DestinationHosts, clients.ClientSets{}, false)
+	if err != nil {
+		return stacktrace.Propagate(err, "could not get destination ips")
+	}
+	ips := strings.Split(destinationIPs, ",")
 	seen := make(map[string]struct{})
 	var ordered []string
 	for _, raw := range ips {
