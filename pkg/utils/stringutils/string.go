@@ -2,6 +2,7 @@ package stringutils
 
 import (
 	"math/rand"
+	"strings"
 	"time"
 )
 
@@ -11,6 +12,22 @@ const (
 	letterIdxMask = 1<<letterIdxBits - 1 // All 1-bits, as many as letterIdxBits
 	letterIdxMax  = 63 / letterIdxBits   // # of letter indices fitting in 63 bits
 )
+
+func SplitList(s string) []string {
+
+	if strings.TrimSpace(s) == "" {
+		return []string{}
+	}
+	parts := strings.Split(strings.TrimSpace(s), ",")
+	var result []string
+	for _, p := range parts {
+		trimmed := strings.TrimSpace(p)
+		if trimmed != "" {
+			result = append(result, trimmed)
+		}
+	}
+	return result
+}
 
 func GetRunID() string {
 	return RandStringBytesMask(6, rand.NewSource(time.Now().UnixNano()))
