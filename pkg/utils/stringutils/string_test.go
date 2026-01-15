@@ -92,12 +92,12 @@ func TestSplitList(t *testing.T) {
 			expected: []string{"pod1", "pod2"},
 		},
 		{
-			name:	  "only commas input",
+			name:     "only commas input",
 			input:    ",,,",
 			expected: []string{},
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := SplitList(tt.input)
@@ -105,12 +105,12 @@ func TestSplitList(t *testing.T) {
 				t.Errorf("SplitList(%q) length =%d; want %d", tt.input, len(got), len(tt.expected))
 				return
 			}
-			
+
 			for i := range got {
 				if got[i] != tt.expected[i] {
 					t.Errorf("SplitList(%q)[%d] = %q; want %q", tt.input, i, got[i], tt.expected[i])
 				}
 			}
 		})
-	}	
+	}
 }
