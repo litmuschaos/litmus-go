@@ -9,13 +9,13 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/palantir/stacktrace"
 
+	network_chaos "github.com/litmuschaos/litmus-go/chaoslib/litmus/network-chaos/lib"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-network-partition/types"
 	"gopkg.in/yaml.v2"
 	corev1 "k8s.io/api/core/v1"
 	networkv1 "k8s.io/api/networking/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	network_chaos "github.com/litmuschaos/litmus-go/chaoslib/litmus/network-chaos/lib"
 )
 
 const (
