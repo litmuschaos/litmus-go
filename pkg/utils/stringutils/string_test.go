@@ -64,3 +64,53 @@ func TestGetRunID(t *testing.T) {
 		}
 	}
 }
+
+func TestSplitList(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected []string
+	}{
+		{
+			name:     "simple comma seperation",
+			input:    "pod1,pod2,pod3",
+			expected: []string{"pod1", "pod2", "pod3"},
+		},
+		{
+			name:     "seperation with spaces",
+			input:    " pod1 , pod2 , pod3 ",
+			expected: []string{"pod1", "pod2", "pod3"},
+		},
+		{
+			name:     "empty string",
+			input:    "",
+			expected: []string{},
+		},
+		{
+			name:     "string with empty elements",
+			input:    "pod1,,pod2, ,",
+			expected: []string{"pod1", "pod2"},
+		},
+		{
+			name:     "only commas input",
+			input:    ",,,",
+			expected: []string{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := SplitList(tt.input)
+			if len(got) != len(tt.expected) {
+				t.Errorf("SplitList(%q) length =%d; want %d", tt.input, len(got), len(tt.expected))
+				return
+			}
+
+			for i := range got {
+				if got[i] != tt.expected[i] {
+					t.Errorf("SplitList(%q)[%d] = %q; want %q", tt.input, i, got[i], tt.expected[i])
+				}
+			}
+		})
+	}
+}
