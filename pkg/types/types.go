@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
+	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/utils/stringutils"
 
 	"github.com/litmuschaos/chaos-operator/api/litmuschaos/v1alpha1"
@@ -156,10 +157,11 @@ type ProbeContext struct {
 
 // AppDetails contains all the application related envs
 type AppDetails struct {
-	Namespace string
-	Labels    []string
-	Kind      string
-	Names     []string
+	Namespace      string
+	Labels         []string
+	Kind           string
+	Names          []string
+	LabelMatchMode string
 }
 
 func GetTargets(targets string) []AppDetails {
@@ -169,11 +171,27 @@ func GetTargets(targets string) []AppDetails {
 	}
 	t := strings.Split(targets, ";")
 	for _, k := range t {
-		val := strings.Split(strings.TrimSpace(k), ":")
-		data := AppDetails{
-			Kind:      val[0],
-			Namespace: val[1],
+		trimmed := strings.TrimSpace(k)
+		if trimmed == "" {
+			continue
 		}
+		val := strings.Split(trimmed, ":")
+		if len(val) < 3 {
+			log.Fatalf("invalid TARGETS entry %q: expected format kind:namespace:[labels|names][:mode]", trimmed)
+		}
+		data := AppDetails{
+			Kind:           val[0],
+			Namespace:      val[1],
+			LabelMatchMode: "union",
+		}
+
+		if len(val) > 3 {
+			mode := strings.TrimSpace(val[3])
+			if mode == "intersection" || mode == "union" {
+				data.LabelMatchMode = mode
+			}
+		}
+
 		if strings.Contains(val[2], "=") {
 			data.Labels = parse(val[2])
 		} else {
