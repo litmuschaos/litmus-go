@@ -15,6 +15,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
 	"github.com/litmuschaos/litmus-go/pkg/workloads"
+	"github.com/litmuschaos/litmus-go/pkg/utils/stringutils"
 	logrus "github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -81,7 +82,7 @@ func CheckApplicationStatusesByLabels(appNs, appLabel string, timeout, delay int
 // CheckAuxiliaryApplicationStatus checks the status of the Auxiliary applications
 func CheckAuxiliaryApplicationStatus(AuxiliaryAppDetails string, timeout, delay int, clients clients.ClientSets) error {
 
-	AuxiliaryAppInfo := strings.Split(AuxiliaryAppDetails, ",")
+	AuxiliaryAppInfo := stringutils.SplitList(AuxiliaryAppDetails)
 
 	for _, val := range AuxiliaryAppInfo {
 		AppInfo := strings.Split(val, ":")
