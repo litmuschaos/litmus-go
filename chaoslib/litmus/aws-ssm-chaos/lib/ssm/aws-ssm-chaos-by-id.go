@@ -18,6 +18,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/palantir/stacktrace"
+	"github.com/litmuschaos/litmus-go/pkg/utils/stringutils"
 	"go.opentelemetry.io/otel"
 )
 
@@ -58,8 +59,8 @@ func PrepareAWSSSMChaosByID(ctx context.Context, experimentsDetails *experimentT
 	go lib.AbortWatcher(experimentsDetails, abort)
 
 	//get the instance id or list of instance ids
-	instanceIDList := strings.Split(experimentsDetails.EC2InstanceID, ",")
-	if experimentsDetails.EC2InstanceID == "" || len(instanceIDList) == 0 {
+	instanceIDList := stringutils.SplitList(experimentsDetails.EC2InstanceID)
+	if len(instanceIDList) ==0 {
 		return cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Reason: "no instance id found for chaos injection"}
 	}
 
