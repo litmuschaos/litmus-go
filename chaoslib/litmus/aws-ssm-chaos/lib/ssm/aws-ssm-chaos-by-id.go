@@ -17,8 +17,8 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/telemetry"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
-	"github.com/palantir/stacktrace"
 	"github.com/litmuschaos/litmus-go/pkg/utils/stringutils"
+	"github.com/palantir/stacktrace"
 	"go.opentelemetry.io/otel"
 )
 
