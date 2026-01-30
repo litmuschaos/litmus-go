@@ -3,7 +3,6 @@ package azure
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/profiles/latest/compute/mgmt/compute"
 	"github.com/Azure/go-autorest/autorest/azure"
@@ -13,6 +12,7 @@ import (
 	"github.com/palantir/stacktrace"
 
 	"github.com/litmuschaos/litmus-go/pkg/log"
+	"github.com/litmuschaos/litmus-go/pkg/utils/stringutils"
 )
 
 // GetAzureInstanceStatus will verify the azure instance state details
@@ -97,8 +97,8 @@ func GetAzureScaleSetInstanceStatus(subscriptionID, resourceGroup, virtualMachin
 
 // InstanceStatusCheckByName is used to check the instance status of all the instance under chaos
 func InstanceStatusCheckByName(azureInstanceNames, scaleSet, subscriptionID, resourceGroup string) error {
-	instanceNameList := strings.Split(azureInstanceNames, ",")
-	if azureInstanceNames == "" || len(instanceNameList) == 0 {
+	instanceNameList := stringutils.SplitList(azureInstanceNames)
+	if len(instanceNameList) == 0 {
 		return cerrors.Error{
 			ErrorCode: cerrors.ErrorTypeStatusChecks,
 			Reason:    "no instance provided",

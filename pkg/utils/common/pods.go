@@ -21,6 +21,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
 	"github.com/litmuschaos/litmus-go/pkg/workloads"
+	"github.com/litmuschaos/litmus-go/pkg/utils/stringutils"
 	"github.com/sirupsen/logrus"
 	core_v1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -142,7 +143,7 @@ func VerifyExistanceOfPods(namespace, pods string, clients clients.ClientSets) (
 		return false, nil
 	}
 
-	podList := strings.Split(strings.TrimSpace(pods), ",")
+	podList := stringutils.SplitList(pods)
 	for index := range podList {
 		isPodsAvailable, err := CheckForAvailabilityOfPod(namespace, podList[index], clients)
 		if err != nil {
@@ -227,7 +228,7 @@ func FilterNonChaosPods(ns, labels string, clients clients.ClientSets, chaosDeta
 
 // GetTargetPodsWhenTargetPodsENVSet derive the specific target pods, if TARGET_PODS env is set
 func GetTargetPodsWhenTargetPodsENVSet(targetPods, namespace string, clients clients.ClientSets, chaosDetails *types.ChaosDetails) (core_v1.PodList, error) {
-	targetPodsList := strings.Split(targetPods, ",")
+	targetPodsList := stringutils.SplitList(targetPods)
 	realPods := core_v1.PodList{}
 
 	for index := range targetPodsList {
@@ -702,7 +703,7 @@ func isAllContainers(container string) bool {
 func GetTargetContainers(name, namespace, container, source string, clients clients.ClientSets) ([]string, error) {
 	var (
 		containerList []string
-		containers    = strings.Split(container, ",")
+		containers    = stringutils.SplitList(container)
 	)
 
 	pod, err := clients.GetPod(namespace, name, 180, 2)
