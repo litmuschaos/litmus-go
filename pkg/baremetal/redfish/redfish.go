@@ -27,7 +27,7 @@ func GetNodeStatus(IP, user, password string) (string, error) {
 	json_data, _ := json.Marshal(data)
 	req, err := http.NewRequest("GET", URL, bytes.NewBuffer(json_data))
 	if err != nil {
-		log.Errorf("Error creating HTTP get request, err: ", err)
+		log.Errorf("Error creating HTTP get request, err: %v", err)
 		return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeStatusChecks, Reason: fmt.Sprintf("failed to get the node status, err: %v", err)}
 	}
 	req.Header.Add("Authorization", "Basic "+encodedAuth)
