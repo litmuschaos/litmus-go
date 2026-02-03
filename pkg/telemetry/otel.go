@@ -11,6 +11,11 @@ import (
 	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.25.0"
+	"go.opentelemetry.io/otel/exporters/prometheus"
+	"go.opentelemetry.io/otel/sdk/metric"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"net/http"
+	"github.com/litmuschaos/litmus-go/pkg/log"
 )
 
 const (
@@ -88,4 +93,26 @@ func newTracerProvider(ctx context.Context, isExperiment bool, endpoint string) 
 	)
 
 	return tracerProvider, nil
+}
+
+// InitMetrics setup the prometheus metrics wrapper
+func InitMetrics(ctx context.Context) error {
+	exporter, err := prometheus.New()
+	if err != nil {
+		return err
+	}
+	provider := metric.NewMeterProvider(metric.WithReader(exporter))
+	otel.SetMeterProvider(provider)
+
+	go func() {
+		// Expose the registered metrics via HTTP.
+		http.Handle("/metrics", promhttp.Handler())
+		// TODO: Make port configurable
+		log.Infof("Starting metrics server on :8080")
+		if err := http.ListenAndServe(":8080", nil); err != nil {
+			log.Errorf("Failed to start metrics server: %v", err)
+		}
+	}()
+
+	return nil
 }
