@@ -1,8 +1,8 @@
 module github.com/litmuschaos/litmus-go
 
-go 1.24.0
+go 1.22.0
 
-toolchain go1.24.12
+toolchain go1.24.13
 
 require (
 	github.com/AdaLogics/go-fuzz-headers v0.0.0-20230811130428-ced1acdcaa24
