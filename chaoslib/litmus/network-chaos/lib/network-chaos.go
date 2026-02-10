@@ -445,6 +445,12 @@ func SetChaosTunables(experimentsDetails *experimentTypes.ExperimentDetails) {
 
 // It checks if pod contains service mesh sidecar
 func isServiceMeshEnabledForPod(pod apiv1.Pod) bool {
+	// since Kubernetes v1.33, sidecar containers are GA and implemented via init containers
+	for _, c := range pod.Spec.InitContainers {
+		if common.SubStringExistsInSlice(c.Name, serviceMesh) {
+			return true
+		}
+	}
 	for _, c := range pod.Spec.Containers {
 		if common.SubStringExistsInSlice(c.Name, serviceMesh) {
 			return true
