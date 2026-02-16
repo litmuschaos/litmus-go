@@ -250,6 +250,22 @@ func Test_GetPodOwnerTypeAndName(t *testing.T) {
 			dynamicClient: nil,
 		},
 		{
+			name: "Job owner",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pod-job",
+					Namespace: "default",
+					OwnerReferences: []metav1.OwnerReference{
+						{Kind: "Job", Name: "my-job"},
+					},
+				},
+			},
+			expectedKind:  "job",
+			expectedName:  "my-job",
+			expectErr:     false,
+			dynamicClient: nil,
+		},
+		{
 			name: "ReplicaSet with pod-template-hash match",
 			pod: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
