@@ -74,7 +74,7 @@ func GetPodOwnerTypeAndName(pod *kcorev1.Pod, dynamicClient dynamic.Interface) (
 	for _, owner := range pod.GetOwnerReferences() {
 		parentName = owner.Name
 		parentType = strings.ToLower(owner.Kind)
-		if owner.Kind == "StatefulSet" || owner.Kind == "DaemonSet" {
+		if owner.Kind == "StatefulSet" || owner.Kind == "DaemonSet" || owner.Kind == "Job" {
 			return strings.ToLower(owner.Kind), parentName, nil
 		}
 
