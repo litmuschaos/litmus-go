@@ -60,7 +60,7 @@ func PrepareAWSSSMChaosByID(ctx context.Context, experimentsDetails *experimentT
 
 	//get the instance id or list of instance ids
 	instanceIDList := stringutils.SplitList(experimentsDetails.EC2InstanceID)
-	if len(instanceIDList) ==0 {
+	if len(instanceIDList) == 0 {
 		return cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Reason: "no instance id found for chaos injection"}
 	}
 

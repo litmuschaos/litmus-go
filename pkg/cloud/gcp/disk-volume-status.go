@@ -111,7 +111,7 @@ func DiskVolumeStateCheck(computeService *compute.Service, experimentsDetails *e
 		return cerrors.Error{ErrorCode: cerrors.ErrorTypeStatusChecks, Target: fmt.Sprintf("{diskNames: %v}", diskNamesList), Reason: "no disk name provided, please provide the name of the disk"}
 	}
 
-	zonesList := stringutils.SplitList(experimentsDetails.Zones,)
+	zonesList := stringutils.SplitList(experimentsDetails.Zones)
 	if len(zonesList) == 0 {
 		return cerrors.Error{ErrorCode: cerrors.ErrorTypeStatusChecks, Target: fmt.Sprintf("{zones: %v}", zonesList), Reason: "no zone provided, please provide the zone of the disk"}
 	}
