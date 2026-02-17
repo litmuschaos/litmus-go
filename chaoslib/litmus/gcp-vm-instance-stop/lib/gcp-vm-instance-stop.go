@@ -19,6 +19,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/telemetry"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
+	"github.com/litmuschaos/litmus-go/pkg/utils/stringutils"
 	"github.com/palantir/stacktrace"
 	"go.opentelemetry.io/otel"
 	"google.golang.org/api/compute/v1"
@@ -51,10 +52,10 @@ func PrepareVMStop(ctx context.Context, computeService *compute.Service, experim
 	}
 
 	// get the instance name or list of instance names
-	instanceNamesList := strings.Split(experimentsDetails.VMInstanceName, ",")
+	instanceNamesList := stringutils.SplitList(experimentsDetails.VMInstanceName)
 
 	// get the zone name or list of corresponding zones for the instances
-	instanceZonesList := strings.Split(experimentsDetails.Zones, ",")
+	instanceZonesList := stringutils.SplitList(experimentsDetails.Zones)
 
 	go abortWatcher(computeService, experimentsDetails, instanceNamesList, instanceZonesList, chaosDetails)
 

@@ -9,6 +9,7 @@ import (
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/gcp/gcp-vm-disk-loss/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
+	"github.com/litmuschaos/litmus-go/pkg/utils/stringutils"
 	"github.com/palantir/stacktrace"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/api/compute/v1"
@@ -105,12 +106,12 @@ func DiskVolumeStateCheck(computeService *compute.Service, experimentsDetails *e
 		return cerrors.Error{ErrorCode: cerrors.ErrorTypeStatusChecks, Target: fmt.Sprintf("{projectId: %s}", experimentsDetails.GCPProjectID), Reason: "no gcp project id provided, please provide the project id"}
 	}
 
-	diskNamesList := strings.Split(experimentsDetails.DiskVolumeNames, ",")
+	diskNamesList := stringutils.SplitList(experimentsDetails.DiskVolumeNames)
 	if len(diskNamesList) == 0 {
 		return cerrors.Error{ErrorCode: cerrors.ErrorTypeStatusChecks, Target: fmt.Sprintf("{diskNames: %v}", diskNamesList), Reason: "no disk name provided, please provide the name of the disk"}
 	}
 
-	zonesList := strings.Split(experimentsDetails.Zones, ",")
+	zonesList := stringutils.SplitList(experimentsDetails.Zones)
 	if len(zonesList) == 0 {
 		return cerrors.Error{ErrorCode: cerrors.ErrorTypeStatusChecks, Target: fmt.Sprintf("{zones: %v}", zonesList), Reason: "no zone provided, please provide the zone of the disk"}
 	}
@@ -132,8 +133,8 @@ func DiskVolumeStateCheck(computeService *compute.Service, experimentsDetails *e
 // SetTargetDiskInstanceNames fetches the vm instances to which the disks are attached
 func SetTargetDiskInstanceNames(computeService *compute.Service, experimentsDetails *experimentTypes.ExperimentDetails) error {
 
-	diskNamesList := strings.Split(experimentsDetails.DiskVolumeNames, ",")
-	zonesList := strings.Split(experimentsDetails.Zones, ",")
+	diskNamesList := stringutils.SplitList(experimentsDetails.DiskVolumeNames)
+	zonesList := stringutils.SplitList(experimentsDetails.Zones)
 
 	for i := range diskNamesList {
 		instanceName, err := GetVolumeAttachmentDetails(computeService, experimentsDetails.GCPProjectID, zonesList[i], diskNamesList[i])

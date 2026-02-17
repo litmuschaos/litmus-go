@@ -22,6 +22,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
+	"github.com/litmuschaos/litmus-go/pkg/utils/stringutils"
 )
 
 var (
@@ -50,8 +51,8 @@ func PrepareRDSInstanceStop(ctx context.Context, experimentsDetails *experimentT
 	}
 
 	// Get the instance identifier or list of instance identifiers
-	instanceIdentifierList := strings.Split(experimentsDetails.RDSInstanceIdentifier, ",")
-	if experimentsDetails.RDSInstanceIdentifier == "" || len(instanceIdentifierList) == 0 {
+	instanceIdentifierList := stringutils.SplitList(experimentsDetails.RDSInstanceIdentifier)
+	if len(instanceIdentifierList) == 0 {
 		return cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Reason: "no RDS instance identifier found to stop"}
 	}
 

@@ -6,7 +6,6 @@ import (
 	"math"
 	"math/rand"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
@@ -19,6 +18,7 @@ import (
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/http-chaos/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/types"
+	"github.com/litmuschaos/litmus-go/pkg/utils/stringutils"
 	"github.com/sirupsen/logrus"
 )
 
@@ -68,7 +68,7 @@ func GetStatusCode(statusCode string) (string, error) {
 		return acceptedStatusCodes[rand.Intn(len(acceptedStatusCodes))], nil
 	}
 
-	statusCodeList := strings.Split(statusCode, ",")
+	statusCodeList := stringutils.SplitList(statusCode)
 	rand.Seed(time.Now().Unix())
 	if len(statusCodeList) == 1 {
 		if checkStatusCode(statusCodeList[0], acceptedStatusCodes) {
