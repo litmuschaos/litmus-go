@@ -22,12 +22,23 @@ import (
 	"github.com/sirupsen/logrus"
 	"go.opentelemetry.io/otel"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"go.opentelemetry.io/otel/metric"
 )
 
 // PreparePodDelete contains the preparation steps before chaos injection
 func PreparePodDelete(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PreparePodDeleteFault")
 	defer span.End()
+
+	// Initialize metrics
+	if err := telemetry.InitMetrics(ctx); err != nil {
+		log.Errorf("Failed to initialize metrics: %v", err)
+	}
+
+	meter := otel.Meter("litmus-go")
+	injectionCount, _ := meter.Int64Counter("litmuschaos_experiment_injection_count", metric.WithDescription("Total number of chaos injections"))
+	targetCount, _ := meter.Int64Gauge("litmuschaos_target_count", metric.WithDescription("Number of targets identified"))
+
 
 	//Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
@@ -45,11 +56,11 @@ func PreparePodDelete(ctx context.Context, experimentsDetails *experimentTypes.E
 
 	switch strings.ToLower(experimentsDetails.Sequence) {
 	case "serial":
-		if err := injectChaosInSerialMode(ctx, experimentsDetails, clients, chaosDetails, eventsDetails, resultDetails); err != nil {
+		if err := injectChaosInSerialMode(ctx, experimentsDetails, clients, chaosDetails, eventsDetails, resultDetails, injectionCount, targetCount); err != nil {
 			return stacktrace.Propagate(err, "could not run chaos in serial mode")
 		}
 	case "parallel":
-		if err := injectChaosInParallelMode(ctx, experimentsDetails, clients, chaosDetails, eventsDetails, resultDetails); err != nil {
+		if err := injectChaosInParallelMode(ctx, experimentsDetails, clients, chaosDetails, eventsDetails, resultDetails, injectionCount, targetCount); err != nil {
 			return stacktrace.Propagate(err, "could not run chaos in parallel mode")
 		}
 	default:
@@ -61,11 +72,16 @@ func PreparePodDelete(ctx context.Context, experimentsDetails *experimentTypes.E
 		log.Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", experimentsDetails.RampTime)
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
+
+	// Graceful wait for metrics scrape
+	log.Infof("[Metrics]: Waiting 5s for final scrape")
+	time.Sleep(5 * time.Second)
+
 	return nil
 }
 
 // injectChaosInSerialMode delete the target application pods serial mode(one by one)
-func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, eventsDetails *types.EventDetails, resultDetails *types.ResultDetails) error {
+func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, eventsDetails *types.EventDetails, resultDetails *types.ResultDetails, injectionCount metric.Int64Counter, targetCount metric.Int64Gauge) error {
 	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectPodDeleteFaultInSerialMode")
 	defer span.End()
 
@@ -92,6 +108,7 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 		if err != nil {
 			return stacktrace.Propagate(err, "could not get target pods")
 		}
+		targetCount.Record(ctx, int64(len(targetPodList.Items)))
 
 		// deriving the parent name of the target resources
 		for _, pod := range targetPodList.Items {
@@ -125,6 +142,7 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 			if err != nil {
 				return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Target: fmt.Sprintf("{podName: %s, namespace: %s}", pod.Name, pod.Namespace), Reason: fmt.Sprintf("failed to delete the target pod: %s", err.Error())}
 			}
+			injectionCount.Add(ctx, 1)
 
 			switch chaosDetails.Randomness {
 			case true:
@@ -164,7 +182,7 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 }
 
 // injectChaosInParallelMode delete the target application pods in parallel mode (all at once)
-func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, eventsDetails *types.EventDetails, resultDetails *types.ResultDetails) error {
+func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, eventsDetails *types.EventDetails, resultDetails *types.ResultDetails, injectionCount metric.Int64Counter, targetCount metric.Int64Gauge) error {
 	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectPodDeleteFaultInParallelMode")
 	defer span.End()
 
@@ -190,6 +208,7 @@ func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experime
 		if err != nil {
 			return stacktrace.Propagate(err, "could not get target pods")
 		}
+		targetCount.Record(ctx, int64(len(targetPodList.Items)))
 
 		// deriving the parent name of the target resources
 		for _, pod := range targetPodList.Items {
@@ -223,6 +242,7 @@ func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experime
 			if err != nil {
 				return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Target: fmt.Sprintf("{podName: %s, namespace: %s}", pod.Name, pod.Namespace), Reason: fmt.Sprintf("failed to delete the target pod: %s", err.Error())}
 			}
+			injectionCount.Add(ctx, 1)
 		}
 
 		switch chaosDetails.Randomness {
