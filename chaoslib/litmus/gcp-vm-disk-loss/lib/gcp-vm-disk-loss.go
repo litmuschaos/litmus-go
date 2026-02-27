@@ -19,6 +19,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/telemetry"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
+	"github.com/litmuschaos/litmus-go/pkg/utils/stringutils"
 	"github.com/palantir/stacktrace"
 	"github.com/pkg/errors"
 	"go.opentelemetry.io/otel"
@@ -52,10 +53,10 @@ func PrepareDiskVolumeLoss(ctx context.Context, computeService *compute.Service,
 	}
 
 	//get the disk volume names list
-	diskNamesList := strings.Split(experimentsDetails.DiskVolumeNames, ",")
+	diskNamesList := stringutils.SplitList(experimentsDetails.DiskVolumeNames)
 
 	//get the disk zones list
-	diskZonesList := strings.Split(experimentsDetails.Zones, ",")
+	diskZonesList := stringutils.SplitList(experimentsDetails.Zones)
 
 	//get the device names for the given disks
 	if err := getDeviceNamesList(computeService, experimentsDetails, diskNamesList, diskZonesList); err != nil {

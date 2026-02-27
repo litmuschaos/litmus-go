@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
+	"github.com/litmuschaos/litmus-go/pkg/utils/stringutils"
 	"github.com/palantir/stacktrace"
 )
 
@@ -90,8 +90,8 @@ func GetVMStatus(vcenterServer, vmId, cookie string) (string, error) {
 // VMStatusCheck validates the steady state for the given vm ids
 func VMStatusCheck(vcenterServer, vmIds, cookie string) error {
 
-	vmIdList := strings.Split(vmIds, ",")
-	if vmIds == "" || len(vmIdList) == 0 {
+	vmIdList := stringutils.SplitList(vmIds)
+	if len(vmIdList) == 0 {
 		return cerrors.Error{
 			ErrorCode: cerrors.ErrorTypeStatusChecks,
 			Reason:    "no VMoid found, please provide target VMMoids",

@@ -11,6 +11,7 @@ import (
 	"github.com/Azure/go-autorest/autorest/azure/auth"
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	"github.com/litmuschaos/litmus-go/pkg/cloud/azure/common"
+	"github.com/litmuschaos/litmus-go/pkg/utils/stringutils"
 )
 
 // GetInstanceDiskList will fetch the disks attached to an instance
@@ -111,8 +112,8 @@ func CheckVirtualDiskWithInstance(subscriptionID, virtualDiskNames, resourceGrou
 	diskClient.Authorizer = authorizer
 
 	// Creating an array of the name of the attached disks
-	diskNameList := strings.Split(virtualDiskNames, ",")
-	if virtualDiskNames == "" || len(diskNameList) == 0 {
+	diskNameList := stringutils.SplitList(virtualDiskNames)
+	if len(diskNameList) == 0 {
 		return cerrors.Error{
 			ErrorCode: cerrors.ErrorTypeStatusChecks,
 			Reason:    "no disk name provided",
