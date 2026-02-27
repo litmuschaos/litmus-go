@@ -2,7 +2,6 @@ package aws
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go/service/ec2"
@@ -11,6 +10,7 @@ import (
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/kube-aws/ebs-loss/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
+	"github.com/litmuschaos/litmus-go/pkg/utils/stringutils"
 	"github.com/palantir/stacktrace"
 	"github.com/sirupsen/logrus"
 )
@@ -117,7 +117,7 @@ func GetEBSStatus(ebsVolumeID, ec2InstanceID, region string) (string, error) {
 // EBSStateCheckByID will check the attachment state of the given volume
 func EBSStateCheckByID(volumeIDs, region string) error {
 
-	volumeIDList := strings.Split(volumeIDs, ",")
+	volumeIDList := stringutils.SplitList(volumeIDs)
 	if len(volumeIDList) == 0 {
 		return cerrors.Error{
 			ErrorCode: cerrors.ErrorTypeStatusChecks,

@@ -3,7 +3,6 @@ package experiment
 import (
 	"context"
 	"os"
-	"strings"
 
 	"github.com/litmuschaos/chaos-operator/api/litmuschaos/v1alpha1"
 	litmusLIB "github.com/litmuschaos/litmus-go/chaoslib/litmus/ec2-terminate-by-id/lib"
@@ -17,6 +16,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
+	"github.com/litmuschaos/litmus-go/pkg/utils/stringutils"
 	"github.com/sirupsen/logrus"
 )
 
@@ -120,7 +120,7 @@ func EC2TerminateByID(ctx context.Context, clients clients.ClientSets) {
 	//PRE-CHAOS NODE STATUS CHECK
 	if experimentsDetails.ManagedNodegroup == "enable" {
 		log.Info("[Status]: Counting number of active nodes in the node group (pre-chaos)")
-		activeNodeCount, autoScalingGroupName, err = aws.PreChaosNodeCountCheck(strings.Split(experimentsDetails.Ec2InstanceID, ","), experimentsDetails.Region)
+		activeNodeCount, autoScalingGroupName, err = aws.PreChaosNodeCountCheck(stringutils.SplitList(experimentsDetails.Ec2InstanceID), experimentsDetails.Region)
 		if err != nil {
 			log.Errorf("Pre chaos node status check failed: %v", err)
 			result.RecordAfterFailure(&chaosDetails, &resultDetails, err, clients, &eventsDetails)
