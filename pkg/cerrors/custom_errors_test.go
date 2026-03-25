@@ -107,9 +107,9 @@ func TestError_UserFriendly(t *testing.T) {
 
 func TestError_ErrorType(t *testing.T) {
 	tests := []struct {
-		name      string
-		err       Error
-		wantType  ErrorType
+		name     string
+		err      Error
+		wantType ErrorType
 	}{
 		{"generic type", Error{ErrorCode: ErrorTypeGeneric}, ErrorTypeGeneric},
 		{"timeout type", Error{ErrorCode: ErrorTypeTimeout}, ErrorTypeTimeout},
@@ -207,10 +207,10 @@ func TestGetErrorType(t *testing.T) {
 
 func TestGetRootCauseAndErrorCode(t *testing.T) {
 	tests := []struct {
-		name          string
-		err           error
-		phase         string
-		wantType      ErrorType
+		name           string
+		err            error
+		phase          string
+		wantType       ErrorType
 		wantMsgContain string
 	}{
 		{

@@ -308,11 +308,11 @@ func TestGetContainerNames(t *testing.T) {
 
 func TestBuildSidecar(t *testing.T) {
 	tests := []struct {
-		name          string
-		chaosDetails  types.ChaosDetails
-		wantLen       int
-		wantNames     []string
-		wantMountLen  int
+		name         string
+		chaosDetails types.ChaosDetails
+		wantLen      int
+		wantNames    []string
+		wantMountLen int
 	}{
 		{
 			name: "no sidecars returns empty slice",
@@ -638,15 +638,15 @@ func TestValidateRange(t *testing.T) {
 			expectExact: "abc",
 		},
 		{
-			name:       "range returns value within bounds",
-			input:      "1-10",
-			checkRange: true,
+			name:        "range returns value within bounds",
+			input:       "1-10",
+			checkRange:  true,
 			expectRange: [2]int{1, 10},
 		},
 		{
-			name:       "range with same bounds",
-			input:      "5-5",
-			checkRange: true,
+			name:        "range with same bounds",
+			input:       "5-5",
+			checkRange:  true,
 			expectRange: [2]int{5, 5},
 		},
 		{
