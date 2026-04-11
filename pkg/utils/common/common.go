@@ -54,7 +54,7 @@ func RandomInterval(interval string) error {
 	default:
 		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: "could not parse CHAOS_INTERVAL env, invalid format"}
 	}
-	rand.Seed(time.Now().UnixNano())
+	// rand.Seed is deprecated; math/rand is global and pseudo-random
 	if upperBound < 1 {
 		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: "invalid CHAOS_INTERVAL env value, value below lower limit"}
 	}
@@ -112,7 +112,7 @@ func FilterBasedOnPercentage(percentage int, list []string) []string {
 
 	var finalList []string
 	newInstanceListLength := math.Maximum(1, math.Adjustment(percentage, len(list)))
-	rand.Seed(time.Now().UnixNano())
+	// rand.Seed is deprecated; math/rand is global and pseudo-random
 
 	// it will generate the random instanceList
 	// it starts from the random index and choose requirement no of volumeID next to that index in a circular way.
@@ -187,7 +187,7 @@ func GetStatusMessage(defaultCheck bool, defaultMsg, probeStatus string) string 
 // GetRandomSequence will gives a random value for sequence
 func GetRandomSequence(sequence string) string {
 	if strings.ToLower(sequence) == "random" {
-		rand.Seed(time.Now().UnixNano())
+		// rand.Seed is deprecated; math/rand is global and pseudo-random
 		seq := []string{"serial", "parallel"}
 		randomIndex := rand.Intn(len(seq))
 		return seq[randomIndex]
@@ -215,7 +215,6 @@ func ValidateRange(a string) string {
 
 // getRandomValue gives a random value between two integers
 func getRandomValue(a, b int) int {
-	rand.Seed(time.Now().Unix())
 	return (a + rand.Intn(b-a+1))
 }
 
