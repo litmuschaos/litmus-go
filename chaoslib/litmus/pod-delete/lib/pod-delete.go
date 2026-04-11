@@ -88,7 +88,7 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 			return cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Reason: "provide one of the appLabel or TARGET_PODS"}
 		}
 
-		targetPodList, err := common.GetTargetPods(experimentsDetails.NodeLabel, experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, clients, chaosDetails)
+		targetPodList, err := common.GetTargetPods(experimentsDetails.NodeLabel, experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, experimentsDetails.PodTerminationOrder, clients, chaosDetails)
 		if err != nil {
 			return stacktrace.Propagate(err, "could not get target pods")
 		}
@@ -108,7 +108,7 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 		if experimentsDetails.EngineName != "" {
 			msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on application pod"
 			types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
-			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
+			_ = events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 		}
 
 		//Deleting the application pod
@@ -124,6 +124,13 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 			}
 			if err != nil {
 				return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Target: fmt.Sprintf("{podName: %s, namespace: %s}", pod.Name, pod.Namespace), Reason: fmt.Sprintf("failed to delete the target pod: %s", err.Error())}
+			}
+
+			// Wait for the inter-pod kill interval before deleting the next pod.
+			// This is additive to CHAOS_INTERVAL and fires even when RANDOMNESS is enabled.
+			if experimentsDetails.InterPodKillIntervalSeconds > 0 {
+				log.Infof("[Wait]: Waiting %vs between pod kills (INTER_POD_KILL_INTERVAL_SECONDS)", experimentsDetails.InterPodKillIntervalSeconds)
+				common.WaitForDuration(experimentsDetails.InterPodKillIntervalSeconds)
 			}
 
 			switch chaosDetails.Randomness {
@@ -186,7 +193,7 @@ func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experime
 		if experimentsDetails.TargetPods == "" && chaosDetails.AppDetail == nil {
 			return cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Reason: "please provide one of the appLabel or TARGET_PODS"}
 		}
-		targetPodList, err := common.GetTargetPods(experimentsDetails.NodeLabel, experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, clients, chaosDetails)
+		targetPodList, err := common.GetTargetPods(experimentsDetails.NodeLabel, experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, experimentsDetails.PodTerminationOrder, clients, chaosDetails)
 		if err != nil {
 			return stacktrace.Propagate(err, "could not get target pods")
 		}
@@ -206,7 +213,7 @@ func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experime
 		if experimentsDetails.EngineName != "" {
 			msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on application pod"
 			types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
-			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
+			_ = events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 		}
 
 		//Deleting the application pod

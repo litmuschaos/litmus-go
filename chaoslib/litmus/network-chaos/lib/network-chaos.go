@@ -43,7 +43,7 @@ func PrepareAndInjectChaos(ctx context.Context, experimentsDetails *experimentTy
 	SetChaosTunables(experimentsDetails)
 	logExperimentFields(experimentsDetails)
 
-	targetPodList, err := common.GetTargetPods(experimentsDetails.NodeLabel, experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, clients, chaosDetails)
+	targetPodList, err := common.GetTargetPods(experimentsDetails.NodeLabel, experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, "", clients, chaosDetails)
 	if err != nil {
 		return stacktrace.Propagate(err, "could not get target pods")
 	}

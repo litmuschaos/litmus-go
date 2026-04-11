@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"os"
 	"os/exec"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -90,7 +91,7 @@ func SetHelperData(chaosDetails *types.ChaosDetails, setHelperData string, clien
 	}
 
 	// Get Labels
-	labels := pod.ObjectMeta.Labels
+	labels := pod.Labels
 	for label := range labels {
 		if strings.HasSuffix(label, "job-name") || strings.HasSuffix(label, "controller-uid") {
 			delete(labels, label)
@@ -565,7 +566,23 @@ func getTargetPodsWhenNodeFilterSet(podAffPerc int, pods core_v1.PodList, nodes 
 	return filterPodsByPercentage(nodeFilteredPods, podAffPerc), nil
 }
 
-func GetTargetPods(nodeLabel, targetPods, podsAffectedPerc string, clients clients.ClientSets, chaosDetails *types.ChaosDetails) (core_v1.PodList, error) {
+// SortPodsByName sorts a PodList lexicographically by pod name.
+func SortPodsByName(pods core_v1.PodList) core_v1.PodList {
+	sort.Slice(pods.Items, func(i, j int) bool {
+		return pods.Items[i].Name < pods.Items[j].Name
+	})
+	return pods
+}
+
+// SortPodsByNameReverse sorts a PodList reverse-lexicographically by pod name.
+func SortPodsByNameReverse(pods core_v1.PodList) core_v1.PodList {
+	sort.Slice(pods.Items, func(i, j int) bool {
+		return pods.Items[i].Name > pods.Items[j].Name
+	})
+	return pods
+}
+
+func GetTargetPods(nodeLabel, targetPods, podsAffectedPerc, podTerminationOrder string, clients clients.ClientSets, chaosDetails *types.ChaosDetails) (core_v1.PodList, error) {
 
 	podAffectedPerc, _ := strconv.Atoi(podsAffectedPerc)
 
@@ -583,6 +600,24 @@ func GetTargetPods(nodeLabel, targetPods, podsAffectedPerc string, clients clien
 		pods, err = GetPodList(targetPods, podAffectedPerc, clients, chaosDetails)
 		if err != nil {
 			return core_v1.PodList{}, err
+		}
+	}
+
+	// Apply deterministic ordering based on POD_TERMINATION_ORDER.
+	// Sorting is skipped when TARGET_PODS is explicitly set: the caller has
+	// already expressed their intended kill sequence via insertion order, and
+	// re-sorting would silently destroy it.
+	if targetPods != "" {
+		log.Info("[Info]: TARGET_PODS is set; skipping POD_TERMINATION_ORDER sort to preserve explicit kill sequence")
+	} else {
+		switch strings.ToLower(podTerminationOrder) {
+		case "alphabetical":
+			log.Info("[Info]: POD_TERMINATION_ORDER is 'alphabetical', sorting target pods by name (ascending)")
+			pods = SortPodsByName(pods)
+		case "reverse":
+			log.Info("[Info]: POD_TERMINATION_ORDER is 'reverse', sorting target pods by name (descending)")
+			pods = SortPodsByNameReverse(pods)
+		// default "random": no reordering; filterPodsByPercentage already used a random start index
 		}
 	}
 

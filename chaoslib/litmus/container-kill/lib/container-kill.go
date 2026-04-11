@@ -43,7 +43,7 @@ func PrepareContainerKill(ctx context.Context, experimentsDetails *experimentTyp
 		"Sequence":         experimentsDetails.Sequence,
 	})
 
-	targetPodList, err := common.GetTargetPods(experimentsDetails.NodeLabel, experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, clients, chaosDetails)
+	targetPodList, err := common.GetTargetPods(experimentsDetails.NodeLabel, experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, experimentsDetails.PodTerminationOrder, clients, chaosDetails)
 	if err != nil {
 		return stacktrace.Propagate(err, "could not get target pods")
 	}

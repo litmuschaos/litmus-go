@@ -28,4 +28,6 @@ type ExperimentDetails struct {
 	LIBImagePullPolicy  string
 	TargetContainer     string
 	NodeLabel           string
+	PodTerminationOrder          string
+	InterPodKillIntervalSeconds  int
 }
