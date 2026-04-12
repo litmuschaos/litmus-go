@@ -617,7 +617,7 @@ func GetTargetPods(nodeLabel, targetPods, podsAffectedPerc, podTerminationOrder 
 		case "reverse":
 			log.Info("[Info]: POD_TERMINATION_ORDER is 'reverse', sorting target pods by name (descending)")
 			pods = SortPodsByNameReverse(pods)
-		// default "random": no reordering; filterPodsByPercentage already used a random start index
+			// default "random": no reordering; filterPodsByPercentage already used a random start index
 		}
 	}
 

@@ -112,7 +112,7 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 		}
 
 		//Deleting the application pod
-		for _, pod := range targetPodList.Items {
+		for i, pod := range targetPodList.Items {
 
 			log.InfoWithValues("[Info]: Killing the following pods", logrus.Fields{
 				"PodName": pod.Name})
@@ -126,9 +126,8 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 				return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Target: fmt.Sprintf("{podName: %s, namespace: %s}", pod.Name, pod.Namespace), Reason: fmt.Sprintf("failed to delete the target pod: %s", err.Error())}
 			}
 
-			// Wait for the inter-pod kill interval before deleting the next pod.
-			// This is additive to CHAOS_INTERVAL and fires even when RANDOMNESS is enabled.
-			if experimentsDetails.InterPodKillIntervalSeconds > 0 {
+			// Wait for the inter-pod kill interval only between pods, not after the last one.
+			if experimentsDetails.InterPodKillIntervalSeconds > 0 && i < len(targetPodList.Items)-1 {
 				log.Infof("[Wait]: Waiting %vs between pod kills (INTER_POD_KILL_INTERVAL_SECONDS)", experimentsDetails.InterPodKillIntervalSeconds)
 				common.WaitForDuration(experimentsDetails.InterPodKillIntervalSeconds)
 			}

@@ -37,5 +37,4 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.NodeLabel = types.Getenv("NODE_LABEL", "")
 	experimentDetails.SetHelperData = types.Getenv("SET_HELPER_DATA", "true")
 	experimentDetails.PodTerminationOrder = types.Getenv("POD_TERMINATION_ORDER", "random")
-	experimentDetails.InterPodKillIntervalSeconds, _ = strconv.Atoi(types.Getenv("INTER_POD_KILL_INTERVAL_SECONDS", "0"))
 }
