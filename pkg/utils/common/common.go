@@ -58,6 +58,9 @@ func RandomInterval(interval string) error {
 	if upperBound < 1 {
 		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: "invalid CHAOS_INTERVAL env value, value below lower limit"}
 	}
+	if upperBound <= lowerBound {
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: "invalid CHAOS_INTERVAL env value, upper bound must be greater than lower bound"}
+	}
 	waitTime := lowerBound + rand.Intn(upperBound-lowerBound)
 	log.Infof("[Wait]: Wait for the random chaos interval %vs", waitTime)
 	WaitForDuration(waitTime)
@@ -109,7 +112,9 @@ func AbortWatcherWithoutExit(expname string, clients clients.ClientSets, resultD
 
 // FilterBasedOnPercentage return the slice of list based on the the provided percentage
 func FilterBasedOnPercentage(percentage int, list []string) []string {
-
+	if len(list) == 0 {
+		return []string{}
+	}
 	var finalList []string
 	newInstanceListLength := math.Maximum(1, math.Adjustment(percentage, len(list)))
 	// rand.Seed is deprecated; math/rand is global and pseudo-random
