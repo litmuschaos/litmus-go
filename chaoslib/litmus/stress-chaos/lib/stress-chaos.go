@@ -64,7 +64,7 @@ func PrepareAndInjectStressChaos(ctx context.Context, experimentsDetails *experi
 	if experimentsDetails.TargetPods == "" && chaosDetails.AppDetail == nil {
 		return cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Reason: "provide one of the appLabel or TARGET_PODS"}
 	}
-	targetPodList, err := common.GetTargetPods(experimentsDetails.NodeLabel, experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, clients, chaosDetails)
+	targetPodList, err := common.GetTargetPods(experimentsDetails.NodeLabel, experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, "", clients, chaosDetails)
 	if err != nil {
 		return stacktrace.Propagate(err, "could not get target pods")
 	}

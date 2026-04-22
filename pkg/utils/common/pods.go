@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"os"
 	"os/exec"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -90,7 +91,7 @@ func SetHelperData(chaosDetails *types.ChaosDetails, setHelperData string, clien
 	}
 
 	// Get Labels
-	labels := pod.ObjectMeta.Labels
+	labels := pod.Labels
 	for label := range labels {
 		if strings.HasSuffix(label, "job-name") || strings.HasSuffix(label, "controller-uid") {
 			delete(labels, label)
@@ -350,7 +351,6 @@ func filterPodsByPercentage(finalPods core_v1.PodList, podAffPerc int) core_v1.P
 	finalPods = removeDuplicatePods(finalPods)
 
 	newPodListLength := math.Maximum(1, math.Adjustment(math.Minimum(podAffPerc, 100), len(finalPods.Items)))
-	rand.Seed(time.Now().UnixNano())
 
 	var realPods core_v1.PodList
 	// it will generate the random podlist
@@ -565,7 +565,25 @@ func getTargetPodsWhenNodeFilterSet(podAffPerc int, pods core_v1.PodList, nodes 
 	return filterPodsByPercentage(nodeFilteredPods, podAffPerc), nil
 }
 
-func GetTargetPods(nodeLabel, targetPods, podsAffectedPerc string, clients clients.ClientSets, chaosDetails *types.ChaosDetails) (core_v1.PodList, error) {
+// sortPodsByName sorts a PodList lexicographically by pod name.
+func sortPodsByName(pods core_v1.PodList) core_v1.PodList {
+	sort.Slice(pods.Items, func(i, j int) bool {
+		return pods.Items[i].Name < pods.Items[j].Name
+	})
+	return pods
+}
+
+// sortPodsByNameReverse sorts a PodList reverse-lexicographically by pod name.
+func sortPodsByNameReverse(pods core_v1.PodList) core_v1.PodList {
+	sort.Slice(pods.Items, func(i, j int) bool {
+		return pods.Items[i].Name > pods.Items[j].Name
+	})
+	return pods
+}
+
+// GetTargetPods derives the target pods based on the target pods, node label, pod affected percentage and pod termination order.
+// Note: Callers who do not support or do not wish to use the new podTerminationOrder tunable should pass "" (empty string) to preserve the original random behavior.
+func GetTargetPods(nodeLabel, targetPods, podsAffectedPerc, podTerminationOrder string, clients clients.ClientSets, chaosDetails *types.ChaosDetails) (core_v1.PodList, error) {
 
 	podAffectedPerc, _ := strconv.Atoi(podsAffectedPerc)
 
@@ -583,6 +601,21 @@ func GetTargetPods(nodeLabel, targetPods, podsAffectedPerc string, clients clien
 		pods, err = GetPodList(targetPods, podAffectedPerc, clients, chaosDetails)
 		if err != nil {
 			return core_v1.PodList{}, err
+		}
+	}
+
+	// Apply deterministic ordering based on POD_TERMINATION_ORDER.
+	// Only sort when TARGET_PODS is not explicitly set.
+	// When it is set, insertion order already expresses the caller's intended kill sequence.
+	if targetPods == "" {
+		switch strings.ToLower(podTerminationOrder) {
+		case "alphabetical":
+			log.Infof("POD_TERMINATION_ORDER is 'alphabetical', sorting target pods by name (ascending)")
+			pods = sortPodsByName(pods)
+		case "reverse":
+			log.Infof("POD_TERMINATION_ORDER is 'reverse', sorting target pods by name (descending)")
+			pods = sortPodsByNameReverse(pods)
+			// default "random": no reordering; filterPodsByPercentage already used a random start index
 		}
 	}
 

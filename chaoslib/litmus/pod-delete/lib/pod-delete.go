@@ -38,7 +38,7 @@ func PreparePodDelete(ctx context.Context, experimentsDetails *experimentTypes.E
 	//set up the tunables if provided in range
 	SetChaosTunables(experimentsDetails)
 
-	log.InfoWithValues("[Info]: The chaos tunables are:", logrus.Fields{
+	log.InfoWithValues("The chaos tunables are:", logrus.Fields{
 		"PodsAffectedPerc": experimentsDetails.PodsAffectedPerc,
 		"Sequence":         experimentsDetails.Sequence,
 	})
@@ -88,7 +88,7 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 			return cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Reason: "provide one of the appLabel or TARGET_PODS"}
 		}
 
-		targetPodList, err := common.GetTargetPods(experimentsDetails.NodeLabel, experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, clients, chaosDetails)
+		targetPodList, err := common.GetTargetPods(experimentsDetails.NodeLabel, experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, experimentsDetails.PodTerminationOrder, clients, chaosDetails)
 		if err != nil {
 			return stacktrace.Propagate(err, "could not get target pods")
 		}
@@ -108,13 +108,13 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 		if experimentsDetails.EngineName != "" {
 			msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on application pod"
 			types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
-			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
+			_ = events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 		}
 
 		//Deleting the application pod
-		for _, pod := range targetPodList.Items {
+		for i, pod := range targetPodList.Items {
 
-			log.InfoWithValues("[Info]: Killing the following pods", logrus.Fields{
+			log.InfoWithValues("Killing the following pods", logrus.Fields{
 				"PodName": pod.Name})
 
 			if experimentsDetails.Force {
@@ -124,6 +124,12 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 			}
 			if err != nil {
 				return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Target: fmt.Sprintf("{podName: %s, namespace: %s}", pod.Name, pod.Namespace), Reason: fmt.Sprintf("failed to delete the target pod: %s", err.Error())}
+			}
+
+			// Wait for the inter-pod kill interval only between pods, not after the last one.
+			if experimentsDetails.InterPodKillIntervalSeconds > 0 && i < len(targetPodList.Items)-1 {
+				log.Infof("[Wait]: Waiting %vs between pod kills (INTER_POD_KILL_INTERVAL_SECONDS)", experimentsDetails.InterPodKillIntervalSeconds)
+				common.WaitForDuration(experimentsDetails.InterPodKillIntervalSeconds)
 			}
 
 			switch chaosDetails.Randomness {
@@ -186,7 +192,7 @@ func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experime
 		if experimentsDetails.TargetPods == "" && chaosDetails.AppDetail == nil {
 			return cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Reason: "please provide one of the appLabel or TARGET_PODS"}
 		}
-		targetPodList, err := common.GetTargetPods(experimentsDetails.NodeLabel, experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, clients, chaosDetails)
+		targetPodList, err := common.GetTargetPods(experimentsDetails.NodeLabel, experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, experimentsDetails.PodTerminationOrder, clients, chaosDetails)
 		if err != nil {
 			return stacktrace.Propagate(err, "could not get target pods")
 		}
@@ -206,13 +212,14 @@ func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experime
 		if experimentsDetails.EngineName != "" {
 			msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on application pod"
 			types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
-			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
+			_ = events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 		}
 
-		//Deleting the application pod
+		// Note: INTER_POD_KILL_INTERVAL_SECONDS is ignored in parallel mode,
+		// as the intention is to terminate all targeted pods simultaneously.
 		for _, pod := range targetPodList.Items {
 
-			log.InfoWithValues("[Info]: Killing the following pods", logrus.Fields{
+			log.InfoWithValues("Killing the following pods", logrus.Fields{
 				"PodName": pod.Name})
 
 			if experimentsDetails.Force {

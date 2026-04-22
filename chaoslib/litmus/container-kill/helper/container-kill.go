@@ -31,7 +31,7 @@ var err error
 
 // Helper injects the container-kill chaos
 func Helper(ctx context.Context, clients clients.ClientSets) {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "SimulateContainerKillFault")
+	_, span := otel.Tracer(telemetry.TracerName).Start(ctx, "SimulateContainerKillFault")
 	defer span.End()
 
 	experimentsDetails := experimentTypes.ExperimentDetails{}
@@ -149,7 +149,7 @@ func kill(experimentsDetails *experimentTypes.ExperimentDetails, containerIds []
 	if experimentsDetails.EngineName != "" {
 		msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on application pod"
 		types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
-		events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
+		_ = events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 	}
 
 	switch experimentsDetails.ContainerRuntime {
