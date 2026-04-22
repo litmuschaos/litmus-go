@@ -8,7 +8,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func TestSortPodsByName(t *testing.T) {
+func Test_sortPodsByName(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    core_v1.PodList
@@ -46,7 +46,7 @@ func TestSortPodsByName(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := SortPodsByName(tt.input)
+			result := sortPodsByName(tt.input)
 			resultNames := []string{}
 			for _, pod := range result.Items {
 				resultNames = append(resultNames, pod.Name)
@@ -56,7 +56,7 @@ func TestSortPodsByName(t *testing.T) {
 	}
 }
 
-func TestSortPodsByNameReverse(t *testing.T) {
+func Test_sortPodsByNameReverse(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    core_v1.PodList
@@ -94,7 +94,7 @@ func TestSortPodsByNameReverse(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := SortPodsByNameReverse(tt.input)
+			result := sortPodsByNameReverse(tt.input)
 			resultNames := []string{}
 			for _, pod := range result.Items {
 				resultNames = append(resultNames, pod.Name)

@@ -37,4 +37,5 @@ type ExperimentDetails struct {
 	IsTargetContainerProvided     bool
 	SetHelperData                 string
 	PodTerminationOrder           string
+	InterPodKillIntervalSeconds   int
 }

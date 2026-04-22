@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math/rand"
 	"strconv"
-	"time"
 
 	"github.com/palantir/stacktrace"
 	apiv1 "k8s.io/api/core/v1"
@@ -51,7 +50,6 @@ func GetNodeList(nodeNames, nodeLabel string, nodeAffPerc int, clients clients.C
 
 	// it will generate the random nodelist
 	// it starts from the random index and choose requirement no of pods next to that index in a circular way.
-	rand.Seed(time.Now().UnixNano())
 	index := rand.Intn(len(nodes.Items))
 	for i := 0; i < newNodeListLength; i++ {
 		nodeList = append(nodeList, nodes.Items[index].Name)
@@ -75,7 +73,6 @@ func GetNodeName(namespace, labels, nodeLabel string, clients clients.ClientSets
 			return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Target: fmt.Sprintf("{podLabel: %s, namespace: %s}", labels, namespace), Reason: "no pod found with matching labels"}
 		}
 
-		rand.Seed(time.Now().Unix())
 		randomIndex := rand.Intn(len(podList.Items))
 		return podList.Items[randomIndex].Spec.NodeName, nil
 	default:
@@ -83,7 +80,6 @@ func GetNodeName(namespace, labels, nodeLabel string, clients clients.ClientSets
 		if err != nil {
 			return "", stacktrace.Propagate(err, "could not get nodes by labels")
 		}
-		rand.Seed(time.Now().Unix())
 		randomIndex := rand.Intn(len(nodeList.Items))
 		return nodeList.Items[randomIndex].Name, nil
 	}
