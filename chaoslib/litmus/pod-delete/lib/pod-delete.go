@@ -38,7 +38,7 @@ func PreparePodDelete(ctx context.Context, experimentsDetails *experimentTypes.E
 	//set up the tunables if provided in range
 	SetChaosTunables(experimentsDetails)
 
-	log.InfoWithValues("[Info]: The chaos tunables are:", logrus.Fields{
+	log.InfoWithValues("The chaos tunables are:", logrus.Fields{
 		"PodsAffectedPerc": experimentsDetails.PodsAffectedPerc,
 		"Sequence":         experimentsDetails.Sequence,
 	})
@@ -114,7 +114,7 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 		//Deleting the application pod
 		for i, pod := range targetPodList.Items {
 
-			log.InfoWithValues("[Info]: Killing the following pods", logrus.Fields{
+			log.InfoWithValues("Killing the following pods", logrus.Fields{
 				"PodName": pod.Name})
 
 			if experimentsDetails.Force {
@@ -215,10 +215,11 @@ func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experime
 			_ = events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 		}
 
-		//Deleting the application pod
+		// Note: INTER_POD_KILL_INTERVAL_SECONDS is ignored in parallel mode,
+		// as the intention is to terminate all targeted pods simultaneously.
 		for _, pod := range targetPodList.Items {
 
-			log.InfoWithValues("[Info]: Killing the following pods", logrus.Fields{
+			log.InfoWithValues("Killing the following pods", logrus.Fields{
 				"PodName": pod.Name})
 
 			if experimentsDetails.Force {

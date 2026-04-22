@@ -351,7 +351,6 @@ func filterPodsByPercentage(finalPods core_v1.PodList, podAffPerc int) core_v1.P
 	finalPods = removeDuplicatePods(finalPods)
 
 	newPodListLength := math.Maximum(1, math.Adjustment(math.Minimum(podAffPerc, 100), len(finalPods.Items)))
-	rand.Seed(time.Now().UnixNano())
 
 	var realPods core_v1.PodList
 	// it will generate the random podlist
@@ -566,22 +565,24 @@ func getTargetPodsWhenNodeFilterSet(podAffPerc int, pods core_v1.PodList, nodes 
 	return filterPodsByPercentage(nodeFilteredPods, podAffPerc), nil
 }
 
-// SortPodsByName sorts a PodList lexicographically by pod name.
-func SortPodsByName(pods core_v1.PodList) core_v1.PodList {
+// sortPodsByName sorts a PodList lexicographically by pod name.
+func sortPodsByName(pods core_v1.PodList) core_v1.PodList {
 	sort.Slice(pods.Items, func(i, j int) bool {
 		return pods.Items[i].Name < pods.Items[j].Name
 	})
 	return pods
 }
 
-// SortPodsByNameReverse sorts a PodList reverse-lexicographically by pod name.
-func SortPodsByNameReverse(pods core_v1.PodList) core_v1.PodList {
+// sortPodsByNameReverse sorts a PodList reverse-lexicographically by pod name.
+func sortPodsByNameReverse(pods core_v1.PodList) core_v1.PodList {
 	sort.Slice(pods.Items, func(i, j int) bool {
 		return pods.Items[i].Name > pods.Items[j].Name
 	})
 	return pods
 }
 
+// GetTargetPods derives the target pods based on the target pods, node label, pod affected percentage and pod termination order.
+// Note: Callers who do not support or do not wish to use the new podTerminationOrder tunable should pass "" (empty string) to preserve the original random behavior.
 func GetTargetPods(nodeLabel, targetPods, podsAffectedPerc, podTerminationOrder string, clients clients.ClientSets, chaosDetails *types.ChaosDetails) (core_v1.PodList, error) {
 
 	podAffectedPerc, _ := strconv.Atoi(podsAffectedPerc)
@@ -604,19 +605,16 @@ func GetTargetPods(nodeLabel, targetPods, podsAffectedPerc, podTerminationOrder 
 	}
 
 	// Apply deterministic ordering based on POD_TERMINATION_ORDER.
-	// Sorting is skipped when TARGET_PODS is explicitly set: the caller has
-	// already expressed their intended kill sequence via insertion order, and
-	// re-sorting would silently destroy it.
-	if targetPods != "" {
-		log.Info("[Info]: TARGET_PODS is set; skipping POD_TERMINATION_ORDER sort to preserve explicit kill sequence")
-	} else {
+	// Only sort when TARGET_PODS is not explicitly set.
+	// When it is set, insertion order already expresses the caller's intended kill sequence.
+	if targetPods == "" {
 		switch strings.ToLower(podTerminationOrder) {
 		case "alphabetical":
-			log.Info("[Info]: POD_TERMINATION_ORDER is 'alphabetical', sorting target pods by name (ascending)")
-			pods = SortPodsByName(pods)
+			log.Infof("POD_TERMINATION_ORDER is 'alphabetical', sorting target pods by name (ascending)")
+			pods = sortPodsByName(pods)
 		case "reverse":
-			log.Info("[Info]: POD_TERMINATION_ORDER is 'reverse', sorting target pods by name (descending)")
-			pods = SortPodsByNameReverse(pods)
+			log.Infof("POD_TERMINATION_ORDER is 'reverse', sorting target pods by name (descending)")
+			pods = sortPodsByNameReverse(pods)
 			// default "random": no reordering; filterPodsByPercentage already used a random start index
 		}
 	}
