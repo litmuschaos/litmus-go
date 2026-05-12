@@ -22,6 +22,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
+	"github.com/litmuschaos/litmus-go/pkg/utils/stringutils"
 	"github.com/palantir/stacktrace"
 	"go.opentelemetry.io/otel"
 )
@@ -53,8 +54,8 @@ func PrepareChaos(ctx context.Context, experimentsDetails *experimentTypes.Exper
 	}
 
 	//get the disk name  or list of disk names
-	diskNameList := strings.Split(experimentsDetails.VirtualDiskNames, ",")
-	if experimentsDetails.VirtualDiskNames == "" || len(diskNameList) == 0 {
+	diskNameList := stringutils.SplitList(experimentsDetails.VirtualDiskNames)
+	if len(diskNameList) == 0 {
 		return cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Reason: "no volume names found to detach"}
 	}
 	instanceNamesWithDiskNames, err := diskStatus.GetInstanceNameForDisks(diskNameList, experimentsDetails.SubscriptionID, experimentsDetails.ResourceGroup)

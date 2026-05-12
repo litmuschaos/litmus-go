@@ -369,7 +369,7 @@ func getIpsForTargetHosts(targetHosts string, clients clients.ClientSets, servic
 	if targetHosts == "" {
 		return "", nil
 	}
-	hosts := strings.Split(targetHosts, ",")
+	hosts := stringutils.SplitList(targetHosts)
 	finalHosts := ""
 	var commaSeparatedIPs []string
 	for i := range hosts {

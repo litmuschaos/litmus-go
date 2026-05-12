@@ -5,7 +5,6 @@ import (
 	"math"
 	"math/rand"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -19,6 +18,7 @@ import (
 	ec2 "github.com/litmuschaos/litmus-go/pkg/cloud/aws/ec2"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
+	"github.com/litmuschaos/litmus-go/pkg/utils/stringutils"
 	"github.com/palantir/stacktrace"
 	"github.com/sirupsen/logrus"
 )
@@ -147,7 +147,7 @@ func CheckInstanceInformation(experimentsDetails *experimentTypes.ExperimentDeta
 	switch {
 	case experimentsDetails.EC2InstanceID != "":
 		// If specific instance IDs are provided, use instance ID filter
-		instanceIDList = strings.Split(experimentsDetails.EC2InstanceID, ",")
+		instanceIDList = stringutils.SplitList(experimentsDetails.EC2InstanceID)
 
 		input = &ssm.DescribeInstanceInformationInput{
 			Filters: []*ssm.InstanceInformationStringFilter{

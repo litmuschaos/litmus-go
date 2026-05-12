@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math/rand"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/palantir/stacktrace"
@@ -18,6 +17,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
+	"github.com/litmuschaos/litmus-go/pkg/utils/stringutils"
 )
 
 var err error
@@ -30,7 +30,7 @@ func GetNodeList(nodeNames, nodeLabel string, nodeAffPerc int, clients clients.C
 	var nodes *apiv1.NodeList
 
 	if nodeNames != "" {
-		targetNodesList := strings.Split(nodeNames, ",")
+		targetNodesList := stringutils.SplitList(nodeNames)
 		return targetNodesList, nil
 	}
 
