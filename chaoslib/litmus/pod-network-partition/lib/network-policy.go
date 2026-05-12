@@ -11,6 +11,7 @@ import (
 
 	network_chaos "github.com/litmuschaos/litmus-go/chaoslib/litmus/network-chaos/lib"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-network-partition/types"
+	"github.com/litmuschaos/litmus-go/pkg/utils/stringutils"
 	"gopkg.in/yaml.v2"
 	corev1 "k8s.io/api/core/v1"
 	networkv1 "k8s.io/api/networking/v1"
@@ -115,7 +116,7 @@ func (np *NetworkPolicy) setPolicy(policy string) *NetworkPolicy {
 // setPodSelector sets the pod labels selector
 func (np *NetworkPolicy) setPodSelector(podLabel string) *NetworkPolicy {
 	podSelector := map[string]string{}
-	labels := strings.Split(podLabel, ",")
+	labels := stringutils.SplitList(podLabel)
 	for i := range labels {
 		key, value := getKeyValue(labels[i])
 		if key != "" || value != "" {
@@ -129,7 +130,7 @@ func (np *NetworkPolicy) setPodSelector(podLabel string) *NetworkPolicy {
 // setNamespaceSelector sets the namespace labels selector
 func (np *NetworkPolicy) setNamespaceSelector(nsLabel string) *NetworkPolicy {
 	nsSelector := map[string]string{}
-	labels := strings.Split(nsLabel, ",")
+	labels := stringutils.SplitList(nsLabel)
 	for i := range labels {
 		key, value := getKeyValue(labels[i])
 		if key != "" || value != "" {
@@ -187,7 +188,7 @@ func (np *NetworkPolicy) setExceptIPs(experimentsDetails *experimentTypes.Experi
 	if err != nil {
 		return stacktrace.Propagate(err, "could not get destination ips")
 	}
-	ips := strings.Split(destinationIPs, ",")
+	ips := stringutils.SplitList(destinationIPs)
 	seen := make(map[string]struct{})
 	var ordered []string
 	for _, raw := range ips {
