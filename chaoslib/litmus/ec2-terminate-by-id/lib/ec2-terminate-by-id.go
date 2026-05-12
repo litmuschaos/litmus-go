@@ -19,6 +19,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/telemetry"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
+	"github.com/litmuschaos/litmus-go/pkg/utils/stringutils"
 	"github.com/palantir/stacktrace"
 	"go.opentelemetry.io/otel"
 )
@@ -50,8 +51,8 @@ func PrepareEC2TerminateByID(ctx context.Context, experimentsDetails *experiment
 	}
 
 	//get the instance id or list of instance ids
-	instanceIDList := strings.Split(experimentsDetails.Ec2InstanceID, ",")
-	if experimentsDetails.Ec2InstanceID == "" || len(instanceIDList) == 0 {
+	instanceIDList := stringutils.SplitList(experimentsDetails.Ec2InstanceID)
+	if len(instanceIDList) == 0 {
 		return cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Reason: "no EC2 instance ID found to terminate"}
 	}
 

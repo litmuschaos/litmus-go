@@ -3,7 +3,6 @@ package status
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
@@ -11,6 +10,7 @@ import (
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
+	"github.com/litmuschaos/litmus-go/pkg/utils/stringutils"
 	logrus "github.com/sirupsen/logrus"
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -25,7 +25,7 @@ func CheckNodeStatus(nodes string, timeout, delay int, clients clients.ClientSet
 		Try(func(attempt uint) error {
 			nodeList := apiv1.NodeList{}
 			if nodes != "" {
-				targetNodes := strings.Split(nodes, ",")
+				targetNodes := stringutils.SplitList(nodes)
 				for index := range targetNodes {
 					node, err := clients.KubeClient.CoreV1().Nodes().Get(context.Background(), targetNodes[index], metav1.GetOptions{})
 					if err != nil {
