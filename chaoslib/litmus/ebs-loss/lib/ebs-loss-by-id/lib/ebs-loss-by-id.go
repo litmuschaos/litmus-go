@@ -16,6 +16,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/telemetry"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
+	"github.com/litmuschaos/litmus-go/pkg/utils/stringutils"
 	"github.com/palantir/stacktrace"
 	"go.opentelemetry.io/otel"
 )
@@ -53,7 +54,7 @@ func PrepareEBSLossByID(ctx context.Context, experimentsDetails *experimentTypes
 	default:
 
 		//get the volume id or list of instance ids
-		volumeIDList := strings.Split(experimentsDetails.EBSVolumeID, ",")
+		volumeIDList := stringutils.SplitList(experimentsDetails.EBSVolumeID)
 		if len(volumeIDList) == 0 {
 			return cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Reason: "no volume id found to detach"}
 		}

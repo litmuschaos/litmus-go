@@ -2,12 +2,12 @@ package aws
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/aws/aws-sdk-go/service/rds"
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	"github.com/litmuschaos/litmus-go/pkg/cloud/aws/common"
 	"github.com/litmuschaos/litmus-go/pkg/log"
+	"github.com/litmuschaos/litmus-go/pkg/utils/stringutils"
 )
 
 // GetRDSInstanceStatus will verify and give the rds instance details.
@@ -45,8 +45,8 @@ func GetRDSInstanceStatus(instanceIdentifier, region string) (string, error) {
 // InstanceStatusCheckByInstanceIdentifier is used to check the instance status of all the instance under chaos.
 func InstanceStatusCheckByInstanceIdentifier(instanceIdentifier, region string) error {
 
-	instanceIdentifierList := strings.Split(instanceIdentifier, ",")
-	if instanceIdentifier == "" || len(instanceIdentifierList) == 0 {
+	instanceIdentifierList := stringutils.SplitList(instanceIdentifier)
+	if len(instanceIdentifierList) == 0 {
 		return cerrors.Error{
 			ErrorCode: cerrors.ErrorTypeStatusChecks,
 			Reason:    "no instance identifier provided to stop",
