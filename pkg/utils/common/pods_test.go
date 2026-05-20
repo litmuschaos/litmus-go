@@ -46,7 +46,7 @@ func Test_sortPodsByName(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := sortPodsByName(tt.input)
+			result := sortPodsByName(tt.input, false)
 			resultNames := []string{}
 			for _, pod := range result.Items {
 				resultNames = append(resultNames, pod.Name)
@@ -94,7 +94,7 @@ func Test_sortPodsByNameReverse(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := sortPodsByNameReverse(tt.input)
+			result := sortPodsByName(tt.input, true)
 			resultNames := []string{}
 			for _, pod := range result.Items {
 				resultNames = append(resultNames, pod.Name)

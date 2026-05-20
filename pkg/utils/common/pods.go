@@ -566,17 +566,12 @@ func getTargetPodsWhenNodeFilterSet(podAffPerc int, pods core_v1.PodList, nodes 
 }
 
 // sortPodsByName sorts a PodList lexicographically by pod name.
-func sortPodsByName(pods core_v1.PodList) core_v1.PodList {
+func sortPodsByName(pods core_v1.PodList, reverse bool) core_v1.PodList {
 	sort.Slice(pods.Items, func(i, j int) bool {
+		if reverse {
+			return pods.Items[i].Name > pods.Items[j].Name
+		}
 		return pods.Items[i].Name < pods.Items[j].Name
-	})
-	return pods
-}
-
-// sortPodsByNameReverse sorts a PodList reverse-lexicographically by pod name.
-func sortPodsByNameReverse(pods core_v1.PodList) core_v1.PodList {
-	sort.Slice(pods.Items, func(i, j int) bool {
-		return pods.Items[i].Name > pods.Items[j].Name
 	})
 	return pods
 }
@@ -611,10 +606,10 @@ func GetTargetPods(nodeLabel, targetPods, podsAffectedPerc, podTerminationOrder 
 		switch strings.ToLower(podTerminationOrder) {
 		case "alphabetical":
 			log.Infof("POD_TERMINATION_ORDER is 'alphabetical', sorting target pods by name (ascending)")
-			pods = sortPodsByName(pods)
+			pods = sortPodsByName(pods, false)
 		case "reverse":
 			log.Infof("POD_TERMINATION_ORDER is 'reverse', sorting target pods by name (descending)")
-			pods = sortPodsByNameReverse(pods)
+			pods = sortPodsByName(pods, true)
 			// default "random": no reordering; filterPodsByPercentage already used a random start index
 		}
 	}

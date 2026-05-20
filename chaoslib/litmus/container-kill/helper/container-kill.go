@@ -149,7 +149,9 @@ func kill(experimentsDetails *experimentTypes.ExperimentDetails, containerIds []
 	if experimentsDetails.EngineName != "" {
 		msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on application pod"
 		types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
-		_ = events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
+		if err := events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine"); err != nil {
+			log.Errorf("[Chaos]: Failed to create chaosengine inject event, err: %v", err)
+		}
 	}
 
 	switch experimentsDetails.ContainerRuntime {

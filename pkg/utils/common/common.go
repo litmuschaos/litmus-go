@@ -58,10 +58,10 @@ func RandomInterval(interval string) error {
 	if upperBound < 1 {
 		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: "invalid CHAOS_INTERVAL env value, value below lower limit"}
 	}
-	if upperBound <= lowerBound {
-		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: "invalid CHAOS_INTERVAL env value, upper bound must be greater than lower bound"}
+	if upperBound < lowerBound {
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: "invalid CHAOS_INTERVAL env value, upper bound must be greater than or equal to lower bound"}
 	}
-	waitTime := lowerBound + rand.Intn(upperBound-lowerBound)
+	waitTime := lowerBound + rand.Intn(upperBound-lowerBound+1)
 	log.Infof("[Wait]: Wait for the random chaos interval %vs", waitTime)
 	WaitForDuration(waitTime)
 	return nil
