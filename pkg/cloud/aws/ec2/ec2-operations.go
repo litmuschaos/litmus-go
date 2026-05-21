@@ -92,11 +92,19 @@ func WaitForEC2Down(timeout, delay int, managedNodegroup, region, instanceID str
 			if err != nil {
 				return stacktrace.Propagate(err, "failed to get the instance status")
 			}
-			if (managedNodegroup != "enable" && instanceState != "stopped") || (managedNodegroup == "enable" && instanceState != "terminated") {
+			if managedNodegroup != "enable" && instanceState != "stopped" {
 				log.Infof("The instance state is %v", instanceState)
 				return cerrors.Error{
 					ErrorCode: cerrors.ErrorTypeChaosInject,
 					Reason:    "instance is not in stopped state",
+					Target:    fmt.Sprintf("{EC2 Instance ID: %v, Region: %v}", instanceID, region),
+				}
+			}
+			if managedNodegroup == "enable" && instanceState != "stopped" && instanceState != "terminated" {
+				log.Infof("The instance state is %v", instanceState)
+				return cerrors.Error{
+					ErrorCode: cerrors.ErrorTypeChaosInject,
+					Reason:    "instance is not in stopped or terminated state",
 					Target:    fmt.Sprintf("{EC2 Instance ID: %v, Region: %v}", instanceID, region),
 				}
 			}
