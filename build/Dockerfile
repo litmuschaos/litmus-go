@@ -68,10 +68,10 @@ RUN curl -L https://github.com/litmuschaos/test-tools/releases/download/${LITMUS
 RUN curl -L https://github.com/litmuschaos/test-tools/releases/download/${LITMUS_VERSION}/nsutil_${TARGETARCH}.so --output /usr/local/lib/nsutil.so && chmod 755 /usr/local/lib/nsutil.so
 
 # Installing toxiproxy binaries
-RUN curl -L https://litmus-http-proxy.s3.amazonaws.com/cli/cli/toxiproxy-cli-linux-${TARGETARCH}.tar.gz --output toxiproxy-cli-linux-${TARGETARCH}.tar.gz && \
+RUN curl -L https://github.com/chaosnative/toxiproxy/releases/download/v2.6.0/toxiproxy-cli-linux-${TARGETARCH}.tar.gz --output toxiproxy-cli-linux-${TARGETARCH}.tar.gz && \
     tar zxvf toxiproxy-cli-linux-${TARGETARCH}.tar.gz -C /sbin/ && \
     chmod 755 /sbin/toxiproxy-cli
-RUN curl -L https://litmus-http-proxy.s3.amazonaws.com/server/server/toxiproxy-server-linux-${TARGETARCH}.tar.gz --output toxiproxy-server-linux-${TARGETARCH}.tar.gz && \
+RUN curl -L https://github.com/chaosnative/toxiproxy/releases/download/v2.6.0/toxiproxy-server-linux-${TARGETARCH}.tar.gz --output toxiproxy-server-linux-${TARGETARCH}.tar.gz && \
     tar zxvf toxiproxy-server-linux-${TARGETARCH}.tar.gz -C /sbin/ && \
     chmod 755 /sbin/toxiproxy-server
 
