@@ -15,6 +15,8 @@ import (
 	// _ "k8s.io/client-go/plugin/pkg/client/auth/oidc"
 	// _ "k8s.io/client-go/plugin/pkg/client/auth/openstack"
 
+	"go.opentelemetry.io/otel"
+
 	awsSSMChaosByID "github.com/litmuschaos/litmus-go/experiments/aws-ssm/aws-ssm-chaos-by-id/experiment"
 	awsSSMChaosByTag "github.com/litmuschaos/litmus-go/experiments/aws-ssm/aws-ssm-chaos-by-tag/experiment"
 	azureDiskLoss "github.com/litmuschaos/litmus-go/experiments/azure/azure-disk-loss/experiment"
@@ -55,11 +57,13 @@ import (
 	podNetworkLatency "github.com/litmuschaos/litmus-go/experiments/generic/pod-network-latency/experiment"
 	podNetworkLoss "github.com/litmuschaos/litmus-go/experiments/generic/pod-network-loss/experiment"
 	podNetworkPartition "github.com/litmuschaos/litmus-go/experiments/generic/pod-network-partition/experiment"
+	podNetworkRateLimit "github.com/litmuschaos/litmus-go/experiments/generic/pod-network-rate-limit/experiment"
 	kafkaBrokerPodFailure "github.com/litmuschaos/litmus-go/experiments/kafka/kafka-broker-pod-failure/experiment"
 	ebsLossByID "github.com/litmuschaos/litmus-go/experiments/kube-aws/ebs-loss-by-id/experiment"
 	ebsLossByTag "github.com/litmuschaos/litmus-go/experiments/kube-aws/ebs-loss-by-tag/experiment"
 	ec2TerminateByID "github.com/litmuschaos/litmus-go/experiments/kube-aws/ec2-terminate-by-id/experiment"
 	ec2TerminateByTag "github.com/litmuschaos/litmus-go/experiments/kube-aws/ec2-terminate-by-tag/experiment"
+	rdsInstanceStop "github.com/litmuschaos/litmus-go/experiments/kube-aws/rds-instance-stop/experiment"
 	k6Loadgen "github.com/litmuschaos/litmus-go/experiments/load/k6-loadgen/experiment"
 	springBootFaults "github.com/litmuschaos/litmus-go/experiments/spring-boot/spring-boot-faults/experiment"
 	vmpoweroff "github.com/litmuschaos/litmus-go/experiments/vmware/vm-poweroff/experiment"
@@ -67,7 +71,6 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/telemetry"
 	"github.com/sirupsen/logrus"
-	"go.opentelemetry.io/otel"
 )
 
 func init() {
@@ -153,6 +156,8 @@ func main() {
 		podNetworkLoss.PodNetworkLoss(ctx, clients)
 	case "pod-network-partition":
 		podNetworkPartition.PodNetworkPartition(ctx, clients)
+	case "pod-network-rate-limit":
+		podNetworkRateLimit.PodNetworkRateLimit(ctx, clients)
 	case "pod-memory-hog":
 		podMemoryHog.PodMemoryHog(ctx, clients)
 	case "pod-cpu-hog":
@@ -171,6 +176,8 @@ func main() {
 		ebsLossByID.EBSLossByID(ctx, clients)
 	case "ebs-loss-by-tag":
 		ebsLossByTag.EBSLossByTag(ctx, clients)
+	case "rds-instance-stop":
+		rdsInstanceStop.RDSInstanceStop(ctx, clients)
 	case "node-restart":
 		nodeRestart.NodeRestart(ctx, clients)
 	case "pod-dns-error":

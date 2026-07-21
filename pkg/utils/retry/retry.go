@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	"time"
-
-	"github.com/pkg/errors"
 )
 
 // Action defines the prototype of action function, function as a value
@@ -72,9 +70,11 @@ func (model Model) Try(action Action) error {
 		if model.waitTime > 0 {
 			time.Sleep(model.waitTime)
 		}
-		if err == errors.Errorf("container is in terminated state") {
+		// Match based on error string to support testability and avoid fragile pointer comparison
+		if err != nil && err.Error() == "container is in terminated state" {
 			break
 		}
+
 	}
 
 	return err

@@ -2,6 +2,7 @@ package duplication
 
 import (
 	"context"
+	"fmt"
 
 	network_chaos "github.com/litmuschaos/litmus-go/chaoslib/litmus/network-chaos/lib"
 	"github.com/litmuschaos/litmus-go/pkg/clients"
@@ -16,6 +17,10 @@ func PodNetworkDuplicationChaos(ctx context.Context, experimentsDetails *experim
 	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PreparePodNetworkDuplicationFault")
 	defer span.End()
 
-	args := "duplicate " + experimentsDetails.NetworkPacketDuplicationPercentage
+	args := "netem duplicate " + experimentsDetails.NetworkPacketDuplicationPercentage
+	if experimentsDetails.Correlation > 0 {
+		args = fmt.Sprintf("%s %d", args, experimentsDetails.Correlation)
+	}
+
 	return network_chaos.PrepareAndInjectChaos(ctx, experimentsDetails, clients, resultDetails, eventsDetails, chaosDetails, args)
 }
