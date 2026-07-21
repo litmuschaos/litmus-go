@@ -26,7 +26,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-var serviceMesh = []string{"istio", "envoy"}
+var serviceMesh = []string{"istio", "envoy", "linkerd-proxy"}
 var destIpsSvcMesh string
 var destIps string
 
