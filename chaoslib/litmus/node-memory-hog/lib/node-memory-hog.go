@@ -16,11 +16,9 @@ import (
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/node-memory-hog/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
-	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/litmuschaos/litmus-go/pkg/utils/stringutils"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	apiv1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -134,30 +132,10 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 
 		appLabel := fmt.Sprintf("app=%s-helper-%s", experimentsDetails.ExperimentName, experimentsDetails.RunID)
 
-		//Checking the status of helper pod
-		log.Info("[Status]: Checking the status of the helper pod")
-		if err := status.CheckHelperStatus(experimentsDetails.ChaosNamespace, appLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
-			common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
-			return stacktrace.Propagate(err, "could not check helper status")
-		}
-
 		common.SetTargets(appNode, "targeted", "node", chaosDetails)
 
-		// Wait till the completion of helper pod
-		log.Info("[Wait]: Waiting till the completion of the helper pod")
-		podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, appLabel, clients, experimentsDetails.ChaosDuration+experimentsDetails.Timeout, experimentsDetails.ExperimentName)
-		if err != nil {
-			common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
-			return common.HelperFailedError(err, appLabel, chaosDetails.ChaosNamespace, false)
-		} else if podStatus == "Failed" {
-			common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
-			return errors.Errorf("helper pod status is %v", podStatus)
-		}
-
-		//Deleting the helper pod
-		log.Info("[Cleanup]: Deleting the helper pod")
-		if err := common.DeleteAllPod(appLabel, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients); err != nil {
-			return stacktrace.Propagate(err, "could not delete helper pod(s)")
+		if err := common.ManagerHelperLifecycle(appLabel, chaosDetails, clients, false); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -211,29 +189,12 @@ func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experime
 
 	appLabel := fmt.Sprintf("app=%s-helper-%s", experimentsDetails.ExperimentName, experimentsDetails.RunID)
 
-	//Checking the status of helper pod
-	log.Info("[Status]: Checking the status of the helper pod")
-	if err := status.CheckHelperStatus(experimentsDetails.ChaosNamespace, appLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
-		common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
-		return stacktrace.Propagate(err, "could not check helper status")
-	}
-
 	for _, appNode := range targetNodeList {
 		common.SetTargets(appNode, "targeted", "node", chaosDetails)
 	}
 
-	// Wait till the completion of helper pod
-	log.Info("[Wait]: Waiting till the completion of the helper pod")
-	podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, appLabel, clients, experimentsDetails.ChaosDuration+experimentsDetails.Timeout, common.GetContainerNames(chaosDetails)...)
-	if err != nil || podStatus == "Failed" {
-		common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
-		return common.HelperFailedError(err, appLabel, chaosDetails.ChaosNamespace, false)
-	}
-
-	//Deleting the helper pod
-	log.Info("[Cleanup]: Deleting the helper pod")
-	if err = common.DeleteAllPod(appLabel, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients); err != nil {
-		return stacktrace.Propagate(err, "could not delete helper pod(s)")
+	if err := common.ManagerHelperLifecycle(appLabel, chaosDetails, clients, false); err != nil {
+		return err
 	}
 
 	return nil
@@ -241,8 +202,7 @@ func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experime
 
 // getNodeMemoryDetails will return the total memory capacity and memory allocatable of an application node
 func getNodeMemoryDetails(appNodeName string, clients clients.ClientSets) (int, int, error) {
-
-	nodeDetails, err := clients.KubeClient.CoreV1().Nodes().Get(context.Background(), appNodeName, v1.GetOptions{})
+	nodeDetails, err := clients.GetNode(appNodeName, 180, 2)
 	if err != nil {
 		return 0, 0, cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Target: fmt.Sprintf("{nodeName: %s}", appNodeName), Reason: err.Error()}
 	}
@@ -365,10 +325,10 @@ func createHelperPod(ctx context.Context, experimentsDetails *experimentTypes.Ex
 		helperPod.Spec.Volumes = append(helperPod.Spec.Volumes, common.GetSidecarVolumes(chaosDetails)...)
 	}
 
-	_, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Create(context.Background(), helperPod, v1.CreateOptions{})
-	if err != nil {
+	if err := clients.CreatePod(experimentsDetails.ChaosNamespace, helperPod); err != nil {
 		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("unable to create helper pod: %s", err.Error())}
 	}
+
 	return nil
 }
 

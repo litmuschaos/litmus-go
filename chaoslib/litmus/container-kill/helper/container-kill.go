@@ -208,10 +208,11 @@ func stopDockerContainer(containerIDs []string, socketPath, signal, source strin
 
 // getRestartCount return the restart count of target container
 func getRestartCount(target targetDetails, clients clients.ClientSets) (int, error) {
-	pod, err := clients.KubeClient.CoreV1().Pods(target.Namespace).Get(context.Background(), target.Name, v1.GetOptions{})
+	pod, err := clients.GetPod(target.Namespace, target.Name, 180, 2)
 	if err != nil {
 		return 0, cerrors.Error{ErrorCode: cerrors.ErrorTypeHelper, Source: target.Source, Target: fmt.Sprintf("{podName: %s, namespace: %s}", target.Name, target.Namespace), Reason: err.Error()}
 	}
+
 	restartCount := 0
 	for _, container := range pod.Status.ContainerStatuses {
 		if container.Name == target.TargetContainer {

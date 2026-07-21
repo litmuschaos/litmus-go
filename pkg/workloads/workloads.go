@@ -4,14 +4,15 @@ package workloads
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/palantir/stacktrace"
-	"strings"
 
 	kcorev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 )
@@ -26,7 +27,7 @@ var (
 	gvrrc = schema.GroupVersionResource{
 		Group:    "",
 		Version:  "v1",
-		Resource: "replicacontrollers",
+		Resource: "replicationcontrollers",
 	}
 
 	gvrrs = schema.GroupVersionResource{
@@ -38,8 +39,7 @@ var (
 
 // GetPodsFromWorkloads derives the pods from the parent workloads
 func GetPodsFromWorkloads(target types.AppDetails, client clients.ClientSets) (kcorev1.PodList, error) {
-
-	allPods, err := getAllPods(target.Namespace, client)
+	allPods, err := client.GetAllPod(target.Namespace)
 	if err != nil {
 		return kcorev1.PodList{}, stacktrace.Propagate(err, "could not get all pods")
 	}
@@ -74,7 +74,7 @@ func GetPodOwnerTypeAndName(pod *kcorev1.Pod, dynamicClient dynamic.Interface) (
 	for _, owner := range pod.GetOwnerReferences() {
 		parentName = owner.Name
 		parentType = strings.ToLower(owner.Kind)
-		if owner.Kind == "StatefulSet" || owner.Kind == "DaemonSet" {
+		if owner.Kind == "StatefulSet" || owner.Kind == "DaemonSet" || owner.Kind == "Job" {
 			return strings.ToLower(owner.Kind), parentName, nil
 		}
 
@@ -82,7 +82,7 @@ func GetPodOwnerTypeAndName(pod *kcorev1.Pod, dynamicClient dynamic.Interface) (
 			return getParent(owner.Name, pod.Namespace, gvrrs, dynamicClient)
 		}
 
-		if owner.Kind == "ReplicaController" {
+		if owner.Kind == "ReplicationController" {
 			return getParent(owner.Name, pod.Namespace, gvrrc, dynamicClient)
 		}
 	}
@@ -102,12 +102,4 @@ func getParent(name, namespace string, gvr schema.GroupVersionResource, dynamicC
 		}
 	}
 	return "", "", nil
-}
-
-func getAllPods(namespace string, client clients.ClientSets) (*kcorev1.PodList, error) {
-	pods, err := client.KubeClient.CoreV1().Pods(namespace).List(context.Background(), v1.ListOptions{})
-	if err != nil {
-		return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Target: fmt.Sprintf("{namespace: %s, resource: AllPods}", namespace), Reason: fmt.Sprintf("failed to get all pods :%s", err.Error())}
-	}
-	return pods, nil
 }

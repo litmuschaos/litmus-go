@@ -2,6 +2,7 @@ package corruption
 
 import (
 	"context"
+	"fmt"
 
 	network_chaos "github.com/litmuschaos/litmus-go/chaoslib/litmus/network-chaos/lib"
 	"github.com/litmuschaos/litmus-go/pkg/clients"
@@ -16,6 +17,10 @@ func PodNetworkCorruptionChaos(ctx context.Context, experimentsDetails *experime
 	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PreparePodNetworkCorruptionFault")
 	defer span.End()
 
-	args := "corrupt " + experimentsDetails.NetworkPacketCorruptionPercentage
+	args := "netem corrupt " + experimentsDetails.NetworkPacketCorruptionPercentage
+	if experimentsDetails.Correlation > 0 {
+		args = fmt.Sprintf("%s %d", args, experimentsDetails.Correlation)
+	}
+
 	return network_chaos.PrepareAndInjectChaos(ctx, experimentsDetails, clients, resultDetails, eventsDetails, chaosDetails, args)
 }

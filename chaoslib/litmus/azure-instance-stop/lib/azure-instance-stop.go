@@ -20,6 +20,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/telemetry"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
+	"github.com/litmuschaos/litmus-go/pkg/utils/stringutils"
 	"github.com/palantir/stacktrace"
 	"go.opentelemetry.io/otel"
 )
@@ -50,8 +51,8 @@ func PrepareAzureStop(ctx context.Context, experimentsDetails *experimentTypes.E
 	}
 
 	//  get the instance name or list of instance names
-	instanceNameList := strings.Split(experimentsDetails.AzureInstanceNames, ",")
-	if experimentsDetails.AzureInstanceNames == "" || len(instanceNameList) == 0 {
+	instanceNameList := stringutils.SplitList(experimentsDetails.AzureInstanceNames)
+	if len(instanceNameList) == 0 {
 		return cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Reason: "no instance name found to stop"}
 	}
 

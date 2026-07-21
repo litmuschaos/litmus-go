@@ -116,7 +116,9 @@ func httpGet(probe v1alpha1.ProbeAttributes, client *http.Client, resultDetails 
 			// getting the response from the given url
 			resp, err := client.Get(probe.HTTPProbeInputs.URL)
 			if err != nil {
-				if utils.HttpTimeout(err) {
+				// Treat connection errors (timeout, connection refused, network unreachable, etc.) as failures
+				// instead of errors so they can be handled with stopOnFailure config
+				if utils.HttpTimeout(err) || utils.IsConnectionError(err) {
 					return cerrors.Error{ErrorCode: cerrors.FailureTypeHttpProbe, Target: fmt.Sprintf("{name: %v}", probe.Name), Reason: err.Error()}
 				}
 				return cerrors.Error{ErrorCode: cerrors.ErrorTypeHttpProbe, Target: fmt.Sprintf("{name: %v}", probe.Name), Reason: err.Error()}
@@ -163,7 +165,9 @@ func httpPost(probe v1alpha1.ProbeAttributes, client *http.Client, resultDetails
 		Try(func(attempt uint) error {
 			resp, err := client.Post(probe.HTTPProbeInputs.URL, probe.HTTPProbeInputs.Method.Post.ContentType, strings.NewReader(body))
 			if err != nil {
-				if utils.HttpTimeout(err) {
+				// Treat connection errors (timeout, connection refused, network unreachable, etc.) as failures
+				// instead of errors so they can be handled with stopOnFailure config
+				if utils.HttpTimeout(err) || utils.IsConnectionError(err) {
 					return cerrors.Error{ErrorCode: cerrors.FailureTypeHttpProbe, Target: fmt.Sprintf("{name: %v}", probe.Name), Reason: err.Error()}
 				}
 				return cerrors.Error{ErrorCode: cerrors.ErrorTypeHttpProbe, Target: fmt.Sprintf("{name: %v}", probe.Name), Reason: err.Error()}
