@@ -31,6 +31,7 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.NodeLabel = types.Getenv("NODE_LABEL", "")
 	experimentDetails.TerminationGracePeriodSeconds, _ = strconv.Atoi(types.Getenv("TERMINATION_GRACE_PERIOD_SECONDS", ""))
 	experimentDetails.SetHelperData = types.Getenv("SET_HELPER_DATA", "true")
+	experimentDetails.SSHSecretName = types.Getenv("SSH_SECRET_NAME", "id-rsa")
 	experimentDetails.AppNS, experimentDetails.AppKind, experimentDetails.AppLabel = getAppDetails()
 }
 

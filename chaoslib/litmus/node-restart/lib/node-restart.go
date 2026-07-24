@@ -26,7 +26,8 @@ import (
 var err error
 
 const (
-	secretName      string = "id-rsa"
+        // We will add provision to pass secretName as env var
+	// secretName      string = "id-rsa"
 	privateKeyMount string = "/mnt"
 	privateKeyPath  string = "/mnt/ssh-privatekey"
 	emptyDirMount   string = "/data"
@@ -172,7 +173,7 @@ func createHelperPod(ctx context.Context, experimentsDetails *experimentTypes.Ex
 					Name: privateKeySecret + experimentsDetails.RunID,
 					VolumeSource: apiv1.VolumeSource{
 						Secret: &apiv1.SecretVolumeSource{
-							SecretName: secretName,
+							SecretName: experimentsDetails.SSHSecretName,
 						},
 					},
 				},
