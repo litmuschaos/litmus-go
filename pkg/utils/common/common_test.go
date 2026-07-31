@@ -76,9 +76,9 @@ func TestGetStatusMessage(t *testing.T) {
 
 func TestGetRandomSequence(t *testing.T) {
 	tests := []struct {
-		name             string
-		sequence         string
-		expectOneOf      []string
+		name        string
+		sequence    string
+		expectOneOf []string
 	}{
 		{
 			name:        "random lowercase returns serial or parallel",
@@ -96,19 +96,19 @@ func TestGetRandomSequence(t *testing.T) {
 			expectOneOf: []string{"serial", "parallel"},
 		},
 		{
-			name:             "serial stays as serial",
-			sequence:         "serial",
-			expectOneOf:      []string{"serial"},
+			name:        "serial stays as serial",
+			sequence:    "serial",
+			expectOneOf: []string{"serial"},
 		},
 		{
-			name:             "parallel stays as parallel",
-			sequence:         "parallel",
-			expectOneOf:      []string{"parallel"},
+			name:        "parallel stays as parallel",
+			sequence:    "parallel",
+			expectOneOf: []string{"parallel"},
 		},
 		{
-			name:             "custom value stays as-is",
-			sequence:         "custom-sequence",
-			expectOneOf:      []string{"custom-sequence"},
+			name:        "custom value stays as-is",
+			sequence:    "custom-sequence",
+			expectOneOf: []string{"custom-sequence"},
 		},
 	}
 
