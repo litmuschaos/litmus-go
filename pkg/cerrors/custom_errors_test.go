@@ -3,10 +3,16 @@ package cerrors
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
 	"github.com/palantir/stacktrace"
+)
+
+var (
+	_ error = Error{}
+	_ error = PreserveError{}
 )
 
 func TestErrorTypeConstants(t *testing.T) {
@@ -149,7 +155,7 @@ func TestIsUserFriendly(t *testing.T) {
 		},
 		{
 			name:     "fmt.Errorf is not user-friendly",
-			err:      errors.New("fmt error"),
+			err:      fmt.Errorf("fmt error"),
 			expected: false,
 		},
 	}
@@ -287,19 +293,5 @@ func TestPreserveError_ErrorType(t *testing.T) {
 	pe := PreserveError{ErrString: "test"}
 	if got := pe.ErrorType(); got != ErrorTypeGeneric {
 		t.Errorf("PreserveError.ErrorType() = %v, want %v", got, ErrorTypeGeneric)
-	}
-}
-
-func TestError_ImplementsErrorInterface(t *testing.T) {
-	var err error = Error{ErrorCode: ErrorTypeGeneric, Reason: "test"}
-	if err == nil {
-		t.Error("Error should implement error interface")
-	}
-}
-
-func TestPreserveError_ImplementsErrorInterface(t *testing.T) {
-	var err error = PreserveError{ErrString: "test"}
-	if err == nil {
-		t.Error("PreserveError should implement error interface")
 	}
 }

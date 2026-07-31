@@ -79,7 +79,6 @@ func TestGetRandomSequence(t *testing.T) {
 		name             string
 		sequence         string
 		expectOneOf      []string
-		expectExactMatch bool
 	}{
 		{
 			name:        "random lowercase returns serial or parallel",
@@ -100,19 +99,16 @@ func TestGetRandomSequence(t *testing.T) {
 			name:             "serial stays as serial",
 			sequence:         "serial",
 			expectOneOf:      []string{"serial"},
-			expectExactMatch: true,
 		},
 		{
 			name:             "parallel stays as parallel",
 			sequence:         "parallel",
 			expectOneOf:      []string{"parallel"},
-			expectExactMatch: true,
 		},
 		{
 			name:             "custom value stays as-is",
 			sequence:         "custom-sequence",
 			expectOneOf:      []string{"custom-sequence"},
-			expectExactMatch: true,
 		},
 	}
 
@@ -659,10 +655,8 @@ func TestValidateRange(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := ValidateRange(tt.input)
-			if tt.expectExact != "" || (!tt.checkRange && tt.input == tt.expectExact) {
-				if tt.expectExact != "" && got != tt.expectExact {
-					t.Errorf("ValidateRange(%q) = %q, want %q", tt.input, got, tt.expectExact)
-				}
+			if !tt.checkRange && got != tt.expectExact {
+				t.Errorf("ValidateRange(%q) = %q, want %q", tt.input, got, tt.expectExact)
 			}
 			if tt.checkRange {
 				val := 0
