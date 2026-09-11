@@ -1,9 +1,9 @@
 # GLOBAL ARGUMENT: Base Image
-ARG BASE_IMAGE=registry.access.redhat.com/ubi9/ubi:9.4
+ARG BASE_IMAGE=registry.access.redhat.com/ubi9/ubi:9.8
 
 # Multi-stage docker build
 # Build stage
-FROM golang:1.22 AS builder
+FROM golang:1.27.2 AS builder
 
 ARG TARGETOS=linux
 ARG TARGETARCH
@@ -17,8 +17,12 @@ RUN export GOOS=${TARGETOS} && \
 RUN CGO_ENABLED=0 go build -o /output/experiments ./bin/experiment
 RUN CGO_ENABLED=0 go build -o /output/helpers ./bin/helper
 
+# Compile stale tools securely from source (Bypassing CVEs)
+RUN CGO_ENABLED=0 go install github.com/nalbury/promql-cli@latest && \
+    CGO_ENABLED=0 go install github.com/Shopify/toxiproxy/v2/cmd/toxiproxy-cli@latest && \
+    CGO_ENABLED=0 go install github.com/Shopify/toxiproxy/v2/cmd/toxiproxy-server@latest
+
 # Packaging stage
-# We set the default to UBI 9.4, but allow it to be overridden via --build-arg
 FROM ${BASE_IMAGE}
 
 LABEL maintainer="LitmusChaos"
@@ -36,11 +40,8 @@ RUN yum install -y \
 # EPEL repo for stress-ng
 RUN yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-$(rpm -E %rhel).noarch.rpm
 
-# tc binary
-RUN yum install -y iproute
-
-# iptables
-RUN yum install -y iptables iptables-services
+# tc binary & iptables
+RUN yum install -y iproute iptables iptables-services
 
 # stress-ng
 RUN if [ $(rpm -E %rhel) -eq 9 ]; then \
@@ -50,46 +51,34 @@ RUN if [ $(rpm -E %rhel) -eq 9 ]; then \
       yum install -y stress-ng; \
     fi && yum clean all
 
-#Installing Kubectl
-ENV KUBE_LATEST_VERSION="v1.31.0"
-RUN curl -L https://storage.googleapis.com/kubernetes-release/release/${KUBE_LATEST_VERSION}/bin/linux/${TARGETARCH}/kubectl -o     /usr/bin/kubectl && \
+# Installing Kubectl (Updated to modern registry with fail-fast flag)
+ENV KUBE_LATEST_VERSION="v1.37.0"
+RUN curl -fL https://dl.k8s.io/release/${KUBE_LATEST_VERSION}/bin/linux/${TARGETARCH}/kubectl -o /usr/bin/kubectl && \
     chmod 755 /usr/bin/kubectl
 
-#Installing crictl binaries
-RUN curl -L https://github.com/kubernetes-sigs/cri-tools/releases/download/v1.31.1/crictl-v1.31.1-linux-${TARGETARCH}.tar.gz --output crictl-v1.31.1-linux-${TARGETARCH}.tar.gz && \
-    tar zxvf crictl-v1.31.1-linux-${TARGETARCH}.tar.gz -C /sbin && \
+# Installing crictl binaries
+RUN curl -fL https://github.com/kubernetes-sigs/cri-tools/releases/download/v1.37.0/crictl-v1.37.0-linux-${TARGETARCH}.tar.gz --output crictl-v1.37.0-linux-${TARGETARCH}.tar.gz && \
+    tar zxvf crictl-v1.37.0-linux-${TARGETARCH}.tar.gz -C /sbin && \
+    rm -f crictl-v1.37.0-linux-${TARGETARCH}.tar.gz && \
     chmod 755 /sbin/crictl
 
-#Installing promql cli binaries
-RUN curl -L https://github.com/chaosnative/promql-cli/releases/download/3.0.0-beta6/promql_linux_${TARGETARCH} --output /usr/bin/promql && chmod 755 /usr/bin/promql
+# Installing pause cli binaries
+RUN curl -fL https://github.com/litmuschaos/test-tools/releases/download/${LITMUS_VERSION}/pause-linux-${TARGETARCH} --output /usr/bin/pause && chmod 755 /usr/bin/pause
 
-#Installing pause cli binaries
-RUN curl -L https://github.com/litmuschaos/test-tools/releases/download/${LITMUS_VERSION}/pause-linux-${TARGETARCH} --output /usr/bin/pause && chmod 755 /usr/bin/pause
+# Installing dns_interceptor cli binaries
+RUN curl -fL https://github.com/litmuschaos/test-tools/releases/download/${LITMUS_VERSION}/dns_interceptor --output /sbin/dns_interceptor && chmod 755 /sbin/dns_interceptor
 
-#Installing dns_interceptor cli binaries
-RUN curl -L https://github.com/litmuschaos/test-tools/releases/download/${LITMUS_VERSION}/dns_interceptor --output /sbin/dns_interceptor && chmod 755 /sbin/dns_interceptor
-
-#Installing nsutil cli binaries
-RUN curl -L https://github.com/litmuschaos/test-tools/releases/download/${LITMUS_VERSION}/nsutil-linux-${TARGETARCH} --output /sbin/nsutil && chmod 755 /sbin/nsutil
-
-#Installing nsutil shared lib
-RUN curl -L https://github.com/litmuschaos/test-tools/releases/download/${LITMUS_VERSION}/nsutil_${TARGETARCH}.so --output /usr/local/lib/nsutil.so && chmod 755 /usr/local/lib/nsutil.so
-
-# Installing toxiproxy binaries
-RUN curl -L https://github.com/chaosnative/toxiproxy/releases/download/v2.6.0/toxiproxy-cli-linux-${TARGETARCH}.tar.gz --output toxiproxy-cli-linux-${TARGETARCH}.tar.gz && \
-    tar zxvf toxiproxy-cli-linux-${TARGETARCH}.tar.gz -C /sbin/ && \
-    chmod 755 /sbin/toxiproxy-cli
-RUN curl -L https://github.com/chaosnative/toxiproxy/releases/download/v2.6.0/toxiproxy-server-linux-${TARGETARCH}.tar.gz --output toxiproxy-server-linux-${TARGETARCH}.tar.gz && \
-    tar zxvf toxiproxy-server-linux-${TARGETARCH}.tar.gz -C /sbin/ && \
-    chmod 755 /sbin/toxiproxy-server
+# Installing nsutil cli binaries and shared lib
+RUN curl -fL https://github.com/litmuschaos/test-tools/releases/download/${LITMUS_VERSION}/nsutil-linux-${TARGETARCH} --output /sbin/nsutil && chmod 755 /sbin/nsutil
+RUN curl -fL https://github.com/litmuschaos/test-tools/releases/download/${LITMUS_VERSION}/nsutil_${TARGETARCH}.so --output /usr/local/lib/nsutil.so && chmod 755 /usr/local/lib/nsutil.so
 
 ENV APP_USER=litmus
 ENV APP_DIR="/$APP_USER"
 ENV DATA_DIR="$APP_DIR/data"
 
-# The USERD_ID of user
+# The USERD_ID of user (Updated to /bin/bash for PAM compatibility)
 ENV APP_USER_ID=2000
-RUN useradd -s /bin/true -u $APP_USER_ID -m -d $APP_DIR $APP_USER
+RUN useradd -s /bin/bash -u $APP_USER_ID -m -d $APP_DIR $APP_USER
 
 # change to 0(root) group because openshift will run container with arbitrary uid as a member of root group
 RUN chgrp -R 0 "$APP_DIR" && chmod -R g=u "$APP_DIR"
@@ -99,7 +88,14 @@ RUN echo 'ALL ALL=(ALL:ALL) NOPASSWD: ALL' >> /etc/sudoers
 
 WORKDIR $APP_DIR
 
+# Copy internal Litmus code
 COPY --from=builder /output/ .
+
+# Copy secure third-party tools from builder stage
+COPY --from=builder /go/bin/promql-cli /usr/bin/promql
+COPY --from=builder /go/bin/toxiproxy-cli /sbin/toxiproxy-cli
+COPY --from=builder /go/bin/toxiproxy-server /sbin/toxiproxy-server
+RUN chmod 755 /usr/bin/promql /sbin/toxiproxy-cli /sbin/toxiproxy-server
 
 COPY --from=docker:27.0.3 /usr/local/bin/docker /sbin/docker
 RUN chmod 755 /sbin/docker
@@ -108,8 +104,8 @@ RUN chmod 755 /sbin/docker
 RUN chmod 755 ./experiments ./helpers && \
     chown ${APP_USER}:0 ./experiments ./helpers
 
-# Set ownership for binaries in /sbin and /usr/bin
-RUN chown ${APP_USER}:0 /sbin/* /usr/bin/* && \
+# Surgical ownership (Drops the wildcard to protect PAM/sudo)
+RUN chown ${APP_USER}:0 /usr/bin/promql /sbin/toxiproxy-cli /sbin/toxiproxy-server /usr/bin/kubectl /sbin/crictl /sbin/docker /usr/bin/pause /sbin/dns_interceptor /sbin/nsutil && \
     chown root:root /usr/bin/sudo && \
     chmod 4755 /usr/bin/sudo
 
