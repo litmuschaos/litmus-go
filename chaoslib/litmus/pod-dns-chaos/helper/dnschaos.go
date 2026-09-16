@@ -4,10 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/litmuschaos/litmus-go/pkg/cerrors"
-	"github.com/litmuschaos/litmus-go/pkg/telemetry"
-	"github.com/palantir/stacktrace"
-	"go.opentelemetry.io/otel"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -15,6 +11,11 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
+	"github.com/litmuschaos/litmus-go/pkg/telemetry"
+	"github.com/palantir/stacktrace"
+	"go.opentelemetry.io/otel"
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
