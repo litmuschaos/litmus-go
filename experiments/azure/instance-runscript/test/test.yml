@@ -1,0 +1,102 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: litmus-experiment
+spec:
+  replicas: 1
+  selector: 
+    matchLabels:
+      app: litmus-experiment
+  template:
+    metadata:
+      labels:
+        app: litmus-experiment
+    spec:
+      serviceAccountName: azure-instance-runscript-sa
+      containers:
+      - name: gotest
+        image: busybox
+        command:
+          - sleep 
+          - "3600"
+        env:
+
+          - name: APP_NAMESPACE
+            value: 'default'
+
+          - name: APP_LABEL
+            value: 'run=nginx'
+
+          - name: APP_KIND
+            value: 'deployment'
+          
+          - name: RAMP_TIME
+            value: ''
+          
+          - name: TOTAL_CHAOS_DURATION
+            value: '60'
+          
+          - name: CHAOS_INTERVAL
+            value: '30'
+          
+          - name: CHAOS_NAMESPACE
+            value: 'litmus'
+
+          # provide the instance names (comma seperated if multiple)
+          - name: AZURE_INSTANCE_NAME
+            value: ''
+          
+          # provide the resouce group of the instance
+          - name: RESOURCE_GROUP
+            value: ''
+          
+          # whether the disk is attached to scale instance or not, accepted values are disable, enable
+          - name: SCALE_SET
+            value: 'disable'
+          
+          # provide the Powershell paramNames for Chaos Start powershell script
+          - name: PowershellChaosStartParamNames
+            value: ''
+          
+          # provide the Powershell paramValues for Chaos Start powershell script
+          - name: PowershellChaosStartParamValues
+            value: ''
+          
+          # provide the Powershell script file path or script itself as a Base64 string for Chaos Start powershell script
+          - name: PowershellChaosStartBase64OrPsFilePath
+            value: ''
+          
+          # provide the Powershell paramNames for Chaos End powershell script
+          - name: PowershellChaosEndParamNames
+            value: ''
+          
+          # provide the Powershell paramValues for Chaos End powershell script
+          - name: PowershellChaosEndParamValues
+            value: ''
+          
+          # provide the Powershell script file path or script itself as a Base64 string for Chaos End powershell script
+          - name: PowershellChaosEndBase64OrPsFilePath
+            value: ''
+          
+          # provide the sequence type for the run. Options: serial/parallel
+          - name: SEQUENCE
+            value: 'serial'
+          
+          # provide the path to aks credentials mounted from secret
+          - name: AZURE_AUTH_LOCATION
+            value: '/tmp/azure.auth'
+
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          
+          - name: CHAOS_SERVICE_ACCOUNT
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.serviceAccountName
+          
+        secrets:
+          - name: cloud-secret
+            mountPath: /tmp/
