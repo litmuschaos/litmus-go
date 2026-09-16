@@ -11,15 +11,15 @@
 [![YouTube Channel](https://img.shields.io/badge/YouTube-Subscribe-red)](https://www.youtube.com/channel/UCa57PMqmz_j0wnteRa9nCaw)
 <br><br>
 
-This repo consists of Litmus Chaos Experiments written in golang. The examples in this repo are good indicators of how to construct the experiments in golang: complete with steady state checks, chaosresult generation, chaos injection etc.., post chaos checks, create events and reports for observability and configure sinks for these.
+This repo consists of Litmus Chaos Experiments written in golang. The examples in this repo are good indicators of how to construct the experiments in golang: complete with steady state checks, chaosresult generation, chaos injection etc., post chaos checks, create events and reports for observability and configure sinks for these.
 
-**NOTE**: This repo can be viewed as an extension to the [litmuschaos/litmus](https://github.com/litmuschaos/litmus) repo. The litmus repo will also continue to be the project's community-facing meta repo housing other important project artifacts. In that sense, litmus-go is very similar to and therefore a sister repo of [litmus-python](https://github.com/litmuschaos/litmus-python) which houses examples for experiment business logic written in python.
+**NOTE**: This repo can be viewed as an extension to the [litmuschaos/litmus](https://github.com/litmuschaos/litmus) repo. The litmus repo will also continue to be the project's community-facing meta repo housing other important project artifacts. In that sense, litmus-go is very similar to and therefore a sister repo of [litmus-python](https://github.com/litmuschaos/litmus-python), which houses examples for experiment business logic written in python.
 
 ## Litmus SDK
 
-The Litmus SDK provides a simple way to bootstrap your experiment and helps create the aforementioned artifacts in the appropriate directory (i.e., as per the chaos-category) based on an attributes file provided as input by the chart-developer. The scaffolded files consist of placeholders which can then be filled as desired.
+The Litmus SDK provides a simple way to bootstrap your experiment and helps create the aforementioned artifacts in the appropriate directory (i.e., as per the chaos-category) based on an attributes file provided as input by the chart-developer. The scaffolded files consist of placeholders, which can then be filled as desired.
 
-It generates the custom chaos experiments with some default Pre & Post Chaos Checks (AUT & Auxiliary Applications status checks). It can use the existing chaoslib (present inside /chaoslib directory), if available else It will create a new chaoslib inside the corresponding directory.
+It generates the custom chaos experiments with some default Pre & Post Chaos Checks (AUT & Auxiliary Applications status checks). It can use the existing chaoslib (present inside /chaoslib directory), if available else it will create a new chaoslib inside the corresponding directory.
 
 Refer [Litmus-SDK](https://github.com/litmuschaos/litmus-go/blob/master/contribute/developer-guide/README.md) for more details.
 
