@@ -1,6 +1,9 @@
+# GLOBAL ARGUMENT: Base Image
+ARG BASE_IMAGE=registry.access.redhat.com/ubi9/ubi:latest
+
 # Multi-stage docker build
 # Build stage
-FROM golang:1.22 AS builder
+FROM golang:1.26.8 AS builder
 
 ARG TARGETOS=linux
 ARG TARGETARCH
@@ -15,7 +18,8 @@ RUN CGO_ENABLED=0 go build -o /output/experiments ./bin/experiment
 RUN CGO_ENABLED=0 go build -o /output/helpers ./bin/helper
 
 # Packaging stage
-FROM registry.access.redhat.com/ubi9/ubi:9.4
+# We set the default to UBI 9.4, but allow it to be overridden via --build-arg
+FROM ${BASE_IMAGE}
 
 LABEL maintainer="LitmusChaos"
 
@@ -26,34 +30,38 @@ ARG LITMUS_VERSION
 RUN yum install -y \
     sudo \
     sshpass \
-    procps \
-    openssh-clients
+    procps-ng \
+    openssh-clients 
+    
+# EPEL repo for stress-ng
+RUN yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-$(rpm -E %rhel).noarch.rpm
 
 # tc binary
-RUN yum install -y https://dl.rockylinux.org/vault/rocky/9.3/devel/$(uname -m)/os/Packages/i/iproute-6.2.0-5.el9.$(uname -m).rpm
-RUN yum install -y https://dl.rockylinux.org/vault/rocky/9.3/devel/$(uname -m)/os/Packages/i/iproute-tc-6.2.0-5.el9.$(uname -m).rpm
+RUN yum install -y iproute
 
 # iptables
-RUN yum install -y https://dl.rockylinux.org/vault/rocky/9.3/devel/$(uname -m)/os/Packages/i/iptables-libs-1.8.8-6.el9_1.$(uname -m).rpm
-RUN yum install -y https://dl.fedoraproject.org/pub/archive/epel/9.3/Everything/$(uname -m)/Packages/i/iptables-legacy-libs-1.8.8-6.el9.2.$(uname -m).rpm
-RUN yum install -y https://dl.fedoraproject.org/pub/archive/epel/9.3/Everything/$(uname -m)/Packages/i/iptables-legacy-1.8.8-6.el9.2.$(uname -m).rpm
+RUN yum install -y iptables iptables-services
 
 # stress-ng
-RUN yum install -y https://yum.oracle.com/repo/OracleLinux/OL9/appstream/$(uname -m)/getPackage/Judy-1.0.5-28.el9.$(uname -m).rpm
-RUN yum install -y https://yum.oracle.com/repo/OracleLinux/OL9/appstream/$(uname -m)/getPackage/stress-ng-0.14.00-2.el9.$(uname -m).rpm
+RUN if [ $(rpm -E %rhel) -eq 9 ]; then \
+      yum install -y https://yum.oracle.com/repo/OracleLinux/OL9/appstream/$(uname -m)/getPackage/Judy-1.0.5-28.el9.$(uname -m).rpm && \
+      yum install -y https://yum.oracle.com/repo/OracleLinux/OL9/appstream/$(uname -m)/getPackage/stress-ng-0.14.00-2.el9.$(uname -m).rpm; \
+    else \
+      yum install -y stress-ng; \
+    fi && yum clean all
 
 #Installing Kubectl
-ENV KUBE_LATEST_VERSION="v1.31.0"
+ENV KUBE_LATEST_VERSION="v1.37"
 RUN curl -L https://storage.googleapis.com/kubernetes-release/release/${KUBE_LATEST_VERSION}/bin/linux/${TARGETARCH}/kubectl -o     /usr/bin/kubectl && \
     chmod 755 /usr/bin/kubectl
 
 #Installing crictl binaries
-RUN curl -L https://github.com/kubernetes-sigs/cri-tools/releases/download/v1.31.1/crictl-v1.31.1-linux-${TARGETARCH}.tar.gz --output crictl-v1.31.1-linux-${TARGETARCH}.tar.gz && \
-    tar zxvf crictl-v1.31.1-linux-${TARGETARCH}.tar.gz -C /sbin && \
+RUN curl -L https://github.com/kubernetes-sigs/cri-tools/releases/download/v1.37.0/crictl-v1.37.0-linux-${TARGETARCH}.tar.gz --output crictl-v1.37.0-linux-${TARGETARCH}.tar.gz && \
+    tar zxvf crictl-v1.37.0-linux-${TARGETARCH}.tar.gz -C /sbin && \
     chmod 755 /sbin/crictl
 
 #Installing promql cli binaries
-RUN curl -L https://github.com/chaosnative/promql-cli/releases/download/3.0.0-beta6/promql_linux_${TARGETARCH} --output /usr/bin/promql && chmod 755 /usr/bin/promql
+RUN curl -L https://github.com/chaosnative/promql-cli/releases/download/1.1.0/promql_linux_${TARGETARCH} --output /usr/bin/promql && chmod 755 /usr/bin/promql
 
 #Installing pause cli binaries
 RUN curl -L https://github.com/litmuschaos/test-tools/releases/download/${LITMUS_VERSION}/pause-linux-${TARGETARCH} --output /usr/bin/pause && chmod 755 /usr/bin/pause
