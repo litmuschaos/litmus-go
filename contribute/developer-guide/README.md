@@ -204,7 +204,7 @@ Follow the steps provided below to setup okteto & test the experiment execution.
 - Install the Okteto CLI 
 
   ```
-  curl https://get.okteto.com -sSfL | sh
+  curl https://get.okteto.com -sSfL | OKTETO_VERSION=2.31.0 sh
   ```
 
 - (Optional) Create a sample nginx deployment that can be used as the application under test (AUT).
