@@ -111,6 +111,7 @@ func createHelperPod(ctx context.Context, experimentsDetails *experimentTypes.Ex
 			Annotations: chaosDetails.Annotations,
 		},
 		Spec: apiv1.PodSpec{
+			HostPID:                       true,
 			RestartPolicy:                 apiv1.RestartPolicyNever,
 			ImagePullSecrets:              chaosDetails.ImagePullSecrets,
 			NodeName:                      appNodeName,
@@ -143,7 +144,7 @@ func createHelperPod(ctx context.Context, experimentsDetails *experimentTypes.Ex
 					},
 					Args: []string{
 						"-c",
-						"sleep 10 && systemctl stop kubelet && sleep " + strconv.Itoa(experimentsDetails.ChaosDuration) + " && systemctl start kubelet",
+						"sleep 10 && chroot /node systemctl stop kubelet && sleep " + strconv.Itoa(experimentsDetails.ChaosDuration) + " && chroot /node systemctl start kubelet",
 					},
 					Resources: chaosDetails.Resources,
 					VolumeMounts: []apiv1.VolumeMount{
