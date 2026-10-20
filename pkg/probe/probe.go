@@ -13,9 +13,11 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/log"
+	"github.com/litmuschaos/litmus-go/pkg/telemetry"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/palantir/stacktrace"
 	"github.com/sirupsen/logrus"
+	"go.opentelemetry.io/otel"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -23,7 +25,9 @@ var err error
 
 // RunProbes contains the steps to trigger the probes
 // It contains steps to trigger all three probes: k8sprobe, httpprobe, cmdprobe
-func RunProbes(chaosDetails *types.ChaosDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, phase string, eventsDetails *types.EventDetails) error {
+func RunProbes(ctx context.Context, chaosDetails *types.ChaosDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, phase string, eventsDetails *types.EventDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "RunProbes")
+	defer span.End()
 
 	// get the probes details from the chaosengine
 	probes, err := getProbesFromChaosEngine(chaosDetails, clients)
@@ -125,7 +129,7 @@ func SetProbeVerdictAfterFailure(result *v1alpha1.ChaosResult) {
 }
 
 func getProbesFromChaosEngine(chaosDetails *types.ChaosDetails, clients clients.ClientSets) ([]v1alpha1.ProbeAttributes, error) {
-	engine, err := types.GetChaosEngine(chaosDetails, clients)
+	engine, err := clients.GetChaosEngine(chaosDetails)
 	if err != nil {
 		return nil, err
 	}
@@ -305,7 +309,7 @@ func parseCommand(templatedCommand string, resultDetails *types.ResultDetails) (
 // stopChaosEngine update the probe status and patch the chaosengine to stop state
 func stopChaosEngine(probe v1alpha1.ProbeAttributes, clients clients.ClientSets, chaosresult *types.ResultDetails, chaosDetails *types.ChaosDetails) error {
 	// it will check for the error, It will detect the error if any error encountered in probe during chaos
-	if err = checkForErrorInContinuousProbe(chaosresult, probe.Name, chaosDetails.Timeout, chaosDetails.Delay); err != nil && cerrors.GetErrorType(err) != cerrors.FailureTypeProbeTimeout {
+	if err = checkForErrorInContinuousProbe(chaosresult, probe.Name, chaosDetails.Timeout, chaosDetails.Delay); err != nil && cerrors.GetErrorType(err) == cerrors.FailureTypeProbeTimeout {
 		return err
 	}
 

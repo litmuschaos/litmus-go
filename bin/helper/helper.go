@@ -1,7 +1,11 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"flag"
+	"os"
+
 	// Uncomment to load all auth plugins
 	// _ "k8s.io/client-go/plugin/pkg/client/auth"
 
@@ -17,10 +21,11 @@ import (
 	networkChaos "github.com/litmuschaos/litmus-go/chaoslib/litmus/network-chaos/helper"
 	dnsChaos "github.com/litmuschaos/litmus-go/chaoslib/litmus/pod-dns-chaos/helper"
 	stressChaos "github.com/litmuschaos/litmus-go/chaoslib/litmus/stress-chaos/helper"
-
-	"github.com/litmuschaos/litmus-go/pkg/clients"
+	cli "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/log"
+	"github.com/litmuschaos/litmus-go/pkg/telemetry"
 	"github.com/sirupsen/logrus"
+	"go.opentelemetry.io/otel"
 )
 
 func init() {
@@ -33,8 +38,24 @@ func init() {
 }
 
 func main() {
+	ctx := context.Background()
+	// Set up Observability.
+	if otelExporterEndpoint := os.Getenv(telemetry.OTELExporterOTLPEndpoint); otelExporterEndpoint != "" {
+		shutdown, err := telemetry.InitOTelSDK(ctx, true, otelExporterEndpoint)
+		if err != nil {
+			log.Errorf("Failed to initialize OTel SDK: %v", err)
+			return
+		}
+		defer func() {
+			err = errors.Join(err, shutdown(ctx))
+		}()
+		ctx = telemetry.GetTraceParentContext()
+	}
 
-	clients := clients.ClientSets{}
+	clients := cli.ClientSets{}
+
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "ExecuteExperimentHelper")
+	defer span.End()
 
 	// parse the helper name
 	helperName := flag.String("name", "", "name of the helper pod")
@@ -50,17 +71,17 @@ func main() {
 	// invoke the corresponding helper based on the the (-name) flag
 	switch *helperName {
 	case "container-kill":
-		containerKill.Helper(clients)
+		containerKill.Helper(ctx, clients)
 	case "disk-fill":
-		diskFill.Helper(clients)
+		diskFill.Helper(ctx, clients)
 	case "dns-chaos":
-		dnsChaos.Helper(clients)
+		dnsChaos.Helper(ctx, clients)
 	case "stress-chaos":
-		stressChaos.Helper(clients)
+		stressChaos.Helper(ctx, clients)
 	case "network-chaos":
-		networkChaos.Helper(clients)
+		networkChaos.Helper(ctx, clients)
 	case "http-chaos":
-		httpChaos.Helper(clients)
+		httpChaos.Helper(ctx, clients)
 
 	default:
 		log.Errorf("Unsupported -name %v, please provide the correct value of -name args", *helperName)

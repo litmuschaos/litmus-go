@@ -9,11 +9,8 @@ import (
 	"time"
 
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
-	"github.com/litmuschaos/litmus-go/pkg/clients"
-	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
+	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/utils/stringutils"
-	"github.com/palantir/stacktrace"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/litmuschaos/chaos-operator/api/litmuschaos/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
@@ -131,6 +128,7 @@ type ChaosDetails struct {
 	Annotations          map[string]string
 	Resources            corev1.ResourceRequirements
 	ImagePullSecrets     []corev1.LocalObjectReference
+	Tolerations          []corev1.Toleration
 	Labels               map[string]string
 	Phase                ExperimentPhase
 	ProbeContext         ProbeContext
@@ -159,10 +157,11 @@ type ProbeContext struct {
 
 // AppDetails contains all the application related envs
 type AppDetails struct {
-	Namespace string
-	Labels    []string
-	Kind      string
-	Names     []string
+	Namespace      string
+	Labels         []string
+	Kind           string
+	Names          []string
+	LabelMatchMode string
 }
 
 func GetTargets(targets string) []AppDetails {
@@ -172,11 +171,27 @@ func GetTargets(targets string) []AppDetails {
 	}
 	t := strings.Split(targets, ";")
 	for _, k := range t {
-		val := strings.Split(strings.TrimSpace(k), ":")
-		data := AppDetails{
-			Kind:      val[0],
-			Namespace: val[1],
+		trimmed := strings.TrimSpace(k)
+		if trimmed == "" {
+			continue
 		}
+		val := strings.Split(trimmed, ":")
+		if len(val) < 3 {
+			log.Fatalf("invalid TARGETS entry %q: expected format kind:namespace:[labels|names][:mode]", trimmed)
+		}
+		data := AppDetails{
+			Kind:           val[0],
+			Namespace:      val[1],
+			LabelMatchMode: "union",
+		}
+
+		if len(val) > 3 {
+			mode := strings.TrimSpace(val[3])
+			if mode == "intersection" || mode == "union" {
+				data.LabelMatchMode = mode
+			}
+		}
+
 		if strings.Contains(val[2], "=") {
 			data.Labels = parse(val[2])
 		} else {
@@ -289,48 +304,6 @@ func Getenv(key string, defaultValue string) string {
 		value = defaultValue
 	}
 	return value
-}
-
-// GetChaosEngine fetches the chaosengine instance
-func GetChaosEngine(chaosDetails *ChaosDetails, clients clients.ClientSets) (*v1alpha1.ChaosEngine, error) {
-	var engine *v1alpha1.ChaosEngine
-
-	if err := retry.
-		Times(uint(chaosDetails.Timeout / chaosDetails.Delay)).
-		Wait(time.Duration(chaosDetails.Delay) * time.Second).
-		Try(func(attempt uint) error {
-			engine, err = clients.LitmusClient.ChaosEngines(chaosDetails.ChaosNamespace).Get(context.Background(), chaosDetails.EngineName, v1.GetOptions{})
-			if err != nil {
-				return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: err.Error(), Target: fmt.Sprintf("{engineName: %s, engineNs: %s}", chaosDetails.EngineName, chaosDetails.ChaosNamespace)}
-			}
-			return nil
-		}); err != nil {
-		return nil, err
-	}
-
-	return engine, nil
-}
-
-// GetValuesFromChaosEngine get the values from the chaosengine
-func GetValuesFromChaosEngine(chaosDetails *ChaosDetails, clients clients.ClientSets, chaosresult *ResultDetails) error {
-
-	// get the chaosengine instance
-	engine, err := GetChaosEngine(chaosDetails, clients)
-	if err != nil {
-		return stacktrace.Propagate(err, "could not get chaosengine")
-	}
-
-	// get all the probes defined inside chaosengine for the corresponding experiment
-	for _, experiment := range engine.Spec.Experiments {
-		if experiment.Name == chaosDetails.ExperimentName {
-			if err := InitializeProbesInChaosResultDetails(chaosresult, experiment.Spec.Probe); err != nil {
-				return stacktrace.Propagate(err, "could not initialize probe")
-			}
-			InitializeSidecarDetails(chaosDetails, engine, experiment.Spec.Components.ENV)
-		}
-	}
-
-	return nil
 }
 
 // InitializeSidecarDetails sets the sidecar details

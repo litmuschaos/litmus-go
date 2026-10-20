@@ -7,14 +7,14 @@ import (
 	"strings"
 
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
+	"github.com/litmuschaos/litmus-go/pkg/telemetry"
 	"github.com/palantir/stacktrace"
+	"go.opentelemetry.io/otel"
 
-	clients "github.com/litmuschaos/litmus-go/pkg/clients"
+	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/node-restart/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
-	"github.com/litmuschaos/litmus-go/pkg/probe"
-	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/litmuschaos/litmus-go/pkg/utils/stringutils"
@@ -38,7 +38,9 @@ const (
 )
 
 // PrepareNodeRestart contains preparation steps before chaos injection
-func PrepareNodeRestart(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+func PrepareNodeRestart(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PrepareNodeRestartFault")
+	defer span.End()
 
 	//Select the node
 	if experimentsDetails.TargetNode == "" {
@@ -81,41 +83,19 @@ func PrepareNodeRestart(experimentsDetails *experimentTypes.ExperimentDetails, c
 	}
 
 	// Creating the helper pod to perform node restart
-	if err = createHelperPod(experimentsDetails, chaosDetails, clients); err != nil {
+	if err = createHelperPod(ctx, experimentsDetails, chaosDetails, clients); err != nil {
 		return stacktrace.Propagate(err, "could not create helper pod")
 	}
 
 	appLabel := fmt.Sprintf("app=%s-helper-%s", experimentsDetails.ExperimentName, experimentsDetails.RunID)
 
 	//Checking the status of helper pod
-	log.Info("[Status]: Checking the status of the helper pod")
-	if err = status.CheckHelperStatus(experimentsDetails.ChaosNamespace, appLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
-		common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-helper-"+experimentsDetails.RunID, appLabel, chaosDetails, clients)
-		return stacktrace.Propagate(err, "could not check helper status")
+	if err := common.CheckHelperStatusAndRunProbes(ctx, appLabel, experimentsDetails.TargetNode, chaosDetails, clients, resultDetails, eventsDetails); err != nil {
+		return err
 	}
 
-	common.SetTargets(experimentsDetails.TargetNode, "targeted", "node", chaosDetails)
-
-	// run the probes during chaos
-	if len(resultDetails.ProbeDetails) != 0 {
-		if err = probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
-			common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
-			return err
-		}
-	}
-
-	// Wait till the completion of helper pod
-	log.Info("[Wait]: Waiting till the completion of the helper pod")
-	podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, appLabel, clients, experimentsDetails.ChaosDuration+experimentsDetails.Timeout, common.GetContainerNames(chaosDetails)...)
-	if err != nil || podStatus == "Failed" {
-		common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-helper-"+experimentsDetails.RunID, appLabel, chaosDetails, clients)
-		return common.HelperFailedError(err, appLabel, chaosDetails.ChaosNamespace, false)
-	}
-
-	//Deleting the helper pod
-	log.Info("[Cleanup]: Deleting the helper pod")
-	if err = common.DeletePod(experimentsDetails.ExperimentName+"-helper-"+experimentsDetails.RunID, appLabel, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients); err != nil {
-		return stacktrace.Propagate(err, "could not delete helper pod")
+	if err := common.WaitForCompletionAndDeleteHelperPods(appLabel, chaosDetails, clients, false); err != nil {
+		return err
 	}
 
 	//Waiting for the ramp time after chaos injection
@@ -123,14 +103,17 @@ func PrepareNodeRestart(experimentsDetails *experimentTypes.ExperimentDetails, c
 		log.Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", strconv.Itoa(experimentsDetails.RampTime))
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
+
 	return nil
 }
 
 // createHelperPod derive the attributes for helper pod and create the helper pod
-func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, chaosDetails *types.ChaosDetails, clients clients.ClientSets) error {
+func createHelperPod(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, chaosDetails *types.ChaosDetails, clients clients.ClientSets) error {
 	// This method is attaching emptyDir along with secret volume, and copy data from secret
 	// to the emptyDir, because secret is mounted as readonly and with 777 perms and it can't be changed
 	// because of: https://github.com/kubernetes/kubernetes/issues/57923
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "CreateNodeRestartFaultHelperPod")
+	defer span.End()
 
 	terminationGracePeriodSeconds := int64(experimentsDetails.TerminationGracePeriodSeconds)
 
@@ -208,16 +191,16 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, chao
 		helperPod.Spec.Volumes = append(helperPod.Spec.Volumes, common.GetSidecarVolumes(chaosDetails)...)
 	}
 
-	_, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Create(context.Background(), helperPod, v1.CreateOptions{})
-	if err != nil {
+	if err := clients.CreatePod(experimentsDetails.ChaosNamespace, helperPod); err != nil {
 		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("unable to create helper pod: %s", err.Error())}
 	}
+
 	return nil
 }
 
 // getInternalIP gets the internal ip of the given node
 func getInternalIP(nodeName string, clients clients.ClientSets) (string, error) {
-	node, err := clients.KubeClient.CoreV1().Nodes().Get(context.Background(), nodeName, v1.GetOptions{})
+	node, err := clients.GetNode(nodeName, 180, 2)
 	if err != nil {
 		return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Target: fmt.Sprintf("{nodeName: %s}", nodeName), Reason: err.Error()}
 	}

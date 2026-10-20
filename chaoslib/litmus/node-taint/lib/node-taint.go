@@ -3,15 +3,18 @@ package lib
 import (
 	"context"
 	"fmt"
-	"github.com/litmuschaos/litmus-go/pkg/cerrors"
-	"github.com/palantir/stacktrace"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
 	"time"
 
-	clients "github.com/litmuschaos/litmus-go/pkg/clients"
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
+	"github.com/litmuschaos/litmus-go/pkg/telemetry"
+	"github.com/palantir/stacktrace"
+	"go.opentelemetry.io/otel"
+
+	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/node-taint/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
@@ -20,7 +23,6 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	apiv1 "k8s.io/api/core/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var (
@@ -29,7 +31,9 @@ var (
 )
 
 // PrepareNodeTaint contains the preparation steps before chaos injection
-func PrepareNodeTaint(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+func PrepareNodeTaint(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PrepareNodeTaintFault")
+	defer span.End()
 
 	// inject channel is used to transmit signal notifications.
 	inject = make(chan os.Signal, 1)
@@ -63,7 +67,7 @@ func PrepareNodeTaint(experimentsDetails *experimentTypes.ExperimentDetails, cli
 
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
-		if err = probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+		if err = probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
 			return err
 		}
 	}
@@ -72,7 +76,7 @@ func PrepareNodeTaint(experimentsDetails *experimentTypes.ExperimentDetails, cli
 	go abortWatcher(experimentsDetails, clients, resultDetails, chaosDetails, eventsDetails)
 
 	// taint the application node
-	if err := taintNode(experimentsDetails, clients, chaosDetails); err != nil {
+	if err := taintNode(ctx, experimentsDetails, clients, chaosDetails); err != nil {
 		return stacktrace.Propagate(err, "could not taint node")
 	}
 
@@ -117,7 +121,9 @@ func PrepareNodeTaint(experimentsDetails *experimentTypes.ExperimentDetails, cli
 }
 
 // taintNode taint the application node
-func taintNode(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
+func taintNode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectNodeTaintFault")
+	defer span.End()
 
 	// get the taint labels & effect
 	taintKey, taintValue, taintEffect := getTaintDetails(experimentsDetails)
@@ -125,7 +131,7 @@ func taintNode(experimentsDetails *experimentTypes.ExperimentDetails, clients cl
 	log.Infof("Add %v taints to the %v node", taintKey+"="+taintValue+":"+taintEffect, experimentsDetails.TargetNode)
 
 	// get the node details
-	node, err := clients.KubeClient.CoreV1().Nodes().Get(context.Background(), experimentsDetails.TargetNode, v1.GetOptions{})
+	node, err := clients.GetNode(experimentsDetails.TargetNode, chaosDetails.Timeout, chaosDetails.Delay)
 	if err != nil {
 		return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Target: fmt.Sprintf("{nodeName: %s}", experimentsDetails.TargetNode), Reason: err.Error()}
 	}
@@ -151,8 +157,7 @@ func taintNode(experimentsDetails *experimentTypes.ExperimentDetails, clients cl
 				Effect: apiv1.TaintEffect(taintEffect),
 			})
 
-			_, err := clients.KubeClient.CoreV1().Nodes().Update(context.Background(), node, v1.UpdateOptions{})
-			if err != nil {
+			if err := clients.UpdateNode(chaosDetails, node); err != nil {
 				return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Target: fmt.Sprintf("{nodeName: %s}", node.Name), Reason: fmt.Sprintf("failed to add taints: %s", err.Error())}
 			}
 		}
@@ -172,7 +177,7 @@ func removeTaintFromNode(experimentsDetails *experimentTypes.ExperimentDetails, 
 	taintKey := strings.Split(taintLabel[0], "=")[0]
 
 	// get the node details
-	node, err := clients.KubeClient.CoreV1().Nodes().Get(context.Background(), experimentsDetails.TargetNode, v1.GetOptions{})
+	node, err := clients.GetNode(experimentsDetails.TargetNode, chaosDetails.Timeout, chaosDetails.Delay)
 	if err != nil {
 		return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosRevert, Target: fmt.Sprintf("{nodeName: %s}", experimentsDetails.TargetNode), Reason: err.Error()}
 	}
@@ -195,8 +200,7 @@ func removeTaintFromNode(experimentsDetails *experimentTypes.ExperimentDetails, 
 			}
 		}
 		node.Spec.Taints = newTaints
-		updatedNodeWithTaint, err := clients.KubeClient.CoreV1().Nodes().Update(context.Background(), node, v1.UpdateOptions{})
-		if err != nil || updatedNodeWithTaint == nil {
+		if err := clients.UpdateNode(chaosDetails, node); err != nil {
 			return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosRevert, Target: fmt.Sprintf("{nodeName: %s}", node.Name), Reason: fmt.Sprintf("failed to remove taints: %s", err.Error())}
 		}
 	}

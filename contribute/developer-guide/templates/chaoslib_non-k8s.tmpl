@@ -1,6 +1,7 @@
 package lib
 
 import (
+    "context"
 	"os"
 	"os/signal"
 	"strings"
@@ -22,7 +23,10 @@ var (
 )
 
 //PrepareChaos contains the preparation and injection steps for the experiment
-func PrepareChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+func PrepareChaos(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+    // @TODO: setup tracing
+    // ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "Prepare[name-your-chaos]Fault")
+    // defer span.End()
 
 	// inject channel is used to transmit signal notifications.
 	inject = make(chan os.Signal, 1)
@@ -53,11 +57,11 @@ func PrepareChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients
 
 	switch strings.ToLower(experimentsDetails.Sequence) {
 	case "serial":
-		if err = injectChaosInSerialMode(experimentsDetails, targetIDList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+		if err = injectChaosInSerialMode(ctx, experimentsDetails, targetIDList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
 			return stacktrace.Propagate(err, "could not run chaos in serial mode")
 		}
 	case "parallel":
-		if err = injectChaosInParallelMode(experimentsDetails, targetIDList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+		if err = injectChaosInParallelMode(ctx, experimentsDetails, targetIDList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
 			return stacktrace.Propagate(err, "could not run chaos in parallel mode")
 		}
 	default:
@@ -73,7 +77,10 @@ func PrepareChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients
 }
 
 //injectChaosInSerialMode will inject the chaos on the target one after other 
-func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, targetIDList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+func injectChaosInSerialMode(ctx context.Contxt, experimentsDetails *experimentTypes.ExperimentDetails, targetIDList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+    // @TODO: setup tracing
+    // ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "Inject[name-your-chaos]FaultInSerialMode")
+    // defer span.End()
 
 	select {
 	case <-inject:
@@ -111,7 +118,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 
 				// The OnChaos probes execution will start in the first iteration and keep running for the entire chaos duration
 				if len(resultDetails.ProbeDetails) != 0 && i == 0 {
-					if err = probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+					if err = probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
 						return err
 					}
 				}
@@ -136,7 +143,10 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 }
 
 // injectChaosInParallelMode will inject the chaos on the target all at once
-func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, targetIDList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, targetIDList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+    // @TODO: setup tracing
+    // ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "Inject[name-your-chaos]FaultInParallelMode")
+    // defer span.End()
 
 	select {
 	case <-inject:
@@ -177,7 +187,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 
 			// run the probes during chaos
 			if len(resultDetails.ProbeDetails) != 0 {
-				if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+				if err := probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
 					return err
 				}
 			}

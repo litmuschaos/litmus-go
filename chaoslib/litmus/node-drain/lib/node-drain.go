@@ -3,17 +3,19 @@ package lib
 import (
 	"context"
 	"fmt"
-	"github.com/litmuschaos/litmus-go/pkg/cerrors"
-	"github.com/palantir/stacktrace"
 	"os"
 	"os/exec"
 	"os/signal"
 	"strconv"
-	"strings"
 	"syscall"
 	"time"
 
-	clients "github.com/litmuschaos/litmus-go/pkg/clients"
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
+	"github.com/litmuschaos/litmus-go/pkg/telemetry"
+	"github.com/palantir/stacktrace"
+	"go.opentelemetry.io/otel"
+
+	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/node-drain/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
@@ -22,6 +24,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
+	"github.com/litmuschaos/litmus-go/pkg/utils/stringutils"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -32,7 +35,9 @@ var (
 )
 
 // PrepareNodeDrain contains the preparation steps before chaos injection
-func PrepareNodeDrain(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+func PrepareNodeDrain(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PrepareNodeDrainFault")
+	defer span.End()
 
 	// inject channel is used to transmit signal notifications.
 	inject = make(chan os.Signal, 1)
@@ -66,7 +71,7 @@ func PrepareNodeDrain(experimentsDetails *experimentTypes.ExperimentDetails, cli
 
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
-		if err = probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+		if err = probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
 			return err
 		}
 	}
@@ -75,7 +80,7 @@ func PrepareNodeDrain(experimentsDetails *experimentTypes.ExperimentDetails, cli
 	go abortWatcher(experimentsDetails, clients, resultDetails, chaosDetails, eventsDetails)
 
 	// Drain the application node
-	if err := drainNode(experimentsDetails, clients, chaosDetails); err != nil {
+	if err := drainNode(ctx, experimentsDetails, clients, chaosDetails); err != nil {
 		log.Info("[Revert]: Reverting chaos because error during draining of node")
 		if uncordonErr := uncordonNode(experimentsDetails, clients, chaosDetails); uncordonErr != nil {
 			return cerrors.PreserveError{ErrString: fmt.Sprintf("[%s,%s]", stacktrace.RootCause(err).Error(), stacktrace.RootCause(uncordonErr).Error())}
@@ -125,7 +130,9 @@ func PrepareNodeDrain(experimentsDetails *experimentTypes.ExperimentDetails, cli
 }
 
 // drainNode drain the target node
-func drainNode(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
+func drainNode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectNodeDrainFault")
+	defer span.End()
 
 	select {
 	case <-inject:
@@ -161,11 +168,11 @@ func drainNode(experimentsDetails *experimentTypes.ExperimentDetails, clients cl
 // uncordonNode uncordon the application node
 func uncordonNode(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
 
-	targetNodes := strings.Split(experimentsDetails.TargetNode, ",")
+	targetNodes := stringutils.SplitList(experimentsDetails.TargetNode)
 	for _, targetNode := range targetNodes {
 
 		//Check node exist before uncordon the node
-		_, err := clients.KubeClient.CoreV1().Nodes().Get(context.Background(), targetNode, v1.GetOptions{})
+		_, err := clients.GetNode(targetNode, chaosDetails.Timeout, chaosDetails.Delay)
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				log.Infof("[Info]: The %v node is no longer exist, skip uncordon the node", targetNode)
@@ -188,7 +195,7 @@ func uncordonNode(experimentsDetails *experimentTypes.ExperimentDetails, clients
 		Times(uint(experimentsDetails.Timeout / experimentsDetails.Delay)).
 		Wait(time.Duration(experimentsDetails.Delay) * time.Second).
 		Try(func(attempt uint) error {
-			targetNodes := strings.Split(experimentsDetails.TargetNode, ",")
+			targetNodes := stringutils.SplitList(experimentsDetails.TargetNode)
 			for _, targetNode := range targetNodes {
 				nodeSpec, err := clients.KubeClient.CoreV1().Nodes().Get(context.Background(), targetNode, v1.GetOptions{})
 				if err != nil {

@@ -7,9 +7,11 @@ import (
 	"strings"
 
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
+	"github.com/litmuschaos/litmus-go/pkg/telemetry"
 	"github.com/palantir/stacktrace"
+	"go.opentelemetry.io/otel"
 
-	clients "github.com/litmuschaos/litmus-go/pkg/clients"
+	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/node-cpu-hog/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
@@ -24,7 +26,9 @@ import (
 )
 
 // PrepareNodeCPUHog contains preparation steps before chaos injection
-func PrepareNodeCPUHog(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+func PrepareNodeCPUHog(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PrepareNodeCPUHogFault")
+	defer span.End()
 
 	//set up the tunables if provided in range
 	setChaosTunables(experimentsDetails)
@@ -62,11 +66,11 @@ func PrepareNodeCPUHog(experimentsDetails *experimentTypes.ExperimentDetails, cl
 
 	switch strings.ToLower(experimentsDetails.Sequence) {
 	case "serial":
-		if err = injectChaosInSerialMode(experimentsDetails, targetNodeList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+		if err = injectChaosInSerialMode(ctx, experimentsDetails, targetNodeList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
 			return stacktrace.Propagate(err, "could not run chaos in serial mode")
 		}
 	case "parallel":
-		if err = injectChaosInParallelMode(experimentsDetails, targetNodeList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+		if err = injectChaosInParallelMode(ctx, experimentsDetails, targetNodeList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
 			return stacktrace.Propagate(err, "could not run chaos in parallel mode")
 		}
 	default:
@@ -82,13 +86,15 @@ func PrepareNodeCPUHog(experimentsDetails *experimentTypes.ExperimentDetails, cl
 }
 
 // injectChaosInSerialMode stress the cpu of all the target nodes serially (one by one)
-func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, targetNodeList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, targetNodeList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectNodeCPUHogFaultInSerialMode")
+	defer span.End()
 
 	nodeCPUCores := experimentsDetails.NodeCPUcores
 
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
-		if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+		if err := probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
 			return err
 		}
 	}
@@ -116,7 +122,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 		experimentsDetails.RunID = stringutils.GetRunID()
 
 		// Creating the helper pod to perform node cpu hog
-		if err := createHelperPod(experimentsDetails, chaosDetails, appNode, clients); err != nil {
+		if err := createHelperPod(ctx, experimentsDetails, chaosDetails, appNode, clients); err != nil {
 			return stacktrace.Propagate(err, "could not create helper pod")
 		}
 
@@ -149,12 +155,15 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 }
 
 // injectChaosInParallelMode stress the cpu of  all the target nodes in parallel mode (all at once)
-func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, targetNodeList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, targetNodeList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectNodeCPUHogFaultInParallelMode")
+	defer span.End()
+
 	nodeCPUCores := experimentsDetails.NodeCPUcores
 
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
-		if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+		if err := probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
 			return err
 		}
 	}
@@ -182,36 +191,15 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 		})
 
 		// Creating the helper pod to perform node cpu hog
-		if err := createHelperPod(experimentsDetails, chaosDetails, appNode, clients); err != nil {
+		if err := createHelperPod(ctx, experimentsDetails, chaosDetails, appNode, clients); err != nil {
 			return stacktrace.Propagate(err, "could not create helper pod")
 		}
 	}
 
 	appLabel := fmt.Sprintf("app=%s-helper-%s", experimentsDetails.ExperimentName, experimentsDetails.RunID)
 
-	//Checking the status of helper pod
-	log.Info("[Status]: Checking the status of the helper pods")
-	if err := status.CheckHelperStatus(experimentsDetails.ChaosNamespace, appLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
-		common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
-		return stacktrace.Propagate(err, "could not check helper status")
-	}
-
-	for _, appNode := range targetNodeList {
-		common.SetTargets(appNode, "targeted", "node", chaosDetails)
-	}
-
-	// Wait till the completion of helper pod
-	log.Info("[Wait]: Waiting till the completion of the helper pod")
-	podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, appLabel, clients, experimentsDetails.ChaosDuration+experimentsDetails.Timeout, common.GetContainerNames(chaosDetails)...)
-	if err != nil || podStatus == "Failed" {
-		common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
-		return common.HelperFailedError(err, appLabel, chaosDetails.ChaosNamespace, false)
-	}
-
-	//Deleting the helper pod
-	log.Info("[Cleanup]: Deleting the helper pod")
-	if err = common.DeleteAllPod(appLabel, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients); err != nil {
-		return stacktrace.Propagate(err, "could not delete helper pod(s)")
+	if err := common.ManagerHelperLifecycle(appLabel, chaosDetails, clients, true); err != nil {
+		return err
 	}
 
 	return nil
@@ -219,7 +207,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 
 // setCPUCapacity fetch the node cpu capacity
 func setCPUCapacity(experimentsDetails *experimentTypes.ExperimentDetails, appNode string, clients clients.ClientSets) error {
-	node, err := clients.KubeClient.CoreV1().Nodes().Get(context.Background(), appNode, v1.GetOptions{})
+	node, err := clients.GetNode(appNode, experimentsDetails.Timeout, experimentsDetails.Delay)
 	if err != nil {
 		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Target: fmt.Sprintf("{nodeName: %s}", appNode), Reason: err.Error()}
 	}
@@ -228,7 +216,9 @@ func setCPUCapacity(experimentsDetails *experimentTypes.ExperimentDetails, appNo
 }
 
 // createHelperPod derive the attributes for helper pod and create the helper pod
-func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, chaosDetails *types.ChaosDetails, appNode string, clients clients.ClientSets) error {
+func createHelperPod(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, chaosDetails *types.ChaosDetails, appNode string, clients clients.ClientSets) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "CreateNodeCPUHogFaultHelperPod")
+	defer span.End()
 
 	terminationGracePeriodSeconds := int64(experimentsDetails.TerminationGracePeriodSeconds)
 
@@ -271,10 +261,10 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, chao
 		helperPod.Spec.Volumes = append(helperPod.Spec.Volumes, common.GetSidecarVolumes(chaosDetails)...)
 	}
 
-	_, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Create(context.Background(), helperPod, v1.CreateOptions{})
-	if err != nil {
+	if err := clients.CreatePod(experimentsDetails.ChaosNamespace, helperPod); err != nil {
 		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("unable to create helper pod: %s", err.Error())}
 	}
+
 	return nil
 }
 

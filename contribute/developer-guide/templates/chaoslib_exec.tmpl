@@ -1,6 +1,7 @@
 package lib
 
 import (
+    "context"
     "fmt"
 	"os"
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
@@ -32,7 +33,7 @@ func injectChaos(experimentsDetails *experimentTypes.ExperimentDetails, podName 
 	return nil
 }
 
-func experimentExecution(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+func experimentExecution(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 
     // Get the target pod details for the chaos execution
 	// if the target pod is not defined it will derive the random target pod list using pod affected percentage
@@ -53,13 +54,13 @@ func experimentExecution(experimentsDetails *experimentTypes.ExperimentDetails, 
 	}
 	log.Infof("Target pods list for chaos, %v", podNames)
 
-	return runChaos(experimentsDetails, targetPodList, clients, resultDetails, eventsDetails, chaosDetails)
+	return runChaos(ctx, experimentsDetails, targetPodList, clients, resultDetails, eventsDetails, chaosDetails)
 }
 
-func runChaos(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList corev1.PodList, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+func runChaos(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, targetPodList corev1.PodList, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
-		if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+		if err := probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
 			return err
 		}
 	}
@@ -120,7 +121,10 @@ func runChaos(experimentsDetails *experimentTypes.ExperimentDetails, targetPodLi
 }
 
 //PrepareChaos contains the preparation steps before chaos injection
-func PrepareChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+func PrepareChaos(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+    // @TODO: setup tracing
+    // ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectChaos")
+    // defer span.End()
 
 	//Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
@@ -128,7 +132,7 @@ func PrepareChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 	//Starting the CPU stress experiment
-	if err := experimentExecution(experimentsDetails, clients, resultDetails, eventsDetails, chaosDetails);err != nil {
+	if err := experimentExecution(ctx, experimentsDetails, clients, resultDetails, eventsDetails, chaosDetails);err != nil {
 		return stacktrace.Propagate(err, "could not execute experiment")
 	}
 	//Waiting for the ramp time after chaos injection
