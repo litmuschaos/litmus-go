@@ -205,7 +205,7 @@ func getContainerdAndCRIONetworkNsPath(containerID, socketPath, source string) (
 			return namespace.Path, nil
 		}
 	}
-	return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeContainerRuntime, Source: source, Target: fmt.Sprintf("containerID: %s", containerID), Reason: fmt.Sprintf("failed to get the pid")}
+	return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeContainerRuntime, Source: source, Target: fmt.Sprintf("containerID: %s", containerID), Reason: "failed to get the pid"}
 }
 
 // getDockerNetworkNsPath returns the sandbox network ns path of docker runtime
@@ -216,7 +216,7 @@ func getDockerNetworkNsPath(containerID, socketPath, source string) (string, err
 	}
 
 	if pid == 0 {
-		return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeContainerRuntime, Source: source, Target: fmt.Sprintf("containerID: %s", containerID), Reason: fmt.Sprintf("failed to get the pid")}
+		return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeContainerRuntime, Source: source, Target: fmt.Sprintf("containerID: %s", containerID), Reason: "failed to get the pid"}
 	}
 
 	nsPath := fmt.Sprintf("/proc/%d/ns/net", pid)
