@@ -100,6 +100,10 @@ func SetHelperData(chaosDetails *types.ChaosDetails, setHelperData string, clien
 
 	chaosDetails.Labels = labels
 
+	// Retain ImagePullSecrets even when setHelperData=false
+    // so helper pods can pull images from private registries
+	chaosDetails.ImagePullSecrets = pod.Spec.ImagePullSecrets
+
 	switch setHelperData {
 	case "false":
 		return nil
@@ -107,9 +111,6 @@ func SetHelperData(chaosDetails *types.ChaosDetails, setHelperData string, clien
 	default:
 		// Get Chaos Pod Annotation
 		chaosDetails.Annotations = pod.Annotations
-
-		// Get ImagePullSecrets
-		chaosDetails.ImagePullSecrets = pod.Spec.ImagePullSecrets
 
 		//Get Tolerations
 		chaosDetails.Tolerations = pod.Spec.Tolerations
@@ -119,15 +120,7 @@ func SetHelperData(chaosDetails *types.ChaosDetails, setHelperData string, clien
 		if err != nil {
 			return stacktrace.Propagate(err, "could not inherit resource requirements")
 		}
-
-		switch setHelperData {
-		case "false":
-			return nil
-		default:
-			// Get Chaos Pod Annotation
-			chaosDetails.Annotations = pod.Annotations
-			return nil
-		}
+		return nil
 	}
 }
 
