@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
+	"github.com/litmuschaos/litmus-go/pkg/cleanup"
 	"github.com/litmuschaos/litmus-go/pkg/telemetry"
 	"github.com/palantir/stacktrace"
 	"go.opentelemetry.io/otel"
@@ -192,7 +193,17 @@ func revertChaos(experimentDetails *experimentTypes.ExperimentDetails, t targetD
 		errList = append(errList, err.Error())
 	}
 	if len(errList) != 0 {
-		return cerrors.PreserveError{ErrString: fmt.Sprintf("[%s]", strings.Join(errList, ","))}
+		// the target pod died mid-experiment, so its network namespace, and with
+		// it the proxy and the ip rules, is already gone. Honour
+		// CLEANUP_POLICY=ignore and treat the revert as complete. Every step
+		// is checked on its own, so a step that genuinely failed is never
+		// hidden by another step reporting a gone target.
+		joinedErrs := strings.Join(errList, ",")
+		if cleanup.ShouldIgnoreRevertFailures(cleanup.TargetTypePod, errList) {
+			log.Warnf("[Cleanup]: target is gone, nothing left to revert on {name: %s, namespace: %s, container: %s}, err: %s", t.Name, t.Namespace, t.TargetContainer, joinedErrs)
+			return nil
+		}
+		return cerrors.PreserveError{ErrString: fmt.Sprintf("[%s]", joinedErrs)}
 	}
 	log.Infof("successfully reverted chaos on target: {name: %s, namespace: %v, container: %v}", t.Name, t.Namespace, t.TargetContainer)
 	return nil

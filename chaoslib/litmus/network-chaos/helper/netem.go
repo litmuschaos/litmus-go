@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
+	"github.com/litmuschaos/litmus-go/pkg/cleanup"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	"github.com/litmuschaos/litmus-go/pkg/telemetry"
 	"github.com/palantir/stacktrace"
@@ -318,6 +319,13 @@ func killnetem(target targetDetails, networkInterface string) (bool, error) {
 		if strings.Contains(string(out), qdiscNotFound) || strings.Contains(string(out), qdiscNoFileFound) {
 			log.Warn("The network chaos process has already been removed")
 			return true, err
+		}
+		// the target pod died mid-experiment, so its network namespace, and with
+		// it the injected fault, is already gone. Honour CLEANUP_POLICY=ignore
+		// and treat the revert as complete instead of failing the experiment.
+		if cleanup.ShouldIgnoreRevertFailure(cleanup.TargetTypePod, string(out)) {
+			log.Warnf("[Cleanup]: target is gone, nothing left to revert on {name: %s, namespace: %s, container: %s}, err: %s", target.Name, target.Namespace, target.TargetContainer, strings.TrimSpace(string(out)))
+			return true, nil
 		}
 		log.Error(err.Error())
 		return false, cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosRevert, Source: target.Source, Target: fmt.Sprintf("{podName: %s, namespace: %s, container: %s}", target.Name, target.Namespace, target.TargetContainer), Reason: fmt.Sprintf("failed to revert network faults: %s", string(out))}
