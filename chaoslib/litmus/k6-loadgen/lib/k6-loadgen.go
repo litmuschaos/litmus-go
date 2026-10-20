@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strconv"
 
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	"github.com/litmuschaos/litmus-go/pkg/clients"
@@ -90,8 +89,6 @@ func createHelperPod(ctx context.Context, experimentsDetails *experimentTypes.Ex
 	args := []string{
 		mountPath + "/" + experimentsDetails.ScriptSecretKey,
 		"-q",
-		"--duration",
-		strconv.Itoa(experimentsDetails.ChaosDuration) + "s",
 		"--tag",
 		"trace_id=" + span.SpanContext().TraceID().String(),
 	}
