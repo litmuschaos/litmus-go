@@ -18,4 +18,5 @@ type ExperimentDetails struct {
 	LIBImage           string
 	ScriptSecretName   string
 	ScriptSecretKey    string
+	OTELMetricPrefix   string
 }

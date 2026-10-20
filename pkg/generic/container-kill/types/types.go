@@ -23,6 +23,7 @@ type ExperimentDetails struct {
 	LIBImagePullPolicy            string
 	TargetContainer               string
 	SocketPath                    string
+	ContainerAPITimeout           int
 	ChaosServiceAccount           string
 	RunID                         string
 	Timeout                       int
@@ -35,4 +36,6 @@ type ExperimentDetails struct {
 	NodeLabel                     string
 	IsTargetContainerProvided     bool
 	SetHelperData                 string
+	PodTerminationOrder           string
+	InterPodKillIntervalSeconds   int
 }

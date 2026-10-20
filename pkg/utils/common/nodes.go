@@ -3,18 +3,20 @@ package common
 import (
 	"context"
 	"fmt"
-	"github.com/litmuschaos/litmus-go/pkg/cerrors"
-	"github.com/palantir/stacktrace"
 	"math/rand"
 	"strconv"
-	"strings"
-	"time"
 
+	"github.com/palantir/stacktrace"
+	apiv1 "k8s.io/api/core/v1"
+
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/math"
-	apiv1 "k8s.io/api/core/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"github.com/litmuschaos/litmus-go/pkg/probe"
+	"github.com/litmuschaos/litmus-go/pkg/status"
+	"github.com/litmuschaos/litmus-go/pkg/types"
+	"github.com/litmuschaos/litmus-go/pkg/utils/stringutils"
 )
 
 var err error
@@ -27,7 +29,7 @@ func GetNodeList(nodeNames, nodeLabel string, nodeAffPerc int, clients clients.C
 	var nodes *apiv1.NodeList
 
 	if nodeNames != "" {
-		targetNodesList := strings.Split(nodeNames, ",")
+		targetNodesList := stringutils.SplitList(nodeNames)
 		return targetNodesList, nil
 	}
 
@@ -48,7 +50,6 @@ func GetNodeList(nodeNames, nodeLabel string, nodeAffPerc int, clients clients.C
 
 	// it will generate the random nodelist
 	// it starts from the random index and choose requirement no of pods next to that index in a circular way.
-	rand.Seed(time.Now().UnixNano())
 	index := rand.Intn(len(nodes.Items))
 	for i := 0; i < newNodeListLength; i++ {
 		nodeList = append(nodeList, nodes.Items[index].Name)
@@ -65,14 +66,13 @@ func GetNodeName(namespace, labels, nodeLabel string, clients clients.ClientSets
 
 	switch nodeLabel {
 	case "":
-		podList, err := clients.KubeClient.CoreV1().Pods(namespace).List(context.Background(), v1.ListOptions{LabelSelector: labels})
+		podList, err := clients.ListPods(namespace, labels)
 		if err != nil {
 			return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Target: fmt.Sprintf("{podLabel: %s, namespace: %s}", labels, namespace), Reason: err.Error()}
 		} else if len(podList.Items) == 0 {
 			return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Target: fmt.Sprintf("{podLabel: %s, namespace: %s}", labels, namespace), Reason: "no pod found with matching labels"}
 		}
 
-		rand.Seed(time.Now().Unix())
 		randomIndex := rand.Intn(len(podList.Items))
 		return podList.Items[randomIndex].Spec.NodeName, nil
 	default:
@@ -80,14 +80,13 @@ func GetNodeName(namespace, labels, nodeLabel string, clients clients.ClientSets
 		if err != nil {
 			return "", stacktrace.Propagate(err, "could not get nodes by labels")
 		}
-		rand.Seed(time.Now().Unix())
 		randomIndex := rand.Intn(len(nodeList.Items))
 		return nodeList.Items[randomIndex].Name, nil
 	}
 }
 
 func getAllNodes(clients clients.ClientSets) (*apiv1.NodeList, error) {
-	nodeList, err := clients.KubeClient.CoreV1().Nodes().List(context.Background(), v1.ListOptions{})
+	nodeList, err := clients.GetAllNode(180, 2)
 	if err != nil {
 		return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Reason: fmt.Sprintf("failed to list all nodes: %s", err.Error())}
 	} else if len(nodeList.Items) == 0 {
@@ -97,11 +96,66 @@ func getAllNodes(clients clients.ClientSets) (*apiv1.NodeList, error) {
 }
 
 func getNodesByLabels(nodeLabel string, clients clients.ClientSets) (*apiv1.NodeList, error) {
-	nodeList, err := clients.KubeClient.CoreV1().Nodes().List(context.Background(), v1.ListOptions{LabelSelector: nodeLabel})
+	nodeList, err := clients.ListNode(nodeLabel, 180, 2)
 	if err != nil {
 		return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Target: fmt.Sprintf("{nodeLabel: %s}", nodeLabel), Reason: err.Error()}
 	} else if len(nodeList.Items) == 0 {
 		return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Target: fmt.Sprintf("{nodeLabel: %s}", nodeLabel), Reason: "no node found with matching labels"}
 	}
 	return nodeList, nil
+}
+
+func checkHelperStatus(appLabel string, chaosDetails *types.ChaosDetails, clients clients.ClientSets) error {
+	// Checking the status of the helper pods
+	// if the pod doesn't transition to the 'running' state within a specified timeout period, consider the experiment unsuccessful
+	log.Info("[Status]: Checking the status of the helper pods")
+	err := status.CheckHelperStatus(chaosDetails.ChaosNamespace, appLabel, chaosDetails.Timeout, chaosDetails.Delay, clients)
+	if err != nil {
+		if deleteErr := DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients); deleteErr != nil {
+			return cerrors.PreserveError{ErrString: fmt.Sprintf("[err: %v, delete error: %v]", err, deleteErr)}
+		}
+		return stacktrace.Propagate(err, "could not check helper status")
+	}
+
+	return nil
+}
+
+func CheckHelperStatusAndRunProbes(ctx context.Context, appLabel, node string, chaosDetails *types.ChaosDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
+	if err := checkHelperStatus(appLabel, chaosDetails, clients); err != nil {
+		return err
+	}
+
+	SetTargets(node, "targeted", "node", chaosDetails)
+
+	// run the probes during chaos
+	if len(resultDetails.ProbeDetails) != 0 {
+		if err = probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+			if deleteErr := DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients); deleteErr != nil {
+				return cerrors.PreserveError{ErrString: fmt.Sprintf("[err: %v, delete error: %v]", err, deleteErr)}
+			}
+			return err
+		}
+	}
+
+	return nil
+}
+
+func WaitForCompletionAndDeleteHelperPods(appLabel string, chaosDetails *types.ChaosDetails, clients clients.ClientSets, podLevel bool) error {
+	// Wait till the completion of helper pod
+	log.Info("[Wait]: Waiting till the completion of the helper pod")
+	podStatus, err := status.WaitForCompletion(chaosDetails.ChaosNamespace, appLabel, clients, chaosDetails.ChaosDuration+chaosDetails.Timeout, GetContainerNames(chaosDetails)...)
+	if err != nil || podStatus == "Failed" {
+		err = HelperFailedError(err, appLabel, chaosDetails.ChaosNamespace, podLevel)
+		if deleteErr := DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients); deleteErr != nil {
+			return cerrors.PreserveError{ErrString: fmt.Sprintf("[err: %v, delete error: %v]", err, deleteErr)}
+		}
+		return err
+	}
+
+	// Deleting the helper pod
+	if err := DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients); err != nil {
+		return stacktrace.Propagate(err, "could not delete helper pod")
+	}
+
+	return nil
 }

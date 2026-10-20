@@ -3,6 +3,7 @@ package lib
 import (
 	"context"
 	"fmt"
+	"os"
 	"strconv"
 
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
@@ -11,7 +12,6 @@ import (
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/load/k6-loadgen/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
-	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/telemetry"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
@@ -47,26 +47,8 @@ func experimentExecution(ctx context.Context, experimentsDetails *experimentType
 
 	appLabel := fmt.Sprintf("app=%s-helper-%s", experimentsDetails.ExperimentName, runID)
 
-	//checking the status of the helper pod, wait till the pod comes to running state else fail the experiment
-	log.Info("[Status]: Checking the status of the helper pod")
-	if err := status.CheckHelperStatus(experimentsDetails.ChaosNamespace, appLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
-		common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
-		return stacktrace.Propagate(err, "could not check helper status")
-	}
-
-	// Wait till the completion of the helper pod
-	// set an upper limit for the waiting time
-	log.Info("[Wait]: Waiting till the completion of the helper pod")
-	podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, appLabel, clients, experimentsDetails.ChaosDuration+experimentsDetails.Timeout, common.GetContainerNames(chaosDetails)...)
-	if err != nil || podStatus == "Failed" {
-		common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
-		return common.HelperFailedError(err, appLabel, experimentsDetails.ChaosNamespace, true)
-	}
-
-	//Deleting all the helper pod for k6-loadgen chaos
-	log.Info("[Cleanup]: Deleting all the helper pods")
-	if err = common.DeleteAllPod(appLabel, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients); err != nil {
-		return stacktrace.Propagate(err, "could not delete helper pod(s)")
+	if err := common.ManagerHelperLifecycle(appLabel, chaosDetails, clients, true); err != nil {
+		return err
 	}
 
 	return nil
@@ -103,6 +85,35 @@ func createHelperPod(ctx context.Context, experimentsDetails *experimentTypes.Ex
 
 	const volumeName = "script-volume"
 	const mountPath = "/mnt"
+
+	var envs []corev1.EnvVar
+	args := []string{
+		mountPath + "/" + experimentsDetails.ScriptSecretKey,
+		"-q",
+		"--duration",
+		strconv.Itoa(experimentsDetails.ChaosDuration) + "s",
+		"--tag",
+		"trace_id=" + span.SpanContext().TraceID().String(),
+	}
+
+	if otelExporterEndpoint := os.Getenv(telemetry.OTELExporterOTLPEndpoint); otelExporterEndpoint != "" {
+		envs = []corev1.EnvVar{
+			{
+				Name:  "K6_OTEL_METRIC_PREFIX",
+				Value: experimentsDetails.OTELMetricPrefix,
+			},
+			{
+				Name:  "K6_OTEL_GRPC_EXPORTER_INSECURE",
+				Value: "true",
+			},
+			{
+				Name:  "K6_OTEL_GRPC_EXPORTER_ENDPOINT",
+				Value: otelExporterEndpoint,
+			},
+		}
+		args = append(args, "--out", "experimental-opentelemetry")
+	}
+
 	helperPod := &corev1.Pod{
 		ObjectMeta: v1.ObjectMeta{
 			GenerateName: experimentsDetails.ExperimentName + "-helper-",
@@ -122,12 +133,8 @@ func createHelperPod(ctx context.Context, experimentsDetails *experimentTypes.Ex
 						"k6",
 						"run",
 					},
-					Args: []string{
-						mountPath + "/" + experimentsDetails.ScriptSecretKey,
-						"-q",
-						"--duration",
-						strconv.Itoa(experimentsDetails.ChaosDuration) + "s",
-					},
+					Args:      args,
+					Env:       envs,
 					Resources: chaosDetails.Resources,
 					VolumeMounts: []corev1.VolumeMount{
 						{

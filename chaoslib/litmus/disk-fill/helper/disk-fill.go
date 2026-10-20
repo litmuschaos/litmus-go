@@ -3,8 +3,6 @@ package helper
 import (
 	"context"
 	"fmt"
-	"github.com/litmuschaos/litmus-go/pkg/cerrors"
-	"github.com/palantir/stacktrace"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -12,6 +10,11 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
+	"github.com/litmuschaos/litmus-go/pkg/telemetry"
+	"github.com/palantir/stacktrace"
+	"go.opentelemetry.io/otel"
 
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
@@ -29,7 +32,9 @@ import (
 var inject, abort chan os.Signal
 
 // Helper injects the disk-fill chaos
-func Helper(clients clients.ClientSets) {
+func Helper(ctx context.Context, clients clients.ClientSets) {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "SimulateDiskFillFault")
+	defer span.End()
 
 	experimentsDetails := experimentTypes.ExperimentDetails{}
 	eventsDetails := types.EventDetails{}
@@ -193,7 +198,7 @@ func fillDisk(t targetDetails, bs int) error {
 // getEphemeralStorageAttributes derive the ephemeral storage attributes from the target pod
 func getEphemeralStorageAttributes(t targetDetails, clients clients.ClientSets) (int64, error) {
 
-	pod, err := clients.KubeClient.CoreV1().Pods(t.Namespace).Get(context.Background(), t.Name, v1.GetOptions{})
+	pod, err := clients.GetPod(t.Namespace, t.Name, 180, 2)
 	if err != nil {
 		return 0, cerrors.Error{ErrorCode: cerrors.ErrorTypeHelper, Source: t.Source, Target: fmt.Sprintf("{podName: %s, namespace: %s}", t.Name, t.Namespace), Reason: err.Error()}
 	}
@@ -247,7 +252,7 @@ func getSizeToBeFilled(experimentsDetails *experimentTypes.ExperimentDetails, us
 // revertDiskFill will delete the target pod if target pod is evicted
 // if target pod is still running then it will delete the files, which was created during chaos execution
 func revertDiskFill(t targetDetails, clients clients.ClientSets) error {
-	pod, err := clients.KubeClient.CoreV1().Pods(t.Namespace).Get(context.Background(), t.Name, v1.GetOptions{})
+	pod, err := clients.GetPod(t.Namespace, t.Name, 180, 2)
 	if err != nil {
 		return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosRevert, Source: t.Source, Target: fmt.Sprintf("{podName: %s,namespace: %s}", t.Name, t.Namespace), Reason: err.Error()}
 	}

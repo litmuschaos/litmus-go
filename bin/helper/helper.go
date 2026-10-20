@@ -54,7 +54,7 @@ func main() {
 
 	clients := cli.ClientSets{}
 
-	_, span := otel.Tracer(telemetry.TracerName).Start(ctx, "ExecuteExperimentHelper")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "ExecuteExperimentHelper")
 	defer span.End()
 
 	// parse the helper name
@@ -71,17 +71,17 @@ func main() {
 	// invoke the corresponding helper based on the the (-name) flag
 	switch *helperName {
 	case "container-kill":
-		containerKill.Helper(clients)
+		containerKill.Helper(ctx, clients)
 	case "disk-fill":
-		diskFill.Helper(clients)
+		diskFill.Helper(ctx, clients)
 	case "dns-chaos":
-		dnsChaos.Helper(clients)
+		dnsChaos.Helper(ctx, clients)
 	case "stress-chaos":
-		stressChaos.Helper(clients)
+		stressChaos.Helper(ctx, clients)
 	case "network-chaos":
-		networkChaos.Helper(clients)
+		networkChaos.Helper(ctx, clients)
 	case "http-chaos":
-		httpChaos.Helper(clients)
+		httpChaos.Helper(ctx, clients)
 
 	default:
 		log.Errorf("Unsupported -name %v, please provide the correct value of -name args", *helperName)
