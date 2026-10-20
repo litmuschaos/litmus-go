@@ -129,7 +129,7 @@ func SetProbeVerdictAfterFailure(result *v1alpha1.ChaosResult) {
 }
 
 func getProbesFromChaosEngine(chaosDetails *types.ChaosDetails, clients clients.ClientSets) ([]v1alpha1.ProbeAttributes, error) {
-	engine, err := types.GetChaosEngine(chaosDetails, clients)
+	engine, err := clients.GetChaosEngine(chaosDetails)
 	if err != nil {
 		return nil, err
 	}
@@ -309,7 +309,7 @@ func parseCommand(templatedCommand string, resultDetails *types.ResultDetails) (
 // stopChaosEngine update the probe status and patch the chaosengine to stop state
 func stopChaosEngine(probe v1alpha1.ProbeAttributes, clients clients.ClientSets, chaosresult *types.ResultDetails, chaosDetails *types.ChaosDetails) error {
 	// it will check for the error, It will detect the error if any error encountered in probe during chaos
-	if err = checkForErrorInContinuousProbe(chaosresult, probe.Name, chaosDetails.Timeout, chaosDetails.Delay); err != nil && cerrors.GetErrorType(err) != cerrors.FailureTypeProbeTimeout {
+	if err = checkForErrorInContinuousProbe(chaosresult, probe.Name, chaosDetails.Timeout, chaosDetails.Delay); err != nil && cerrors.GetErrorType(err) == cerrors.FailureTypeProbeTimeout {
 		return err
 	}
 

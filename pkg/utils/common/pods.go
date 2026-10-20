@@ -6,11 +6,13 @@ import (
 	"math/rand"
 	"os"
 	"os/exec"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
+	"github.com/litmuschaos/litmus-go/pkg/utils"
 	"github.com/palantir/stacktrace"
 
 	"github.com/litmuschaos/chaos-operator/api/litmuschaos/v1alpha1"
@@ -19,11 +21,16 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/math"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
+	"github.com/litmuschaos/litmus-go/pkg/utils/stringutils"
 	"github.com/litmuschaos/litmus-go/pkg/workloads"
 	"github.com/sirupsen/logrus"
 	core_v1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+const (
+	AllContainers string = "all"
 )
 
 // DeletePod deletes the specified pod and wait until it got terminated
@@ -84,12 +91,13 @@ func SetHelperData(chaosDetails *types.ChaosDetails, setHelperData string, clien
 	}
 
 	// Get Labels
-	labels := pod.ObjectMeta.Labels
+	labels := pod.Labels
 	for label := range labels {
 		if strings.HasSuffix(label, "job-name") || strings.HasSuffix(label, "controller-uid") {
 			delete(labels, label)
 		}
 	}
+
 	chaosDetails.Labels = labels
 
 	switch setHelperData {
@@ -97,19 +105,29 @@ func SetHelperData(chaosDetails *types.ChaosDetails, setHelperData string, clien
 		return nil
 
 	default:
-
 		// Get Chaos Pod Annotation
 		chaosDetails.Annotations = pod.Annotations
 
 		// Get ImagePullSecrets
 		chaosDetails.ImagePullSecrets = pod.Spec.ImagePullSecrets
 
+		//Get Tolerations
+		chaosDetails.Tolerations = pod.Spec.Tolerations
+
 		// Get Resource Requirements
 		chaosDetails.Resources, err = getChaosPodResourceRequirements(pod, chaosDetails.ExperimentName)
 		if err != nil {
 			return stacktrace.Propagate(err, "could not inherit resource requirements")
 		}
-		return nil
+
+		switch setHelperData {
+		case "false":
+			return nil
+		default:
+			// Get Chaos Pod Annotation
+			chaosDetails.Annotations = pod.Annotations
+			return nil
+		}
 	}
 }
 
@@ -126,7 +144,7 @@ func VerifyExistanceOfPods(namespace, pods string, clients clients.ClientSets) (
 		return false, nil
 	}
 
-	podList := strings.Split(strings.TrimSpace(pods), ",")
+	podList := stringutils.SplitList(pods)
 	for index := range podList {
 		isPodsAvailable, err := CheckForAvailabilityOfPod(namespace, podList[index], clients)
 		if err != nil {
@@ -180,7 +198,7 @@ func CheckForAvailabilityOfPod(namespace, name string, clients clients.ClientSet
 	if name == "" {
 		return false, nil
 	}
-	_, err := clients.KubeClient.CoreV1().Pods(namespace).Get(context.Background(), name, v1.GetOptions{})
+	_, err := clients.GetPod(namespace, name, 180, 2)
 
 	if err != nil && k8serrors.IsNotFound(err) {
 		return false, nil
@@ -193,7 +211,7 @@ func CheckForAvailabilityOfPod(namespace, name string, clients clients.ClientSet
 // FilterNonChaosPods remove the chaos pods(operator, runner) for the podList
 // it filter when the applabels are not defined and it will select random pods from appns
 func FilterNonChaosPods(ns, labels string, clients clients.ClientSets, chaosDetails *types.ChaosDetails) (core_v1.PodList, error) {
-	podList, err := clients.KubeClient.CoreV1().Pods(ns).List(context.Background(), v1.ListOptions{LabelSelector: labels})
+	podList, err := clients.ListPods(ns, labels)
 	if err != nil {
 		return core_v1.PodList{}, cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Target: fmt.Sprintf("{podLabel: %s, namespace: %s}", labels, ns), Reason: err.Error()}
 	} else if len(podList.Items) == 0 {
@@ -211,11 +229,11 @@ func FilterNonChaosPods(ns, labels string, clients clients.ClientSets, chaosDeta
 
 // GetTargetPodsWhenTargetPodsENVSet derive the specific target pods, if TARGET_PODS env is set
 func GetTargetPodsWhenTargetPodsENVSet(targetPods, namespace string, clients clients.ClientSets, chaosDetails *types.ChaosDetails) (core_v1.PodList, error) {
-	targetPodsList := strings.Split(targetPods, ",")
+	targetPodsList := stringutils.SplitList(targetPods)
 	realPods := core_v1.PodList{}
 
 	for index := range targetPodsList {
-		pod, err := clients.KubeClient.CoreV1().Pods(namespace).Get(context.Background(), strings.TrimSpace(targetPodsList[index]), v1.GetOptions{})
+		pod, err := clients.GetPod(namespace, strings.TrimSpace(targetPodsList[index]), chaosDetails.Timeout, chaosDetails.Delay)
 		if err != nil {
 			return core_v1.PodList{}, cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Target: fmt.Sprintf("{podName: %s, namespace: %s}", targetPodsList[index], namespace), Reason: err.Error()}
 		}
@@ -275,7 +293,7 @@ func GetTargetPodsWhenTargetPodsENVNotSet(podAffPerc int, clients clients.Client
 		switch target.Kind {
 		case "pod":
 			for _, name := range target.Names {
-				pod, err := clients.KubeClient.CoreV1().Pods(target.Namespace).Get(context.Background(), name, v1.GetOptions{})
+				pod, err := clients.GetPod(target.Namespace, name, chaosDetails.Timeout, chaosDetails.Delay)
 				if err != nil {
 					return finalPods, cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Target: fmt.Sprintf("{podName: %s, namespace: %s}", name, target.Namespace), Reason: err.Error()}
 				}
@@ -290,16 +308,30 @@ func GetTargetPodsWhenTargetPodsENVNotSet(podAffPerc int, clients clients.Client
 				}
 				finalPods.Items = append(finalPods.Items, pods.Items...)
 			} else {
-				for _, label := range target.Labels {
-					pods, err := clients.KubeClient.CoreV1().Pods(target.Namespace).List(context.Background(), v1.ListOptions{LabelSelector: label})
+				// Check label match mode to determine union vs intersection
+				if target.LabelMatchMode == "intersection" {
+					// INTERSECTION: Get pods matching ALL labels
+					pods, err := getPodsWithIntersectionLabels(target, clients)
 					if err != nil {
-						return finalPods, cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Target: fmt.Sprintf("{podLabel: %s, namespace: %s}", label, target.Namespace), Reason: err.Error()}
+						return finalPods, err
 					}
-					filteredPods, err := filterPodsByOwnerKind(pods.Items, target, clients)
+					filteredPods, err := filterPodsByOwnerKind(pods, target, clients)
 					if err != nil {
 						return finalPods, stacktrace.Propagate(err, "could not identify parent type from pod")
 					}
 					finalPods.Items = append(finalPods.Items, filteredPods...)
+				} else {
+					for _, label := range target.Labels {
+						pods, err := clients.KubeClient.CoreV1().Pods(target.Namespace).List(context.Background(), v1.ListOptions{LabelSelector: label})
+						if err != nil {
+							return finalPods, cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Target: fmt.Sprintf("{podLabel: %s, namespace: %s}", label, target.Namespace), Reason: err.Error()}
+						}
+						filteredPods, err := filterPodsByOwnerKind(pods.Items, target, clients)
+						if err != nil {
+							return finalPods, stacktrace.Propagate(err, "could not identify parent type from pod")
+						}
+						finalPods.Items = append(finalPods.Items, filteredPods...)
+					}
 				}
 			}
 		}
@@ -313,6 +345,42 @@ func GetTargetPodsWhenTargetPodsENVNotSet(podAffPerc int, clients clients.Client
 		return finalPods, nil
 	}
 	return filterPodsByPercentage(finalPods, podAffPerc), nil
+}
+
+// getPodsWithIntersectionLabels returns pods that match ALL the provided labels (intersection)
+func getPodsWithIntersectionLabels(target types.AppDetails, clients clients.ClientSets) ([]core_v1.Pod, error) {
+	if len(target.Labels) == 0 {
+		return nil, cerrors.Error{
+			ErrorCode: cerrors.ErrorTypeTargetSelection,
+			Target:    fmt.Sprintf("{namespace: %s, kind: %s}", target.Namespace, target.Kind),
+			Reason:    "no labels provided for intersection",
+		}
+	}
+
+	// Build comma-separated label selector for intersection (AND logic)
+	// e.g., "app=nginx,env=prod,role=primary"
+	labelSelector := strings.Join(target.Labels, ",")
+
+	pods, err := clients.KubeClient.CoreV1().Pods(target.Namespace).List(context.Background(), v1.ListOptions{
+		LabelSelector: labelSelector,
+	})
+	if err != nil {
+		return nil, cerrors.Error{
+			ErrorCode: cerrors.ErrorTypeTargetSelection,
+			Target:    fmt.Sprintf("{labels: %v, namespace: %s}", target.Labels, target.Namespace),
+			Reason:    err.Error(),
+		}
+	}
+
+	if len(pods.Items) == 0 {
+		return nil, cerrors.Error{
+			ErrorCode: cerrors.ErrorTypeTargetSelection,
+			Target:    fmt.Sprintf("{labels: %v, namespace: %s}", target.Labels, target.Namespace),
+			Reason:    "no pods found matching all labels",
+		}
+	}
+
+	return pods.Items, nil
 }
 
 func filterPodsByOwnerKind(pods []core_v1.Pod, target types.AppDetails, clients clients.ClientSets) ([]core_v1.Pod, error) {
@@ -333,7 +401,6 @@ func filterPodsByPercentage(finalPods core_v1.PodList, podAffPerc int) core_v1.P
 	finalPods = removeDuplicatePods(finalPods)
 
 	newPodListLength := math.Maximum(1, math.Adjustment(math.Minimum(podAffPerc, 100), len(finalPods.Items)))
-	rand.Seed(time.Now().UnixNano())
 
 	var realPods core_v1.PodList
 	// it will generate the random podlist
@@ -358,14 +425,16 @@ func DeleteHelperPodBasedOnJobCleanupPolicy(podName, podLabel string, chaosDetai
 }
 
 // DeleteAllHelperPodBasedOnJobCleanupPolicy delete all the helper pods w/ matching label based on jobCleanupPolicy
-func DeleteAllHelperPodBasedOnJobCleanupPolicy(podLabel string, chaosDetails *types.ChaosDetails, clients clients.ClientSets) {
-
+func DeleteAllHelperPodBasedOnJobCleanupPolicy(podLabel string, chaosDetails *types.ChaosDetails, clients clients.ClientSets) error {
 	if chaosDetails.JobCleanupPolicy == "delete" {
 		log.Info("[Cleanup]: Deleting all the helper pods")
 		if err := DeleteAllPod(podLabel, chaosDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients); err != nil {
-			log.Errorf("Unable to delete the helper pods, err: %v", err)
+			return stacktrace.Propagate(err, "could not delete helper pod(s)")
 		}
+	} else {
+		log.Infof("[Cleanup]: Skipping deletion of helper pods as JOB_CLEANUP_POLICY is set to %s", chaosDetails.JobCleanupPolicy)
 	}
+	return nil
 }
 
 // GetServiceAccount derive the serviceAccountName for the helper pod
@@ -379,17 +448,45 @@ func GetServiceAccount(chaosNamespace, chaosPodName string, clients clients.Clie
 
 // GetExperimentPod fetch the experiment pod
 func GetExperimentPod(name, namespace string, clients clients.ClientSets) (*core_v1.Pod, error) {
-	pod, err := clients.KubeClient.CoreV1().Pods(namespace).Get(context.Background(), name, v1.GetOptions{})
+	pod, err := clients.GetPod(namespace, name, 180, 2)
 	if err != nil {
 		return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Target: fmt.Sprintf("{podName: %s, namespace: %s}", name, namespace), Reason: fmt.Sprintf("failed to get experiment pod: %s", err.Error())}
 	}
 	return pod, nil
 }
 
+// GetContainerIDs  derive the container id of the application containers
+func GetContainerIDs(appNamespace, targetPod string, targetContainers []string, clients clients.ClientSets, source string) ([]string, error) {
+	pod, err := clients.GetPod(appNamespace, targetPod, 180, 2)
+	if err != nil {
+		return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeHelper, Source: source, Target: fmt.Sprintf("{podName: %s, namespace: %s}", targetPod, appNamespace), Reason: err.Error()}
+	}
+
+	var containerIDs []string
+
+	// filtering out the container id from the details of containers inside containerStatuses of the given pod
+	// container id is present in the form of <runtime>://<container-id>
+	for _, container := range pod.Status.ContainerStatuses {
+		if utils.Contains(container.Name, targetContainers) {
+			containerIDs = append(containerIDs, strings.Split(container.ContainerID, "//")[1])
+		}
+	}
+
+	if len(targetContainers) != len(containerIDs) {
+		return nil, cerrors.Error{
+			ErrorCode: cerrors.ErrorTypeContainerRuntime,
+			Source:    source,
+			Target:    fmt.Sprintf("{podName: %s, namespace: %s, container: %s}", targetPod, appNamespace, targetContainers),
+			Reason:    fmt.Sprintf("failed to get the container id of %v containers", targetContainers),
+		}
+	}
+
+	return containerIDs, nil
+}
+
 // GetContainerID  derive the container id of the application container
 func GetContainerID(appNamespace, targetPod, targetContainer string, clients clients.ClientSets, source string) (string, error) {
-
-	pod, err := clients.KubeClient.CoreV1().Pods(appNamespace).Get(context.Background(), targetPod, v1.GetOptions{})
+	pod, err := clients.GetPod(appNamespace, targetPod, 180, 2)
 	if err != nil {
 		return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeHelper, Source: source, Target: fmt.Sprintf("{podName: %s, namespace: %s}", targetPod, appNamespace), Reason: err.Error()}
 	}
@@ -404,9 +501,11 @@ func GetContainerID(appNamespace, targetPod, targetContainer string, clients cli
 			break
 		}
 	}
+
 	if containerID == "" {
-		return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeContainerRuntime, Source: source, Target: fmt.Sprintf("{podName: %s, namespace: %s, container: %s}", targetPod, appNamespace, targetContainer), Reason: fmt.Sprintf("no container found with specified name")}
+		return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeContainerRuntime, Source: source, Target: fmt.Sprintf("{podName: %s, namespace: %s, container: %s}", targetPod, appNamespace, targetContainer), Reason: "no container found with specified name"}
 	}
+
 	return containerID, nil
 }
 
@@ -433,7 +532,16 @@ func GetRuntimeBasedContainerID(containerRuntime, socketPath, targetPods, appNam
 	default:
 		return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeHelper, Source: source, Reason: fmt.Sprintf("unsupported container runtime: %s", containerRuntime)}
 	}
+
 	log.Infof("Container ID: %v", containerID)
+
+	if containerID == "" {
+		return "", cerrors.Error{
+			ErrorCode: cerrors.ErrorTypeHelper,
+			Source:    source,
+			Reason:    fmt.Sprintf("failed to get the container id, runtime: %s", containerRuntime),
+		}
+	}
 
 	return containerID, nil
 }
@@ -464,7 +572,7 @@ func GetPodListFromSpecifiedNodes(podAffPerc int, nodeLabel string, clients clie
 	var nodes *core_v1.NodeList
 
 	// identify node list from the provided node label
-	nodes, err = clients.KubeClient.CoreV1().Nodes().List(context.Background(), v1.ListOptions{LabelSelector: nodeLabel})
+	nodes, err = clients.ListNode(nodeLabel, chaosDetails.Timeout, chaosDetails.Delay)
 	if err != nil {
 		return core_v1.PodList{}, cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Target: fmt.Sprintf("{nodeLabel: %s}", nodeLabel), Reason: err.Error()}
 	} else if len(nodes.Items) == 0 {
@@ -507,7 +615,20 @@ func getTargetPodsWhenNodeFilterSet(podAffPerc int, pods core_v1.PodList, nodes 
 	return filterPodsByPercentage(nodeFilteredPods, podAffPerc), nil
 }
 
-func GetTargetPods(nodeLabel, targetPods, podsAffectedPerc string, clients clients.ClientSets, chaosDetails *types.ChaosDetails) (core_v1.PodList, error) {
+// sortPodsByName sorts a PodList lexicographically by pod name.
+func sortPodsByName(pods core_v1.PodList, reverse bool) core_v1.PodList {
+	sort.Slice(pods.Items, func(i, j int) bool {
+		if reverse {
+			return pods.Items[i].Name > pods.Items[j].Name
+		}
+		return pods.Items[i].Name < pods.Items[j].Name
+	})
+	return pods
+}
+
+// GetTargetPods derives the target pods based on the target pods, node label, pod affected percentage and pod termination order.
+// Note: Callers who do not support or do not wish to use the new podTerminationOrder tunable should pass "" (empty string) to preserve the original random behavior.
+func GetTargetPods(nodeLabel, targetPods, podsAffectedPerc, podTerminationOrder string, clients clients.ClientSets, chaosDetails *types.ChaosDetails) (core_v1.PodList, error) {
 
 	podAffectedPerc, _ := strconv.Atoi(podsAffectedPerc)
 
@@ -525,6 +646,21 @@ func GetTargetPods(nodeLabel, targetPods, podsAffectedPerc string, clients clien
 		pods, err = GetPodList(targetPods, podAffectedPerc, clients, chaosDetails)
 		if err != nil {
 			return core_v1.PodList{}, err
+		}
+	}
+
+	// Apply deterministic ordering based on POD_TERMINATION_ORDER.
+	// Only sort when TARGET_PODS is not explicitly set.
+	// When it is set, insertion order already expresses the caller's intended kill sequence.
+	if targetPods == "" {
+		switch strings.ToLower(podTerminationOrder) {
+		case "alphabetical":
+			log.Infof("POD_TERMINATION_ORDER is 'alphabetical', sorting target pods by name (ascending)")
+			pods = sortPodsByName(pods, false)
+		case "reverse":
+			log.Infof("POD_TERMINATION_ORDER is 'reverse', sorting target pods by name (descending)")
+			pods = sortPodsByName(pods, true)
+			// default "random": no reordering; filterPodsByPercentage already used a random start index
 		}
 	}
 
@@ -561,36 +697,22 @@ func FilterPodsForNodes(targetPodList core_v1.PodList, containerName string) map
 	targets := make(map[string]*TargetsDetails)
 
 	for _, pod := range targetPodList.Items {
-
-		var containerNames []string
-
-		switch containerName {
-		case "ALL":
-			for _, container := range pod.Spec.Containers {
-				containerNames = append(containerNames, container.Name)
-			}
-		case "":
-			containerNames = append(containerNames, pod.Spec.Containers[0].Name)
-		default:
-			containerNames = append(containerNames, containerName)
+		td := target{
+			Name:            pod.Name,
+			Namespace:       pod.Namespace,
+			TargetContainer: containerName,
 		}
 
-		for _, targetName := range containerNames {
+		if td.TargetContainer == "" {
+			td.TargetContainer = pod.Spec.Containers[0].Name
+		}
 
-			td := target{
-				Name:            pod.Name,
-				Namespace:       pod.Namespace,
-				TargetContainer: targetName,
+		if targets[pod.Spec.NodeName] == nil {
+			targets[pod.Spec.NodeName] = &TargetsDetails{
+				Target: []target{td},
 			}
-
-			if targets[pod.Spec.NodeName] == nil {
-				targets[pod.Spec.NodeName] = &TargetsDetails{
-					Target: []target{td},
-				}
-			} else {
-				targets[pod.Spec.NodeName].Target = append(targets[pod.Spec.NodeName].Target, td)
-			}
-
+		} else {
+			targets[pod.Spec.NodeName].Target = append(targets[pod.Spec.NodeName].Target, td)
 		}
 	}
 	return targets
@@ -640,4 +762,46 @@ func GetAppDetailsForLogging(appDetails []types.AppDetails) string {
 		return fmt.Sprintf("[%v]", strings.Join(result, ","))
 	}
 	return ""
+}
+
+func ManagerHelperLifecycle(label string, chaosDetails *types.ChaosDetails, clients clients.ClientSets, podLevel bool) error {
+	err := checkHelperStatus(label, chaosDetails, clients)
+	if err != nil {
+		return err
+	}
+
+	// waiting till the completion of helper pod and delete the helper pods based on job cleanup policy
+	return WaitForCompletionAndDeleteHelperPods(label, chaosDetails, clients, podLevel)
+}
+
+func isAllContainers(container string) bool {
+	return strings.ToLower(container) == AllContainers
+}
+
+func GetTargetContainers(name, namespace, container, source string, clients clients.ClientSets) ([]string, error) {
+	var (
+		containerList []string
+		containers    = stringutils.SplitList(container)
+	)
+
+	pod, err := clients.GetPod(namespace, name, 180, 2)
+	if err != nil {
+		return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeHelper, Source: source, Target: fmt.Sprintf("{podName: %s, namespace: %s}", name, namespace), Reason: err.Error()}
+	}
+
+	for _, c := range pod.Spec.Containers {
+		if utils.Contains(c.Name, containers) || isAllContainers(container) {
+			containerList = append(containerList, c.Name)
+		}
+	}
+
+	if !isAllContainers(container) && len(containers) != len(containerList) {
+		return nil, cerrors.Error{
+			ErrorCode: cerrors.ErrorTypeHelper,
+			Source:    source,
+			Target:    fmt.Sprintf("{podName: %s, namespace: %s}", name, namespace),
+			Reason:    fmt.Sprintf("target pod doesn't contains all the target containers: '%v'", container)}
+	}
+
+	return containerList, nil
 }
