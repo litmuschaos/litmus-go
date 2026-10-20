@@ -38,12 +38,12 @@ func PrepareContainerKill(ctx context.Context, experimentsDetails *experimentTyp
 	//Set up the tunables if provided in range
 	SetChaosTunables(experimentsDetails)
 
-	log.InfoWithValues("[Info]: The tunables are:", logrus.Fields{
+	log.InfoWithValues("The tunables are:", logrus.Fields{
 		"PodsAffectedPerc": experimentsDetails.PodsAffectedPerc,
 		"Sequence":         experimentsDetails.Sequence,
 	})
 
-	targetPodList, err := common.GetTargetPods(experimentsDetails.NodeLabel, experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, clients, chaosDetails)
+	targetPodList, err := common.GetTargetPods(experimentsDetails.NodeLabel, experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, experimentsDetails.PodTerminationOrder, clients, chaosDetails)
 	if err != nil {
 		return stacktrace.Propagate(err, "could not get target pods")
 	}
@@ -102,7 +102,7 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 	}
 
 	// creating the helper pod to perform container kill chaos
-	for _, pod := range targetPodList.Items {
+	for i, pod := range targetPodList.Items {
 
 		//Get the target container name of the application pod
 		if !experimentsDetails.IsTargetContainerProvided {
@@ -119,6 +119,12 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 
 		if err := common.ManagerHelperLifecycle(appLabel, chaosDetails, clients, true); err != nil {
 			return err
+		}
+
+		// Wait for the inter-pod kill interval only between pods, not after the last one.
+		if experimentsDetails.InterPodKillIntervalSeconds > 0 && i < len(targetPodList.Items)-1 {
+			log.Infof("[Wait]: Waiting %vs between pod kills (INTER_POD_KILL_INTERVAL_SECONDS)", experimentsDetails.InterPodKillIntervalSeconds)
+			common.WaitForDuration(experimentsDetails.InterPodKillIntervalSeconds)
 		}
 	}
 	return nil
@@ -163,10 +169,7 @@ func createHelperPod(ctx context.Context, experimentsDetails *experimentTypes.Ex
 	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "CreateContainerKillFaultHelperPod")
 	defer span.End()
 
-	privilegedEnable := false
-	if experimentsDetails.ContainerRuntime == "crio" {
-		privilegedEnable = true
-	}
+	privilegedEnable := experimentsDetails.ContainerRuntime == "crio"
 	terminationGracePeriodSeconds := int64(experimentsDetails.TerminationGracePeriodSeconds)
 
 	helperPod := &apiv1.Pod{

@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"os"
 	"os/exec"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -20,6 +21,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/math"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
+	"github.com/litmuschaos/litmus-go/pkg/utils/stringutils"
 	"github.com/litmuschaos/litmus-go/pkg/workloads"
 	"github.com/sirupsen/logrus"
 	core_v1 "k8s.io/api/core/v1"
@@ -89,7 +91,7 @@ func SetHelperData(chaosDetails *types.ChaosDetails, setHelperData string, clien
 	}
 
 	// Get Labels
-	labels := pod.ObjectMeta.Labels
+	labels := pod.Labels
 	for label := range labels {
 		if strings.HasSuffix(label, "job-name") || strings.HasSuffix(label, "controller-uid") {
 			delete(labels, label)
@@ -142,7 +144,7 @@ func VerifyExistanceOfPods(namespace, pods string, clients clients.ClientSets) (
 		return false, nil
 	}
 
-	podList := strings.Split(strings.TrimSpace(pods), ",")
+	podList := stringutils.SplitList(pods)
 	for index := range podList {
 		isPodsAvailable, err := CheckForAvailabilityOfPod(namespace, podList[index], clients)
 		if err != nil {
@@ -227,7 +229,7 @@ func FilterNonChaosPods(ns, labels string, clients clients.ClientSets, chaosDeta
 
 // GetTargetPodsWhenTargetPodsENVSet derive the specific target pods, if TARGET_PODS env is set
 func GetTargetPodsWhenTargetPodsENVSet(targetPods, namespace string, clients clients.ClientSets, chaosDetails *types.ChaosDetails) (core_v1.PodList, error) {
-	targetPodsList := strings.Split(targetPods, ",")
+	targetPodsList := stringutils.SplitList(targetPods)
 	realPods := core_v1.PodList{}
 
 	for index := range targetPodsList {
@@ -306,16 +308,30 @@ func GetTargetPodsWhenTargetPodsENVNotSet(podAffPerc int, clients clients.Client
 				}
 				finalPods.Items = append(finalPods.Items, pods.Items...)
 			} else {
-				for _, label := range target.Labels {
-					pods, err := clients.KubeClient.CoreV1().Pods(target.Namespace).List(context.Background(), v1.ListOptions{LabelSelector: label})
+				// Check label match mode to determine union vs intersection
+				if target.LabelMatchMode == "intersection" {
+					// INTERSECTION: Get pods matching ALL labels
+					pods, err := getPodsWithIntersectionLabels(target, clients)
 					if err != nil {
-						return finalPods, cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Target: fmt.Sprintf("{podLabel: %s, namespace: %s}", label, target.Namespace), Reason: err.Error()}
+						return finalPods, err
 					}
-					filteredPods, err := filterPodsByOwnerKind(pods.Items, target, clients)
+					filteredPods, err := filterPodsByOwnerKind(pods, target, clients)
 					if err != nil {
 						return finalPods, stacktrace.Propagate(err, "could not identify parent type from pod")
 					}
 					finalPods.Items = append(finalPods.Items, filteredPods...)
+				} else {
+					for _, label := range target.Labels {
+						pods, err := clients.KubeClient.CoreV1().Pods(target.Namespace).List(context.Background(), v1.ListOptions{LabelSelector: label})
+						if err != nil {
+							return finalPods, cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Target: fmt.Sprintf("{podLabel: %s, namespace: %s}", label, target.Namespace), Reason: err.Error()}
+						}
+						filteredPods, err := filterPodsByOwnerKind(pods.Items, target, clients)
+						if err != nil {
+							return finalPods, stacktrace.Propagate(err, "could not identify parent type from pod")
+						}
+						finalPods.Items = append(finalPods.Items, filteredPods...)
+					}
 				}
 			}
 		}
@@ -329,6 +345,42 @@ func GetTargetPodsWhenTargetPodsENVNotSet(podAffPerc int, clients clients.Client
 		return finalPods, nil
 	}
 	return filterPodsByPercentage(finalPods, podAffPerc), nil
+}
+
+// getPodsWithIntersectionLabels returns pods that match ALL the provided labels (intersection)
+func getPodsWithIntersectionLabels(target types.AppDetails, clients clients.ClientSets) ([]core_v1.Pod, error) {
+	if len(target.Labels) == 0 {
+		return nil, cerrors.Error{
+			ErrorCode: cerrors.ErrorTypeTargetSelection,
+			Target:    fmt.Sprintf("{namespace: %s, kind: %s}", target.Namespace, target.Kind),
+			Reason:    "no labels provided for intersection",
+		}
+	}
+
+	// Build comma-separated label selector for intersection (AND logic)
+	// e.g., "app=nginx,env=prod,role=primary"
+	labelSelector := strings.Join(target.Labels, ",")
+
+	pods, err := clients.KubeClient.CoreV1().Pods(target.Namespace).List(context.Background(), v1.ListOptions{
+		LabelSelector: labelSelector,
+	})
+	if err != nil {
+		return nil, cerrors.Error{
+			ErrorCode: cerrors.ErrorTypeTargetSelection,
+			Target:    fmt.Sprintf("{labels: %v, namespace: %s}", target.Labels, target.Namespace),
+			Reason:    err.Error(),
+		}
+	}
+
+	if len(pods.Items) == 0 {
+		return nil, cerrors.Error{
+			ErrorCode: cerrors.ErrorTypeTargetSelection,
+			Target:    fmt.Sprintf("{labels: %v, namespace: %s}", target.Labels, target.Namespace),
+			Reason:    "no pods found matching all labels",
+		}
+	}
+
+	return pods.Items, nil
 }
 
 func filterPodsByOwnerKind(pods []core_v1.Pod, target types.AppDetails, clients clients.ClientSets) ([]core_v1.Pod, error) {
@@ -349,7 +401,6 @@ func filterPodsByPercentage(finalPods core_v1.PodList, podAffPerc int) core_v1.P
 	finalPods = removeDuplicatePods(finalPods)
 
 	newPodListLength := math.Maximum(1, math.Adjustment(math.Minimum(podAffPerc, 100), len(finalPods.Items)))
-	rand.Seed(time.Now().UnixNano())
 
 	var realPods core_v1.PodList
 	// it will generate the random podlist
@@ -564,7 +615,20 @@ func getTargetPodsWhenNodeFilterSet(podAffPerc int, pods core_v1.PodList, nodes 
 	return filterPodsByPercentage(nodeFilteredPods, podAffPerc), nil
 }
 
-func GetTargetPods(nodeLabel, targetPods, podsAffectedPerc string, clients clients.ClientSets, chaosDetails *types.ChaosDetails) (core_v1.PodList, error) {
+// sortPodsByName sorts a PodList lexicographically by pod name.
+func sortPodsByName(pods core_v1.PodList, reverse bool) core_v1.PodList {
+	sort.Slice(pods.Items, func(i, j int) bool {
+		if reverse {
+			return pods.Items[i].Name > pods.Items[j].Name
+		}
+		return pods.Items[i].Name < pods.Items[j].Name
+	})
+	return pods
+}
+
+// GetTargetPods derives the target pods based on the target pods, node label, pod affected percentage and pod termination order.
+// Note: Callers who do not support or do not wish to use the new podTerminationOrder tunable should pass "" (empty string) to preserve the original random behavior.
+func GetTargetPods(nodeLabel, targetPods, podsAffectedPerc, podTerminationOrder string, clients clients.ClientSets, chaosDetails *types.ChaosDetails) (core_v1.PodList, error) {
 
 	podAffectedPerc, _ := strconv.Atoi(podsAffectedPerc)
 
@@ -582,6 +646,21 @@ func GetTargetPods(nodeLabel, targetPods, podsAffectedPerc string, clients clien
 		pods, err = GetPodList(targetPods, podAffectedPerc, clients, chaosDetails)
 		if err != nil {
 			return core_v1.PodList{}, err
+		}
+	}
+
+	// Apply deterministic ordering based on POD_TERMINATION_ORDER.
+	// Only sort when TARGET_PODS is not explicitly set.
+	// When it is set, insertion order already expresses the caller's intended kill sequence.
+	if targetPods == "" {
+		switch strings.ToLower(podTerminationOrder) {
+		case "alphabetical":
+			log.Infof("POD_TERMINATION_ORDER is 'alphabetical', sorting target pods by name (ascending)")
+			pods = sortPodsByName(pods, false)
+		case "reverse":
+			log.Infof("POD_TERMINATION_ORDER is 'reverse', sorting target pods by name (descending)")
+			pods = sortPodsByName(pods, true)
+			// default "random": no reordering; filterPodsByPercentage already used a random start index
 		}
 	}
 
@@ -702,7 +781,7 @@ func isAllContainers(container string) bool {
 func GetTargetContainers(name, namespace, container, source string, clients clients.ClientSets) ([]string, error) {
 	var (
 		containerList []string
-		containers    = strings.Split(container, ",")
+		containers    = stringutils.SplitList(container)
 	)
 
 	pod, err := clients.GetPod(namespace, name, 180, 2)
