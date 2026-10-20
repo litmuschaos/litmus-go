@@ -2,13 +2,13 @@ package aws
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	"github.com/litmuschaos/litmus-go/pkg/cloud/aws/common"
 	"github.com/litmuschaos/litmus-go/pkg/log"
+	"github.com/litmuschaos/litmus-go/pkg/utils/stringutils"
 	"github.com/palantir/stacktrace"
 )
 
@@ -52,8 +52,8 @@ func GetEC2InstanceStatus(instanceID, region string) (string, error) {
 // InstanceStatusCheckByID is used to check the instance status of all the instance under chaos.
 func InstanceStatusCheckByID(instanceID, region string) error {
 
-	instanceIDList := strings.Split(instanceID, ",")
-	if instanceID == "" || len(instanceIDList) == 0 {
+	instanceIDList := stringutils.SplitList(instanceID)
+	if len(instanceIDList) == 0 {
 		return cerrors.Error{
 			ErrorCode: cerrors.ErrorTypeStatusChecks,
 			Reason:    "no instance id provided to terminate",

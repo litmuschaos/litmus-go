@@ -7,7 +7,6 @@ import (
 	"os/exec"
 	"os/signal"
 	"strconv"
-	"strings"
 	"syscall"
 	"time"
 
@@ -25,6 +24,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
+	"github.com/litmuschaos/litmus-go/pkg/utils/stringutils"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -168,7 +168,7 @@ func drainNode(ctx context.Context, experimentsDetails *experimentTypes.Experime
 // uncordonNode uncordon the application node
 func uncordonNode(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
 
-	targetNodes := strings.Split(experimentsDetails.TargetNode, ",")
+	targetNodes := stringutils.SplitList(experimentsDetails.TargetNode)
 	for _, targetNode := range targetNodes {
 
 		//Check node exist before uncordon the node
@@ -195,7 +195,7 @@ func uncordonNode(experimentsDetails *experimentTypes.ExperimentDetails, clients
 		Times(uint(experimentsDetails.Timeout / experimentsDetails.Delay)).
 		Wait(time.Duration(experimentsDetails.Delay) * time.Second).
 		Try(func(attempt uint) error {
-			targetNodes := strings.Split(experimentsDetails.TargetNode, ",")
+			targetNodes := stringutils.SplitList(experimentsDetails.TargetNode)
 			for _, targetNode := range targetNodes {
 				nodeSpec, err := clients.KubeClient.CoreV1().Nodes().Get(context.Background(), targetNode, v1.GetOptions{})
 				if err != nil {

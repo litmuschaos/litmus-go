@@ -309,7 +309,7 @@ func parseCommand(templatedCommand string, resultDetails *types.ResultDetails) (
 // stopChaosEngine update the probe status and patch the chaosengine to stop state
 func stopChaosEngine(probe v1alpha1.ProbeAttributes, clients clients.ClientSets, chaosresult *types.ResultDetails, chaosDetails *types.ChaosDetails) error {
 	// it will check for the error, It will detect the error if any error encountered in probe during chaos
-	if err = checkForErrorInContinuousProbe(chaosresult, probe.Name, chaosDetails.Timeout, chaosDetails.Delay); err != nil && cerrors.GetErrorType(err) != cerrors.FailureTypeProbeTimeout {
+	if err = checkForErrorInContinuousProbe(chaosresult, probe.Name, chaosDetails.Timeout, chaosDetails.Delay); err != nil && cerrors.GetErrorType(err) == cerrors.FailureTypeProbeTimeout {
 		return err
 	}
 

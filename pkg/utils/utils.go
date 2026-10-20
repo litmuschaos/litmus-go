@@ -1,9 +1,12 @@
 package utils
 
 import (
+	"errors"
 	"fmt"
+	"net"
 	"net/url"
 	"reflect"
+	"syscall"
 )
 
 func HttpTimeout(err error) bool {
@@ -11,6 +14,33 @@ func HttpTimeout(err error) bool {
 	if httpErr != nil {
 		return httpErr.Timeout()
 	}
+	return false
+}
+
+func IsConnectionError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	var urlErr *url.Error
+	if errors.As(err, &urlErr) {
+		err = urlErr.Err
+	}
+
+	var netErr *net.OpError
+	if errors.As(err, &netErr) {
+		return true
+	}
+
+	var syscallErr syscall.Errno
+	if errors.As(err, &syscallErr) {
+		switch syscallErr {
+		case syscall.ECONNREFUSED, syscall.ETIMEDOUT, syscall.ENETUNREACH,
+			syscall.EHOSTUNREACH, syscall.ECONNRESET, syscall.EPIPE:
+			return true
+		}
+	}
+
 	return false
 }
 

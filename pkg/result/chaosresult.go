@@ -31,7 +31,7 @@ func ChaosResult(chaosDetails *types.ChaosDetails, clients clients.ClientSets, r
 	// It tries to get the chaosresult, if available
 	// it will retry until it got chaos result or met the timeout(3 mins)
 	isResultAvailable := false
-	result, err := clients.GetChaosResult(chaosDetails)
+	result, err := clients.GetChaosResult(chaosDetails, resultDetails)
 	if err != nil {
 		return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosResultCRUD, Target: fmt.Sprintf("{name: %s, namespace: %s}", resultDetails.Name, chaosDetails.ChaosNamespace), Reason: fmt.Sprintf("failed to get result: %s", err.Error())}
 	}
@@ -234,7 +234,7 @@ func PatchChaosResult(clients clients.ClientSets, chaosDetails *types.ChaosDetai
 
 // SetResultUID sets the ResultUID into the ResultDetails structure
 func SetResultUID(resultDetails *types.ResultDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
-	result, err := clients.GetChaosResult(chaosDetails)
+	result, err := clients.GetChaosResult(chaosDetails, resultDetails)
 	if err != nil {
 		return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosResultCRUD, Target: fmt.Sprintf("{name: %s, namespace: %s}", resultDetails.Name, chaosDetails.ChaosNamespace), Reason: err.Error()}
 	}
@@ -304,7 +304,7 @@ func AnnotateChaosResult(resultName, namespace, status, kind, name string) error
 // GetChaosStatus get the chaos status based on annotations in chaosresult
 func GetChaosStatus(resultDetails *types.ResultDetails, chaosDetails *types.ChaosDetails, clients clients.ClientSets) (*v1alpha1.ChaosResult, error) {
 
-	result, err := clients.GetChaosResult(chaosDetails)
+	result, err := clients.GetChaosResult(chaosDetails, resultDetails)
 	if err != nil {
 		return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosResultCRUD, Target: fmt.Sprintf("{name: %s, namespace: %s}", resultDetails.Name, chaosDetails.ChaosNamespace), Reason: err.Error()}
 	}
