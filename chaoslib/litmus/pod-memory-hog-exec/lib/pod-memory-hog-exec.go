@@ -3,6 +3,8 @@ package lib
 import (
 	"context"
 	"fmt"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"os"
 	"os/signal"
 	"strconv"
@@ -32,7 +34,9 @@ var inject chan os.Signal
 
 // PrepareMemoryExecStress contains the chaos preparation and injection steps
 func PrepareMemoryExecStress(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PreparePodMemoryHogExecFault")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PreparePodMemoryHogExecFault",
+		trace.WithAttributes(attribute.Int("experiment.ramptime", experimentsDetails.RampTime)),
+	)
 	defer span.End()
 
 	// inject channel is used to transmit signal notifications.
@@ -60,7 +64,8 @@ func PrepareMemoryExecStress(ctx context.Context, experimentsDetails *experiment
 // stressMemory Uses the REST API to exec into the target container of the target pod
 // The function will be constantly increasing the Memory utilisation until it reaches the maximum available or allowed number.
 // Using the TOTAL_CHAOS_DURATION we will need to specify for how long this experiment will last
-func stressMemory(MemoryConsumption, containerName, podName, namespace string, clients clients.ClientSets, stressErr chan error) {
+func stressMemory(ctx context.Context, MemoryConsumption, containerName, podName, namespace string, clients clients.ClientSets, stressErr chan error) {
+	span := trace.SpanFromContext(ctx)
 
 	log.Infof("The memory consumption is: %v", MemoryConsumption)
 
@@ -68,6 +73,7 @@ func stressMemory(MemoryConsumption, containerName, podName, namespace string, c
 	execCommandDetails := litmusexec.PodDetails{}
 
 	ddCmd := fmt.Sprintf("dd if=/dev/zero of=/dev/null bs=" + MemoryConsumption + "M")
+	span.SetAttributes(attribute.String("inject.command_line", ddCmd))
 	command := []string{"/bin/sh", "-c", ddCmd}
 
 	litmusexec.SetExecCommandAttributes(&execCommandDetails, podName, containerName, namespace)
@@ -115,7 +121,13 @@ func experimentMemory(ctx context.Context, experimentsDetails *experimentTypes.E
 
 // injectChaosInSerialMode stressed the memory of all target application serially (one by one)
 func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, targetPodList corev1.PodList, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectPodMemoryHogExecFaultInSerialMode")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectPodMemoryHogExecFaultInSerialMode",
+		trace.WithAttributes(
+			attribute.Int("chaos.duration", experimentsDetails.ChaosDuration),
+			attribute.Int("chaos.interval", experimentsDetails.ChaosInterval),
+			attribute.String("chaos.namespace", experimentsDetails.ChaosNamespace),
+		),
+	)
 	defer span.End()
 
 	// run the probes during chaos
@@ -160,7 +172,7 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 				"Target Pod":             pod.Name,
 				"Memory Consumption(MB)": experimentsDetails.MemoryConsumption,
 			})
-			go stressMemory(strconv.Itoa(experimentsDetails.MemoryConsumption), experimentsDetails.TargetContainer, pod.Name, pod.Namespace, clients, stressErr)
+			go stressMemory(ctx, strconv.Itoa(experimentsDetails.MemoryConsumption), experimentsDetails.TargetContainer, pod.Name, pod.Namespace, clients, stressErr)
 
 			common.SetTargets(pod.Name, "injected", "pod", chaosDetails)
 
@@ -183,7 +195,7 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 					}
 				case <-signChan:
 					log.Info("[Chaos]: Revert Started")
-					if err := killStressMemorySerial(experimentsDetails.TargetContainer, pod.Name, pod.Namespace, experimentsDetails.ChaosKillCmd, clients, chaosDetails); err != nil {
+					if err := killStressMemorySerial(ctx, experimentsDetails.TargetContainer, pod.Name, pod.Namespace, experimentsDetails.ChaosKillCmd, clients, chaosDetails); err != nil {
 						log.Errorf("Error in Kill stress after abortion, err: %v", err)
 					}
 					// updating the chaosresult after stopped
@@ -201,7 +213,7 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 					break loop
 				}
 			}
-			if err := killStressMemorySerial(experimentsDetails.TargetContainer, pod.Name, pod.Namespace, experimentsDetails.ChaosKillCmd, clients, chaosDetails); err != nil {
+			if err := killStressMemorySerial(ctx, experimentsDetails.TargetContainer, pod.Name, pod.Namespace, experimentsDetails.ChaosKillCmd, clients, chaosDetails); err != nil {
 				return stacktrace.Propagate(err, "could not revert memory stress")
 			}
 		}
@@ -211,7 +223,13 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 
 // injectChaosInParallelMode stressed the memory of all target application in parallel mode (all at once)
 func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, targetPodList corev1.PodList, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectPodMemoryHogExecFaultInParallelMode")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectPodMemoryHogExecFaultInParallelMode",
+		trace.WithAttributes(
+			attribute.Int("chaos.duration", experimentsDetails.ChaosDuration),
+			attribute.Int("chaos.interval", experimentsDetails.ChaosInterval),
+			attribute.String("chaos.namespace", experimentsDetails.ChaosNamespace),
+		),
+	)
 	defer span.End()
 
 	// creating err channel to receive the error from the go routine
@@ -257,7 +275,7 @@ func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experime
 				"Memory Consumption(MB)": experimentsDetails.MemoryConsumption,
 			})
 
-			go stressMemory(strconv.Itoa(experimentsDetails.MemoryConsumption), experimentsDetails.TargetContainer, pod.Name, pod.Namespace, clients, stressErr)
+			go stressMemory(ctx, strconv.Itoa(experimentsDetails.MemoryConsumption), experimentsDetails.TargetContainer, pod.Name, pod.Namespace, clients, stressErr)
 		}
 	}
 
@@ -280,7 +298,7 @@ loop:
 			}
 		case <-signChan:
 			log.Info("[Chaos]: Revert Started")
-			if err := killStressMemoryParallel(experimentsDetails.TargetContainer, targetPodList, experimentsDetails.ChaosKillCmd, clients, chaosDetails); err != nil {
+			if err := killStressMemoryParallel(ctx, experimentsDetails.TargetContainer, targetPodList, experimentsDetails.ChaosKillCmd, clients, chaosDetails); err != nil {
 				log.Errorf("Error in Kill stress after abortion, err: %v", err)
 			}
 			// updating the chaosresult after stopped
@@ -297,13 +315,16 @@ loop:
 			break loop
 		}
 	}
-	return killStressMemoryParallel(experimentsDetails.TargetContainer, targetPodList, experimentsDetails.ChaosKillCmd, clients, chaosDetails)
+	return killStressMemoryParallel(ctx, experimentsDetails.TargetContainer, targetPodList, experimentsDetails.ChaosKillCmd, clients, chaosDetails)
 }
 
 // killStressMemorySerial function to kill a stress process running inside target container
 //
 //	Triggered by either timeout of chaos duration or termination of the experiment
-func killStressMemorySerial(containerName, podName, namespace, memFreeCmd string, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
+func killStressMemorySerial(ctx context.Context, containerName, podName, namespace, memFreeCmd string, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
+	span := trace.SpanFromContext(ctx)
+	span.SetAttributes(attribute.String("recover.command_line", memFreeCmd))
+
 	// It will contains all the pod & container details required for exec command
 	execCommandDetails := litmusexec.PodDetails{}
 
@@ -320,10 +341,10 @@ func killStressMemorySerial(containerName, podName, namespace, memFreeCmd string
 
 // killStressMemoryParallel function to kill all the stress process running inside target container
 // Triggered by either timeout of chaos duration or termination of the experiment
-func killStressMemoryParallel(containerName string, targetPodList corev1.PodList, memFreeCmd string, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
+func killStressMemoryParallel(ctx context.Context, containerName string, targetPodList corev1.PodList, memFreeCmd string, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
 	var errList []string
 	for _, pod := range targetPodList.Items {
-		if err := killStressMemorySerial(containerName, pod.Name, pod.Namespace, memFreeCmd, clients, chaosDetails); err != nil {
+		if err := killStressMemorySerial(ctx, containerName, pod.Name, pod.Namespace, memFreeCmd, clients, chaosDetails); err != nil {
 			errList = append(errList, err.Error())
 		}
 	}

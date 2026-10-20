@@ -3,6 +3,8 @@ package lib
 import (
 	"context"
 	"fmt"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"os"
 	"strconv"
 	"strings"
@@ -26,7 +28,9 @@ import (
 
 // PrepareAndInjectStressChaos contains the prepration & injection steps for the stress experiments.
 func PrepareAndInjectStressChaos(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PreparePodStressFault")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PreparePodStressFault",
+		trace.WithAttributes(attribute.Int("experiment.ramptime", experimentsDetails.RampTime)),
+	)
 	defer span.End()
 	var err error
 	//Set up the tunables if provided in range
@@ -108,7 +112,12 @@ func PrepareAndInjectStressChaos(ctx context.Context, experimentsDetails *experi
 
 // injectChaosInSerialMode inject the stress chaos in all target application serially (one by one)
 func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectPodStressFaultInSerialMode")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectPodStressFaultInSerialMode",
+		trace.WithAttributes(
+			attribute.Int("chaos.duration", experimentsDetails.ChaosDuration),
+			attribute.String("chaos.namespace", experimentsDetails.ChaosNamespace),
+		),
+	)
 	defer span.End()
 
 	// run the probes during chaos
@@ -147,7 +156,12 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 
 // injectChaosInParallelMode inject the stress chaos in all target application in parallel mode (all at once)
 func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectPodStressFaultInParallelMode")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectPodStressFaultInParallelMode",
+		trace.WithAttributes(
+			attribute.Int("chaos.duration", experimentsDetails.ChaosDuration),
+			attribute.String("chaos.namespace", experimentsDetails.ChaosNamespace),
+		),
+	)
 	defer span.End()
 
 	// run the probes during chaos
@@ -265,9 +279,14 @@ func createHelperPod(ctx context.Context, experimentsDetails *experimentTypes.Ex
 		helperPod.Spec.Volumes = append(helperPod.Spec.Volumes, common.GetSidecarVolumes(chaosDetails)...)
 	}
 
-	if err := clients.CreatePod(experimentsDetails.ChaosNamespace, helperPod); err != nil {
+	createdHelperPod, err := clients.CreatePod(experimentsDetails.ChaosNamespace, helperPod)
+	if err != nil {
 		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("unable to create helper pod: %s", err.Error())}
 	}
+	span.SetAttributes(
+		attribute.String("helper.pod.name", createdHelperPod.Name),
+		attribute.String("helper.image.name", createdHelperPod.Spec.Containers[0].Image),
+	)
 
 	return nil
 }

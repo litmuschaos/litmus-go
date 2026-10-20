@@ -2,6 +2,8 @@ package lib
 
 import (
 	"context"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"os"
 	"strings"
 	"time"
@@ -21,7 +23,17 @@ import (
 
 // InjectChaosInSerialMode will inject the aws ssm chaos in serial mode that is one after other
 func InjectChaosInSerialMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, instanceIDList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, inject chan os.Signal) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectAWSSSMFaultInSerialMode")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectAWSSSMFaultInSerialMode",
+		trace.WithAttributes(
+			attribute.Int("chaos.duration", experimentsDetails.ChaosDuration),
+			attribute.Int("chaos.interval", experimentsDetails.ChaosInterval),
+			attribute.String("chaos.namespace", experimentsDetails.ChaosNamespace),
+			attribute.String("aws.ec2.id", experimentsDetails.EC2InstanceID),
+			attribute.String("aws.ec2.tag", experimentsDetails.EC2InstanceTag),
+			attribute.String("aws.ssm.document", experimentsDetails.DocumentName),
+			attribute.String("aws.region", experimentsDetails.Region),
+		),
+	)
 	defer span.End()
 
 	select {
@@ -91,7 +103,17 @@ func InjectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 
 // InjectChaosInParallelMode will inject the aws ssm chaos in parallel mode that is all at once
 func InjectChaosInParallelMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, instanceIDList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, inject chan os.Signal) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectAWSSSMFaultInParallelMode")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectAWSSSMFaultInParallelMode",
+		trace.WithAttributes(
+			attribute.Int("chaos.duration", experimentsDetails.ChaosDuration),
+			attribute.Int("chaos.interval", experimentsDetails.ChaosInterval),
+			attribute.String("chaos.namespace", experimentsDetails.ChaosNamespace),
+			attribute.String("aws.ec2.id", experimentsDetails.EC2InstanceID),
+			attribute.String("aws.ec2.tag", experimentsDetails.EC2InstanceTag),
+			attribute.String("aws.ssm.document", experimentsDetails.DocumentName),
+			attribute.String("aws.region", experimentsDetails.Region),
+		),
+	)
 	defer span.End()
 
 	select {

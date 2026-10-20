@@ -95,14 +95,23 @@ func (clients *ClientSets) GetService(namespace, name string) (*core_v1.Service,
 	return pod, nil
 }
 
-func (clients *ClientSets) CreatePod(namespace string, pod *core_v1.Pod) error {
-	return retry.
+func (clients *ClientSets) CreatePod(namespace string, pod *core_v1.Pod) (*core_v1.Pod, error) {
+	var (
+		createdPod *core_v1.Pod
+		err        error
+	)
+
+	if err := retry.
 		Times(uint(defaultTimeout / defaultDelay)).
 		Wait(time.Duration(defaultDelay) * time.Second).
 		Try(func(attempt uint) error {
-			_, err := clients.KubeClient.CoreV1().Pods(namespace).Create(context.Background(), pod, v1.CreateOptions{})
+			createdPod, err = clients.KubeClient.CoreV1().Pods(namespace).Create(context.Background(), pod, v1.CreateOptions{})
 			return err
-		})
+		}); err != nil {
+		return nil, err
+	}
+
+	return createdPod, nil
 }
 
 func (clients *ClientSets) CreateDeployment(namespace string, deploy *appsv1.Deployment) error {

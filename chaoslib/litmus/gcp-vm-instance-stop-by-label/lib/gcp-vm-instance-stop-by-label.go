@@ -3,6 +3,8 @@ package lib
 import (
 	"context"
 	"fmt"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"os"
 	"os/signal"
 	"strings"
@@ -28,7 +30,9 @@ var inject, abort chan os.Signal
 
 // PrepareVMStopByLabel executes the experiment steps by injecting chaos into target VM instances
 func PrepareVMStopByLabel(ctx context.Context, computeService *compute.Service, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PrepareGCPVMInstanceStopFaultByLabel")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PrepareGCPVMInstanceStopFaultByLabel",
+		trace.WithAttributes(attribute.Int("experiment.ramptime", experimentsDetails.RampTime)),
+	)
 	defer span.End()
 
 	// inject channel is used to transmit signal notifications.
@@ -77,7 +81,16 @@ func PrepareVMStopByLabel(ctx context.Context, computeService *compute.Service, 
 
 // injectChaosInSerialMode stops VM instances in serial mode i.e. one after the other
 func injectChaosInSerialMode(ctx context.Context, computeService *compute.Service, experimentsDetails *experimentTypes.ExperimentDetails, instanceNamesList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectGCPVMInstanceStopFaultByLabelInSerialMode")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectGCPVMInstanceStopFaultByLabelInSerialMode",
+		trace.WithAttributes(
+			attribute.Int("chaos.duration", experimentsDetails.ChaosDuration),
+			attribute.Int("chaos.interval", experimentsDetails.ChaosInterval),
+			attribute.String("chaos.namespace", experimentsDetails.ChaosNamespace),
+			attribute.String("gcp.project.id", experimentsDetails.GCPProjectID),
+			attribute.String("gcp.vm.label", experimentsDetails.InstanceLabel),
+			attribute.String("gcp.zone", experimentsDetails.Zones),
+		),
+	)
 	defer span.End()
 
 	select {
@@ -164,7 +177,16 @@ func injectChaosInSerialMode(ctx context.Context, computeService *compute.Servic
 
 // injectChaosInParallelMode will inject the VM instance termination in serial mode that is one after other
 func injectChaosInParallelMode(ctx context.Context, computeService *compute.Service, experimentsDetails *experimentTypes.ExperimentDetails, instanceNamesList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectGCPVMInstanceStopFaultByLabelInParallelMode")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectGCPVMInstanceStopFaultByLabelInParallelMode",
+		trace.WithAttributes(
+			attribute.Int("chaos.duration", experimentsDetails.ChaosDuration),
+			attribute.Int("chaos.interval", experimentsDetails.ChaosInterval),
+			attribute.String("chaos.namespace", experimentsDetails.ChaosNamespace),
+			attribute.String("gcp.project.id", experimentsDetails.GCPProjectID),
+			attribute.String("gcp.vm.label", experimentsDetails.InstanceLabel),
+			attribute.String("gcp.zone", experimentsDetails.Zones),
+		),
+	)
 	defer span.End()
 	select {
 	case <-inject:

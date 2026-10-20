@@ -3,6 +3,8 @@ package lib
 import (
 	"context"
 	"fmt"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"time"
 
 	redfishLib "github.com/litmuschaos/litmus-go/pkg/baremetal/redfish"
@@ -20,7 +22,12 @@ import (
 
 // injectChaos initiates node restart chaos on the target node
 func injectChaos(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectRedfishNodeRestartFault")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectRedfishNodeRestartFault",
+		trace.WithAttributes(
+			attribute.Int("chaos.duration", experimentsDetails.ChaosDuration),
+			attribute.String("chaos.namespace", experimentsDetails.ChaosNamespace),
+		),
+	)
 	defer span.End()
 
 	URL := fmt.Sprintf("https://%v/redfish/v1/Systems/System.Embedded.1/Actions/ComputerSystem.Reset", experimentsDetails.IPMIIP)
@@ -54,7 +61,9 @@ func experimentExecution(ctx context.Context, experimentsDetails *experimentType
 
 // PrepareChaos contains the chaos prepration and injection steps
 func PrepareChaos(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PrepareRedfishNodeRestartFault")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PrepareRedfishNodeRestartFault",
+		trace.WithAttributes(attribute.Int("experiment.ramptime", experimentsDetails.RampTime)),
+	)
 	defer span.End()
 
 	//Waiting for the ramp time before chaos injection

@@ -7,6 +7,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/telemetry"
 	"github.com/palantir/stacktrace"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 	"os"
 	"os/signal"
 	"strconv"
@@ -62,6 +63,12 @@ func Helper(ctx context.Context, clients clients.ClientSets) {
 
 	// Set the chaos result uid
 	result.SetResultUID(&resultDetails, clients, &chaosDetails)
+
+	span.SetAttributes(
+		attribute.String("container.runtime", experimentsDetails.ContainerRuntime),
+		attribute.Int("http.port", experimentsDetails.TargetServicePort),
+		attribute.Int("proxy.port", experimentsDetails.ProxyPort),
+	)
 
 	err := prepareK8sHttpChaos(&experimentsDetails, clients, &eventsDetails, &chaosDetails, &resultDetails)
 	if err != nil {

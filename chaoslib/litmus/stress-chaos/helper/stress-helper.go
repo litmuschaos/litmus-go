@@ -21,6 +21,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientTypes "k8s.io/apimachinery/pkg/types"
 
@@ -89,6 +90,8 @@ func Helper(ctx context.Context, clients clients.ClientSets) {
 
 	// Set the chaos result uid
 	result.SetResultUID(&resultDetails, clients, &chaosDetails)
+
+	span.SetAttributes(attribute.String("container.runtime", experimentsDetails.ContainerRuntime))
 
 	if err := prepareStressChaos(&experimentsDetails, clients, &eventsDetails, &chaosDetails, &resultDetails); err != nil {
 		// update failstep inside chaosresult

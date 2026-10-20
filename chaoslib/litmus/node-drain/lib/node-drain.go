@@ -3,6 +3,8 @@ package lib
 import (
 	"context"
 	"fmt"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -36,7 +38,9 @@ var (
 
 // PrepareNodeDrain contains the preparation steps before chaos injection
 func PrepareNodeDrain(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PrepareNodeDrainFault")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PrepareNodeDrainFault",
+		trace.WithAttributes(attribute.Int("experiment.ramptime", experimentsDetails.RampTime)),
+	)
 	defer span.End()
 
 	// inject channel is used to transmit signal notifications.
@@ -131,7 +135,14 @@ func PrepareNodeDrain(ctx context.Context, experimentsDetails *experimentTypes.E
 
 // drainNode drain the target node
 func drainNode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectNodeDrainFault")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectNodeDrainFault",
+		trace.WithAttributes(
+			attribute.Int("chaos.duration", experimentsDetails.ChaosDuration),
+			attribute.String("chaos.namespace", experimentsDetails.ChaosNamespace),
+			attribute.String("node.name", experimentsDetails.TargetNode),
+			attribute.String("node.label", experimentsDetails.NodeLabel),
+		),
+	)
 	defer span.End()
 
 	select {

@@ -183,7 +183,7 @@ func CreateLivenessPod(experimentsDetails *experimentTypes.ExperimentDetails, Ka
 		},
 	}
 
-	if err := clients.CreatePod(experimentsDetails.KafkaNamespace, LivenessPod); err != nil {
+	if _, err := clients.CreatePod(experimentsDetails.KafkaNamespace, LivenessPod); err != nil {
 		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("unable to create liveness pod, err: %v", err)}
 	}
 

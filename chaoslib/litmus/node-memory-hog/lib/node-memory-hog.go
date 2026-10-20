@@ -3,6 +3,8 @@ package lib
 import (
 	"context"
 	"fmt"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"strconv"
 	"strings"
 
@@ -26,7 +28,9 @@ import (
 
 // PrepareNodeMemoryHog contains preparation steps before chaos injection
 func PrepareNodeMemoryHog(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PrepareNodeMemoryHogFault")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PrepareNodeMemoryHogFault",
+		trace.WithAttributes(attribute.Int("experiment.ramptime", experimentsDetails.RampTime)),
+	)
 	defer span.End()
 
 	//set up the tunables if provided in range
@@ -87,7 +91,15 @@ func PrepareNodeMemoryHog(ctx context.Context, experimentsDetails *experimentTyp
 
 // injectChaosInSerialMode stress the memory of all the target nodes serially (one by one)
 func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, targetNodeList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectNodeMemoryHogFaultInSerialMode")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectNodeMemoryHogFaultInSerialMode",
+		trace.WithAttributes(
+			attribute.Int("chaos.duration", experimentsDetails.ChaosDuration),
+			attribute.String("chaos.namespace", experimentsDetails.ChaosNamespace),
+			attribute.String("node.name", experimentsDetails.TargetNodes),
+			attribute.String("node.label", experimentsDetails.NodeLabel),
+			attribute.String("io.worker.count", experimentsDetails.NumberOfWorkers),
+		),
+	)
 	defer span.End()
 
 	// run the probes during chaos
@@ -143,7 +155,15 @@ func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 
 // injectChaosInParallelMode stress the memory all the target nodes in parallel mode (all at once)
 func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, targetNodeList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectNodeMemoryHogFaultInParallelMode")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectNodeMemoryHogFaultInParallelMode",
+		trace.WithAttributes(
+			attribute.Int("chaos.duration", experimentsDetails.ChaosDuration),
+			attribute.String("chaos.namespace", experimentsDetails.ChaosNamespace),
+			attribute.String("node.name", experimentsDetails.TargetNodes),
+			attribute.String("node.label", experimentsDetails.NodeLabel),
+			attribute.String("io.worker.count", experimentsDetails.NumberOfWorkers),
+		),
+	)
 	defer span.End()
 
 	// run the probes during chaos
@@ -325,9 +345,14 @@ func createHelperPod(ctx context.Context, experimentsDetails *experimentTypes.Ex
 		helperPod.Spec.Volumes = append(helperPod.Spec.Volumes, common.GetSidecarVolumes(chaosDetails)...)
 	}
 
-	if err := clients.CreatePod(experimentsDetails.ChaosNamespace, helperPod); err != nil {
+	createdHelperPod, err := clients.CreatePod(experimentsDetails.ChaosNamespace, helperPod)
+	if err != nil {
 		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("unable to create helper pod: %s", err.Error())}
 	}
+	span.SetAttributes(
+		attribute.String("helper.pod.name", createdHelperPod.Name),
+		attribute.String("helper.image.name", createdHelperPod.Spec.Containers[0].Image),
+	)
 
 	return nil
 }

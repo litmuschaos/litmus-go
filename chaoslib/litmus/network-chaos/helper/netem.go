@@ -16,6 +16,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/telemetry"
 	"github.com/palantir/stacktrace"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/network-chaos/types"
@@ -70,6 +71,12 @@ func Helper(ctx context.Context, clients clients.ClientSets) {
 
 	// Set the chaos result uid
 	result.SetResultUID(&resultDetails, clients, &chaosDetails)
+
+	span.SetAttributes(
+		attribute.String("container.runtime", experimentsDetails.ContainerRuntime),
+		attribute.String("network.interface", experimentsDetails.NetworkInterface),
+		attribute.String("tc.image.name", "gaiadocker/iproute2"),
+	)
 
 	err := preparePodNetworkChaos(&experimentsDetails, clients, &eventsDetails, &chaosDetails, &resultDetails)
 	if err != nil {

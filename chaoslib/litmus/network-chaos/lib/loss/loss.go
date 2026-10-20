@@ -10,11 +10,15 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/telemetry"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // PodNetworkLossChaos contains the steps to prepare and inject chaos
 func PodNetworkLossChaos(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PreparePodNetworkLossFault")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PreparePodNetworkLossFault",
+		trace.WithAttributes(attribute.Int("experiment.ramptime", experimentsDetails.RampTime)),
+	)
 	defer span.End()
 
 	args := "netem loss " + experimentsDetails.NetworkPacketLossPercentage

@@ -10,11 +10,15 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/telemetry"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // PodNetworkDuplicationChaos contains the steps to prepare and inject chaos
 func PodNetworkDuplicationChaos(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PreparePodNetworkDuplicationFault")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PreparePodNetworkDuplicationFault",
+		trace.WithAttributes(attribute.Int("experiment.ramptime", experimentsDetails.RampTime)),
+	)
 	defer span.End()
 
 	args := "netem duplicate " + experimentsDetails.NetworkPacketDuplicationPercentage

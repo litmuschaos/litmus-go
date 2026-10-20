@@ -199,7 +199,7 @@ func createProbePod(clients clients.ClientSets, chaosDetails *types.ChaosDetails
 		},
 	}
 
-	if err := clients.CreatePod(chaosDetails.ChaosNamespace, cmdProbe); err != nil {
+	if _, err := clients.CreatePod(chaosDetails.ChaosNamespace, cmdProbe); err != nil {
 		return cerrors.Error{ErrorCode: cerrors.ErrorTypeCmdProbe, Target: fmt.Sprintf("{name: %v}", probeName), Reason: err.Error()}
 	}
 

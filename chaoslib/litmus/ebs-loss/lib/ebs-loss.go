@@ -3,6 +3,8 @@ package lib
 import (
 	"context"
 	"fmt"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"os"
 	"time"
 
@@ -22,7 +24,16 @@ import (
 
 // InjectChaosInSerialMode will inject the ebs loss chaos in serial mode which means one after other
 func InjectChaosInSerialMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, targetEBSVolumeIDList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectAWSEBSLossFaultInSerialMode")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectAWSEBSLossFaultInSerialMode",
+		trace.WithAttributes(
+			attribute.Int("chaos.duration", experimentsDetails.ChaosDuration),
+			attribute.Int("chaos.interval", experimentsDetails.ChaosInterval),
+			attribute.String("chaos.namespace", experimentsDetails.ChaosNamespace),
+			attribute.String("aws.ebs.id", experimentsDetails.EBSVolumeID),
+			attribute.String("aws.ebs.tag", experimentsDetails.VolumeTag),
+			attribute.String("aws.region", experimentsDetails.Region),
+		),
+	)
 	defer span.End()
 
 	//ChaosStartTimeStamp contains the start timestamp, when the chaos injection begin
@@ -101,7 +112,16 @@ func InjectChaosInSerialMode(ctx context.Context, experimentsDetails *experiment
 
 // InjectChaosInParallelMode will inject the chaos in parallel mode that means all at once
 func InjectChaosInParallelMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, targetEBSVolumeIDList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectAWSEBSLossFaultInParallelMode")
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectAWSEBSLossFaultInParallelMode",
+		trace.WithAttributes(
+			attribute.Int("chaos.duration", experimentsDetails.ChaosDuration),
+			attribute.Int("chaos.interval", experimentsDetails.ChaosInterval),
+			attribute.String("chaos.namespace", experimentsDetails.ChaosNamespace),
+			attribute.String("aws.ebs.id", experimentsDetails.EBSVolumeID),
+			attribute.String("aws.ebs.tag", experimentsDetails.VolumeTag),
+			attribute.String("aws.region", experimentsDetails.Region),
+		),
+	)
 	defer span.End()
 
 	var ec2InstanceIDList, deviceList []string
