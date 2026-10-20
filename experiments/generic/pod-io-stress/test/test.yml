@@ -44,10 +44,7 @@ spec:
 
           ## Percentage of total pods to target
           - name: PODS_AFFECTED_PERC
-            value: '100'
-
-          - name: LIB
-            value: 'litmus'
+            value: '100' 
 
           - name: TARGET_POD
             value: ''

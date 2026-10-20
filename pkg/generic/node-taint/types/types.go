@@ -10,7 +10,6 @@ type ExperimentDetails struct {
 	EngineName         string
 	RampTime           int
 	ChaosDuration      int
-	ChaosLib           string
 	AppNS              string
 	AppLabel           string
 	AppKind            string
@@ -26,4 +25,5 @@ type ExperimentDetails struct {
 	LIBImagePullPolicy string
 	TargetContainer    string
 	NodeLabel          string
+	SetHelperData      string
 }

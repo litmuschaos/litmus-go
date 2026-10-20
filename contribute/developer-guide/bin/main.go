@@ -13,6 +13,7 @@ func main() {
 	var (
 		filePath  string
 		chartType string
+		libType   string
 	)
 
 	var generate = &cobra.Command{
@@ -30,7 +31,7 @@ func main() {
 		Example:               "./litmus-sdk generate experiment -f=attribute.yaml",
 		DisableFlagsInUseLine: true,
 		Run: func(cmd *cobra.Command, args []string) {
-			if err := sdkCmd.GenerateExperiment(filePath, chartType, "experiment"); err != nil {
+			if err := sdkCmd.GenerateExperiment(filePath, chartType, "experiment", libType); err != nil {
 				log.Fatalf("error: %v", err)
 			}
 			fmt.Println("experiment created successfully")
@@ -45,7 +46,7 @@ func main() {
 		Example:               "./litmus-sdk generate chart -f=attribute.yaml",
 		DisableFlagsInUseLine: true,
 		Run: func(cmd *cobra.Command, args []string) {
-			if err := sdkCmd.GenerateExperiment(filePath, chartType, "chart"); err != nil {
+			if err := sdkCmd.GenerateExperiment(filePath, chartType, "chart", libType); err != nil {
 				log.Fatalf("error: %v", err)
 			}
 			fmt.Println("chart created successfully")
@@ -53,6 +54,7 @@ func main() {
 	}
 
 	experiment.Flags().StringVarP(&filePath, "file", "f", "", "path of the attribute.yaml manifest")
+	experiment.Flags().StringVarP(&libType, "type", "t", "exec", "type of the experiment lib")
 	chart.Flags().StringVarP(&filePath, "file", "f", "", "path of the attribute.yaml manifest")
 	chart.Flags().StringVarP(&chartType, "type", "t", "all", "type of the chaos chart")
 	chart.MarkFlagRequired("file")

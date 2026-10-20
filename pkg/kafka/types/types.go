@@ -23,6 +23,5 @@ type ExperimentDetails struct {
 	ZookeeperLabel        string
 	ZookeeperService      string
 	ZookeeperPort         string
-	Lib                   string
 	RunID                 string
 }

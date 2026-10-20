@@ -1,13 +1,21 @@
 package common
 
 import (
+	"bytes"
+	"fmt"
 	"math/rand"
 	"os"
+	"os/exec"
 	"os/signal"
+	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
+	"github.com/palantir/stacktrace"
 
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
@@ -15,7 +23,6 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/math"
 	"github.com/litmuschaos/litmus-go/pkg/result"
 	"github.com/litmuschaos/litmus-go/pkg/types"
-	"github.com/pkg/errors"
 	apiv1 "k8s.io/api/core/v1"
 )
 
@@ -24,13 +31,17 @@ type ENVDetails struct {
 	ENV []apiv1.EnvVar
 }
 
-//WaitForDuration waits for the given time duration (in seconds)
+// WaitForDuration waits for the given time duration (in seconds)
 func WaitForDuration(duration int) {
 	time.Sleep(time.Duration(duration) * time.Second)
 }
 
 // RandomInterval wait for the random interval lies between lower & upper bounds
 func RandomInterval(interval string) error {
+	re := regexp.MustCompile(`^\d+(-\d+)?$`)
+	if !re.MatchString(interval) {
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: "could not parse CHAOS_INTERVAL env, bad input"}
+	}
 	intervals := strings.Split(interval, "-")
 	var lowerBound, upperBound int
 	switch len(intervals) {
@@ -41,24 +52,19 @@ func RandomInterval(interval string) error {
 		lowerBound, _ = strconv.Atoi(intervals[0])
 		upperBound, _ = strconv.Atoi(intervals[1])
 	default:
-		return errors.Errorf("unable to parse CHAOS_INTERVAL, provide in valid format")
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: "could not parse CHAOS_INTERVAL env, invalid format"}
 	}
-	rand.Seed(time.Now().UnixNano())
-	waitTime := lowerBound + rand.Intn(upperBound-lowerBound)
+	// rand.Seed is deprecated; math/rand is global and pseudo-random
+	if upperBound < 1 {
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: "invalid CHAOS_INTERVAL env value, value below lower limit"}
+	}
+	if upperBound < lowerBound {
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: "invalid CHAOS_INTERVAL env value, upper bound must be greater than or equal to lower bound"}
+	}
+	waitTime := lowerBound + rand.Intn(upperBound-lowerBound+1)
 	log.Infof("[Wait]: Wait for the random chaos interval %vs", waitTime)
 	WaitForDuration(waitTime)
 	return nil
-}
-
-// GetRunID generate a random string
-func GetRunID() string {
-	var letterRunes = []rune("abcdefghijklmnopqrstuvwxyz")
-	runID := make([]rune, 6)
-	rand.Seed(time.Now().UnixNano())
-	for i := range runID {
-		runID[i] = letterRunes[rand.Intn(len(letterRunes))]
-	}
-	return string(runID)
 }
 
 // AbortWatcher continuously watch for the abort signals
@@ -82,34 +88,36 @@ func AbortWatcherWithoutExit(expname string, clients clients.ClientSets, resultD
 	log.Info("[Chaos]: Chaos Experiment Abortion started because of terminated signal received")
 	// updating the chaosresult after stopped
 	failStep := "Chaos injection stopped!"
-	types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep)
-	result.ChaosResult(chaosDetails, clients, resultDetails, "EOT")
+	types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep, cerrors.ErrorTypeExperimentAborted)
+	if err := result.ChaosResult(chaosDetails, clients, resultDetails, "EOT"); err != nil {
+		log.Errorf("[ABORT]: Failed to update result, err: %v", err)
+	}
+	log.Info("[ABORT]: Updated chaosresult post stop")
 
 	// generating summary event in chaosengine
 	msg := expname + " experiment has been aborted"
 	types.SetEngineEventAttributes(eventsDetails, types.Summary, msg, "Warning", chaosDetails)
-	events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
+	err := events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
+	if err != nil {
+		log.Errorf("[ABORT]: Failed to create chaosengine summary event, err: %v", err)
+	}
 
 	// generating summary event in chaosresult
 	types.SetResultEventAttributes(eventsDetails, types.AbortVerdict, msg, "Warning", resultDetails)
-	events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosResult")
-}
-
-//GetIterations derive the iterations value from given parameters
-func GetIterations(duration, interval int) int {
-	var iterations int
-	if interval != 0 {
-		iterations = duration / interval
+	err = events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosResult")
+	if err != nil {
+		log.Errorf("[ABORT]: Failed to create chaosresult abort event, err: %v", err)
 	}
-	return math.Maximum(iterations, 1)
 }
 
-//FilterBasedOnPercentage return the slice of list based on the the provided percentage
+// FilterBasedOnPercentage return the slice of list based on the the provided percentage
 func FilterBasedOnPercentage(percentage int, list []string) []string {
-
+	if len(list) == 0 {
+		return []string{}
+	}
 	var finalList []string
 	newInstanceListLength := math.Maximum(1, math.Adjustment(percentage, len(list)))
-	rand.Seed(time.Now().UnixNano())
+	// rand.Seed is deprecated; math/rand is global and pseudo-random
 
 	// it will generate the random instanceList
 	// it starts from the random index and choose requirement no of volumeID next to that index in a circular way.
@@ -157,11 +165,14 @@ func getEnvSource(apiVersion string, fieldPath string) apiv1.EnvVarSource {
 }
 
 // HelperFailedError return the helper pod error message
-func HelperFailedError(err error) error {
+func HelperFailedError(err error, appLabel, namespace string, podLevel bool) error {
 	if err != nil {
-		return errors.Errorf("helper pod failed, err: %v", err)
+		return stacktrace.Propagate(err, "helper pod failed")
 	}
-	return errors.Errorf("helper pod failed")
+	if podLevel {
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeHelperPodFailed, Target: fmt.Sprintf("{podLabel: %s, namespace: %s}", appLabel, namespace), Reason: "helper pod failed"}
+	}
+	return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Target: fmt.Sprintf("{podLabel: %s, namespace: %s}", appLabel, namespace), Reason: "helper pod failed"}
 }
 
 // GetStatusMessage returns the event message
@@ -176,4 +187,165 @@ func GetStatusMessage(defaultCheck bool, defaultMsg, probeStatus string) string 
 		return "Skipped the default checks"
 	}
 	return "Probes: " + probeStatus
+}
+
+// GetRandomSequence will gives a random value for sequence
+func GetRandomSequence(sequence string) string {
+	if strings.ToLower(sequence) == "random" {
+		// rand.Seed is deprecated; math/rand is global and pseudo-random
+		seq := []string{"serial", "parallel"}
+		randomIndex := rand.Intn(len(seq))
+		return seq[randomIndex]
+	}
+	return sequence
+}
+
+// ValidateRange validates the given range of numbers
+func ValidateRange(a string) string {
+	var lb, ub int
+	intervals := strings.Split(a, "-")
+
+	switch len(intervals) {
+	case 1:
+		return a
+	case 2:
+		lb, _ = strconv.Atoi(intervals[0])
+		ub, _ = strconv.Atoi(intervals[1])
+		return strconv.Itoa(getRandomValue(lb, ub))
+	default:
+		log.Errorf("unable to parse the value, please provide in valid format")
+		return "0"
+	}
+}
+
+// getRandomValue gives a random value between two integers
+func getRandomValue(a, b int) int {
+	return (a + rand.Intn(b-a+1))
+}
+
+// SubStringExistsInSlice checks the existence of sub string in slice
+func SubStringExistsInSlice(val string, slice []string) bool {
+	for _, v := range slice {
+		if strings.Contains(val, v) {
+			return true
+		}
+	}
+	return false
+}
+
+func Contains(val interface{}, slice interface{}) bool {
+	if slice == nil {
+		return false
+	}
+	for i := 0; i < reflect.ValueOf(slice).Len(); i++ {
+		if fmt.Sprintf("%v", reflect.ValueOf(val).Interface()) == fmt.Sprintf("%v", reflect.ValueOf(slice).Index(i).Interface()) {
+			return true
+		}
+	}
+	return false
+}
+
+func RunBashCommand(command string, failMsg string, source string) error {
+	cmd := exec.Command("/bin/bash", "-c", command)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	return RunCLICommands(cmd, source, "", failMsg, cerrors.ErrorTypeHelper)
+}
+
+func RunCLICommands(cmd *exec.Cmd, source, target, failMsg string, errorCode cerrors.ErrorType) error {
+	var out, stdErr bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &stdErr
+	if err = cmd.Run(); err != nil {
+		return cerrors.Error{ErrorCode: errorCode, Target: target, Source: source, Reason: fmt.Sprintf("%s: %s :%s", failMsg, stdErr.String(), out.String())}
+	}
+	return nil
+}
+
+// BuildSidecar builds the sidecar containers list
+func BuildSidecar(chaosDetails *types.ChaosDetails) []apiv1.Container {
+	var sidecars []apiv1.Container
+
+	for _, c := range chaosDetails.SideCar {
+		container := apiv1.Container{
+			Name:            c.Name,
+			Image:           c.Image,
+			ImagePullPolicy: c.ImagePullPolicy,
+			Env:             c.ENV,
+			EnvFrom:         c.EnvFrom,
+		}
+		if len(c.Secrets) != 0 {
+			var volMounts []apiv1.VolumeMount
+			for _, v := range c.Secrets {
+				volMounts = append(volMounts, apiv1.VolumeMount{
+					Name:      v.Name,
+					MountPath: v.MountPath,
+				})
+			}
+			container.VolumeMounts = volMounts
+		}
+		sidecars = append(sidecars, container)
+	}
+	return sidecars
+}
+
+// GetSidecarVolumes get the list of all the unique volumes from the sidecar
+func GetSidecarVolumes(chaosDetails *types.ChaosDetails) []apiv1.Volume {
+	var volumes []apiv1.Volume
+	k := int32(420)
+
+	secretMap := make(map[string]bool)
+	for _, c := range chaosDetails.SideCar {
+		if len(c.Secrets) != 0 {
+			for _, v := range c.Secrets {
+				if _, ok := secretMap[v.Name]; ok {
+					continue
+				}
+				secretMap[v.Name] = true
+				volumes = append(volumes, apiv1.Volume{
+					Name: v.Name,
+					VolumeSource: apiv1.VolumeSource{
+						Secret: &apiv1.SecretVolumeSource{
+							SecretName:  v.Name,
+							DefaultMode: &k,
+						},
+					},
+				})
+			}
+		}
+	}
+
+	return volumes
+}
+
+// GetContainerNames gets the name of the main and sidecar containers
+func GetContainerNames(chaosDetails *types.ChaosDetails) []string {
+	containerNames := []string{chaosDetails.ExperimentName}
+	if len(chaosDetails.SideCar) == 0 {
+		return containerNames
+	}
+	for _, c := range chaosDetails.SideCar {
+		containerNames = append(containerNames, c.Name)
+	}
+	return containerNames
+}
+
+// GetValuesFromChaosEngine get the values from the chaosengine
+func GetValuesFromChaosEngine(chaosDetails *types.ChaosDetails, clients clients.ClientSets, chaosresult *types.ResultDetails) error {
+	// get the chaosengine instance
+	engine, err := clients.GetChaosEngine(chaosDetails)
+	if err != nil {
+		return stacktrace.Propagate(err, "could not get chaosengine")
+	}
+
+	// get all the probes defined inside chaosengine for the corresponding experiment
+	for _, experiment := range engine.Spec.Experiments {
+		if experiment.Name == chaosDetails.ExperimentName {
+			if err := types.InitializeProbesInChaosResultDetails(chaosresult, experiment.Spec.Probe); err != nil {
+				return stacktrace.Propagate(err, "could not initialize probe")
+			}
+			types.InitializeSidecarDetails(chaosDetails, engine, experiment.Spec.Components.ENV)
+		}
+	}
+
+	return nil
 }

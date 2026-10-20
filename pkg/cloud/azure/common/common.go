@@ -2,11 +2,12 @@ package common
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"fmt"
+	"io"
 	"os"
 	"strings"
 
-	"github.com/pkg/errors"
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 )
 
 // StringInSlice will check and return whether a string is present inside a slice or not
@@ -25,23 +26,35 @@ func GetSubscriptionID() (string, error) {
 	var err error
 	authFile, err := os.Open(os.Getenv("AZURE_AUTH_LOCATION"))
 	if err != nil {
-		return "", errors.Errorf("fail to open auth file, err: %v", err)
+		return "", cerrors.Error{
+			ErrorCode: cerrors.ErrorTypeGeneric,
+			Reason:    fmt.Sprintf("failed to open auth file: %v", err),
+		}
 	}
 
-	authFileContent, err := ioutil.ReadAll(authFile)
+	authFileContent, err := io.ReadAll(authFile)
 	if err != nil {
-		return "", errors.Errorf("fail to read auth file, err: %v", err)
+		return "", cerrors.Error{
+			ErrorCode: cerrors.ErrorTypeGeneric,
+			Reason:    fmt.Sprintf("failed to read auth file: %v", err),
+		}
 	}
 
 	details := make(map[string]string)
 	if err := json.Unmarshal(authFileContent, &details); err != nil {
-		return "", errors.Errorf("fail to unmarshal file, err: %v", err)
+		return "", cerrors.Error{
+			ErrorCode: cerrors.ErrorTypeGeneric,
+			Reason:    fmt.Sprintf("failed to unmarshal file: %v", err),
+		}
 	}
 
 	if id, contains := details["subscriptionId"]; contains {
 		return id, nil
 	}
-	return "", errors.Errorf("The auth file does not have a subscriptionId field")
+	return "", cerrors.Error{
+		ErrorCode: cerrors.ErrorTypeGeneric,
+		Reason:    "The auth file does not have a subscriptionId field",
+	}
 }
 
 // GetScaleSetNameAndInstanceId extracts the scale set name and VM id from the instance name

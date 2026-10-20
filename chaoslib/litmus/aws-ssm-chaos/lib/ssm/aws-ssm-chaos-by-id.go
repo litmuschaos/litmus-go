@@ -1,6 +1,8 @@
 package ssm
 
 import (
+	"context"
+	"fmt"
 	"os"
 	"os/signal"
 	"strings"
@@ -8,12 +10,16 @@ import (
 
 	"github.com/litmuschaos/litmus-go/chaoslib/litmus/aws-ssm-chaos/lib"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/aws-ssm/aws-ssm-chaos/types"
-	clients "github.com/litmuschaos/litmus-go/pkg/clients"
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
+	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/cloud/aws/ssm"
 	"github.com/litmuschaos/litmus-go/pkg/log"
+	"github.com/litmuschaos/litmus-go/pkg/telemetry"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
-	"github.com/pkg/errors"
+	"github.com/litmuschaos/litmus-go/pkg/utils/stringutils"
+	"github.com/palantir/stacktrace"
+	"go.opentelemetry.io/otel"
 )
 
 var (
@@ -21,8 +27,10 @@ var (
 	inject, abort chan os.Signal
 )
 
-//PrepareAWSSSMChaosByID contains the prepration and injection steps for the experiment
-func PrepareAWSSSMChaosByID(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+// PrepareAWSSSMChaosByID contains the prepration and injection steps for the experiment
+func PrepareAWSSSMChaosByID(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PrepareAWSSSMFaultByID")
+	defer span.End()
 
 	// inject channel is used to transmit signal notifications.
 	inject = make(chan os.Signal, 1)
@@ -42,7 +50,7 @@ func PrepareAWSSSMChaosByID(experimentsDetails *experimentTypes.ExperimentDetail
 
 	//create and upload the ssm document on the given aws service monitoring docs
 	if err = ssm.CreateAndUploadDocument(experimentsDetails.DocumentName, experimentsDetails.DocumentType, experimentsDetails.DocumentFormat, experimentsDetails.DocumentPath, experimentsDetails.Region); err != nil {
-		return errors.Errorf("fail to create and upload ssm doc, err: %v", err)
+		return stacktrace.Propagate(err, "could not create and upload the ssm document")
 	}
 	experimentsDetails.IsDocsUploaded = true
 	log.Info("[Info]: SSM docs uploaded successfully")
@@ -51,28 +59,28 @@ func PrepareAWSSSMChaosByID(experimentsDetails *experimentTypes.ExperimentDetail
 	go lib.AbortWatcher(experimentsDetails, abort)
 
 	//get the instance id or list of instance ids
-	instanceIDList := strings.Split(experimentsDetails.EC2InstanceID, ",")
+	instanceIDList := stringutils.SplitList(experimentsDetails.EC2InstanceID)
 	if len(instanceIDList) == 0 {
-		return errors.Errorf("no instance id found for chaos injection")
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Reason: "no instance id found for chaos injection"}
 	}
 
 	switch strings.ToLower(experimentsDetails.Sequence) {
 	case "serial":
-		if err = lib.InjectChaosInSerialMode(experimentsDetails, instanceIDList, clients, resultDetails, eventsDetails, chaosDetails, inject); err != nil {
-			return err
+		if err = lib.InjectChaosInSerialMode(ctx, experimentsDetails, instanceIDList, clients, resultDetails, eventsDetails, chaosDetails, inject); err != nil {
+			return stacktrace.Propagate(err, "could not run chaos in serial mode")
 		}
 	case "parallel":
-		if err = lib.InjectChaosInParallelMode(experimentsDetails, instanceIDList, clients, resultDetails, eventsDetails, chaosDetails, inject); err != nil {
-			return err
+		if err = lib.InjectChaosInParallelMode(ctx, experimentsDetails, instanceIDList, clients, resultDetails, eventsDetails, chaosDetails, inject); err != nil {
+			return stacktrace.Propagate(err, "could not run chaos in parallel mode")
 		}
 	default:
-		return errors.Errorf("%v sequence is not supported", experimentsDetails.Sequence)
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Reason: fmt.Sprintf("'%s' sequence is not supported", experimentsDetails.Sequence)}
 	}
 
 	//Delete the ssm document on the given aws service monitoring docs
 	err = ssm.SSMDeleteDocument(experimentsDetails.DocumentName, experimentsDetails.Region)
 	if err != nil {
-		return errors.Errorf("fail to delete ssm doc, err: %v", err)
+		return stacktrace.Propagate(err, "failed to delete ssm doc")
 	}
 
 	//Waiting for the ramp time after chaos injection

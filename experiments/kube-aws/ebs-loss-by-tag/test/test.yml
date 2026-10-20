@@ -34,10 +34,7 @@ spec:
             value: '30'
 
           - name: CHOAS_INTERVAL
-            value: '30'            
-
-          - name: LIB
-            value: 'litmus'
+            value: '30'             
 
           - name: EBS_VOLUME_TAG
             value: ''

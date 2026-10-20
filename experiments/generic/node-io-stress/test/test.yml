@@ -45,9 +45,6 @@ spec:
           - name: NUMBER_OF_WORKERS
             value: '4'
 
-          - name: LIB
-            value: 'litmus'
-
           - name: LIB_IMAGE
             value: 'litmuschaos/go-runner:ci'
 

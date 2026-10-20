@@ -3,7 +3,7 @@ package helper
 import (
 	"bufio"
 	"bytes"
-	"encoding/json"
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -16,19 +16,27 @@ import (
 	"time"
 
 	"github.com/containerd/cgroups"
+	cgroupsv2 "github.com/containerd/cgroups/v2"
+	"github.com/palantir/stacktrace"
+	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
+	"go.opentelemetry.io/otel"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	clientTypes "k8s.io/apimachinery/pkg/types"
+
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	clients "github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/stress-chaos/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/result"
+	"github.com/litmuschaos/litmus-go/pkg/telemetry"
 	"github.com/litmuschaos/litmus-go/pkg/types"
+	"github.com/litmuschaos/litmus-go/pkg/utils"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
-	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
-	clientTypes "k8s.io/apimachinery/pkg/types"
 )
 
-//list of cgroups in a container
+// list of cgroups in a container
 var (
 	cgroupSubsystemList = []string{"cpu", "memory", "systemd", "net_cls",
 		"net_prio", "freezer", "blkio", "perf_event", "devices", "cpuset",
@@ -44,10 +52,14 @@ var (
 const (
 	// ProcessAlreadyFinished contains error code when process is finished
 	ProcessAlreadyFinished = "os: process already finished"
+	// ProcessAlreadyKilled contains error code when process is already killed
+	ProcessAlreadyKilled = "no such process"
 )
 
 // Helper injects the stress chaos
-func Helper(clients clients.ClientSets) {
+func Helper(ctx context.Context, clients clients.ClientSets) {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "SimulatePodStressFault")
+	defer span.End()
 
 	experimentsDetails := experimentTypes.ExperimentDetails{}
 	eventsDetails := types.EventDetails{}
@@ -70,6 +82,7 @@ func Helper(clients clients.ClientSets) {
 
 	// Intialise the chaos attributes
 	types.InitialiseChaosVariables(&chaosDetails)
+	chaosDetails.Phase = types.ChaosInjectPhase
 
 	// Intialise Chaos Result Parameters
 	types.SetResultAttributes(&resultDetails, chaosDetails)
@@ -78,150 +91,260 @@ func Helper(clients clients.ClientSets) {
 	result.SetResultUID(&resultDetails, clients, &chaosDetails)
 
 	if err := prepareStressChaos(&experimentsDetails, clients, &eventsDetails, &chaosDetails, &resultDetails); err != nil {
+		// update failstep inside chaosresult
+		if resultErr := result.UpdateFailedStepFromHelper(&resultDetails, &chaosDetails, clients, err); resultErr != nil {
+			log.Fatalf("helper pod failed, err: %v, resultErr: %v", err, resultErr)
+		}
 		log.Fatalf("helper pod failed, err: %v", err)
 	}
 }
 
-//prepareStressChaos contains the chaos preparation and injection steps
+// prepareStressChaos contains the chaos preparation and injection steps
 func prepareStressChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails) error {
+	// get stressors in list format
+	stressorList := prepareStressor(experimentsDetails)
+	if len(stressorList) == 0 {
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeHelper, Source: chaosDetails.ChaosPodName, Reason: "fail to prepare stressors"}
+	}
+	stressors := strings.Join(stressorList, " ")
+
+	targetList, err := common.ParseTargets(chaosDetails.ChaosPodName)
+	if err != nil {
+		return stacktrace.Propagate(err, "could not parse targets")
+	}
+
+	var targets []*targetDetails
+
+	for _, t := range targetList.Target {
+		td := &targetDetails{
+			Name:      t.Name,
+			Namespace: t.Namespace,
+			Source:    chaosDetails.ChaosPodName,
+		}
+
+		td.TargetContainers, err = common.GetTargetContainers(t.Name, t.Namespace, t.TargetContainer, chaosDetails.ChaosPodName, clients)
+		if err != nil {
+			return stacktrace.Propagate(err, "could not get target containers")
+		}
+
+		td.ContainerIds, err = common.GetContainerIDs(td.Namespace, td.Name, td.TargetContainers, clients, td.Source)
+		if err != nil {
+			return stacktrace.Propagate(err, "could not get container ids")
+		}
+
+		for _, cid := range td.ContainerIds {
+			// extract out the pid of the target container
+			pid, err := common.GetPID(experimentsDetails.ContainerRuntime, cid, experimentsDetails.SocketPath, td.Source)
+			if err != nil {
+				return stacktrace.Propagate(err, "could not get container pid")
+			}
+			td.Pids = append(td.Pids, pid)
+		}
+
+		for i := range td.Pids {
+			cGroupManagers, err, grpPath := getCGroupManager(td, i)
+			if err != nil {
+				return stacktrace.Propagate(err, "could not get cgroup manager")
+			}
+			td.GroupPath = grpPath
+			td.CGroupManagers = append(td.CGroupManagers, cGroupManagers)
+		}
+
+		log.InfoWithValues("[Info]: Details of application under chaos injection", logrus.Fields{
+			"PodName":          td.Name,
+			"Namespace":        td.Namespace,
+			"TargetContainers": td.TargetContainers,
+		})
+
+		targets = append(targets, td)
+	}
+
+	// watching for the abort signal and revert the chaos if an abort signal is received
+	go abortWatcher(targets, resultDetails.Name, chaosDetails.ChaosNamespace)
 
 	select {
 	case <-inject:
 		// stopping the chaos execution, if abort signal received
 		os.Exit(1)
 	default:
+	}
 
-		containerID, err := common.GetContainerID(experimentsDetails.AppNS, experimentsDetails.TargetPods, experimentsDetails.TargetContainer, clients)
-		if err != nil {
-			return err
-		}
-		// extract out the pid of the target container
-		targetPID, err := getPID(experimentsDetails, containerID)
-		if err != nil {
-			return err
-		}
+	done := make(chan error, 1)
 
-		// record the event inside chaosengine
-		if experimentsDetails.EngineName != "" {
-			msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on application pod"
-			types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
-			events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
-		}
-
-		//get the pid path and check cgroup
-		path := pidPath(targetPID)
-		cgroup, err := findValidCgroup(path, containerID)
-		if err != nil {
-			return errors.Errorf("fail to get cgroup, err: %v", err)
-		}
-
-		// load the existing cgroup
-		control, err := cgroups.Load(cgroups.V1, cgroups.StaticPath(cgroup))
-		if err != nil {
-			return errors.Errorf("fail to load the cgroup, err: %v", err)
-		}
-
-		// get stressors in list format
-		stressorList := prepareStressor(experimentsDetails)
-		if len(stressorList) == 0 {
-			return errors.Errorf("fail to prepare stressor for %v experiment", experimentsDetails.ExperimentName)
-		}
-		stressors := strings.Join(stressorList, " ")
-		stressCommand := "pause nsutil -t " + strconv.Itoa(targetPID) + " -p -- " + stressors
-		log.Infof("[Info]: starting process: %v", stressCommand)
-
-		// launch the stress-ng process on the target container in paused mode
-		cmd := exec.Command("/bin/bash", "-c", stressCommand)
-		var buf bytes.Buffer
-		cmd.Stdout = &buf
-		err = cmd.Start()
-		if err != nil {
-			return errors.Errorf("fail to start the stress process %v, err: %v", stressCommand, err)
-		}
-
-		// watching for the abort signal and revert the chaos if an abort signal is received
-		go abortWatcher(cmd.Process.Pid, resultDetails.Name, chaosDetails.ChaosNamespace, experimentsDetails.TargetPods)
-
-		// add the stress process to the cgroup of target container
-		if err = control.Add(cgroups.Process{Pid: cmd.Process.Pid}); err != nil {
-			if killErr := cmd.Process.Kill(); killErr != nil {
-				return errors.Errorf("stressors failed killing %v process, err: %v", cmd.Process.Pid, killErr)
-			}
-			return errors.Errorf("fail to add the stress process into target container cgroup, err: %v", err)
-		}
-
-		log.Info("[Info]: Sending signal to resume the stress process")
-		// wait for the process to start before sending the resume signal
-		// TODO: need a dynamic way to check the start of the process
-		time.Sleep(700 * time.Millisecond)
-
-		// remove pause and resume or start the stress process
-		if err := cmd.Process.Signal(syscall.SIGCONT); err != nil {
-			return errors.Errorf("fail to remove pause and start the stress process: %v", err)
-		}
-
-		if err = result.AnnotateChaosResult(resultDetails.Name, chaosDetails.ChaosNamespace, "injected", "pod", experimentsDetails.TargetPods); err != nil {
-			return err
-		}
-
-		log.Info("[Wait]: Waiting for chaos completion")
-		// channel to check the completion of the stress process
-		done := make(chan error)
-		go func() { done <- cmd.Wait() }()
-
-		// check the timeout for the command
-		// Note: timeout will occur when process didn't complete even after 10s of chaos duration
-		timeout := time.After((time.Duration(experimentsDetails.ChaosDuration) + 30) * time.Second)
-
-		select {
-		case <-timeout:
-			// the stress process gets timeout before completion
-			log.Infof("[Chaos] The stress process is not yet completed after the chaos duration of %vs", experimentsDetails.ChaosDuration+30)
-			log.Info("[Timeout]: Killing the stress process")
-			if err = terminateProcess(cmd.Process.Pid); err != nil {
-				return err
-			}
-			if err = result.AnnotateChaosResult(resultDetails.Name, chaosDetails.ChaosNamespace, "reverted", "pod", experimentsDetails.TargetPods); err != nil {
-				return err
-			}
-			return nil
-		case err := <-done:
+	for index, t := range targets {
+		for i := range t.Pids {
+			cmd, err := injectChaos(t, stressors, i, experimentsDetails.StressType)
 			if err != nil {
-				err, ok := err.(*exec.ExitError)
-				if ok {
-					status := err.Sys().(syscall.WaitStatus)
-					if status.Signaled() && status.Signal() == syscall.SIGTERM {
-						// wait for the completion of abort handler
-						time.Sleep(10 * time.Second)
-						return errors.Errorf("process stopped with SIGTERM signal")
+				if revertErr := revertChaosForAllTargets(targets, resultDetails, chaosDetails.ChaosNamespace, index-1); revertErr != nil {
+					return cerrors.PreserveError{ErrString: fmt.Sprintf("[%s,%s]", stacktrace.RootCause(err).Error(), stacktrace.RootCause(revertErr).Error())}
+				}
+				return stacktrace.Propagate(err, "could not inject chaos")
+			}
+			targets[index].Cmds = append(targets[index].Cmds, cmd)
+			log.Infof("successfully injected chaos on target: {name: %s, namespace: %v, container: %v}", t.Name, t.Namespace, t.TargetContainers[i])
+		}
+
+		if err = result.AnnotateChaosResult(resultDetails.Name, chaosDetails.ChaosNamespace, "injected", "pod", t.Name); err != nil {
+			if revertErr := revertChaosForAllTargets(targets, resultDetails, chaosDetails.ChaosNamespace, index); revertErr != nil {
+				return cerrors.PreserveError{ErrString: fmt.Sprintf("[%s,%s]", stacktrace.RootCause(err).Error(), stacktrace.RootCause(revertErr).Error())}
+			}
+			return stacktrace.Propagate(err, "could not annotate chaosresult")
+		}
+	}
+
+	// record the event inside chaosengine
+	if experimentsDetails.EngineName != "" {
+		msg := "Injecting " + experimentsDetails.ExperimentName + " chaos on application pod"
+		types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
+		events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
+	}
+
+	log.Info("[Wait]: Waiting for chaos completion")
+	// channel to check the completion of the stress process
+	go func() {
+		var errList []string
+		var exitErr error
+		for _, t := range targets {
+			for i := range t.Cmds {
+				if err := t.Cmds[i].Cmd.Wait(); err != nil {
+					log.Infof("stress process failed, err: %v, out: %v", err, t.Cmds[i].Buffer.String())
+					if _, ok := err.(*exec.ExitError); ok {
+						exitErr = err
+						continue
+					}
+					errList = append(errList, err.Error())
+				}
+			}
+		}
+		if exitErr != nil {
+			oomKilled, err := checkOOMKilled(targets, clients, exitErr)
+			if err != nil {
+				log.Infof("could not check oomkilled, err: %v", err)
+			}
+			if !oomKilled {
+				done <- exitErr
+			}
+			done <- nil
+		} else if len(errList) != 0 {
+			oomKilled, err := checkOOMKilled(targets, clients, fmt.Errorf("err: %v", strings.Join(errList, ", ")))
+			if err != nil {
+				log.Infof("could not check oomkilled, err: %v", err)
+			}
+			if !oomKilled {
+				done <- fmt.Errorf("err: %v", strings.Join(errList, ", "))
+			}
+			done <- nil
+		} else {
+			done <- nil
+		}
+	}()
+
+	// check the timeout for the command
+	// Note: timeout will occur when process didn't complete even after 10s of chaos duration
+	timeout := time.After((time.Duration(experimentsDetails.ChaosDuration) + 30) * time.Second)
+
+	select {
+	case <-timeout:
+		// the stress process gets timeout before completion
+		log.Infof("[Chaos] The stress process is not yet completed after the chaos duration of %vs", experimentsDetails.ChaosDuration+30)
+		log.Info("[Timeout]: Killing the stress process")
+		if err := revertChaosForAllTargets(targets, resultDetails, chaosDetails.ChaosNamespace, len(targets)-1); err != nil {
+			return stacktrace.Propagate(err, "could not revert chaos")
+		}
+	case err := <-done:
+		if err != nil {
+			exitErr, ok := err.(*exec.ExitError)
+			if ok {
+				status := exitErr.Sys().(syscall.WaitStatus)
+				if status.Signaled() {
+					log.Infof("process stopped with signal: %v", status.Signal())
+				}
+				if status.Signaled() && status.Signal() == syscall.SIGKILL {
+					// wait for the completion of abort handler
+					time.Sleep(10 * time.Second)
+					return cerrors.Error{ErrorCode: cerrors.ErrorTypeExperimentAborted, Source: chaosDetails.ChaosPodName, Reason: fmt.Sprintf("process stopped with SIGTERM signal")}
+				}
+			}
+			return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Source: chaosDetails.ChaosPodName, Reason: err.Error()}
+		}
+		log.Info("[Info]: Reverting Chaos")
+		if err := revertChaosForAllTargets(targets, resultDetails, chaosDetails.ChaosNamespace, len(targets)-1); err != nil {
+			return stacktrace.Propagate(err, "could not revert chaos")
+		}
+	}
+
+	return nil
+}
+
+func revertChaosForAllTargets(targets []*targetDetails, resultDetails *types.ResultDetails, chaosNs string, index int) error {
+	var errList []string
+	for i := 0; i <= index; i++ {
+		if err := terminateProcess(targets[i]); err != nil {
+			errList = append(errList, err.Error())
+			continue
+		}
+		if err := result.AnnotateChaosResult(resultDetails.Name, chaosNs, "reverted", "pod", targets[i].Name); err != nil {
+			errList = append(errList, err.Error())
+		}
+	}
+
+	if len(errList) != 0 {
+		return cerrors.PreserveError{ErrString: fmt.Sprintf("[%s]", strings.Join(errList, ","))}
+	}
+	return nil
+}
+
+// checkOOMKilled checks if the container within the target pods failed due to an OOMKilled error.
+func checkOOMKilled(targets []*targetDetails, clients clients.ClientSets, chaosError error) (bool, error) {
+	// Check each container in the pod
+	for i := 0; i < 3; i++ {
+		for _, t := range targets {
+			// Fetch the target pod
+			targetPod, err := clients.KubeClient.CoreV1().Pods(t.Namespace).Get(context.Background(), t.Name, v1.GetOptions{})
+			if err != nil {
+				return false, cerrors.Error{
+					ErrorCode: cerrors.ErrorTypeStatusChecks,
+					Target:    fmt.Sprintf("{podName: %s, namespace: %s}", t.Name, t.Namespace),
+					Reason:    err.Error(),
+				}
+			}
+			for _, c := range targetPod.Status.ContainerStatuses {
+				if utils.Contains(c.Name, t.TargetContainers) {
+					// Check for OOMKilled and restart
+					if c.LastTerminationState.Terminated != nil && c.LastTerminationState.Terminated.ExitCode == 137 {
+						log.Warnf("[Warning]: The target container '%s' of pod '%s' got OOM Killed, err: %v", c.Name, t.Name, chaosError)
+						return true, nil
 					}
 				}
-				return errors.Errorf("process exited before the actual cleanup, err: %v", err)
-			}
-			log.Info("[Info]: Chaos injection completed")
-			terminateProcess(cmd.Process.Pid)
-			if err = result.AnnotateChaosResult(resultDetails.Name, chaosDetails.ChaosNamespace, "reverted", "pod", experimentsDetails.TargetPods); err != nil {
-				return err
 			}
 		}
+		time.Sleep(1 * time.Second)
+	}
+	return false, nil
+}
+
+// terminateProcess will remove the stress process from the target container after chaos completion
+func terminateProcess(t *targetDetails) error {
+	var errList []string
+	for i := range t.Cmds {
+		if t.Cmds[i] != nil && t.Cmds[i].Cmd.Process != nil {
+			if err := syscall.Kill(-t.Cmds[i].Cmd.Process.Pid, syscall.SIGKILL); err != nil {
+				if strings.Contains(err.Error(), ProcessAlreadyKilled) || strings.Contains(err.Error(), ProcessAlreadyFinished) {
+					continue
+				}
+				errList = append(errList, cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosRevert, Source: t.Source, Target: fmt.Sprintf("{podName: %s, namespace: %s, container: %s}", t.Name, t.Namespace, t.TargetContainers[i]), Reason: fmt.Sprintf("failed to revert chaos: %s", err.Error())}.Error())
+				continue
+			}
+			log.Infof("successfully reverted chaos on target: {name: %s, namespace: %v, container: %v}", t.Name, t.Namespace, t.TargetContainers[i])
+		}
+	}
+	if len(errList) != 0 {
+		return cerrors.PreserveError{ErrString: fmt.Sprintf("[%s]", strings.Join(errList, ","))}
 	}
 	return nil
 }
 
-//terminateProcess will remove the stress process from the target container after chaos completion
-func terminateProcess(pid int) error {
-	process, err := os.FindProcess(pid)
-	if err != nil {
-		return errors.Errorf("unreachable path, err: %v", err)
-	}
-	if err = process.Signal(syscall.SIGTERM); err != nil && err.Error() != ProcessAlreadyFinished {
-		return errors.Errorf("error while killing process, err: %v", err)
-	}
-	log.Info("[Info]: Stress process removed successfully")
-	return nil
-}
-
-//prepareStressor will set the required stressors for the given experiment
+// prepareStressor will set the required stressors for the given experiment
 func prepareStressor(experimentDetails *experimentTypes.ExperimentDetails) []string {
 
 	stressArgs := []string{
@@ -235,10 +358,11 @@ func prepareStressor(experimentDetails *experimentTypes.ExperimentDetails) []str
 
 		log.InfoWithValues("[Info]: Details of Stressor:", logrus.Fields{
 			"CPU Core": experimentDetails.CPUcores,
+			"CPU Load": experimentDetails.CPULoad,
 			"Timeout":  experimentDetails.ChaosDuration,
 		})
-		stressArgs = append(stressArgs, "--cpu "+strconv.Itoa(experimentDetails.CPUcores))
-		stressArgs = append(stressArgs, " --cpu-load "+strconv.Itoa(experimentDetails.CPULoad))
+		stressArgs = append(stressArgs, "--cpu "+experimentDetails.CPUcores)
+		stressArgs = append(stressArgs, " --cpu-load "+experimentDetails.CPULoad)
 
 	case "pod-memory-stress":
 
@@ -247,22 +371,22 @@ func prepareStressor(experimentDetails *experimentTypes.ExperimentDetails) []str
 			"Memory Consumption": experimentDetails.MemoryConsumption,
 			"Timeout":            experimentDetails.ChaosDuration,
 		})
-		stressArgs = append(stressArgs, "--vm "+strconv.Itoa(experimentDetails.NumberOfWorkers)+" --vm-bytes "+strconv.Itoa(experimentDetails.MemoryConsumption)+"M")
+		stressArgs = append(stressArgs, "--vm "+experimentDetails.NumberOfWorkers+" --vm-bytes "+experimentDetails.MemoryConsumption+"M")
 
 	case "pod-io-stress":
 		var hddbytes string
-		if experimentDetails.FilesystemUtilizationBytes == 0 {
-			if experimentDetails.FilesystemUtilizationPercentage == 0 {
+		if experimentDetails.FilesystemUtilizationBytes == "0" {
+			if experimentDetails.FilesystemUtilizationPercentage == "0" {
 				hddbytes = "10%"
 				log.Info("Neither of FilesystemUtilizationPercentage or FilesystemUtilizationBytes provided, proceeding with a default FilesystemUtilizationPercentage value of 10%")
 			} else {
-				hddbytes = strconv.Itoa(experimentDetails.FilesystemUtilizationPercentage) + "%"
+				hddbytes = experimentDetails.FilesystemUtilizationPercentage + "%"
 			}
 		} else {
-			if experimentDetails.FilesystemUtilizationPercentage == 0 {
-				hddbytes = strconv.Itoa(experimentDetails.FilesystemUtilizationBytes) + "G"
+			if experimentDetails.FilesystemUtilizationPercentage == "0" {
+				hddbytes = experimentDetails.FilesystemUtilizationBytes + "G"
 			} else {
-				hddbytes = strconv.Itoa(experimentDetails.FilesystemUtilizationPercentage) + "%"
+				hddbytes = experimentDetails.FilesystemUtilizationPercentage + "%"
 				log.Warn("Both FsUtilPercentage & FsUtilBytes provided as inputs, using the FsUtilPercentage value to proceed with stress exp")
 			}
 		}
@@ -274,87 +398,42 @@ func prepareStressor(experimentDetails *experimentTypes.ExperimentDetails) []str
 			"Volume Mount Path": experimentDetails.VolumeMountPath,
 		})
 		if experimentDetails.VolumeMountPath == "" {
-			stressArgs = append(stressArgs, "--io "+strconv.Itoa(experimentDetails.NumberOfWorkers)+" --hdd "+strconv.Itoa(experimentDetails.NumberOfWorkers)+" --hdd-bytes "+hddbytes)
+			stressArgs = append(stressArgs, "--io "+experimentDetails.NumberOfWorkers+" --hdd "+experimentDetails.NumberOfWorkers+" --hdd-bytes "+hddbytes)
 		} else {
-			stressArgs = append(stressArgs, "--io "+strconv.Itoa(experimentDetails.NumberOfWorkers)+" --hdd "+strconv.Itoa(experimentDetails.NumberOfWorkers)+" --hdd-bytes "+hddbytes+" --temp-path "+experimentDetails.VolumeMountPath)
+			stressArgs = append(stressArgs, "--io "+experimentDetails.NumberOfWorkers+" --hdd "+experimentDetails.NumberOfWorkers+" --hdd-bytes "+hddbytes+" --temp-path "+experimentDetails.VolumeMountPath)
 		}
-		if experimentDetails.CPUcores != 0 {
-			stressArgs = append(stressArgs, "--cpu %v", strconv.Itoa(experimentDetails.CPUcores))
+		if experimentDetails.CPUcores != "0" {
+			stressArgs = append(stressArgs, "--cpu %v", experimentDetails.CPUcores)
 		}
 
 	default:
-		log.Fatalf("stressor for %v experiment is not suported", experimentDetails.ExperimentName)
+		log.Fatalf("stressor for %v experiment is not supported", experimentDetails.ExperimentName)
 	}
 	return stressArgs
 }
 
-//getPID extract out the PID of the target container
-func getPID(experimentDetails *experimentTypes.ExperimentDetails, containerID string) (int, error) {
-	var PID int
-
-	switch experimentDetails.ContainerRuntime {
-	case "docker":
-		host := "unix://" + experimentDetails.SocketPath
-		// deriving pid from the inspect out of target container
-		out, err := exec.Command("sudo", "docker", "--host", host, "inspect", containerID).CombinedOutput()
-		if err != nil {
-			log.Error(fmt.Sprintf("[docker]: Failed to run docker inspect: %s", string(out)))
-			return 0, err
-		}
-
-		// parsing data from the json output of inspect command
-		PID, err = parsePIDFromJSON(out, experimentDetails.ContainerRuntime)
-		if err != nil {
-			log.Error(fmt.Sprintf("[docker]: Failed to parse json from docker inspect output: %s", string(out)))
-			return 0, err
-		}
-
-	case "containerd", "crio":
-		// deriving pid from the inspect out of target container
-		endpoint := "unix://" + experimentDetails.SocketPath
-		out, err := exec.Command("sudo", "crictl", "-i", endpoint, "-r", endpoint, "inspect", containerID).CombinedOutput()
-		if err != nil {
-			log.Error(fmt.Sprintf("[cri]: Failed to run crictl: %s", string(out)))
-			return 0, err
-		}
-
-		// parsing data from the json output of inspect command
-		PID, err = parsePIDFromJSON(out, experimentDetails.ContainerRuntime)
-		if err != nil {
-			log.Errorf(fmt.Sprintf("[cri]: Failed to parse json from crictl output: %s", string(out)))
-			return 0, err
-		}
-	default:
-		return 0, errors.Errorf("%v container runtime not suported", experimentDetails.ContainerRuntime)
-	}
-
-	log.Info(fmt.Sprintf("[Info]: Container ID=%s has process PID=%d", containerID, PID))
-
-	return PID, nil
-}
-
-//pidPath will get the pid path of the container
-func pidPath(pid int) cgroups.Path {
-	processPath := "/proc/" + strconv.Itoa(pid) + "/cgroup"
-	paths, err := parseCgroupFile(processPath)
+// pidPath will get the pid path of the container
+func pidPath(t *targetDetails, index int) cgroups.Path {
+	processPath := "/proc/" + strconv.Itoa(t.Pids[index]) + "/cgroup"
+	paths, err := parseCgroupFile(processPath, t, index)
 	if err != nil {
 		return getErrorPath(errors.Wrapf(err, "parse cgroup file %s", processPath))
 	}
-	return getExistingPath(paths, pid, "")
+	return getExistingPath(paths, t.Pids[index], "")
 }
 
-//parseCgroupFile will read and verify the cgroup file entry of a container
-func parseCgroupFile(path string) (map[string]string, error) {
+// parseCgroupFile will read and verify the cgroup file entry of a container
+func parseCgroupFile(path string, t *targetDetails, index int) (map[string]string, error) {
 	file, err := os.Open(path)
 	if err != nil {
-		return nil, errors.Errorf("unable to parse cgroup file: %v", err)
+		return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeHelper, Source: t.Source, Target: fmt.Sprintf("{podName: %s, namespace: %s, container: %s}", t.Name, t.Namespace, t.TargetContainers[index]), Reason: fmt.Sprintf("fail to parse cgroup: %s", err.Error())}
 	}
 	defer file.Close()
-	return parseCgroupFromReader(file)
+	return parseCgroupFromReader(file, t, index)
 }
 
-//parseCgroupFromReader will parse the cgroup file from the reader
-func parseCgroupFromReader(r io.Reader) (map[string]string, error) {
+// parseCgroupFromReader will parse the cgroup file from the reader
+func parseCgroupFromReader(r io.Reader, t *targetDetails, index int) (map[string]string, error) {
 	var (
 		cgroups = make(map[string]string)
 		s       = bufio.NewScanner(r)
@@ -365,7 +444,7 @@ func parseCgroupFromReader(r io.Reader) (map[string]string, error) {
 			parts = strings.SplitN(text, ":", 3)
 		)
 		if len(parts) < 3 {
-			return nil, errors.Errorf("invalid cgroup entry: %q", text)
+			return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeHelper, Source: t.Source, Target: fmt.Sprintf("{podName: %s, namespace: %s, container: %s}", t.Name, t.Namespace, t.TargetContainers[index]), Reason: fmt.Sprintf("invalid cgroup entry: %q", text)}
 		}
 		for _, subs := range strings.Split(parts[1], ",") {
 			if subs != "" {
@@ -374,13 +453,13 @@ func parseCgroupFromReader(r io.Reader) (map[string]string, error) {
 		}
 	}
 	if err := s.Err(); err != nil {
-		return nil, errors.Errorf("buffer scanner failed: %v", err)
+		return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeHelper, Source: t.Source, Target: fmt.Sprintf("{podName: %s, namespace: %s, container: %s}", t.Name, t.Namespace, t.TargetContainers[index]), Reason: fmt.Sprintf("buffer scanner failed: %s", err.Error())}
 	}
 
 	return cgroups, nil
 }
 
-//getExistingPath will be used to get the existing valid cgroup path
+// getExistingPath will be used to get the existing valid cgroup path
 func getExistingPath(paths map[string]string, pid int, suffix string) cgroups.Path {
 	for n, p := range paths {
 		dest, err := getCgroupDestination(pid, n)
@@ -410,14 +489,14 @@ func getExistingPath(paths map[string]string, pid int, suffix string) cgroups.Pa
 	}
 }
 
-//getErrorPath will give the invalid cgroup path
+// getErrorPath will give the invalid cgroup path
 func getErrorPath(err error) cgroups.Path {
 	return func(_ cgroups.Name) (string, error) {
 		return "", err
 	}
 }
 
-//getCgroupDestination will validate the subsystem with the mountpath in container mountinfo file.
+// getCgroupDestination will validate the subsystem with the mountpath in container mountinfo file.
 func getCgroupDestination(pid int, subsystem string) (string, error) {
 	mountinfoPath := fmt.Sprintf("/proc/%d/mountinfo", pid)
 	file, err := os.Open(mountinfoPath)
@@ -440,69 +519,25 @@ func getCgroupDestination(pid int, subsystem string) (string, error) {
 	return "", errors.Errorf("no destination found for %v ", subsystem)
 }
 
-//findValidCgroup will be used to get a valid cgroup path
-func findValidCgroup(path cgroups.Path, target string) (string, error) {
+// findValidCgroup will be used to get a valid cgroup path
+func findValidCgroup(path cgroups.Path, t *targetDetails, index int) (string, error) {
 	for _, subsystem := range cgroupSubsystemList {
 		path, err := path(cgroups.Name(subsystem))
 		if err != nil {
-			log.Errorf("fail to retrieve the cgroup path, subsystem: %v, target: %v, err: %v", subsystem, target, err)
+			log.Errorf("fail to retrieve the cgroup path, subsystem: %v, target: %v, err: %v", subsystem, t.ContainerIds[index], err)
 			continue
 		}
-		if strings.Contains(path, target) {
+		if strings.Contains(path, t.ContainerIds[index]) {
 			return path, nil
 		}
 	}
-	return "", errors.Errorf("never found valid cgroup for %s", target)
+	return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeHelper, Source: t.Source, Target: fmt.Sprintf("{podName: %s, namespace: %s, container: %s}", t.Name, t.Namespace, t.TargetContainers[index]), Reason: "could not find valid cgroup"}
 }
 
-//parsePIDFromJSON extract the pid from the json output
-func parsePIDFromJSON(j []byte, runtime string) (int, error) {
-	var pid int
-	switch runtime {
-	case "docker":
-		// in docker, pid is present inside state.pid attribute of inspect output
-		var resp []common.DockerInspectResponse
-		if err := json.Unmarshal(j, &resp); err != nil {
-			return 0, err
-		}
-		pid = resp[0].State.PID
-	case "containerd":
-		var resp common.CrictlInspectResponse
-		if err := json.Unmarshal(j, &resp); err != nil {
-			return 0, err
-		}
-		pid = resp.Info.PID
-
-	case "crio":
-		var info common.InfoDetails
-		if err := json.Unmarshal(j, &info); err != nil {
-			return 0, err
-		}
-		pid = info.PID
-		if pid == 0 {
-			var resp common.CrictlInspectResponse
-			if err := json.Unmarshal(j, &resp); err != nil {
-				return 0, err
-			}
-			pid = resp.Info.PID
-		}
-	default:
-		return 0, errors.Errorf("[cri]: No supported container runtime, runtime: %v", runtime)
-	}
-	if pid == 0 {
-		return 0, errors.Errorf("[cri]: No running target container found, pid: %d", pid)
-	}
-
-	return pid, nil
-}
-
-//getENV fetches all the env variables from the runner pod
+// getENV fetches all the env variables from the runner pod
 func getENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.ExperimentName = types.Getenv("EXPERIMENT_NAME", "")
 	experimentDetails.InstanceID = types.Getenv("INSTANCE_ID", "")
-	experimentDetails.AppNS = types.Getenv("APP_NAMESPACE", "")
-	experimentDetails.TargetContainer = types.Getenv("APP_CONTAINER", "")
-	experimentDetails.TargetPods = types.Getenv("APP_POD", "")
 	experimentDetails.ChaosDuration, _ = strconv.Atoi(types.Getenv("TOTAL_CHAOS_DURATION", "30"))
 	experimentDetails.ChaosNamespace = types.Getenv("CHAOS_NAMESPACE", "litmus")
 	experimentDetails.EngineName = types.Getenv("CHAOSENGINE", "")
@@ -510,18 +545,18 @@ func getENV(experimentDetails *experimentTypes.ExperimentDetails) {
 	experimentDetails.ChaosPodName = types.Getenv("POD_NAME", "")
 	experimentDetails.ContainerRuntime = types.Getenv("CONTAINER_RUNTIME", "")
 	experimentDetails.SocketPath = types.Getenv("SOCKET_PATH", "")
-	experimentDetails.CPUcores, _ = strconv.Atoi(types.Getenv("CPU_CORES", ""))
-	experimentDetails.CPULoad, _ = strconv.Atoi(types.Getenv("CPU_LOAD", ""))
-	experimentDetails.FilesystemUtilizationPercentage, _ = strconv.Atoi(types.Getenv("FILESYSTEM_UTILIZATION_PERCENTAGE", ""))
-	experimentDetails.FilesystemUtilizationBytes, _ = strconv.Atoi(types.Getenv("FILESYSTEM_UTILIZATION_BYTES", ""))
-	experimentDetails.NumberOfWorkers, _ = strconv.Atoi(types.Getenv("NUMBER_OF_WORKERS", ""))
-	experimentDetails.MemoryConsumption, _ = strconv.Atoi(types.Getenv("MEMORY_CONSUMPTION", ""))
+	experimentDetails.CPUcores = types.Getenv("CPU_CORES", "")
+	experimentDetails.CPULoad = types.Getenv("CPU_LOAD", "")
+	experimentDetails.FilesystemUtilizationPercentage = types.Getenv("FILESYSTEM_UTILIZATION_PERCENTAGE", "")
+	experimentDetails.FilesystemUtilizationBytes = types.Getenv("FILESYSTEM_UTILIZATION_BYTES", "")
+	experimentDetails.NumberOfWorkers = types.Getenv("NUMBER_OF_WORKERS", "")
+	experimentDetails.MemoryConsumption = types.Getenv("MEMORY_CONSUMPTION", "")
 	experimentDetails.VolumeMountPath = types.Getenv("VOLUME_MOUNT_PATH", "")
 	experimentDetails.StressType = types.Getenv("STRESS_TYPE", "")
 }
 
 // abortWatcher continuously watch for the abort signals
-func abortWatcher(targetPID int, resultName, chaosNS, targetPodName string) {
+func abortWatcher(targets []*targetDetails, resultName, chaosNS string) {
 
 	<-abort
 
@@ -530,15 +565,133 @@ func abortWatcher(targetPID int, resultName, chaosNS, targetPodName string) {
 	// retry thrice for the chaos revert
 	retry := 3
 	for retry > 0 {
-		if err = terminateProcess(targetPID); err != nil {
-			log.Errorf("unable to kill stress process, err :%v", err)
+		for _, t := range targets {
+			if err = terminateProcess(t); err != nil {
+				log.Errorf("[Abort]: unable to revert for %v pod, err :%v", t.Name, err)
+				continue
+			}
+			if err = result.AnnotateChaosResult(resultName, chaosNS, "reverted", "pod", t.Name); err != nil {
+				log.Errorf("[Abort]: Unable to annotate the chaosresult for %v pod, err :%v", t.Name, err)
+			}
 		}
 		retry--
 		time.Sleep(1 * time.Second)
 	}
-	if err = result.AnnotateChaosResult(resultName, chaosNS, "reverted", "pod", targetPodName); err != nil {
-		log.Errorf("unable to annotate the chaosresult, err :%v", err)
-	}
 	log.Info("[Abort]: Chaos Revert Completed")
 	os.Exit(1)
+}
+
+// getCGroupManager will return the cgroup for the given pid of the process
+func getCGroupManager(t *targetDetails, index int) (interface{}, error, string) {
+	if cgroups.Mode() == cgroups.Unified {
+		groupPath := ""
+		output, err := exec.Command("bash", "-c", fmt.Sprintf("nsenter -t 1 -C -m -- cat /proc/%v/cgroup", t.Pids[index])).CombinedOutput()
+		if err != nil {
+			return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Source: t.Source, Target: fmt.Sprintf("{podName: %s, namespace: %s, container: %s}", t.Name, t.Namespace, t.TargetContainers[index]), Reason: fmt.Sprintf("fail to get the cgroup: %s :%v", err.Error(), output)}, ""
+		}
+		log.Infof("cgroup output: %s", string(output))
+		parts := strings.Split(string(output), ":")
+		if len(parts) < 3 {
+			return "", fmt.Errorf("invalid cgroup entry: %s", string(output)), ""
+		}
+		if strings.HasSuffix(parts[len(parts)-3], "0") && parts[len(parts)-2] == "" {
+			groupPath = parts[len(parts)-1]
+		}
+		log.Infof("group path: %s", groupPath)
+
+		cgroup2, err := cgroupsv2.LoadManager("/sys/fs/cgroup", string(groupPath))
+		if err != nil {
+			return nil, errors.Errorf("Error loading cgroup v2 manager, %v", err), ""
+		}
+		return cgroup2, nil, groupPath
+	}
+	path := pidPath(t, index)
+	cgroup, err := findValidCgroup(path, t, index)
+	if err != nil {
+		return nil, stacktrace.Propagate(err, "could not find valid cgroup"), ""
+	}
+	cgroup1, err := cgroups.Load(cgroups.V1, cgroups.StaticPath(cgroup))
+	if err != nil {
+		return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeHelper, Source: t.Source, Target: fmt.Sprintf("{podName: %s, namespace: %s, container: %s}", t.Name, t.Namespace, t.TargetContainers[index]), Reason: fmt.Sprintf("fail to load the cgroup: %s", err.Error())}, ""
+	}
+
+	return cgroup1, nil, ""
+}
+
+// addProcessToCgroup will add the process to cgroup
+// By default it will add to v1 cgroup
+func addProcessToCgroup(pid int, control interface{}, groupPath string) error {
+	if cgroups.Mode() == cgroups.Unified {
+		args := []string{"-t", "1", "-C", "--", "sudo", "sh", "-c", fmt.Sprintf("echo %d >> /sys/fs/cgroup%s/cgroup.procs", pid, strings.ReplaceAll(groupPath, "\n", ""))}
+		output, err := exec.Command("nsenter", args...).CombinedOutput()
+		if err != nil {
+			return cerrors.Error{
+				ErrorCode: cerrors.ErrorTypeChaosInject,
+				Reason:    fmt.Sprintf("failed to add process to cgroup %s: %v", string(output), err),
+			}
+		}
+		return nil
+	}
+	var cgroup1 = control.(cgroups.Cgroup)
+	return cgroup1.Add(cgroups.Process{Pid: pid})
+}
+
+func injectChaos(t *targetDetails, stressors string, index int, stressType string) (*Command, error) {
+	stressCommand := fmt.Sprintf("pause nsutil -t %v -p -- %v", strconv.Itoa(t.Pids[index]), stressors)
+	// for io stress,we need to enter into mount ns of the target container
+	// enabling it by passing -m flag
+	if stressType == "pod-io-stress" {
+		stressCommand = fmt.Sprintf("pause nsutil -t %v -p -m -- %v", strconv.Itoa(t.Pids[index]), stressors)
+	}
+	log.Infof("[Info]: starting process: %v", stressCommand)
+
+	// launch the stress-ng process on the target container in paused mode
+	cmd := exec.Command("/bin/bash", "-c", stressCommand)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	var buf bytes.Buffer
+	cmd.Stdout = &buf
+	cmd.Stderr = &buf
+	err = cmd.Start()
+	if err != nil {
+		return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Source: t.Source, Target: fmt.Sprintf("{podName: %s, namespace: %s, container: %s}", t.Name, t.Namespace, t.TargetContainers[index]), Reason: fmt.Sprintf("failed to start stress process: %s", err.Error())}
+	}
+
+	// add the stress process to the cgroup of target container
+	if err = addProcessToCgroup(cmd.Process.Pid, t.CGroupManagers[index], t.GroupPath); err != nil {
+		if killErr := cmd.Process.Kill(); killErr != nil {
+			return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Source: t.Source, Target: fmt.Sprintf("{podName: %s, namespace: %s, container: %s}", t.Name, t.Namespace, t.TargetContainers[index]), Reason: fmt.Sprintf("fail to add the stress process to cgroup %s and kill stress process: %s", err.Error(), killErr.Error())}
+		}
+		return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Source: t.Source, Target: fmt.Sprintf("{podName: %s, namespace: %s, container: %s}", t.Name, t.Namespace, t.TargetContainers[index]), Reason: fmt.Sprintf("fail to add the stress process to cgroup: %s", err.Error())}
+	}
+
+	log.Info("[Info]: Sending signal to resume the stress process")
+	// wait for the process to start before sending the resume signal
+	// TODO: need a dynamic way to check the start of the process
+	time.Sleep(700 * time.Millisecond)
+
+	// remove pause and resume or start the stress process
+	if err := cmd.Process.Signal(syscall.SIGCONT); err != nil {
+		return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Source: t.Source, Target: fmt.Sprintf("{podName: %s, namespace: %s, container: %s}", t.Name, t.Namespace, t.TargetContainers[index]), Reason: fmt.Sprintf("fail to remove pause and start the stress process: %s", err.Error())}
+	}
+	return &Command{
+		Cmd:    cmd,
+		Buffer: buf,
+	}, nil
+}
+
+type targetDetails struct {
+	Name             string
+	Namespace        string
+	TargetContainers []string
+	ContainerIds     []string
+	Pids             []int
+	CGroupManagers   []interface{}
+	Cmds             []*Command
+	Source           string
+	GroupPath        string
+}
+
+type Command struct {
+	Cmd    *exec.Cmd
+	Buffer bytes.Buffer
 }

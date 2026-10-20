@@ -3,21 +3,27 @@ package vmware
 import (
 	"crypto/tls"
 	"encoding/json"
-	"io/ioutil"
+	"fmt"
+	"io"
 	"net/http"
 	"time"
 
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
-	"github.com/pkg/errors"
+	"github.com/palantir/stacktrace"
 )
 
-//StartVM starts a given powered-off VM
+// StartVM starts a given powered-off VM
 func StartVM(vcenterServer, vmId, cookie string) error {
 
 	req, err := http.NewRequest("POST", "https://"+vcenterServer+"/rest/vcenter/vm/"+vmId+"/power/start", nil)
 	if err != nil {
-		return err
+		return cerrors.Error{
+			ErrorCode: cerrors.ErrorTypeChaosRevert,
+			Reason:    fmt.Sprintf("failed to start VM: %v", err.Error()),
+			Target:    fmt.Sprintf("{VM ID: %v}", vmId),
+		}
 	}
 
 	req.Header.Set("Content-Type", "application/json")
@@ -29,32 +35,56 @@ func StartVM(vcenterServer, vmId, cookie string) error {
 	client := &http.Client{Transport: tr}
 	resp, err := client.Do(req)
 	if err != nil {
-		return err
+		return cerrors.Error{
+			ErrorCode: cerrors.ErrorTypeChaosRevert,
+			Reason:    fmt.Sprintf("failed to start VM: %v", err.Error()),
+			Target:    fmt.Sprintf("{VM ID: %v}", vmId),
+		}
 	}
 
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 
-		body, err := ioutil.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
 		if err != nil {
-			return err
+			return cerrors.Error{
+				ErrorCode: cerrors.ErrorTypeChaosRevert,
+				Reason:    fmt.Sprintf("failed to start VM: %v", err.Error()),
+				Target:    fmt.Sprintf("{VM ID: %v}", vmId),
+			}
 		}
 
 		var errorResponse ErrorResponse
-		json.Unmarshal(body, &errorResponse)
-		return errors.Errorf("failed to start vm: %s", errorResponse.MsgValue.MsgMessages[0].MsgDefaultMessage)
+		var reason string
+
+		err = json.Unmarshal(body, &errorResponse)
+		if err != nil {
+			reason = fmt.Sprintf("failed to unmarshal error response: %v", err)
+		} else {
+			reason = fmt.Sprintf("failed to start VM: %v", errorResponse.MsgValue.MsgMessages[0].MsgDefaultMessage)
+		}
+
+		return cerrors.Error{
+			ErrorCode: cerrors.ErrorTypeChaosRevert,
+			Reason:    reason,
+			Target:    fmt.Sprintf("{VM ID: %v}", vmId),
+		}
 	}
 
 	return nil
 }
 
-//StopVM stops a given powered-on VM
+// StopVM stops a given powered-on VM
 func StopVM(vcenterServer, vmId, cookie string) error {
 
 	req, err := http.NewRequest("POST", "https://"+vcenterServer+"/rest/vcenter/vm/"+vmId+"/power/stop", nil)
 	if err != nil {
-		return err
+		return cerrors.Error{
+			ErrorCode: cerrors.ErrorTypeChaosInject,
+			Reason:    fmt.Sprintf("failed to stop VM: %v", err.Error()),
+			Target:    fmt.Sprintf("{VM ID: %v}", vmId),
+		}
 	}
 
 	req.Header.Set("Content-Type", "application/json")
@@ -66,68 +96,95 @@ func StopVM(vcenterServer, vmId, cookie string) error {
 	client := &http.Client{Transport: tr}
 	resp, err := client.Do(req)
 	if err != nil {
-		return err
+		return cerrors.Error{
+			ErrorCode: cerrors.ErrorTypeChaosInject,
+			Reason:    fmt.Sprintf("failed to stop VM: %v", err.Error()),
+			Target:    fmt.Sprintf("{VM ID: %v}", vmId),
+		}
 	}
 
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 
-		body, err := ioutil.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
 		if err != nil {
-			return err
+			return cerrors.Error{
+				ErrorCode: cerrors.ErrorTypeChaosInject,
+				Reason:    fmt.Sprintf("failed to stop VM: %v", err.Error()),
+				Target:    fmt.Sprintf("{VM ID: %v}", vmId),
+			}
 		}
 
 		var errorResponse ErrorResponse
-		json.Unmarshal(body, &errorResponse)
-		return errors.Errorf("failed to stop vm: %s", errorResponse.MsgValue.MsgMessages[0].MsgDefaultMessage)
+		var reason string
+
+		err = json.Unmarshal(body, &errorResponse)
+		if err != nil {
+			reason = fmt.Sprintf("failed to unmarshal error response: %v", err)
+		} else {
+			reason = fmt.Sprintf("failed to stop VM: %v", errorResponse.MsgValue.MsgMessages[0].MsgDefaultMessage)
+		}
+		return cerrors.Error{
+			ErrorCode: cerrors.ErrorTypeChaosInject,
+			Reason:    reason,
+			Target:    fmt.Sprintf("{VM ID: %v}", vmId),
+		}
 	}
 
 	return nil
 }
 
-//WaitForVMStart waits for the given VM to attain the POWERED_ON state
+// WaitForVMStart waits for the given VM to attain the POWERED_ON state
 func WaitForVMStart(timeout, delay int, vcenterServer, vmId, cookie string) error {
 
-	log.Infof("[Status]: Checking %s VM status", vmId)
+	log.Infof("[Status]: Checking %v VM status", vmId)
 	return retry.Times(uint(timeout / delay)).
 		Wait(time.Duration(delay) * time.Second).
 		Try(func(attempt uint) error {
 
 			vmStatus, err := GetVMStatus(vcenterServer, vmId, cookie)
 			if err != nil {
-				return errors.Errorf("failed to get %s VM status: %s", vmId, err.Error())
+				return stacktrace.Propagate(err, "failed to get VM status")
 			}
 
 			if vmStatus != "POWERED_ON" {
-				log.Infof("%s VM state is %s", vmId, vmStatus)
-				return errors.Errorf("%s vm is not yet in POWERED_ON state", vmId)
+				log.Infof("%v VM state is %v", vmId, vmStatus)
+				return cerrors.Error{
+					ErrorCode: cerrors.ErrorTypeChaosRevert,
+					Reason:    "VM is not in POWERED_ON state",
+					Target:    fmt.Sprintf("{VM ID: %v}", vmId),
+				}
 			}
 
-			log.Infof("%s VM state is %s", vmId, vmStatus)
+			log.Infof("%v VM state is %v", vmId, vmStatus)
 			return nil
 		})
 }
 
-//WaitForVMStop waits for the given VM to attain the POWERED_OFF state
+// WaitForVMStop waits for the given VM to attain the POWERED_OFF state
 func WaitForVMStop(timeout, delay int, vcenterServer, vmId, cookie string) error {
 
-	log.Infof("[Status]: Checking %s VM status", vmId)
+	log.Infof("[Status]: Checking %v VM status", vmId)
 	return retry.Times(uint(timeout / delay)).
 		Wait(time.Duration(delay) * time.Second).
 		Try(func(attempt uint) error {
 
 			vmStatus, err := GetVMStatus(vcenterServer, vmId, cookie)
 			if err != nil {
-				return errors.Errorf("failed to get %s VM status: %s", vmId, err.Error())
+				return stacktrace.Propagate(err, "failed to get VM status")
 			}
 
 			if vmStatus != "POWERED_OFF" {
-				log.Infof("%s VM state is %s", vmId, vmStatus)
-				return errors.Errorf("%s vm is not yet in POWERED_OFF state", vmId)
+				log.Infof("%v VM state is %v", vmId, vmStatus)
+				return cerrors.Error{
+					ErrorCode: cerrors.ErrorTypeChaosInject,
+					Reason:    "VM is not in POWERED_OFF state",
+					Target:    fmt.Sprintf("{VM ID: %v}", vmId),
+				}
 			}
 
-			log.Infof("%s VM state is %s", vmId, vmStatus)
+			log.Infof("%v VM state is %v", vmId, vmStatus)
 			return nil
 		})
 }

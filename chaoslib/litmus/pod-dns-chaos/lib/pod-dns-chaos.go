@@ -1,33 +1,41 @@
 package lib
 
 import (
+	"context"
+	"fmt"
+	"os"
 	"strconv"
 	"strings"
 
-	clients "github.com/litmuschaos/litmus-go/pkg/clients"
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
+	"github.com/litmuschaos/litmus-go/pkg/telemetry"
+	"github.com/palantir/stacktrace"
+	"go.opentelemetry.io/otel"
+
+	"github.com/litmuschaos/litmus-go/pkg/clients"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-dns-chaos/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
-	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
-	"github.com/pkg/errors"
+	"github.com/litmuschaos/litmus-go/pkg/utils/stringutils"
 	"github.com/sirupsen/logrus"
 	apiv1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-//PrepareAndInjectChaos contains the preparation & injection steps
-func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-
+// PrepareAndInjectChaos contains the preparation & injection steps
+func PrepareAndInjectChaos(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PreparePodDNSFault")
+	defer span.End()
 	// Get the target pod details for the chaos execution
 	// if the target pod is not defined it will derive the random target pod list using pod affected percentage
-	if experimentsDetails.TargetPods == "" && chaosDetails.AppDetail.Label == "" {
-		return errors.Errorf("please provide one of the appLabel or TARGET_PODS")
+	if experimentsDetails.TargetPods == "" && chaosDetails.AppDetail == nil {
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Reason: "provide one of the appLabel or TARGET_PODS"}
 	}
 	targetPodList, err := common.GetPodList(experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, clients, chaosDetails)
 	if err != nil {
-		return err
+		return stacktrace.Propagate(err, "could not get target pods")
 	}
 
 	podNames := []string{}
@@ -46,48 +54,41 @@ func PrepareAndInjectChaos(experimentsDetails *experimentTypes.ExperimentDetails
 	if experimentsDetails.ChaosServiceAccount == "" {
 		experimentsDetails.ChaosServiceAccount, err = common.GetServiceAccount(experimentsDetails.ChaosNamespace, experimentsDetails.ChaosPodName, clients)
 		if err != nil {
-			return errors.Errorf("unable to get the serviceAccountName, err: %v", err)
-		}
-	}
-
-	//Get the target container name of the application pod
-	if experimentsDetails.TargetContainer == "" {
-		experimentsDetails.TargetContainer, err = common.GetTargetContainer(experimentsDetails.AppNS, targetPodList.Items[0].Name, clients)
-		if err != nil {
-			return errors.Errorf("unable to get the target container name, err: %v", err)
+			return stacktrace.Propagate(err, "could not get experiment service account")
 		}
 	}
 
 	if experimentsDetails.EngineName != "" {
-		if err := common.SetHelperData(chaosDetails, clients); err != nil {
-			return err
+		if err := common.SetHelperData(chaosDetails, experimentsDetails.SetHelperData, clients); err != nil {
+			return stacktrace.Propagate(err, "could not set helper data")
 		}
 	}
 
+	experimentsDetails.IsTargetContainerProvided = experimentsDetails.TargetContainer != ""
 	switch strings.ToLower(experimentsDetails.Sequence) {
 	case "serial":
-		if err = injectChaosInSerialMode(experimentsDetails, targetPodList, clients, chaosDetails, resultDetails, eventsDetails); err != nil {
-			return err
+		if err = injectChaosInSerialMode(ctx, experimentsDetails, targetPodList, clients, chaosDetails, resultDetails, eventsDetails); err != nil {
+			return stacktrace.Propagate(err, "could not run chaos in serial mode")
 		}
 	case "parallel":
-		if err = injectChaosInParallelMode(experimentsDetails, targetPodList, clients, chaosDetails, resultDetails, eventsDetails); err != nil {
-			return err
+		if err = injectChaosInParallelMode(ctx, experimentsDetails, targetPodList, clients, chaosDetails, resultDetails, eventsDetails); err != nil {
+			return stacktrace.Propagate(err, "could not run chaos in parallel mode")
 		}
 	default:
-		return errors.Errorf("%v sequence is not supported", experimentsDetails.Sequence)
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("'%s' sequence is not supported", experimentsDetails.Sequence)}
 	}
 
 	return nil
 }
 
 // injectChaosInSerialMode inject the DNS Chaos in all target application serially (one by one)
-func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
-
-	labelSuffix := common.GetRunID()
+func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectPodDNSFaultInSerialMode")
+	defer span.End()
 
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
-		if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+		if err := probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
 			return err
 		}
 	}
@@ -95,38 +96,25 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 	// creating the helper pod to perform DNS Chaos
 	for _, pod := range targetPodList.Items {
 
+		//Get the target container name of the application pod
+		if !experimentsDetails.IsTargetContainerProvided {
+			experimentsDetails.TargetContainer = pod.Spec.Containers[0].Name
+		}
+
 		log.InfoWithValues("[Info]: Details of application under chaos injection", logrus.Fields{
 			"PodName":       pod.Name,
 			"NodeName":      pod.Spec.NodeName,
 			"ContainerName": experimentsDetails.TargetContainer,
 		})
-		runID := common.GetRunID()
-		if err := createHelperPod(experimentsDetails, clients, chaosDetails, pod.Name, pod.Spec.NodeName, runID, labelSuffix); err != nil {
-			return errors.Errorf("unable to create the helper pod, err: %v", err)
+		runID := stringutils.GetRunID()
+		if err := createHelperPod(ctx, experimentsDetails, clients, chaosDetails, fmt.Sprintf("%s:%s:%s", pod.Name, pod.Namespace, experimentsDetails.TargetContainer), pod.Spec.NodeName, runID); err != nil {
+			return stacktrace.Propagate(err, "could not create helper pod")
 		}
 
-		appLabel := "name=" + experimentsDetails.ExperimentName + "-helper-" + runID
+		appLabel := fmt.Sprintf("app=%s-helper-%s", experimentsDetails.ExperimentName, runID)
 
-		//checking the status of the helper pods, wait till the pod comes to running state else fail the experiment
-		log.Info("[Status]: Checking the status of the helper pods")
-		if err := status.CheckHelperStatus(experimentsDetails.ChaosNamespace, appLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
-			common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-"+runID, appLabel, chaosDetails, clients)
-			return errors.Errorf("helper pods are not in running state, err: %v", err)
-		}
-
-		// Wait till the completion of the helper pod
-		// set an upper limit for the waiting time
-		log.Info("[Wait]: waiting till the completion of the helper pod")
-		podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, appLabel, clients, experimentsDetails.ChaosDuration+experimentsDetails.Timeout, experimentsDetails.ExperimentName)
-		if err != nil || podStatus == "Failed" {
-			common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-"+runID, appLabel, chaosDetails, clients)
-			return common.HelperFailedError(err)
-		}
-
-		//Deleting all the helper pod for pod-dns chaos
-		log.Info("[Cleanup]: Deleting the the helper pod")
-		if err = common.DeletePod(experimentsDetails.ExperimentName+"-helper-"+runID, appLabel, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients); err != nil {
-			return errors.Errorf("Unable to delete the helper pods, err: %v", err)
+		if err := common.ManagerHelperLifecycle(appLabel, chaosDetails, clients, true); err != nil {
+			return err
 		}
 	}
 
@@ -134,70 +122,53 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 }
 
 // injectChaosInParallelMode inject the DNS Chaos in all target application in parallel mode (all at once)
-func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
-
-	labelSuffix := common.GetRunID()
+func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectPodDNSFaultInParallelMode")
+	defer span.End()
 
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
-		if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+		if err := probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
 			return err
 		}
 	}
 
-	// creating the helper pod to perform DNS Chaos
-	for _, pod := range targetPodList.Items {
+	runID := stringutils.GetRunID()
+	targets := common.FilterPodsForNodes(targetPodList, experimentsDetails.TargetContainer)
 
-		log.InfoWithValues("[Info]: Details of application under chaos injection", logrus.Fields{
-			"PodName":       pod.Name,
-			"NodeName":      pod.Spec.NodeName,
-			"ContainerName": experimentsDetails.TargetContainer,
-		})
-		runID := common.GetRunID()
-		if err := createHelperPod(experimentsDetails, clients, chaosDetails, pod.Name, pod.Spec.NodeName, runID, labelSuffix); err != nil {
-			return errors.Errorf("Unable to create the helper pod, err: %v", err)
+	for node, tar := range targets {
+		var targetsPerNode []string
+		for _, k := range tar.Target {
+			targetsPerNode = append(targetsPerNode, fmt.Sprintf("%s:%s:%s", k.Name, k.Namespace, k.TargetContainer))
+		}
+
+		if err := createHelperPod(ctx, experimentsDetails, clients, chaosDetails, strings.Join(targetsPerNode, ";"), node, runID); err != nil {
+			return stacktrace.Propagate(err, "could not create helper pod")
 		}
 	}
 
-	appLabel := "app=" + experimentsDetails.ExperimentName + "-helper-" + labelSuffix
+	appLabel := fmt.Sprintf("app=%s-helper-%s", experimentsDetails.ExperimentName, runID)
 
-	//checking the status of the helper pods, wait till the pod comes to running state else fail the experiment
-	log.Info("[Status]: Checking the status of the helper pods")
-	if err := status.CheckHelperStatus(experimentsDetails.ChaosNamespace, appLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
-		common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
-		return errors.Errorf("helper pods are not in running state, err: %v", err)
-	}
-
-	// Wait till the completion of the helper pod
-	// set an upper limit for the waiting time
-	log.Info("[Wait]: waiting till the completion of the helper pod")
-	podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, appLabel, clients, experimentsDetails.ChaosDuration+experimentsDetails.Timeout, experimentsDetails.ExperimentName)
-	if err != nil || podStatus == "Failed" {
-		common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
-		return common.HelperFailedError(err)
-	}
-
-	//Deleting all the helper pod for pod-dns chaos
-	log.Info("[Cleanup]: Deleting all the helper pod")
-	if err = common.DeleteAllPod(appLabel, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients); err != nil {
-		return errors.Errorf("Unable to delete the helper pods, err: %v", err)
+	if err := common.ManagerHelperLifecycle(appLabel, chaosDetails, clients, true); err != nil {
+		return err
 	}
 
 	return nil
 }
 
 // createHelperPod derive the attributes for helper pod and create the helper pod
-func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, podName, nodeName, runID, labelSuffix string) error {
-
+func createHelperPod(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, targets, nodeName, runID string) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "CreatePodDNSFaultHelperPod")
+	defer span.End()
 	privilegedEnable := true
 	terminationGracePeriodSeconds := int64(experimentsDetails.TerminationGracePeriodSeconds)
 
 	helperPod := &apiv1.Pod{
 		ObjectMeta: v1.ObjectMeta{
-			Name:        experimentsDetails.ExperimentName + "-helper-" + runID,
-			Namespace:   experimentsDetails.ChaosNamespace,
-			Labels:      common.GetHelperLabels(chaosDetails.Labels, runID, labelSuffix, experimentsDetails.ExperimentName),
-			Annotations: chaosDetails.Annotations,
+			GenerateName: experimentsDetails.ExperimentName + "-helper-",
+			Namespace:    experimentsDetails.ChaosNamespace,
+			Labels:       common.GetHelperLabels(chaosDetails.Labels, runID, experimentsDetails.ExperimentName),
+			Annotations:  chaosDetails.Annotations,
 		},
 		Spec: apiv1.PodSpec{
 			HostPID:                       true,
@@ -230,7 +201,7 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 						"./helpers -name dns-chaos",
 					},
 					Resources: chaosDetails.Resources,
-					Env:       getPodEnv(experimentsDetails, podName),
+					Env:       getPodEnv(ctx, experimentsDetails, targets),
 					VolumeMounts: []apiv1.VolumeMount{
 						{
 							Name:      "cri-socket",
@@ -245,18 +216,23 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 		},
 	}
 
-	_, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Create(helperPod)
-	return err
+	if len(chaosDetails.SideCar) != 0 {
+		helperPod.Spec.Containers = append(helperPod.Spec.Containers, common.BuildSidecar(chaosDetails)...)
+		helperPod.Spec.Volumes = append(helperPod.Spec.Volumes, common.GetSidecarVolumes(chaosDetails)...)
+	}
 
+	if err := clients.CreatePod(experimentsDetails.ChaosNamespace, helperPod); err != nil {
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("unable to create helper pod: %s", err.Error())}
+	}
+
+	return nil
 }
 
 // getPodEnv derive all the env required for the helper pod
-func getPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, podName string) []apiv1.EnvVar {
+func getPodEnv(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, targets string) []apiv1.EnvVar {
 
 	var envDetails common.ENVDetails
-	envDetails.SetEnv("APP_NAMESPACE", experimentsDetails.AppNS).
-		SetEnv("APP_POD", podName).
-		SetEnv("APP_CONTAINER", experimentsDetails.TargetContainer).
+	envDetails.SetEnv("TARGETS", targets).
 		SetEnv("TOTAL_CHAOS_DURATION", strconv.Itoa(experimentsDetails.ChaosDuration)).
 		SetEnv("CHAOS_NAMESPACE", experimentsDetails.ChaosNamespace).
 		SetEnv("CHAOSENGINE", experimentsDetails.EngineName).
@@ -269,6 +245,8 @@ func getPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, podName st
 		SetEnv("MATCH_SCHEME", experimentsDetails.MatchScheme).
 		SetEnv("CHAOS_TYPE", experimentsDetails.ChaosType).
 		SetEnv("INSTANCE_ID", experimentsDetails.InstanceID).
+		SetEnv("OTEL_EXPORTER_OTLP_ENDPOINT", os.Getenv(telemetry.OTELExporterOTLPEndpoint)).
+		SetEnv("TRACE_PARENT", telemetry.GetMarshalledSpanFromContext(ctx)).
 		SetEnvFromDownwardAPI("v1", "metadata.name")
 
 	return envDetails.ENV

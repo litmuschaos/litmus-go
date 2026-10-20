@@ -1,25 +1,44 @@
 package lib
 
 import (
+	"context"
+	"fmt"
 	"strconv"
 	"strings"
 
-	clients "github.com/litmuschaos/litmus-go/pkg/clients"
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
+	"github.com/litmuschaos/litmus-go/pkg/telemetry"
+	"github.com/palantir/stacktrace"
+	"go.opentelemetry.io/otel"
+
+	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/node-memory-hog/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
-	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
-	"github.com/pkg/errors"
+	"github.com/litmuschaos/litmus-go/pkg/utils/stringutils"
 	"github.com/sirupsen/logrus"
 	apiv1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// PrepareNodeMemoryHog contains prepration steps before chaos injection
-func PrepareNodeMemoryHog(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+// PrepareNodeMemoryHog contains preparation steps before chaos injection
+func PrepareNodeMemoryHog(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PrepareNodeMemoryHogFault")
+	defer span.End()
+
+	//set up the tunables if provided in range
+	setChaosTunables(experimentsDetails)
+
+	log.InfoWithValues("[Info]: The details of chaos tunables are:", logrus.Fields{
+		"MemoryConsumptionMebibytes":  experimentsDetails.MemoryConsumptionMebibytes,
+		"MemoryConsumptionPercentage": experimentsDetails.MemoryConsumptionPercentage,
+		"NumberOfWorkers":             experimentsDetails.NumberOfWorkers,
+		"Node Affected Percentage":    experimentsDetails.NodesAffectedPerc,
+		"Sequence":                    experimentsDetails.Sequence,
+	})
 
 	//Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
@@ -28,32 +47,34 @@ func PrepareNodeMemoryHog(experimentsDetails *experimentTypes.ExperimentDetails,
 	}
 
 	//Select node for node-memory-hog
-	targetNodeList, err := common.GetNodeList(experimentsDetails.TargetNodes, experimentsDetails.NodeLabel, experimentsDetails.NodesAffectedPerc, clients)
+	nodesAffectedPerc, _ := strconv.Atoi(experimentsDetails.NodesAffectedPerc)
+	targetNodeList, err := common.GetNodeList(experimentsDetails.TargetNodes, experimentsDetails.NodeLabel, nodesAffectedPerc, clients)
 	if err != nil {
-		return err
+		return stacktrace.Propagate(err, "could not get node list")
 	}
+
 	log.InfoWithValues("[Info]: Details of Nodes under chaos injection", logrus.Fields{
 		"No. Of Nodes": len(targetNodeList),
 		"Node Names":   targetNodeList,
 	})
 
 	if experimentsDetails.EngineName != "" {
-		if err := common.SetHelperData(chaosDetails, clients); err != nil {
-			return err
+		if err := common.SetHelperData(chaosDetails, experimentsDetails.SetHelperData, clients); err != nil {
+			return stacktrace.Propagate(err, "could not set helper data")
 		}
 	}
 
 	switch strings.ToLower(experimentsDetails.Sequence) {
 	case "serial":
-		if err = injectChaosInSerialMode(experimentsDetails, targetNodeList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
-			return err
+		if err = injectChaosInSerialMode(ctx, experimentsDetails, targetNodeList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+			return stacktrace.Propagate(err, "could not run chaos in serial mode")
 		}
 	case "parallel":
-		if err = injectChaosInParallelMode(experimentsDetails, targetNodeList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
-			return err
+		if err = injectChaosInParallelMode(ctx, experimentsDetails, targetNodeList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+			return stacktrace.Propagate(err, "could not run chaos in parallel mode")
 		}
 	default:
-		return errors.Errorf("%v sequence is not supported", experimentsDetails.Sequence)
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("'%s' sequence is not supported", experimentsDetails.Sequence)}
 	}
 
 	//Waiting for the ramp time after chaos injection
@@ -65,13 +86,13 @@ func PrepareNodeMemoryHog(experimentsDetails *experimentTypes.ExperimentDetails,
 }
 
 // injectChaosInSerialMode stress the memory of all the target nodes serially (one by one)
-func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, targetNodeList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-
-	labelSuffix := common.GetRunID()
+func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, targetNodeList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectNodeMemoryHogFaultInSerialMode")
+	defer span.End()
 
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
-		if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+		if err := probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
 			return err
 		}
 	}
@@ -90,67 +111,49 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 			"Memory Consumption Mebibytes":  experimentsDetails.MemoryConsumptionMebibytes,
 		})
 
-		experimentsDetails.RunID = common.GetRunID()
+		experimentsDetails.RunID = stringutils.GetRunID()
 
 		//Getting node memory details
 		memoryCapacity, memoryAllocatable, err := getNodeMemoryDetails(appNode, clients)
 		if err != nil {
-			return errors.Errorf("unable to get the node memory details, err: %v", err)
+			return stacktrace.Propagate(err, "could not get node memory details")
 		}
 
 		//Getting the exact memory value to exhaust
-		MemoryConsumption, err := calculateMemoryConsumption(experimentsDetails, clients, memoryCapacity, memoryAllocatable)
+		MemoryConsumption, err := calculateMemoryConsumption(experimentsDetails, memoryCapacity, memoryAllocatable)
 		if err != nil {
-			return errors.Errorf("memory calculation failed, err: %v", err)
+			return stacktrace.Propagate(err, "could not calculate memory consumption value")
 		}
 
 		// Creating the helper pod to perform node memory hog
-		if err = createHelperPod(experimentsDetails, chaosDetails, appNode, clients, labelSuffix, MemoryConsumption); err != nil {
-			return errors.Errorf("unable to create the helper pod, err: %v", err)
+		if err = createHelperPod(ctx, experimentsDetails, chaosDetails, appNode, clients, MemoryConsumption); err != nil {
+			return stacktrace.Propagate(err, "could not create helper pod")
 		}
 
-		appLabel := "name=" + experimentsDetails.ExperimentName + "-helper-" + experimentsDetails.RunID
-
-		//Checking the status of helper pod
-		log.Info("[Status]: Checking the status of the helper pod")
-		if err := status.CheckHelperStatus(experimentsDetails.ChaosNamespace, appLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
-			common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-helper-"+experimentsDetails.RunID, appLabel, chaosDetails, clients)
-			return errors.Errorf("helper pod is not in running state, err: %v", err)
-		}
+		appLabel := fmt.Sprintf("app=%s-helper-%s", experimentsDetails.ExperimentName, experimentsDetails.RunID)
 
 		common.SetTargets(appNode, "targeted", "node", chaosDetails)
 
-		// Wait till the completion of helper pod
-		log.Info("[Wait]: Waiting till the completion of the helper pod")
-		podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, appLabel, clients, experimentsDetails.ChaosDuration+experimentsDetails.Timeout, experimentsDetails.ExperimentName)
-		if err != nil {
-			common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-helper-"+experimentsDetails.RunID, appLabel, chaosDetails, clients)
-			return common.HelperFailedError(err)
-		} else if podStatus == "Failed" {
-			common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-"+experimentsDetails.RunID, appLabel, chaosDetails, clients)
-			return errors.Errorf("helper pod status is %v", podStatus)
-		}
-
-		//Deleting the helper pod
-		log.Info("[Cleanup]: Deleting the helper pod")
-		if err = common.DeletePod(experimentsDetails.ExperimentName+"-helper-"+experimentsDetails.RunID, appLabel, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients); err != nil {
-			return errors.Errorf("unable to delete the helper pod, err: %v", err)
+		if err := common.ManagerHelperLifecycle(appLabel, chaosDetails, clients, false); err != nil {
+			return err
 		}
 	}
 	return nil
 }
 
 // injectChaosInParallelMode stress the memory all the target nodes in parallel mode (all at once)
-func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, targetNodeList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-
-	labelSuffix := common.GetRunID()
+func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, targetNodeList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectNodeMemoryHogFaultInParallelMode")
+	defer span.End()
 
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
-		if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+		if err := probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
 			return err
 		}
 	}
+
+	experimentsDetails.RunID = stringutils.GetRunID()
 
 	for _, appNode := range targetNodeList {
 
@@ -166,54 +169,32 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 			"Memory Consumption Mebibytes":  experimentsDetails.MemoryConsumptionMebibytes,
 		})
 
-		experimentsDetails.RunID = common.GetRunID()
-
 		//Getting node memory details
 		memoryCapacity, memoryAllocatable, err := getNodeMemoryDetails(appNode, clients)
 		if err != nil {
-			return errors.Errorf("unable to get the node memory details, err: %v", err)
+			return stacktrace.Propagate(err, "could not get node memory details")
 		}
 
 		//Getting the exact memory value to exhaust
-		MemoryConsumption, err := calculateMemoryConsumption(experimentsDetails, clients, memoryCapacity, memoryAllocatable)
+		MemoryConsumption, err := calculateMemoryConsumption(experimentsDetails, memoryCapacity, memoryAllocatable)
 		if err != nil {
-			return errors.Errorf("memory calculation failed, err: %v", err)
+			return stacktrace.Propagate(err, "could not calculate memory consumption value")
 		}
 
 		// Creating the helper pod to perform node memory hog
-		if err = createHelperPod(experimentsDetails, chaosDetails, appNode, clients, labelSuffix, MemoryConsumption); err != nil {
-			return errors.Errorf("unable to create the helper pod, err: %v", err)
+		if err = createHelperPod(ctx, experimentsDetails, chaosDetails, appNode, clients, MemoryConsumption); err != nil {
+			return stacktrace.Propagate(err, "could not create helper pod")
 		}
 	}
 
-	appLabel := "app=" + experimentsDetails.ExperimentName + "-helper-" + labelSuffix
-
-	//Checking the status of helper pod
-	log.Info("[Status]: Checking the status of the helper pod")
-	if err := status.CheckHelperStatus(experimentsDetails.ChaosNamespace, appLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
-		common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
-		return errors.Errorf("helper pod is not in running state, err: %v", err)
-	}
+	appLabel := fmt.Sprintf("app=%s-helper-%s", experimentsDetails.ExperimentName, experimentsDetails.RunID)
 
 	for _, appNode := range targetNodeList {
 		common.SetTargets(appNode, "targeted", "node", chaosDetails)
 	}
 
-	// Wait till the completion of helper pod
-	log.Info("[Wait]: Waiting till the completion of the helper pod")
-	podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, appLabel, clients, experimentsDetails.ChaosDuration+experimentsDetails.Timeout, experimentsDetails.ExperimentName)
-	if err != nil {
-		common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
-		return common.HelperFailedError(err)
-	} else if podStatus == "Failed" {
-		common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
-		return errors.Errorf("helper pod status is %v", podStatus)
-	}
-
-	//Deleting the helper pod
-	log.Info("[Cleanup]: Deleting the helper pod")
-	if err = common.DeleteAllPod(appLabel, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients); err != nil {
-		return errors.Errorf("unable to delete the helper pod, err: %v", err)
+	if err := common.ManagerHelperLifecycle(appLabel, chaosDetails, clients, false); err != nil {
+		return err
 	}
 
 	return nil
@@ -221,38 +202,36 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 
 // getNodeMemoryDetails will return the total memory capacity and memory allocatable of an application node
 func getNodeMemoryDetails(appNodeName string, clients clients.ClientSets) (int, int, error) {
-
-	nodeDetails, err := clients.KubeClient.CoreV1().Nodes().Get(appNodeName, v1.GetOptions{})
+	nodeDetails, err := clients.GetNode(appNodeName, 180, 2)
 	if err != nil {
-		return 0, 0, err
+		return 0, 0, cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Target: fmt.Sprintf("{nodeName: %s}", appNodeName), Reason: err.Error()}
 	}
 
 	memoryCapacity := int(nodeDetails.Status.Capacity.Memory().Value())
 	memoryAllocatable := int(nodeDetails.Status.Allocatable.Memory().Value())
 
 	if memoryCapacity == 0 || memoryAllocatable == 0 {
-		return memoryCapacity, memoryAllocatable, errors.Errorf("failed to get memory details of the application node")
+		return memoryCapacity, memoryAllocatable, cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Target: fmt.Sprintf("{nodeName: %s}", appNodeName), Reason: "failed to get memory details of the target node"}
 	}
 
 	return memoryCapacity, memoryAllocatable, nil
-
 }
 
 // calculateMemoryConsumption will calculate the amount of memory to be consumed for a given unit.
-func calculateMemoryConsumption(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, memoryCapacity, memoryAllocatable int) (string, error) {
+func calculateMemoryConsumption(experimentsDetails *experimentTypes.ExperimentDetails, memoryCapacity, memoryAllocatable int) (string, error) {
 
 	var totalMemoryConsumption int
 	var MemoryConsumption string
 	var selector string
 
-	if experimentsDetails.MemoryConsumptionMebibytes == 0 {
-		if experimentsDetails.MemoryConsumptionPercentage == 0 {
+	if experimentsDetails.MemoryConsumptionMebibytes == "0" {
+		if experimentsDetails.MemoryConsumptionPercentage == "0" {
 			log.Info("Neither of MemoryConsumptionPercentage or MemoryConsumptionMebibytes provided, proceeding with a default MemoryConsumptionPercentage value of 30%%")
 			return "30%", nil
 		}
 		selector = "percentage"
 	} else {
-		if experimentsDetails.MemoryConsumptionPercentage == 0 {
+		if experimentsDetails.MemoryConsumptionPercentage == "0" {
 			selector = "mebibytes"
 		} else {
 			log.Warn("Both MemoryConsumptionPercentage & MemoryConsumptionMebibytes provided as inputs, using the MemoryConsumptionPercentage value to proceed with the experiment")
@@ -265,12 +244,13 @@ func calculateMemoryConsumption(experimentsDetails *experimentTypes.ExperimentDe
 	case "percentage":
 
 		//Getting the total memory under chaos
-		memoryForChaos := ((float64(experimentsDetails.MemoryConsumptionPercentage) / 100) * float64(memoryCapacity))
+		memoryConsumptionPercentage, _ := strconv.ParseFloat(experimentsDetails.MemoryConsumptionPercentage, 64)
+		memoryForChaos := (memoryConsumptionPercentage / 100) * float64(memoryCapacity)
 
 		//Get the percentage of memory under chaos wrt allocatable memory
-		totalMemoryConsumption = int((float64(memoryForChaos) / float64(memoryAllocatable)) * 100)
+		totalMemoryConsumption = int((memoryForChaos / float64(memoryAllocatable)) * 100)
 		if totalMemoryConsumption > 100 {
-			log.Infof("[Info]: PercentageOfMemoryCapacity To Be Used: %d percent, which is more than 100 percent (%d percent) of Allocatable Memory, so the experiment will only consume upto 100 percent of Allocatable Memory", experimentsDetails.MemoryConsumptionPercentage, totalMemoryConsumption)
+			log.Infof("[Info]: PercentageOfMemoryCapacity To Be Used: %v percent, which is more than 100 percent (%d percent) of Allocatable Memory, so the experiment will only consume upto 100 percent of Allocatable Memory", experimentsDetails.MemoryConsumptionPercentage, totalMemoryConsumption)
 			MemoryConsumption = "100%"
 		} else {
 			log.Infof("[Info]: PercentageOfMemoryCapacity To Be Used: %v percent, which is %d percent of Allocatable Memory", experimentsDetails.MemoryConsumptionPercentage, totalMemoryConsumption)
@@ -282,7 +262,9 @@ func calculateMemoryConsumption(experimentsDetails *experimentTypes.ExperimentDe
 
 		// Bringing all the values in Ki unit to compare
 		// since 1Mi = 1025.390625Ki
-		TotalMemoryConsumption := float64(experimentsDetails.MemoryConsumptionMebibytes) * 1025.390625
+		memoryConsumptionMebibytes, _ := strconv.ParseFloat(experimentsDetails.MemoryConsumptionMebibytes, 64)
+
+		TotalMemoryConsumption := memoryConsumptionMebibytes * 1025.390625
 		// since 1Ki = 1024 bytes
 		memoryAllocatable := memoryAllocatable / 1024
 
@@ -290,24 +272,26 @@ func calculateMemoryConsumption(experimentsDetails *experimentTypes.ExperimentDe
 			MemoryConsumption = strconv.Itoa(memoryAllocatable) + "k"
 			log.Infof("[Info]: The memory for consumption %vKi is more than the available memory %vKi, so the experiment will hog the memory upto %vKi", int(TotalMemoryConsumption), memoryAllocatable, memoryAllocatable)
 		} else {
-			MemoryConsumption = strconv.Itoa(experimentsDetails.MemoryConsumptionMebibytes) + "m"
+			MemoryConsumption = experimentsDetails.MemoryConsumptionMebibytes + "m"
 		}
 		return MemoryConsumption, nil
 	}
-	return "", errors.Errorf("please specify the memory consumption value either in percentage or mebibytes in a non-decimal format using respective envs")
+	return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: "specify the memory consumption value either in percentage or mebibytes in a non-decimal format using respective envs"}
 }
 
 // createHelperPod derive the attributes for helper pod and create the helper pod
-func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, chaosDetails *types.ChaosDetails, appNode string, clients clients.ClientSets, labelSuffix, MemoryConsumption string) error {
+func createHelperPod(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, chaosDetails *types.ChaosDetails, appNode string, clients clients.ClientSets, MemoryConsumption string) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "CreateNodeMemoryHogFaultHelperPod")
+	defer span.End()
 
 	terminationGracePeriodSeconds := int64(experimentsDetails.TerminationGracePeriodSeconds)
 
 	helperPod := &apiv1.Pod{
 		ObjectMeta: v1.ObjectMeta{
-			Name:        experimentsDetails.ExperimentName + "-helper-" + experimentsDetails.RunID,
-			Namespace:   experimentsDetails.ChaosNamespace,
-			Labels:      common.GetHelperLabels(chaosDetails.Labels, experimentsDetails.RunID, labelSuffix, experimentsDetails.ExperimentName),
-			Annotations: chaosDetails.Annotations,
+			GenerateName: experimentsDetails.ExperimentName + "-helper-",
+			Namespace:    experimentsDetails.ChaosNamespace,
+			Labels:       common.GetHelperLabels(chaosDetails.Labels, experimentsDetails.RunID, experimentsDetails.ExperimentName),
+			Annotations:  chaosDetails.Annotations,
 		},
 		Spec: apiv1.PodSpec{
 			RestartPolicy:                 apiv1.RestartPolicyNever,
@@ -324,7 +308,7 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, chao
 					},
 					Args: []string{
 						"--vm",
-						strconv.Itoa(experimentsDetails.NumberOfWorkers),
+						experimentsDetails.NumberOfWorkers,
 						"--vm-bytes",
 						MemoryConsumption,
 						"--timeout",
@@ -336,6 +320,24 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, chao
 		},
 	}
 
-	_, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Create(helperPod)
-	return err
+	if len(chaosDetails.SideCar) != 0 {
+		helperPod.Spec.Containers = append(helperPod.Spec.Containers, common.BuildSidecar(chaosDetails)...)
+		helperPod.Spec.Volumes = append(helperPod.Spec.Volumes, common.GetSidecarVolumes(chaosDetails)...)
+	}
+
+	if err := clients.CreatePod(experimentsDetails.ChaosNamespace, helperPod); err != nil {
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("unable to create helper pod: %s", err.Error())}
+	}
+
+	return nil
+}
+
+// setChaosTunables will set up a random value within a given range of values
+// If the value is not provided in range it'll set up the initial provided value.
+func setChaosTunables(experimentsDetails *experimentTypes.ExperimentDetails) {
+	experimentsDetails.MemoryConsumptionMebibytes = common.ValidateRange(experimentsDetails.MemoryConsumptionMebibytes)
+	experimentsDetails.MemoryConsumptionPercentage = common.ValidateRange(experimentsDetails.MemoryConsumptionPercentage)
+	experimentsDetails.NumberOfWorkers = common.ValidateRange(experimentsDetails.NumberOfWorkers)
+	experimentsDetails.NodesAffectedPerc = common.ValidateRange(experimentsDetails.NodesAffectedPerc)
+	experimentsDetails.Sequence = common.GetRandomSequence(experimentsDetails.Sequence)
 }

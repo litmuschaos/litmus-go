@@ -1,10 +1,17 @@
 package lib
 
 import (
+	"context"
+	"fmt"
 	"strconv"
 	"strings"
 
-	clients "github.com/litmuschaos/litmus-go/pkg/clients"
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
+	"github.com/litmuschaos/litmus-go/pkg/telemetry"
+	"github.com/palantir/stacktrace"
+	"go.opentelemetry.io/otel"
+
+	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/node-io-stress/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
@@ -12,14 +19,27 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
-	"github.com/pkg/errors"
+	"github.com/litmuschaos/litmus-go/pkg/utils/stringutils"
 	"github.com/sirupsen/logrus"
 	apiv1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// PrepareNodeIOStress contains prepration steps before chaos injection
-func PrepareNodeIOStress(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+// PrepareNodeIOStress contains preparation steps before chaos injection
+func PrepareNodeIOStress(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PrepareNodeIOStressFault")
+	defer span.End()
+	//set up the tunables if provided in range
+	setChaosTunables(experimentsDetails)
+
+	log.InfoWithValues("[Info]: The details of chaos tunables are:", logrus.Fields{
+		"FilesystemUtilizationBytes":      experimentsDetails.FilesystemUtilizationBytes,
+		"FilesystemUtilizationPercentage": experimentsDetails.FilesystemUtilizationPercentage,
+		"CPU Core":                        experimentsDetails.CPU,
+		"NumberOfWorkers":                 experimentsDetails.NumberOfWorkers,
+		"Node Affected Percentage":        experimentsDetails.NodesAffectedPerc,
+		"Sequence":                        experimentsDetails.Sequence,
+	})
 
 	//Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
@@ -28,9 +48,10 @@ func PrepareNodeIOStress(experimentsDetails *experimentTypes.ExperimentDetails, 
 	}
 
 	//Select node for node-io-stress
-	targetNodeList, err := common.GetNodeList(experimentsDetails.TargetNodes, experimentsDetails.NodeLabel, experimentsDetails.NodesAffectedPerc, clients)
+	nodesAffectedPerc, _ := strconv.Atoi(experimentsDetails.NodesAffectedPerc)
+	targetNodeList, err := common.GetNodeList(experimentsDetails.TargetNodes, experimentsDetails.NodeLabel, nodesAffectedPerc, clients)
 	if err != nil {
-		return err
+		return stacktrace.Propagate(err, "could not get node list")
 	}
 	log.InfoWithValues("[Info]: Details of Nodes under chaos injection", logrus.Fields{
 		"No. Of Nodes": len(targetNodeList),
@@ -38,22 +59,22 @@ func PrepareNodeIOStress(experimentsDetails *experimentTypes.ExperimentDetails, 
 	})
 
 	if experimentsDetails.EngineName != "" {
-		if err := common.SetHelperData(chaosDetails, clients); err != nil {
-			return err
+		if err := common.SetHelperData(chaosDetails, experimentsDetails.SetHelperData, clients); err != nil {
+			return stacktrace.Propagate(err, "could not set helper data")
 		}
 	}
 
 	switch strings.ToLower(experimentsDetails.Sequence) {
 	case "serial":
-		if err = injectChaosInSerialMode(experimentsDetails, targetNodeList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
-			return err
+		if err = injectChaosInSerialMode(ctx, experimentsDetails, targetNodeList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+			return stacktrace.Propagate(err, "could not run chaos in serial mode")
 		}
 	case "parallel":
-		if err = injectChaosInParallelMode(experimentsDetails, targetNodeList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
-			return err
+		if err = injectChaosInParallelMode(ctx, experimentsDetails, targetNodeList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+			return stacktrace.Propagate(err, "could not run chaos in parallel mode")
 		}
 	default:
-		return errors.Errorf("%v sequence is not supported", experimentsDetails.Sequence)
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("'%s' sequence is not supported", experimentsDetails.Sequence)}
 	}
 
 	//Waiting for the ramp time after chaos injection
@@ -65,13 +86,13 @@ func PrepareNodeIOStress(experimentsDetails *experimentTypes.ExperimentDetails, 
 }
 
 // injectChaosInSerialMode stress the io of all the target nodes serially (one by one)
-func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, targetNodeList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-
-	labelSuffix := common.GetRunID()
+func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, targetNodeList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectNodeIOStressFaultInSerialMode")
+	defer span.End()
 
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
-		if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+		if err := probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
 			return err
 		}
 	}
@@ -90,51 +111,44 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 			"NumberOfWorkers":                 experimentsDetails.NumberOfWorkers,
 		})
 
-		experimentsDetails.RunID = common.GetRunID()
+		experimentsDetails.RunID = stringutils.GetRunID()
 
 		// Creating the helper pod to perform node io stress
-		if err := createHelperPod(experimentsDetails, chaosDetails, appNode, clients, labelSuffix); err != nil {
-			return errors.Errorf("unable to create the helper pod, err: %v", err)
+		if err := createHelperPod(ctx, experimentsDetails, chaosDetails, appNode, clients); err != nil {
+			return stacktrace.Propagate(err, "could not create helper pod")
 		}
 
-		appLabel := "name=" + experimentsDetails.ExperimentName + "-helper-" + experimentsDetails.RunID
+		appLabel := fmt.Sprintf("app=%s-helper-%s", experimentsDetails.ExperimentName, experimentsDetails.RunID)
 
 		//Checking the status of helper pod
 		log.Info("[Status]: Checking the status of the helper pod")
 		if err := status.CheckHelperStatus(experimentsDetails.ChaosNamespace, appLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
-			common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-helper-"+experimentsDetails.RunID, appLabel, chaosDetails, clients)
-			return errors.Errorf("helper pod is not in running state, err: %v", err)
-		}
-		common.SetTargets(appNode, "injected", "node", chaosDetails)
-
-		log.Info("[Wait]: Waiting till the completion of the helper pod")
-		podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, appLabel, clients, experimentsDetails.ChaosDuration+experimentsDetails.Timeout, experimentsDetails.ExperimentName)
-		common.SetTargets(appNode, "reverted", "node", chaosDetails)
-		if err != nil || podStatus == "Failed" {
-			common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-helper-"+experimentsDetails.RunID, appLabel, chaosDetails, clients)
-			return common.HelperFailedError(err)
+			common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
+			return stacktrace.Propagate(err, "could not check helper status")
 		}
 
-		//Deleting the helper pod
-		log.Info("[Cleanup]: Deleting the helper pod")
-		if err = common.DeletePod(experimentsDetails.ExperimentName+"-helper-"+experimentsDetails.RunID, appLabel, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients); err != nil {
-			return errors.Errorf("unable to delete the helper pod, err: %v", err)
+		common.SetTargets(appNode, "targeted", "node", chaosDetails)
+
+		if err := common.ManagerHelperLifecycle(appLabel, chaosDetails, clients, false); err != nil {
+			return err
 		}
 	}
 	return nil
 }
 
 // injectChaosInParallelMode stress the io of all the target nodes in parallel mode (all at once)
-func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, targetNodeList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-
-	labelSuffix := common.GetRunID()
+func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, targetNodeList []string, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectNodeIOStressFaultInParallelMode")
+	defer span.End()
 
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
-		if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+		if err := probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
 			return err
 		}
 	}
+
+	experimentsDetails.RunID = stringutils.GetRunID()
 
 	for _, appNode := range targetNodeList {
 
@@ -150,57 +164,37 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 			"NumberOfWorkers":                 experimentsDetails.NumberOfWorkers,
 		})
 
-		experimentsDetails.RunID = common.GetRunID()
-
 		// Creating the helper pod to perform node io stress
-		if err := createHelperPod(experimentsDetails, chaosDetails, appNode, clients, labelSuffix); err != nil {
-			return errors.Errorf("unable to create the helper pod, err: %v", err)
+		if err := createHelperPod(ctx, experimentsDetails, chaosDetails, appNode, clients); err != nil {
+			return stacktrace.Propagate(err, "could not create helper pod")
 		}
 	}
 
-	appLabel := "app=" + experimentsDetails.ExperimentName + "-helper-" + labelSuffix
-
-	//Checking the status of helper pod
-	log.Info("[Status]: Checking the status of the helper pod")
-	if err := status.CheckHelperStatus(experimentsDetails.ChaosNamespace, appLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
-		common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
-		return errors.Errorf("helper pod is not in running state, err: %v", err)
-	}
+	appLabel := fmt.Sprintf("app=%s-helper-%s", experimentsDetails.ExperimentName, experimentsDetails.RunID)
 
 	for _, appNode := range targetNodeList {
-		common.SetTargets(appNode, "injected", "node", chaosDetails)
+		common.SetTargets(appNode, "targeted", "node", chaosDetails)
 	}
 
-	log.Info("[Wait]: Waiting till the completion of the helper pod")
-	podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, appLabel, clients, experimentsDetails.ChaosDuration+experimentsDetails.Timeout, experimentsDetails.ExperimentName)
-	for _, appNode := range targetNodeList {
-		common.SetTargets(appNode, "reverted", "node", chaosDetails)
-	}
-	if err != nil || podStatus == "Failed" {
-		common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
-		return common.HelperFailedError(err)
-	}
-
-	//Deleting the helper pod
-	log.Info("[Cleanup]: Deleting the helper pod")
-	if err = common.DeleteAllPod(appLabel, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients); err != nil {
-		return errors.Errorf("unable to delete the helper pod, err: %v", err)
+	if err := common.ManagerHelperLifecycle(appLabel, chaosDetails, clients, false); err != nil {
+		return err
 	}
 
 	return nil
 }
 
 // createHelperPod derive the attributes for helper pod and create the helper pod
-func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, chaosDetails *types.ChaosDetails, appNode string, clients clients.ClientSets, labelSuffix string) error {
-
+func createHelperPod(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, chaosDetails *types.ChaosDetails, appNode string, clients clients.ClientSets) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "CreateNodeIOStressFaultHelperPod")
+	defer span.End()
 	terminationGracePeriodSeconds := int64(experimentsDetails.TerminationGracePeriodSeconds)
 
 	helperPod := &apiv1.Pod{
 		ObjectMeta: v1.ObjectMeta{
-			Name:        experimentsDetails.ExperimentName + "-helper-" + experimentsDetails.RunID,
-			Namespace:   experimentsDetails.ChaosNamespace,
-			Labels:      common.GetHelperLabels(chaosDetails.Labels, experimentsDetails.RunID, labelSuffix, experimentsDetails.ExperimentName),
-			Annotations: chaosDetails.Annotations,
+			GenerateName: experimentsDetails.ExperimentName + "-helper-",
+			Namespace:    experimentsDetails.ChaosNamespace,
+			Labels:       common.GetHelperLabels(chaosDetails.Labels, experimentsDetails.RunID, experimentsDetails.ExperimentName),
+			Annotations:  chaosDetails.Annotations,
 		},
 		Spec: apiv1.PodSpec{
 			RestartPolicy:                 apiv1.RestartPolicyNever,
@@ -222,39 +216,47 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, chao
 		},
 	}
 
-	_, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Create(helperPod)
-	return err
+	if len(chaosDetails.SideCar) != 0 {
+		helperPod.Spec.Containers = append(helperPod.Spec.Containers, common.BuildSidecar(chaosDetails)...)
+		helperPod.Spec.Volumes = append(helperPod.Spec.Volumes, common.GetSidecarVolumes(chaosDetails)...)
+	}
+
+	if err := clients.CreatePod(experimentsDetails.ChaosNamespace, helperPod); err != nil {
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("unable to create helper pod: %s", err.Error())}
+	}
+
+	return nil
 }
 
 // getContainerArguments derives the args for the pumba stress helper pod
 func getContainerArguments(experimentsDetails *experimentTypes.ExperimentDetails) []string {
 
 	var hddbytes string
-	if experimentsDetails.FilesystemUtilizationBytes == 0 {
-		if experimentsDetails.FilesystemUtilizationPercentage == 0 {
+	if experimentsDetails.FilesystemUtilizationBytes == "0" {
+		if experimentsDetails.FilesystemUtilizationPercentage == "0" {
 			hddbytes = "10%"
 			log.Info("Neither of FilesystemUtilizationPercentage or FilesystemUtilizationBytes provided, proceeding with a default FilesystemUtilizationPercentage value of 10%")
 		} else {
-			hddbytes = strconv.Itoa(experimentsDetails.FilesystemUtilizationPercentage) + "%"
+			hddbytes = experimentsDetails.FilesystemUtilizationPercentage + "%"
 		}
 	} else {
-		if experimentsDetails.FilesystemUtilizationPercentage == 0 {
-			hddbytes = strconv.Itoa(experimentsDetails.FilesystemUtilizationBytes) + "G"
+		if experimentsDetails.FilesystemUtilizationPercentage == "0" {
+			hddbytes = experimentsDetails.FilesystemUtilizationBytes + "G"
 		} else {
-			hddbytes = strconv.Itoa(experimentsDetails.FilesystemUtilizationPercentage) + "%"
+			hddbytes = experimentsDetails.FilesystemUtilizationPercentage + "%"
 			log.Warn("Both FsUtilPercentage & FsUtilBytes provided as inputs, using the FsUtilPercentage value to proceed with stress exp")
 		}
 	}
 
 	stressArgs := []string{
 		"--cpu",
-		strconv.Itoa(experimentsDetails.CPU),
+		experimentsDetails.CPU,
 		"--vm",
-		strconv.Itoa(experimentsDetails.VMWorkers),
+		experimentsDetails.VMWorkers,
 		"--io",
-		strconv.Itoa(experimentsDetails.NumberOfWorkers),
+		experimentsDetails.NumberOfWorkers,
 		"--hdd",
-		strconv.Itoa(experimentsDetails.NumberOfWorkers),
+		experimentsDetails.NumberOfWorkers,
 		"--hdd-bytes",
 		hddbytes,
 		"--timeout",
@@ -263,4 +265,16 @@ func getContainerArguments(experimentsDetails *experimentTypes.ExperimentDetails
 		"/tmp",
 	}
 	return stressArgs
+}
+
+// setChaosTunables will set up a random value within a given range of values
+// If the value is not provided in range it'll set up the initial provided value.
+func setChaosTunables(experimentsDetails *experimentTypes.ExperimentDetails) {
+	experimentsDetails.FilesystemUtilizationBytes = common.ValidateRange(experimentsDetails.FilesystemUtilizationBytes)
+	experimentsDetails.FilesystemUtilizationPercentage = common.ValidateRange(experimentsDetails.FilesystemUtilizationPercentage)
+	experimentsDetails.CPU = common.ValidateRange(experimentsDetails.CPU)
+	experimentsDetails.VMWorkers = common.ValidateRange(experimentsDetails.VMWorkers)
+	experimentsDetails.NumberOfWorkers = common.ValidateRange(experimentsDetails.NumberOfWorkers)
+	experimentsDetails.NodesAffectedPerc = common.ValidateRange(experimentsDetails.NodesAffectedPerc)
+	experimentsDetails.Sequence = common.GetRandomSequence(experimentsDetails.Sequence)
 }

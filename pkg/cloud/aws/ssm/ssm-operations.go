@@ -1,18 +1,25 @@
 package ssm
 
 import (
+	"fmt"
+	"math"
+	"math/rand"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/service/ssm"
+
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/aws-ssm/aws-ssm-chaos/types"
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	"github.com/litmuschaos/litmus-go/pkg/cloud/aws/common"
 	ec2 "github.com/litmuschaos/litmus-go/pkg/cloud/aws/ec2"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
-	"github.com/pkg/errors"
+	"github.com/litmuschaos/litmus-go/pkg/utils/stringutils"
+	"github.com/palantir/stacktrace"
 	"github.com/sirupsen/logrus"
 )
 
@@ -20,6 +27,14 @@ const (
 	// DefaultSSMDocsDirectory contains path of the ssm docs
 	DefaultSSMDocsDirectory = "LitmusChaos-AWS-SSM-Docs.yml"
 )
+
+// awsErrHasCode checks if an AWS error has a specific error code
+func awsErrHasCode(err error, code string) bool {
+	if aerr, ok := err.(awserr.Error); ok {
+		return aerr.Code() == code
+	}
+	return false
+}
 
 // SendSSMCommand will create and add the ssm document in aws service monitoring docs.
 func SendSSMCommand(experimentsDetails *experimentTypes.ExperimentDetails, ec2InstanceID []string) (string, error) {
@@ -42,7 +57,11 @@ func SendSSMCommand(experimentsDetails *experimentTypes.ExperimentDetails, ec2In
 		MaxErrors:      aws.String("0"),
 	})
 	if err != nil {
-		return "", common.CheckAWSError(err)
+		return "", cerrors.Error{
+			ErrorCode: cerrors.ErrorTypeChaosInject,
+			Reason:    fmt.Sprintf("failed to send SSM command: %v", common.CheckAWSError(err).Error()),
+			Target:    fmt.Sprintf("{EC2 Instance ID: %v, Region: %v}", ec2InstanceID, experimentsDetails.Region),
+		}
 	}
 
 	return *res.Command.CommandId, nil
@@ -75,8 +94,8 @@ func getParameters(experimentsDetails *experimentTypes.ExperimentDetails) map[st
 	return parameter
 }
 
-//WaitForCommandStatus will wait until the ssm command comes in target status
-func WaitForCommandStatus(status, commandID, EC2InstanceID, region string, timeout, delay int) error {
+// WaitForCommandStatus will wait until the ssm command comes in target status
+func WaitForCommandStatus(status, commandID, ec2InstanceID, region string, timeout, delay int) error {
 
 	log.Info("[Status]: Checking SSM command status")
 	return retry.
@@ -84,74 +103,157 @@ func WaitForCommandStatus(status, commandID, EC2InstanceID, region string, timeo
 		Wait(time.Duration(delay) * time.Second).
 		Try(func(attempt uint) error {
 
-			commandStatus, err := getSSMCommandStatus(commandID, EC2InstanceID, region)
+			commandStatus, err := getSSMCommandStatus(commandID, ec2InstanceID, region)
 			if err != nil {
-				return errors.Errorf("failed to get the ssm command status")
+				return stacktrace.Propagate(err, "failed to get the SSM command status")
 			}
 			if commandStatus != status {
 				log.Infof("The instance state is %v", commandStatus)
-				return errors.Errorf("ssm command is not yet in %v state", status)
+				return cerrors.Error{
+					ErrorCode: cerrors.ErrorTypeChaosInject,
+					Reason:    fmt.Sprintf("SSM command is not in %v state within timeout", status),
+					Target:    fmt.Sprintf("{EC2 Instance ID: %v, Region: %v}", ec2InstanceID, region)}
 			}
-			log.Infof("The ssm command status is %v", commandStatus)
+			log.Infof("The SSM command status is %v", commandStatus)
 			return nil
 		})
 }
 
 // getSSMCommandStatus will create and add the ssm document in aws service monitoring docs.
-func getSSMCommandStatus(commandID, EC2InstanceID, region string) (string, error) {
+func getSSMCommandStatus(commandID, ec2InstanceID, region string) (string, error) {
 
 	sesh := common.GetAWSSession(region)
 	ssmClient := ssm.New(sesh)
 
 	cmdOutput, err := ssmClient.GetCommandInvocation(&ssm.GetCommandInvocationInput{
 		CommandId:  aws.String(commandID),
-		InstanceId: aws.String(EC2InstanceID),
+		InstanceId: aws.String(ec2InstanceID),
 	})
 	if err != nil {
-		return "", common.CheckAWSError(err)
+		return "", cerrors.Error{
+			ErrorCode: cerrors.ErrorTypeChaosInject,
+			Reason:    fmt.Sprintf("failed to get SSM command status: %v", common.CheckAWSError(err).Error()),
+			Target:    fmt.Sprintf("{Command ID: %v, EC2 Instance ID: %v, Region: %v}", commandID, ec2InstanceID, region),
+		}
 	}
 	return *cmdOutput.Status, nil
 }
 
-//CheckInstanceInformation will check if the instance has permission to do smm api calls
+// CheckInstanceInformation checks if the instance has permission to do SSM API calls,
 func CheckInstanceInformation(experimentsDetails *experimentTypes.ExperimentDetails) error {
-
 	var instanceIDList []string
+	var input *ssm.DescribeInstanceInformationInput
+
 	switch {
 	case experimentsDetails.EC2InstanceID != "":
-		instanceIDList = strings.Split(experimentsDetails.EC2InstanceID, ",")
+		// If specific instance IDs are provided, use instance ID filter
+		instanceIDList = stringutils.SplitList(experimentsDetails.EC2InstanceID)
+
+		input = &ssm.DescribeInstanceInformationInput{
+			Filters: []*ssm.InstanceInformationStringFilter{
+				{
+					Key:    aws.String("InstanceIds"),
+					Values: aws.StringSlice(instanceIDList),
+				},
+			},
+		}
 	default:
+		// If using tags, first verify we have valid targets
 		if err := CheckTargetInstanceStatus(experimentsDetails); err != nil {
-			return err
+			return stacktrace.Propagate(err, "failed to check target instance(s) status")
 		}
 		instanceIDList = experimentsDetails.TargetInstanceIDList
 
+		// For filtering by instance IDs that we collected from tags
+		input = &ssm.DescribeInstanceInformationInput{
+			Filters: []*ssm.InstanceInformationStringFilter{
+				{
+					Key:    aws.String("InstanceIds"),
+					Values: aws.StringSlice(instanceIDList),
+				},
+			},
+		}
 	}
+
 	sesh := common.GetAWSSession(experimentsDetails.Region)
 	ssmClient := ssm.New(sesh)
-	for _, ec2ID := range instanceIDList {
-		res, err := ssmClient.DescribeInstanceInformation(&ssm.DescribeInstanceInformationInput{})
-		if err != nil {
-			return common.CheckAWSError(err)
+	var (
+		foundInstances   = make(map[string]bool)
+		err              error
+		maxRetries       = 5
+		maxRetryDuration = time.Second * 30
+		startTime        = time.Now()
+	)
+
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		if time.Since(startTime) > maxRetryDuration {
+			break
 		}
-		isInstanceFound := false
-		if len(res.InstanceInformationList) != 0 {
-			for _, instanceDetails := range res.InstanceInformationList {
-				if *instanceDetails.InstanceId == ec2ID {
-					isInstanceFound = true
-					break
+
+		err = ssmClient.DescribeInstanceInformationPages(input,
+			func(page *ssm.DescribeInstanceInformationOutput, lastPage bool) bool {
+				for _, instanceDetails := range page.InstanceInformationList {
+					if instanceDetails.InstanceId != nil {
+						foundInstances[*instanceDetails.InstanceId] = true
+					}
 				}
+				return true // continue to next page
+			})
+
+		if err != nil {
+			awsErr := common.CheckAWSError(err)
+			if request.IsErrorThrottle(err) ||
+				awsErrHasCode(awsErr, "ThrottlingException") ||
+				awsErrHasCode(awsErr, "RequestThrottledException") ||
+				awsErrHasCode(awsErr, "Throttling") ||
+				awsErrHasCode(awsErr, "TooManyRequestsException") ||
+				awsErrHasCode(awsErr, "RequestLimitExceeded") {
+
+				// Calculate exponential backoff with jitter
+				backoffTime := time.Duration(math.Pow(2, float64(attempt))) * time.Second
+				rnd := rand.New(rand.NewSource(time.Now().UnixNano()))
+				jitter := time.Duration(rnd.Intn(1000)) * time.Millisecond
+				sleepTime := backoffTime + jitter
+
+				log.Infof("AWS API rate limit hit, retrying in %v (attempt %d/%d)", sleepTime, attempt+1, maxRetries)
+				time.Sleep(sleepTime)
+				continue
 			}
-			if !isInstanceFound {
-				return errors.Errorf("error: the instance %v might not have suitable permission or iam attached to it. use \"aws ssm describe-instance-information\" to check the available instances", ec2ID)
+
+			return cerrors.Error{
+				ErrorCode: cerrors.ErrorTypeChaosInject,
+				Reason:    fmt.Sprintf("failed to get instance information: %v", awsErr.Error()),
+				Target:    fmt.Sprintf("{Region: %v}", experimentsDetails.Region),
+			}
+		}
+
+		break
+	}
+
+	if err != nil {
+		return cerrors.Error{
+			ErrorCode: cerrors.ErrorTypeChaosInject,
+			Reason:    fmt.Sprintf("failed to get instance information after retries: %v", common.CheckAWSError(err).Error()),
+			Target:    fmt.Sprintf("{Region: %v}", experimentsDetails.Region),
+		}
+	}
+
+	// Validate that each target instance is present.
+	for _, ec2ID := range instanceIDList {
+		if _, exists := foundInstances[ec2ID]; !exists {
+			return cerrors.Error{
+				ErrorCode: cerrors.ErrorTypeChaosInject,
+				Reason:    fmt.Sprintf("the instance %v might not have suitable permission or IAM attached to it. Run command `aws ssm describe-instance-information` to check for available instances", ec2ID),
+				Target:    fmt.Sprintf("{EC2 Instance ID: %v, Region: %v}", ec2ID, experimentsDetails.Region),
 			}
 		}
 	}
-	log.Info("[Info]: The target instance have permission to perform ssm api calls")
+
+	log.Info("[Info]: The target instance have permission to perform SSM API calls")
 	return nil
 }
 
-//CancelCommand will cancel the ssm command
+// CancelCommand will cancel the ssm command
 func CancelCommand(commandIDs, region string) error {
 	sesh := common.GetAWSSession(region)
 	ssmClient := ssm.New(sesh)
@@ -159,27 +261,35 @@ func CancelCommand(commandIDs, region string) error {
 		CommandId: aws.String(commandIDs),
 	})
 	if err != nil {
-		return common.CheckAWSError(err)
+		return cerrors.Error{
+			ErrorCode: cerrors.ErrorTypeChaosRevert,
+			Reason:    fmt.Sprintf("failed to cancel SSM command: %v", common.CheckAWSError(err).Error()),
+			Target:    fmt.Sprintf("{SSM Command ID: %v, Region: %v}", commandIDs, region),
+		}
 	}
 	return nil
 }
 
-//CheckTargetInstanceStatus will select the target instance which are in running state and
+// CheckTargetInstanceStatus will select the target instance which are in running state and
 // filtered from the given instance tag and check its status
 func CheckTargetInstanceStatus(experimentsDetails *experimentTypes.ExperimentDetails) error {
 
 	instanceIDList, err := ec2.GetInstanceList(experimentsDetails.EC2InstanceTag, experimentsDetails.Region)
 	if err != nil {
-		return err
+		return stacktrace.Propagate(err, "failed to get the instance list")
 	}
 	if len(instanceIDList) == 0 {
-		return errors.Errorf("no instance found with the given tag %v, in region %v", experimentsDetails.EC2InstanceTag, experimentsDetails.Region)
+		return cerrors.Error{
+			ErrorCode: cerrors.ErrorTypeTargetSelection,
+			Reason:    "no instance found",
+			Target:    fmt.Sprintf("{EC2 Instance Tag: %v, Region: %v}", experimentsDetails.EC2InstanceTag, experimentsDetails.Region),
+		}
 	}
 
 	for _, id := range instanceIDList {
 		instanceState, err := ec2.GetEC2InstanceStatus(id, experimentsDetails.Region)
 		if err != nil {
-			return errors.Errorf("fail to get the instance status while selecting the target instances, err: %v", err)
+			return stacktrace.Propagate(err, "failed to get the instance status while selecting the target instances")
 		}
 		if instanceState == "running" {
 			experimentsDetails.TargetInstanceIDList = append(experimentsDetails.TargetInstanceIDList, id)
@@ -187,7 +297,11 @@ func CheckTargetInstanceStatus(experimentsDetails *experimentTypes.ExperimentDet
 	}
 
 	if len(experimentsDetails.TargetInstanceIDList) == 0 {
-		return errors.Errorf("fail to get any running instance having instance tag: %v", experimentsDetails.EC2InstanceTag)
+		return cerrors.Error{
+			ErrorCode: cerrors.ErrorTypeStatusChecks,
+			Reason:    "failed to get any running instance with instance tag",
+			Target:    fmt.Sprintf("{EC2 Instance Tag: %v, Region: %v}", experimentsDetails.EC2InstanceTag, experimentsDetails.Region),
+		}
 	}
 
 	log.InfoWithValues("[Info]: Targeting the running instances filtered from instance tag", logrus.Fields{

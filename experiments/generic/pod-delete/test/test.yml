@@ -37,10 +37,7 @@ spec:
             value: '10'
 
           - name: FORCE
-            value: ''
-
-          - name: LIB
-            value: 'litmus'
+            value: '' 
 
           - name: TARGET_POD
             value: ''

@@ -1,24 +1,27 @@
 package common
 
 import (
+	"context"
+	"fmt"
 	"math/rand"
 	"strconv"
-	"strings"
-	"time"
 
+	"github.com/palantir/stacktrace"
+	apiv1 "k8s.io/api/core/v1"
+
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/math"
+	"github.com/litmuschaos/litmus-go/pkg/probe"
 	"github.com/litmuschaos/litmus-go/pkg/status"
-	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
-	"github.com/pkg/errors"
-	apiv1 "k8s.io/api/core/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"github.com/litmuschaos/litmus-go/pkg/types"
+	"github.com/litmuschaos/litmus-go/pkg/utils/stringutils"
 )
 
 var err error
 
-//GetNodeList check for the availibilty of the application node for the chaos execution
+// GetNodeList check for the availability of the application node for the chaos execution
 // if the application node is not defined it will derive the random target node list using node affected percentage
 func GetNodeList(nodeNames, nodeLabel string, nodeAffPerc int, clients clients.ClientSets) ([]string, error) {
 
@@ -26,24 +29,20 @@ func GetNodeList(nodeNames, nodeLabel string, nodeAffPerc int, clients clients.C
 	var nodes *apiv1.NodeList
 
 	if nodeNames != "" {
-		targetNodesList := strings.Split(nodeNames, ",")
+		targetNodesList := stringutils.SplitList(nodeNames)
 		return targetNodesList, nil
 	}
 
 	switch nodeLabel {
 	case "":
-		nodes, err = clients.KubeClient.CoreV1().Nodes().List(v1.ListOptions{})
+		nodes, err = getAllNodes(clients)
 		if err != nil {
-			return nil, errors.Errorf("Failed to find the nodes, err: %v", err)
-		} else if len(nodes.Items) == 0 {
-			return nil, errors.Errorf("Failed to find the nodes")
+			return nil, stacktrace.Propagate(err, "could not get all nodes")
 		}
 	default:
-		nodes, err = clients.KubeClient.CoreV1().Nodes().List(v1.ListOptions{LabelSelector: nodeLabel})
+		nodes, err = getNodesByLabels(nodeLabel, clients)
 		if err != nil {
-			return nil, errors.Errorf("Failed to find the nodes with matching label, err: %v", err)
-		} else if len(nodes.Items) == 0 {
-			return nil, errors.Errorf("Failed to find the nodes with matching label")
+			return nil, stacktrace.Propagate(err, "could not get nodes by labels")
 		}
 	}
 
@@ -51,7 +50,6 @@ func GetNodeList(nodeNames, nodeLabel string, nodeAffPerc int, clients clients.C
 
 	// it will generate the random nodelist
 	// it starts from the random index and choose requirement no of pods next to that index in a circular way.
-	rand.Seed(time.Now().UnixNano())
 	index := rand.Intn(len(nodes.Items))
 	for i := 0; i < newNodeListLength; i++ {
 		nodeList = append(nodeList, nodes.Items[index].Name)
@@ -63,90 +61,101 @@ func GetNodeList(nodeNames, nodeLabel string, nodeAffPerc int, clients clients.C
 	return nodeList, nil
 }
 
-//GetNodeName will select a random replica of application pod and return the node name of that application pod
+// GetNodeName will select a random replica of application pod and return the node name of that application pod
 func GetNodeName(namespace, labels, nodeLabel string, clients clients.ClientSets) (string, error) {
 
 	switch nodeLabel {
 	case "":
-		podList, err := clients.KubeClient.CoreV1().Pods(namespace).List(v1.ListOptions{LabelSelector: labels})
+		podList, err := clients.ListPods(namespace, labels)
 		if err != nil {
-			return "", errors.Wrapf(err, "Failed to find the application pods with matching labels in %v namespace, err: %v", namespace, err)
+			return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Target: fmt.Sprintf("{podLabel: %s, namespace: %s}", labels, namespace), Reason: err.Error()}
 		} else if len(podList.Items) == 0 {
-			return "", errors.Errorf("Failed to find the application pods with matching labels in %v namespace", namespace)
+			return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Target: fmt.Sprintf("{podLabel: %s, namespace: %s}", labels, namespace), Reason: "no pod found with matching labels"}
 		}
 
-		rand.Seed(time.Now().Unix())
 		randomIndex := rand.Intn(len(podList.Items))
 		return podList.Items[randomIndex].Spec.NodeName, nil
 	default:
-		nodeList, err := clients.KubeClient.CoreV1().Nodes().List(v1.ListOptions{LabelSelector: nodeLabel})
+		nodeList, err := getNodesByLabels(nodeLabel, clients)
 		if err != nil {
-			return "", errors.Wrapf(err, "Failed to find the target nodes with matching labels in %v namespace, err: %v", namespace, err)
-		} else if len(nodeList.Items) == 0 {
-			return "", errors.Wrapf(err, "Failed to find the target nodes with matching labels in %v namespace", namespace)
+			return "", stacktrace.Propagate(err, "could not get nodes by labels")
 		}
-		rand.Seed(time.Now().Unix())
 		randomIndex := rand.Intn(len(nodeList.Items))
 		return nodeList.Items[randomIndex].Name, nil
 	}
 }
 
-// PreChaosNodeStatusCheck fetches all the nodes in the cluster and checks their status, and fetches the total active nodes in the cluster, prior to the chaos experiment
-func PreChaosNodeStatusCheck(timeout, delay int, clients clients.ClientSets) (int, error) {
-	nodeList, err := clients.KubeClient.CoreV1().Nodes().List(v1.ListOptions{})
+func getAllNodes(clients clients.ClientSets) (*apiv1.NodeList, error) {
+	nodeList, err := clients.GetAllNode(180, 2)
 	if err != nil {
-		return 0, errors.Errorf("fail to get the nodes, err: %v", err)
+		return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Reason: fmt.Sprintf("failed to list all nodes: %s", err.Error())}
+	} else if len(nodeList.Items) == 0 {
+		return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Reason: "no node found!"}
 	}
-	for _, node := range nodeList.Items {
-		if err = status.CheckNodeStatus(node.Name, timeout, delay, clients); err != nil {
-			log.Infof("[Info]: The cluster is unhealthy this might not work, due to %v", err)
-		}
-	}
-	activeNodeCount, err := getActiveNodeCount(clients)
-	if err != nil {
-		return 0, errors.Errorf("fail to get the total active node count pre chaos, err: %v", err)
-	}
-
-	return activeNodeCount, nil
+	return nodeList, nil
 }
 
-// PostChaosActiveNodeCountCheck checks the number of active nodes post chaos and validates the number of healthy node count post chaos
-func PostChaosActiveNodeCountCheck(activeNodeCount, timeout, delay int, clients clients.ClientSets) error {
-	err := retry.
-		Times(uint(timeout / delay)).
-		Wait(time.Duration(delay) * time.Second).
-		Try(func(attempt uint) error {
-
-			activeNodes, err := getActiveNodeCount(clients)
-			if err != nil {
-				return errors.Errorf("fail to get the total active nodes, err: %v", err)
-			}
-			if activeNodeCount != activeNodes {
-				return errors.Errorf("fail to get equal active node post chaos")
-			}
-			return nil
-		})
-	return err
+func getNodesByLabels(nodeLabel string, clients clients.ClientSets) (*apiv1.NodeList, error) {
+	nodeList, err := clients.ListNode(nodeLabel, 180, 2)
+	if err != nil {
+		return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Target: fmt.Sprintf("{nodeLabel: %s}", nodeLabel), Reason: err.Error()}
+	} else if len(nodeList.Items) == 0 {
+		return nil, cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Target: fmt.Sprintf("{nodeLabel: %s}", nodeLabel), Reason: "no node found with matching labels"}
+	}
+	return nodeList, nil
 }
 
-// getActiveNodeCount fetches the target node and total node count from the cluster
-func getActiveNodeCount(clients clients.ClientSets) (int, error) {
-	nodeList, err := clients.KubeClient.CoreV1().Nodes().List(v1.ListOptions{})
+func checkHelperStatus(appLabel string, chaosDetails *types.ChaosDetails, clients clients.ClientSets) error {
+	// Checking the status of the helper pods
+	// if the pod doesn't transition to the 'running' state within a specified timeout period, consider the experiment unsuccessful
+	log.Info("[Status]: Checking the status of the helper pods")
+	err := status.CheckHelperStatus(chaosDetails.ChaosNamespace, appLabel, chaosDetails.Timeout, chaosDetails.Delay, clients)
 	if err != nil {
-		return 0, errors.Errorf("fail to get the nodes, err: %v", err)
+		if deleteErr := DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients); deleteErr != nil {
+			return cerrors.PreserveError{ErrString: fmt.Sprintf("[err: %v, delete error: %v]", err, deleteErr)}
+		}
+		return stacktrace.Propagate(err, "could not check helper status")
 	}
 
-	nodeCount := 0
-	for _, node := range nodeList.Items {
+	return nil
+}
 
-		conditions := node.Status.Conditions
-		for _, condition := range conditions {
-			if condition.Type == apiv1.NodeReady && condition.Status == apiv1.ConditionTrue {
-				nodeCount++
+func CheckHelperStatusAndRunProbes(ctx context.Context, appLabel, node string, chaosDetails *types.ChaosDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
+	if err := checkHelperStatus(appLabel, chaosDetails, clients); err != nil {
+		return err
+	}
+
+	SetTargets(node, "targeted", "node", chaosDetails)
+
+	// run the probes during chaos
+	if len(resultDetails.ProbeDetails) != 0 {
+		if err = probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+			if deleteErr := DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients); deleteErr != nil {
+				return cerrors.PreserveError{ErrString: fmt.Sprintf("[err: %v, delete error: %v]", err, deleteErr)}
 			}
+			return err
 		}
 	}
-	log.Infof("[Info]: Total number active nodes are: %v", nodeCount)
 
-	return nodeCount, nil
+	return nil
+}
+
+func WaitForCompletionAndDeleteHelperPods(appLabel string, chaosDetails *types.ChaosDetails, clients clients.ClientSets, podLevel bool) error {
+	// Wait till the completion of helper pod
+	log.Info("[Wait]: Waiting till the completion of the helper pod")
+	podStatus, err := status.WaitForCompletion(chaosDetails.ChaosNamespace, appLabel, clients, chaosDetails.ChaosDuration+chaosDetails.Timeout, GetContainerNames(chaosDetails)...)
+	if err != nil || podStatus == "Failed" {
+		err = HelperFailedError(err, appLabel, chaosDetails.ChaosNamespace, podLevel)
+		if deleteErr := DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients); deleteErr != nil {
+			return cerrors.PreserveError{ErrString: fmt.Sprintf("[err: %v, delete error: %v]", err, deleteErr)}
+		}
+		return err
+	}
+
+	// Deleting the helper pod
+	if err := DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients); err != nil {
+		return stacktrace.Propagate(err, "could not delete helper pod")
+	}
+
+	return nil
 }

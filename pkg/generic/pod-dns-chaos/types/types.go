@@ -12,7 +12,6 @@ type ExperimentDetails struct {
 	LIBImage                      string
 	LIBImagePullPolicy            string
 	RampTime                      int
-	ChaosLib                      string
 	AppNS                         string
 	AppLabel                      string
 	AppKind                       string
@@ -35,4 +34,6 @@ type ExperimentDetails struct {
 	Sequence                      string
 	SocketPath                    string
 	TerminationGracePeriodSeconds int
+	IsTargetContainerProvided     bool
+	SetHelperData                 string
 }

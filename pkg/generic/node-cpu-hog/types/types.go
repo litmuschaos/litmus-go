@@ -10,17 +10,13 @@ type ExperimentDetails struct {
 	EngineName                    string
 	ChaosDuration                 int
 	RampTime                      int
-	ChaosLib                      string
-	AppNS                         string
-	AppLabel                      string
-	AppKind                       string
 	ChaosUID                      clientTypes.UID
 	TerminationGracePeriodSeconds int
 	InstanceID                    string
 	ChaosNamespace                string
 	ChaosPodName                  string
-	NodeCPUcores                  int
-	CPULoad                       int
+	NodeCPUcores                  string
+	CPULoad                       string
 	RunID                         string
 	LIBImage                      string
 	LIBImagePullPolicy            string
@@ -28,8 +24,9 @@ type ExperimentDetails struct {
 	Timeout                       int
 	Delay                         int
 	TargetNodes                   string
-	NodesAffectedPerc             int
+	NodesAffectedPerc             string
 	Sequence                      string
 	TargetContainer               string
 	NodeLabel                     string
+	SetHelperData                 string
 }

@@ -12,7 +12,6 @@ type ExperimentDetails struct {
 	LIBImage                        string
 	LIBImagePullPolicy              string
 	RampTime                        int
-	ChaosLib                        string
 	AppNS                           string
 	AppLabel                        string
 	AppKind                         string
@@ -22,22 +21,24 @@ type ExperimentDetails struct {
 	ChaosPodName                    string
 	RunID                           string
 	TargetContainer                 string
-	StressImage                     string
 	Timeout                         int
 	Delay                           int
 	TargetPods                      string
-	PodsAffectedPerc                int
+	PodsAffectedPerc                string
 	ContainerRuntime                string
 	ChaosServiceAccount             string
 	SocketPath                      string
 	Sequence                        string
 	TerminationGracePeriodSeconds   int
-	CPUcores                        int
-	CPULoad                         int
-	FilesystemUtilizationPercentage int
-	FilesystemUtilizationBytes      int
-	NumberOfWorkers                 int
-	MemoryConsumption               int
+	CPUcores                        string
+	CPULoad                         string
+	FilesystemUtilizationPercentage string
+	FilesystemUtilizationBytes      string
+	NumberOfWorkers                 string
+	MemoryConsumption               string
 	VolumeMountPath                 string
 	StressType                      string
+	IsTargetContainerProvided       bool
+	NodeLabel                       string
+	SetHelperData                   string
 }

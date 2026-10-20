@@ -40,10 +40,7 @@ spec:
             value: ''
 
           - name: TOTAL_CHAOS_DURATION
-            value: '60'
-
-          - name: LIB
-            value: 'litmus'
+            value: '60' 
 
           - name: CHAOS_NAMESPACE
             value: 'default'

@@ -11,7 +11,6 @@ type ExperimentDetails struct {
 	ChaosDuration                 int
 	ChaosInterval                 int
 	RampTime                      int
-	ChaosLib                      string
 	AppNS                         string
 	AppLabel                      string
 	AppKind                       string
@@ -24,13 +23,19 @@ type ExperimentDetails struct {
 	LIBImagePullPolicy            string
 	TargetContainer               string
 	SocketPath                    string
+	ContainerAPITimeout           int
 	ChaosServiceAccount           string
 	RunID                         string
 	Timeout                       int
 	Delay                         int
 	TargetPods                    string
 	ContainerRuntime              string
-	PodsAffectedPerc              int
+	PodsAffectedPerc              string
 	Sequence                      string
 	Signal                        string
+	NodeLabel                     string
+	IsTargetContainerProvided     bool
+	SetHelperData                 string
+	PodTerminationOrder           string
+	InterPodKillIntervalSeconds   int
 }

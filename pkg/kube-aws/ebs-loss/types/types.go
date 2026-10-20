@@ -11,7 +11,6 @@ type ExperimentDetails struct {
 	ChaosDuration      int
 	ChaosInterval      int
 	RampTime           int
-	ChaosLib           string
 	AppNS              string
 	AppLabel           string
 	AppKind            string
@@ -19,14 +18,11 @@ type ExperimentDetails struct {
 	InstanceID         string
 	ChaosNamespace     string
 	ChaosPodName       string
-	AuxiliaryAppInfo   string
 	Timeout            int
 	Delay              int
 	Sequence           string
 	VolumeTag          string
 	Region             string
-	LIBImagePullPolicy string
-	TargetContainer    string
 	VolumeAffectedPerc int
 	EBSVolumeID        string
 	TargetVolumeIDList []string

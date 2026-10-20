@@ -1,40 +1,52 @@
 package lib
 
 import (
+	"context"
+	"fmt"
+	"os"
 	"strconv"
 	"strings"
 
-	clients "github.com/litmuschaos/litmus-go/pkg/clients"
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
+	"github.com/litmuschaos/litmus-go/pkg/telemetry"
+	"github.com/palantir/stacktrace"
+	"go.opentelemetry.io/otel"
+
+	"github.com/litmuschaos/litmus-go/pkg/clients"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/container-kill/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
-	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
-	"github.com/pkg/errors"
+	"github.com/litmuschaos/litmus-go/pkg/utils/stringutils"
 	"github.com/sirupsen/logrus"
 	apiv1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-//PrepareContainerKill contains the prepration steps before chaos injection
-func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+// PrepareContainerKill contains the preparation steps before chaos injection
+func PrepareContainerKill(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PrepareContainerKillFault")
+	defer span.End()
 
+	var err error
 	// Get the target pod details for the chaos execution
 	// if the target pod is not defined it will derive the random target pod list using pod affected percentage
-	if experimentsDetails.TargetPods == "" && chaosDetails.AppDetail.Label == "" {
-		return errors.Errorf("please provide one of the appLabel or TARGET_PODS")
+	if experimentsDetails.TargetPods == "" && chaosDetails.AppDetail == nil {
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Reason: "provide one of the appLabel or TARGET_PODS"}
 	}
-	targetPodList, err := common.GetPodList(experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, clients, chaosDetails)
-	if err != nil {
-		return err
-	}
+	//Set up the tunables if provided in range
+	SetChaosTunables(experimentsDetails)
 
-	podNames := []string{}
-	for _, pod := range targetPodList.Items {
-		podNames = append(podNames, pod.Name)
+	log.InfoWithValues("The tunables are:", logrus.Fields{
+		"PodsAffectedPerc": experimentsDetails.PodsAffectedPerc,
+		"Sequence":         experimentsDetails.Sequence,
+	})
+
+	targetPodList, err := common.GetTargetPods(experimentsDetails.NodeLabel, experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, experimentsDetails.PodTerminationOrder, clients, chaosDetails)
+	if err != nil {
+		return stacktrace.Propagate(err, "could not get target pods")
 	}
-	log.Infof("Target pods list for chaos, %v", podNames)
 
 	//Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
@@ -46,35 +58,28 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 	if experimentsDetails.ChaosServiceAccount == "" {
 		experimentsDetails.ChaosServiceAccount, err = common.GetServiceAccount(experimentsDetails.ChaosNamespace, experimentsDetails.ChaosPodName, clients)
 		if err != nil {
-			return errors.Errorf("unable to get the serviceAccountName, err: %v", err)
-		}
-	}
-
-	//Get the target container name of the application pod
-	if experimentsDetails.TargetContainer == "" {
-		experimentsDetails.TargetContainer, err = common.GetTargetContainer(experimentsDetails.AppNS, targetPodList.Items[0].Name, clients)
-		if err != nil {
-			return errors.Errorf("unable to get the target container name, err: %v", err)
+			return stacktrace.Propagate(err, "could not get experiment service account")
 		}
 	}
 
 	if experimentsDetails.EngineName != "" {
-		if err := common.SetHelperData(chaosDetails, clients); err != nil {
-			return err
+		if err := common.SetHelperData(chaosDetails, experimentsDetails.SetHelperData, clients); err != nil {
+			return stacktrace.Propagate(err, "could not set helper data")
 		}
 	}
 
+	experimentsDetails.IsTargetContainerProvided = experimentsDetails.TargetContainer != ""
 	switch strings.ToLower(experimentsDetails.Sequence) {
 	case "serial":
-		if err = injectChaosInSerialMode(experimentsDetails, targetPodList, clients, chaosDetails, resultDetails, eventsDetails); err != nil {
-			return err
+		if err = injectChaosInSerialMode(ctx, experimentsDetails, targetPodList, clients, chaosDetails, resultDetails, eventsDetails); err != nil {
+			return stacktrace.Propagate(err, "could not run chaos in serial mode")
 		}
 	case "parallel":
-		if err = injectChaosInParallelMode(experimentsDetails, targetPodList, clients, chaosDetails, resultDetails, eventsDetails); err != nil {
-			return err
+		if err = injectChaosInParallelMode(ctx, experimentsDetails, targetPodList, clients, chaosDetails, resultDetails, eventsDetails); err != nil {
+			return stacktrace.Propagate(err, "could not run chaos in parallel mode")
 		}
 	default:
-		return errors.Errorf("%v sequence is not supported", experimentsDetails.Sequence)
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("'%s' sequence is not supported", experimentsDetails.Sequence)}
 	}
 
 	//Waiting for the ramp time after chaos injection
@@ -86,125 +91,93 @@ func PrepareContainerKill(experimentsDetails *experimentTypes.ExperimentDetails,
 }
 
 // injectChaosInSerialMode kill the container of all target application serially (one by one)
-func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
-
-	labelSuffix := common.GetRunID()
-
+func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectContainerKillFaultInSerialMode")
+	defer span.End()
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
-		if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+		if err := probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
 			return err
 		}
 	}
 
 	// creating the helper pod to perform container kill chaos
-	for _, pod := range targetPodList.Items {
+	for i, pod := range targetPodList.Items {
 
-		log.InfoWithValues("[Info]: Details of application under chaos injection", logrus.Fields{
-			"PodName":       pod.Name,
-			"NodeName":      pod.Spec.NodeName,
-			"ContainerName": experimentsDetails.TargetContainer,
-		})
-		runID := common.GetRunID()
-		if err := createHelperPod(experimentsDetails, clients, chaosDetails, pod.Name, pod.Spec.NodeName, runID, labelSuffix); err != nil {
-			return errors.Errorf("unable to create the helper pod, err: %v", err)
+		//Get the target container name of the application pod
+		if !experimentsDetails.IsTargetContainerProvided {
+			experimentsDetails.TargetContainer = pod.Spec.Containers[0].Name
 		}
 
-		appLabel := "name=" + experimentsDetails.ExperimentName + "-helper-" + runID
+		runID := stringutils.GetRunID()
 
-		//checking the status of the helper pods, wait till the pod comes to running state else fail the experiment
-		log.Info("[Status]: Checking the status of the helper pods")
-		if err := status.CheckHelperStatus(experimentsDetails.ChaosNamespace, appLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
-			common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-helper-"+runID, appLabel, chaosDetails, clients)
-			return errors.Errorf("helper pods are not in running state, err: %v", err)
+		if err := createHelperPod(ctx, experimentsDetails, clients, chaosDetails, fmt.Sprintf("%s:%s:%s", pod.Name, pod.Namespace, experimentsDetails.TargetContainer), pod.Spec.NodeName, runID); err != nil {
+			return stacktrace.Propagate(err, "could not create helper pod")
 		}
 
-		// Wait till the completion of the helper pod
-		// set an upper limit for the waiting time
-		log.Info("[Wait]: waiting till the completion of the helper pod")
-		podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, appLabel, clients, experimentsDetails.ChaosDuration+experimentsDetails.Timeout, experimentsDetails.ExperimentName)
-		if err != nil || podStatus == "Failed" {
-			common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-helper-"+runID, appLabel, chaosDetails, clients)
-			return common.HelperFailedError(err)
+		appLabel := fmt.Sprintf("app=%s-helper-%s", experimentsDetails.ExperimentName, runID)
+
+		if err := common.ManagerHelperLifecycle(appLabel, chaosDetails, clients, true); err != nil {
+			return err
 		}
 
-		//Deleting all the helper pod for container-kill chaos
-		log.Info("[Cleanup]: Deleting all the helper pods")
-		if err = common.DeletePod(experimentsDetails.ExperimentName+"-helper-"+runID, appLabel, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients); err != nil {
-			return errors.Errorf("unable to delete the helper pod, err: %v", err)
+		// Wait for the inter-pod kill interval only between pods, not after the last one.
+		if experimentsDetails.InterPodKillIntervalSeconds > 0 && i < len(targetPodList.Items)-1 {
+			log.Infof("[Wait]: Waiting %vs between pod kills (INTER_POD_KILL_INTERVAL_SECONDS)", experimentsDetails.InterPodKillIntervalSeconds)
+			common.WaitForDuration(experimentsDetails.InterPodKillIntervalSeconds)
 		}
 	}
 	return nil
 }
 
 // injectChaosInParallelMode kill the container of all target application in parallel mode (all at once)
-func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
-
-	labelSuffix := common.GetRunID()
-
+func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectContainerKillFaultInParallelMode")
+	defer span.End()
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
-		if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+		if err := probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
 			return err
 		}
 	}
 
-	// creating the helper pod to perform container kill chaos
-	for _, pod := range targetPodList.Items {
+	runID := stringutils.GetRunID()
+	targets := common.FilterPodsForNodes(targetPodList, experimentsDetails.TargetContainer)
 
-		log.InfoWithValues("[Info]: Details of application under chaos injection", logrus.Fields{
-			"PodName":       pod.Name,
-			"NodeName":      pod.Spec.NodeName,
-			"ContainerName": experimentsDetails.TargetContainer,
-		})
-		runID := common.GetRunID()
-		if err := createHelperPod(experimentsDetails, clients, chaosDetails, pod.Name, pod.Spec.NodeName, runID, labelSuffix); err != nil {
-			return errors.Errorf("unable to create the helper pod, err: %v", err)
+	for node, tar := range targets {
+		var targetsPerNode []string
+		for _, k := range tar.Target {
+			targetsPerNode = append(targetsPerNode, fmt.Sprintf("%s:%s:%s", k.Name, k.Namespace, k.TargetContainer))
+		}
+
+		if err := createHelperPod(ctx, experimentsDetails, clients, chaosDetails, strings.Join(targetsPerNode, ";"), node, runID); err != nil {
+			return stacktrace.Propagate(err, "could not create helper pod")
 		}
 	}
 
-	appLabel := "app=" + experimentsDetails.ExperimentName + "-helper-" + labelSuffix
+	appLabel := fmt.Sprintf("app=%s-helper-%s", experimentsDetails.ExperimentName, runID)
 
-	//checking the status of the helper pods, wait till the pod comes to running state else fail the experiment
-	log.Info("[Status]: Checking the status of the helper pods")
-	if err := status.CheckHelperStatus(experimentsDetails.ChaosNamespace, appLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
-		common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
-		return errors.Errorf("helper pods are not in running state, err: %v", err)
-	}
-
-	// Wait till the completion of the helper pod
-	// set an upper limit for the waiting time
-	log.Info("[Wait]: waiting till the completion of the helper pod")
-	podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, appLabel, clients, experimentsDetails.ChaosDuration+experimentsDetails.Timeout, experimentsDetails.ExperimentName)
-	if err != nil || podStatus == "Failed" {
-		common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
-		return common.HelperFailedError(err)
-	}
-
-	//Deleting all the helper pod for container-kill chaos
-	log.Info("[Cleanup]: Deleting all the helper pods")
-	if err = common.DeleteAllPod(appLabel, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients); err != nil {
-		return errors.Errorf("unable to delete the helper pod, err: %v", err)
+	if err := common.ManagerHelperLifecycle(appLabel, chaosDetails, clients, true); err != nil {
+		return err
 	}
 
 	return nil
 }
 
 // createHelperPod derive the attributes for helper pod and create the helper pod
-func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, podName, nodeName, runID, labelSuffix string) error {
+func createHelperPod(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, targets, nodeName, runID string) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "CreateContainerKillFaultHelperPod")
+	defer span.End()
 
-	privilegedEnable := false
-	if experimentsDetails.ContainerRuntime == "crio" {
-		privilegedEnable = true
-	}
+	privilegedEnable := experimentsDetails.ContainerRuntime == "crio"
 	terminationGracePeriodSeconds := int64(experimentsDetails.TerminationGracePeriodSeconds)
 
 	helperPod := &apiv1.Pod{
 		ObjectMeta: v1.ObjectMeta{
-			Name:        experimentsDetails.ExperimentName + "-helper-" + runID,
-			Namespace:   experimentsDetails.ChaosNamespace,
-			Labels:      common.GetHelperLabels(chaosDetails.Labels, runID, labelSuffix, experimentsDetails.ExperimentName),
-			Annotations: chaosDetails.Annotations,
+			GenerateName: experimentsDetails.ExperimentName + "-helper-",
+			Namespace:    experimentsDetails.ChaosNamespace,
+			Labels:       common.GetHelperLabels(chaosDetails.Labels, runID, experimentsDetails.ExperimentName),
+			Annotations:  chaosDetails.Annotations,
 		},
 		Spec: apiv1.PodSpec{
 			ServiceAccountName:            experimentsDetails.ChaosServiceAccount,
@@ -235,7 +208,7 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 						"./helpers -name container-kill",
 					},
 					Resources: chaosDetails.Resources,
-					Env:       getPodEnv(experimentsDetails, podName),
+					Env:       getPodEnv(ctx, experimentsDetails, targets),
 					VolumeMounts: []apiv1.VolumeMount{
 						{
 							Name:      "cri-socket",
@@ -250,17 +223,23 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 		},
 	}
 
-	_, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Create(helperPod)
-	return err
+	if len(chaosDetails.SideCar) != 0 {
+		helperPod.Spec.Containers = append(helperPod.Spec.Containers, common.BuildSidecar(chaosDetails)...)
+		helperPod.Spec.Volumes = append(helperPod.Spec.Volumes, common.GetSidecarVolumes(chaosDetails)...)
+	}
+
+	if err := clients.CreatePod(experimentsDetails.ChaosNamespace, helperPod); err != nil {
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("unable to create helper pod: %s", err.Error())}
+	}
+
+	return nil
 }
 
 // getPodEnv derive all the env required for the helper pod
-func getPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, podName string) []apiv1.EnvVar {
+func getPodEnv(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, targets string) []apiv1.EnvVar {
 
 	var envDetails common.ENVDetails
-	envDetails.SetEnv("APP_NAMESPACE", experimentsDetails.AppNS).
-		SetEnv("APP_POD", podName).
-		SetEnv("APP_CONTAINER", experimentsDetails.TargetContainer).
+	envDetails.SetEnv("TARGETS", targets).
 		SetEnv("TOTAL_CHAOS_DURATION", strconv.Itoa(experimentsDetails.ChaosDuration)).
 		SetEnv("CHAOS_NAMESPACE", experimentsDetails.ChaosNamespace).
 		SetEnv("CHAOSENGINE", experimentsDetails.EngineName).
@@ -272,8 +251,18 @@ func getPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, podName st
 		SetEnv("STATUS_CHECK_DELAY", strconv.Itoa(experimentsDetails.Delay)).
 		SetEnv("STATUS_CHECK_TIMEOUT", strconv.Itoa(experimentsDetails.Timeout)).
 		SetEnv("EXPERIMENT_NAME", experimentsDetails.ExperimentName).
+		SetEnv("CONTAINER_API_TIMEOUT", strconv.Itoa(experimentsDetails.ContainerAPITimeout)).
 		SetEnv("INSTANCE_ID", experimentsDetails.InstanceID).
+		SetEnv("OTEL_EXPORTER_OTLP_ENDPOINT", os.Getenv(telemetry.OTELExporterOTLPEndpoint)).
+		SetEnv("TRACE_PARENT", telemetry.GetMarshalledSpanFromContext(ctx)).
 		SetEnvFromDownwardAPI("v1", "metadata.name")
 
 	return envDetails.ENV
+}
+
+// SetChaosTunables will setup a random value within a given range of values
+// If the value is not provided in range it'll setup the initial provided value.
+func SetChaosTunables(experimentsDetails *experimentTypes.ExperimentDetails) {
+	experimentsDetails.PodsAffectedPerc = common.ValidateRange(experimentsDetails.PodsAffectedPerc)
+	experimentsDetails.Sequence = common.GetRandomSequence(experimentsDetails.Sequence)
 }

@@ -12,10 +12,6 @@ type ExperimentDetails struct {
 	ChaosDuration                 int
 	ChaosInterval                 int
 	RampTime                      int
-	ChaosLib                      string
-	AppNS                         string
-	AppLabel                      string
-	AppKind                       string
 	ChaosUID                      clientTypes.UID
 	InstanceID                    string
 	ChaosNamespace                string
@@ -34,4 +30,5 @@ type ExperimentDetails struct {
 	Resources                     corev1.ResourceRequirements
 	ImagePullSecrets              []corev1.LocalObjectReference
 	TerminationGracePeriodSeconds int
+	IsTargetContainerProvided     bool
 }

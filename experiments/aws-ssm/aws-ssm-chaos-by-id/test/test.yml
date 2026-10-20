@@ -21,8 +21,6 @@ spec:
           - sleep 
           - "3600"
         env:
-          - name: LIB
-            value: 'litmus'
 
           - name: EC2_INSTANCE_ID
             value: ''

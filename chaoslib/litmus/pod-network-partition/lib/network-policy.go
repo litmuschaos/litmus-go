@@ -1,11 +1,17 @@
 package lib
 
 import (
+	"fmt"
+	"net"
 	"strings"
+
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
+	"github.com/litmuschaos/litmus-go/pkg/clients"
+	"github.com/palantir/stacktrace"
 
 	network_chaos "github.com/litmuschaos/litmus-go/chaoslib/litmus/network-chaos/lib"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-network-partition/types"
-	"github.com/pkg/errors"
+	"github.com/litmuschaos/litmus-go/pkg/utils/stringutils"
 	"gopkg.in/yaml.v2"
 	corev1 "k8s.io/api/core/v1"
 	networkv1 "k8s.io/api/networking/v1"
@@ -51,12 +57,12 @@ func (np *NetworkPolicy) getNetworkPolicyDetails(experimentsDetails *experimentT
 
 	// sets the ports for the traffic control
 	if err := np.setPort(experimentsDetails.PORTS); err != nil {
-		return err
+		return stacktrace.Propagate(err, "could not set port")
 	}
 
 	// sets the destination ips for which the traffic should be blocked
 	if err := np.setExceptIPs(experimentsDetails); err != nil {
-		return err
+		return stacktrace.Propagate(err, "could not set ips")
 	}
 
 	// sets the egress traffic rules
@@ -110,7 +116,7 @@ func (np *NetworkPolicy) setPolicy(policy string) *NetworkPolicy {
 // setPodSelector sets the pod labels selector
 func (np *NetworkPolicy) setPodSelector(podLabel string) *NetworkPolicy {
 	podSelector := map[string]string{}
-	labels := strings.Split(podLabel, ",")
+	labels := stringutils.SplitList(podLabel)
 	for i := range labels {
 		key, value := getKeyValue(labels[i])
 		if key != "" || value != "" {
@@ -124,7 +130,7 @@ func (np *NetworkPolicy) setPodSelector(podLabel string) *NetworkPolicy {
 // setNamespaceSelector sets the namespace labels selector
 func (np *NetworkPolicy) setNamespaceSelector(nsLabel string) *NetworkPolicy {
 	nsSelector := map[string]string{}
-	labels := strings.Split(nsLabel, ",")
+	labels := stringutils.SplitList(nsLabel)
 	for i := range labels {
 		key, value := getKeyValue(labels[i])
 		if key != "" || value != "" {
@@ -137,11 +143,11 @@ func (np *NetworkPolicy) setNamespaceSelector(nsLabel string) *NetworkPolicy {
 
 // setPort sets all the protocols and ports
 func (np *NetworkPolicy) setPort(p string) error {
-	ports := []networkv1.NetworkPolicyPort{}
+	var ports []networkv1.NetworkPolicyPort
 	var port Port
 	// unmarshal the protocols and ports from the env
 	if err := yaml.Unmarshal([]byte(strings.TrimSpace(parseCommand(p))), &port); err != nil {
-		return errors.Errorf("Unable to unmarshal, err: %v", err)
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("failed to unmarshal ports: %s", err.Error())}
 	}
 
 	// sets all the tcp ports
@@ -178,28 +184,53 @@ func getPort(port int32, protocol corev1.Protocol) networkv1.NetworkPolicyPort {
 // setExceptIPs sets all the destination ips
 // for which traffic should be blocked
 func (np *NetworkPolicy) setExceptIPs(experimentsDetails *experimentTypes.ExperimentDetails) error {
-	// get all the target ips
-	destinationIPs, err := network_chaos.GetTargetIps(experimentsDetails.DestinationIPs, experimentsDetails.DestinationHosts)
+	destinationIPs, err := network_chaos.GetTargetIps(experimentsDetails.DestinationIPs, experimentsDetails.DestinationHosts, clients.ClientSets{}, false)
 	if err != nil {
-		return err
+		return stacktrace.Propagate(err, "could not get destination ips")
 	}
-
-	ips := strings.Split(destinationIPs, ",")
-	var uniqueIps []string
-	// removing all the duplicates and ipv6 ips from the list, if any
-	for i := range ips {
-		isPresent := false
-		for j := range uniqueIps {
-			if ips[i] == uniqueIps[j] {
-				isPresent = true
-			}
+	ips := stringutils.SplitList(destinationIPs)
+	seen := make(map[string]struct{})
+	var ordered []string
+	for _, raw := range ips {
+		norm, err := normalizeIPOrCIDR(raw)
+		if err != nil {
+			return err
 		}
-		if ips[i] != "" && !isPresent && !strings.Contains(ips[i], ":") {
-			uniqueIps = append(uniqueIps, ips[i]+"/32")
+		if norm == "" {
+			continue
 		}
+		if _, ok := seen[norm]; ok {
+			continue
+		}
+		seen[norm] = struct{}{}
+		ordered = append(ordered, norm)
 	}
-	np.ExceptIPs = uniqueIps
+	np.ExceptIPs = ordered
 	return nil
+}
+
+// normalizeIPOrCIDR validates and normalizes IP addresses or CIDR blocks,
+// adding appropriate subnet masks (/32 for IPv4, /128 for IPv6) to plain IP addresses.
+
+func normalizeIPOrCIDR(raw string) (string, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "", nil
+	}
+	if strings.Contains(raw, "/") {
+		if _, _, err := net.ParseCIDR(raw); err != nil {
+			return "", fmt.Errorf("invalid CIDR %q: %w", raw, err)
+		}
+		return raw, nil
+	}
+	ip := net.ParseIP(raw)
+	if ip == nil {
+		return "", fmt.Errorf("invalid IP %q", raw)
+	}
+	if ip.To4() != nil {
+		return raw + "/32", nil
+	}
+	return raw + "/128", nil
 }
 
 // setIngressRules sets the ingress traffic rules

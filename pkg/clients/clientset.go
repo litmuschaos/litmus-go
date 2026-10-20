@@ -9,6 +9,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	"k8s.io/klog"
 )
 
 // ClientSets is a collection of clientSets and kubeConfig needed
@@ -50,7 +52,7 @@ func getKubeConfig() (*rest.Config, error) {
 	kubeconfig := flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
 	flag.Parse()
 	// It uses in-cluster config, if kubeconfig path is not specified
-	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
+	config, err := buildConfigFromFlags("", *kubeconfig)
 	return config, err
 }
 
@@ -70,4 +72,19 @@ func generateLitmusClientSet(config *rest.Config) (*chaosClient.LitmuschaosV1alp
 		return nil, errors.Wrapf(err, "Unable to create LitmusClientSet, err: %v", err)
 	}
 	return litmusClientSet, nil
+}
+
+// buildConfigFromFlags is a helper function that builds configs from a master
+// url or a kubeconfig filepath, if nothing is provided it falls back to inClusterConfig
+func buildConfigFromFlags(masterUrl, kubeconfigPath string) (*rest.Config, error) {
+	if kubeconfigPath == "" && masterUrl == "" {
+		kubeconfig, err := rest.InClusterConfig()
+		if err == nil {
+			return kubeconfig, nil
+		}
+		klog.Warningf("Neither --kubeconfig nor --master was specified.  Using the inClusterConfig. Error creating inClusterConfig: %v", err)
+	}
+	return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
+		&clientcmd.ClientConfigLoadingRules{ExplicitPath: kubeconfigPath},
+		&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: masterUrl}}).ClientConfig()
 }

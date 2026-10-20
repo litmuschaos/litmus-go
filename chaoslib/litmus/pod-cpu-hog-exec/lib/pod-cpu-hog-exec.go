@@ -1,13 +1,20 @@
 package lib
 
 import (
+	"context"
+	"fmt"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
 	"time"
 
-	clients "github.com/litmuschaos/litmus-go/pkg/clients"
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
+	"github.com/litmuschaos/litmus-go/pkg/telemetry"
+	"github.com/palantir/stacktrace"
+	"go.opentelemetry.io/otel"
+
+	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/pod-cpu-hog-exec/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
@@ -16,36 +23,61 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	litmusexec "github.com/litmuschaos/litmus-go/pkg/utils/exec"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 )
 
 var inject chan os.Signal
 
+// PrepareCPUExecStress contains the chaos preparation and injection steps
+func PrepareCPUExecStress(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PreparePodCPUHogExecFault")
+	defer span.End()
+	// inject channel is used to transmit signal notifications.
+	inject = make(chan os.Signal, 1)
+	// Catch and relay certain signal(s) to inject channel.
+	signal.Notify(inject, os.Interrupt, syscall.SIGTERM)
+
+	//Waiting for the ramp time before chaos injection
+	if experimentsDetails.RampTime != 0 {
+		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", experimentsDetails.RampTime)
+		common.WaitForDuration(experimentsDetails.RampTime)
+	}
+	//Starting the CPU stress experiment
+	if err := experimentCPU(ctx, experimentsDetails, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+		return stacktrace.Propagate(err, "could not stress cpu")
+	}
+	//Waiting for the ramp time after chaos injection
+	if experimentsDetails.RampTime != 0 {
+		log.Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", experimentsDetails.RampTime)
+		common.WaitForDuration(experimentsDetails.RampTime)
+	}
+	return nil
+}
+
 // stressCPU Uses the REST API to exec into the target container of the target pod
 // The function will be constantly increasing the CPU utilisation until it reaches the maximum available or allowed number.
 // Using the TOTAL_CHAOS_DURATION we will need to specify for how long this experiment will last
-func stressCPU(experimentsDetails *experimentTypes.ExperimentDetails, podName string, clients clients.ClientSets, stressErr chan error) {
-	// It will contains all the pod & container details required for exec command
+func stressCPU(experimentsDetails *experimentTypes.ExperimentDetails, podName, ns string, clients clients.ClientSets, stressErr chan error) {
+	// It will contain all the pod & container details required for exec command
 	execCommandDetails := litmusexec.PodDetails{}
 	command := []string{"/bin/sh", "-c", experimentsDetails.ChaosInjectCmd}
-	litmusexec.SetExecCommandAttributes(&execCommandDetails, podName, experimentsDetails.TargetContainer, experimentsDetails.AppNS)
-	_, err := litmusexec.Exec(&execCommandDetails, clients, command)
+	litmusexec.SetExecCommandAttributes(&execCommandDetails, podName, experimentsDetails.TargetContainer, ns)
+	_, _, err := litmusexec.Exec(&execCommandDetails, clients, command)
 	stressErr <- err
 }
 
-//experimentCPU function orchestrates the experiment by calling the StressCPU function for every core, of every container, of every pod that is targeted
-func experimentCPU(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-
+// experimentCPU function orchestrates the experiment by calling the StressCPU function for every core, of every container, of every pod that is targeted
+func experimentCPU(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
 	// Get the target pod details for the chaos execution
 	// if the target pod is not defined it will derive the random target pod list using pod affected percentage
-	if experimentsDetails.TargetPods == "" && chaosDetails.AppDetail.Label == "" {
-		return errors.Errorf("please provide one of the appLabel or TARGET_PODS")
+	if experimentsDetails.TargetPods == "" && chaosDetails.AppDetail == nil {
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Reason: "provide one of the appLabel or TARGET_PODS"}
 	}
+
 	targetPodList, err := common.GetPodList(experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, clients, chaosDetails)
 	if err != nil {
-		return err
+		return stacktrace.Propagate(err, "could not get target pods")
 	}
 
 	podNames := []string{}
@@ -54,36 +86,31 @@ func experimentCPU(experimentsDetails *experimentTypes.ExperimentDetails, client
 	}
 	log.Infof("Target pods list for chaos, %v", podNames)
 
-	//Get the target container name of the application pod
-	if experimentsDetails.TargetContainer == "" {
-		experimentsDetails.TargetContainer, err = common.GetTargetContainer(experimentsDetails.AppNS, targetPodList.Items[0].Name, clients)
-		if err != nil {
-			return errors.Errorf("unable to get the target container name, err: %v", err)
-		}
-	}
-
+	experimentsDetails.IsTargetContainerProvided = experimentsDetails.TargetContainer != ""
 	switch strings.ToLower(experimentsDetails.Sequence) {
 	case "serial":
-		if err = injectChaosInSerialMode(experimentsDetails, targetPodList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
-			return err
+		if err = injectChaosInSerialMode(ctx, experimentsDetails, targetPodList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+			return stacktrace.Propagate(err, "could not run chaos in serial mode")
 		}
 	case "parallel":
-		if err = injectChaosInParallelMode(experimentsDetails, targetPodList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
-			return err
+		if err = injectChaosInParallelMode(ctx, experimentsDetails, targetPodList, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
+			return stacktrace.Propagate(err, "could not run chaos in parallel mode")
 		}
 	default:
-		return errors.Errorf("%v sequence is not supported", experimentsDetails.Sequence)
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("'%s' sequence is not supported", experimentsDetails.Sequence)}
 	}
 
 	return nil
 }
 
 // injectChaosInSerialMode stressed the cpu of all target application serially (one by one)
-func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList corev1.PodList, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, targetPodList corev1.PodList, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectPodCPUHogExecFaultInSerialMode")
+	defer span.End()
 
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
-		if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+		if err := probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
 			return err
 		}
 	}
@@ -113,6 +140,11 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 				events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 			}
 
+			//Get the target container name of the application pod
+			if !experimentsDetails.IsTargetContainerProvided {
+				experimentsDetails.TargetContainer = pod.Spec.Containers[0].Name
+			}
+
 			log.InfoWithValues("[Chaos]: The Target application details", logrus.Fields{
 				"Target Container": experimentsDetails.TargetContainer,
 				"Target Pod":       pod.Name,
@@ -120,7 +152,7 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 			})
 
 			for i := 0; i < experimentsDetails.CPUcores; i++ {
-				go stressCPU(experimentsDetails, pod.Name, clients, stressErr)
+				go stressCPU(experimentsDetails, pod.Name, pod.Namespace, clients, stressErr)
 			}
 
 			common.SetTargets(pod.Name, "injected", "pod", chaosDetails)
@@ -140,18 +172,20 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 							log.Warn("Chaos process OOM killed")
 							return nil
 						}
-						return err
+						return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Target: fmt.Sprintf("podName: %s, namespace: %s, container: %s", pod.Name, pod.Namespace, experimentsDetails.TargetContainer), Reason: fmt.Sprintf("failed to stress cpu of target pod: %s", err.Error())}
 					}
 				case <-signChan:
 					log.Info("[Chaos]: Revert Started")
-					err := killStressCPUSerial(experimentsDetails, pod.Name, clients, chaosDetails)
-					if err != nil {
+					if err := killStressCPUSerial(experimentsDetails, pod.Name, pod.Namespace, clients, chaosDetails); err != nil {
 						log.Errorf("Error in Kill stress after abortion, err: %v", err)
 					}
 					// updating the chaosresult after stopped
-					failStep := "Chaos injection stopped!"
-					types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep)
-					result.ChaosResult(chaosDetails, clients, resultDetails, "EOT")
+					err := cerrors.Error{ErrorCode: cerrors.ErrorTypeExperimentAborted, Target: fmt.Sprintf("{podName: %s, namespace: %s, container: %s}", pod.Name, pod.Namespace, experimentsDetails.TargetContainer), Reason: "experiment is aborted"}
+					failStep, errCode := cerrors.GetRootCauseAndErrorCode(err, string(chaosDetails.Phase))
+					types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep, errCode)
+					if err := result.ChaosResult(chaosDetails, clients, resultDetails, "EOT"); err != nil {
+						log.Errorf("failed to update chaos result %s", err.Error())
+					}
 					log.Info("[Chaos]: Revert Completed")
 					os.Exit(1)
 				case <-endTime:
@@ -160,8 +194,8 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 					break loop
 				}
 			}
-			if err := killStressCPUSerial(experimentsDetails, pod.Name, clients, chaosDetails); err != nil {
-				return err
+			if err := killStressCPUSerial(experimentsDetails, pod.Name, pod.Namespace, clients, chaosDetails); err != nil {
+				return stacktrace.Propagate(err, "could not revert cpu stress")
 			}
 		}
 	}
@@ -169,13 +203,16 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 }
 
 // injectChaosInParallelMode stressed the cpu of all target application in parallel mode (all at once)
-func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList corev1.PodList, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, targetPodList corev1.PodList, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectPodCPUHogExecFaultInParallelMode")
+	defer span.End()
+
 	// creating err channel to receive the error from the go routine
 	stressErr := make(chan error)
 
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
-		if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+		if err := probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
 			return err
 		}
 	}
@@ -201,6 +238,10 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 				types.SetEngineEventAttributes(eventsDetails, types.ChaosInject, msg, "Normal", chaosDetails)
 				events.GenerateEvents(eventsDetails, clients, chaosDetails, "ChaosEngine")
 			}
+			//Get the target container name of the application pod
+			if !experimentsDetails.IsTargetContainerProvided {
+				experimentsDetails.TargetContainer = pod.Spec.Containers[0].Name
+			}
 
 			log.InfoWithValues("[Chaos]: The Target application details", logrus.Fields{
 				"Target Container": experimentsDetails.TargetContainer,
@@ -208,7 +249,7 @@ func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDet
 				"CPU CORE":         experimentsDetails.CPUcores,
 			})
 			for i := 0; i < experimentsDetails.CPUcores; i++ {
-				go stressCPU(experimentsDetails, pod.Name, clients, stressErr)
+				go stressCPU(experimentsDetails, pod.Name, pod.Namespace, clients, stressErr)
 			}
 			common.SetTargets(pod.Name, "injected", "pod", chaosDetails)
 		}
@@ -229,7 +270,7 @@ loop:
 					log.Warn("Chaos process OOM killed")
 					return nil
 				}
-				return err
+				return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Reason: fmt.Sprintf("failed to stress cpu of target pod: %s", err.Error())}
 			}
 		case <-signChan:
 			log.Info("[Chaos]: Revert Started")
@@ -237,9 +278,12 @@ loop:
 				log.Errorf("Error in Kill stress after abortion, err: %v", err)
 			}
 			// updating the chaosresult after stopped
-			failStep := "Chaos injection stopped!"
-			types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep)
-			result.ChaosResult(chaosDetails, clients, resultDetails, "EOT")
+			err := cerrors.Error{ErrorCode: cerrors.ErrorTypeExperimentAborted, Reason: "experiment is aborted"}
+			failStep, errCode := cerrors.GetRootCauseAndErrorCode(err, string(chaosDetails.Phase))
+			types.SetResultAfterCompletion(resultDetails, "Stopped", "Stopped", failStep, errCode)
+			if err := result.ChaosResult(chaosDetails, clients, resultDetails, "EOT"); err != nil {
+				log.Errorf("failed to update chaos result %s", err.Error())
+			}
 			log.Info("[Chaos]: Revert Completed")
 			os.Exit(1)
 		case <-endTime:
@@ -251,43 +295,19 @@ loop:
 	return killStressCPUParallel(experimentsDetails, targetPodList, clients, chaosDetails)
 }
 
-//PrepareCPUExecStress contains the chaos prepration and injection steps
-func PrepareCPUExecStress(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
-
-	// inject channel is used to transmit signal notifications.
-	inject = make(chan os.Signal, 1)
-	// Catch and relay certain signal(s) to inject channel.
-	signal.Notify(inject, os.Interrupt, syscall.SIGTERM)
-
-	//Waiting for the ramp time before chaos injection
-	if experimentsDetails.RampTime != 0 {
-		log.Infof("[Ramp]: Waiting for the %vs ramp time before injecting chaos", experimentsDetails.RampTime)
-		common.WaitForDuration(experimentsDetails.RampTime)
-	}
-	//Starting the CPU stress experiment
-	if err := experimentCPU(experimentsDetails, clients, resultDetails, eventsDetails, chaosDetails); err != nil {
-		return err
-	}
-	//Waiting for the ramp time after chaos injection
-	if experimentsDetails.RampTime != 0 {
-		log.Infof("[Ramp]: Waiting for the %vs ramp time after injecting chaos", experimentsDetails.RampTime)
-		common.WaitForDuration(experimentsDetails.RampTime)
-	}
-	return nil
-}
-
 // killStressCPUSerial function to kill a stress process running inside target container
-//  Triggered by either timeout of chaos duration or termination of the experiment
-func killStressCPUSerial(experimentsDetails *experimentTypes.ExperimentDetails, podName string, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
-	// It will contains all the pod & container details required for exec command
+//
+//	Triggered by either timeout of chaos duration or termination of the experiment
+func killStressCPUSerial(experimentsDetails *experimentTypes.ExperimentDetails, podName, ns string, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
+	// It will contain all the pod & container details required for exec command
 	execCommandDetails := litmusexec.PodDetails{}
 
 	command := []string{"/bin/sh", "-c", experimentsDetails.ChaosKillCmd}
 
-	litmusexec.SetExecCommandAttributes(&execCommandDetails, podName, experimentsDetails.TargetContainer, experimentsDetails.AppNS)
-	_, err := litmusexec.Exec(&execCommandDetails, clients, command)
+	litmusexec.SetExecCommandAttributes(&execCommandDetails, podName, experimentsDetails.TargetContainer, ns)
+	out, _, err := litmusexec.Exec(&execCommandDetails, clients, command)
 	if err != nil {
-		return errors.Errorf("Unable to kill the stress process in %v pod, err: %v", podName, err)
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosRevert, Target: fmt.Sprintf("{podName: %s, namespace: %s}", podName, ns), Reason: fmt.Sprintf("failed to revert chaos: %s", out)}
 	}
 	common.SetTargets(podName, "reverted", "pod", chaosDetails)
 	return nil
@@ -296,12 +316,14 @@ func killStressCPUSerial(experimentsDetails *experimentTypes.ExperimentDetails, 
 // killStressCPUParallel function to kill all the stress process running inside target container
 // Triggered by either timeout of chaos duration or termination of the experiment
 func killStressCPUParallel(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList corev1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
-
+	var errList []string
 	for _, pod := range targetPodList.Items {
-
-		if err := killStressCPUSerial(experimentsDetails, pod.Name, clients, chaosDetails); err != nil {
-			return err
+		if err := killStressCPUSerial(experimentsDetails, pod.Name, pod.Namespace, clients, chaosDetails); err != nil {
+			errList = append(errList, err.Error())
 		}
+	}
+	if len(errList) != 0 {
+		return cerrors.PreserveError{ErrString: fmt.Sprintf("[%s]", strings.Join(errList, ","))}
 	}
 	return nil
 }

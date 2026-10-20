@@ -10,7 +10,6 @@ type ExperimentDetails struct {
 	EngineName                    string
 	ChaosDuration                 int
 	RampTime                      int
-	ChaosLib                      string
 	AppNS                         string
 	AppLabel                      string
 	AppKind                       string
@@ -31,4 +30,5 @@ type ExperimentDetails struct {
 	TargetNodeIP                  string
 	TargetContainer               string
 	NodeLabel                     string
+	SetHelperData                 string
 }

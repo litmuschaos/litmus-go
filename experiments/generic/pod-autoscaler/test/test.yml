@@ -46,11 +46,6 @@ spec:
           - name: RAMP_TIME
             value: ''
 
-          ## env var that describes the library used to execute the chaos
-          ## Only supported litmus
-          - name: LIB
-            value: 'litmus'
-
           - name: CHAOS_SERVICE_ACCOUNT
             valueFrom:
               fieldRef:

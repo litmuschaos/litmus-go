@@ -8,17 +8,13 @@ import (
 	clientTypes "k8s.io/apimachinery/pkg/types"
 )
 
-//GetENV fetches all the env variables from the runner pod
+// GetENV fetches all the env variables from the runner pod
 func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string) {
 	experimentDetails.ExperimentName = types.Getenv("EXPERIMENT_NAME", "")
 	experimentDetails.ChaosNamespace = types.Getenv("CHAOS_NAMESPACE", "litmus")
 	experimentDetails.EngineName = types.Getenv("CHAOSENGINE", "")
 	experimentDetails.ChaosDuration, _ = strconv.Atoi(types.Getenv("TOTAL_CHAOS_DURATION", "60"))
 	experimentDetails.RampTime, _ = strconv.Atoi(types.Getenv("RAMP_TIME", "0"))
-	experimentDetails.ChaosLib = types.Getenv("LIB", "litmus")
-	experimentDetails.AppNS = types.Getenv("APP_NAMESPACE", "")
-	experimentDetails.AppLabel = types.Getenv("APP_LABEL", "")
-	experimentDetails.AppKind = types.Getenv("APP_KIND", "")
 	experimentDetails.ChaosUID = clientTypes.UID(types.Getenv("CHAOS_UID", ""))
 	experimentDetails.InstanceID = types.Getenv("INSTANCE_ID", "")
 	experimentDetails.LIBImage = types.Getenv("LIB_IMAGE", "litmuschaos/go-runner:latest")
@@ -28,31 +24,32 @@ func GetENV(experimentDetails *experimentTypes.ExperimentDetails, expName string
 	experimentDetails.Delay, _ = strconv.Atoi(types.Getenv("STATUS_CHECK_DELAY", "2"))
 	experimentDetails.Timeout, _ = strconv.Atoi(types.Getenv("STATUS_CHECK_TIMEOUT", "180"))
 	experimentDetails.TargetPods = types.Getenv("TARGET_PODS", "")
-	experimentDetails.PodsAffectedPerc, _ = strconv.Atoi(types.Getenv("PODS_AFFECTED_PERC", "0"))
-	experimentDetails.ContainerRuntime = types.Getenv("CONTAINER_RUNTIME", "docker")
+	experimentDetails.PodsAffectedPerc = types.Getenv("PODS_AFFECTED_PERC", "0")
+	experimentDetails.ContainerRuntime = types.Getenv("CONTAINER_RUNTIME", "containerd")
 	experimentDetails.ChaosServiceAccount = types.Getenv("CHAOS_SERVICE_ACCOUNT", "")
-	experimentDetails.SocketPath = types.Getenv("SOCKET_PATH", "/var/run/docker.sock")
+	experimentDetails.SocketPath = types.Getenv("SOCKET_PATH", "/run/containerd/containerd.sock")
 	experimentDetails.Sequence = types.Getenv("SEQUENCE", "parallel")
 	experimentDetails.TerminationGracePeriodSeconds, _ = strconv.Atoi(types.Getenv("TERMINATION_GRACE_PERIOD_SECONDS", ""))
-	experimentDetails.StressImage = types.Getenv("STRESS_IMAGE", "alexeiled/stress-ng:latest-ubuntu")
+	experimentDetails.NodeLabel = types.Getenv("NODE_LABEL", "")
+	experimentDetails.SetHelperData = types.Getenv("SET_HELPER_DATA", "true")
 
 	switch expName {
 	case "pod-cpu-hog":
-		experimentDetails.CPUcores, _ = strconv.Atoi(types.Getenv("CPU_CORES", "0"))
-		experimentDetails.CPULoad, _ = strconv.Atoi(types.Getenv("CPU_LOAD", "100"))
+		experimentDetails.CPUcores = types.Getenv("CPU_CORES", "0")
+		experimentDetails.CPULoad = types.Getenv("CPU_LOAD", "100")
 		experimentDetails.StressType = "pod-cpu-stress"
 
 	case "pod-memory-hog":
-		experimentDetails.MemoryConsumption, _ = strconv.Atoi(types.Getenv("MEMORY_CONSUMPTION", "500"))
-		experimentDetails.NumberOfWorkers, _ = strconv.Atoi(types.Getenv("NUMBER_OF_WORKERS", "4"))
+		experimentDetails.MemoryConsumption = types.Getenv("MEMORY_CONSUMPTION", "500")
+		experimentDetails.NumberOfWorkers = types.Getenv("NUMBER_OF_WORKERS", "4")
 		experimentDetails.StressType = "pod-memory-stress"
 
 	case "pod-io-stress":
-		experimentDetails.FilesystemUtilizationPercentage, _ = strconv.Atoi(types.Getenv("FILESYSTEM_UTILIZATION_PERCENTAGE", ""))
-		experimentDetails.FilesystemUtilizationBytes, _ = strconv.Atoi(types.Getenv("FILESYSTEM_UTILIZATION_BYTES", ""))
-		experimentDetails.NumberOfWorkers, _ = strconv.Atoi(types.Getenv("NUMBER_OF_WORKERS", "4"))
+		experimentDetails.FilesystemUtilizationPercentage = types.Getenv("FILESYSTEM_UTILIZATION_PERCENTAGE", "")
+		experimentDetails.FilesystemUtilizationBytes = types.Getenv("FILESYSTEM_UTILIZATION_BYTES", "")
+		experimentDetails.NumberOfWorkers = types.Getenv("NUMBER_OF_WORKERS", "4")
 		experimentDetails.VolumeMountPath = types.Getenv("VOLUME_MOUNT_PATH", "")
-		experimentDetails.CPUcores, _ = strconv.Atoi(types.Getenv("CPU_CORES", "0"))
+		experimentDetails.CPUcores = types.Getenv("CPU_CORES", "0")
 		experimentDetails.StressType = "pod-io-stress"
 	}
 }

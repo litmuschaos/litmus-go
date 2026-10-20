@@ -1,16 +1,21 @@
 package lib
 
 import (
-	"bytes"
+	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"os/signal"
 	"strconv"
-	"strings"
 	"syscall"
 	"time"
 
-	clients "github.com/litmuschaos/litmus-go/pkg/clients"
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
+	"github.com/litmuschaos/litmus-go/pkg/telemetry"
+	"github.com/palantir/stacktrace"
+	"go.opentelemetry.io/otel"
+
+	"github.com/litmuschaos/litmus-go/pkg/clients"
 	"github.com/litmuschaos/litmus-go/pkg/events"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/node-drain/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
@@ -19,9 +24,8 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/litmuschaos/litmus-go/pkg/utils/retry"
-	"github.com/pkg/errors"
+	"github.com/litmuschaos/litmus-go/pkg/utils/stringutils"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -30,8 +34,10 @@ var (
 	inject, abort chan os.Signal
 )
 
-//PrepareNodeDrain contains the prepration steps before chaos injection
-func PrepareNodeDrain(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+// PrepareNodeDrain contains the preparation steps before chaos injection
+func PrepareNodeDrain(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PrepareNodeDrainFault")
+	defer span.End()
 
 	// inject channel is used to transmit signal notifications.
 	inject = make(chan os.Signal, 1)
@@ -53,7 +59,7 @@ func PrepareNodeDrain(experimentsDetails *experimentTypes.ExperimentDetails, cli
 		//Select node for kubelet-service-kill
 		experimentsDetails.TargetNode, err = common.GetNodeName(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.NodeLabel, clients)
 		if err != nil {
-			return err
+			return stacktrace.Propagate(err, "could not get node name")
 		}
 	}
 
@@ -65,7 +71,7 @@ func PrepareNodeDrain(experimentsDetails *experimentTypes.ExperimentDetails, cli
 
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
-		if err = probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+		if err = probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
 			return err
 		}
 	}
@@ -74,21 +80,33 @@ func PrepareNodeDrain(experimentsDetails *experimentTypes.ExperimentDetails, cli
 	go abortWatcher(experimentsDetails, clients, resultDetails, chaosDetails, eventsDetails)
 
 	// Drain the application node
-	if err := drainNode(experimentsDetails, clients, chaosDetails); err != nil {
-		return err
+	if err := drainNode(ctx, experimentsDetails, clients, chaosDetails); err != nil {
+		log.Info("[Revert]: Reverting chaos because error during draining of node")
+		if uncordonErr := uncordonNode(experimentsDetails, clients, chaosDetails); uncordonErr != nil {
+			return cerrors.PreserveError{ErrString: fmt.Sprintf("[%s,%s]", stacktrace.RootCause(err).Error(), stacktrace.RootCause(uncordonErr).Error())}
+		}
+		return stacktrace.Propagate(err, "could not drain node")
 	}
 
 	// Verify the status of AUT after reschedule
 	log.Info("[Status]: Verify the status of AUT after reschedule")
-	if err = status.CheckApplicationStatus(experimentsDetails.AppNS, experimentsDetails.AppLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
-		return errors.Errorf("application status check failed, err: %v", err)
+	if err = status.AUTStatusCheck(clients, chaosDetails); err != nil {
+		log.Info("[Revert]: Reverting chaos because application status check failed")
+		if uncordonErr := uncordonNode(experimentsDetails, clients, chaosDetails); uncordonErr != nil {
+			return cerrors.PreserveError{ErrString: fmt.Sprintf("[%s,%s]", stacktrace.RootCause(err).Error(), stacktrace.RootCause(uncordonErr).Error())}
+		}
+		return err
 	}
 
 	// Verify the status of Auxiliary Applications after reschedule
 	if experimentsDetails.AuxiliaryAppInfo != "" {
 		log.Info("[Status]: Verify that the Auxiliary Applications are running")
 		if err = status.CheckAuxiliaryApplicationStatus(experimentsDetails.AuxiliaryAppInfo, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
-			return errors.Errorf("auxiliary Applications status check failed, err: %v", err)
+			log.Info("[Revert]: Reverting chaos because auxiliary application status check failed")
+			if uncordonErr := uncordonNode(experimentsDetails, clients, chaosDetails); uncordonErr != nil {
+				return cerrors.PreserveError{ErrString: fmt.Sprintf("[%s,%s]", stacktrace.RootCause(err).Error(), stacktrace.RootCause(uncordonErr).Error())}
+			}
+			return err
 		}
 	}
 
@@ -100,7 +118,7 @@ func PrepareNodeDrain(experimentsDetails *experimentTypes.ExperimentDetails, cli
 
 	// Uncordon the application node
 	if err := uncordonNode(experimentsDetails, clients, chaosDetails); err != nil {
-		return err
+		return stacktrace.Propagate(err, "could not uncordon the target node")
 	}
 
 	//Waiting for the ramp time after chaos injection
@@ -111,8 +129,10 @@ func PrepareNodeDrain(experimentsDetails *experimentTypes.ExperimentDetails, cli
 	return nil
 }
 
-// drainNode drain the application node
-func drainNode(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
+// drainNode drain the target node
+func drainNode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectNodeDrainFault")
+	defer span.End()
 
 	select {
 	case <-inject:
@@ -121,13 +141,9 @@ func drainNode(experimentsDetails *experimentTypes.ExperimentDetails, clients cl
 	default:
 		log.Infof("[Inject]: Draining the %v node", experimentsDetails.TargetNode)
 
-		command := exec.Command("kubectl", "drain", experimentsDetails.TargetNode, "--ignore-daemonsets", "--delete-local-data", "--force", "--timeout", strconv.Itoa(experimentsDetails.ChaosDuration)+"s")
-		var out, stderr bytes.Buffer
-		command.Stdout = &out
-		command.Stderr = &stderr
-		if err := command.Run(); err != nil {
-			log.Infof("Error String: %v", stderr.String())
-			return errors.Errorf("Unable to drain the %v node, err: %v", experimentsDetails.TargetNode, err)
+		command := exec.Command("kubectl", "drain", experimentsDetails.TargetNode, "--ignore-daemonsets", "--delete-emptydir-data", "--force", "--timeout", strconv.Itoa(experimentsDetails.ChaosDuration)+"s")
+		if err := common.RunCLICommands(command, "", fmt.Sprintf("{node: %s}", experimentsDetails.TargetNode), "failed to drain the target node", cerrors.ErrorTypeChaosInject); err != nil {
+			return err
 		}
 
 		common.SetTargets(experimentsDetails.TargetNode, "injected", "node", chaosDetails)
@@ -136,12 +152,12 @@ func drainNode(experimentsDetails *experimentTypes.ExperimentDetails, clients cl
 			Times(uint(experimentsDetails.Timeout / experimentsDetails.Delay)).
 			Wait(time.Duration(experimentsDetails.Delay) * time.Second).
 			Try(func(attempt uint) error {
-				nodeSpec, err := clients.KubeClient.CoreV1().Nodes().Get(experimentsDetails.TargetNode, v1.GetOptions{})
+				nodeSpec, err := clients.KubeClient.CoreV1().Nodes().Get(context.Background(), experimentsDetails.TargetNode, v1.GetOptions{})
 				if err != nil {
-					return err
+					return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Target: fmt.Sprintf("{node: %s}", experimentsDetails.TargetNode), Reason: err.Error()}
 				}
 				if !nodeSpec.Spec.Unschedulable {
-					return errors.Errorf("%v node is not in unschedulable state", experimentsDetails.TargetNode)
+					return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Target: fmt.Sprintf("{node: %s}", experimentsDetails.TargetNode), Reason: "node is not in unschedule state"}
 				}
 				return nil
 			})
@@ -152,29 +168,25 @@ func drainNode(experimentsDetails *experimentTypes.ExperimentDetails, clients cl
 // uncordonNode uncordon the application node
 func uncordonNode(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails) error {
 
-	targetNodes := strings.Split(experimentsDetails.TargetNode, ",")
+	targetNodes := stringutils.SplitList(experimentsDetails.TargetNode)
 	for _, targetNode := range targetNodes {
 
 		//Check node exist before uncordon the node
-		_, err := clients.KubeClient.CoreV1().Nodes().Get(targetNode, metav1.GetOptions{})
+		_, err := clients.GetNode(targetNode, chaosDetails.Timeout, chaosDetails.Delay)
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				log.Infof("[Info]: The %v node is no longer exist, skip uncordon the node", targetNode)
 				common.SetTargets(targetNode, "noLongerExist", "node", chaosDetails)
 				continue
 			} else {
-				return errors.Errorf("unable to get the %v node, err: %v", targetNode, err)
+				return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosRevert, Target: fmt.Sprintf("{node: %s}", targetNode), Reason: err.Error()}
 			}
 		}
 
 		log.Infof("[Recover]: Uncordon the %v node", targetNode)
 		command := exec.Command("kubectl", "uncordon", targetNode)
-		var out, stderr bytes.Buffer
-		command.Stdout = &out
-		command.Stderr = &stderr
-		if err := command.Run(); err != nil {
-			log.Infof("Error String: %v", stderr.String())
-			return errors.Errorf("unable to uncordon the %v node, err: %v", targetNode, err)
+		if err := common.RunCLICommands(command, "", fmt.Sprintf("{node: %s}", targetNode), "failed to uncordon the target node", cerrors.ErrorTypeChaosInject); err != nil {
+			return err
 		}
 		common.SetTargets(targetNode, "reverted", "node", chaosDetails)
 	}
@@ -183,18 +195,18 @@ func uncordonNode(experimentsDetails *experimentTypes.ExperimentDetails, clients
 		Times(uint(experimentsDetails.Timeout / experimentsDetails.Delay)).
 		Wait(time.Duration(experimentsDetails.Delay) * time.Second).
 		Try(func(attempt uint) error {
-			targetNodes := strings.Split(experimentsDetails.TargetNode, ",")
+			targetNodes := stringutils.SplitList(experimentsDetails.TargetNode)
 			for _, targetNode := range targetNodes {
-				nodeSpec, err := clients.KubeClient.CoreV1().Nodes().Get(targetNode, v1.GetOptions{})
+				nodeSpec, err := clients.KubeClient.CoreV1().Nodes().Get(context.Background(), targetNode, v1.GetOptions{})
 				if err != nil {
 					if apierrors.IsNotFound(err) {
 						continue
 					} else {
-						return err
+						return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosRevert, Target: fmt.Sprintf("{node: %s}", targetNode), Reason: err.Error()}
 					}
 				}
 				if nodeSpec.Spec.Unschedulable {
-					return errors.Errorf("%v node is in unschedulable state", experimentsDetails.TargetNode)
+					return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosRevert, Target: fmt.Sprintf("{node: %s}", targetNode), Reason: "target node is in unschedule state"}
 				}
 			}
 			return nil

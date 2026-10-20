@@ -1,43 +1,57 @@
 package lib
 
 import (
+	"context"
+	"fmt"
+	"os"
 	"strconv"
 	"strings"
 
-	clients "github.com/litmuschaos/litmus-go/pkg/clients"
+	"github.com/litmuschaos/litmus-go/pkg/cerrors"
+	"github.com/litmuschaos/litmus-go/pkg/telemetry"
+	"github.com/palantir/stacktrace"
+	"go.opentelemetry.io/otel"
+
+	"github.com/litmuschaos/litmus-go/pkg/clients"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/generic/disk-fill/types"
 	"github.com/litmuschaos/litmus-go/pkg/log"
 	"github.com/litmuschaos/litmus-go/pkg/probe"
-	"github.com/litmuschaos/litmus-go/pkg/status"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
 	"github.com/litmuschaos/litmus-go/pkg/utils/exec"
-	"github.com/pkg/errors"
+	"github.com/litmuschaos/litmus-go/pkg/utils/stringutils"
+	"github.com/sirupsen/logrus"
 	apiv1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-//PrepareDiskFill contains the prepration steps before chaos injection
-func PrepareDiskFill(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+// PrepareDiskFill contains the preparation steps before chaos injection
+func PrepareDiskFill(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "PrepareDiskFillFault")
+	defer span.End()
 
-	// It will contains all the pod & container details required for exec command
+	var err error
+	// It will contain all the pod & container details required for exec command
 	execCommandDetails := exec.PodDetails{}
-
 	// Get the target pod details for the chaos execution
 	// if the target pod is not defined it will derive the random target pod list using pod affected percentage
-	if experimentsDetails.TargetPods == "" && chaosDetails.AppDetail.Label == "" {
-		return errors.Errorf("please provide one of the appLabel or TARGET_PODS")
+	if experimentsDetails.TargetPods == "" && chaosDetails.AppDetail == nil {
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeTargetSelection, Reason: "provide one of the appLabel or TARGET_PODS"}
 	}
-	targetPodList, err := common.GetPodList(experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, clients, chaosDetails)
-	if err != nil {
-		return err
-	}
+	//set up the tunables if provided in range
+	setChaosTunables(experimentsDetails)
 
-	podNames := []string{}
-	for _, pod := range targetPodList.Items {
-		podNames = append(podNames, pod.Name)
+	log.InfoWithValues("[Info]: The chaos tunables are:", logrus.Fields{
+		"FillPercentage":            experimentsDetails.FillPercentage,
+		"EphemeralStorageMebibytes": experimentsDetails.EphemeralStorageMebibytes,
+		"PodsAffectedPerc":          experimentsDetails.PodsAffectedPerc,
+		"Sequence":                  experimentsDetails.Sequence,
+	})
+
+	targetPodList, err := common.GetTargetPods(experimentsDetails.NodeLabel, experimentsDetails.TargetPods, experimentsDetails.PodsAffectedPerc, "", clients, chaosDetails)
+	if err != nil {
+		return stacktrace.Propagate(err, "could not get target pods")
 	}
-	log.Infof("Target pods list for chaos, %v", podNames)
 
 	//Waiting for the ramp time before chaos injection
 	if experimentsDetails.RampTime != 0 {
@@ -45,39 +59,32 @@ func PrepareDiskFill(experimentsDetails *experimentTypes.ExperimentDetails, clie
 		common.WaitForDuration(experimentsDetails.RampTime)
 	}
 
-	//Get the target container name of the application pod
-	if experimentsDetails.TargetContainer == "" {
-		experimentsDetails.TargetContainer, err = common.GetTargetContainer(experimentsDetails.AppNS, targetPodList.Items[0].Name, clients)
-		if err != nil {
-			return errors.Errorf("unable to get the target container name, err: %v", err)
-		}
-	}
-
 	// Getting the serviceAccountName, need permission inside helper pod to create the events
 	if experimentsDetails.ChaosServiceAccount == "" {
 		experimentsDetails.ChaosServiceAccount, err = common.GetServiceAccount(experimentsDetails.ChaosNamespace, experimentsDetails.ChaosPodName, clients)
 		if err != nil {
-			return errors.Errorf("unable to get the serviceAccountName, err: %v", err)
+			return stacktrace.Propagate(err, "could not get experiment service account")
 		}
 	}
 
 	if experimentsDetails.EngineName != "" {
-		if err := common.SetHelperData(chaosDetails, clients); err != nil {
-			return err
+		if err := common.SetHelperData(chaosDetails, experimentsDetails.SetHelperData, clients); err != nil {
+			return stacktrace.Propagate(err, "could not set helper data")
 		}
 	}
 
+	experimentsDetails.IsTargetContainerProvided = experimentsDetails.TargetContainer != ""
 	switch strings.ToLower(experimentsDetails.Sequence) {
 	case "serial":
-		if err = injectChaosInSerialMode(experimentsDetails, targetPodList, clients, chaosDetails, execCommandDetails, resultDetails, eventsDetails); err != nil {
-			return err
+		if err = injectChaosInSerialMode(ctx, experimentsDetails, targetPodList, clients, chaosDetails, execCommandDetails, resultDetails, eventsDetails); err != nil {
+			return stacktrace.Propagate(err, "could not run chaos in serial mode")
 		}
 	case "parallel":
-		if err = injectChaosInParallelMode(experimentsDetails, targetPodList, clients, chaosDetails, execCommandDetails, resultDetails, eventsDetails); err != nil {
-			return err
+		if err = injectChaosInParallelMode(ctx, experimentsDetails, targetPodList, clients, chaosDetails, execCommandDetails, resultDetails, eventsDetails); err != nil {
+			return stacktrace.Propagate(err, "could not run chaos in parallel mode")
 		}
 	default:
-		return errors.Errorf("%v sequence is not supported", experimentsDetails.Sequence)
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("'%s' sequence is not supported", experimentsDetails.Sequence)}
 	}
 
 	//Waiting for the ramp time after chaos injection
@@ -89,46 +96,33 @@ func PrepareDiskFill(experimentsDetails *experimentTypes.ExperimentDetails, clie
 }
 
 // injectChaosInSerialMode fill the ephemeral storage of all target application serially (one by one)
-func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, execCommandDetails exec.PodDetails, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
-
-	labelSuffix := common.GetRunID()
-
+func injectChaosInSerialMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, execCommandDetails exec.PodDetails, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectDiskFillFaultInSerialMode")
+	defer span.End()
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
-		if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+		if err := probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
 			return err
 		}
 	}
 
 	// creating the helper pod to perform disk-fill chaos
 	for _, pod := range targetPodList.Items {
-		runID := common.GetRunID()
-		if err := createHelperPod(experimentsDetails, clients, chaosDetails, pod.Name, pod.Spec.NodeName, runID, labelSuffix); err != nil {
-			return errors.Errorf("unable to create the helper pod, err: %v", err)
+
+		//Get the target container name of the application pod
+		if !experimentsDetails.IsTargetContainerProvided {
+			experimentsDetails.TargetContainer = pod.Spec.Containers[0].Name
 		}
 
-		appLabel := "name=" + experimentsDetails.ExperimentName + "-helper-" + runID
-
-		//checking the status of the helper pods, wait till the pod comes to running state else fail the experiment
-		log.Info("[Status]: Checking the status of the helper pods")
-		if err := status.CheckHelperStatus(experimentsDetails.ChaosNamespace, appLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
-			common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-helper-"+runID, appLabel, chaosDetails, clients)
-			return errors.Errorf("helper pods are not in running state, err: %v", err)
+		runID := stringutils.GetRunID()
+		if err := createHelperPod(ctx, experimentsDetails, clients, chaosDetails, fmt.Sprintf("%s:%s:%s", pod.Name, pod.Namespace, experimentsDetails.TargetContainer), pod.Spec.NodeName, runID); err != nil {
+			return stacktrace.Propagate(err, "could not create helper pod")
 		}
 
-		// Wait till the completion of the helper pod
-		// set an upper limit for the waiting time
-		log.Info("[Wait]: waiting till the completion of the helper pod")
-		podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, appLabel, clients, experimentsDetails.ChaosDuration+experimentsDetails.Timeout, experimentsDetails.ExperimentName)
-		if err != nil || podStatus == "Failed" {
-			common.DeleteHelperPodBasedOnJobCleanupPolicy(experimentsDetails.ExperimentName+"-helper-"+runID, appLabel, chaosDetails, clients)
-			return common.HelperFailedError(err)
-		}
+		appLabel := fmt.Sprintf("app=%s-helper-%s", experimentsDetails.ExperimentName, runID)
 
-		//Deleting all the helper pod for disk-fill chaos
-		log.Info("[Cleanup]: Deleting the helper pod")
-		if err = common.DeletePod(experimentsDetails.ExperimentName+"-helper-"+runID, appLabel, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients); err != nil {
-			return errors.Errorf("unable to delete the helper pod, %v", err)
+		if err := common.ManagerHelperLifecycle(appLabel, chaosDetails, clients, true); err != nil {
+			return err
 		}
 	}
 
@@ -137,77 +131,69 @@ func injectChaosInSerialMode(experimentsDetails *experimentTypes.ExperimentDetai
 }
 
 // injectChaosInParallelMode fill the ephemeral storage of of all target application in parallel mode (all at once)
-func injectChaosInParallelMode(experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, execCommandDetails exec.PodDetails, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
-
-	labelSuffix := common.GetRunID()
+func injectChaosInParallelMode(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, targetPodList apiv1.PodList, clients clients.ClientSets, chaosDetails *types.ChaosDetails, execCommandDetails exec.PodDetails, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectDiskFillFaultInParallelMode")
+	defer span.End()
 
 	// run the probes during chaos
 	if len(resultDetails.ProbeDetails) != 0 {
-		if err := probe.RunProbes(chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
+		if err := probe.RunProbes(ctx, chaosDetails, clients, resultDetails, "DuringChaos", eventsDetails); err != nil {
 			return err
 		}
 	}
 
-	// creating the helper pod to perform disk-fill chaos
-	for _, pod := range targetPodList.Items {
-		runID := common.GetRunID()
-		if err := createHelperPod(experimentsDetails, clients, chaosDetails, pod.Name, pod.Spec.NodeName, runID, labelSuffix); err != nil {
-			return errors.Errorf("unable to create the helper pod, err: %v", err)
+	runID := stringutils.GetRunID()
+	targets := common.FilterPodsForNodes(targetPodList, experimentsDetails.TargetContainer)
+
+	for node, tar := range targets {
+		var targetsPerNode []string
+		for _, k := range tar.Target {
+			targetsPerNode = append(targetsPerNode, fmt.Sprintf("%s:%s:%s", k.Name, k.Namespace, k.TargetContainer))
+		}
+
+		if err := createHelperPod(ctx, experimentsDetails, clients, chaosDetails, strings.Join(targetsPerNode, ";"), node, runID); err != nil {
+			return stacktrace.Propagate(err, "could not create helper pod")
 		}
 	}
 
-	appLabel := "app=" + experimentsDetails.ExperimentName + "-helper-" + labelSuffix
+	appLabel := fmt.Sprintf("app=%s-helper-%s", experimentsDetails.ExperimentName, runID)
 
-	//checking the status of the helper pods, wait till the pod comes to running state else fail the experiment
-	log.Info("[Status]: Checking the status of the helper pods")
-	if err := status.CheckHelperStatus(experimentsDetails.ChaosNamespace, appLabel, experimentsDetails.Timeout, experimentsDetails.Delay, clients); err != nil {
-		common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
-		return errors.Errorf("helper pods are not in running state, err: %v", err)
-	}
-
-	// Wait till the completion of the helper pod
-	// set an upper limit for the waiting time
-	log.Info("[Wait]: waiting till the completion of the helper pod")
-	podStatus, err := status.WaitForCompletion(experimentsDetails.ChaosNamespace, appLabel, clients, experimentsDetails.ChaosDuration+experimentsDetails.Timeout, experimentsDetails.ExperimentName)
-	if err != nil || podStatus == "Failed" {
-		common.DeleteAllHelperPodBasedOnJobCleanupPolicy(appLabel, chaosDetails, clients)
-		return common.HelperFailedError(err)
-	}
-
-	//Deleting all the helper pod for disk-fill chaos
-	log.Info("[Cleanup]: Deleting all the helper pod")
-	if err = common.DeleteAllPod(appLabel, experimentsDetails.ChaosNamespace, chaosDetails.Timeout, chaosDetails.Delay, clients); err != nil {
-		return errors.Errorf("unable to delete the helper pod, %v", err)
+	if err := common.ManagerHelperLifecycle(appLabel, chaosDetails, clients, true); err != nil {
+		return err
 	}
 
 	return nil
 }
 
 // createHelperPod derive the attributes for helper pod and create the helper pod
-func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, appName, appNodeName, runID, labelSuffix string) error {
+func createHelperPod(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, chaosDetails *types.ChaosDetails, targets, appNodeName, runID string) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "CreateDiskFillFaultHelperPod")
+	defer span.End()
 
-	mountPropagationMode := apiv1.MountPropagationHostToContainer
+	privilegedEnable := true
 	terminationGracePeriodSeconds := int64(experimentsDetails.TerminationGracePeriodSeconds)
 
 	helperPod := &apiv1.Pod{
 		ObjectMeta: v1.ObjectMeta{
-			Name:        experimentsDetails.ExperimentName + "-helper-" + runID,
-			Namespace:   experimentsDetails.ChaosNamespace,
-			Labels:      common.GetHelperLabels(chaosDetails.Labels, runID, labelSuffix, experimentsDetails.ExperimentName),
-			Annotations: chaosDetails.Annotations,
+			GenerateName: experimentsDetails.ExperimentName + "-helper-",
+			Namespace:    experimentsDetails.ChaosNamespace,
+			Labels:       common.GetHelperLabels(chaosDetails.Labels, runID, experimentsDetails.ExperimentName),
+			Annotations:  chaosDetails.Annotations,
 		},
 		Spec: apiv1.PodSpec{
+			HostPID:                       true,
 			RestartPolicy:                 apiv1.RestartPolicyNever,
 			ImagePullSecrets:              chaosDetails.ImagePullSecrets,
 			NodeName:                      appNodeName,
 			ServiceAccountName:            experimentsDetails.ChaosServiceAccount,
 			TerminationGracePeriodSeconds: &terminationGracePeriodSeconds,
+
 			Volumes: []apiv1.Volume{
 				{
-					Name: "udev",
+					Name: "socket-path",
 					VolumeSource: apiv1.VolumeSource{
 						HostPath: &apiv1.HostPathVolumeSource{
-							Path: experimentsDetails.ContainerPath,
+							Path: experimentsDetails.SocketPath,
 						},
 					},
 				},
@@ -225,40 +211,62 @@ func createHelperPod(experimentsDetails *experimentTypes.ExperimentDetails, clie
 						"./helpers -name disk-fill",
 					},
 					Resources: chaosDetails.Resources,
-					Env:       getPodEnv(experimentsDetails, appName),
+					Env:       getPodEnv(ctx, experimentsDetails, targets),
 					VolumeMounts: []apiv1.VolumeMount{
 						{
-							Name:             "udev",
-							MountPath:        "/diskfill",
-							MountPropagation: &mountPropagationMode,
+							Name:      "socket-path",
+							MountPath: experimentsDetails.SocketPath,
 						},
+					},
+					SecurityContext: &apiv1.SecurityContext{
+						Privileged: &privilegedEnable,
 					},
 				},
 			},
 		},
 	}
 
-	_, err := clients.KubeClient.CoreV1().Pods(experimentsDetails.ChaosNamespace).Create(helperPod)
-	return err
+	if len(chaosDetails.SideCar) != 0 {
+		helperPod.Spec.Containers = append(helperPod.Spec.Containers, common.BuildSidecar(chaosDetails)...)
+		helperPod.Spec.Volumes = append(helperPod.Spec.Volumes, common.GetSidecarVolumes(chaosDetails)...)
+	}
+
+	if err := clients.CreatePod(experimentsDetails.ChaosNamespace, helperPod); err != nil {
+		return cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("unable to create helper pod: %s", err.Error())}
+	}
+
+	return nil
 }
 
 // getPodEnv derive all the env required for the helper pod
-func getPodEnv(experimentsDetails *experimentTypes.ExperimentDetails, podName string) []apiv1.EnvVar {
+func getPodEnv(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, targets string) []apiv1.EnvVar {
 
 	var envDetails common.ENVDetails
-	envDetails.SetEnv("APP_NAMESPACE", experimentsDetails.AppNS).
-		SetEnv("APP_POD", podName).
+	envDetails.SetEnv("TARGETS", targets).
 		SetEnv("APP_CONTAINER", experimentsDetails.TargetContainer).
 		SetEnv("TOTAL_CHAOS_DURATION", strconv.Itoa(experimentsDetails.ChaosDuration)).
 		SetEnv("CHAOS_NAMESPACE", experimentsDetails.ChaosNamespace).
 		SetEnv("CHAOSENGINE", experimentsDetails.EngineName).
 		SetEnv("CHAOS_UID", string(experimentsDetails.ChaosUID)).
 		SetEnv("EXPERIMENT_NAME", experimentsDetails.ExperimentName).
-		SetEnv("FILL_PERCENTAGE", strconv.Itoa(experimentsDetails.FillPercentage)).
-		SetEnv("EPHEMERAL_STORAGE_MEBIBYTES", strconv.Itoa(experimentsDetails.EphemeralStorageMebibytes)).
+		SetEnv("FILL_PERCENTAGE", experimentsDetails.FillPercentage).
+		SetEnv("EPHEMERAL_STORAGE_MEBIBYTES", experimentsDetails.EphemeralStorageMebibytes).
 		SetEnv("DATA_BLOCK_SIZE", strconv.Itoa(experimentsDetails.DataBlockSize)).
 		SetEnv("INSTANCE_ID", experimentsDetails.InstanceID).
+		SetEnv("SOCKET_PATH", experimentsDetails.SocketPath).
+		SetEnv("CONTAINER_RUNTIME", experimentsDetails.ContainerRuntime).
+		SetEnv("OTEL_EXPORTER_OTLP_ENDPOINT", os.Getenv(telemetry.OTELExporterOTLPEndpoint)).
+		SetEnv("TRACE_PARENT", telemetry.GetMarshalledSpanFromContext(ctx)).
 		SetEnvFromDownwardAPI("v1", "metadata.name")
 
 	return envDetails.ENV
+}
+
+// setChaosTunables will setup a random value within a given range of values
+// If the value is not provided in range it'll setup the initial provided value.
+func setChaosTunables(experimentsDetails *experimentTypes.ExperimentDetails) {
+	experimentsDetails.FillPercentage = common.ValidateRange(experimentsDetails.FillPercentage)
+	experimentsDetails.EphemeralStorageMebibytes = common.ValidateRange(experimentsDetails.EphemeralStorageMebibytes)
+	experimentsDetails.PodsAffectedPerc = common.ValidateRange(experimentsDetails.PodsAffectedPerc)
+	experimentsDetails.Sequence = common.GetRandomSequence(experimentsDetails.Sequence)
 }

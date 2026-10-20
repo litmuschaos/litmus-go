@@ -12,7 +12,6 @@ type ExperimentDetails struct {
 	LIBImage                           string
 	LIBImagePullPolicy                 string
 	RampTime                           int
-	ChaosLib                           string
 	AppNS                              string
 	AppLabel                           string
 	AppKind                            string
@@ -21,17 +20,17 @@ type ExperimentDetails struct {
 	ChaosNamespace                     string
 	ChaosPodName                       string
 	RunID                              string
-	NetworkPacketDuplicationPercentage int
+	NetworkPacketDuplicationPercentage string
 	NetworkInterface                   string
 	TargetContainer                    string
 	NetworkLatency                     int
-	NetworkPacketLossPercentage        int
-	NetworkPacketCorruptionPercentage  int
-	TCImage                            string
+	NetworkPacketLossPercentage        string
+	NetworkPacketCorruptionPercentage  string
+	Correlation                        int
 	Timeout                            int
 	Delay                              int
 	TargetPods                         string
-	PodsAffectedPerc                   int
+	PodsAffectedPerc                   string
 	DestinationIPs                     string
 	DestinationHosts                   string
 	ContainerRuntime                   string
@@ -40,4 +39,15 @@ type ExperimentDetails struct {
 	Sequence                           string
 	TerminationGracePeriodSeconds      int
 	Jitter                             int
+	NetworkChaosType                   string
+	NodeLabel                          string
+	IsTargetContainerProvided          bool
+	SetHelperData                      string
+	SourcePorts                        string
+	DestinationPorts                   string
+	NetworkBandwidth                   string
+	Burst                              string
+	Limit                              string
+	PeakRate                           string
+	MinBurst                           string
 }

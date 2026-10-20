@@ -42,9 +42,6 @@ spec:
           - name: NODE_CPU_CORE
             value: '1'
 
-          - name: LIB
-            value: 'litmus'
-
           - name: LIB_IMAGE
             value: 'litmuschaos/go-runner:ci'
 

@@ -11,7 +11,6 @@ type ExperimentDetails struct {
 	ChaosDuration       int
 	RampTime            int
 	Replicas            int
-	ChaosLib            string
 	AppNS               string
 	AppLabel            string
 	AppKind             string

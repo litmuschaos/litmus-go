@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -17,7 +18,7 @@ import (
 )
 
 // GenerateExperiment generate the new/custom chaos experiment based on specified attribute file
-func GenerateExperiment(attributeFile, chartType string, generationType string) error {
+func GenerateExperiment(attributeFile, chartType, generationType, libType string) error {
 
 	// Fetch all the required attributes from the given file
 	// Experiment contains all the required attributes
@@ -65,17 +66,17 @@ func GenerateExperiment(attributeFile, chartType string, generationType string) 
 	default:
 
 		// creating experiment dir & files
-		if err := createExperiment(experimentRootDIR, experimentDetails); err != nil {
+		if err := createExperiment(experimentRootDIR, experimentDetails, libType); err != nil {
 			return err
 		}
 
 		// creating chaoslib dir & files
-		if err := createChaosLib(litmusRootDir, experimentDetails); err != nil {
+		if err := createChaosLib(litmusRootDir, experimentDetails, libType); err != nil {
 			return err
 		}
 
 		// creating envs dir & files
-		if err := createENV(litmusRootDir, experimentDetails); err != nil {
+		if err := createENV(litmusRootDir, experimentDetails, libType); err != nil {
 			return err
 		}
 
@@ -147,31 +148,43 @@ func copy(src, dest string) error {
 }
 
 // createExperimentFile creates the experiment file
-func createExperiment(experimentRootDIR string, experimentDetails types.Experiment) error {
+func createExperiment(experimentRootDIR string, experimentDetails types.Experiment, libType string) error {
+	var experimentTemplateName string
 	// create the experiment directory, if not present
 	experimentDIR := experimentRootDIR + "/experiment"
 	createDirectoryIfNotPresent(experimentDIR)
 
+	if libType == "helper" || libType == "exec" {
+		experimentTemplateName = "./templates/experiment_k8s.tmpl"
+	} else {
+		experimentTemplateName = fmt.Sprintf("./templates/experiment_%s.tmpl", libType)
+	}
 	// generating the experiement.go file
 	experimentFilePath := experimentDIR + "/" + experimentDetails.Name + ".go"
-	return generateFile(experimentDetails, experimentFilePath, "./templates/experiment.tmpl")
+	return generateFile(experimentDetails, experimentFilePath, experimentTemplateName)
 }
 
 // createChaosLib creates the chaoslib for the experiment
-func createChaosLib(litmusRootDir string, experimentDetails types.Experiment) error {
+func createChaosLib(litmusRootDir string, experimentDetails types.Experiment, libType string) error {
+	var chaosLibTemplateName string
 	// create the chaoslib directory, if not present
 	chaoslibRootDIR := litmusRootDir + "/chaoslib/litmus/" + experimentDetails.Name
 	createDirectoryIfNotPresent(chaoslibRootDIR)
 	chaoslibDIR := chaoslibRootDIR + "/lib"
 	createDirectoryIfNotPresent(chaoslibDIR)
 
+	if libType == "aws" || libType == "vmware" || libType == "gcp" || libType == "azure" {
+		chaosLibTemplateName = "./templates/chaoslib_non-k8s.tmpl"
+	} else {
+		chaosLibTemplateName = fmt.Sprintf("./templates/chaoslib_%s.tmpl", libType)
+	}
 	// generating the chaoslib file
 	chaoslibFilePath := chaoslibDIR + "/" + experimentDetails.Name + ".go"
-	return generateFile(experimentDetails, chaoslibFilePath, "./templates/chaoslib.tmpl")
+	return generateFile(experimentDetails, chaoslibFilePath, chaosLibTemplateName)
 }
 
 // createENV creates the env getter and setter files
-func createENV(litmusRootDir string, experimentDetails types.Experiment) error {
+func createENV(litmusRootDir string, experimentDetails types.Experiment, libType string) error {
 	// creating the directory for the environment variables file, if not present
 	experimentPKGDirectory := litmusRootDir + "/pkg/" + experimentDetails.Category
 	createDirectoryIfNotPresent(experimentPKGDirectory)
@@ -188,13 +201,13 @@ func createENV(litmusRootDir string, experimentDetails types.Experiment) error {
 
 	// generating the environment var file
 	environmentFilePath := environmentDIR + "/" + "environment.go"
-	if err := generateFile(experimentDetails, environmentFilePath, "./templates/environment.tmpl"); err != nil {
+	if err := generateFile(experimentDetails, environmentFilePath, fmt.Sprintf("./templates/environment_%s.tmpl", libType)); err != nil {
 		return err
 	}
 
 	// generating the types.go file
 	typesFilePath := typesDIR + "/" + "types.go"
-	if err := generateFile(experimentDetails, typesFilePath, "./templates/types.tmpl"); err != nil {
+	if err := generateFile(experimentDetails, typesFilePath, fmt.Sprintf("./templates/types_%s.tmpl", libType)); err != nil {
 		return err
 	}
 	return nil
