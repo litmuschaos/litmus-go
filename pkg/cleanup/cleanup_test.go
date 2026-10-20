@@ -175,3 +175,81 @@ func TestShouldIgnoreRevertFailure(t *testing.T) {
 		})
 	}
 }
+
+func TestShouldIgnoreRevertFailures(t *testing.T) {
+	const (
+		ipRulesGone    = "failed to remove ip rules: nsenter: cannot open /proc/4215/ns/net: No such file or directory"
+		proxyGone      = "failed to stop proxy server: kill: (4215): No such process"
+		ipRulesRealErr = "failed to remove ip rules: iptables: Operation not permitted"
+	)
+
+	testcases := []struct {
+		name       string
+		policy     string
+		targetType string
+		outputs    []string
+		expected   bool
+	}{
+		{
+			name:       "ignores a multi step revert where every step reports a gone target",
+			policy:     PolicyIgnore,
+			targetType: TargetTypePod,
+			outputs:    []string{ipRulesGone, proxyGone},
+			expected:   true,
+		},
+		{
+			// a gone proxy must not hide an iptables rule that could not be
+			// removed, otherwise the rule is left behind on a live namespace
+			name:       "does not ignore a genuine failure paired with a gone target",
+			policy:     PolicyIgnore,
+			targetType: TargetTypePod,
+			outputs:    []string{ipRulesRealErr, proxyGone},
+			expected:   false,
+		},
+		{
+			name:       "order of the steps does not matter",
+			policy:     PolicyIgnore,
+			targetType: TargetTypePod,
+			outputs:    []string{proxyGone, ipRulesRealErr},
+			expected:   false,
+		},
+		{
+			name:       "does not ignore when every step genuinely failed",
+			policy:     PolicyIgnore,
+			targetType: TargetTypePod,
+			outputs:    []string{ipRulesRealErr, ipRulesRealErr},
+			expected:   false,
+		},
+		{
+			name:       "no failures is not something to ignore",
+			policy:     PolicyIgnore,
+			targetType: TargetTypePod,
+			outputs:    nil,
+			expected:   false,
+		},
+		{
+			name:       "default policy still fails a fully gone target",
+			policy:     PolicyFail,
+			targetType: TargetTypePod,
+			outputs:    []string{ipRulesGone, proxyGone},
+			expected:   false,
+		},
+		{
+			name:       "node targets are never ignored",
+			policy:     PolicyIgnore,
+			targetType: "node",
+			outputs:    []string{ipRulesGone, proxyGone},
+			expected:   false,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("CLEANUP_POLICY", tc.policy)
+			if got := ShouldIgnoreRevertFailures(tc.targetType, tc.outputs); got != tc.expected {
+				t.Errorf("ShouldIgnoreRevertFailures(%q, %v) with CLEANUP_POLICY=%q = %v, want %v",
+					tc.targetType, tc.outputs, tc.policy, got, tc.expected)
+			}
+		})
+	}
+}

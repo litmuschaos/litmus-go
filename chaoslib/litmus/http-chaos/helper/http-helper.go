@@ -195,9 +195,11 @@ func revertChaos(experimentDetails *experimentTypes.ExperimentDetails, t targetD
 	if len(errList) != 0 {
 		// the target pod died mid-experiment, so its network namespace, and with
 		// it the proxy and the ip rules, is already gone. Honour
-		// CLEANUP_POLICY=ignore and treat the revert as complete.
+		// CLEANUP_POLICY=ignore and treat the revert as complete. Every step
+		// is checked on its own, so a step that genuinely failed is never
+		// hidden by another step reporting a gone target.
 		joinedErrs := strings.Join(errList, ",")
-		if cleanup.ShouldIgnoreRevertFailure(cleanup.TargetTypePod, joinedErrs) {
+		if cleanup.ShouldIgnoreRevertFailures(cleanup.TargetTypePod, errList) {
 			log.Warnf("[Cleanup]: target is gone, nothing left to revert on {name: %s, namespace: %s, container: %s}, err: %s", t.Name, t.Namespace, t.TargetContainer, joinedErrs)
 			return nil
 		}

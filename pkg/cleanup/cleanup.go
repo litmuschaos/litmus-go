@@ -82,11 +82,30 @@ func IsTargetGone(output string) bool {
 // This only governs the cleanup phase, never the verdict: probes and
 // steady-state checks continue to decide whether the experiment passed.
 func ShouldIgnoreRevertFailure(targetType, output string) bool {
+	return ShouldIgnoreRevertFailures(targetType, []string{output})
+}
+
+// ShouldIgnoreRevertFailures is the multi-step form of
+// ShouldIgnoreRevertFailure, for a revert made of several independent steps.
+//
+// Every single failure must indicate that the target is gone. Checking the
+// steps as one joined string would let a gone-target error from one step hide
+// a genuine failure in another, e.g. a proxy that is already dead masking an
+// iptables rule that could not be removed, which would leave the rule behind.
+func ShouldIgnoreRevertFailures(targetType string, outputs []string) bool {
+	if len(outputs) == 0 {
+		return false
+	}
 	if !strings.EqualFold(strings.TrimSpace(targetType), TargetTypePod) {
 		return false
 	}
 	if Policy() != PolicyIgnore {
 		return false
 	}
-	return IsTargetGone(output)
+	for _, output := range outputs {
+		if !IsTargetGone(output) {
+			return false
+		}
+	}
+	return true
 }
