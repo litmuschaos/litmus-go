@@ -2,10 +2,10 @@ package gcp
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/litmuschaos/litmus-go/pkg/cerrors"
 	"github.com/litmuschaos/litmus-go/pkg/log"
+	"github.com/litmuschaos/litmus-go/pkg/utils/stringutils"
 	"google.golang.org/api/compute/v1"
 )
 
@@ -27,9 +27,9 @@ func GetVMInstanceStatus(computeService *compute.Service, instanceName string, g
 // InstanceStatusCheckByName is used to check the status of all the VM instances under chaos
 func InstanceStatusCheckByName(computeService *compute.Service, managedInstanceGroup string, delay, timeout int, check string, instanceNames string, gcpProjectId string, instanceZones string) error {
 
-	instanceNamesList := strings.Split(instanceNames, ",")
+	instanceNamesList := stringutils.SplitList(instanceNames)
 
-	instanceZonesList := strings.Split(instanceZones, ",")
+	instanceZonesList := stringutils.SplitList(instanceZones)
 
 	if managedInstanceGroup != "enable" && managedInstanceGroup != "disable" {
 		return cerrors.Error{ErrorCode: cerrors.ErrorTypeStatusChecks, Target: fmt.Sprintf("{vmNames: %s, zones: %s}", instanceNamesList, instanceZonesList), Reason: fmt.Sprintf("invalid value for MANAGED_INSTANCE_GROUP: %s", managedInstanceGroup)}

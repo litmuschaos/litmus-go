@@ -2,8 +2,7 @@ package latency
 
 import (
 	"context"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/trace"
+	"fmt"
 	"strconv"
 
 	network_chaos "github.com/litmuschaos/litmus-go/chaoslib/litmus/network-chaos/lib"
@@ -12,6 +11,8 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/telemetry"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // PodNetworkLatencyChaos contains the steps to prepare and inject chaos
@@ -21,6 +22,10 @@ func PodNetworkLatencyChaos(ctx context.Context, experimentsDetails *experimentT
 	)
 	defer span.End()
 
-	args := "delay " + strconv.Itoa(experimentsDetails.NetworkLatency) + "ms " + strconv.Itoa(experimentsDetails.Jitter) + "ms"
+	args := "netem delay " + strconv.Itoa(experimentsDetails.NetworkLatency) + "ms " + strconv.Itoa(experimentsDetails.Jitter) + "ms"
+	if experimentsDetails.Correlation > 0 {
+		args = fmt.Sprintf("%s %d", args, experimentsDetails.Correlation)
+	}
+
 	return network_chaos.PrepareAndInjectChaos(ctx, experimentsDetails, clients, resultDetails, eventsDetails, chaosDetails, args)
 }

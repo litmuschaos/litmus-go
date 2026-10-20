@@ -147,7 +147,7 @@ func injectChaosInSerialMode(ctx context.Context, computeService *compute.Servic
 					// wait for VM instance to get in running state
 					log.Infof("[Wait]: Wait for VM instance %s to get in RUNNING state", instanceNamesList[i])
 					if err := gcplib.WaitForVMInstanceUp(computeService, experimentsDetails.Timeout, experimentsDetails.Delay, instanceNamesList[i], experimentsDetails.GCPProjectID, experimentsDetails.Zones); err != nil {
-						return stacktrace.Propagate(err, "unable to start %s vm instance")
+						return stacktrace.Propagate(err, "unable to start %s vm instance", instanceNamesList[i])
 					}
 
 				default:
@@ -161,7 +161,7 @@ func injectChaosInSerialMode(ctx context.Context, computeService *compute.Servic
 					// wait for VM instance to get in running state
 					log.Infof("[Wait]: Wait for VM instance %s to get in RUNNING state", instanceNamesList[i])
 					if err := gcplib.WaitForVMInstanceUp(computeService, experimentsDetails.Timeout, experimentsDetails.Delay, instanceNamesList[i], experimentsDetails.GCPProjectID, experimentsDetails.Zones); err != nil {
-						return stacktrace.Propagate(err, "unable to start %s vm instance")
+						return stacktrace.Propagate(err, "unable to start %s vm instance", instanceNamesList[i])
 					}
 				}
 

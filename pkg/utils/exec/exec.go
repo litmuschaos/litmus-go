@@ -92,9 +92,20 @@ func checkPodStatus(pod *apiv1.Pod, containerName string) error {
 	if strings.ToLower(string(pod.Status.Phase)) != "running" {
 		return cerrors.Error{ErrorCode: cerrors.ErrorTypeStatusChecks, Reason: fmt.Sprintf("%v pod is not in running state, phase: %v", pod.Name, pod.Status.Phase)}
 	}
+	containerFound := false
 	for _, container := range pod.Status.ContainerStatuses {
-		if container.Name == containerName && !container.Ready {
-			return cerrors.Error{ErrorCode: cerrors.ErrorTypeStatusChecks, Reason: fmt.Sprintf("%v container of %v pod is not in ready state, phase: %v", container.Name, pod.Name, pod.Status.Phase)}
+		if container.Name == containerName {
+			containerFound = true
+			if !container.Ready {
+				return cerrors.Error{ErrorCode: cerrors.ErrorTypeStatusChecks, Reason: fmt.Sprintf("%v container of %v pod is not in ready state, phase: %v", container.Name, pod.Name, pod.Status.Phase)}
+			}
+			break
+		}
+	}
+	if !containerFound {
+		return cerrors.Error{
+			ErrorCode: cerrors.ErrorTypeStatusChecks,
+			Reason:    fmt.Sprintf("container %v not found in pod %v", containerName, pod.Name),
 		}
 	}
 	return nil

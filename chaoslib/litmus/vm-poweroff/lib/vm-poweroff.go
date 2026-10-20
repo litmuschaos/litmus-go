@@ -20,6 +20,7 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/telemetry"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"github.com/litmuschaos/litmus-go/pkg/utils/common"
+	"github.com/litmuschaos/litmus-go/pkg/utils/stringutils"
 	experimentTypes "github.com/litmuschaos/litmus-go/pkg/vmware/vm-poweroff/types"
 	"github.com/palantir/stacktrace"
 	"go.opentelemetry.io/otel"
@@ -50,7 +51,7 @@ func InjectVMPowerOffChaos(ctx context.Context, experimentsDetails *experimentTy
 	}
 
 	//Fetching the target VM Ids
-	vmIdList := strings.Split(experimentsDetails.VMIds, ",")
+	vmIdList := stringutils.SplitList(experimentsDetails.VMIds)
 
 	// Calling AbortWatcher go routine, it will continuously watch for the abort signal and generate the required events and result
 	go abortWatcher(experimentsDetails, vmIdList, clients, resultDetails, chaosDetails, eventsDetails, cookie)

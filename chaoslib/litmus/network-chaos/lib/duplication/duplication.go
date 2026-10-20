@@ -2,8 +2,7 @@ package duplication
 
 import (
 	"context"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/trace"
+	"fmt"
 
 	network_chaos "github.com/litmuschaos/litmus-go/chaoslib/litmus/network-chaos/lib"
 	"github.com/litmuschaos/litmus-go/pkg/clients"
@@ -11,6 +10,8 @@ import (
 	"github.com/litmuschaos/litmus-go/pkg/telemetry"
 	"github.com/litmuschaos/litmus-go/pkg/types"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // PodNetworkDuplicationChaos contains the steps to prepare and inject chaos
@@ -20,6 +21,10 @@ func PodNetworkDuplicationChaos(ctx context.Context, experimentsDetails *experim
 	)
 	defer span.End()
 
-	args := "duplicate " + experimentsDetails.NetworkPacketDuplicationPercentage
+	args := "netem duplicate " + experimentsDetails.NetworkPacketDuplicationPercentage
+	if experimentsDetails.Correlation > 0 {
+		args = fmt.Sprintf("%s %d", args, experimentsDetails.Correlation)
+	}
+
 	return network_chaos.PrepareAndInjectChaos(ctx, experimentsDetails, clients, resultDetails, eventsDetails, chaosDetails, args)
 }

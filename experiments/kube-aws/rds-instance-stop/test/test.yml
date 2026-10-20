@@ -1,0 +1,46 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: litmus-experiment
+spec:
+  replicas: 1
+  selector: 
+    matchLabels:
+      app: litmus-experiment
+  template:
+    metadata:
+      labels:
+        app: litmus-experiment
+    spec:
+      serviceAccountName: rds-instance-stop-sa
+      containers:
+      - name: gotest
+        image: busybox
+        command:
+          - sleep 
+          - "3600"
+        env:
+          - name: CHAOS_NAMESPACE
+            value: 'default'
+
+          - name: RDS_INSTANCE_IDENTIFIER
+            value: ''
+
+          - name: REGION
+            value: ''
+
+          - name: RAMP_TIME
+            value: ''
+
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+        volumeMounts:
+          - name: cloud-secret
+            mountPath: /tmp/
+      volumes:
+        - name: cloud-secret
+          secret:
+            secretName: cloud-secret
