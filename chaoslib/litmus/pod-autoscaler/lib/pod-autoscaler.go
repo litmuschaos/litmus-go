@@ -161,20 +161,22 @@ func getStatefulsetDetails(experimentsDetails *experimentTypes.ExperimentDetails
 
 // podAutoscalerChaosInDeployment scales up the replicas of deployment and verify the status
 func podAutoscalerChaosInDeployment(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, appsUnderTest []experimentTypes.ApplicationUnderTest, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectPodAutoscalerInDeploymentFault")
+	defer span.End()
 
 	// Scale Application
 	retryErr := retries.RetryOnConflict(retries.DefaultRetry, func() error {
 		for _, app := range appsUnderTest {
 			// Retrieve the latest version of Deployment before attempting update
 			// RetryOnConflict uses exponential backoff to avoid exhausting the apiserver
-			appUnderTest, err := appsv1DeploymentClient.Get(context.Background(), app.AppName, metav1.GetOptions{})
+			appUnderTest, err := appsv1DeploymentClient.Get(ctx, app.AppName, metav1.GetOptions{})
 			if err != nil {
 				return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Target: fmt.Sprintf("{kind: deployment, name: %s, namespace: %s}", app.AppName, experimentsDetails.AppNS), Reason: err.Error()}
 			}
 			// modifying the replica count
 			appUnderTest.Spec.Replicas = int32Ptr(int32(experimentsDetails.Replicas))
 			log.Infof("Updating deployment '%s' to number of replicas '%d'", appUnderTest.ObjectMeta.Name, experimentsDetails.Replicas)
-			_, err = appsv1DeploymentClient.Update(context.Background(), appUnderTest, metav1.UpdateOptions{})
+			_, err = appsv1DeploymentClient.Update(ctx, appUnderTest, metav1.UpdateOptions{})
 			if err != nil {
 				return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Target: fmt.Sprintf("{kind: deployment, name: %s, namespace: %s}", app.AppName, experimentsDetails.AppNS), Reason: fmt.Sprintf("failed to scale deployment :%s", err.Error())}
 			}
@@ -192,19 +194,21 @@ func podAutoscalerChaosInDeployment(ctx context.Context, experimentsDetails *exp
 
 // podAutoscalerChaosInStatefulset scales up the replicas of statefulset and verify the status
 func podAutoscalerChaosInStatefulset(ctx context.Context, experimentsDetails *experimentTypes.ExperimentDetails, clients clients.ClientSets, appsUnderTest []experimentTypes.ApplicationUnderTest, resultDetails *types.ResultDetails, eventsDetails *types.EventDetails, chaosDetails *types.ChaosDetails) error {
+	ctx, span := otel.Tracer(telemetry.TracerName).Start(ctx, "InjectPodAutoscalerInStatefulsetFault")
+	defer span.End()
 
 	// Scale Application
 	retryErr := retries.RetryOnConflict(retries.DefaultRetry, func() error {
 		for _, app := range appsUnderTest {
 			// Retrieve the latest version of Statefulset before attempting update
 			// RetryOnConflict uses exponential backoff to avoid exhausting the apiserver
-			appUnderTest, err := appsv1StatefulsetClient.Get(context.Background(), app.AppName, metav1.GetOptions{})
+			appUnderTest, err := appsv1StatefulsetClient.Get(ctx, app.AppName, metav1.GetOptions{})
 			if err != nil {
 				return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Target: fmt.Sprintf("{kind: statefulset, name: %s, namespace: %s}", app.AppName, experimentsDetails.AppNS), Reason: err.Error()}
 			}
 			// modifying the replica count
 			appUnderTest.Spec.Replicas = int32Ptr(int32(experimentsDetails.Replicas))
-			_, err = appsv1StatefulsetClient.Update(context.Background(), appUnderTest, metav1.UpdateOptions{})
+			_, err = appsv1StatefulsetClient.Update(ctx, appUnderTest, metav1.UpdateOptions{})
 			if err != nil {
 				return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Target: fmt.Sprintf("{kind: statefulset, name: %s, namespace: %s}", app.AppName, experimentsDetails.AppNS), Reason: fmt.Sprintf("failed to scale statefulset :%s", err.Error())}
 			}
@@ -231,7 +235,7 @@ func deploymentStatusCheck(ctx context.Context, experimentsDetails *experimentTy
 		Wait(time.Duration(experimentsDetails.Delay) * time.Second).
 		Try(func(attempt uint) error {
 			for _, app := range appsUnderTest {
-				deployment, err := appsv1DeploymentClient.Get(context.Background(), app.AppName, metav1.GetOptions{})
+				deployment, err := appsv1DeploymentClient.Get(ctx, app.AppName, metav1.GetOptions{})
 				if err != nil {
 					return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Target: fmt.Sprintf("{kind: deployment, namespace: %s, name: %s}", experimentsDetails.AppNS, app.AppName), Reason: err.Error()}
 				}
@@ -276,7 +280,7 @@ func statefulsetStatusCheck(ctx context.Context, experimentsDetails *experimentT
 		Wait(time.Duration(experimentsDetails.Delay) * time.Second).
 		Try(func(attempt uint) error {
 			for _, app := range appsUnderTest {
-				statefulset, err := appsv1StatefulsetClient.Get(context.Background(), app.AppName, metav1.GetOptions{})
+				statefulset, err := appsv1StatefulsetClient.Get(ctx, app.AppName, metav1.GetOptions{})
 				if err != nil {
 					return cerrors.Error{ErrorCode: cerrors.ErrorTypeChaosInject, Target: fmt.Sprintf("{kind: statefulset, namespace: %s, name: %s}", experimentsDetails.AppNS, app.AppName), Reason: err.Error()}
 				}
