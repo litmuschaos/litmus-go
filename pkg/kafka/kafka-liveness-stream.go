@@ -41,7 +41,7 @@ func LivenessStream(experimentsDetails *experimentTypes.ExperimentDetails, clien
 	if experimentsDetails.KafkaInstanceName == "" {
 
 		execCommandDetails := litmusexec.PodDetails{}
-		command := append([]string{"/bin/sh", "-c"}, "kafka-topics --topic topic-"+experimentsDetails.RunID+" --describe --boostrap-server "+experimentsDetails.KafkaService+":"+experimentsDetails.KafkaPort+" | grep -o 'Leader: [^[:space:]]*' | awk '{print $2}'")
+		command := append([]string{"/bin/sh", "-c"}, "kafka-topics --topic topic-"+experimentsDetails.RunID+" --describe --bootstrap-server "+experimentsDetails.KafkaService+":"+experimentsDetails.KafkaPort+" | grep -o 'Leader: [^[:space:]]*' | awk '{print $2}'")
 		litmusexec.SetExecCommandAttributes(&execCommandDetails, "kafka-liveness-"+experimentsDetails.RunID, "kafka-consumer", experimentsDetails.KafkaNamespace)
 		ordinality, _, err = litmusexec.Exec(&execCommandDetails, clients, command)
 		if err != nil {
