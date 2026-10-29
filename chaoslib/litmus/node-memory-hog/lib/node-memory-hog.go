@@ -224,14 +224,18 @@ func calculateMemoryConsumption(experimentsDetails *experimentTypes.ExperimentDe
 	var MemoryConsumption string
 	var selector string
 
-	if experimentsDetails.MemoryConsumptionMebibytes == "0" {
-		if experimentsDetails.MemoryConsumptionPercentage == "0" {
+	// An empty value (the env default) and "0" both mean the input is unset.
+	percentageUnset := isMemoryInputUnset(experimentsDetails.MemoryConsumptionPercentage)
+	mebibytesUnset := isMemoryInputUnset(experimentsDetails.MemoryConsumptionMebibytes)
+
+	if mebibytesUnset {
+		if percentageUnset {
 			log.Info("Neither of MemoryConsumptionPercentage or MemoryConsumptionMebibytes provided, proceeding with a default MemoryConsumptionPercentage value of 30%%")
 			return "30%", nil
 		}
 		selector = "percentage"
 	} else {
-		if experimentsDetails.MemoryConsumptionPercentage == "0" {
+		if percentageUnset {
 			selector = "mebibytes"
 		} else {
 			log.Warn("Both MemoryConsumptionPercentage & MemoryConsumptionMebibytes provided as inputs, using the MemoryConsumptionPercentage value to proceed with the experiment")
@@ -244,7 +248,10 @@ func calculateMemoryConsumption(experimentsDetails *experimentTypes.ExperimentDe
 	case "percentage":
 
 		//Getting the total memory under chaos
-		memoryConsumptionPercentage, _ := strconv.ParseFloat(experimentsDetails.MemoryConsumptionPercentage, 64)
+		memoryConsumptionPercentage, err := strconv.ParseFloat(strings.TrimSpace(experimentsDetails.MemoryConsumptionPercentage), 64)
+		if err != nil {
+			return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("invalid MEMORY_CONSUMPTION_PERCENTAGE value %q, specify a non-decimal number", experimentsDetails.MemoryConsumptionPercentage)}
+		}
 		memoryForChaos := (memoryConsumptionPercentage / 100) * float64(memoryCapacity)
 
 		//Get the percentage of memory under chaos wrt allocatable memory
@@ -262,7 +269,11 @@ func calculateMemoryConsumption(experimentsDetails *experimentTypes.ExperimentDe
 
 		// Bringing all the values in Ki unit to compare
 		// since 1Mi = 1025.390625Ki
-		memoryConsumptionMebibytes, _ := strconv.ParseFloat(experimentsDetails.MemoryConsumptionMebibytes, 64)
+		memoryConsumptionMebibytesInput := strings.TrimSpace(experimentsDetails.MemoryConsumptionMebibytes)
+		memoryConsumptionMebibytes, err := strconv.ParseFloat(memoryConsumptionMebibytesInput, 64)
+		if err != nil {
+			return "", cerrors.Error{ErrorCode: cerrors.ErrorTypeGeneric, Reason: fmt.Sprintf("invalid MEMORY_CONSUMPTION_MEBIBYTES value %q, specify a non-decimal number", experimentsDetails.MemoryConsumptionMebibytes)}
+		}
 
 		TotalMemoryConsumption := memoryConsumptionMebibytes * 1025.390625
 		// since 1Ki = 1024 bytes
@@ -272,7 +283,7 @@ func calculateMemoryConsumption(experimentsDetails *experimentTypes.ExperimentDe
 			MemoryConsumption = strconv.Itoa(memoryAllocatable) + "k"
 			log.Infof("[Info]: The memory for consumption %vKi is more than the available memory %vKi, so the experiment will hog the memory upto %vKi", int(TotalMemoryConsumption), memoryAllocatable, memoryAllocatable)
 		} else {
-			MemoryConsumption = experimentsDetails.MemoryConsumptionMebibytes + "m"
+			MemoryConsumption = memoryConsumptionMebibytesInput + "m"
 		}
 		return MemoryConsumption, nil
 	}
@@ -340,4 +351,11 @@ func setChaosTunables(experimentsDetails *experimentTypes.ExperimentDetails) {
 	experimentsDetails.NumberOfWorkers = common.ValidateRange(experimentsDetails.NumberOfWorkers)
 	experimentsDetails.NodesAffectedPerc = common.ValidateRange(experimentsDetails.NodesAffectedPerc)
 	experimentsDetails.Sequence = common.GetRandomSequence(experimentsDetails.Sequence)
+}
+
+// isMemoryInputUnset reports whether a memory consumption input was left unset.
+// Both an empty value and "0" are treated as unset.
+func isMemoryInputUnset(value string) bool {
+	value = strings.TrimSpace(value)
+	return value == "" || value == "0"
 }
