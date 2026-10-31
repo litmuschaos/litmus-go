@@ -138,3 +138,25 @@ func TestGetTargets_WithNames(t *testing.T) {
 		t.Errorf("Expected default LabelMatchMode to be 'union', got '%s'", result[0].LabelMatchMode)
 	}
 }
+
+func TestGetTargets_PodsIsAliasOfPod(t *testing.T) {
+	for _, kind := range []string{"pod", "pods", "Pods"} {
+		result := GetTargets(kind + ":default:[wf-a,wf-b]")
+		if len(result) != 1 {
+			t.Fatalf("%s: expected 1 AppDetail, got %d", kind, len(result))
+		}
+		if result[0].Kind != "pod" {
+			t.Errorf("%s: expected Kind 'pod', got '%s'", kind, result[0].Kind)
+		}
+		if len(result[0].Names) != 2 || result[0].Names[0] != "wf-a" || result[0].Names[1] != "wf-b" {
+			t.Errorf("%s: unexpected names %v", kind, result[0].Names)
+		}
+	}
+}
+
+func TestGetTargets_WorkloadKindsUnchanged(t *testing.T) {
+	result := GetTargets("deployment:default:[web]")
+	if len(result) != 1 || result[0].Kind != "deployment" {
+		t.Fatalf("expected deployment kind to be kept, got %+v", result)
+	}
+}

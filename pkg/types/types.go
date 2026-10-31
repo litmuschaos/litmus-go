@@ -179,8 +179,13 @@ func GetTargets(targets string) []AppDetails {
 		if len(val) < 3 {
 			log.Fatalf("invalid TARGETS entry %q: expected format kind:namespace:[labels|names][:mode]", trimmed)
 		}
+		kind := val[0]
+		// "pods" is accepted as an alias of the standalone pod kind "pod"
+		if strings.EqualFold(strings.TrimSpace(kind), "pods") {
+			kind = "pod"
+		}
 		data := AppDetails{
-			Kind:           val[0],
+			Kind:           kind,
 			Namespace:      val[1],
 			LabelMatchMode: "union",
 		}
