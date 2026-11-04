@@ -211,6 +211,10 @@ func ValidateRange(a string) string {
 	case 2:
 		lb, _ = strconv.Atoi(intervals[0])
 		ub, _ = strconv.Atoi(intervals[1])
+		if lb > ub {
+			log.Errorf("unable to parse the value, lower bound must not be greater than upper bound")
+			return "0"
+		}
 		return strconv.Itoa(getRandomValue(lb, ub))
 	default:
 		log.Errorf("unable to parse the value, please provide in valid format")

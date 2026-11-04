@@ -650,6 +650,16 @@ func TestValidateRange(t *testing.T) {
 			input:       "1-2-3",
 			expectExact: "0",
 		},
+		{
+			name:        "lower bound greater than upper bound returns 0",
+			input:       "10-5",
+			expectExact: "0",
+		},
+		{
+			name:        "missing upper bound returns 0",
+			input:       "10-",
+			expectExact: "0",
+		},
 	}
 
 	for _, tt := range tests {
