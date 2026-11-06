@@ -1,6 +1,6 @@
 # Multi-stage docker build
 # Build stage
-FROM golang:1.22 AS builder
+FROM golang:1.26.10 AS builder
 
 ARG TARGETOS=linux
 ARG TARGETARCH
@@ -21,6 +21,9 @@ LABEL maintainer="LitmusChaos"
 
 ARG TARGETARCH
 ARG LITMUS_VERSION
+
+# Patch OS packages
+RUN yum update -y && yum clean all
 
 # Install generally useful things
 RUN yum install -y \
