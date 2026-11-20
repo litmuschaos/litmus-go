@@ -46,7 +46,7 @@ func GetNodeList(nodeNames, nodeLabel string, nodeAffPerc int, clients clients.C
 		}
 	}
 
-	newNodeListLength := math.Maximum(1, math.Adjustment(nodeAffPerc, len(nodes.Items)))
+	newNodeListLength := math.Maximum(1, math.Adjustment(math.Minimum(nodeAffPerc, 100), len(nodes.Items)))
 
 	// it will generate the random nodelist
 	// it starts from the random index and choose requirement no of pods next to that index in a circular way.
